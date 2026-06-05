@@ -1,6 +1,9 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Inventory.Data;
+using GameInterface.Services.TroopRosters.Data;
 using ProtoBuf;
+using System.Collections.Generic;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.Inventory.Messages;
 
@@ -14,31 +17,45 @@ internal readonly struct CompleteTrade : ICommand
     [ProtoMember(3)]
     public readonly string ToItemRosterId;
     [ProtoMember(4)]
-    public readonly bool IsTrading;
+    public readonly ItemRosterElement[] FromItemRosterData;
     [ProtoMember(5)]
-    public readonly bool CanGainXpFromDiscarding;
+    public readonly ItemRosterElement[] ToItemRosterData;
     [ProtoMember(6)]
-    public readonly string HeroId;
+    public readonly Dictionary<string, EquipmentData[]> CharacterIdEquipmentsData;
     [ProtoMember(7)]
-    public readonly int TotalAmount;
+    public readonly bool IsTrading;
     [ProtoMember(8)]
-    public readonly int MerchantGold;
+    public readonly bool CanGainXpFromDiscarding;
     [ProtoMember(9)]
-    public readonly string PartyId;
+    public readonly string HeroId;
+    [ProtoMember(10)]
+    public readonly int TotalAmount;
     [ProtoMember(11)]
-    public readonly bool IsSettlementComponentNull;
+    public readonly int MerchantGold;
     [ProtoMember(12)]
+    public readonly string PartyId;
+    [ProtoMember(13)]
+    public readonly bool IsSettlementComponentNull;
+    [ProtoMember(14)]
     public readonly string CurrentSettlementComponentId;
 
-    [ProtoMember(13)]
+    [ProtoMember(15)]
     public readonly (ItemRosterElementData, int)[] BoughtItems;
-    [ProtoMember(14)]
+    [ProtoMember(16)]
     public readonly (ItemRosterElementData, int)[] SoldItems;
+
+    [ProtoMember(17)]
+    public readonly string TroopRosterId;
+    [ProtoMember(18)]
+    public readonly TroopRosterData TroopRosterData;
 
     public CompleteTrade(
         string fromItemRosterId,
         bool isFromItemRosterNull,
         string toItemRosterId,
+        ItemRosterElement[] fromItemRosterData,
+        ItemRosterElement[] toItemRosterData,
+        Dictionary<string, EquipmentData[]> characterIdEquipmentsData,
         bool isTrading,
         bool canGainXpFromDiscarding,
         string heroId,
@@ -48,11 +65,16 @@ internal readonly struct CompleteTrade : ICommand
         bool isSettlementComponentNull,
         string currentSettlementComponentId,
         (ItemRosterElementData, int)[] boughtItems,
-        (ItemRosterElementData, int)[] soldItems)
+        (ItemRosterElementData, int)[] soldItems,
+        string troopRosterId,
+        TroopRosterData troopRosterData)
     {
         FromItemRosterId = fromItemRosterId;
         IsFromItemRosterNull = isFromItemRosterNull;
         ToItemRosterId = toItemRosterId;
+        FromItemRosterData = fromItemRosterData;
+        ToItemRosterData = toItemRosterData;
+        CharacterIdEquipmentsData = characterIdEquipmentsData;
         IsTrading = isTrading;
         CanGainXpFromDiscarding = canGainXpFromDiscarding;
         HeroId = heroId;
@@ -63,5 +85,7 @@ internal readonly struct CompleteTrade : ICommand
         CurrentSettlementComponentId = currentSettlementComponentId;
         BoughtItems = boughtItems;
         SoldItems = soldItems;
+        TroopRosterId = troopRosterId;
+        TroopRosterData = troopRosterData;
     }
 }

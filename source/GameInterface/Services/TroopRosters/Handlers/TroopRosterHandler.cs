@@ -25,8 +25,6 @@ public class TroopRosterHandler : IHandler
         this.objectManager = objectManager;
         this.network = network;
 
-        messageBroker.Subscribe<TroopRosterAddToCountsChanged>(Handle_AddToCountsChanged);
-        messageBroker.Subscribe<NetworkChangeTroopRosterAddToCounts>(Handle_AddToCounts);
 
         messageBroker.Subscribe<CountsAtIndexAdded>(Handle_CountsAtIndexAdded);
         messageBroker.Subscribe<NetworkAddToCountsAtIndex>(Handle_NetworkAddToCountsAtIndex);
@@ -55,8 +53,6 @@ public class TroopRosterHandler : IHandler
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<TroopRosterAddToCountsChanged>(Handle_AddToCountsChanged);
-        messageBroker.Unsubscribe<NetworkChangeTroopRosterAddToCounts>(Handle_AddToCounts);
 
         messageBroker.Unsubscribe<CountsAtIndexAdded>(Handle_CountsAtIndexAdded);
         messageBroker.Unsubscribe<NetworkAddToCountsAtIndex>(Handle_NetworkAddToCountsAtIndex);
