@@ -31,6 +31,12 @@ internal class PartyVisibilityOnServerPatch
         {
             // Return is active (inactive is player captivity)
             __result = __instance.IsActive;
+
+            if (__result != __instance._isVisible)
+            {
+                __instance.Party.OnVisibilityChanged(__result);
+                __instance.Party.SetVisualAsDirty();
+            }
         }
     }
 

@@ -1,5 +1,4 @@
-﻿using System.Linq;
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Server.Connections.Messages;
@@ -7,8 +6,12 @@ using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
+using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Serilog;
+using System.Linq;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
 
 namespace Coop.Core.Server.Connections.States;
@@ -67,14 +70,16 @@ public class ResolveCharacterState : ConnectionStateBase
         var peer = obj.Who as NetPeer;
         if (peer != ConnectionLogic.Peer) return;
 
-        if (heroInterface.TryResolveHero(obj.What.PlayerId, out string heroId))
+        if (heroInterface.TryResolve<Hero>(obj.What.PlayerId, out string heroId) &&
+            heroInterface.TryResolve<MobileParty>(obj.What.PlayerId, out string mobilePartyId))
         {
-            network.Send(peer, new NetworkClientValidated(true, heroId));
+            var player = new Player(heroId, mobilePartyId);
+            network.Send(peer, new NetworkClientValidated(true, player));
             ConnectionLogic.TransferSave();
         }
         else
         {
-            network.Send(peer, new NetworkClientValidated(false, string.Empty));
+            network.Send(peer, new NetworkClientValidated(false, null));
             ConnectionLogic.CreateCharacter();
         }
     }

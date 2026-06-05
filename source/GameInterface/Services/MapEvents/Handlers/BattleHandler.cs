@@ -241,7 +241,7 @@ internal class BattleHandler : IHandler
     {
         return playerRegistry.All(player =>
         {
-            if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.PartyId, out var playerParty))
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var playerParty))
                 return false;
 
             return playerParty.MapEvent != null;

@@ -27,7 +27,7 @@ namespace GameInterface.Services.Players.Handlers
         {
             var playerData = obj.What.Player;
 
-            var player = new Player(playerData.PartyStringId);
+            var player = new Player(playerData.HeroStringId, playerData.PartyStringId);
 
             if(!playerRegistry.AddPlayer(player))
             {

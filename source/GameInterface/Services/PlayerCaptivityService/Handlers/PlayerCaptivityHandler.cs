@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
@@ -39,6 +40,7 @@ internal class PlayerCaptivityHandler : IHandler
         messageBroker.Subscribe<PlayerSurrendered>(Handle_PlayerSurrendered);
         messageBroker.Subscribe<NetworkPlayerSurrendered>(Handle_NetworkPlayerSurrendered);
 
+        messageBroker.Subscribe<PlayerCaptivityChanged>(Handle_PlayerCaptivityChanged);
 
         messageBroker.Subscribe<EndPlayerCaptivityAttempted>(Handle_PlayerCaptivityEnded);
         messageBroker.Subscribe<NetworkEndPlayerCaptivityAttempted>(Handle_NetworkEndPlayerCaptivityAttempted);
@@ -54,41 +56,61 @@ internal class PlayerCaptivityHandler : IHandler
     private void Handle_PlayerSurrendered(MessagePayload<PlayerSurrendered> payload)
     {
         if (!objectManager.TryGetIdWithLogging(payload.What.MapEvent, out string mapEventId)) return;
-        if (!objectManager.TryGetIdWithLogging(payload.What.MobileParty, out string mobilePartyId)) return;
+        if (!objectManager.TryGetIdWithLogging(payload.What.PlayerParty, out string playerParty)) return;
 
-        var message = new NetworkPlayerSurrendered(mobilePartyId, mapEventId);
+        var message = new NetworkPlayerSurrendered(playerParty, mapEventId);
 
         network.SendAll(message);
 
         using (new AllowedThread())
         {
-            var playerCaptivity = Campaign.Current.PlayerCaptivity;
-            playerCaptivity._captivityStartTime = CampaignTime.Now;
-            playerCaptivity._lastCheckTime = CampaignTime.Now;
-
-            PlayerCaptivity.RandomNumber = MBRandom.RandomFloat;
             if (PlayerEncounter.Current != null)
             {
                 PlayerEncounter.LeaveEncounter = true;
             }
-            // Server side
-            //MobileParty.MainParty.IsActive = false;
-            PartyBase.MainParty.UpdateVisibilityAndInspected(MobileParty.MainParty.Position, 0f);
-            playerCaptivity._captorParty = payload.What.MobileParty.Party;
-            playerCaptivity._captorParty.SetAsCameraFollowParty();
-            playerCaptivity._captorParty.UpdateVisibilityAndInspected(MobileParty.MainParty.Position, 0f);
-            Hero.MainHero.PartyBelongedToAsPrisoner = payload.What.MobileParty.Party;
         }
     }
 
     private void Handle_NetworkPlayerSurrendered(MessagePayload<NetworkPlayerSurrendered> payload)
     {
         if (!objectManager.TryGetObjectWithLogging(payload.What.MapEventId, out MapEvent mapEvent)) return;
-        if (!objectManager.TryGetObjectWithLogging(payload.What.MobilePartyId, out MobileParty mobileParty)) return;
+        if (!objectManager.TryGetObjectWithLogging(payload.What.PlayerParty, out MobileParty playerParty)) return;
 
-        mapEvent.DoSurrender(mobileParty.Party.Side);
-        mobileParty.IsActive = false;
+        mapEvent.DoSurrender(playerParty.Party.Side);
         mapEvent.FinalizeEvent();
+
+        playerParty.IsActive = false;
+        playerParty.ChangePartyLeader(null);
+    }
+
+    /// <summary>
+    /// This will run every time player captivity changes
+    /// </summary>
+    /// <param name="payload"></param>
+    private void Handle_PlayerCaptivityChanged(MessagePayload<PlayerCaptivityChanged> payload)
+    {
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            var playerCaptivity = Campaign.Current.PlayerCaptivity;
+            var captorParty = payload.What.CaptorParty;
+            if (captorParty == null)
+            {
+                PartyBase.MainParty.UpdateVisibilityAndInspected(MobileParty.MainParty.Position, 0f);
+                PartyBase.MainParty.SetAsCameraFollowParty();
+
+                playerCaptivity._captorParty = null;
+                return;
+            }
+
+            playerCaptivity._captivityStartTime = CampaignTime.Now;
+            playerCaptivity._lastCheckTime = CampaignTime.Now;
+            PlayerCaptivity.RandomNumber = MBRandom.RandomFloat;
+
+            PartyBase.MainParty.UpdateVisibilityAndInspected(MobileParty.MainParty.Position, 0f);
+            playerCaptivity._captorParty = payload.What.CaptorParty;
+            playerCaptivity._captorParty.SetAsCameraFollowParty();
+            playerCaptivity._captorParty.UpdateVisibilityAndInspected(MobileParty.MainParty.Position, 0f);
+        });
     }
 
     // Client
@@ -97,12 +119,14 @@ internal class PlayerCaptivityHandler : IHandler
         var data = payload.What;
 
         if (!objectManager.TryGetIdWithLogging(data.PlayerHero, out string heroId)) return;
-        if (!objectManager.TryGetIdWithLogging(MobileParty.MainParty, out string partyId)) return;
+
+        var playerParty = MobileParty.MainParty;
+        if (!objectManager.TryGetIdWithLogging(playerParty, out string partyId)) return;
 
         string facilitatorId = null;
         if (data.Facilitator != null && !objectManager.TryGetIdWithLogging(data.Facilitator, out facilitatorId)) return;
 
-        var message = new NetworkEndPlayerCaptivityAttempted(heroId, partyId, data.Detail, facilitatorId);
+        var message = new NetworkEndPlayerCaptivityAttempted(heroId, partyId, playerParty.Position, data.Detail, facilitatorId);
         network.SendAll(message);
 
 
@@ -132,11 +156,11 @@ internal class PlayerCaptivityHandler : IHandler
         IFaction capturerFaction = (partyBelongedToAsPrisoner != null) ? partyBelongedToAsPrisoner.MapFaction : null;
         if (partyBelongedToAsPrisoner != null && partyBelongedToAsPrisoner.IsSettlement)
         {
-            playerHero.PartyBelongedTo.DisembarkToPosition(partyBelongedToAsPrisoner.Settlement.GatePosition);
+            playerParty.DisembarkToPosition(partyBelongedToAsPrisoner.Settlement.GatePosition);
         }
         else if (partyBelongedToAsPrisoner != null && partyBelongedToAsPrisoner.IsMobile)
         {
-            playerHero.PartyBelongedTo.IsCurrentlyAtSea = partyBelongedToAsPrisoner.MobileParty.IsCurrentlyAtSea;
+            playerParty.IsCurrentlyAtSea = partyBelongedToAsPrisoner.MobileParty.IsCurrentlyAtSea;
         }
         if (facilitator != null && payload.What.Detail != EndCaptivityDetail.Death)
         {
@@ -147,6 +171,8 @@ internal class PlayerCaptivityHandler : IHandler
         CampaignEventDispatcher.Instance.OnHeroPrisonerReleased(playerHero, partyBelongedToAsPrisoner, capturerFaction, payload.What.Detail, true);
 
         playerParty.IsActive = true;
+        playerParty.Position = payload.What.PlayerPartyPosition;
+        playerParty.IgnoreForHours(4);
 
         var message = new NetworkPlayerCaptivityEnded();
         network.Send(payload.Who as NetPeer, message);

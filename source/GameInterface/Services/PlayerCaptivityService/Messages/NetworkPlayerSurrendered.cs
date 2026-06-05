@@ -7,13 +7,13 @@ namespace GameInterface.Services.PlayerCaptivityService.Messages;
 public readonly struct NetworkPlayerSurrendered : ICommand
 {
     [ProtoMember(1)]
-    public readonly string MobilePartyId;
+    public readonly string PlayerParty;
     [ProtoMember(2)]
     public readonly string MapEventId;
 
     public NetworkPlayerSurrendered(string mobilePartyId, string mapEventId)
     {
-        MobilePartyId = mobilePartyId;
+        PlayerParty = mobilePartyId;
         MapEventId = mapEventId;
     }
 }

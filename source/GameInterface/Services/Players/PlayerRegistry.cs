@@ -46,9 +46,9 @@ internal class PlayerRegistry : IPlayerRegistry
     {
         if (!_players.Add(player)) return false;
 
-        if (!_playerMobileParties.Add(player.PartyId)) return false;
+        if (!_playerMobileParties.Add(player.MobilePartyId)) return false;
 
-        if (objectManager.TryGetObjectWithLogging<MobileParty>(player.PartyId, out var mobileParty))
+        if (objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var mobileParty))
         {
             mobileParty.InvalidatePartyCache();
         }

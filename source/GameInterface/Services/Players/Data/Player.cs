@@ -6,10 +6,13 @@ namespace GameInterface.Services.Players.Data;
 public class Player
 {
     [ProtoMember(1)]
-    public string PartyId { get; }
+    public string HeroId { get; }
+    [ProtoMember(2)]
+    public string MobilePartyId { get; }
 
-    public Player(string partyId)
+    public Player(string heroId, string mobilePartyId)
     {
-        PartyId = partyId;
+        HeroId = heroId;
+        MobilePartyId = mobilePartyId;
     }
 }
