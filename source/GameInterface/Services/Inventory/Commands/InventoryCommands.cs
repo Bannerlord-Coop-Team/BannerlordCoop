@@ -9,11 +9,11 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
-namespace GameInterface.Services.Smithing.Commands;
+namespace GameInterface.Services.Inventory.Commands;
 
 internal class InventoryCommands
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<SmithingCommands>();
+    private static readonly ILogger Logger = LogManager.GetLogger<InventoryCommands>();
 
     /// <summary>
     /// Attempts to get the ObjectManager
@@ -172,6 +172,53 @@ internal class InventoryCommands
                 }
 
                 stringBuilder.AppendLine(strings[0] + " was given animals.");
+            }
+        }
+
+        string result = stringBuilder.ToString();
+        if (result.Length > 0)
+        {
+            return result;
+        }
+        return "Hero not found.";
+    }
+
+    /// <summary>
+    /// Give war horses to a hero with a given name
+    /// </summary>
+    [CommandLineArgumentFunction("givewarhorses", "coop.debug.inventory")]
+    public static string GiveWarhorsesCommand(List<string> strings)
+    {
+        if (ModInformation.IsClient) return "Command can only be run on the server.";
+
+        if (strings.Count == 0) return "Hero name argument required.";
+        
+        if (TryGetObjectManager(out var objectManager) == false) return "Unable to resolve ObjectManager.";
+
+        StringBuilder stringBuilder = new StringBuilder();
+        foreach (var hero in Hero.AllAliveHeroes)
+        {
+            if (hero.Name.ToString() == strings[0])
+            {
+                var itemsToAdd = new Dictionary<string, int>()
+                {
+                    { "t2_empire_horse", 3 },
+                    { "t2_khuzait_horse", 2 }
+                };
+
+                foreach (var itemId in itemsToAdd.Keys)
+                {
+                    if (!objectManager.TryGetObject(itemId, out ItemObject itemObject))
+                    {
+                        stringBuilder.AppendLine("Failed to retrieve object for ItemObject id: " + itemId);
+                    }
+                    else
+                    {
+                        hero.PartyBelongedTo.ItemRoster.AddToCounts(itemObject, itemsToAdd[itemId]);
+                    }
+                }
+
+                stringBuilder.AppendLine(strings[0] + " was given war horses.");
             }
         }
 
