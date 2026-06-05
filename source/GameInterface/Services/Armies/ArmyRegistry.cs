@@ -1,8 +1,11 @@
-﻿using GameInterface.Registry;
+﻿using Common;
+using Common.Util;
+using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
+using Serilog.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -51,6 +54,18 @@ internal class ArmyRegistry : AutoRegistryBase<Army>
 
     public override void OnClientDestroyed(Army obj, string id)
     {
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            using (new AllowedThread())
+            {
+                foreach (var party in obj._parties)
+                {
+                    party.AttachedTo = null;
+                    party._army = null;
+                }
+                obj._parties.Clear();
+            }
+        });
     }
 
     public override void OnServerCreated(Army obj, string id)

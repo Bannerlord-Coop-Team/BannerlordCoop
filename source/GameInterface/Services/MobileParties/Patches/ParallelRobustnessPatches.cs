@@ -111,15 +111,9 @@ internal class ParallelRobustnessPatches
             CampaignTickCacheDataStore.PartyTickCachePerParty tickCachePerParty = __instance._cacheData[__instance._movingArmyLeaderPartyIndices[index]];
             MobileParty mobileParty = tickCachePerParty.MobileParty;
 
-            if (mobileParty.Party == null)
+            if (mobileParty == null || mobileParty.Party == null )
             {
                 Logger.Error("{var} was null for {stringId}", nameof(MobileParty.Party), mobileParty.StringId);
-                continue;
-            }
-
-            if (mobileParty.AttachedTo == null)
-            {
-                Logger.Error("{var} was null for {stringId}", nameof(MobileParty.AttachedTo), mobileParty.StringId);
                 continue;
             }
 

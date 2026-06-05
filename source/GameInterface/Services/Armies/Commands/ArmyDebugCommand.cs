@@ -1,11 +1,14 @@
 ﻿using Common;
 using Common.Extensions;
 using Common.Messaging;
+using Common.Util;
 using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Armies.Messages.Lifetime;
+using GameInterface.Services.Armies.Patches;
 using GameInterface.Services.ObjectManager;
+using Helpers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,8 +17,12 @@ using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
+using TaleWorlds.Localization;
+using static HarmonyLib.Code;
 using static TaleWorlds.CampaignSystem.Army;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
@@ -57,13 +64,16 @@ public class ArmyDebugCommand
         return stringBuilder.ToString();
     }
 
-    // coop.debug.army.create empire town_V1 lord_1_1 Patrolling
+    // coop.debug.army.create empire town_EN2 lord_1_1 Raider
+    // coop.debug.army.mobile_party_add Army_Created_1 lord_1_3_party_1
+    // coop.debug.army.destroy Army_Created_1 NotEnoughParty
     /// <summary>
     /// Creates a new army on the server and clients
     /// </summary>
     [CommandLineArgumentFunction("create", "coop.debug.army")]
     public static string CreateArmy(List<string> args)
     {
+        var sb = new StringBuilder();
         if (ModInformation.IsClient)
         {
             return "Command is only available to run on the server";
@@ -109,22 +119,10 @@ public class ArmyDebugCommand
                 GetArmyTypesUsage();
         }
 
-        var tcs = new TaskCompletionSource<string>();
-
-        MessageBroker.Instance.Subscribe<InstanceCreated<Army>>((msg) =>
-        {
-            if (objectManager.TryGetId(msg.What.Instance, out var armyId) == false)
-            {
-                tcs.SetResult(null);
-                return;
-            }
-
-            tcs.SetResult(armyId);
-        });
-
         kingdom.CreateArmy(armyLeader, targetSettlment, armyType);
-
-        return $"New army created with id: {tcs.Task.Result}";
+        var army = armyLeader.PartyBelongedTo?.Army;
+        sb.AppendLine($"Created army {army.Name.ToString()}");
+        return sb.ToString();
     }
 
     private static string GetArmyTypesUsage(StringBuilder stringBuilder = null)
@@ -143,7 +141,7 @@ public class ArmyDebugCommand
         return stringBuilder.ToString();
     }
 
-    // coop.debug.army.destroy CoopArmy_1 NotEnoughParty
+    // coop.debug.army.destroy Army_Created_1 NotEnoughParty
     /// <summary>
     /// Deletes an army on the server and clients
     /// </summary>
@@ -177,10 +175,10 @@ public class ArmyDebugCommand
             return $"Unable to cast {disbandArmyReason} to {nameof(ArmyDispersionReason)}\n" +
                 GetArmyDispersionReasonUsage();
         }
+        var armyName = army.Name.ToString();
+        DisbandArmyAction.ApplyInternal(army, reason);
 
-        army.DisperseInternal(reason);
-
-        return $"Destroyed army {army.Name} with id {armyId}";
+        return $"Destroyed army {armyName} with id {armyId}";
     }
 
     private static string GetArmyDispersionReasonUsage(StringBuilder stringBuilder = null)
@@ -199,7 +197,7 @@ public class ArmyDebugCommand
         return stringBuilder.ToString();
     }
 
-    // coop.debug.army.mobile_party_list CoopArmy_1
+    // coop.debug.army.mobile_party_list Army_Created_1
     /// <summary>
     /// Lists all the current Mobile Parties for an Army
     /// </summary>
@@ -238,7 +236,7 @@ public class ArmyDebugCommand
         return stringBuilder.ToString();
     }
 
-    // coop.debug.army.mobile_party_add CoopArmy_1 lord_1_34_party_1
+    // coop.debug.army.mobile_party_add Army_Created_1 lord_1_34_party_1
     /// <summary>
     /// Add a Mobile Party to an Army
     /// </summary>
@@ -259,14 +257,14 @@ public class ArmyDebugCommand
         string armyId = args[0];
         string mobilePartyId = args[1];
 
-        
+
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
         {
             return $"Unable to get {nameof(IObjectManager)}";
         }
 
         if (objectManager.TryGetObject(mobilePartyId, out MobileParty mobileParty) == false)
-        { 
+        {
             return $"Unable to get {nameof(MobileParty)} with {mobilePartyId}";
         }
 
@@ -276,14 +274,14 @@ public class ArmyDebugCommand
             return $"Unable to get {nameof(Army)} with {armyId}";
         }
 
-        army.OnAddPartyInternal(mobileParty);
-        
+        mobileParty.Army = army;
+
         stringBuilder.AppendLine($"Added {mobileParty.Name} to {armyId}");
-        
+
         return stringBuilder.ToString();
     }
 
-    // coop.debug.army.mobile_party_remove CoopArmy_1 lord_1_34_party_1
+    // coop.debug.army.mobile_party_remove Army_Created_1 lord_1_3_party_1
     /// <summary>
     /// Add a Mobile Party to an Army
     /// </summary>
@@ -321,12 +319,40 @@ public class ArmyDebugCommand
             return $"Unable to get {nameof(Army)} with {armyId}";
         }
 
-        army.OnRemovePartyInternal(mobileParty);
-        
+        army.OnRemovePartyInternal(mobileParty); 
+
         stringBuilder.AppendLine($"Removed {mobileParty.Name} from {armyId}");
-        
+
         return stringBuilder.ToString();
     }
+    // coop.debug.army.info Army_Created_1 
+    /// <summary>
+    /// Info about army
+    /// </summary>
+    /// 
+    [CommandLineArgumentFunction("info", "coop.debug.army")]
+    public static string Info(List<string> args)
+    {
+        var sb = new StringBuilder();
+        if (args.Count != 1)
+        {
 
-
-}
+            return "Usage: coop.debug.army.info <ArmyId>";
+        }
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        {
+            return $"Unable to get {nameof(IObjectManager)}";
+        }
+        if (objectManager.TryGetObject<Army>(args[0], out var army) == false)
+        {
+            return $"Unable to get {nameof(Army)} with {args[0]}";
+        }
+        sb.AppendLine($"AttachedParties count: {army?.LeaderParty.AttachedParties?.Count}");
+        sb.AppendLine($"{army._parties.Count}");
+        sb.AppendLine($"LeaderHero: {army?.LeaderParty?.LeaderHero?.Name}");
+        sb.AppendLine($"Army.name {army.Name}");
+        sb.AppendLine($"Armyowner {army.ArmyOwner.Name}");
+        sb.AppendLine($"leaderparty owner {army?.LeaderParty.Owner.Name}");
+        return sb.ToString();
+        }
+    }

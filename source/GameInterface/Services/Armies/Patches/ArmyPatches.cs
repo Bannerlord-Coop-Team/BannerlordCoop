@@ -7,10 +7,15 @@ using GameInterface.Services.Armies.Extensions;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
+using SandBox.CampaignBehaviors;
+using SandBox.ViewModelCollection.Nameplate;
 using Serilog;
+using System;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Localization;
 namespace GameInterface.Services.Armies.Patches;
 
 /// <summary>
@@ -36,32 +41,6 @@ public class ArmyPatches
         return true;
     }
 
-    [HarmonyPatch(nameof(Army.OnAddPartyInternal))]
-    [HarmonyPrefix]
-    static bool OnAddPartyInternalDebugPrefix(ref Army __instance, MobileParty mobileParty)
-    {
-        __instance._parties.Add(mobileParty);
-        mobileParty.Ai.RethinkAtNextHourlyTick = true;
-        CampaignEventDispatcher.Instance.OnPartyJoinedArmy(mobileParty);
-        if (__instance == MobileParty.MainParty.Army && __instance.LeaderParty != MobileParty.MainParty)
-        {
-            __instance.StartTrackingTargetSettlement(__instance.AiBehaviorObject);
-            CampaignEventDispatcher.Instance.OnArmyOverlaySetDirty();
-        }
-        if (!mobileParty.IsMainParty)
-        {
-            mobileParty.Ai.RethinkAtNextHourlyTick = true;
-        }
-        if (mobileParty != MobileParty.MainParty && __instance.LeaderParty != MobileParty.MainParty && __instance.LeaderParty.LeaderHero != null)
-        {
-            int num = -Campaign.Current.Models.ArmyManagementCalculationModel.CalculatePartyInfluenceCost(__instance.LeaderParty, mobileParty);
-            ChangeClanInfluenceAction.Apply(__instance.LeaderParty.LeaderHero.Clan, (float)num);
-        }
-
-        return false;
-    }
-
-
     [HarmonyPatch(nameof(Army.OnRemovePartyInternal))]
     [HarmonyPrefix]
     static bool OnRemovePartyInternalPrefix(ref Army __instance, MobileParty mobileParty)
@@ -81,20 +60,24 @@ public class ArmyPatches
 
         return true;
     }
-
-
+    [HarmonyPatch(typeof(Army), "set_ArmyOwner")]
+    [HarmonyPostfix]
+    static void ArmyOwnerSetPostfix(Army __instance)
+    {
+        if (ModInformation.IsClient)
+        {
+            __instance.UpdateName();
+        }
+    }
+    
+   
     public static void AddMobilePartyInArmy(MobileParty mobileParty, Army army)
     {
         GameLoopRunner.RunOnMainThread(() =>
         {
             using (new AllowedThread())
             {
-                // TODO find why this is not getting set automatically
-                if (mobileParty.Army == null)
-                {
-                    mobileParty._army = army;
-                }
-                army.OnAddPartyInternal(mobileParty);
+                mobileParty.Army = army;
             }
         });
     }
@@ -105,13 +88,9 @@ public class ArmyPatches
         {
             using (new AllowedThread())
             {
-                // TODO find why this is not getting set automatically
-                if (mobileParty.Army == null)
-                {
-                    mobileParty._army = army;
-                }
-
-                army.OnRemovePartyInternal(mobileParty);
+                army._parties.Remove(mobileParty);
+                mobileParty.AttachedTo = null;
+                mobileParty._army = null;
             }
         });
     }
