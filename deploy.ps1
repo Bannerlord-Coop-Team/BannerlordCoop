@@ -14,40 +14,41 @@ $BaseDir                = "${SolutionDir}..\"
 $BaseDirWithoutQuotes   = $BaseDir.Trim('"')
 $DeployDir              = "${BaseDirWithoutQuotes}deploy\"
 $ConfigPath             = "${BaseDirWithoutQuotes}config.json"
-$TemplateDir            = "${BaseDirWithoutQuotes}template"
 $UIMovieDir             = "${BaseDirWithoutQuotes}UIMovies"
 
-# create output directory structure
-Remove-Item $DeployDir -Recurse
-New-Item -ItemType Directory -Force -Path $DeployDir | Out-Null
-
-# read config
+# Read config
 $config = Get-Content -Raw -Path $ConfigPath | ConvertFrom-Json
 Write-Output $config
-
-# write SubModule.xml
-$subModuleContent = Get-Content -path "${TemplateDir}\SubModule.xml" -Raw
-$subModuleContent = $subModuleContent.replace('${name}', $config.name)
-$subModuleContent = $subModuleContent.replace('${main_class}', $config.main_class)
-$subModuleContent = $subModuleContent.replace('${version}', $config.version)
-$subModuleContent = $subModuleContent.replace('${game_version}', $config.game_version)
-$subModuleContent | Out-File -Encoding utf8 -FilePath "${DeployDir}\SubModule.xml"
 
 # copy to games mod folder
 if(Test-Path (${BaseDir} + $config.modsDir))
 {
     $ModDir = ${BaseDir} + $config.modsDir + "\" + $config.name
     Remove-Item "${ModDir}\*" -Recurse -Force -ErrorAction Ignore
-    New-Item -Force -ItemType Directory -Path "${ModDir}" | Out-Null
-    New-Item -Force -ItemType Directory -Path "${ModDir}\bin" | Out-Null
     New-Item -Force -ItemType Directory -Path "${ModDir}\bin\Win64_Shipping_Client" | Out-Null
     $ModSourceDir = ${SolutionDir} + "\" + $config.name
-    Get-ChildItem -Path "${ModSourceDir}\bin\Debug" -Filter "*.dll" -Recurse -ErrorAction Ignore | Where { $_.PSIsContainer -eq $false } | Copy-Item -Destination "${ModDir}\bin\Win64_Shipping_Client"
-    Get-ChildItem -Path "${ModSourceDir}\bin\Release" -Filter "*.dll" -Recurse -ErrorAction Ignore | Where { $_.PSIsContainer -eq $false } | Copy-Item -Destination "${ModDir}\bin\Win64_Shipping_Client"
-    Copy-Item -Force "${DeployDir}\SubModule.xml" -Destination "${ModDir}\"
+
+    # Copy all dlls from target dir to mod folder
+    Get-ChildItem -Path "${TargetDir}\" -Filter "*.dll" -Recurse -ErrorAction Ignore | Where { $_.PSIsContainer -eq $false } | Copy-Item -Destination "${ModDir}\bin\Win64_Shipping_Client"
+
+    # Write SubModule.xml to mod folder
+    $subModuleContent = Get-Content -path "${DeployDir}\SubModule.xml" -Raw
+    $subModuleContent = $subModuleContent.replace('${name}', $config.name)
+    $subModuleContent = $subModuleContent.replace('${main_class}', $config.main_class)
+    $subModuleContent = $subModuleContent.replace('${version}', $config.version)
+    $subModuleContent = $subModuleContent.replace('${game_version}', $config.game_version)
+    $subModuleContent | Out-File -Encoding utf8 -FilePath "${ModDir}\SubModule.xml"
+
+    # Copy all files except SubModule.xml to mod folder
+    Get-ChildItem -Path "${DeployDir}\*" -Recurse -Force |
+    Where-Object {
+        $_.PSIsContainer -eq $false -and
+        $_.Name -ne "SubModule.xml"
+    } |
+    Copy-Item -Force -Destination "${ModDir}\"
 }
 
-# write Movie Prefabs
+# Write Movie Prefabs
 $MovieModDir = ${BaseDir} + $config.modsDir + "\" + $config.name + "\GUI\Prefabs"
 New-Item -Force -ItemType Directory -Path "${MovieModDir}" | Out-Null
 Copy-Item -Force "${UIMovieDir}\*" -Recurse -Destination "${MovieModDir}\"
