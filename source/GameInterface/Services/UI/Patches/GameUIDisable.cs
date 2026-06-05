@@ -17,7 +17,7 @@ namespace GameInterface.Services.UI.Patches
                 KingdomState => false,
                 QuestsState => false,
                 CharacterDeveloperState => ModInformation.IsClient,
-                PartyState => false,
+                PartyState => ModInformation.IsClient,
                 InventoryState => ModInformation.IsClient,
                 ClanState => ModInformation.IsClient,
                 _ => true,

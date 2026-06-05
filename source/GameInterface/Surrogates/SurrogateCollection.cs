@@ -29,7 +29,6 @@ internal class SurrogateCollection : ISurrogateCollection
             AddSurrogate<EquipmentElement, EquipmentElementSurrogate>();
             AddSurrogate<PropertyOwner<TraitObject>, PropertyOwnerSurrogate>();
             AddSurrogate<ItemRosterElement, ItemRosterElementSurrogate>();
-            AddSurrogate<TroopRosterElement, TroopRosterElementSurrogate>();
 
             AddSurrogate<ExplainedNumber, ExplainedNumberSurrogate>();
             AddSurrogate<ExplainedNumber.StatExplainer, StatExplainerSurrogate>();

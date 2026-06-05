@@ -3,14 +3,11 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
-using GameInterface.Services.Heroes.Messages.Collections;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Messages;
 using Serilog;
 using System;
-using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.TroopRosters.Handlers;
@@ -28,7 +25,8 @@ public class TroopRosterHandler : IHandler
         this.objectManager = objectManager;
         this.network = network;
 
-        messageBroker.Subscribe<RecruitTroops>(HandleOnRecruitmentDone);
+        messageBroker.Subscribe<TroopRosterAddToCountsChanged>(Handle_AddToCountsChanged);
+        messageBroker.Subscribe<NetworkChangeTroopRosterAddToCounts>(Handle_AddToCounts);
 
         messageBroker.Subscribe<CountsAtIndexAdded>(Handle_CountsAtIndexAdded);
         messageBroker.Subscribe<NetworkAddToCountsAtIndex>(Handle_NetworkAddToCountsAtIndex);
@@ -57,7 +55,8 @@ public class TroopRosterHandler : IHandler
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<RecruitTroops>(HandleOnRecruitmentDone);
+        messageBroker.Unsubscribe<TroopRosterAddToCountsChanged>(Handle_AddToCountsChanged);
+        messageBroker.Unsubscribe<NetworkChangeTroopRosterAddToCounts>(Handle_AddToCounts);
 
         messageBroker.Unsubscribe<CountsAtIndexAdded>(Handle_CountsAtIndexAdded);
         messageBroker.Unsubscribe<NetworkAddToCountsAtIndex>(Handle_NetworkAddToCountsAtIndex);
@@ -82,59 +81,6 @@ public class TroopRosterHandler : IHandler
 
         messageBroker.Unsubscribe<TroopsSwappedAtIndices>(Handle_TroopsSwappedAtIndices);
         messageBroker.Unsubscribe<NetworkSwapTroopsAtIndices>(Handle_NetworkSwapTroopsAtIndices);
-    }
-
-    public void HandleOnRecruitmentDone(MessagePayload<RecruitTroops> payload)
-    {
-        var obj = payload.What;
-
-        if (!objectManager.TryGetObjectWithLogging(obj.MobilePartyId, out MobileParty mobileParty)) return;
-
-        List<(Hero, CharacterObject, int)> herosValidated = new();
-
-        // validate they are all good before recruiting any
-        foreach (var troop in obj.TroopsInCart)
-        {
-            if (!objectManager.TryGetObjectWithLogging(troop.RecruiterHeroId, out Hero hero)) continue;
-            if (!objectManager.TryGetObjectWithLogging(troop.CharacterObjectId, out CharacterObject characterObject)) continue;
-
-
-            var volunteerTroopAtIndex = hero.VolunteerTypes[troop.TroopIndex];
-
-            if (volunteerTroopAtIndex is null)
-            {
-                // later send decline for specific reason
-                continue;
-            }
-
-            herosValidated.Add((hero, characterObject, troop.TroopIndex));
-        }
-
-        // Calculate cost before changing any data
-        var cost = 0;
-        foreach ((Hero hero, CharacterObject characterObject, int index) in herosValidated)
-        {
-            cost += Campaign.Current.Models.PartyWageModel.GetTroopRecruitmentCost(characterObject, mobileParty.LeaderHero).RoundedResultNumber;
-        }
-
-        // Do not apply recruitment if the player does not have enough gold
-        if (cost > mobileParty.LeaderHero.Gold)
-        {
-            Logger.Warning("Attempted to recruit troops that cost more than the player had");
-            return;
-        }
-
-        // Commit recruitment
-        foreach ((Hero hero, CharacterObject characterObject, int index) in herosValidated)
-        {
-            hero.VolunteerTypes[index] = null;
-            messageBroker.Publish(this, new VolunteerTypesArrayUpdated(hero, null, index));
-
-            mobileParty.MemberRoster.AddToCounts(characterObject, 1, false, 0, 0, true, -1);
-            CampaignEventDispatcher.Instance.OnUnitRecruited(characterObject, 1);
-        }
-
-        mobileParty.LeaderHero.Gold -= cost;
     }
 
     private bool TryResolveCharacterObject(string objectId, bool isHero, out CharacterObject characterObject)
