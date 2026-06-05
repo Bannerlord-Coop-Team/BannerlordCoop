@@ -33,7 +33,7 @@ public class GameInterface : IGameInterface
     public void PatchAll()
     {
         // NOTE: Patching in constructor causes issues with tests and CI
-        if (Harmony.HasAnyPatches(GameInterfaceModule.HarmonyId)) return;
+        if (Harmony.HasAnyPatches(harmony.Id)) return;
 
         var assembly = typeof(GameInterface).Assembly;
 
@@ -44,6 +44,7 @@ public class GameInterface : IGameInterface
 
     public void UnpatchAll()
     {
+        patchCollector.UnpatchAll();
         harmony.UnpatchAll();
     }
 }

@@ -23,7 +23,7 @@ namespace Coop.IntegrationTests.Players
         [Fact]
         public void ServerNewPlayerRegistered_ClientPublishes_RegisterPlayer()
         {
-            var player = new Player("CoopParty");
+            var player = new Player("CoopHero", "CoopParty");
             
             var message = new PlayerRegistered(player);
 

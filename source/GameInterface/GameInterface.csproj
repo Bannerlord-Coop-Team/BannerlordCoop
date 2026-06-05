@@ -286,7 +286,7 @@
     <Publicize Include="SandBox" />
     <Publicize Include="SandBox.GauntletUI" />                             
     <Publicize Include="SandBox.View" />                                   
-    <!--<Publicize Include="SandBox.ViewModelCollection"/>                    -->
+    <Publicize Include="SandBox.ViewModelCollection" />
     <!--<Publicize Include="TaleWorlds.AchievementSystem"/>                   -->
     <!--<Publicize Include="TaleWorlds.ActivitySystem"/>-->
     <Publicize Include="TaleWorlds.CampaignSystem" />

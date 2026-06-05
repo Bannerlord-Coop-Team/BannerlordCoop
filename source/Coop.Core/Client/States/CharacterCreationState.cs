@@ -9,7 +9,9 @@ using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.Players.Data;
 using GameInterface.Services.UI.Messages;
+using NetworkPlayerData = Coop.Core.Server.Connections.Messages.NetworkPlayerData;
 
 namespace Coop.Core.Client.States;
 
@@ -74,7 +76,7 @@ public class CharacterCreationState : ClientStateBase
 
     internal void Handle_NetworkPlayerData(MessagePayload<NetworkPlayerData> obj)
     {
-        Logic.ControlledHeroId = obj.What.HeroStringId;
+        Logic.Player = new Player(obj.What.HeroStringId, obj.What.PartyStringId);
 
         var controllerId = controllerIdProvider.ControllerId;
 

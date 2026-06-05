@@ -42,6 +42,7 @@ internal class PartyBaseRegistry : AutoRegistryBase<PartyBase>
 
     public override void OnClientDestroyed(PartyBase obj, string id)
     {
+        obj.SetVisualAsDirty();
     }
 
     public override void OnServerCreated(PartyBase obj, string id)
@@ -50,5 +51,6 @@ internal class PartyBaseRegistry : AutoRegistryBase<PartyBase>
 
     public override void OnServerDestroyed(PartyBase obj, string id)
     {
+        obj.SetVisualAsDirty();
     }
 }

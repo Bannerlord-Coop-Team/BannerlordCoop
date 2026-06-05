@@ -10,17 +10,15 @@ using GameInterface;
 using GameInterface.DynamicSync;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.UI.Messages;
-using HarmonyLib;
 using System;
 
 namespace Coop.Core
 {
     public class CoopartiveMultiplayerExperience : IDisposable
     {
-        private readonly IMessageBroker messageBroker;
+        private IMessageBroker messageBroker;
         private INetworkConfiguration configuration;
         private IContainer container;
-        private INetwork network;
 
         public CoopartiveMultiplayerExperience()
         {
@@ -92,8 +90,6 @@ namespace Coop.Core
             // Create harmony patches
             container.Resolve<IGameInterface>().PatchAll();
 
-            network = container.Resolve<INetwork>();
-
             var logic = container.Resolve<ILogic>();
             logic.Start();
         }
@@ -126,15 +122,13 @@ namespace Coop.Core
             // Create harmony patches
             container.Resolve<IGameInterface>().PatchAll();
 
-            network = container.Resolve<INetwork>();
-
             var logic = container.Resolve<ILogic>();
             logic.Start();
         }
 
         private void DestroyContainer()
         {
-            container?.Resolve<Harmony>().UnpatchAll();
+            container?.Resolve<IGameInterface>().UnpatchAll();
             container?.Dispose();
             container = null;
         }

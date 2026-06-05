@@ -20,13 +20,7 @@ internal class MapEventPartyUpdatePatch
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("MapEventParty.Update was called on the client. This should never happen. Please report this to the mod developers.");
-            return false;
-        }
-
-        return true;
+        return ModInformation.IsServer;
     }
 
     [HarmonyPostfix]
@@ -36,10 +30,7 @@ internal class MapEventPartyUpdatePatch
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
         if (ModInformation.IsClient)
-        {
-            Logger.Error("MapEventParty.Update was called on the client. This should never happen. Please report this to the mod developers.");
             return;
-        }
 
         var message = new MapEventPartyUpdated(__instance, __instance._roster);
         MessageBroker.Instance.Publish(__instance, message);

@@ -14,16 +14,22 @@ namespace GameInterface.Services.TroopRosters.Messages;
 internal readonly struct CountsAtIndexAdded : IEvent
 {
     public readonly TroopRoster TroopRoster;
-    public readonly CharacterObject Character;
+    public readonly int Index;
     public readonly int CountChange;
     public readonly int WoundedCountChange;
     public readonly int XpChange;
     public readonly bool RemoveDepleted;
 
-    public CountsAtIndexAdded(TroopRoster troopRoster, CharacterObject character, int countChange, int woundedCountChange, int xpChange, bool removeDepleted)
+    public CountsAtIndexAdded(
+        TroopRoster troopRoster,
+        int index,
+        int countChange,
+        int woundedCountChange,
+        int xpChange,
+        bool removeDepleted)
     {
         TroopRoster = troopRoster;
-        Character = character;
+        Index = index;
         CountChange = countChange;
         WoundedCountChange = woundedCountChange;
         XpChange = xpChange;

@@ -1,4 +1,6 @@
-﻿using HarmonyLib;
+﻿using Common.Logging;
+using HarmonyLib;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -11,17 +13,27 @@ namespace GameInterface.Services.UI.Patches;
 [HarmonyPatch(typeof(GameMenu))]
 internal class RemoveWaitOption
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<RemoveWaitOption>();
+
     [HarmonyPatch(nameof(GameMenu.SwitchToMenu))]
     static bool Prefix(string menuId)
     {
         MenuContext currentMenuContext = Campaign.Current.CurrentMenuContext;
         if (currentMenuContext != null)
         {
-            currentMenuContext.SwitchToMenu(menuId);
-            if (currentMenuContext.GameMenu.IsWaitMenu)
+            try
             {
-                currentMenuContext.GameMenu.StartWait();
-                return false;
+                currentMenuContext.SwitchToMenu(menuId);
+                if (currentMenuContext.GameMenu.IsWaitMenu)
+                {
+                    currentMenuContext.GameMenu.StartWait();
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, $"Failed to switch to menu {menuId}");
+                GameMenu.ExitToLast();
             }
         }
 

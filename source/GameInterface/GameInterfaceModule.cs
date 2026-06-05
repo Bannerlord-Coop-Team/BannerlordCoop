@@ -5,9 +5,7 @@ using Autofac.Core.Resolving.Pipeline;
 using Common.Logging;
 using Common.PacketHandlers;
 using GameInterface.AutoSync;
-using GameInterface.DynamicSync;
 using GameInterface.Registry;
-using GameInterface.Registry.Auto;
 using GameInterface.Serialization;
 using GameInterface.Services;
 using GameInterface.Services.Entity;
@@ -25,7 +23,7 @@ namespace GameInterface;
 public class GameInterfaceModule : Module
 {
     // TODO move to config
-    public const string HarmonyId = "TaleWorlds.MountAndBlade.Bannerlord.Coop";
+    public const string HarmonyId = "Bannerlord.Coop";
 
     private static readonly Harmony harmony = new Harmony(HarmonyId);
 

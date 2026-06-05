@@ -2,16 +2,16 @@
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 
-namespace GameInterface.Services.MapEvents.Messages.Leave;
+namespace GameInterface.Services.PlayerCaptivityService.Messages;
 
 public readonly struct PlayerSurrendered : IEvent
 {
     public readonly MapEvent MapEvent;
-    public readonly MobileParty MobileParty;
+    public readonly MobileParty PlayerParty;
 
     public PlayerSurrendered(MapEvent mapEvent, MobileParty mobileParty)
     {
         MapEvent = mapEvent;
-        MobileParty = mobileParty;
+        PlayerParty = mobileParty;
     }
 }

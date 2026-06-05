@@ -16,13 +16,12 @@ using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using static TaleWorlds.Library.CommandLineFunctionality;
-using static TaleWorlds.MountAndBlade.MovementOrder;
 
 namespace GameInterface.Services.Villages.Commands;
 
-public class MapEventDebugCammands
+public class MapEventDebugCommands
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<MapEventDebugCammands>();
+    private static readonly ILogger Logger = LogManager.GetLogger<MapEventDebugCommands>();
 
     /// <summary>
     /// Attempts to get the ObjectManager
@@ -61,27 +60,8 @@ public class MapEventDebugCammands
 
         EncounterManager.StartPartyEncounter(MobileParty.MainParty.Party, partyBase);
 
+
         return $"MapEvent Started";
-    }
-
-    [CommandLineArgumentFunction("test", "coop.debug.mapevent")]
-    public static string Test1(List<string> args)
-    {
-        //if (args.Count != 2)
-        //{
-        //    return "Usage: coop.debug.besiegercamp.set_number_of_troops_killed_on_side <besiegerCampId> <value> ";
-        //}
-
-        if (TryGetObjectManager(out var objectManager) == false)
-        {
-            return "Unable to resolve ObjectManager";
-        }
-        _ = objectManager;
-        _ = PlayerEncounter.Current;
-
-        _ = Campaign.Current.MapEventManager._mapEvents;
-
-        return $"OK";
     }
 
     /// <summary>
@@ -110,7 +90,7 @@ public class MapEventDebugCammands
             return "Failed to get enemy map event side";
         }
 
-        var party = enemySide.Parties.FirstOrDefault();
+        var party = enemySide.Parties[MBRandom.RandomInt(enemySide.Parties.Count)];
         if (party is null)
         {
             return "Enemy side has no parties";
@@ -137,6 +117,104 @@ public class MapEventDebugCammands
         enemySide.OnTroopKilled(descriptor);
 
         return $"Killed random troop: {troopElement.Troop?.Name}";
+    }
+
+    /// <summary>
+    /// Kills all but one troop from the enemy side of the current map event.
+    /// </summary>
+    [CommandLineArgumentFunction("kill_all_but_one", "coop.debug.mapevent")]
+    public static string KillAllButOneTroop(List<string> args)
+    {
+        var mapEvent = MobileParty.MainParty.MapEvent;
+        if (mapEvent is null)
+        {
+            return "Main party is not in a map event";
+        }
+
+        var mainPartySide = MobileParty.MainParty.MapEventSide;
+        if (mainPartySide is null)
+        {
+            return "Main party has no map event side";
+        }
+
+        var enemySide = mapEvent._sides
+            .SingleOrDefault(side => side != mainPartySide);
+
+        if (enemySide is null)
+        {
+            return "Failed to get enemy map event side";
+        }
+
+        if (enemySide.Parties is null || enemySide.Parties.Count == 0)
+        {
+            return "Enemy side has no parties";
+        }
+
+        var allTroops = new List<(MapEventParty Party, UniqueTroopDescriptor Descriptor, FlattenedTroopRosterElement Element)>();
+
+        foreach (var party in enemySide.Parties)
+        {
+            if (party?.Troops?._elementDictionary is null)
+                continue;
+
+            foreach (var entry in party.Troops._elementDictionary)
+            {
+                var descriptor = entry.Key;
+                var element = entry.Value;
+
+                allTroops.Add((party, descriptor, element));
+            }
+        }
+
+        if (allTroops.Count == 0)
+        {
+            return "Enemy side has no troops";
+        }
+
+        if (allTroops.Count == 1)
+        {
+            return $"Enemy side already has only one troop: {allTroops[0].Element.Troop?.Name}";
+        }
+
+        var survivorIndex = MBRandom.RandomInt(allTroops.Count);
+        var survivor = allTroops[survivorIndex];
+
+        var killedCount = 0;
+
+        for (var i = 0; i < allTroops.Count; i++)
+        {
+            if (i == survivorIndex)
+                continue;
+
+            enemySide.OnTroopKilled(allTroops[i].Descriptor);
+            killedCount++;
+        }
+
+        return $"Killed {killedCount} troops. Survivor: {survivor.Element.Troop?.Name}";
+    }
+
+    /// <summary>
+    /// Lists the fields and properties of the current PlayerEncounter.
+    /// </summary>
+    [CommandLineArgumentFunction("list_player_encounter", "coop.debug.mapevent")]
+    public static string ListPlayerEncounter(List<string> args)
+    {
+        var playerEncounter = PlayerEncounter.Current;
+        if (playerEncounter == null)
+        {
+            return "No current PlayerEncounter";
+        }
+
+        var sb = new StringBuilder();
+
+        sb.AppendLine("PlayerEncounter:");
+        AppendObjectDetails(sb, playerEncounter, "\t", "PlayerEncounter Details");
+
+        var result = sb.ToString();
+
+        Logger.Debug("{PlayerEncounter}", result);
+
+        return result;
     }
 
     [CommandLineArgumentFunction("get_events", "coop.debug.mapevent")]
@@ -211,78 +289,6 @@ public class MapEventDebugCammands
         return result;
     }
 
-    [CommandLineArgumentFunction("get_event_side", "coop.debug.mapevent")]
-    public static string GetEventSide(List<string> args)
-    {
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.mapevent.get_event_side <mapEventSideId>";
-        }
-
-        if (!TryGetObjectManager(out var objectManager))
-        {
-            return "Failed to get object manager";
-        }
-
-        var mapEventSideId = args[0];
-
-        if (!objectManager.TryGetObjectWithLogging<MapEventSide>(mapEventSideId, out var mapEventSide))
-        {
-            return $"Failed to find MapEvent with id: {mapEventSideId}";
-        }
-
-        var sb = new StringBuilder();
-
-        sb.AppendLine($"Map event side id: {mapEventSideId}");
-        sb.AppendLine();
-
-        AppendMapEventSidesDetails(sb, mapEventSide, "\t", "Side Details");
-
-        sb.AppendLine();
-
-        var result = sb.ToString();
-
-        Logger.Debug("{MapEventSide}", result);
-
-        return result;
-    }
-
-    [CommandLineArgumentFunction("get_event_party", "coop.debug.mapevent")]
-    public static string GetEventParty(List<string> args)
-    {
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.mapevent.get_event_party <mapEventPartyId>";
-        }
-
-        if (!TryGetObjectManager(out var objectManager))
-        {
-            return "Failed to get object manager";
-        }
-
-        var mapEventPartyId = args[0];
-
-        if (!objectManager.TryGetObjectWithLogging<MapEventParty>(mapEventPartyId, out var mapEventParty))
-        {
-            return $"Failed to find MapEventParty with id: {mapEventPartyId}";
-        }
-
-        var sb = new StringBuilder();
-
-        sb.AppendLine($"Map event side id: {mapEventPartyId}");
-        sb.AppendLine();
-
-        AppendMapEventPartyDetails(sb, mapEventParty, "\t");
-
-        sb.AppendLine();
-
-        var result = sb.ToString();
-
-        Logger.Debug("{MapEventParty}", result);
-
-        return result;
-    }
-
     private static void AppendMapEventSummary(StringBuilder sb, MapEvent mapEvent)
     {
         sb.AppendLine("Summary:");
@@ -301,7 +307,7 @@ public class MapEventDebugCammands
 
         sb.AppendLine($"\t{sideName}: {string.Join(", ", FormatSideNames(side))}");
 
-        AppendMapEventSidesDetails(sb, side, "\t\t", "Side Details");
+        AppendObjectDetails(sb, side, "\t\t", "Side Details");
 
         sb.AppendLine("\t\tParties:");
 
@@ -334,10 +340,10 @@ public class MapEventDebugCammands
         var partyName = party.Party?.Name?.ToString() ?? "<null>";
         sb.AppendLine($"{indent}Party: {partyName}");
 
-        AppendMapEventSidesDetails(sb, party, indent, "MapEventParty Details");
+        AppendObjectDetails(sb, party, indent, "MapEventParty Details");
     }
 
-    private static void AppendMapEventSidesDetails(StringBuilder sb, object obj, string indent, string title)
+    private static void AppendObjectDetails(StringBuilder sb, object obj, string indent, string title)
     {
         if (obj == null)
         {
@@ -451,9 +457,6 @@ public class MapEventDebugCammands
         if (value is UniqueTroopDescriptor descriptor)
             return descriptor.ToString();
 
-        if (value is FlattenedTroopRoster flattenedTroopRoster)
-            return FormatFlattenedTroopRoster(flattenedTroopRoster);
-
         if (value is IEnumerable enumerable && !(value is string))
             return FormatEnumerable(enumerable);
 
@@ -531,20 +534,5 @@ public class MapEventDebugCammands
             .ToArray();
 
         return genericTypeName + "<" + string.Join(", ", genericArguments) + ">";
-    }
-
-    private static string FormatFlattenedTroopRoster(FlattenedTroopRoster flattenedRoster)
-    {
-        var stringBuilder = new StringBuilder();
-
-        stringBuilder.AppendLine("FlattenedTroopRoster");
-        stringBuilder.AppendLine("[");
-        foreach (var item in flattenedRoster)
-        {
-            stringBuilder.AppendLine($"\t[{item._uniqueNo}]: {item.Troop.StringId}");
-        }
-        stringBuilder.AppendLine("]");
-
-        return stringBuilder.ToString();
     }
 }

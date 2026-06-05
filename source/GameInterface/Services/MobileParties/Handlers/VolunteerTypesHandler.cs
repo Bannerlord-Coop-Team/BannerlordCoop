@@ -66,6 +66,8 @@ internal class VolunteerTypesHandler : IHandler
             updatedVolunteerTypeIds[currentHeroId] = new string[] {};
             foreach (CharacterObject character in keyValuePair.Value)
             {
+                if (character is null) continue;
+
                 if (!objectManager.TryGetIdWithLogging(character, out var currentCharacterId)) continue;
 
                 updatedVolunteerTypeIds[currentHeroId].AddItem(currentCharacterId);

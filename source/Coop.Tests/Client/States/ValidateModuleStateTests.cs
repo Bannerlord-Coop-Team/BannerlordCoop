@@ -7,6 +7,7 @@ using Coop.Tests.Mocks;
 using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Xunit;
 using Xunit.Abstractions;
@@ -65,7 +66,7 @@ namespace Coop.Tests.Client.States
 
             var heroExists = true;
             var payload = new MessagePayload<NetworkClientValidated>(
-                this, new NetworkClientValidated(heroExists, "12345"));
+                this, new NetworkClientValidated(heroExists, new Player("12345", "111")));
 
             // Act
             validateState.Handle_NetworkClientValidated(payload);
@@ -82,7 +83,7 @@ namespace Coop.Tests.Client.States
 
             var heroExists = false;
             var payload = new MessagePayload<NetworkClientValidated>(
-                this, new NetworkClientValidated(heroExists, "12345"));
+                this, new NetworkClientValidated(heroExists, new Player("12345", "111")));
 
             // Act
             validateState.Handle_NetworkClientValidated(payload);

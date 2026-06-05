@@ -22,7 +22,6 @@ namespace GameInterface.Services.GameDebug.Interfaces
     internal interface IDebugGameInterface : IGameAbstraction
     {
         void LoadDebugGame();
-        void ShowAllParties();
         void LoadGame(string saveName);
     }
 
@@ -58,20 +57,6 @@ namespace GameInterface.Services.GameDebug.Interfaces
         {
             MBGameManager.StartNewGame(new SandBoxGameManager(loadResult));
             MouseManager.ShowCursor(false);
-        }
-
-        public void ShowAllParties()
-        {
-            PartyVisibilityPatch.AllPartiesVisible = true;
-
-            GameLoopRunner.RunOnMainThread(() =>
-            {
-                foreach (var party in Campaign.Current.MobileParties)
-                {
-                    party.IsVisible = true;
-                    party.Party.SetVisualAsDirty();
-                }
-            });
         }
 
         public void LoadGame(string saveName)
