@@ -87,7 +87,7 @@ namespace Missions.Services.Arena
             NetworkAgentRegistry.Instance.Clear();
 
             string civilianUpgradeLevelTag = Campaign.Current.Models.LocationModel.GetCivilianUpgradeLevelTag(upgradeLevel);
-            Mission currentMission = MissionState.OpenNew("ArenaDuelMission", SandBoxMissions.CreateSandBoxMissionInitializerRecord(location.GetSceneName(upgradeLevel), "", false), (mission) => new MissionBehavior[]
+            Mission currentMission = MissionState.OpenNew("ArenaDuelMission", SandBoxMissions.CreateSandBoxMissionInitializerRecord(location.GetSceneName(upgradeLevel), "", false, DecalAtlasGroup.Battle), (mission) => new MissionBehavior[]
             {
                 new MissionOptionsComponent(),
                 new MissionFacialAnimationHandler(),
@@ -97,7 +97,7 @@ namespace Missions.Services.Arena
                 new VisualTrackerMissionBehavior(),
                 new CampaignMissionComponent(),
                 new EquipmentControllerLeaveLogic(),
-                new MissionAgentHandler(location, null),
+                new MissionAgentHandler(), //new MissionAgentHandler(location, null),
                 _networkBehavior,
                 _battlesController,
             }, true, true);

@@ -63,7 +63,7 @@ namespace Missions.Services.Network
             {
                 if (Queues[peer].TryDequeue(out var message))
                 {
-                    PublishEvent(peer, message);
+                    HandlePacket(peer, (IPacket)message);
                 }
             }
 

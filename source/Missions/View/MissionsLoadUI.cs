@@ -1,14 +1,18 @@
-﻿
-
-using SandBox.View;
+﻿using SandBox.View;
 using SandBox.ViewModelCollection.SaveLoad;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using TaleWorlds.CampaignSystem.Extensions;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.Core;
+using TaleWorlds.Engine;
 using TaleWorlds.Engine.GauntletUI;
 using TaleWorlds.InputSystem;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.View;
 using TaleWorlds.SaveSystem;
@@ -124,6 +128,80 @@ namespace Missions.View
             _loadAction = loadAction;
             IsVisualDisabled = false;
 
+            /*
+            this.IsBusyWithAnAction = true;
+            this.IsLoadingSaves = true;
+            int num = 0;
+            SaveGameFileInfo[] saveFiles = MBSaveLoad.GetSaveFiles(null);
+            IEnumerable<SaveGameFileInfo> enumerable = from s in saveFiles
+                                                       where s.IsCorrupted
+                                                       select s;
+            foreach (IGrouping<string, SaveGameFileInfo> grouping in from s in saveFiles
+                                                                     where !s.IsCorrupted
+                                                                     select s into m
+                                                                     group m by m.MetaData.GetUniqueGameId() into s
+                                                                     orderby this.GetMostRecentSaveInGroup(s) descending
+                                                                     select s)
+            {
+                SavedGameGroupVM savedGameGroupVM = new SavedGameGroupVM();
+                if (string.IsNullOrWhiteSpace(grouping.Key))
+                {
+                    savedGameGroupVM.IdentifierID = this._uncategorizedSaveGroupName.ToString();
+                }
+                else
+                {
+                    num++;
+                    this._categorizedSaveGroupName.SetTextVariable("ID", num);
+                    savedGameGroupVM.IdentifierID = this._categorizedSaveGroupName.ToString();
+                }
+                foreach (SaveGameFileInfo saveGameFileInfo in grouping.OrderByDescending((SaveGameFileInfo s) => s.MetaData.GetCreationTime()))
+                {
+                    bool ironmanMode = saveGameFileInfo.MetaData.GetIronmanMode();
+                    savedGameGroupVM.SavedGamesList.Add(new SavedGameVM(saveGameFileInfo, this.IsSaving, new Action<SavedGameVM>(this.OnDeleteSavedGame), new Action<SavedGameVM>(this.OnSaveSelection), new Action(this.OnCancelLoadSave), new Action(this.ExecuteDone), false, ironmanMode));
+                }
+                this.SaveGroups.Add(savedGameGroupVM);
+            }
+            if (enumerable.Any<SaveGameFileInfo>())
+            {
+                SavedGameGroupVM savedGameGroupVM2 = new SavedGameGroupVM
+                {
+                    IdentifierID = new TextObject("{=o9PIe7am}Corrupted", null).ToString()
+                };
+                foreach (SaveGameFileInfo save in enumerable)
+                {
+                    savedGameGroupVM2.SavedGamesList.Add(new SavedGameVM(save, this.IsSaving, new Action<SavedGameVM>(this.OnDeleteSavedGame), new Action<SavedGameVM>(this.OnSaveSelection), new Action(this.OnCancelLoadSave), new Action(this.ExecuteDone), true, false));
+                }
+                this.SaveGroups.Add(savedGameGroupVM2);
+            }
+            this.RefreshCanCreateNewSave();
+            this.RefreshCanSearch();
+            this.OnSaveSelection(this.GetFirstAvailableSavedGame());
+            this.RefreshValues();
+            Thread.Sleep(1);
+            this.IsBusyWithAnAction = false;
+            this.IsLoadingSaves = false;
+            */
+
+            base.Initialize();
+            FilterSaveGames();
+
+            //RefreshValues();
+        }
+
+        private new DateTime GetMostRecentSaveInGroup(IGrouping<string, SaveGameFileInfo> group)
+        {
+            SaveGameFileInfo saveGameFileInfo = (from g in @group
+                                                 orderby g.MetaData.GetCreationTime() descending
+                                                 select g).FirstOrDefault<SaveGameFileInfo>();
+            if (saveGameFileInfo == null)
+            {
+                return default(DateTime);
+            }
+            return saveGameFileInfo.MetaData.GetCreationTime();
+        }
+
+        public void FilterSaveGames()
+        {
             MBBindingList<SavedGameGroupVM> newGroups = new MBBindingList<SavedGameGroupVM>();
             foreach (SavedGameGroupVM group in SaveGroups)
             {
@@ -133,6 +211,7 @@ namespace Missions.View
                 {
                     bool containsCoop = false;
                     bool containsNonApprovedMods = false;
+                    /*
                     foreach (SavedGameModuleInfoVM savedGameModuleInfoVM in save.LoadedModulesInSave)
                     {
                         if (!allowedModules.Contains(savedGameModuleInfoVM.Definition))
@@ -144,11 +223,16 @@ namespace Missions.View
                             containsCoop = true;
                         }
                     }
-                    if (!containsNonApprovedMods && containsCoop)
+                    
+                    if (!containsNonApprovedMods)
                     {
                         MissionSelectedGameVM gameVm = new MissionSelectedGameVM(save.Save, IsSaving, new Action<SavedGameVM>(OnDeleteSavedGame), new Action<SavedGameVM>(OnSaveSelection), new Action(OnCancelLoadSave), new Action(ExecuteDone));
                         newSaves.Add(gameVm);
                     }
+                    */
+
+                    MissionSelectedGameVM gameVm = new MissionSelectedGameVM(save.Save, IsSaving, new Action<SavedGameVM>(OnDeleteSavedGame), new Action<SavedGameVM>(OnSaveSelection), new Action(OnCancelLoadSave), new Action(ExecuteDone));
+                    newSaves.Add(gameVm);
 
                 }
                 if (newSaves.Count() <= 0)
@@ -161,7 +245,8 @@ namespace Missions.View
             }
             SaveGroups = newGroups;
             OnSaveSelection(SaveGroups.FirstOrDefault((SavedGameGroupVM x) => x.SavedGamesList.Count > 0)?.SavedGamesList.FirstOrDefault());
-            RefreshValues();
+
+            //base.RefreshValues();
         }
 
         /// <summary>
@@ -268,14 +353,13 @@ namespace Missions.View
         {
             base.OnInitialize();
 
-
             _datasource = new MissionLoadVM(_loadAction);
-            _gauntletLayer = new GauntletLayer(1, "GauntletLayer");
+            _gauntletLayer = new GauntletLayer("GauntletLayer", 1);
             _gauntletLayer.LoadMovie("SaveLoadScreen", _datasource);
             _gauntletLayer.InputRestrictions.SetInputRestrictions(true, InputUsageMask.All);
             SpriteData spriteData = UIResourceManager.SpriteData;
             TwoDimensionEngineResourceContext resourceContext = UIResourceManager.ResourceContext;
-            ResourceDepot uiresourceDepot = UIResourceManager.UIResourceDepot;
+            ResourceDepot uiresourceDepot = UIResourceManager.ResourceDepot;
             this._spriteCategory = spriteData.SpriteCategories["ui_saveload"];
             this._spriteCategory.Load(resourceContext, uiresourceDepot);
             this._gauntletLayer.InputRestrictions.SetInputRestrictions(true, InputUsageMask.All);

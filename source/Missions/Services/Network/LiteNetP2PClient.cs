@@ -24,7 +24,7 @@ using Version = System.Version;
 
 namespace Missions.Services.Network
 {
-    public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateable, IDisposable, INetwork
+    public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateable, IDisposable, IP2PClient
     {
         private static readonly ILogger Logger = LogManager.GetLogger<LiteNetP2PClient>();
         public int ConnectedPeersCount => netManager.ConnectedPeersCount;

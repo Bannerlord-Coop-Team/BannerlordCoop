@@ -13,6 +13,14 @@ namespace MissionTestMod
             "System.Runtime.CompilerServices.Unsafe",
             "Microsoft.Bcl.AsyncInterfaces",
             "System.Threading.Tasks.Extensions",
+            "System.Text.Json",
+            "Serilog",
+            "System.Diagnostics.DiagnosticSource",
+            "System.Memory",
+            "System.Buffers",
+            "System.Numerics.Vectors",
+            "System.Threading.Channels",
+            "Autofac",
         };
 
         private static readonly Dictionary<string, Assembly> LoadedRedirects = RedirectedAssemblies
@@ -23,8 +31,7 @@ namespace MissionTestMod
         /// </summary>
         public static void CreateAssemblyBindingRedirects()
         {
-            AppDomain.CurrentDomain.AssemblyResolve += (sender, args) =>
-            {
+            AppDomain.CurrentDomain.AssemblyResolve += (sender, args) => {
                 var requestedAssembly = new AssemblyName(args.Name);
                 if (LoadedRedirects.TryGetValue(requestedAssembly.Name, out Assembly assembly))
                 {

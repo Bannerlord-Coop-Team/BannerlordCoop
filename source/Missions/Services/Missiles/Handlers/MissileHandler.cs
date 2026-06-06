@@ -144,12 +144,7 @@ namespace Missions.Services.Missiles.Handlers
             }
 
             weaponData.DeinitializeManagedPointers();
-            Mission.Missile missile = new Mission.Missile(Mission.Current, missileEntity)
-            {
-                Index = num,
-                ShooterAgent = shooter,
-                Weapon = missileWeapon,
-            };
+            Mission.Missile missile = new Mission.Missile(Mission.Current, num, missileEntity, shooter, missileWeapon, null); // Probably need to change this to not be null
 
             missileEntity.ManualInvalidate();
 

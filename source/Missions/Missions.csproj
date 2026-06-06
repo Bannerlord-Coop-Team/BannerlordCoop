@@ -1,5 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="..\packages\Krafs.Publicizer.2.3.0\build\Krafs.Publicizer.props" Condition="Exists('..\packages\Krafs.Publicizer.2.3.0\build\Krafs.Publicizer.props')" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -12,6 +13,8 @@
     <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
+    <NuGetPackageImportStamp>
+    </NuGetPackageImportStamp>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -36,14 +39,14 @@
     <Reference Include="0Harmony, Version=2.2.2.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\Bannerlord.Lib.Harmony.2.2.2\lib\net472\0Harmony.dll</HintPath>
     </Reference>
-    <Reference Include="Autofac, Version=7.0.1.0, Culture=neutral, PublicKeyToken=17863af14b0044da, processorArchitecture=MSIL">
-      <HintPath>..\packages\Autofac.7.0.1\lib\netstandard2.0\Autofac.dll</HintPath>
+    <Reference Include="Autofac, Version=8.2.0.0, Culture=neutral, PublicKeyToken=17863af14b0044da, processorArchitecture=MSIL">
+      <HintPath>..\packages\Autofac.8.2.0\lib\netstandard2.0\Autofac.dll</HintPath>
     </Reference>
     <Reference Include="LiteNetLib, Version=1.1.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\LiteNetLib.1.1.0\lib\net471\LiteNetLib.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.Bcl.AsyncInterfaces, Version=7.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.Bcl.AsyncInterfaces.7.0.0\lib\net462\Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
+    <Reference Include="Microsoft.Bcl.AsyncInterfaces, Version=8.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Bcl.AsyncInterfaces.8.0.0\lib\net462\Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
     </Reference>
     <Reference Include="protobuf-net, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
       <HintPath>..\packages\protobuf-net.3.2.26\lib\net462\protobuf-net.dll</HintPath>
@@ -63,8 +66,8 @@
     <Reference Include="SandBox.ViewModelCollection">
       <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.ViewModelCollection.dll</HintPath>
     </Reference>
-    <Reference Include="Serilog, Version=2.0.0.0, Culture=neutral, PublicKeyToken=24c2f752a8e58a10, processorArchitecture=MSIL">
-      <HintPath>..\packages\Serilog.2.12.0\lib\net47\Serilog.dll</HintPath>
+    <Reference Include="Serilog, Version=4.2.0.0, Culture=neutral, PublicKeyToken=24c2f752a8e58a10, processorArchitecture=MSIL">
+      <HintPath>..\packages\Serilog.4.2.0\lib\net471\Serilog.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Buffers, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
@@ -75,8 +78,8 @@
     </Reference>
     <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
-    <Reference Include="System.Diagnostics.DiagnosticSource, Version=4.0.5.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Diagnostics.DiagnosticSource.4.7.1\lib\net46\System.Diagnostics.DiagnosticSource.dll</HintPath>
+    <Reference Include="System.Diagnostics.DiagnosticSource, Version=8.0.0.1, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Diagnostics.DiagnosticSource.8.0.1\lib\net462\System.Diagnostics.DiagnosticSource.dll</HintPath>
     </Reference>
     <Reference Include="System.IO.Compression" />
     <Reference Include="System.Memory, Version=4.0.1.2, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
@@ -88,6 +91,9 @@
     </Reference>
     <Reference Include="System.Runtime.CompilerServices.Unsafe, Version=6.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Runtime.CompilerServices.Unsafe.6.0.0\lib\net461\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Threading.Channels, Version=8.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Threading.Channels.8.0.0\lib\net462\System.Threading.Channels.dll</HintPath>
     </Reference>
     <Reference Include="System.Threading.Tasks.Extensions, Version=4.2.0.1, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Threading.Tasks.Extensions.4.5.4\lib\net461\System.Threading.Tasks.Extensions.dll</HintPath>
@@ -114,6 +120,9 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Engine.GauntletUI.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.GauntletUI">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.dll</HintPath>
+    </Reference>
     <Reference Include="TaleWorlds.GauntletUI.Data, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null" />
     <Reference Include="TaleWorlds.InputSystem">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.InputSystem.dll</HintPath>
@@ -135,7 +144,9 @@
     <Reference Include="TaleWorlds.MountAndBlade.GauntletUI.Widgets">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.GauntletUI.Widgets.dll</HintPath>
     </Reference>
-    <Reference Include="TaleWorlds.MountAndBlade.View, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null" />
+    <Reference Include="TaleWorlds.MountAndBlade.View, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+      <HintPath>..\..\mb2\Modules\Native\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.View.dll</HintPath>
+    </Reference>
     <Reference Include="TaleWorlds.MountAndBlade.ViewModelCollection, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.ViewModelCollection.dll</HintPath>
@@ -195,6 +206,7 @@
     <Compile Include="Services\Missiles\NetworkMissileRegistry.cs" />
     <Compile Include="Services\Missiles\Patches\MissileAuxPatches.cs" />
     <Compile Include="Services\Network\EventQueueManager.cs" />
+    <Compile Include="Services\Network\IP2PClient.cs" />
     <Compile Include="Services\Network\Messages\PeerReady.cs" />
     <Compile Include="Services\Network\Data\AiAgentData.cs" />
     <Compile Include="Services\Network\Messages\ServerDisconnected.cs" />
@@ -271,4 +283,70 @@
     <Folder Include="Services\Network\Packets\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\packages\Krafs.Publicizer.2.3.0\build\Krafs.Publicizer.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Krafs.Publicizer.2.3.0\build\Krafs.Publicizer.props'))" />
+    <Error Condition="!Exists('..\packages\Krafs.Publicizer.2.3.0\build\Krafs.Publicizer.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Krafs.Publicizer.2.3.0\build\Krafs.Publicizer.targets'))" />
+  </Target>
+  <Import Project="..\packages\Krafs.Publicizer.2.3.0\build\Krafs.Publicizer.targets" Condition="Exists('..\packages\Krafs.Publicizer.2.3.0\build\Krafs.Publicizer.targets')" />
+  <ItemGroup>
+    <Publicize Include="SandBox" />
+    <Publicize Include="SandBox.GauntletUI" />
+    <Publicize Include="SandBox.View" />
+    <Publicize Include="SandBox.ViewModelCollection" />
+    <Publicize Include="SandBox.ViewModelCollection.SaveLoad" />
+    <!--<Publicize Include="TaleWorlds.AchievementSystem"/>                   -->
+    <!--<Publicize Include="TaleWorlds.ActivitySystem"/>-->
+    <Publicize Include="TaleWorlds.CampaignSystem" />
+    <Publicize Include="TaleWorlds.CampaignSystem.ViewModelCollection" />
+    <Publicize Include="TaleWorlds.Core" />
+    <!--<Publicize Include="TaleWorlds.Core.ViewModelCollection"/>                                                               -->
+    <!--<Publicize Include="TaleWorlds.Diamond"/>                                                                                -->
+    <!--<Publicize Include="TaleWorlds.Diamond.AccessProvider.Epic"/>                                                            -->
+    <!--<Publicize Include="TaleWorlds.Diamond.AccessProvider.GDK"/>                                                             -->
+    <!--<Publicize Include="TaleWorlds.Diamond.AccessProvider.GOG"/>                                                             -->
+    <!--<Publicize Include="TaleWorlds.Diamond.AccessProvider.Steam"/>                                                           -->
+    <!--<Publicize Include="TaleWorlds.Diamond.AccessProvider.Test"/>                                                            -->
+    <!--<Publicize Include="TaleWorlds.Diamond.ChatSystem.Library"/>                                                             -->
+    <!--<Publicize Include="TaleWorlds.DotNet"/>                                                                                 -->
+    <!--<Publicize Include="TaleWorlds.DotNet.AutoGenerated"/>                                                                   -->
+    <!--<Publicize Include="TaleWorlds.Engine"/>                                                                                 -->
+    <!--<Publicize Include="TaleWorlds.Engine.AutoGenerated"/>                                                                   -->
+    <!--<Publicize Include="TaleWorlds.Engine.GauntletUI"/>                                                                      -->
+    <Publicize Include="TaleWorlds.GauntletUI" />
+    <!--<Publicize Include="TaleWorlds.GauntletUI.Data"/>                                                                        -->
+    <!--<Publicize Include="TaleWorlds.GauntletUI.ExtraWidgets"/>                                                                -->
+    <!--<Publicize Include="TaleWorlds.GauntletUI.PrefabSystem"/>                                                                -->
+    <!--<Publicize Include="TaleWorlds.GauntletUI.TooltipExtensions"/>                                                           -->
+    <!--<Publicize Include="TaleWorlds.InputSystem"/>                                                                            -->
+    <!--<Publicize Include="TaleWorlds.Library"/>                                                                                -->
+    <!--<Publicize Include="TaleWorlds.LinQuick"/>                                                                               -->
+    <!--<Publicize Include="TaleWorlds.Localization"/>                                                                           -->
+    <!--<Publicize Include="TaleWorlds.ModuleManager"/>                                                                          -->
+    <Publicize Include="TaleWorlds.MountAndBlade" />
+    <!--<Publicize Include="TaleWorlds.MountAndBlade.AutoGenerated"/>                                                            -->
+    <!--<Publicize Include="TaleWorlds.MountAndBlade.Diamond"/>                                                                  -->
+    <!--<Publicize Include="TaleWorlds.MountAndBlade.GauntletUI"/>                                                               -->
+    <!--<Publicize Include="TaleWorlds.MountAndBlade.GauntletUI.Widgets"/>                                                       -->
+    <!--<Publicize Include="TaleWorlds.MountAndBlade.Helpers"/>                                                                  -->
+    <!--<Publicize Include="TaleWorlds.MountAndBlade.Launcher.Library"/>                                                         -->
+    <!--<Publicize Include="TaleWorlds.MountAndBlade.Launcher.Steam"/>                                                           -->
+    <!--<Publicize Include="TaleWorlds.MountAndBlade.View, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64"/>      -->
+    <!--<Publicize Include="TaleWorlds.MountAndBlade.ViewModelCollection"/>                                                      -->
+    <!--<Publicize Include="TaleWorlds.NavigationSystem"/>                                                                       -->
+    <!--<Publicize Include="TaleWorlds.Network"/>                                                                                -->
+    <Publicize Include="TaleWorlds.ObjectSystem" />
+    <!--<Publicize Include="TaleWorlds.PlatformService"/>                                                                        -->
+    <!--<Publicize Include="TaleWorlds.PlatformService.Epic"/>                                                                   -->
+    <!--<Publicize Include="TaleWorlds.PlatformService.GOG"/>                                                                    -->
+    <!--<Publicize Include="TaleWorlds.PlatformService.Steam"/>                                                                  -->
+    <!--<Publicize Include="TaleWorlds.PlayerServices"/>                                                                         -->
+    <!--<Publicize Include="TaleWorlds.PSAI"/>                                                                                   -->
+    <Publicize Include="TaleWorlds.SaveSystem" />
+    <!--<Publicize Include="TaleWorlds.Starter.Library"/>                                                                        -->
+    <!--<Publicize Include="TaleWorlds.TwoDimension"/>                                                                           -->
+    <!--<Publicize Include="TaleWorlds.TwoDimension.Standalone"/>                                                             -->
+  </ItemGroup>
 </Project>

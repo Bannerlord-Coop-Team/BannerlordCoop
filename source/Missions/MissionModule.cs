@@ -55,7 +55,7 @@ namespace Missions
                 .SingleInstance();
 
             // Interface classes
-            builder.RegisterType<LiteNetP2PClient>().As<INetwork>().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<LiteNetP2PClient>().As<IP2PClient>().As<INetwork>().AsSelf().InstancePerLifetimeScope();
 
             builder.RegisterType<NetworkMissileRegistry>().As<INetworkMissileRegistry>();
 

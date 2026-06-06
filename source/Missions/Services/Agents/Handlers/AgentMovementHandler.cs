@@ -119,7 +119,7 @@ namespace Missions.Services.Agents.Handlers
                     {
                         if (agent.Health > 0)
                         {
-                            agent.MakeDead(false, ActionIndexValueCache.act_none);
+                            agent.MakeDead(false, ActionIndexCache.act_none);
                             agent.FadeOut(false, true);
                         }
                     });

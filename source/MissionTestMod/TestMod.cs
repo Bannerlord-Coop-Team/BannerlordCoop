@@ -60,21 +60,21 @@ namespace MissionTestMod
               new TextObject("Join Online Tavern"),
               9991,
               SelectSaveTavern,
-              () => (false, new TextObject()));
+              () => (false, new TextObject("")));
 
             JoinArena = new InitialStateOption(
                "Join Online Arena",
                new TextObject("Join Online Arena"),
                9990,
                SelectSaveArena,
-               () => (false, new TextObject()));
+               () => (false, new TextObject("")));
 
             JoinBattle = new InitialStateOption(
                "Join Online Battle",
                new TextObject("Join Online Battle"),
                9992,
                SelectSaveBattle,
-               () => (false, new TextObject()));
+               () => (false, new TextObject("")));
 
             Module.CurrentModule.AddInitialStateOption(JoinTavern);
             Module.CurrentModule.AddInitialStateOption(JoinArena);

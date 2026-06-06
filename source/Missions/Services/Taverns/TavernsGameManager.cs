@@ -12,6 +12,7 @@ using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Locations;
+using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -91,7 +92,7 @@ namespace Missions.Services.Taverns
             agentBuildData.NoHorses(true);
             agentBuildData.Equipment(character.FirstCivilianEquipment);
             agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
-            agentBuildData.Controller(Agent.ControllerType.None);
+            agentBuildData.Controller(AgentControllerType.None);
 
             Logger.Information("Spawning Agent");
             Agent agent = default;

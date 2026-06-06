@@ -5,14 +5,12 @@ using Common.Network;
 using LiteNetLib;
 using Missions.Services.BoardGames;
 using Missions.Services.Network;
-using Missions.Services.Network.Data;
 using Missions.Services.Network.Messages;
 using Serilog;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.AgentOrigins;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
@@ -88,7 +86,7 @@ namespace Missions.Services.Taverns
             _messageBroker.Unsubscribe<PeerConnected>(Handle_PeerConnected);
         }
 
-        protected override void OnEndMission()
+        public override void OnEndMission()
         {
             base.OnEndMission();
             Dispose();
@@ -123,7 +121,7 @@ namespace Missions.Services.Taverns
             agentBuildData.NoHorses(true);
             agentBuildData.Equipment(character.FirstCivilianEquipment);
             agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
-            agentBuildData.Controller(Agent.ControllerType.None);
+            agentBuildData.Controller(AgentControllerType.None);
 
             Agent agent = default;
             GameLoopRunner.RunOnMainThread(() =>

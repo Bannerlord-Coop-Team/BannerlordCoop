@@ -53,7 +53,7 @@ namespace Missions.Services.Network
             }
         }
 
-        protected override void OnEndMission()
+        public override void OnEndMission()
         {
             base.OnEndMission();
             MBGameManager.EndGame();

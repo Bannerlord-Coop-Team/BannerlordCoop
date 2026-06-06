@@ -280,7 +280,7 @@ namespace Missions.Services
             Hero_BattleEquipment.SetValue(character.HeroObject, generatedEquipment);
             agentBuildData.InitialDirection(vec);
             agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
-            agentBuildData.Controller(Agent.ControllerType.Player);
+            agentBuildData.Controller(AgentControllerType.Player);
 
             Agent agent = default;
             GameLoopRunner.RunOnMainThread(() =>
@@ -308,11 +308,11 @@ namespace Missions.Services
 
             if(isEnemy)
             {
-                agentBuildData.Controller(Agent.ControllerType.None);
+                agentBuildData.Controller(AgentControllerType.None);
             }
             else
             {
-                agentBuildData.Controller(Agent.ControllerType.AI);
+                agentBuildData.Controller(AgentControllerType.AI);
             }
 
             Agent agent = default;
@@ -356,7 +356,7 @@ namespace Missions.Services
             SpawnPlayerAgent(CharacterObject.PlayerCharacter, randomElement);
         }
 
-        protected override void OnEndMission()
+        public override void OnEndMission()
         {
             base.OnEndMission();
             Dispose();
