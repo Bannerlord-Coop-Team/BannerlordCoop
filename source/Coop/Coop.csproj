@@ -5,6 +5,7 @@
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{2C1C41C6-591A-4092-A01A-FEEE1B53185F}</ProjectGuid>
+    <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Coop</RootNamespace>

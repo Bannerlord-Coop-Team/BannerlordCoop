@@ -132,6 +132,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void Start()
     {
+        Logger.Information("Server starting on port {Port}", Configuration.Port);
         netManager.Start(Configuration.Port);
     }
 
