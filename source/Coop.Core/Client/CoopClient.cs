@@ -11,6 +11,7 @@ using GameInterface.Services.GameDebug.Messages;
 using LiteNetLib;
 using Serilog;
 using System;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 
@@ -35,6 +36,8 @@ public class CoopClient : CoopNetworkBase, ICoopClient
     private bool isConnected = false;
     private bool reconnectPending = false;
     private DateTime reconnectAfter = DateTime.MinValue;
+
+    private IPEndPoint connectEndPoint;
 
     public CoopClient(
         INetworkConfiguration config,
@@ -111,22 +114,66 @@ public class CoopClient : CoopNetworkBase, ICoopClient
             Dispose();
         }
 
+        reconnectPending = false;
+        reconnectAfter = DateTime.MinValue;
+
         netManager.Start();
 
-        Logger.Information("Attempting connection to {Address}:{Port}...", Configuration.Address, Configuration.Port);
-        netManager.Connect(Configuration.Address, Configuration.Port, Configuration.Token);
+        var ip = ResolveConnectAddress(Configuration.Address, preferIPv6: false);
+        connectEndPoint = new IPEndPoint(ip, Configuration.Port);
+
+        Logger.Information("Attempting connection to {Endpoint}...", connectEndPoint);
+        netManager.Connect(connectEndPoint, Configuration.Token);
+    }
+
+    private static IPAddress ResolveConnectAddress(string address, bool preferIPv6)
+    {
+        if (IPAddress.TryParse(address, out var parsed))
+            return parsed;
+
+        var addresses = Dns.GetHostAddresses(address)
+            .Where(IsUsableConnectAddress)
+            .ToArray();
+
+        var preferredFamily = preferIPv6
+            ? AddressFamily.InterNetworkV6
+            : AddressFamily.InterNetwork;
+
+        var fallbackFamily = preferIPv6
+            ? AddressFamily.InterNetwork
+            : AddressFamily.InterNetworkV6;
+
+        return addresses.FirstOrDefault(x => x.AddressFamily == preferredFamily)
+            ?? addresses.FirstOrDefault(x => x.AddressFamily == fallbackFamily)
+            ?? throw new InvalidOperationException($"Could not resolve usable address: {address}");
+    }
+
+    private static bool IsUsableConnectAddress(IPAddress address)
+    {
+        if (address.AddressFamily == AddressFamily.InterNetwork)
+            return true;
+
+        if (address.AddressFamily == AddressFamily.InterNetworkV6)
+        {
+            return !address.IsIPv6LinkLocal
+                && !address.IsIPv6Multicast
+                && !address.IsIPv6SiteLocal;
+        }
+
+        return false;
     }
 
     public override void Update(TimeSpan frameTime)
     {
         netManager.PollEvents();
 
-        // Auto-connect retry: fires after a rejection while the server was still loading.
         if (reconnectPending && DateTime.UtcNow >= reconnectAfter)
         {
             reconnectPending = false;
-            Logger.Information("Retrying connection to {Address}:{Port}...", Configuration.Address, Configuration.Port);
-            netManager.Connect(Configuration.Address, Configuration.Port, Configuration.Token);
+
+            messageBroker.Publish(this, new SendInformationMessage($"Retrying connection to {connectEndPoint}..."));
+            Logger.Information("Retrying connection to {Endpoint}...", connectEndPoint);
+            netManager.Connect(connectEndPoint, Configuration.Token);
         }
     }
 

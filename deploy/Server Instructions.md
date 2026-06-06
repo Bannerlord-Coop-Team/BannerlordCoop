@@ -1,5 +1,3 @@
-Here’s a clean version you can use in your README or install guide.
-
 ## Starting the Coop Server
 
 ### 1. Unblock DLLs
@@ -17,8 +15,25 @@ To unblock them:
 You may need to do this for DLLs inside subfolders as well.
 
 ---
+### 2. Disable Warsails DLL if you have it
 
-### 2. Port Forward UDP Ports
+
+### 3. Create the Initial Campaign Save
+
+When starting a server for the first time, you need to create a campaign save before hosting.
+
+From the main menu:
+
+1. Select **Sandbox**.
+2. Create a new character.
+3. Load into the campaign map.
+4. Save the game.
+5. Exit back to the main menu.
+6. Select **Host Coop Campaign**.
+
+---
+
+### 4. Port Forward UDP Ports
 
 The host needs to forward the following UDP ports on their router:
 
@@ -40,7 +55,7 @@ The exact router steps depend on your router model.
 
 ---
 
-### 3. Start the Server
+### 5. Start the Server
 
 Navigate to the mod folder:
 
@@ -58,7 +73,7 @@ This will start the Coop server.
 
 ---
 
-### 4. Connecting
+### 5. Connecting
 
 Players on the same LAN can connect using the host machine’s local IP address, for example:
 

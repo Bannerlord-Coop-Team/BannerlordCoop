@@ -24,7 +24,7 @@ internal static class LoadingWindowPatches
     /// <summary>
     /// While true, native attempts to disable the global loading window are ignored.
     /// </summary>
-    public static bool ForceLoadingWindow { get; private set; }
+    public static bool ForceLoadingWindow { get; set; }
 
     // Setter is non-public on the engine type; resolve it once via reflection.
     private static readonly MethodInfo SetIsLoadingWindowActive =
@@ -36,29 +36,5 @@ internal static class LoadingWindowPatches
     {
         // Skip the disable entirely while we are forcing the window to remain visible.
         return !ForceLoadingWindow;
-    }
-
-    /// <summary>
-    /// Begins forcing the loading window to stay visible. Must run on the main thread.
-    /// </summary>
-    public static void Begin()
-    {
-        ForceLoadingWindow = true;
-
-        // Mark the window active even if no manager exists yet (e.g. mid state-transition),
-        // so the engine re-enables it the next time the manager is (re)initialized.
-        SetIsLoadingWindowActive?.Invoke(null, new object[] { true });
-
-        // Show it immediately if a manager is already present.
-        LoadingWindow.EnableGlobalLoadingWindow();
-    }
-
-    /// <summary>
-    /// Stops forcing and hides the loading window. Must run on the main thread.
-    /// </summary>
-    public static void End()
-    {
-        ForceLoadingWindow = false;
-        LoadingWindow.DisableGlobalLoadingWindow();
     }
 }
