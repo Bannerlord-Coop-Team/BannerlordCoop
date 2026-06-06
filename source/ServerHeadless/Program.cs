@@ -8,7 +8,6 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.SaveSystem;
-using TaleWorlds.SaveSystem.Load;
 using SandBox;
 
 namespace ServerHeadless
@@ -234,39 +233,34 @@ namespace ServerHeadless
         }
 
         /// <summary>
-        /// Loads the selected save headlessly. Deserializes the save into a <see cref="LoadResult"/>,
-        /// then drives the <see cref="SandBoxGameManager"/> loading state machine (by ticking the
-        /// game-state manager) until the game manager reports loaded. On success
+        /// Loads the selected save as a Co-op server through the Coop mod. Publishing
+        /// <see cref="HostSaveGame"/> drives <c>CoopartiveMultiplayerExperience.StartAsServer()</c>
+        /// (which stands up the Coop server + GameInterface patches) and then the LoadGame flow,
+        /// which runs <c>MBGameManager.StartNewGame(new SandBoxGameManager(loadResult))</c>. We then
+        /// drive the loading state machine until the game manager reports loaded; on success
         /// <see cref="Campaign.Current"/> is populated from the save.
         /// </summary>
         private static bool LoadSelectedSave(SaveGameFileInfo save)
         {
-            Console.WriteLine($"[ServerHeadless] Loading save '{save.Name}'...");
+            Console.WriteLine($"[ServerHeadless] Hosting save '{save.Name}' as a Co-op server...");
 
-            LoadResult loadResult = MBSaveLoad.LoadSaveGameData(save.Name);
-            if (loadResult == null || !loadResult.Successful)
-            {
-                Console.Error.WriteLine("[ServerHeadless] Failed to deserialize the save data.");
-                return false;
-            }
-            Console.WriteLine("[ServerHeadless] Save deserialized. Driving game-manager loading...");
+            // This (main) thread is the Coop game-loop thread, then start the server + load the save
+            // through the Coop mod (StartAsServer + HostSaveGame), driven by reflection.
+            CoopServerLauncher.Initialize();
+            CoopServerLauncher.HostSaveGameAsServer(save.Name);
 
-            var gameManager = new SandBoxGameManager(loadResult);
-            MBGameManager.StartNewGame(gameManager);
-
-            // GameLoadingState.OnTick advances SandBoxGameManager.DoLoadingForGameManager each tick
-            // (LoadModuleData -> Game.LoadSaveGame -> repeated DoLoading -> OnLoadFinished), setting
-            // IsLoaded once complete.
+            // HostSaveGame -> StartAsServer + LoadGame has pushed a GameLoadingState; advance it.
             const int maxTicks = 100_000;
             const float dt = 1f / TicksPerSecond;
             int ticks = 0;
-            while (!gameManager.IsLoaded && ticks < maxTicks && !Shutdown.IsCancellationRequested)
+            while ((GameManagerBase.Current as MBGameManager)?.IsLoaded != true && ticks < maxTicks && !Shutdown.IsCancellationRequested)
             {
                 GameStateManager.Current.OnTick(dt);
+                CoopServerLauncher.PumpGameLoop(TimeSpan.FromSeconds(dt));
                 ticks++;
             }
 
-            if (!gameManager.IsLoaded)
+            if ((GameManagerBase.Current as MBGameManager)?.IsLoaded != true)
             {
                 Console.Error.WriteLine($"[ServerHeadless] Loading did not complete after {ticks} ticks.");
                 return false;
@@ -302,10 +296,6 @@ namespace ServerHeadless
         {
             Campaign campaign = Campaign.Current;
 
-            // Let campaign time advance (a paused campaign would tick but never progress).
-            campaign.SetTimeControlModeLock(false);
-            campaign.TimeControlMode = CampaignTimeControlMode.UnstoppablePlay;
-
             Console.WriteLine($"[ServerHeadless] Ticking campaign at {TicksPerSecond} TPS. Press CTRL+C to stop.");
             Console.WriteLine($"    Start time: {CampaignTime.Now}");
 
@@ -321,8 +311,16 @@ namespace ServerHeadless
                 // failure and keep simulating.
                 try
                 {
+                    // Re-assert play mode every tick: encounters/menus reset TimeControlMode to Stop,
+                    // which would freeze the campaign clock. A headless server must keep advancing.
+                    campaign.SetTimeControlModeLock(false);
+                    campaign.TimeControlMode = CampaignTimeControlMode.UnstoppablePlay;
+
                     campaign.RealTick(dt);
                     campaign.Tick();
+
+                    // Pump the Coop server's main-thread work queue (network handlers etc.).
+                    CoopServerLauncher.PumpGameLoop(TimeSpan.FromSeconds(dt));
                 }
                 catch (Exception ex)
                 {

@@ -89,4 +89,11 @@
     </Reference>
   </ItemGroup>
 
+  <!-- The Coop mod assemblies (Common/Coop.Core/GameInterface) are netstandard2.0 and are NOT
+       referenced here: referencing them from this net472 project pulls in conflicting facade
+       assemblies that break Krafs.Publicizer, and the Coop "Common" assembly's namespace collides
+       with TaleWorlds.Library.Common. Instead the Coop server flow (StartAsServer + HostSaveGame) is
+       driven via reflection at runtime (see CoopServerLauncher); the assemblies load from the
+       deployed module bin via the AssemblyResolve handler. -->
+
 </Project>
