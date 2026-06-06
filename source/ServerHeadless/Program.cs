@@ -291,6 +291,8 @@ namespace ServerHeadless
                 ? "none"
                 : $"'{sampleHorse.StringId}' (Monster={sampleHorse.HorseComponent?.Monster?.StringId ?? "<null>"})";
             Console.WriteLine($"[ServerHeadless] Items: {items.Count} (horses: {horses}), Monsters: {monsters}, sample horse: {horseInfo}");
+            // Note: multiplayer-only items (mpitems.xml, IncludedGameTypes=MultiplayerGame) are
+            // intentionally not loaded for a campaign — same as the singleplayer client.
         }
 
         /// <summary>
