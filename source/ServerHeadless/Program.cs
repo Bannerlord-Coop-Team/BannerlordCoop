@@ -269,6 +269,7 @@ namespace ServerHeadless
 
             Console.WriteLine($"[ServerHeadless] Loaded in {ticks} ticks.");
             ReportCampaign();
+            ReportItems();
 
             // The campaign is loaded; signal the server to bind its socket and accept clients.
             // (The mod's graphical MapScreen.OnInitialize hook that normally does this never runs.)
@@ -276,6 +277,20 @@ namespace ServerHeadless
             CoopServerLauncher.SignalCampaignReady();
 
             return true;
+        }
+
+        /// <summary>Reports item/monster loading as a sanity check (horses need a valid Monster).</summary>
+        private static void ReportItems()
+        {
+            var mgr = TaleWorlds.ObjectSystem.MBObjectManager.Instance;
+            var items = mgr.GetObjectTypeList<ItemObject>();
+            int horses = items.Count(i => i.Type == ItemObject.ItemTypeEnum.Horse);
+            int monsters = mgr.GetObjectTypeList<Monster>().Count;
+            var sampleHorse = items.FirstOrDefault(i => i.Type == ItemObject.ItemTypeEnum.Horse);
+            string horseInfo = sampleHorse == null
+                ? "none"
+                : $"'{sampleHorse.StringId}' (Monster={sampleHorse.HorseComponent?.Monster?.StringId ?? "<null>"})";
+            Console.WriteLine($"[ServerHeadless] Items: {items.Count} (horses: {horses}), Monsters: {monsters}, sample horse: {horseInfo}");
         }
 
         /// <summary>

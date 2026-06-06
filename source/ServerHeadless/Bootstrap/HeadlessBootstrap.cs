@@ -1,10 +1,6 @@
 using HarmonyLib;
 using System;
 using System.Reflection;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.CharacterDevelopment;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.ModuleManager;
@@ -80,22 +76,12 @@ namespace ServerHeadless.Bootstrap
         {
             if (MBObjectManager.Instance != null) return;
 
+            // Just create the manager. Do NOT pre-register object types here: the game registers them
+            // itself during load with the correct XML element names (e.g. ItemObject -> "Item"/"Items",
+            // Monster -> "Monster"/"Monsters"), and RegisterType skips duplicates — pre-registering with
+            // wrong names (typeof(T).Name) would block the real registration and break LoadXML for those
+            // types (items/monsters wouldn't load, leaving e.g. horses as invalid items).
             MBObjectManager.Init();
-            RegisterType<ItemObject>();
-            RegisterType<Settlement>();
-            RegisterType<Hero>();
-            RegisterType<MobileParty>();
-            RegisterType<TraitObject>();
-            RegisterType<SkillObject>();
-            RegisterType<PerkObject>();
-            RegisterType<BannerEffect>();
-            RegisterType<CharacterAttribute>();
-        }
-
-        private static uint _typeCounter;
-        private static void RegisterType<T>() where T : MBObjectBase
-        {
-            MBObjectManager.Instance.RegisterType<T>($"{typeof(T).Name}", $"{typeof(T).Name}s", _typeCounter++, true, false);
         }
 
         private static void InitializeModule()
