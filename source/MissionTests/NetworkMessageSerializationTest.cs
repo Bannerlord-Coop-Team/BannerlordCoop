@@ -3,7 +3,6 @@ using Common.Messaging;
 using Common.Serialization;
 using GameInterface.Serialization;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Tests.Stubs;
 using Missions;
 using Missions.Services.Agents.Messages;
 using Missions.Services.Network.Data;
@@ -30,7 +29,7 @@ namespace IntroductionServerTests
 
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterType<MessageBroker>().As<IMessageBroker>().SingleInstance();
-            builder.RegisterType<ObjectManagerAdapterStub>().As<IObjectManager>().InstancePerLifetimeScope();
+            builder.RegisterType<GameInterface.Services.ObjectManager.ObjectManager>().As<IObjectManager>().InstancePerLifetimeScope();
             builder.RegisterType<BinaryPackageFactory>().As<IBinaryPackageFactory>().AutoActivate().SingleInstance();
 
             ContainerProvider.SetContainer(builder.Build());

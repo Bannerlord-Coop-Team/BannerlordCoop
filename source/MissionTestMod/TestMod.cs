@@ -100,7 +100,10 @@ namespace MissionTestMod
                 {
                     file.Delete();
                 }
-                catch (IOException) { }
+                catch (Exception)
+                {
+
+                }
             }
 
             LogManager.Configuration

@@ -157,7 +157,7 @@ namespace Missions.Services
             network.Send(peer, request);
             Logger.Information("Sent {AgentType} Join Request for {AgentName}({PlayerID}) to {Peer}",
                 characterObject.IsPlayerCharacter ? "Player" : "Agent",
-                characterObject.Name, request.PlayerId, peer.EndPoint);
+                characterObject.Name, request.PlayerId, peer);
         }
 
         private void Handle_JoinInfo(MessagePayload<NetworkMissionJoinInfo> payload)
@@ -182,7 +182,7 @@ namespace Missions.Services
                 joinInfo.CharacterObject.IsPlayerCharacter ? "Player" : "Agent",
                 joinInfo.CharacterObject.Name,
                 newAgentId,
-                netPeer?.EndPoint,
+                netPeer,
                 joinInfo?.AiAgentData?.Length);
             }
             catch (Exception) { }

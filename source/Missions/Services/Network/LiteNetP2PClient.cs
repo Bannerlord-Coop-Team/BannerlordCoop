@@ -153,7 +153,7 @@ namespace Missions.Services.Network
         {
             Logger.Verbose("Attempting NAT Punch");
 
-            ConnectionToken token = new ConnectionToken(id, instance, NatAddressType.External);
+            ConnectionToken token = new ConnectionToken(id, instance, networkConfig.NATType);
             if (networkConfig.NATType == NatAddressType.Internal)
             {
                 netManager.NatPunchModule.SendNatIntroduceRequest(networkConfig.LanAddress.ToString(), networkConfig.LanPort, token);
@@ -210,13 +210,13 @@ namespace Missions.Services.Network
 
         public void OnPeerConnected(NetPeer peer)
         {
-            if (PeerServer != null && peer.EndPoint != PeerServer.EndPoint)
+            if (PeerServer != null && peer != PeerServer)
             {
                 var peerConnectedEvent = new PeerConnected(peer);
                 messageBroker.Publish(this, peerConnectedEvent);
             }
 
-            Logger.Verbose("{LocalPort} received connection from {peer}", netManager.LocalPort, peer.EndPoint);
+            Logger.Verbose("{LocalPort} received connection from {peer}", netManager.LocalPort, peer);
         }
 
         public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
@@ -232,7 +232,7 @@ namespace Missions.Services.Network
                 messageBroker.Publish(this, serverDisconnected);
             }
 
-            Logger.Verbose("{LocalPort} received disconnected from {peer}", netManager.LocalPort, peer.EndPoint);
+            Logger.Verbose("{LocalPort} received disconnected from {peer}", netManager.LocalPort, peer);
         }
 
         public void OnNetworkError(IPEndPoint endPoint, SocketError socketError)

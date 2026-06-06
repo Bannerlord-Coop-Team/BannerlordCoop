@@ -43,8 +43,8 @@ namespace Missions.Services.Network
             if(ReadyPeers.ContainsKey(peer) == false)
             {
                 Logger.Error("Tried to process queue for peer that was " +
-                    "not registered {endpoint}, registered peers {readyPeers}", 
-                    peer.EndPoint, ReadyPeers);
+                    "not registered {endpoint}, registered peers {readyPeers}",
+                    peer, ReadyPeers);
                 return;
             }
 
@@ -55,7 +55,7 @@ namespace Missions.Services.Network
             {
                 Logger.Error("Tried to process queue for peer that was " +
                     "not registered {endpoint}, registered peers {readyPeers}",
-                    peer.EndPoint, Queues);
+                    peer, Queues);
                 return;
             }
 
@@ -116,7 +116,7 @@ namespace Missions.Services.Network
             }
             else
             {
-                Logger.Error("Tried to process message for unconnected peer {endpoint}", peer.EndPoint);
+                Logger.Error("Tried to process message for unconnected peer {endpoint}", peer);
             }
         }
 

@@ -77,7 +77,7 @@ namespace Missions.Services.Taverns
             network.Send(peer, request);
             Logger.Information("Sent {AgentType} Join Request for {AgentName}({PlayerID}) to {Peer}",
                 characterObject.IsPlayerCharacter ? "Player" : "Agent",
-                characterObject.Name, request.PlayerId, peer.EndPoint);
+                characterObject.Name, request.PlayerId, peer);
         }
 
         public void Dispose()
@@ -104,7 +104,7 @@ namespace Missions.Services.Taverns
 
             Logger.Information("Spawning {EntityType} called {AgentName}({AgentID}) from {Peer}",
                 joinInfo.CharacterObject.IsPlayerCharacter ? "Player" : "Agent",
-                joinInfo.CharacterObject.Name, newAgentId, netPeer.EndPoint);
+                joinInfo.CharacterObject.Name, newAgentId, netPeer);
 
             
             Agent newAgent = SpawnAgent(startingPos, joinInfo.CharacterObject);
