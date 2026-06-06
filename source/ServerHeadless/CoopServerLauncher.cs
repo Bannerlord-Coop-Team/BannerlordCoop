@@ -25,6 +25,7 @@ namespace ServerHeadless
         // Captured save result (set asynchronously by MessageBroker.Respond).
         private static volatile int _savedBytes = -1;
         private static volatile string _savedCampaignId;
+        private static volatile byte[] _savedData;
         private static readonly SaveResultSink _sink = new SaveResultSink();
 
         /// <summary>
@@ -73,10 +74,11 @@ namespace ServerHeadless
         /// <c>PackageGameSaveData</c> request the server raises when a client connects) and waits for
         /// the resulting in-memory save bytes.
         /// </summary>
-        public static bool TrySaveCurrentState(out int bytes, out string campaignId, int timeoutMs = 10000)
+        public static bool TrySaveCurrentState(out byte[] data, out string campaignId, int timeoutMs = 10000)
         {
             _savedBytes = -1;
             _savedCampaignId = null;
+            _savedData = null;
 
             object broker = Broker();
             Type brokerType = broker.GetType();
@@ -103,9 +105,23 @@ namespace ServerHeadless
                 Thread.Sleep(10);
             }
 
-            bytes = _savedBytes;
+            data = _savedData;
             campaignId = _savedCampaignId;
             return _savedBytes > 0;
+        }
+
+        /// <summary>
+        /// Loads the given save bytes via the exact path the Coop CLIENT uses for a transferred save
+        /// (LoadGameSave -> GameStateInterface.LoadSaveGame -> SaveManager.Load(CoopInMemSaveDriver) ->
+        /// MBGameManager.StartNewGame). Lets us reproduce client-side load failures on the server.
+        /// Pushes a GameLoadingState; the caller must drive the game-state manager to advance it.
+        /// </summary>
+        public static void LoadSaveBytesAsClient(byte[] data)
+        {
+            object broker = Broker();
+            Type loadType = Load("GameInterface", "GameInterface.Services.GameState.Messages.LoadGameSave");
+            object loadMsg = Activator.CreateInstance(loadType, data);
+            Publish(broker, _sink, loadType, loadMsg);
         }
 
         /// <summary>Runs the Coop main-thread work queue (must be called on the game-loop thread).</summary>
@@ -140,6 +156,7 @@ namespace ServerHeadless
                 object what = payload.GetType().GetProperty("What").GetValue(payload);
                 byte[] data = (byte[])what.GetType().GetProperty("GameSaveData").GetValue(what);
                 _savedCampaignId = (string)what.GetType().GetProperty("CampaignID").GetValue(what);
+                _savedData = data;
                 _savedBytes = data?.Length ?? 0;
             }
         }

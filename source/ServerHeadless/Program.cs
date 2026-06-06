@@ -285,13 +285,13 @@ namespace ServerHeadless
         private static void TestServerSave()
         {
             Console.WriteLine("[ServerHeadless] Packaging campaign save for transfer...");
-            if (CoopServerLauncher.TrySaveCurrentState(out int bytes, out string campaignId))
+            if (CoopServerLauncher.TrySaveCurrentState(out byte[] data, out string campaignId))
             {
-                Console.WriteLine($"[ServerHeadless] Save OK: {bytes:N0} bytes (campaign {campaignId}).");
+                Console.WriteLine($"[ServerHeadless] Save OK: {data.Length:N0} bytes (campaign {campaignId}).");
             }
             else
             {
-                Console.Error.WriteLine($"[ServerHeadless] Save produced {bytes} bytes (empty/failed).");
+                Console.Error.WriteLine($"[ServerHeadless] Save failed ({data?.Length ?? 0} bytes).");
             }
         }
 
