@@ -1,4 +1,5 @@
 using HarmonyLib;
+using SandBox.View.Map.Managers;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -17,6 +18,21 @@ namespace ServerHeadless.Bootstrap.Patches
         static bool Prefix(ref IMapEventVisual __result)
         {
             __result = HeadlessMapEventVisual.Instance;
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// <see cref="MobilePartyVisualManager.Current"/> dereferences the SandBox.View submodule's
+    /// visual manager, which isn't loaded headless. Return null — callers (e.g.
+    /// PartyVisualRegistry.RegisterAllObjects) null-check and skip visual registration.
+    /// </summary>
+    [HarmonyPatch(typeof(MobilePartyVisualManager), nameof(MobilePartyVisualManager.Current), MethodType.Getter)]
+    internal class MobilePartyVisualManagerPatches
+    {
+        static bool Prefix(ref MobilePartyVisualManager __result)
+        {
+            __result = null;
             return false;
         }
     }

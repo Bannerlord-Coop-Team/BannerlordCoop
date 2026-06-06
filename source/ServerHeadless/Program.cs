@@ -269,6 +269,12 @@ namespace ServerHeadless
 
             Console.WriteLine($"[ServerHeadless] Loaded in {ticks} ticks.");
             ReportCampaign();
+
+            // The campaign is loaded; signal the server to bind its socket and accept clients.
+            // (The mod's graphical MapScreen.OnInitialize hook that normally does this never runs.)
+            Console.WriteLine("[ServerHeadless] Signalling CampaignReady (starting network)...");
+            CoopServerLauncher.SignalCampaignReady();
+
             return true;
         }
 

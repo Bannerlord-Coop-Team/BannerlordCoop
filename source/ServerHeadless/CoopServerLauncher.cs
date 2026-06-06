@@ -54,6 +54,21 @@ namespace ServerHeadless
         }
 
         /// <summary>
+        /// Publishes <c>CampaignReady</c>, which the server's InitialServerState waits for to call
+        /// <c>network.Start()</c> (bind the listen socket), register all game objects and allow
+        /// joining. The mod normally raises this from a Harmony hook on <c>MapScreen.OnInitialize</c>
+        /// — a graphical screen that never initializes headless — so without this the server never
+        /// binds its port and is unreachable.
+        /// </summary>
+        public static void SignalCampaignReady()
+        {
+            object broker = Broker();
+            Type readyType = Load("GameInterface", "GameInterface.Services.GameState.Messages.CampaignReady");
+            object ready = Activator.CreateInstance(readyType);
+            Publish(broker, null, readyType, ready);
+        }
+
+        /// <summary>
         /// Triggers the server's "package the campaign for transfer" save (the same
         /// <c>PackageGameSaveData</c> request the server raises when a client connects) and waits for
         /// the resulting in-memory save bytes.
