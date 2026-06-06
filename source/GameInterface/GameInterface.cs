@@ -45,6 +45,9 @@ public class GameInterface : IGameInterface
     public void UnpatchAll()
     {
         patchCollector.UnpatchAll();
-        harmony.UnpatchAll();
+        // Only remove Coop's own patches. The parameterless Harmony.UnpatchAll() is a global
+        // unpatch that strips every patch in the process — the base game's and other mods'
+        // included — which crashes the game when a player leaves a coop session.
+        harmony.UnpatchAll(harmony.Id);
     }
 }
