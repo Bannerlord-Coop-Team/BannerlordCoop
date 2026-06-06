@@ -8,6 +8,7 @@ using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
+using GameInterface.Services.Players;
 using Helpers;
 using LiteNetLib;
 using Serilog;
@@ -33,13 +34,21 @@ internal class PlayerCaptivityHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IMessageBroker messageBroker;
+    private readonly IPlayerRegistry playerRegistry;
 
-    public PlayerCaptivityHandler(IObjectManager objectManager, INetwork network, IMessageBroker messageBroker)
+    public PlayerCaptivityHandler(
+        IObjectManager objectManager,
+        INetwork network,
+        IMessageBroker messageBroker,
+        IPlayerRegistry playerRegistry)
     {
         this.objectManager = objectManager;
         this.network = network;
         this.messageBroker = messageBroker;
+        this.playerRegistry = playerRegistry;
+
         messageBroker.Subscribe<PrisonerTaken>(Handle_PrisonerTaken);
+        messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
 
         messageBroker.Subscribe<PlayerSurrendered>(Handle_PlayerSurrendered);
         messageBroker.Subscribe<NetworkPlayerSurrendered>(Handle_NetworkPlayerSurrendered);
@@ -49,6 +58,21 @@ internal class PlayerCaptivityHandler : IHandler
         messageBroker.Subscribe<EndPlayerCaptivityAttempted>(Handle_PlayerCaptivityEnded);
         messageBroker.Subscribe<NetworkEndPlayerCaptivityAttempted>(Handle_NetworkEndPlayerCaptivityAttempted);
         messageBroker.Subscribe<NetworkPlayerCaptivityEnded>(Handle_NetworkPlayerCaptivityEnded);
+    }
+
+    public void Dispose()
+    {
+        messageBroker.Unsubscribe<PrisonerTaken>(Handle_PrisonerTaken);
+        messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
+
+        messageBroker.Unsubscribe<PlayerSurrendered>(Handle_PlayerSurrendered);
+        messageBroker.Unsubscribe<NetworkPlayerSurrendered>(Handle_NetworkPlayerSurrendered);
+
+        messageBroker.Unsubscribe<PlayerCaptivityChanged>(Handle_PlayerCaptivityChanged);
+
+        messageBroker.Unsubscribe<EndPlayerCaptivityAttempted>(Handle_PlayerCaptivityEnded);
+        messageBroker.Unsubscribe<NetworkEndPlayerCaptivityAttempted>(Handle_NetworkEndPlayerCaptivityAttempted);
+        messageBroker.Unsubscribe<NetworkPlayerCaptivityEnded>(Handle_NetworkPlayerCaptivityEnded);
     }
 
     private void Handle_PrisonerTaken(MessagePayload<PrisonerTaken> payload)
@@ -61,17 +85,20 @@ internal class PlayerCaptivityHandler : IHandler
         if (mobileParty?.IsPlayerParty() == false)
             return;
 
+        if (hero.PartyBelongedToAsPrisoner != null)
+            return;
+
         hero.PartyBelongedToAsPrisoner = payload.What.CapturerParty;
         hero.PartyBelongedTo = null;
 
+        mobileParty.MemberRoster.RemoveTroop(hero.CharacterObject);
+        mobileParty.MemberRoster.Clear();
+        mobileParty.PrisonRoster.Clear();
+        
+        payload.What.CapturerParty.PrisonRoster.AddToCounts(hero.CharacterObject, 1);
+
         mobileParty.IsActive = false;
         mobileParty.ChangePartyLeader(null);
-    }
-
-    public void Dispose()
-    {
-        messageBroker.Unsubscribe<PlayerSurrendered>(Handle_PlayerSurrendered);
-        messageBroker.Unsubscribe<NetworkPlayerSurrendered>(Handle_NetworkPlayerSurrendered);
     }
 
     private void Handle_PlayerSurrendered(MessagePayload<PlayerSurrendered> payload)
@@ -89,11 +116,15 @@ internal class PlayerCaptivityHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging(payload.What.MapEventId, out MapEvent mapEvent)) return;
         if (!objectManager.TryGetObjectWithLogging(payload.What.PlayerParty, out MobileParty playerParty)) return;
 
-        mapEvent.DoSurrender(playerParty.Party.Side);
-        mapEvent.FinalizeEvent();
-
-        playerParty.IsActive = false;
-        playerParty.ChangePartyLeader(null);
+        try
+        {
+            mapEvent.DoSurrender(playerParty.Party.Side);
+            mapEvent.FinalizeEvent();
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to surrender");
+        }
     }
 
     /// <summary>
@@ -257,6 +288,34 @@ internal class PlayerCaptivityHandler : IHandler
             if (!playerParty.IsCurrentlyAtSea)
             {
                 playerParty.Party.UpdateVisibilityAndInspected(playerParty.Position);
+            }
+        }
+    }
+
+    // Keep player party by captor
+    // Re-implements <see cref="PlayerCaptivity.Update"> for multiplayer
+    private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
+    {
+        foreach (var (hero, mobileParty) in PlayerHeros())
+        {
+            if (!hero.IsPrisoner) continue;
+
+            var captorParty = hero.PartyBelongedToAsPrisoner;
+
+            if (captorParty == null) continue;
+
+            mobileParty.Position = hero.PartyBelongedToAsPrisoner.Position;
+        }
+    }
+
+    private IEnumerable<(Hero, MobileParty)> PlayerHeros()
+    {
+        foreach (var player in playerRegistry)
+        {
+            if (objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero) &&
+                objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var mobileParty))
+            {
+                yield return (hero, mobileParty);
             }
         }
     }

@@ -92,7 +92,5 @@ internal class SaveGameHandler : IHandler
         {
             playerRegistry.AddPlayer(player);
         }
-
-        PartyExtensions.InvalidateCache();
     }
 }

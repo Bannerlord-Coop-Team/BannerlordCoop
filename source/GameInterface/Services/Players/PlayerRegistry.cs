@@ -1,10 +1,12 @@
-﻿using Common.Messaging;
+﻿using Common.Caching;
+using Common.Messaging;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Players.Messages;
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Players;
@@ -28,9 +30,12 @@ public interface IPlayerRegistry: IEnumerable<Player>
     /// <returns>true if the <paramref name="mobileParty"/> is a player otherwise false.</returns>
     bool Contains(MobileParty mobileParty);
 }
+
 /// <inheritdoc cref="IPlayerRegistry"/>
 internal class PlayerRegistry : IPlayerRegistry
 {
+    public static readonly ConditionalWeakTable<MobileParty, CachedPrimitive<bool>> IsPlayerPartyCache = new();
+
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly HashSet<Player> _players = new HashSet<Player>();
@@ -50,7 +55,7 @@ internal class PlayerRegistry : IPlayerRegistry
 
         if (objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var mobileParty))
         {
-            mobileParty.InvalidatePartyCache();
+            IsPlayerPartyCache.GetValue(mobileParty, _ => new CachedPrimitive<bool>(false)).Value = true;
         }
 
         messageBroker.Publish(this, new PlayerRegistered(player));

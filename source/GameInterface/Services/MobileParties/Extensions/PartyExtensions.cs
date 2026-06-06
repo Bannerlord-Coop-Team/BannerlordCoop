@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common.Caching;
+using Common.Logging;
 using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -17,7 +18,6 @@ public static class PartyExtensions
     private sealed class PartyCache
     {
         public bool? IsPartyControlled;
-        public bool? IsPlayerParty;
         public bool? IsInConversation;
     }
 
@@ -84,23 +84,7 @@ public static class PartyExtensions
             return false;
         }
 
-        var cache = Cache.GetOrCreateValue(party);
-
-        if (cache.IsPlayerParty.HasValue)
-        {
-            return cache.IsPlayerParty.Value;
-        }
-
-        if (!ContainerProvider.TryResolve<IPlayerRegistry>(out var playerRegistry))
-        {
-            Logger.Error("Unable to resolve {name}", nameof(IPlayerRegistry));
-            return false;
-        }
-
-        var result = playerRegistry.Contains(party);
-        cache.IsPlayerParty = result;
-
-        return result;
+        return PlayerRegistry.IsPlayerPartyCache.GetValue(party, _ => new CachedPrimitive<bool>(false)).Value;
     }
 
     public static bool IsInConversation(this MobileParty party)
@@ -165,21 +149,6 @@ public static class PartyExtensions
 
         var cache = Cache.GetOrCreateValue(party);
         cache.IsPartyControlled = null;
-    }
-
-    /// <summary>
-    /// Clears only the cached player-state for a specific party.
-    /// </summary>
-    public static void InvalidatePlayerPartyCache(this MobileParty party)
-    {
-        if (party is null)
-        {
-            Logger.Error("{parameterName} was null", nameof(party));
-            return;
-        }
-
-        var cache = Cache.GetOrCreateValue(party);
-        cache.IsPlayerParty = null;
     }
 
     public static void InvalidateCache()
