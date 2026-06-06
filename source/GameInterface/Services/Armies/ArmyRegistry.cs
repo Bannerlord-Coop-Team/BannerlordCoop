@@ -51,7 +51,9 @@ internal class ArmyRegistry : AutoRegistryBase<Army>
     {
         AccessTools.Field(typeof(Army), nameof(Army._parties)).SetValue(obj, new MBList<MobileParty>());
     }
-
+    // DisperseInternal doesnt work since  it accesses LeaderParty.Position, tick events, and
+    // CampaignEventDispatcher which arent initialized on client objects (SkipConstructor).
+    // Just clean up the fields directly.
     public override void OnClientDestroyed(Army obj, string id)
     {
         GameLoopRunner.RunOnMainThread(() =>

@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.TroopRosters.Messages;
 using HarmonyLib;
@@ -9,6 +10,8 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.TroopRosters.Patches;
@@ -24,7 +27,6 @@ internal class TroopRosterPatches
     int woundedCount, int xpChange, bool removeDepleted, int index)
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
-
         if (ModInformation.IsClient)
         {
             Logger.Error("Client attempted to {methodName} managed {type}", nameof(ItemRoster.AddToCounts), typeof(ItemRoster));
@@ -114,5 +116,34 @@ internal class TroopRosterPatches
 
         var message = new TroopRosterCleared(__instance);
         MessageBroker.Instance.Publish(__instance, message);
+    }
+}
+/// <summary>
+/// Explicitly publishes troop roster sync message when recruitment happens inside an AllowedThread context.
+/// Normally <see cref="TroopRoster.AddToCounts"/> patch handles sync, but when
+/// <see cref="EnterSettlementAction.ApplyForParty"/> runs inside AllowedThread (via OverrideApplyForParty),
+/// the AddToCounts patch is suppressed by CallOriginalPolicy. This patch fires before ApplyInternal
+/// and explicitly sends the sync message to clients.
+/// </summary>
+[HarmonyPatch(typeof(RecruitmentCampaignBehavior), "ApplyInternal")]
+internal class RecruitmentCampaignBehaviorPatch
+{
+    private static readonly ILogger Logger = LogManager.GetLogger<RecruitmentCampaignBehaviorPatch>();
+
+    [HarmonyPrefix]
+    static void PrefixApplyInternal(MobileParty side1Party, CharacterObject troop, int number,
+        RecruitmentCampaignBehavior.RecruitingDetail detail)
+    {
+        if (!AllowedThread.IsThisThreadAllowed()) return;
+        if (ModInformation.IsClient) return;
+        if (side1Party?.MemberRoster == null) return;
+
+        var actualNumber = (detail == RecruitmentCampaignBehavior.RecruitingDetail.VolunteerFromIndividual ||
+                            detail == RecruitmentCampaignBehavior.RecruitingDetail.VolunteerFromIndividualToGarrison)
+                            ? 1 : number;
+
+        var message = new TroopRosterAddToCountsChanged(side1Party.MemberRoster, troop, actualNumber, false, 0, 0, true, -1);
+
+        MessageBroker.Instance.Publish(side1Party.MemberRoster, message);
     }
 }
