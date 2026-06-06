@@ -1,5 +1,6 @@
 ﻿using Common.Network;
 using System;
+using System.Net;
 
 namespace Coop.Core.Common.Configuration;
 
@@ -12,7 +13,7 @@ public class NetworkConfiguration : INetworkConfiguration
     public string Address { get; set; } =  "localhost";
     public TimeSpan ConnectionTimeout { get; set; } = TimeSpan.FromMinutes(5);
 #else
-    public string Address { get; set; } = "bannerlordcoop.duckdns.org";
+    public string Address { get; set; } = "localhost";
     public TimeSpan ConnectionTimeout { get; set; } = TimeSpan.FromSeconds(10);
 #endif
 

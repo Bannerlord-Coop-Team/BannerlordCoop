@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Common.Logging;
+using Serilog;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -9,6 +11,8 @@ namespace Common.Util;
 /// </summary>
 public class Poller
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<Poller>();
+
     /// <summary>
     /// The function to be polled
     /// </summary>
@@ -73,8 +77,15 @@ public class Poller
             // Calculate the delta time span
             var delta = DateTime.Now - startTime;
 
-            // Poll the function
-            pollingFunction(delta);
+            try
+            {
+                // Poll the function
+                pollingFunction(delta);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Polling failed for {FunctionName}", pollingFunction.Method.Name);
+            }
 
             startTime = DateTime.Now;
 

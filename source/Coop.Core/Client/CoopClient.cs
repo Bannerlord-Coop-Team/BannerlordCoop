@@ -6,6 +6,7 @@ using Common.PacketHandlers;
 using Common.Serialization;
 using Coop.Core.Client.Messages;
 using Coop.Core.Common.Network;
+using GameInterface;
 using GameInterface.Services.GameDebug.Messages;
 using LiteNetLib;
 using Serilog;
@@ -31,7 +32,6 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 
     private readonly IMessageBroker messageBroker;
     private readonly IPacketManager packetManager;
-
     private bool isConnected = false;
     private bool reconnectPending = false;
     private DateTime reconnectAfter = DateTime.MinValue;

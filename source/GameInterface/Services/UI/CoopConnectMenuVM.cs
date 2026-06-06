@@ -1,7 +1,9 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.UI.Messages;
+using System;
 using System.Linq;
 using System.Net;
+using System.Net.Sockets;
 using TaleWorlds.Library;
 using TaleWorlds.ScreenSystem;
 
@@ -66,37 +68,39 @@ namespace GameInterface.Services.UI
 
         public void ActionConnect()
         {
-            int port;
-
-            //Connect to IP
-            if (!int.TryParse(connectPort, out port))
+            if (!int.TryParse(connectPort, out var port) || port < IPEndPoint.MinPort || port > IPEndPoint.MaxPort)
             {
-                InformationManager.DisplayMessage(new InformationMessage("ERROR: The port has to be a number"));
+                InformationManager.DisplayMessage(new InformationMessage("ERROR: The connection port is invalid"));
                 return;
             }
-
-            IPHostEntry hostEntry;
 
             try
             {
-                hostEntry = Dns.GetHostEntry(connectIP);
+                IPAddress ip;
+
+                if (IPAddress.TryParse(connectIP, out var enteredIp))
+                {
+                    ip = enteredIp;
+                }
+                else
+                {
+                    var addresses = Dns.GetHostAddresses(connectIP);
+
+                    ip = addresses.FirstOrDefault(x => x.AddressFamily == AddressFamily.InterNetwork);
+
+                    if (ip == null)
+                    {
+                        InformationManager.DisplayMessage(new InformationMessage("ERROR: No IPv4 address found for host"));
+                        return;
+                    }
+                }
+
+                MessageBroker.Instance.Publish(this, new AttemptJoin(ip, port));
             }
-            catch (System.Exception)
+            catch (Exception ex)
             {
-                InformationManager.DisplayMessage(new InformationMessage("ERROR: The connection address could not be resolved"));
-                return;
+                InformationManager.DisplayMessage(new InformationMessage($"ERROR: The connection address could not be resolved: {ex.Message}"));
             }
-            
-
-            if (hostEntry.AddressList.Length <= 0)
-            {
-                InformationManager.DisplayMessage(new InformationMessage("ERROR: The connection address is invalid"));
-                return;
-            }
-
-            IPAddress ip = hostEntry.AddressList.First();
-
-            MessageBroker.Instance.Publish(this, new AttemptJoin(ip, port));
         }
 
         public void ActionCancel()

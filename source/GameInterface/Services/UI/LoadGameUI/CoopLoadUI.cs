@@ -56,10 +56,10 @@ namespace Coop.UI.LoadGameUI
 
 	class CoopLoadUI : SaveLoadVM
 	{
-		private new SelectedGameVM CurrentSelectedSave;
+		private new SavedGameVM CurrentSelectedSave;
         public CoopLoadUI() : base(false, false)
         {
-            GetSavedGames().Clear();
+            Initialize();
             SaveGameFileInfo[] saveFiles = MBSaveLoad.GetSaveFiles();
             for (int i = 0; i < saveFiles.Length; i++)
             {
@@ -72,7 +72,7 @@ namespace Coop.UI.LoadGameUI
 
         private void OnSaveSelection(SavedGameVM saveGame)
         {
-            SelectedGameVM save = (SelectedGameVM)saveGame;
+            var save = saveGame;
             if (save != CurrentSelectedSave)
             {
                 if (CurrentSelectedSave != null)
@@ -90,7 +90,7 @@ namespace Coop.UI.LoadGameUI
 
         public new void ExecuteLoadSave()
         {
-            SelectedGameVM currentSelectedSave = CurrentSelectedSave;
+            var currentSelectedSave = CurrentSelectedSave;
             if (currentSelectedSave == null)
             {
                 return;
