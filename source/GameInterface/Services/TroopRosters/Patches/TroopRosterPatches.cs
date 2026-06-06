@@ -142,32 +142,36 @@ internal class TroopRosterPatches
         MessageBroker.Instance.Publish(__instance, new TroopsSwappedAtIndices(__instance, firstIndex, secondIndex));
     }
 }
-/// <summary>
-/// Explicitly publishes troop roster sync message when recruitment happens inside an AllowedThread context.
-/// Normally <see cref="TroopRoster.AddToCounts"/> patch handles sync, but when
-/// <see cref="EnterSettlementAction.ApplyForParty"/> runs inside AllowedThread (via OverrideApplyForParty),
-/// the AddToCounts patch is suppressed by CallOriginalPolicy. This patch fires before ApplyInternal
-/// and explicitly sends the sync message to clients.
-/// </summary>
-[HarmonyPatch(typeof(RecruitmentCampaignBehavior), "ApplyInternal")]
-internal class RecruitmentCampaignBehaviorPatch
+// RecruitmentCampaignBehavior.ApplyInternal runs inside AllowedThread (via OverrideApplyForParty),
+// which suppresses the AddNewElement and AddToCountsAtIndex patches. This patch explicitly
+// publishes sync messages for that case using the return value as the final index.
+[HarmonyPatch(typeof(TroopRoster), nameof(TroopRoster.AddToCounts))]
+internal class TroopRosterAddToCountsPatch
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<RecruitmentCampaignBehaviorPatch>();
-
     [HarmonyPrefix]
-    static void PrefixApplyInternal(MobileParty side1Party, CharacterObject troop, int number,
-        RecruitmentCampaignBehavior.RecruitingDetail detail)
+    static void Prefix(TroopRoster __instance, CharacterObject character, ref bool __state)
     {
         if (!AllowedThread.IsThisThreadAllowed()) return;
         if (ModInformation.IsClient) return;
-        if (side1Party?.MemberRoster == null) return;
+        if (__instance == null || character == null) return;
 
-        var actualNumber = (detail == RecruitmentCampaignBehavior.RecruitingDetail.VolunteerFromIndividual ||
-                            detail == RecruitmentCampaignBehavior.RecruitingDetail.VolunteerFromIndividualToGarrison)
-                            ? 1 : number;
+        // track if this is a new element
+        __state = __instance.FindIndexOfTroop(character) < 0;
+    }
 
-        var message = new TroopRosterAddToCountsChanged(side1Party.MemberRoster, troop, actualNumber, false, 0, 0, true, -1);
+    [HarmonyPostfix]
+    static void Postfix(TroopRoster __instance, CharacterObject character, int count,
+        bool insertAtFront, int woundedCount, int xpChange, bool removeDepleted, int __result, bool __state)
+    {
+        if (!AllowedThread.IsThisThreadAllowed()) return;
+        if (ModInformation.IsClient) return;
+        if (__instance == null || character == null) return;
 
-        MessageBroker.Instance.Publish(side1Party.MemberRoster, message);
+        if (__state) // was new element
+        {
+            MessageBroker.Instance.Publish(__instance, new NewElementAdded(__instance, character, insertAtFront ? 0 : -1));
+        }
+
+        MessageBroker.Instance.Publish(__instance, new CountsAtIndexAdded(__instance, __result, count, woundedCount, xpChange, removeDepleted));
     }
 }
