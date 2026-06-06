@@ -13,7 +13,7 @@ namespace Common.Util;
 public class AllowedThread : IDisposable
 {
     public static int CurrentThreadId => Thread.CurrentThread.ManagedThreadId;
-    private static readonly HashSet<int> AllowedThreadIds = new HashSet<int>();
+    private static readonly HashSet<int> _allowedThreadIds = new HashSet<int>();
 
     public AllowedThread()
     {
@@ -27,22 +27,19 @@ public class AllowedThread : IDisposable
 
     public static void AllowThisThread()
     {
-        lock(AllowedThreadIds)
+        lock(_allowedThreadIds)
         {
-            AllowedThreadIds.Add(CurrentThreadId);
+            _allowedThreadIds.Add(CurrentThreadId);
         }
     }
 
     public static void RevokeThisThread()
     {
-        lock (AllowedThreadIds)
+        lock (_allowedThreadIds)
         {
-            AllowedThreadIds.Remove(CurrentThreadId);
+            _allowedThreadIds.Remove(CurrentThreadId);
         }
     }
 
-    // Internal on purpose: callers must gate on CallOriginalPolicy.IsOriginalAllowed() (which
-    // consults this plus the sync policy), not the raw thread check. AllowThisThread/RevokeThisThread
-    // stay public so code can still mark a thread allowed.
-    internal static bool IsThisThreadAllowed() => AllowedThreadIds.Contains(CurrentThreadId);
+    public static bool IsThisThreadAllowed() => _allowedThreadIds.Contains(CurrentThreadId);
 }
