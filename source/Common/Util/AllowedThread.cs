@@ -41,5 +41,8 @@ public class AllowedThread : IDisposable
         }
     }
 
-    public static bool IsThisThreadAllowed() => AllowedThreadIds.Contains(CurrentThreadId);
+    // Internal on purpose: callers must gate on CallOriginalPolicy.IsOriginalAllowed() (which
+    // consults this plus the sync policy), not the raw thread check. AllowThisThread/RevokeThisThread
+    // stay public so code can still mark a thread allowed.
+    internal static bool IsThisThreadAllowed() => AllowedThreadIds.Contains(CurrentThreadId);
 }

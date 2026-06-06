@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Policies;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.PlayerCaptivityService.Messages;
@@ -23,7 +24,7 @@ internal class PlayerEncounterPatches
     public static bool RestartPlayerEncounterPrefix(PartyBase defenderParty, PartyBase attackerParty, bool forcePlayerOutFromSettlement)
     {
         // Our own server-approved re-run (AllowedThread) runs the real RestartPlayerEncounter.
-        if (AllowedThread.IsThisThreadAllowed()) return true;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         // The server runs RestartPlayerEncounter locally (authoritative).
         if (ModInformation.IsServer) return true;
@@ -41,7 +42,7 @@ internal class PlayerEncounterPatches
     public static bool StartBattleInternalPrefix(PlayerEncounter __instance, ref MapEvent __result)
     {
         // Our own handler / replication path (AllowedThread) runs the real creation.
-        if (AllowedThread.IsThisThreadAllowed()) return true;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         // The server is authoritative and creates the MapEvent locally.
         if (ModInformation.IsServer) return true;
@@ -93,7 +94,7 @@ internal class PlayerEncounterPatches
     [HarmonyPrefix]
     public static bool PlayerSurrenderInternalPrefix(ref PlayerEncounter __instance)
     {
-        if (AllowedThread.IsThisThreadAllowed()) return true;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsServer) return true;
 
