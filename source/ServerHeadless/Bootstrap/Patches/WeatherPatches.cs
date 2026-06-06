@@ -1,41 +1,27 @@
 using HarmonyLib;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.GameComponents;
-using static TaleWorlds.CampaignSystem.ComponentInterfaces.MapWeatherModel;
 
 namespace ServerHeadless.Bootstrap.Patches
 {
     /// <summary>
-    /// The weather model samples the native map scene (snow/rain/terrain) to derive weather. Headless
-    /// there is no scene, so report clear weather everywhere and skip the scene-based computation.
+    /// The weather model's per-node cache (DefaultMapWeatherModel._weatherDataCache) is normally
+    /// allocated by SandBoxGameManager's loading step (which sets DefaultWeatherNodeDimension then
+    /// calls MapWeatherModel.InitializeCaches). That step doesn't run in our headless load path, so
+    /// the cache stays null and the first weather update NREs. Allocate it just before the weather
+    /// behaviour's session-launched handler builds its node grid and primes every node — by then
+    /// Campaign.Models is wired up and DefaultWeatherNodeDimension is set (see CampaignMapScenePatches).
+    ///
+    /// We intentionally do NOT stub the weather model itself: with the scene-backed snow/rain mocked
+    /// to 0 (MapScenePatches) the weather is purely season/time driven, which is deterministic and
+    /// lets the server maintain an evolving weather state to transfer to clients.
     /// </summary>
-    [HarmonyPatch(typeof(DefaultMapWeatherModel))]
-    internal class WeatherPatches
+    [HarmonyPatch(typeof(MapWeatherCampaignBehavior), "OnSessionLaunchedEvent")]
+    internal class WeatherCachePatches
     {
-        [HarmonyPatch(nameof(DefaultMapWeatherModel.UpdateWeatherForPosition))]
-        [HarmonyPrefix]
-        static bool UpdateWeatherForPositionPrefix(ref WeatherEvent __result)
+        static void Prefix()
         {
-            __result = WeatherEvent.Clear;
-            return false;
+            Campaign.Current?.Models?.MapWeatherModel?.InitializeCaches();
         }
-
-        [HarmonyPatch(nameof(DefaultMapWeatherModel.GetWeatherEventInPosition))]
-        [HarmonyPrefix]
-        static bool GetWeatherEventInPositionPrefix(ref WeatherEvent __result)
-        {
-            __result = WeatherEvent.Clear;
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// The periodic weather update walks a node grid sized from the (placeholder) map, which is
-    /// empty headless — its first index throws. Weather is cosmetic, so skip the update entirely.
-    /// </summary>
-    [HarmonyPatch(typeof(MapWeatherCampaignBehavior), "WeatherUpdateTick")]
-    internal class MapWeatherBehaviorPatches
-    {
-        static bool Prefix() => false;
     }
 }

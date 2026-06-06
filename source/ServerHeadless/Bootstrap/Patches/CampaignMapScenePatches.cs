@@ -25,9 +25,10 @@ namespace ServerHeadless.Bootstrap.Patches
         {
             __instance._mapSceneWrapper = new MapScene();
 
-            // Normally seeded from the native scene; a non-zero value avoids divide-by-zero in the
-            // weather model (WeatherUpdateFrequency divides by its square).
-            __instance.DefaultWeatherNodeDimension = 10;
+            // Match the game's default weather-node grid (SandBoxGameManager uses 32). The weather
+            // behaviour sizes its node grid + shuffled-index array as dimension^2 and the save's
+            // _lastUpdatedNodeIndex assumes that size, so this must match to tick weather correctly.
+            __instance.DefaultWeatherNodeDimension = 32;
 
             Campaign.MapMinimumPosition = new Vec2(0f, 0f);
             Campaign.MapMaximumPosition = new Vec2(1000f, 1000f);

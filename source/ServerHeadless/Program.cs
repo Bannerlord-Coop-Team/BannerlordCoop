@@ -378,13 +378,41 @@ namespace ServerHeadless
 
                 if (tick % (TicksPerSecond * 5) == 0)
                 {
-                    Console.WriteLine($"[ServerHeadless] tick {tick} — {CampaignTime.Now} — {errors} error(s)");
+                    Console.WriteLine($"[ServerHeadless] tick {tick} — {CampaignTime.Now} — {errors} error(s) — weather: {SampleWeather()}");
                 }
 
                 Shutdown.Token.WaitHandle.WaitOne(TimeSpan.FromSeconds(dt));
             }
 
             Console.WriteLine($"[ServerHeadless] Stopped after {tick} ticks.");
+        }
+
+        /// <summary>
+        /// Tally the current weather event over all settlement positions, so the tick log shows the
+        /// server's weather state and confirms it evolves over campaign time.
+        /// </summary>
+        private static string SampleWeather()
+        {
+            try
+            {
+                var model = Campaign.Current?.Models?.MapWeatherModel;
+                var settlements = Campaign.Current?.Settlements;
+                if (model == null || settlements == null) return "n/a";
+
+                var counts = new System.Collections.Generic.Dictionary<TaleWorlds.CampaignSystem.ComponentInterfaces.MapWeatherModel.WeatherEvent, int>();
+                foreach (var settlement in settlements)
+                {
+                    var ev = model.GetWeatherEventInPosition(settlement.GetPosition2D);
+                    counts.TryGetValue(ev, out int c);
+                    counts[ev] = c + 1;
+                }
+
+                return string.Join(", ", counts.OrderByDescending(kv => kv.Value).Select(kv => $"{kv.Key}={kv.Value}"));
+            }
+            catch (Exception ex)
+            {
+                return ex.GetType().Name;
+            }
         }
     }
 }

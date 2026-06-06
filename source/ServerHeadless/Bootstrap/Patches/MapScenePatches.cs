@@ -83,6 +83,16 @@ namespace ServerHeadless.Bootstrap.Patches
             return false;
         }
 
+        // Terrain size drives weather-node positioning. Return a size that comfortably covers the
+        // campaign map so party positions map to in-range weather-grid indices.
+        [HarmonyPatch(nameof(MapScene.GetTerrainSize))]
+        [HarmonyPrefix]
+        static bool GetTerrainSizePrefix(ref Vec2 __result)
+        {
+            __result = new Vec2(2000f, 2000f);
+            return false;
+        }
+
         // Siege-camp placement frames come from the native scene; no siege staging headless.
         [HarmonyPatch(nameof(MapScene.GetSiegeCampFrames))]
         [HarmonyPrefix]
