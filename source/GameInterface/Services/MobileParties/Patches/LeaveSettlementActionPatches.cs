@@ -6,6 +6,7 @@ using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
@@ -20,11 +21,12 @@ public class LeaveSettlementActionPatches
     [HarmonyPatch(nameof(LeaveSettlementAction.ApplyForParty))]
     private static bool Prefix(MobileParty mobileParty)
     {
-        if(CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (mobileParty.CurrentSettlement == null) return false;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient) return false;
 
-        var message = new PartyLeaveSettlementAttempted(mobileParty.StringId);
+        var message = new PartyLeaveSettlementAttempted(mobileParty);
         MessageBroker.Instance.Publish(mobileParty, message);
 
         return false;
@@ -36,7 +38,9 @@ public class LeaveSettlementActionPatches
         {
             using (new AllowedThread())
             {
-                if (party.CurrentSettlement is null) return;
+                if (party.CurrentSettlement == null)
+                    return;
+                
                 LeaveSettlementAction.ApplyForParty(party);
             }
         });

@@ -3,7 +3,6 @@ using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Connections.Messages;
-using GameInterface.Services.Entity.Messages;
 using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
 using Serilog;

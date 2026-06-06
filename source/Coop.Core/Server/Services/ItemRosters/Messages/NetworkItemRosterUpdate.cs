@@ -9,23 +9,23 @@ namespace Coop.Core.Server.Services.ItemRosters.Messages;
 /// </summary>
 [BatchLogMessage]
 [ProtoContract(SkipConstructor = true)]
-public class NetworkItemRosterUpdate : IMessage
+public readonly struct NetworkItemRosterUpdate : IMessage
 {
     [ProtoMember(1)]
-    public string PartyBaseID { get; }
+    public readonly string ItemRosterId;
 
     [ProtoMember(2)]
-    public string ItemID { get; }
+    public readonly string ItemID;
 
     [ProtoMember(3)]
-    public string ItemModifierID { get; }
+    public readonly string ItemModifierID;
 
     [ProtoMember(4)]
-    public int Amount { get; }
+    public readonly int Amount;
 
-    public NetworkItemRosterUpdate(string partyBaseID, string itemID, string itemModifierID, int amount)
+    public NetworkItemRosterUpdate(string itemRosterId, string itemID, string itemModifierID, int amount)
     {
-        PartyBaseID = partyBaseID;
+        ItemRosterId = itemRosterId;
         ItemID = itemID;
         ItemModifierID = itemModifierID;
         Amount = amount;

@@ -1,19 +1,73 @@
-﻿using HarmonyLib;
+﻿using Common;
+using Common.Logging;
+using Common.Messaging;
+using Common.Util;
+using GameInterface.Services.MapEvents.Messages.Conversation;
+using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MobileParties.Messages.Behavior;
+using HarmonyLib;
+using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
 /// <summary>
-/// Disables all map encounters/events
+/// Patches for player encounters
 /// </summary>
+
 [HarmonyPatch(typeof(EncounterManager))]
 internal class EncounterManagerPatches
 {
-    [HarmonyPatch("StartPartyEncounter")]
-    [HarmonyPrefix]
-    private static bool StartPartyEncounterPrefix() => false;
+    private static ILogger Logger = LogManager.GetLogger<EncounterManagerPatches>();
 
-    [HarmonyPatch("StartSettlementEncounter")]
     [HarmonyPrefix]
-    private static bool StartSettlementEncounterPrefix() => false;
+    [HarmonyPatch(nameof(EncounterManager.StartSettlementEncounter))]
+    private static bool Prefix(MobileParty attackerParty, Settlement settlement)
+    {
+        if (ModInformation.IsServer) return true;
+
+        if (!attackerParty.IsPartyControlled())
+            return false;
+
+        var message = new StartSettlementEncounterAttempted(attackerParty, settlement);
+        MessageBroker.Instance.Publish(attackerParty, message);
+
+        return false;
+    }
+
+    [HarmonyPrefix]
+    [HarmonyPatch(nameof(EncounterManager.HandleEncounterForMobileParty))]
+    internal static bool HandleEncounterForMobilePartyPatch(ref MobileParty mobileParty, ref float dt)
+    {
+        // Skip this method if party is not controlled
+        if (!mobileParty.IsPartyControlled())
+            return false;
+
+        return true;
+    }
+
+    // EncounterManager.RestartPlayerEncounter is private; patch by name. It is the path that opens the encounter
+    // menu/conversation (it calls PlayerEncounter.Current.Init). Parameter order here is (attacker, defender).
+    [HarmonyPatch("RestartPlayerEncounter")]
+    [HarmonyPrefix]
+    private static bool RestartPlayerEncounterPrefix(PartyBase attackerParty, PartyBase defenderParty)
+    {
+        // Our own server-approved re-run (AllowedThread) runs the real method.
+        if (AllowedThread.IsThisThreadAllowed()) return true;
+
+        // The server runs it locally (authoritative).
+        if (ModInformation.IsServer) return true;
+
+        // Client: gate the encounter restart behind server approval (rate-limited + validated in
+        // ConversationRequestHandler). On approval the handler re-runs this exact method under an AllowedThread.
+        MessageBroker.Instance.Publish(null, new ConversationRequested(defenderParty, attackerParty, forcePlayerOutFromSettlement: false, ConversationRestartSource.EncounterManager));
+
+        return false;
+    }
 }
+

@@ -1,7 +1,8 @@
 ﻿using Common.Logging.Attributes;
 using Common.Messaging;
-using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Handlers;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Messages.Behavior;
@@ -11,14 +12,18 @@ namespace GameInterface.Services.MobileParties.Messages.Behavior;
 /// </summary>
 /// <seealso cref="MobilePartyBehaviorHandler"/>
 [BatchLogMessage]
-internal record PartyBehaviorChangeAttempted : IEvent
+internal readonly struct PartyBehaviorChangeAttempted : IEvent
 {
-    public MobileParty Party { get; }
-    public PartyBehaviorUpdateData BehaviorUpdateData { get; }
+    public readonly MobilePartyAi PartyAi;
+    public readonly AiBehavior NewAiBehavior;
+    public readonly IInteractablePoint InteractablePoint;
+    public readonly CampaignVec2 BestTargetPoint;
 
-    public PartyBehaviorChangeAttempted(MobileParty party, PartyBehaviorUpdateData behaviorUpdateData)
+    public PartyBehaviorChangeAttempted(MobilePartyAi partyAi, AiBehavior newAiBehavior, IInteractablePoint interactablePoint, CampaignVec2 bestTargetPoint)
     {
-        Party = party;
-        BehaviorUpdateData = behaviorUpdateData;
+        PartyAi = partyAi;
+        NewAiBehavior = newAiBehavior;
+        InteractablePoint = interactablePoint;
+        BestTargetPoint = bestTargetPoint;
     }
 }

@@ -1,19 +1,19 @@
 ﻿using Common.Messaging;
+using TaleWorlds.CampaignSystem.Settlements;
 
-namespace GameInterface.Services.Towns.Messages
+namespace GameInterface.Services.Towns.Messages;
+
+/// <summary>
+/// Used when the InRebelliousState changes in a town.
+/// </summary>
+public readonly struct TownInRebelliousStateChanged : ICommand
 {
-    /// <summary>
-    /// Used when the InRebelliousState changes in a Town.
-    /// </summary>
-    public record TownInRebelliousStateChanged : ICommand
-    {
-        public string TownId { get; }
-        public bool InRebelliousState { get; }
+    public readonly Town Town;
+    public readonly bool InRebelliousState;
 
-        public TownInRebelliousStateChanged(string townId, bool inRebelliousState)
-        {
-            TownId = townId;
-            InRebelliousState = inRebelliousState;
-        }
+    public TownInRebelliousStateChanged(Town town, bool inRebelliousState)
+    {
+        Town = town;
+        InRebelliousState = inRebelliousState;
     }
 }

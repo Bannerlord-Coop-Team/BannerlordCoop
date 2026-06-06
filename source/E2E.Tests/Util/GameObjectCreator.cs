@@ -1,16 +1,22 @@
 ﻿using E2E.Tests.Util.ObjectBuilders;
-using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Settlements.Buildings;
+using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.CampaignSystem.Siege;
+using TaleWorlds.Core;
+using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
 namespace E2E.Tests.Util;
+
 internal class GameObjectCreator
 {
-    private static Dictionary<Type, IObjectBuilder> ObjectBuilders = new Dictionary<Type, IObjectBuilder>
+    private static readonly Dictionary<Type, IObjectBuilder> ObjectBuilders = new Dictionary<Type, IObjectBuilder>
     {
         { typeof(CharacterObject), new CharacterObjectBuilder() },
         { typeof(Settlement), new SettlementBuilder() },
@@ -30,6 +36,31 @@ internal class GameObjectCreator
         { typeof(MapEventSide), new MapEventSideBuilder() },
         { typeof(BesiegerCamp), new BesiegerCampBuilder() },
         { typeof(SiegeEvent), new SiegeEventBuilder() },
+        { typeof(SiegeStrategy), new SiegeStrategyBuilder() },
+        { typeof(SiegeEnginesContainer), new SiegeEnginesBuilder() },
+        { typeof(Workshop), new WorkshopBuilder() },
+        { typeof(WorkshopType), new WorkshopTypeBuilder() },
+        { typeof(MilitiaPartyComponent), new MilitiaPartyComponentBuilder() },
+        { typeof(ItemRoster), new ItemRosterBuilder() },
+        { typeof(Building), new BuildingBuilder() },
+        { typeof(ItemCategory), new ItemCategoryBuilder() },
+        { typeof(TroopRoster), new TroopRosterBuilder() },
+        { typeof(EquipmentElement), new EquipmentElementBuilder() },
+        { typeof(ItemObject), new ItemObjectBuilder() },
+        { typeof(MapEventParty), new MapEventPartyBuilder() },
+        { typeof(Alley), new AlleyBuilder() },
+        { typeof(Equipment), new EquipmentBuilder() },
+        { typeof(MBCharacterSkills), new DefaultBuilder<MBCharacterSkills>() },
+        { typeof(MBEquipmentRoster), new DefaultBuilder<MBEquipmentRoster>() },
+        { typeof(MobilePartyAi), new MobilePartyAiBuilder() },
+        { typeof(VillageMarketData), new VillageMarketDataBuilder() },
+        { typeof(PartyBase), new PartyBaseBuilder() },
+        { typeof(CaravanPartyComponent), new CaravanPartyComponentBuilder() },
+        { typeof(GarrisonPartyComponent), new GarrisonPartyComponentBuilder() },
+        { typeof(VillageType), new VillageTypeBuilder() },
+        { typeof(VillagerPartyComponent), new VillagerPartyComponentBuilder() },
+        { typeof(TraitObject), new TraitObjectBuilder() },
+        { typeof(PropertyOwner<TraitObject>), new PropertyOwnerBuilder() }
     };
 
     public static T CreateInitializedObject<T>()

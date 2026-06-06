@@ -1,20 +1,18 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using HarmonyLib;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
-using TaleWorlds.Core;
-using TaleWorlds.Library;
-using TaleWorlds.Localization;
 
 namespace E2E.Tests.Util.ObjectBuilders;
+
 internal class BesiegerCampBuilder : IObjectBuilder
 {
     public object Build()
     {
         var siegeEvent = GameObjectCreator.CreateInitializedObject<SiegeEvent>();
-        return new BesiegerCamp(siegeEvent);
+        var kingdom = GameObjectCreator.CreateInitializedObject<Kingdom>();
+        return new BesiegerCamp(siegeEvent, kingdom);
     }
 }

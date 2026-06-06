@@ -1,7 +1,9 @@
 ﻿using Autofac;
 using Common.Audit;
+using Common.Extensions;
 using Common.Logging;
 using Common.Messaging;
+using Common.Util;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -12,6 +14,8 @@ namespace GameInterface.Services;
 internal class ServiceModule : Module
 {
     private static readonly ILogger Logger = LogManager.GetLogger<ServiceModule>();
+
+    private const string NAMESPACE = "GameInterface";
 
     protected override void Load(ContainerBuilder builder)
     {
@@ -25,7 +29,7 @@ internal class ServiceModule : Module
             builder.RegisterType(type).AsSelf().InstancePerLifetimeScope().AutoActivate();
         }
 
-        foreach (var type in GetInterfaces())
+        foreach (var type in GetGameAbstractions())
         {
             var interfaceToRegister = type.GetInterfaces().SingleOrDefault(
                 i => typeof(IGameAbstraction).IsAssignableFrom(i) &&
@@ -47,38 +51,14 @@ internal class ServiceModule : Module
         base.Load(builder);
     }
 
-    private IEnumerable<Type> GetHandlers()
-    {
-        var assembly = GetType().Assembly;
-        var @namespace = GetType().Namespace;
-        var types = assembly.GetTypes()
-            .Where(t => t.GetInterface(nameof(IHandler)) != null &&
-                        t.Namespace.StartsWith(@namespace) &&
-                        t.IsClass &&
-                        t.IsGenericType == false &&
-                        t.IsAbstract == false);
-        return types;
-    }
+    // Namespace is needed to separate client and server handlers being registered with DI
+    private IEnumerable<Type> GetHandlers() => InterfaceCollector.GetInterfaces<IHandler>(NAMESPACE).Concat(InterfaceCollector.GetInterfaces<IHandler>("DynamicSync"));
 
-    private IEnumerable<Type> GetInterfaces()
-    {
-        var assembly = GetType().Assembly;
-        var @namespace = GetType().Namespace;
-        var types = assembly.GetTypes()
-            .Where(t => t.GetInterface(nameof(IGameAbstraction)) != null &&
-                        t.Namespace.StartsWith(@namespace) &&
-                        t.IsClass &&
-                        t.IsAbstract == false);
-        return types;
-    }
+    // Namespace is needed to separate client and server handlers being registered with DI
+    private IEnumerable<Type> GetGameAbstractions() => InterfaceCollector.GetInterfaces<IGameAbstraction>(NAMESPACE);
 
-    private IEnumerable<Type> GetAuditors()
-    {
-        var assembly = GetType().Assembly;
-        var types = assembly.GetTypes()
-            .Where(t => t.GetInterface(nameof(IAuditor)) != null &&
-                        t.IsClass &&
-                        t.IsAbstract == false);
-        return types;
-    }
+    // Namespace is needed to separate client and server handlers being registered with DI
+    private IEnumerable<Type> GetAuditors() => InterfaceCollector.GetInterfaces<IAuditor>(NAMESPACE);
+
+    
 }

@@ -1,7 +1,7 @@
 ﻿using Autofac;
 using Common;
 using Common.Logging;
-using GameInterface.Services.Registry;
+using GameInterface.Registry;
 using Serilog;
 using System;
 using System.Collections.Generic;

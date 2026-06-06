@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using GameInterface.Registry;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.MobileParties.Messages;
@@ -13,13 +14,22 @@ public class InitialServerState : ServerStateBase
 {
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
+    private readonly IRegistryManager registryManager;
 
-    public InitialServerState(IServerLogic context, IMessageBroker messageBroker, INetwork network) : base(context)
+    public InitialServerState(
+        IServerLogic context,
+        IMessageBroker messageBroker,
+        INetwork network,
+        IRegistryManager registryManager) : 
+        base(context)
     {
         this.messageBroker = messageBroker;
         this.network = network;
+        this.registryManager = registryManager;
         messageBroker.Subscribe<CampaignReady>(Handle_GameLoaded);
     }
+
+
 
     public override void Dispose()
     {
@@ -34,7 +44,10 @@ public class InitialServerState : ServerStateBase
         // Remove server party
         messageBroker.Publish(this, new RemoveMainParty());
 
-        // Change to server running state
+        // Register all objects after main party is removed to keep order
+        registryManager.RegisterAllGameObjects();
+        registryManager.PatchLifetimes();
+
         Logic.SetState<ServerRunningState>();
     }
 

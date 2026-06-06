@@ -1,8 +1,5 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace GameInterface.Services.Clans.Messages.Lifetime;
 
@@ -13,10 +10,12 @@ namespace GameInterface.Services.Clans.Messages.Lifetime;
 internal class NetworkDestroyClan : ICommand
 {
     [ProtoMember(1)]
-    public ClanDestroyedData Data { get; }
+    public string ClanId { get; }
+    public int Details { get; }
 
-    public NetworkDestroyClan(ClanDestroyedData data)
+    public NetworkDestroyClan(string clanId, int details)
     {
-        Data = data;
+        ClanId = clanId;
+        Details = details;
     }
 }

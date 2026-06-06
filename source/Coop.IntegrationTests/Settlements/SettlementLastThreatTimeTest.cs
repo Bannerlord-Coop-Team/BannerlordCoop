@@ -21,10 +21,7 @@ public class SettlementLastThreatTimeTest
 
     public void ServerSettlementLastThreatTimeChanged_Publishes_AllClients()
     {
-        string settlementId = "Settlement1";
-        long ticks = 99L;
-
-        var triggerMessage = new SettlementChangedLastThreatTime(settlementId, ticks);
+        var triggerMessage = new SettlementChangedLastThreatTime();
 
         var server = TestEnvironment.Server;
 

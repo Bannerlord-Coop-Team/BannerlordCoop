@@ -1,4 +1,5 @@
-﻿using Common.Audit;
+﻿using Common;
+using Common.Audit;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -113,7 +114,11 @@ internal class HeroAuditor : IAuditor
 
     private HeroAuditData[] GetAuditData()
     {
-        return GetHeros().Select(h => new HeroAuditData(h)).ToArray();
+        return GetHeros().Select(hero => {
+            if (objectManager.TryGetId(hero, out var id) == false) return new HeroAuditData(null, hero);
+
+            return new HeroAuditData(id, hero);
+        }).ToArray();
     }
 
     private string AuditData(HeroAuditData[] dataToAudit)
@@ -133,7 +138,7 @@ internal class HeroAuditor : IAuditor
         
         foreach (var audit in dataToAudit)
         {
-            if (objectManager.TryGetObject<Hero>(audit.StringId, out var _) == false)
+            if (objectManager.TryGetObject<Hero>(audit.Id, out var _) == false)
             {
                 Logger.Error("Hero {name} not found in {objectManager}", audit.Name, nameof(IObjectManager));
                 stringBuilder.AppendLine($"Hero {audit.Name} not found in {nameof(IObjectManager)}");

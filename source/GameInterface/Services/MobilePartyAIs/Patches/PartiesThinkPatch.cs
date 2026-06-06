@@ -1,10 +1,9 @@
-﻿using Common.Extensions;
+﻿using Common;
+using Common.Logging;
 using HarmonyLib;
-using System;
-using System.Reflection;
+using Serilog;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobilePartyAIs.Patches;
 
@@ -19,10 +18,14 @@ internal class PartiesThinkPatch
 
     private static int CurrentStartIdx = 0;
 
+    private static readonly ILogger Logger = LogManager.GetLogger<PartiesThinkPatch>();
+
     [HarmonyPatch("PartiesThink")]
     [HarmonyPrefix]
     private static bool PartiesThinkPrefix(Campaign __instance, ref float dt)
     {
+        if (ModInformation.IsClient) return false;
+
         if (delay.IsCompleted == false) return false;
 
         delay = Task.Delay(TICK_DELAY_MS);
@@ -31,7 +34,9 @@ internal class PartiesThinkPatch
         {
             var currentIdx = (CurrentStartIdx + i) % __instance.MobileParties.Count;
 
-            __instance.MobileParties[currentIdx].Ai.Tick(dt);
+            var ai = __instance.MobileParties[currentIdx]?.Ai;
+
+            ai.Tick(dt);
         }
 
         CurrentStartIdx = (CurrentStartIdx + UPDATES_PER_TICK) % __instance.MobileParties.Count;

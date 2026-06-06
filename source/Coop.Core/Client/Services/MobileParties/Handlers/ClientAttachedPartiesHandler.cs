@@ -2,6 +2,9 @@
 using Common.Network;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Messages;
+using GameInterface.Services.ObjectManager;
+using System.Runtime.Serialization;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace Coop.Core.Client.Services.MobileParties.Handlers;
 
@@ -11,28 +14,22 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers;
 public class ClientAttachedPartiesHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;
-    private readonly INetwork network;
 
-    public ClientAttachedPartiesHandler(
-        IMessageBroker messageBroker,
-        INetwork network)
+    public ClientAttachedPartiesHandler(IMessageBroker messageBroker)
     {
         this.messageBroker = messageBroker;
-        this.network = network;
         messageBroker.Subscribe<NetworkAddAttachedParty>(Handle_NetworkAttachedPartyAdded);
         messageBroker.Subscribe<NetworkRemoveAttachedParty>(Handle_NetworkAttachedPartyRemoved);
     }
 
-    private void Handle_NetworkAttachedPartyRemoved(MessagePayload<NetworkRemoveAttachedParty> payload)
-    {
-        var data = payload.What.AttachedPartyData;
-        messageBroker.Publish(this, new RemoveAttachedParty(data));
-    }
-
     private void Handle_NetworkAttachedPartyAdded(MessagePayload<NetworkAddAttachedParty> payload)
     {
-        var data = payload.What.AttachedPartyData;
-        messageBroker.Publish(this, new AddAttachedParty(data));
+        messageBroker.Publish(this, new AddAttachedParty(payload.What.PartyId, payload.What.AttachedPartyId));
+    }
+
+    private void Handle_NetworkAttachedPartyRemoved(MessagePayload<NetworkRemoveAttachedParty> payload)
+    {
+        messageBroker.Publish(this, new RemoveAttachedParty(payload.What.PartyId, payload.What.AttachedPartyId));
     }
 
     public void Dispose()

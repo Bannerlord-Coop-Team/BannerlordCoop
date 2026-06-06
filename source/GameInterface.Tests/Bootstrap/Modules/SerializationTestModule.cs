@@ -1,10 +1,14 @@
 ﻿using Autofac;
+using Common.Messaging;
+using Common.Network;
+using Common.Serialization;
+using GameInterface.AutoSync;
+using GameInterface.Registry;
 using GameInterface.Serialization;
-using GameInterface.Services;
-using GameInterface.Services.Heroes;
-using GameInterface.Services.MobileParties;
+using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Tests.Stubs;
+using Moq;
+using Serilog;
 
 namespace GameInterface.Tests.Bootstrap.Modules
 {
@@ -12,9 +16,22 @@ namespace GameInterface.Tests.Bootstrap.Modules
     {
         protected override void Load(ContainerBuilder builder)
         {
+            var logger = new LoggerConfiguration().CreateLogger();
+
             base.Load(builder);
-            builder.RegisterType<ObjectManagerAdapterStub>().As<IObjectManager>().InstancePerLifetimeScope();
             builder.RegisterType<BinaryPackageFactory>().As<IBinaryPackageFactory>();
+
+            builder.RegisterInstance(logger).As<ILogger>();
+            builder.RegisterInstance(new Mock<IMessageBroker>().Object).As<IMessageBroker>();
+            builder.RegisterModule<ObjectManagerModule>();
+
+            builder.RegisterInstance(new Mock<INetwork>().Object).As<INetwork>();
+            builder.RegisterInstance(new Mock<IAutoSyncPatchCollector>().Object).As<IAutoSyncPatchCollector>();
+            builder.RegisterInstance(new Mock<ISerializableTypeMapper>().Object).As<ISerializableTypeMapper>();
+            builder.RegisterInstance(new Mock<ISerializableTypeMapper>().Object).As<ISerializableTypeMapper>();
+            builder.RegisterInstance(new Mock<IControlledEntityRegistry>().Object).As<IControlledEntityRegistry>();
+            builder.RegisterInstance(new Mock<IControllerIdProvider>().Object).As<IControllerIdProvider>();
+            builder.RegisterModule<RegistryModule>();
         }
     }
 }

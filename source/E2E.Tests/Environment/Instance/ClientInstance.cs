@@ -11,4 +11,9 @@ public class ClientInstance : EnvironmentInstance
         base(messageBroker, client, containerProvider)
     {
     }
+
+    public override void Dispose()
+    {
+        Container.Dispose();
+    }
 }

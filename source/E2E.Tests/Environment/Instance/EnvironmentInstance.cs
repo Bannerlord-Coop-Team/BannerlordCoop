@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common;
 using Common.Messaging;
 using Common.PacketHandlers;
 using Common.Serialization;
@@ -6,10 +7,10 @@ using Common.Tests.Utils;
 using Common.Util;
 using Coop.Core;
 using E2E.Tests.Environment.Mock;
-using GameInterface;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using LiteNetLib;
+using ProtoBuf.Meta;
 using System.Reflection;
 
 namespace E2E.Tests.Environment.Instance;
@@ -17,7 +18,7 @@ namespace E2E.Tests.Environment.Instance;
 /// <summary>
 /// Single instance of a server or client. Stores relevant test information.
 /// </summary>
-public abstract class EnvironmentInstance
+public abstract class EnvironmentInstance : IDisposable
 {
     public NetPeer NetPeer => mockNetwork.NetPeer;
     /// <summary>
@@ -37,6 +38,8 @@ public abstract class EnvironmentInstance
     private readonly TestMessageBroker messageBroker;
     private readonly MockNetworkBase mockNetwork;
     private readonly IContainerProvider containerProvider;
+
+    private readonly static object _lock = new object();
 
     public EnvironmentInstance(
         TestMessageBroker messageBroker,
@@ -86,11 +89,14 @@ public abstract class EnvironmentInstance
             disabledMethods = Array.Empty<MethodBase>();
         }
 
-        using (new PatchScope(disabledMethods))
+        lock (_lock)
         {
-            using (new StaticScope(this))
+            using (new PatchScope(disabledMethods))
             {
-                callFunction();
+                using (new StaticScope(this))
+                {
+                    callFunction();
+                }
             }
         }
     }
@@ -140,8 +146,7 @@ public abstract class EnvironmentInstance
         public StaticScope(EnvironmentInstance instance)
         {
             Monitor.Enter(GameInstance.@lock);
-            instance.GameInstance.SetStatics();
-
+            
             // Save previous static values
             wasServer = ModInformation.IsServer;
             if (GameInterface.ContainerProvider.TryGetContainer(out previousContainer) == false)
@@ -151,10 +156,11 @@ public abstract class EnvironmentInstance
             }
 
             // Set new static values
+            instance.GameInstance.SetStatics();
+
             ModInformation.IsServer = instance is ServerInstance;
             instance.Container.Resolve<TestMessageBroker>().SetStaticInstance();
             GameInterface.ContainerProvider.SetContainer(instance.Container);
-
         }
 
         public void Dispose()
@@ -191,7 +197,7 @@ public abstract class EnvironmentInstance
         {
             for (int i = 0; i < methods.Length; i++)
             {
-                harmony.Unpatch(methods[i], patches[i].method);
+                harmony.Unpatch(methods[i], HarmonyPatchType.Prefix, harmony.Id);
             }
         }
 
@@ -200,10 +206,17 @@ public abstract class EnvironmentInstance
 
     public T EnsureSerializable<T>(T obj)
     {
+        if (RuntimeTypeModel.Default.CanSerialize(obj?.GetType()) == false)
+        {
+            Assert.Fail($"ProtoBuf is unable to serialize type {obj?.GetType().Name}");
+        }
+
         var serializer = Container.Resolve<ICommonSerializer>();
 
         byte[] bytes = serializer.Serialize(obj);
 
         return serializer.Deserialize<T>(bytes);
     }
+
+    public abstract void Dispose();
 }

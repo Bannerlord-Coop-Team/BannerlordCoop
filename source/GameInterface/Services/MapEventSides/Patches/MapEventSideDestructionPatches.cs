@@ -1,11 +1,19 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.MapEventSides.Messages;
 using HarmonyLib;
 using Serilog;
 using System;
+using System.Collections.Generic;
+using System.Reflection;
+using System.Reflection.Emit;
+using System.Text;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Library;
+using TaleWorlds.LinQuick;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
@@ -14,21 +22,37 @@ internal class MapEventSideDestructionPatches
 {
     static readonly ILogger Logger = LogManager.GetLogger<MapEventSideDestructionPatches>();
 
-    [HarmonyPatch(nameof(MapEventSide.HandleMapEventEnd))]
-    static void Postfix(MapEventSide __instance)
+    [HarmonyPatch(nameof(MapEventSide.RemovePartyInternal))]
+    [HarmonyPrefix]
+    static bool Prefix(MapEventSide __instance, PartyBase party)
     {
         // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient)
+        int index = __instance._battleParties.FindIndexQ((MapEventParty p) => p.Party == party);
+
+        if (index == -1)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MapEventSide), Environment.StackTrace);
-            return;
+            Logger.Error("Could not find {party} in {var}", party.Name, nameof(MapEventSide._battleParties));
+            return false;
         }
 
-        var message = new MapEventSideDestroyed(__instance);
+        MapEventParty mapEventParty = __instance._battleParties[index];
+        __instance._battleParties.RemoveAt(index);
+        __instance._mapEvent.RemoveInvolvedPartyInternal(mapEventParty);
+        if (__instance.LeaderParty == party)
+        {
+            __instance._mapFaction = __instance.LeaderParty.MapFaction;
+            if (__instance._battleParties.Count > 0)
+            {
+                __instance.LeaderParty = __instance._battleParties[0].Party;
+                __instance._mapFaction = __instance.LeaderParty.MapFaction;
+                __instance.CacheLeaderSimulationModifier();
+                return false;
+            }
+            __instance.MapEvent.FinalizeEvent();
+        }
 
-        MessageBroker.Instance.Publish(__instance, message);
+        return false;
     }
 }

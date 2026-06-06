@@ -1,11 +1,12 @@
-﻿using HarmonyLib;
+﻿using Common;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
 namespace GameInterface.Services.Bandits.Patches;
 
-[HarmonyPatch(typeof(BanditsCampaignBehavior))]
+[HarmonyPatch(typeof(BanditSpawnCampaignBehavior))]
 internal class DisableBanditsCampaignBehavior
 {
-    [HarmonyPatch(nameof(BanditsCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    [HarmonyPatch(nameof(BanditSpawnCampaignBehavior.RegisterEvents))]
+    static bool Prefix() => ModInformation.IsServer;
 }

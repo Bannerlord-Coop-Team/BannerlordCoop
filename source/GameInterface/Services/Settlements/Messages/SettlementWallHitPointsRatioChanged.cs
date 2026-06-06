@@ -1,20 +1,21 @@
 ﻿using Common.Messaging;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Settlements.Messages;
 
 /// <summary>
-/// Has Game Interface change the SEttlementWallSectionHitPointsRatioList value.
+/// Has Game Interface change the settlement wall section hit points ratio list value.
 /// </summary>
-public record SettlementWallHitPointsRatioChanged : IEvent
+public readonly struct SettlementWallHitPointsRatioChanged : IEvent
 {
-    public string SettlementId { get; }
-    public int index { get; }
-    public float hitPointsRatio { get; }
+    public readonly Settlement Settlement;
+    public readonly int Index;
+    public readonly float HitPointsRatio;
 
-    public SettlementWallHitPointsRatioChanged(string settlementId, int index, float hitPointsRatio)
+    public SettlementWallHitPointsRatioChanged(Settlement settlement, int index, float hitPointsRatio)
     {
-        SettlementId = settlementId;
-        this.index = index;
-        this.hitPointsRatio = hitPointsRatio;
+        Settlement = settlement;
+        Index = index;
+        HitPointsRatio = hitPointsRatio;
     }
 }

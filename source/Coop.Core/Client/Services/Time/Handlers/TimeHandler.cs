@@ -1,8 +1,8 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Time.Messages;
+using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Messages;
 using Serilog;
 
@@ -17,22 +17,24 @@ namespace Coop.Core.Client.Services.Time.Handlers
 
         private readonly IMessageBroker messageBroker;
         private readonly INetwork network;
+        private readonly ITimeControlInterface timeControlInterface;
 
-        public TimeHandler(IMessageBroker messageBroker, INetwork network)
+        public TimeHandler(IMessageBroker messageBroker, INetwork network, ITimeControlInterface timeControlInterface)
         {
             this.messageBroker = messageBroker;
             this.network = network;
-            messageBroker.Subscribe<AttemptedTimeSpeedChanged>(Handle_TimeSpeedChanged);
+            this.timeControlInterface = timeControlInterface;
+            messageBroker.Subscribe<TimeSpeedChangedAttempted>(Handle_TimeSpeedChanged);
             messageBroker.Subscribe<NetworkChangeTimeControlMode>(Handle_NetworkTimeSpeedChanged);
         }
 
         public void Dispose()
         {
-            messageBroker.Unsubscribe<AttemptedTimeSpeedChanged>(Handle_TimeSpeedChanged);
+            messageBroker.Unsubscribe<TimeSpeedChangedAttempted>(Handle_TimeSpeedChanged);
             messageBroker.Unsubscribe<NetworkChangeTimeControlMode>(Handle_NetworkTimeSpeedChanged);
         }
 
-        internal void Handle_TimeSpeedChanged(MessagePayload<AttemptedTimeSpeedChanged> obj)
+        internal void Handle_TimeSpeedChanged(MessagePayload<TimeSpeedChangedAttempted> obj)
         {
             var newMode = obj.What.NewControlMode;
 
@@ -48,7 +50,7 @@ namespace Coop.Core.Client.Services.Time.Handlers
 
             Logger.Verbose("Client requesting time change to {mode}", newMode);
 
-            messageBroker.Publish(this, new SetTimeControlMode(newMode));
+            timeControlInterface.ClientSetTimeControl(newMode);
         }
     }
 }

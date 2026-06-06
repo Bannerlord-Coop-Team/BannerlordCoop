@@ -1,5 +1,8 @@
-﻿using Common.Extensions;
+﻿using Common;
+using Common.Extensions;
 using Common.Messaging;
+using GameInterface.Registry;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Armies.Messages.Lifetime;
 using GameInterface.Services.ObjectManager;
@@ -32,14 +35,23 @@ public class ArmyDebugCommand
     {
         StringBuilder stringBuilder = new StringBuilder();
 
-        if (ContainerProvider.TryResolve<ArmyRegistry>(out var armyRegistry) == false)
+
+
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
         {
             return $"Unable to resolve {nameof(ArmyRegistry)}";
         }
 
-        foreach (var kvp in armyRegistry)
+        foreach (var army in Kingdom.All.SelectMany(kingdom => kingdom.Armies))
         {
-            stringBuilder.Append(string.Format("Name: '{0}'\nStringId: '{1}'\n", kvp.Value.Name, kvp.Key));
+            if (!objectManager.TryGetId(army, out var armyId))
+            {
+                stringBuilder.AppendLine($"Unable to get id for Army Name: '{army.Name}'");
+                continue;
+            }
+
+            stringBuilder.AppendLine($"Name: '{army.Name}'");
+            stringBuilder.AppendLine($"StringId: '{armyId}'");
         }
 
         return stringBuilder.ToString();
@@ -99,9 +111,9 @@ public class ArmyDebugCommand
 
         var tcs = new TaskCompletionSource<string>();
 
-        MessageBroker.Instance.Subscribe<ArmyCreated>((msg) =>
+        MessageBroker.Instance.Subscribe<InstanceCreated<Army>>((msg) =>
         {
-            if (objectManager.TryGetId(msg.What.Army, out var armyId) == false)
+            if (objectManager.TryGetId(msg.What.Instance, out var armyId) == false)
             {
                 tcs.SetResult(null);
                 return;

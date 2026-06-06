@@ -1,13 +1,12 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.PartyComponents.Messages;
 using HarmonyLib;
 using Serilog;
-using System;
 using System.Collections.Generic;
 using System.Reflection;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 
 namespace GameInterface.Services.PartyComponents.Patches.Lifetime;
@@ -30,9 +29,8 @@ internal class CaravanPartyComponentLifetimePatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(CaravanPartyComponent), Environment.StackTrace);
-            return true;
+            Logger.Error("Client created managed {name}", typeof(CaravanPartyComponent));
+            return false;
         }
 
         var message = new PartyComponentCreated(__instance);

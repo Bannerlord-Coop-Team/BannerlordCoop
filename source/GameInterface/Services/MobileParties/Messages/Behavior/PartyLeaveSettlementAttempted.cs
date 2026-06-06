@@ -1,5 +1,6 @@
 ﻿using Common.Logging.Attributes;
 using Common.Messaging;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Messages.Behavior;
 
@@ -7,12 +8,12 @@ namespace GameInterface.Services.MobileParties.Messages.Behavior;
 /// Triggered when a party attempts to leave a settlement
 /// </summary>
 [BatchLogMessage]
-public record PartyLeaveSettlementAttempted : IEvent
+public readonly struct PartyLeaveSettlementAttempted : IEvent
 {
-    public string PartyId { get; }
+    public readonly MobileParty MobileParty;
 
-    public PartyLeaveSettlementAttempted(string partyId)
+    public PartyLeaveSettlementAttempted(MobileParty mobileParty)
     {
-        PartyId = partyId;
+        MobileParty = mobileParty;
     }
 }

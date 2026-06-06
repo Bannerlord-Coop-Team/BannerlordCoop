@@ -7,12 +7,12 @@ namespace Coop.Core.Client.Services.MobileParties.Messages;
 /// Request the server to change paymentlimit request
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-public record NetworkChangeWagePaymentLimitRequest : IEvent
+public readonly struct NetworkChangeWagePaymentLimitRequest : IEvent
 {
     [ProtoMember(1)]
-    public string MobilePartyId { get; }
+    public readonly string MobilePartyId;
     [ProtoMember(2)]
-    public int WageAmount { get; }
+    public readonly int WageAmount;
 
     public NetworkChangeWagePaymentLimitRequest(string mobilePartyId, int wageAmount)
     {

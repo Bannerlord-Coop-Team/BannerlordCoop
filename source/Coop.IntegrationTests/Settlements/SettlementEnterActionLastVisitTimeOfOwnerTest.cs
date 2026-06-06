@@ -15,10 +15,7 @@ public class SettlementEnterActionLastVisitTimeOfOwnerTest
     [Fact]
     public void ServerSettlementEnterActionLastVisitTimeOfOwner_Publishes_AllClients()
     {
-        string SettlementID = "Settlement1";
-        float currentTime = 4329313.0f;
-
-        var triggerMessage = new SettlementChangedLastVisitTimeOfOwner(SettlementID, currentTime);
+        var triggerMessage = new SettlementChangedLastVisitTimeOfOwner();
 
         var server = TestEnvironment.Server;
         server.SimulateMessage(this, triggerMessage);

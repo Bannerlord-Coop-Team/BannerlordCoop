@@ -1,62 +1,75 @@
-﻿using Common;
-using Common.Extensions;
+﻿using Common.Util;
+using GameInterface.Registry;
+using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
+using HarmonyLib;
+using Serilog;
 using System;
-using System.Linq;
+using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Settlements.Workshops;
+using TaleWorlds.Library;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Registry;
 
 /// <summary>
 /// Registry for identifying ownership of <see cref="Hero"/> objects
 /// </summary>
-internal class HeroRegistry : RegistryBase<Hero>
+internal class HeroRegistry : AutoRegistryBase<Hero>
 {
-    public static readonly string HeroStringIdPrefix = "CoopHero";
-
-    public HeroRegistry(IRegistryCollection collection) : base(collection) { }
-
-    public override void RegisterAll()
+    public HeroRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager) : base(logger, autoRegistryFactory, objectManager)
     {
-        var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
+    }
 
-        if (campaignObjectManager == null)
+    public override IEnumerable<MethodBase> Constructors => new MethodBase[] {
+        AccessTools.Constructor(typeof(Hero), Array.Empty<Type>())
+    };
+
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+    public override void RegisterAllObjects()
+    {
+        foreach (var hero in Hero.AllAliveHeroes)
         {
-            Logger.Error("Unable to register objects when CampaignObjectManager is null");
-            return;
+            RegisterExistingObject(hero.StringId, hero);
         }
 
-        var heroes = campaignObjectManager.AliveHeroes.Concat(campaignObjectManager.DeadOrDisabledHeroes).ToArray();
-        foreach (var hero in heroes)
+        foreach (var hero in Hero.DeadOrDisabledHeroes)
         {
-            base.RegisterExistingObject(hero.StringId, hero);
+            RegisterExistingObject(hero.StringId, hero);
         }
     }
 
-    public override bool RegisterExistingObject(string id, object obj)
+    public override void OnClientCreated(Hero obj, string id)
     {
-        var result = base.RegisterExistingObject(id, obj);
+        using(new AllowedThread())
+        {
+            //obj.Init();
+            AccessTools.Field(typeof(Hero), nameof(Hero._children)).SetValue(obj, new MBList<Hero>());
+            AccessTools.Field(typeof(Hero), nameof(Hero._ownedWorkshops)).SetValue(obj, new MBList<Workshop>());
+            AccessTools.Property(typeof(Hero), nameof(Hero.OwnedAlleys)).SetValue(obj, new MBList<Alley>());
+            AccessTools.Property(typeof(Hero), nameof(Hero.OwnedCaravans)).SetValue(obj, new MBList<CaravanPartyComponent>());
+            AccessTools.Field(typeof(Hero), nameof(Hero.VolunteerTypes)).SetValue(obj, new CharacterObject[6]);
+        }
 
-        AddToCampaignObjectManager(obj);
+        MBObjectManager.Instance?.RegisterPresumedObject(obj);
 
-        return result;
+        Campaign.Current?.CampaignObjectManager?.OnHeroAdded(obj);
     }
 
-    protected override string GetNewId(Hero hero)
+    public override void OnClientDestroyed(Hero obj, string id)
     {
-        hero.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<Hero>(HeroStringIdPrefix);
-        return hero.StringId;
     }
 
-    private void AddToCampaignObjectManager(object obj)
+    public override void OnServerCreated(Hero obj, string id)
     {
-        if (TryCast(obj, out var castedObj) == false) return;
+    }
 
-        var objectManager = Campaign.Current?.CampaignObjectManager;
-
-        if (objectManager == null) return;
-
-        objectManager.OnHeroAdded(castedObj);
+    public override void OnServerDestroyed(Hero obj, string id)
+    {
     }
 }

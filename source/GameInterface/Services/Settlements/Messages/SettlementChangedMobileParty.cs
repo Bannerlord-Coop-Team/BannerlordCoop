@@ -1,25 +1,27 @@
 ﻿using Common.Logging.Attributes;
 using Common.Messaging;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Settlements.Messages;
 
-
 /// <summary>
-/// Notify Server to send message about mobileparty cache change
+/// Notify server to send message about mobile party cache change.
 /// </summary>
 [BatchLogMessage]
-public record SettlementChangedMobileParty : IEvent
+public readonly struct SettlementChangedMobileParty : IEvent
 {
-    public string SettlementId { get; }
-    public string MobilePartyId { get; }
-    public int NumberOfLordParties { get; }
-    public bool AddMobileParty { get; }
+    public readonly Settlement Settlement;
+    public readonly MobileParty MobileParty;
+    public readonly bool AddMobileParty;
 
-    public SettlementChangedMobileParty(string settlementId, string mobilePartyId, int numberOfLordParties, bool addMobileParty)
+    public SettlementChangedMobileParty(
+        Settlement settlement,
+        MobileParty mobileParty,
+        bool addMobileParty)
     {
-        SettlementId = settlementId;
-        MobilePartyId = mobilePartyId;
-        NumberOfLordParties = numberOfLordParties;
+        Settlement = settlement;
+        MobileParty = mobileParty;
         AddMobileParty = addMobileParty;
     }
 }

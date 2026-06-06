@@ -3,6 +3,7 @@ using Common.Messaging;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Settlements.Messages
 {
@@ -12,11 +13,11 @@ namespace GameInterface.Services.Settlements.Messages
     [BatchLogMessage]
     public record SettlementComponentGoldChanged : IEvent
     {
-        public string SettlementComponentId { get; }
+        public SettlementComponent SettlementComponent { get; }
         public int Gold { get; }
-        public SettlementComponentGoldChanged(string settlementComponentId, int gold)
+        public SettlementComponentGoldChanged(SettlementComponent settlementComponent, int gold)
         {
-            SettlementComponentId = settlementComponentId;
+            SettlementComponent = settlementComponent;
             Gold = gold;
         }
     }

@@ -17,10 +17,7 @@ public class SettlementHeroWithoutPartyTest
     [Fact]
     public void ServerSettlementAddHeroWithoutPartyChanged_Publishes_AllClients()
     {
-        string SettlementID = "Settlement1";
-        string HeroID = "HERO1";
-
-        var triggerMessage = new SettlementChangedRemoveHeroWithoutParty(SettlementID, HeroID);
+        var triggerMessage = new SettlementChangedRemoveHeroWithoutParty(null, null);
 
         var server = TestEnvironment.Server;
         server.SimulateMessage(this, triggerMessage);
@@ -41,10 +38,7 @@ public class SettlementHeroWithoutPartyTest
     [Fact]
     public void ServerSettlementAddRemoveWithoutPartyChanged_Publishes_AllClients()
     {
-        string SettlementID = "Settlement1";
-        string HeroID = "HERO1";
-
-        var triggerMessage = new SettlementChangedAddHeroWithoutParty(SettlementID, HeroID);
+        var triggerMessage = new SettlementChangedAddHeroWithoutParty(null, null);
 
         var server = TestEnvironment.Server;
         server.SimulateMessage(this, triggerMessage);

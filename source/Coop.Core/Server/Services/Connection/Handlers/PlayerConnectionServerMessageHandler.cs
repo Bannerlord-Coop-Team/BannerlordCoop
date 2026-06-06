@@ -30,20 +30,20 @@ namespace Coop.Core.Server.Services.Connection.Handlers
             this.network = network;
 
             messageBroker.Subscribe<PlayerCampaignEntered>(PlayerCampaignEnteredHandler);
-            messageBroker.Subscribe<AttemptedTimeSpeedChanged>(AttemptedTimeSpeedChanged);
+            messageBroker.Subscribe<TimeSpeedChangedAttempted>(AttemptedTimeSpeedChanged);
             messageBroker.Subscribe<PackageGameSaveData>(Handle_NetworkConnected);
         }
 
         public void Dispose()
         {
             messageBroker.Unsubscribe<PlayerCampaignEntered>(PlayerCampaignEnteredHandler);
-            messageBroker.Unsubscribe<AttemptedTimeSpeedChanged>(AttemptedTimeSpeedChanged);
+            messageBroker.Unsubscribe<TimeSpeedChangedAttempted>(AttemptedTimeSpeedChanged);
             messageBroker.Unsubscribe<PackageGameSaveData>(Handle_NetworkConnected);
         }
 
         internal void Handle_NetworkConnected(MessagePayload<PackageGameSaveData> obj)
         {
-            messageBroker.Publish(this, new SendInformationMessage("A new player is joining the game, pausing"));
+            messageBroker.Publish(this, new SendInformationMessage("A player is joining the game, pausing"));
         }
 
         private void PlayerCampaignEnteredHandler(MessagePayload<PlayerCampaignEntered> obj)
@@ -57,13 +57,13 @@ namespace Coop.Core.Server.Services.Connection.Handlers
             }
         }
 
-        private void AttemptedTimeSpeedChanged(MessagePayload<AttemptedTimeSpeedChanged> obj)
+        private void AttemptedTimeSpeedChanged(MessagePayload<TimeSpeedChangedAttempted> obj)
         {
             if (AnyLoaders())
             {
                 int loadingPeers = clientRegistry.LoadingPeers.Count;
 
-                string loadingMessage = "Pausing disabled, " + loadingPeers + " player(s) are currently joining the game";
+                string loadingMessage = "Time controls disabled, " + loadingPeers + " player(s) are currently joining the game";
 
                 messageBroker.Publish(this, new SendInformationMessage(loadingMessage));
                 network.SendAll(new SendInformationMessage(loadingMessage));
@@ -75,7 +75,7 @@ namespace Coop.Core.Server.Services.Connection.Handlers
             if (clientRegistry.PlayersLoading)
             {
                 var loadingPeers = clientRegistry.LoadingPeers;
-                Logger.Information($"{string.Join(",", loadingPeers.Select(p => p.EndPoint.ToString()))} are currently loading, unable to change time");
+                Logger.Information($"{string.Join(",", loadingPeers.Select(p => p.Address))} are currently loading, unable to change time");
                 return true;
             }
 

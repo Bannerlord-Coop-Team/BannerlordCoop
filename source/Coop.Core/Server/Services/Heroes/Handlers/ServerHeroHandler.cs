@@ -2,16 +2,8 @@
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.Heroes.Messages;
-using Coop.Core.Server.Services.Heroes.Messages;
-using GameInterface.Services.Heroes.Data;
 using GameInterface.Services.Heroes.Messages;
-using GameInterface.Services.Heroes.Messages.Lifetime;
-using LiteNetLib;
 using Serilog;
-using System;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Coop.Core.Server.Services.Heroes.Handlers;
 
@@ -30,31 +22,14 @@ internal class ServerHeroHandler : IHandler
         this.messageBroker = messageBroker;
         this.server = server;
         this.configuration = configuration;
-        messageBroker.Subscribe<HeroCreated>(Handle_HeroCreated);
         messageBroker.Subscribe<HeroNameChanged>(Handle_HeroNameChanged);
+        messageBroker.Subscribe<NetworkChangeHeroName>(Handle_NetworkChangeHeroName);
     }
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<HeroCreated>(Handle_HeroCreated);
         messageBroker.Unsubscribe<HeroNameChanged>(Handle_HeroNameChanged);
-    }
-
-    private void Handle_HeroCreated(MessagePayload<HeroCreated> obj)
-    {
-        var payload = obj.What;
-
-        WaitForAllClientsToCreateHero(payload.Data);
-    }
-
-    private void WaitForAllClientsToCreateHero(HeroCreationData heroCreationData)
-    {
-        var timeout = configuration.ObjectCreationTimeout;
-        var responseProtocol = new ResponseProtocol<NetworkHeroCreated>(server, messageBroker, timeout);
-
-        var triggerMessage = new NetworkCreateHero(heroCreationData);
-        var notifyMessage = new NewHeroSynced();
-        responseProtocol.StartResponseProtocol(triggerMessage, notifyMessage);
+        messageBroker.Unsubscribe<NetworkChangeHeroName>(Handle_NetworkChangeHeroName);
     }
 
     private void Handle_HeroNameChanged(MessagePayload<HeroNameChanged> obj)
@@ -64,5 +39,14 @@ internal class ServerHeroHandler : IHandler
         var message = new NetworkChangeHeroName(payload.Data);
 
         server.SendAll(message);
+    }
+
+    private void Handle_NetworkChangeHeroName(MessagePayload<NetworkChangeHeroName> obj)
+    {
+        var data = obj.What.Data;
+
+        messageBroker.Publish(this, new ChangeHeroName(data));
+
+        server.SendAll(new NetworkChangeHeroName(data));
     }
 }

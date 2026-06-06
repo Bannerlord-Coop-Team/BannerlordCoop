@@ -4,6 +4,7 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
+using static TaleWorlds.CampaignSystem.CharacterDevelopment.DefaultPerks;
 
 namespace GameInterface.Serialization.External
 {
@@ -25,7 +26,7 @@ namespace GameInterface.Serialization.External
         {
         }
 
-        private static HashSet<string> excludes = new HashSet<string>
+        public static readonly HashSet<string> Excludes = new HashSet<string>
         {
             "<TaleWorlds.CampaignSystem.Map.ILocatable<TaleWorlds.CampaignSystem.Party.MobileParty>.NextLocatable>k__BackingField",
             "_partySizeRatioLastCheckVersion",
@@ -35,11 +36,8 @@ namespace GameInterface.Serialization.External
             "_partyLastCheckIsPrisoner",
             "_lastCalculatedSpeed",
             "_partyPureSpeedLastCheckVersion",
-            "_cachedPartySizeLimit",
             "_cachedPartySizeRatio",
-            "_latestUsedPaymentRatio",
             "<VersionNo>k__BackingField",
-            "_currentNavigationFace",
             "_lastNavigationFace",
             "_locatorNodeIndex",
             "<Scout>k__BackingField",
@@ -48,11 +46,18 @@ namespace GameInterface.Serialization.External
             "<Surgeon>k__BackingField",
             "_targetParty",
             "_targetSettlement",
+            "<Anchor>k__BackingField",
+            "Path",
             // These are ignored as there is no way to resolve if
             // they already exist
             "_besiegerCamp",
             "_army",
             "<ThinkParamsCache>k__BackingField",
+
+            // Transfering should only be a single party
+            "_attachedParties",
+            "_attachedTo",
+            "MoveTargetParty"
         };
 
         protected override void PackInternal()
@@ -60,22 +65,23 @@ namespace GameInterface.Serialization.External
             if (Object.Army != null) throw new Exception($"{nameof(Army)} is not handled in {nameof(MobilePartyBinaryPackage)}");
             if (Object.BesiegerCamp != null) throw new Exception($"{nameof(BesiegerCamp)} is not handled in {nameof(MobilePartyBinaryPackage)}");
 
-            stringId = Object.StringId ?? string.Empty;
+            stringId = ResolveId(Object);
 
-            base.PackFields(excludes);
+            base.PackFields(Excludes);
 
-            scoutId = Object.EffectiveScout?.StringId;
-            engineerId = Object.EffectiveEngineer?.StringId;
-            quartermasterId = Object.EffectiveQuartermaster?.StringId;
-            surgeonId = Object.EffectiveSurgeon?.StringId;
+            scoutId = ResolveId(Object.EffectiveScout);
+            engineerId = ResolveId(Object.EffectiveEngineer);
+            quartermasterId = ResolveId(Object.EffectiveQuartermaster);
+            surgeonId = ResolveId(Object.EffectiveSurgeon);
         }
 
         private static ConstructorInfo MobileParty_ctor => typeof(MobileParty).GetConstructor(Array.Empty<Type>());
         protected override void UnpackInternal()
         {
-            if(string.IsNullOrEmpty(stringId) == false)
+            var resolvedObj = ResolveObject<MobileParty>(stringId);
+            if (resolvedObj != null)
             {
-                Object = ResolveId<MobileParty>(stringId);
+                Object = resolvedObj;
                 return;
             }
 
@@ -83,10 +89,10 @@ namespace GameInterface.Serialization.External
 
             base.UnpackFields();
 
-            Object.Scout            = ResolveId<Hero>(scoutId);
-            Object.Engineer         = ResolveId<Hero>(engineerId);
-            Object.Quartermaster    = ResolveId<Hero>(quartermasterId);
-            Object.Surgeon          = ResolveId<Hero>(surgeonId);
+            Object.Scout            = ResolveObject<Hero>(scoutId);
+            Object.Engineer         = ResolveObject<Hero>(engineerId);
+            Object.Quartermaster    = ResolveObject<Hero>(quartermasterId);
+            Object.Surgeon          = ResolveObject<Hero>(surgeonId);
 
 
             Object.OnFinishLoadState();

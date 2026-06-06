@@ -1,20 +1,18 @@
 ﻿using Common.Messaging;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Settlements.Messages;
 /// <summary>
 /// Notifies GI to Server Settlement.CanBeClaimed value SettlementClaimantCampaignBehavior.OnSettlementOwnerChanged();
 /// </summary>
-public record SettlementClaimantCanBeClaimedChanged : ICommand
+public readonly struct SettlementClaimantCanBeClaimedChanged : ICommand
 {
-    public string SettlementId { get; }
-    public int CanBeClaimed { get; }
+    public readonly Settlement Settlement;
+    public readonly int CanBeClaimed;
 
-    public SettlementClaimantCanBeClaimedChanged(string settlementId, int canBeClaimed)
+    public SettlementClaimantCanBeClaimedChanged(Settlement settlement, int canBeClaimed)
     {
-        SettlementId = settlementId;
+        Settlement = settlement;
         CanBeClaimed = canBeClaimed;
     }
 }

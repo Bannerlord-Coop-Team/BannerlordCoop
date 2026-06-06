@@ -12,6 +12,8 @@
     <Deterministic>true</Deterministic>
     <LangVersion>10</LangVersion>
     <Platforms>x64</Platforms>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
@@ -34,6 +36,12 @@
     <WarningLevel>4</WarningLevel>
     <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
+  <ItemGroup>
+    <None Remove="DynamicSync\Templates\Handlers\SubscribePropertyOwnerReferenceTemplate.txt" />
+    <None Remove="DynamicSync\Templates\Messages\LocalPropertyOwnerSetMessageTemplate.txt" />
+    <None Remove="DynamicSync\Templates\Messages\NetworkPropertyOwnerSetReferenceMessageTemplate.txt" />
+    <None Remove="DynamicSync\Templates\Patches\FieldPropertyOwnerChangeTranspilerTemplate.txt" />
+  </ItemGroup>
   <ItemGroup>
     <Reference Include="SandBox">
       <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.dll</HintPath>
@@ -155,8 +163,7 @@
     <Reference Include="TaleWorlds.MountAndBlade.Launcher.Steam">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.Launcher.Steam.dll</HintPath>
     </Reference>
-    <Reference Include="TaleWorlds.MountAndBlade.View, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
-      <SpecificVersion>False</SpecificVersion>
+    <Reference Include="TaleWorlds.MountAndBlade.View">
       <HintPath>..\..\mb2\Modules\Native\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.View.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.MountAndBlade.ViewModelCollection">
@@ -212,24 +219,74 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Autofac" Version="7.0.1" />
-    <PackageReference Include="Krafs.Publicizer" Version="2.2.1">
+    <PackageReference Include="Autofac" Version="8.2.0" />
+    <PackageReference Include="Krafs.Publicizer" Version="2.3.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Lib.Harmony" Version="2.3.3" />
+    <PackageReference Include="Lib.Harmony" Version="2.3.5" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.3" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.13.0" />
+    <PackageReference Include="Microsoft.Extensions.Primitives" Version="9.0.2" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Scriban" Version="7.2.0" />
+    <PackageReference Include="Scrutor" Version="6.0.1" />
   </ItemGroup>
     <ItemGroup>
 	    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
 		    <_Parameter1>E2E.Tests</_Parameter1>
 	    </AssemblyAttribute>
     </ItemGroup>
+    <ItemGroup>
+      <EmbeddedResource Include="DynamicSync\Templates\DynamicConstantsTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\DynamicAssemblyInfoTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\DynamicHandlerTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeArrayReferenceTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeArrayValueTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeCollectionReferenceTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribePropertyOwnerReferenceTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeQueueReferenceTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeCollectionValueTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeSetReferenceTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeSetValueTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeQueueValueTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\LocalArrayChangeMessageTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\LocalCollectionAddMessageTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\LocalCollectionRemoveMessageTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\LocalPropertyOwnerSetMessageTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\LocalSetMessageTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkArrayChangeReferenceMessageTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkArrayChangeValueMessageTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkArraySetReferenceMessageTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkArraySetValueMessageTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkCollectionAddReferenceMessageTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkCollectionAddValueMessageTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkCollectionRemoveReferenceMessageTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkCollectionRemoveValueMessageTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkCollectionSetReferenceMessageTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkCollectionSetValueMessageTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkPropertyOwnerSetReferenceMessageTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkSetInterfaceReferenceMessageTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkSetReferenceMessageTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkSetValueMessageTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Patches\DynamicPatchTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Patches\FieldArrayChangeTranspilerTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Patches\FieldMBListChangeTranspilerTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Patches\FieldListChangeTranspilerTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Patches\FieldPropertyOwnerChangeTranspilerTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Patches\FieldQueueChangeTranspilerTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Patches\FieldSetTranspilerTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Patches\PropertyArrayChangeTranspilerTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Patches\PropertyListChangeTranspilerTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Patches\PropertyMBListChangeTranspilerTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Patches\PropertyQueueChangeTranspilerTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Patches\PropertySetPrefixTemplate.txt" />
+    </ItemGroup>
   <ItemGroup>
     <Publicize Include="SandBox" />
     <Publicize Include="SandBox.GauntletUI" />                             
     <Publicize Include="SandBox.View" />                                   
-    <!--<Publicize Include="SandBox.ViewModelCollection"/>                    -->
+    <Publicize Include="SandBox.ViewModelCollection" />
     <!--<Publicize Include="TaleWorlds.AchievementSystem"/>                   -->
     <!--<Publicize Include="TaleWorlds.ActivitySystem"/>-->
     <Publicize Include="TaleWorlds.CampaignSystem" />
@@ -281,5 +338,9 @@
     <!--<Publicize Include="TaleWorlds.Starter.Library"/>                                                                        -->
     <!--<Publicize Include="TaleWorlds.TwoDimension"/>                                                                           -->
     <!--<Publicize Include="TaleWorlds.TwoDimension.Standalone"/>                                                             -->
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Services\Kingdoms\Commands\" />
+    <Folder Include="Services\MapEvents\Messages\Join\" />
   </ItemGroup>
 </Project>

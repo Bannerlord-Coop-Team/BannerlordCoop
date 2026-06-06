@@ -8,6 +8,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.ObjectSystem;
+using TaleWorlds.ModuleManager;
 
 namespace E2E.Tests.Environment.Instance;
 public class GameInstance
@@ -31,10 +32,12 @@ public class GameInstance
             using(new AllowedThread())
             {
                 Module = (Module)AccessTools.Constructor(typeof(Module)).Invoke(null);
-                GameManager = new SandBoxGameManager();
+                var modules = ModuleHelper.GetOfficialModuleIds().Append("Coop");
+                ModuleHelper.InitializeModules(modules.ToArray());
+                GameManager = new SandBoxGameManager(() => new Campaign(CampaignGameMode.Campaign));
                 Campaign = new Campaign(CampaignGameMode.Campaign);
-                MBObjectManager = MBObjectManager.Instance;
                 Game = Game.CreateGame(Campaign, GameManager);
+                MBObjectManager = MBObjectManager.Instance;
 
 
                 RegisterType<ItemObject>(MBObjectManager);
@@ -72,6 +75,6 @@ public class GameInstance
         MBObjectManager.Instance = MBObjectManager;
         Campaign.Current = Campaign;
         Game.Current = Game;
-        AccessTools.Property(typeof(Module), nameof(Module.CurrentModule)).SetValue(null, Module);
+        Module.CurrentModule = Module;
     }
 }

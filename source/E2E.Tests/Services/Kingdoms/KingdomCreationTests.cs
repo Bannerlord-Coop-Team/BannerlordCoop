@@ -1,15 +1,10 @@
-using Autofac;
-using Common.Messaging;
 using E2E.Tests.Environment;
 using E2E.Tests.Util;
-using GameInterface.Services.Armies.Messages.Lifetime;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Armies;
-
 public class ArmyCreationTests : IDisposable
 {
     E2ETestEnvironment TestEnvironment { get; }
@@ -25,7 +20,7 @@ public class ArmyCreationTests : IDisposable
 
     [Fact]
     public void ServerCreateArmy_SyncAllClients()
-    {
+      {
         // Arrange
         var server = TestEnvironment.Server;
 
@@ -36,7 +31,9 @@ public class ArmyCreationTests : IDisposable
             
             var kingdom = GameObjectCreator.CreateInitializedObject<Kingdom>();
             var mobileParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var clan = GameObjectCreator.CreateInitializedObject<Clan>();
 
+            mobileParty.LeaderHero.Clan = clan;
 
             var army = new Army(kingdom, mobileParty, Army.ArmyTypes.Patrolling);
 
@@ -59,20 +56,8 @@ public class ArmyCreationTests : IDisposable
         var server = TestEnvironment.Server;
         var client1 = TestEnvironment.Clients.First();
 
-        string? kingdomId = null;
-        string? partyId = null;
-
-        server.Call(() =>
-        {
-            var kingdom = GameObjectCreator.CreateInitializedObject<Kingdom>();
-            var mobileParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
-
-            Assert.True(server.ObjectManager.TryGetId(kingdom, out kingdomId));
-            Assert.True(server.ObjectManager.TryGetId(mobileParty, out partyId));
-        });
-
-        Assert.NotNull(kingdomId);
-        Assert.NotNull(partyId);
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
 
         // Act
         string? armyId = null;
@@ -80,7 +65,6 @@ public class ArmyCreationTests : IDisposable
         {
             Assert.True(client1.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
             Assert.True(client1.ObjectManager.TryGetObject<MobileParty>(partyId, out var mobileParty));
-
 
             var army = new Army(kingdom, mobileParty, Army.ArmyTypes.Patrolling);
 

@@ -35,30 +35,10 @@ internal class MobilePartyAttachedPartyHandler : IHandler
         messageBroker.Unsubscribe<RemoveAttachedParty>(Handle_RemoveAttachedParty);
     }
 
-    private void Handle_RemoveAttachedParty(MessagePayload<RemoveAttachedParty> payload)
-    {
-        var data = payload.What.AttachedPartyData;
-        var instanceId = data.PartyId;
-        var removedPartyId = data.ListPartyId;
-
-        if (objectManager.TryGetObject<MobileParty>(instanceId, out var instance) == false)
-        {
-            Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), instanceId);
-        }
-
-        if (objectManager.TryGetObject<MobileParty>(removedPartyId, out var removedParty) == false)
-        {
-            Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), removedPartyId);
-        }
-
-        instance._attachedParties.Remove(removedParty);
-    }
-
     private void Handle_AddAttachedParty(MessagePayload<AddAttachedParty> payload)
     {
-        var data = payload.What.AttachedPartyData;
-        var instanceId = data.PartyId;
-        var addedPartyId = data.ListPartyId;
+        var instanceId = payload.What.MobilePartyId;
+        var addedPartyId = payload.What.AttachedPartyId;
 
         if (objectManager.TryGetObject<MobileParty>(instanceId, out var instance) == false)
         {
@@ -71,5 +51,23 @@ internal class MobilePartyAttachedPartyHandler : IHandler
         }
 
         instance._attachedParties.Add(addedParty);
+    }
+
+    private void Handle_RemoveAttachedParty(MessagePayload<RemoveAttachedParty> payload)
+    {
+        var instanceId = payload.What.MobilePartyId;
+        var removedPartyId = payload.What.AttachedPartyId;
+
+        if (objectManager.TryGetObject<MobileParty>(instanceId, out var instance) == false)
+        {
+            Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), instanceId);
+        }
+
+        if (objectManager.TryGetObject<MobileParty>(removedPartyId, out var removedParty) == false)
+        {
+            Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), removedPartyId);
+        }
+
+        instance._attachedParties.Remove(removedParty);
     }
 }

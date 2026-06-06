@@ -1,14 +1,11 @@
 ﻿using Common.Logging;
 using Common.Messaging;
-using Common.Util;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
-using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Registry;
 using Serilog;
-using System;
 
 namespace GameInterface.Services.Heroes.Handlers;
+
 
 internal class NewHeroHandler : IHandler
 {
@@ -22,20 +19,12 @@ internal class NewHeroHandler : IHandler
     {
         this.heroInterface = heroInterface;
         this.messageBroker = messageBroker;
-        messageBroker.Subscribe<PackageMainHero>(Handle);
         messageBroker.Subscribe<RegisterNewPlayerHero>(Handle);
     }
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<PackageMainHero>(Handle);
         messageBroker.Unsubscribe<RegisterNewPlayerHero>(Handle);
-    }
-
-    private void Handle(MessagePayload<PackageMainHero> obj)
-    {
-        byte[] bytes = heroInterface.PackageMainHero();
-        messageBroker.Publish(this, new NewHeroPackaged(bytes));
     }
 
     private void Handle(MessagePayload<RegisterNewPlayerHero> obj)

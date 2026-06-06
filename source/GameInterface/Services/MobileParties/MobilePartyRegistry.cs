@@ -1,80 +1,120 @@
-﻿using Common.Messaging;
-using GameInterface.Services.MobileParties.Messages.Lifetime;
-using GameInterface.Services.Registry;
+﻿using Common;
+using Common.Messaging;
+using Common.Util;
+using GameInterface.Registry.Auto;
+using GameInterface.Services.Entity;
+using GameInterface.Services.ObjectManager;
+using HarmonyLib;
+using Serilog;
 using System;
+using System.Collections.Generic;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.MobileParties;
 
 /// <summary>
 /// Registry for <see cref="MobileParty"/> objects
 /// </summary>
-internal class MobilePartyRegistry : RegistryBase<MobileParty>
+internal class MobilePartyRegistry : AutoRegistryBase<MobileParty>
 {
-    private const string PartyStringIdPrefix = "CoopParty";
+    public override bool Debug => true;
+
+    private readonly IControlledEntityRegistry controlledEntityRegistry;
+    private readonly IControllerIdProvider controllerIdProvider;
     private readonly IMessageBroker messageBroker;
 
-    public MobilePartyRegistry(IRegistryCollection collection, IMessageBroker messageBroker) : base(collection)
+    public MobilePartyRegistry(
+        IControlledEntityRegistry controlledEntityRegistry,
+        IControllerIdProvider controllerIdProvider,
+        IMessageBroker messageBroker,
+        ILogger logger,
+        IAutoRegistryFactory autoRegistryFactory,
+        IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
+        this.controlledEntityRegistry = controlledEntityRegistry;
+        this.controllerIdProvider = controllerIdProvider;
         this.messageBroker = messageBroker;
-
-        messageBroker.Subscribe<PartyDestroyed>(Handle_PartyDestroyed);
     }
 
-    public override void Dispose()
+    public override IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(MobileParty));
+
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+    //    new MethodBase[]
+    //{
+    //    AccessTools.Method(typeof(MobileParty), nameof(MobileParty.RemoveParty))
+    //};
+
+
+    public override void RegisterAllObjects()
     {
-        messageBroker.Unsubscribe<PartyDestroyed>(Handle_PartyDestroyed);
-
-        base.Dispose();
-    }
-
-    public override void RegisterAll()
-    {
-        var objectManager = Campaign.Current?.CampaignObjectManager;
-
-        if (objectManager == null)
+        foreach (var party in MobileParty.All)
         {
-            Logger.Error("Unable to register objects when CampaignObjectManager is null");
-            return;
-        }
-
-        foreach (var party in objectManager.MobileParties)
-        {
-            base.RegisterExistingObject(party.StringId, party);
+            RegisterExistingObject(party.StringId, party);
         }
     }
 
-    public override bool RegisterExistingObject(string id, object obj)
+    public override void OnClientCreated(MobileParty obj, string id)
     {
-        var result = base.RegisterExistingObject(id, obj);
+        using (new AllowedThread())
+        {
+            obj._isVisible = false;
+            obj.IsActive = true;
+            obj._isCurrentlyUsedByAQuest = false;
+            obj.Party = new PartyBase(obj);
+            obj.Anchor = new AnchorPoint(obj);
+            obj.InitMembers();
+            obj.InitCached();
+            obj.Initialize();
+        }
 
-        AddToCampaignObjectManager(obj);
+        MBObjectManager.Instance?.RegisterObjectInternalWithoutTypeId(obj, false, out _);
 
-        return result;
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            Campaign.Current?.CampaignObjectManager?.AddMobileParty(obj);
+        });
     }
 
-    private void AddToCampaignObjectManager(object obj)
+    public override void OnClientDestroyed(MobileParty obj, string id)
     {
-        if (TryCast(obj, out var castedObj) == false) return;
-
-        var objectManager = Campaign.Current?.CampaignObjectManager;
-
-        if (objectManager == null) return;
-
-        objectManager.AddMobileParty(castedObj);
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            using (new AllowedThread())
+            {
+                try
+                {
+                    Campaign.Current.MobilePartyLocator.RemoveLocatable(obj);
+                    Campaign.Current.VisualTrackerManager.RemoveTrackedObject(obj, true);
+                    CampaignEventDispatcher.Instance.OnPartyRemoved(obj.Party);
+                    Campaign.Current.CampaignObjectManager.RemoveMobileParty(obj);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to remove party");
+                }
+            }
+        });
     }
 
-    protected override string GetNewId(MobileParty party)
+    public override void OnServerCreated(MobileParty obj, string id)
     {
-        party.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<MobileParty>(PartyStringIdPrefix);
-        return party.StringId;
+        controlledEntityRegistry.RegisterAsControlled(controllerIdProvider.ControllerId, id);
     }
 
-    private void Handle_PartyDestroyed(MessagePayload<PartyDestroyed> payload)
+    public override void OnServerDestroyed(MobileParty obj, string id)
     {
-        var stringId = payload.What.Data.StringId;
+        obj.MemberRoster.Clear();
+        obj.PrisonRoster.Clear();
+        obj.Party.SetVisualAsDirty();
 
-        Remove(stringId);
+        var message = new InstanceDestroyed<PartyBase>(obj.Party);
+        messageBroker.Publish(this, message);
+
+        
     }
 }

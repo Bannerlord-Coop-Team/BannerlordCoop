@@ -1,57 +1,61 @@
-﻿using GameInterface.Services.Registry;
+﻿using Common;
+using Common.Util;
+using GameInterface.Registry;
+using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
+using HarmonyLib;
+using Serilog;
 using System;
 using System.Collections.Generic;
-using System.Text;
-using TaleWorlds.CampaignSystem;
+using System.Linq;
+using System.Reflection;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.ObjectSystem;
+using TaleWorlds.CampaignSystem.Settlements.Locations;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Settlements;
-internal class SettlementRegistry : RegistryBase<Settlement>
+internal class SettlementRegistry : AutoRegistryBase<Settlement>
 {
-    public static readonly string SettlementStringIdPrefix = "CoopSettlement";
-
-    public SettlementRegistry(IRegistryCollection collection) : base(collection) { }
-
-    public override void RegisterAll()
+    public SettlementRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
-        var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
+    }
 
-        if (campaignObjectManager == null)
+    public override IEnumerable<MethodBase> Constructors => new MethodBase[] {
+        AccessTools.Constructor(typeof(Settlement), new Type[] { typeof(TextObject), typeof(LocationComplex), typeof(PartyTemplateObject)}),
+    };
+
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+    public override void RegisterAllObjects()
+    {
+        foreach (var settlement in Settlement.All.OrderBy(obj => obj.Id))
         {
-            Logger.Error("Unable to register objects when CampaignObjectManager is null");
-            return;
+            RegisterExistingObject(settlement.StringId, settlement);
         }
+    }
 
-        foreach (var settlement in campaignObjectManager.Settlements)
+    public override void OnClientCreated(Settlement obj, string id)
+    {
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            base.RegisterExistingObject(settlement.StringId, settlement);
-        }
+            using (new AllowedThread())
+            {
+                obj.InitSettlement();
+            }
+        });
     }
 
-    public override bool RegisterExistingObject(string id, object obj)
+    public override void OnClientDestroyed(Settlement obj, string id)
     {
-        var result = base.RegisterExistingObject(id, obj);
-
-        AddToCampaignObjectManager(obj);
-
-        return result;
     }
 
-    protected override string GetNewId(Settlement settlement)
+    public override void OnServerCreated(Settlement obj, string id)
     {
-        settlement.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<Settlement>(SettlementStringIdPrefix);
-        return settlement.StringId;
     }
 
-    private void AddToCampaignObjectManager(object obj)
+    public override void OnServerDestroyed(Settlement obj, string id)
     {
-        if (TryCast(obj, out var _) == false) return;
-
-        var objectManager = Campaign.Current?.CampaignObjectManager;
-
-        if (objectManager == null) return;
-
-        objectManager.Settlements = MBObjectManager.Instance.GetObjectTypeList<Settlement>();
     }
 }

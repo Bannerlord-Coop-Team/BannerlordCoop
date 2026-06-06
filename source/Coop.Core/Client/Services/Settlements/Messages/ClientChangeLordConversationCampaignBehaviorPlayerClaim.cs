@@ -9,12 +9,12 @@ namespace Coop.Core.Client.Services.Settlements.Messages;
 /// </summary>
 [BatchLogMessage]
 [ProtoContract(SkipConstructor = true)] 
-public record ClientChangeLordConversationCampaignBehaviorPlayerClaim : IEvent
+public readonly struct ClientChangeLordConversationCampaignBehaviorPlayerClaim : IEvent
 {
     [ProtoMember(1)]
-    public string SettlementId { get; }
+    public readonly string SettlementId;
     [ProtoMember(2)]
-    public string HeroId { get; }
+    public readonly string HeroId;
 
     public ClientChangeLordConversationCampaignBehaviorPlayerClaim(string settlementId, string heroId)
     {

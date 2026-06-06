@@ -1,19 +1,19 @@
 ﻿using Common.Messaging;
+using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Services.Heroes.Messages
+namespace GameInterface.Services.Heroes.Messages;
+
+/// <summary>
+/// Event from GameInterface for _defaultAge.
+/// </summary>
+public readonly struct DefaultAgeChanged : IEvent
 {
-    /// <summary>
-    /// Event from GameInterface for _defaultAge
-    /// </summary>
-    public record DefaultAgeChanged : IEvent
-    {
-        public float Age { get; }
-        public string HeroId { get; }
+    public readonly float Age;
+    public readonly Hero Hero;
 
-        public DefaultAgeChanged(float age, string heroId)
-        {
-            Age = age;
-            HeroId = heroId;
-        }
+    public DefaultAgeChanged(float age, Hero hero)
+    {
+        Age = age;
+        Hero = hero;
     }
 }

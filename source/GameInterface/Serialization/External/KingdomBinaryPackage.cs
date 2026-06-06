@@ -18,7 +18,8 @@ namespace GameInterface.Serialization.External
         private string[] clanIds;
         private string[] fiefIds;
         private string[] heroIds;
-        private string[] lordIds;
+        private string[] deadLordIds;
+        private string[] aliveLordIds;
         private string[] settlementIds;
         private string[] villageIds;
 
@@ -32,7 +33,8 @@ namespace GameInterface.Serialization.External
             "_distanceToClosestNonAllyFortificationCache",
             "_clans",
             "_warPartyComponentsCache",
-            "_lordsCache",
+            "_deadLordsCache",
+            "_aliveLordsCache",
             "_heroesCache",
             "_settlementsCache",
             "_villagesCache",
@@ -41,28 +43,27 @@ namespace GameInterface.Serialization.External
 
         protected override void PackInternal()
         {
-            stringId = Object.StringId;
+            stringId = ResolveId(Object);
 
             base.PackFields(excludes);
 
-            clanIds = PackIds(Object.Clans);
-            fiefIds = PackIds(Object.Fiefs);
-            heroIds = PackIds(Object.Heroes);
-            lordIds = PackIds(Object.Lords);
-            settlementIds = PackIds(Object.Settlements);
-            villageIds = PackIds(Object.Villages);
+            clanIds = ResolveIds(Object.Clans);
+            fiefIds = ResolveIds(Object.Fiefs);
+            heroIds = ResolveIds(Object.Heroes);
+            deadLordIds = ResolveIds(Object.DeadLords);
+            aliveLordIds = ResolveIds(Object.AliveLords);
+
+            settlementIds = ResolveIds(Object.Settlements);
+            villageIds = ResolveIds(Object.Villages);
         }
 
         protected override void UnpackInternal()
         {
-            if(stringId != null)
+            var resolvedObj = ResolveObject<Kingdom>(stringId);
+            if (resolvedObj != null)
             {
-                Kingdom kingdom = ResolveId<Kingdom>(stringId);
-                if (kingdom != null)
-                {
-                    Object = kingdom;
-                    return;
-                }
+                Object = resolvedObj;
+                return;
             }
 
             base.UnpackFields();
@@ -74,12 +75,13 @@ namespace GameInterface.Serialization.External
             // Cached WarPartyComponents are handed in the
             // BanditComponentBinaryPackage and LordPartyComponentBinaryPackage
 
-            Object._clans = ResolveIds<Clan>(clanIds).ToMBList();
-            Object._fiefsCache = ResolveIds<Town>(fiefIds).ToMBList();
-            Object._heroesCache = ResolveIds<Hero>(heroIds).ToMBList();
-            Object._lordsCache = ResolveIds<Hero>(lordIds).ToMBList();
-            Object._settlementsCache = ResolveIds<Settlement>(settlementIds).ToMBList();
-            Object._villagesCache = ResolveIds<Village>(villageIds).ToMBList();
+            Object._clans = ResolveObjects<Clan>(clanIds).ToMBList();
+            Object._fiefsCache = ResolveObjects<Town>(fiefIds).ToMBList();
+            Object._heroesCache = ResolveObjects<Hero>(heroIds).ToMBList();
+            Object._aliveLordsCache = ResolveObjects<Hero>(aliveLordIds).ToMBList();
+            Object._deadLordsCache = ResolveObjects<Hero>(deadLordIds).ToMBList();
+            Object._settlementsCache = ResolveObjects<Settlement>(settlementIds).ToMBList();
+            Object._villagesCache = ResolveObjects<Village>(villageIds).ToMBList();
         }
     }
 }

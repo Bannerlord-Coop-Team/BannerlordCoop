@@ -7,6 +7,7 @@ using Coop.Tests.Mocks;
 using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Xunit;
 using Xunit.Abstractions;
@@ -38,7 +39,23 @@ namespace Coop.Tests.Client.States
             Assert.NotEmpty(clientComponent.TestNetwork.Peers);
 
             var message = Assert.Single(clientComponent.TestNetwork.GetPeerMessages(serverPeer));
-            Assert.IsType<NetworkClientValidate>(message);
+            Assert.IsType<NetworkModuleVersionsValidate>(message);
+        }
+
+        [Fact]
+        public void NetworkModuleVersionsValidated_Transitions_ReceiveResult()
+        {
+            // Arrange
+            var validateState = clientLogic.SetState<ValidateModuleState>();
+
+            var payload = new MessagePayload<NetworkModuleVersionsValidated>(
+                this, new NetworkModuleVersionsValidated(true, null));
+
+            // Act
+            validateState.Handle_NetworkModuleVersionsValidated(payload);
+
+            // Assert
+            Assert.IsType<ValidateModuleState>(clientLogic.State);
         }
 
         [Fact]
@@ -49,7 +66,7 @@ namespace Coop.Tests.Client.States
 
             var heroExists = true;
             var payload = new MessagePayload<NetworkClientValidated>(
-                this, new NetworkClientValidated(heroExists, "12345"));
+                this, new NetworkClientValidated(heroExists, new Player("12345", "111")));
 
             // Act
             validateState.Handle_NetworkClientValidated(payload);
@@ -66,7 +83,7 @@ namespace Coop.Tests.Client.States
 
             var heroExists = false;
             var payload = new MessagePayload<NetworkClientValidated>(
-                this, new NetworkClientValidated(heroExists, "12345"));
+                this, new NetworkClientValidated(heroExists, new Player("12345", "111")));
 
             // Act
             validateState.Handle_NetworkClientValidated(payload);

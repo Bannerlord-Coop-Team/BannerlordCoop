@@ -3,14 +3,15 @@
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Common;
-using Coop.Core.Common.Services.Connection.Messages;
 using Coop.Core.Server.Connections.Messages;
+using GameInterface.Registry;
 using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.Entity;
-using GameInterface.Services.Entity.Messages;
-using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
-using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.Players.Data;
+using GameInterface.Services.UI.Messages;
+using NetworkPlayerData = Coop.Core.Server.Connections.Messages.NetworkPlayerData;
 
 namespace Coop.Core.Client.States;
 
@@ -21,21 +22,29 @@ public class CharacterCreationState : ClientStateBase
 {
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
+    private readonly IHeroInterface heroInterface;
+    private readonly IRegistryManager registryManager;
     private readonly IControllerIdProvider controllerIdProvider;
+    private readonly IControlledEntityRegistry controlledEntityRegistry;
     private readonly ICoopFinalizer coopFinalizer;
 
     public CharacterCreationState(
         IClientLogic logic,
         IMessageBroker messageBroker,
-        INetwork network, 
+        INetwork network,
+        IHeroInterface heroInterface,
+        IRegistryManager registryManager,
         IControllerIdProvider controllerIdProvider,
+        IControlledEntityRegistry controlledEntityRegistry,
         ICoopFinalizer coopFinalizer) : base(logic)
     {
         this.messageBroker = messageBroker;
         this.network = network;
+        this.heroInterface = heroInterface;
+        this.registryManager = registryManager;
         this.controllerIdProvider = controllerIdProvider;
+        this.controlledEntityRegistry = controlledEntityRegistry;
         this.coopFinalizer = coopFinalizer;
-        messageBroker.Subscribe<NewHeroPackaged>(Handle_NewHeroPackaged);
         messageBroker.Subscribe<CharacterCreationFinished>(Handle_CharacterCreationFinished);
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Subscribe<NetworkPlayerData>(Handle_NetworkPlayerData);
@@ -43,7 +52,6 @@ public class CharacterCreationState : ClientStateBase
 
     public override void Dispose()
     {
-        messageBroker.Unsubscribe<NewHeroPackaged>(Handle_NewHeroPackaged);
         messageBroker.Unsubscribe<CharacterCreationFinished>(Handle_CharacterCreationFinished);
         messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Unsubscribe<NetworkPlayerData>(Handle_NetworkPlayerData);
@@ -51,25 +59,29 @@ public class CharacterCreationState : ClientStateBase
 
     internal void Handle_CharacterCreationFinished(MessagePayload<CharacterCreationFinished> obj)
     {
-        messageBroker.Publish(this, new PackageMainHero());
-    }
+        // Cover the client's own (character-creation) world with a loading screen until the
+        // server campaign is ready, so the local world isn't briefly visible while we join.
+        messageBroker.Publish(this, new StartLoadingScreen());
 
-    internal void Handle_NewHeroPackaged(MessagePayload<NewHeroPackaged> obj)
-    {
+        registryManager.RegisterAllGameObjects();
+
         var playerId = controllerIdProvider.ControllerId;
-        var data = obj.What.Package;
+        var data = heroInterface.PackageMainHero();
+
+        // Clear all registries so next time the game is loaded, it re-registers loaded save objects
+        registryManager.ClearAllRegistries();
 
         network.SendAll(new NetworkTransferedHero(playerId, data));
     }
 
     internal void Handle_NetworkPlayerData(MessagePayload<NetworkPlayerData> obj)
     {
-        Logic.ControlledHeroId = obj.What.HeroStringId;
+        Logic.Player = new Player(obj.What.HeroStringId, obj.What.PartyStringId);
 
         var controllerId = controllerIdProvider.ControllerId;
 
-        messageBroker.Publish(this, new AddControlledEntity(controllerId, obj.What.HeroStringId));
-        messageBroker.Publish(this, new AddControlledEntity(controllerId, obj.What.PartyStringId));
+        controlledEntityRegistry.RegisterAsControlled(controllerId, obj.What.HeroStringId);
+        controlledEntityRegistry.RegisterAsControlled(controllerId, obj.What.PartyStringId);
 
         Logic.LoadSavedData();
     }

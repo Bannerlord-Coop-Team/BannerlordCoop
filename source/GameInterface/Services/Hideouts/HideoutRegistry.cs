@@ -1,34 +1,49 @@
-﻿using GameInterface.Services.Registry;
+﻿using Common;
+using GameInterface.Registry;
+using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
+using HarmonyLib;
+using Serilog;
 using System;
-using System.Linq;
-using TaleWorlds.CampaignSystem;
+using System.Collections.Generic;
+using System.Reflection;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Hideouts;
-internal class HideoutRegistry : RegistryBase<Hideout>
+internal class HideoutRegistry : AutoRegistryBase<Hideout>
 {
-    public HideoutRegistry(IRegistryCollection collection) : base(collection) { }
-
-    public override void RegisterAll()
+    public HideoutRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
-        var objectManager = Campaign.Current?.CampaignObjectManager;
+    }
 
-        if (objectManager == null)
-        {
-            Logger.Error("Unable to register objects when CampaignObjectManager is null");
-            return;
-        }
+    public override IEnumerable<MethodBase> Constructors => new MethodBase[] {
+        AccessTools.Constructor(typeof(Hideout))
+    };
 
-        foreach (var settlement in Campaign.Current.CampaignObjectManager.Settlements.Where(settlement => settlement.IsHideout))
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+    public override void RegisterAllObjects()
+    {
+        foreach (var hideout in Hideout.All)
         {
-            Hideout hideout = settlement.Hideout;
-            base.RegisterExistingObject(hideout.StringId, hideout);
+            RegisterExistingObject(hideout.StringId, hideout);
         }
     }
 
-    protected override string GetNewId(Hideout hideout)
+    public override void OnClientCreated(Hideout obj, string id)
     {
-        return Guid.NewGuid().ToString();
+    }
+
+    public override void OnClientDestroyed(Hideout obj, string id)
+    {
+    }
+
+    public override void OnServerCreated(Hideout obj, string id)
+    {
+    }
+
+    public override void OnServerDestroyed(Hideout obj, string id)
+    {
     }
 }
-

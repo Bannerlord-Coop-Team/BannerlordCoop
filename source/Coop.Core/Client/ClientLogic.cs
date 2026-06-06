@@ -1,7 +1,10 @@
 ﻿using Common.Logging;
 using Common.LogicStates;
 using Coop.Core.Client.States;
+using GameInterface.Services.Players.Data;
 using Serilog;
+using System;
+using System.Collections.Generic;
 
 namespace Coop.Core.Client;
 
@@ -10,7 +13,7 @@ namespace Coop.Core.Client;
 /// </summary>
 public interface IClientLogic : ILogic, IClientState
 {
-    string ControlledHeroId { get; set; }
+    Player Player { get; set; }
 
     /// <summary>
     /// Client-side state
@@ -25,8 +28,13 @@ public class ClientLogic : IClientLogic
 {
     private readonly ILogger Logger = LogManager.GetLogger<ClientLogic>();
     public IStateFactory StateFactory { get; }
-    public string ControlledHeroId { get; set; }
+    public Player Player { get; set; }
     private IClientState InitialState => StateFactory.CreateClientState<MainMenuState>(this);
+    private readonly HashSet<Type> RunningStates = new HashSet<Type>
+    {
+        typeof(MissionState),
+        typeof(CampaignState),
+    };
     public IClientState State 
     {
         get 
@@ -42,6 +50,8 @@ public class ClientLogic : IClientLogic
             _state = value;
         } 
     }
+
+    public bool RunningState => RunningStates.Contains(_state.GetType());
 
     private IClientState _state;
 

@@ -4,7 +4,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Messages;
 using GameInterface.Services.Settlements.Patches;
 using Serilog;
-using System;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -29,7 +29,7 @@ public class SettlementHandler : IHandler
 
         messageBroker.Subscribe<ChangeSettlementBribePaid>(HandleBribePaid);
         messageBroker.Subscribe<ChangeSettlementHitPoints>(HandleHitPoints);
-        messageBroker.Subscribe<ChangeSettlementHitPoints>(HandleHitPoints);
+        //messageBroker.Subscribe<ChangeSettlementHitPoints>(HandleHitPoints);
         messageBroker.Subscribe<ChangeSettlementLastAttackerParty>(HandleLastAttackerParty);
         messageBroker.Subscribe<ChangeSettlementLastThreatTime>(HandleLastThreatTime);
         messageBroker.Subscribe<ChangeSettlementCurrentSiegeState>(HandleCurrentSiegeState);
@@ -66,7 +66,7 @@ public class SettlementHandler : IHandler
             return;
         }
 
-        SettlementClaimantCampaignBehaviorOnOwnerChangedPatch.RunCanBeClaimed(settlement, obj.CanBeClaimed);
+        //SettlementClaimantCampaignBehaviorOnOwnerChangedPatch.RunCanBeClaimed(settlement, obj.CanBeClaimed);
     }
 
     private void HandleLordConversationCampaignBehaviorPlayerClaimValueOthers(MessagePayload<ChangeLordConversationCampaignBehaviorPlayerClaimValueOthers> payload)
@@ -77,7 +77,7 @@ public class SettlementHandler : IHandler
             Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
             return;
         }
-        ClaimLandAnswerOnConversationLordConversationsCampaignBehaviourPatch.RunClaimedValue(settlement, obj.ClaimValue);
+        //ClaimLandAnswerOnConversationLordConversationsCampaignBehaviourPatch.RunClaimedValue(settlement, obj.ClaimValue);
     }
 
     private void HandleLordConversationCampaignBehaviorPlayerClaimValue(MessagePayload<ChangeLordConversationCampaignBehaviourPlayerClaimValue> payload)
@@ -89,7 +89,7 @@ public class SettlementHandler : IHandler
             return;
         }
 
-        ClaimLandAnswerOnConversationLordConversationsCampaignBehaviourPatch.RunClaimedValue(settlement, obj.ClaimValue);
+        //ClaimLandAnswerOnConversationLordConversationsCampaignBehaviourPatch.RunClaimedValue(settlement, obj.ClaimValue);
     }
 
     private void HandleLordConversationCampaignBehaviorPlayerClaimOthers(MessagePayload<ChangeLordConversationCampaignBehaviorPlayerClaimOthers> payload)
@@ -107,7 +107,7 @@ public class SettlementHandler : IHandler
             return;
         }
 
-        ClaimLandAnswerOnConversationLordConversationsCampaignBehaviourPatch.RunClaimedBy(settlement, hero);
+        //ClaimLandAnswerOnConversationLordConversationsCampaignBehaviourPatch.RunClaimedBy(settlement, hero);
     }
 
     private void HandleLordConversationCampaignBehaviorPlayerClaim(MessagePayload<ChangeLordConversationCampaignBehaviorPlayerClaim> payload)
@@ -125,7 +125,7 @@ public class SettlementHandler : IHandler
             return;
         }
 
-        ClaimLandAnswerOnConversationLordConversationsCampaignBehaviourPatch.RunClaimedBy(settlement, hero);
+        //ClaimLandAnswerOnConversationLordConversationsCampaignBehaviourPatch.RunClaimedBy(settlement, hero);
     }
 
     private void HandleLastVisitTimeOfOwner(MessagePayload<ChangeSettlementLastVisitTimeOfOwner> payload)
@@ -168,7 +168,7 @@ public class SettlementHandler : IHandler
             return;
         }
 
-        MobilePartyCachePatch.RunMobileParty(settlement, mobileParty, obj.NumberOfLordParties, obj.AddMobileParty);
+        MobilePartyCachePatch.RunMobileParty(settlement, mobileParty, obj.AddMobileParty);
     }
 
     private void HandleHeroRemoveWithoutParty(MessagePayload<ChangeSettlementHeroWithoutPartyRemove> payload)
@@ -219,7 +219,7 @@ public class SettlementHandler : IHandler
             return;
         }
 
-        foreach (string heroStringId in obj.NotablesCache) {
+        foreach (string heroStringId in obj.NotablesCache ?? Enumerable.Empty<string>()) {
             if (objectManager.TryGetObject<Hero>(heroStringId, out var hero) == false)
             {
                 Logger.Error("Unable to find Hero ({HeroStringId})", heroStringId);
@@ -252,7 +252,7 @@ public class SettlementHandler : IHandler
             return;
         }
 
-        MilitiaSettlementPatch.RunMiltiiaChange(settlement, obj.Militia);
+        MilitiaSettlementPatch.RunMiltiaChange(settlement, obj.Militia);
     }
 
     private void HandleCurrentSiegeState(MessagePayload<ChangeSettlementCurrentSiegeState> payload)
@@ -327,7 +327,7 @@ public class SettlementHandler : IHandler
     {
         messageBroker.Unsubscribe<ChangeSettlementBribePaid>(HandleBribePaid);
         messageBroker.Unsubscribe<ChangeSettlementHitPoints>(HandleHitPoints);
-        messageBroker.Unsubscribe<ChangeSettlementHitPoints>(HandleHitPoints);
+        //messageBroker.Unsubscribe<ChangeSettlementHitPoints>(HandleHitPoints);
         messageBroker.Unsubscribe<ChangeSettlementLastAttackerParty>(HandleLastAttackerParty);
         messageBroker.Unsubscribe<ChangeSettlementLastThreatTime>(HandleLastThreatTime);
         messageBroker.Unsubscribe<ChangeSettlementCurrentSiegeState>(HandleCurrentSiegeState);

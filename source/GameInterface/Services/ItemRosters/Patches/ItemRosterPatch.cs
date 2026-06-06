@@ -25,8 +25,8 @@ namespace GameInterface.Services.ItemRosters.Patches
 
             if (ModInformation.IsClient)
             {
-                __result = -1;
-                return false; // Disallow clients
+                Logger.Error("Client changed managed {var}", nameof(ItemRoster.AddToCounts));
+                return true;
             }
 
             return true; // Allow on server
@@ -39,27 +39,18 @@ namespace GameInterface.Services.ItemRosters.Patches
             // Call original if we call this function
             if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
-            if (ModInformation.IsClient)
-            {
-                return;
-            }
+            // Don't publish unsucessful calls
+            if (__result == -1) return;
 
-            if (__result == -1)
-            {
-                return; // Don't publish unsucessful calls
-            }
+            if (ModInformation.IsClient) return;
 
-            if (ItemRosterLookup.TryGetValue(__instance, out var partyBase) == false)
-            {
-                Logger.Error("Unable to find party from item roster");
-                return;
-            }
+            var message = new ItemRosterUpdated(
+                __instance,
+                rosterElement.Item,
+                rosterElement.ItemModifier,
+                number);
 
-            MessageBroker.Instance.Publish(__instance, new ItemRosterUpdated(
-                        partyBase.Id,
-                        rosterElement.Item.StringId,
-                        rosterElement.ItemModifier?.StringId,
-                        number));
+            MessageBroker.Instance.Publish(__instance, message);
         }
 
         [HarmonyPatch(nameof(ItemRoster.Clear))]
@@ -80,7 +71,8 @@ namespace GameInterface.Services.ItemRosters.Patches
                 return false;
             }
 
-            MessageBroker.Instance.Publish(__instance, new ItemRosterCleared(partyBase.Id));
+            MessageBroker.Instance.Publish(__instance, new ItemRosterCleared(partyBase));
+
             return true; // Allow on server
         }
 
@@ -90,7 +82,7 @@ namespace GameInterface.Services.ItemRosters.Patches
             {
                 using (new AllowedThread())
                 {
-                    itemRoster.AddToCounts(rosterElement, amount);
+                    itemRoster?.AddToCounts(rosterElement, amount);
                 }
             });
         }
@@ -101,7 +93,7 @@ namespace GameInterface.Services.ItemRosters.Patches
             {
                 using (new AllowedThread())
                 {
-                    itemRoster.Clear();
+                    itemRoster?.Clear();
                 }
             });
         }

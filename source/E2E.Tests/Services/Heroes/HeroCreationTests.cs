@@ -2,6 +2,7 @@ using E2E.Tests.Environment;
 using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
@@ -27,13 +28,19 @@ public class HeroCreationTests : IDisposable
         // Arrange
         var server = TestEnvironment.Server;
 
-        var characterObject = GameObjectCreator.CreateInitializedObject<CharacterObject>();
-        MBObjectManager.Instance.RegisterObject(characterObject);
+        
 
         // Act
         Hero? serverHero = null;
         server.Call(() =>
         {
+            var characterObject = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+
+            // Required: SetupMainHero also initializes these to avoid NullReferenceException in SetInitialValuesFromCharacter
+            characterObject.Culture.DefaultBattleEquipmentRoster = GameObjectCreator.CreateInitializedObject<MBEquipmentRoster>();
+            characterObject.Culture.DefaultStealthEquipmentRoster = GameObjectCreator.CreateInitializedObject<MBEquipmentRoster>();
+            characterObject.Culture.DefaultStealthEquipmentRoster.AllEquipments[0]._itemSlots[0].Item = GameObjectCreator.CreateInitializedObject<ItemObject>();
+
             var hero = HeroCreator.CreateSpecialHero(characterObject);
 
             hero.BornSettlement = Settlement.GetFirst;
@@ -60,15 +67,12 @@ public class HeroCreationTests : IDisposable
         // Arrange
         var server = TestEnvironment.Server;
         var client1 = TestEnvironment.Clients.First();
-
-        var characterObject = GameObjectCreator.CreateInitializedObject<CharacterObject>();
-        MBObjectManager.Instance.RegisterObject(characterObject);
-
+        
         // Act
         Hero? clientHero = null;
         client1.Call(() =>
         {
-            var hero = HeroCreator.CreateSpecialHero(characterObject);
+            var hero = new Hero();
 
             hero.BornSettlement = Settlement.GetFirst;
             clientHero = hero;

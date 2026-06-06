@@ -28,13 +28,12 @@ internal class VillagePatches
     [HarmonyPrefix]
     private static bool VillageStatePrefix(ref Village __instance, ref VillageStates value)
     {
-        if(AllowedThread.IsThisThreadAllowed()) return true;
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient) return false;
         if (__instance._villageState == value) return false;
         
-        var message = new VillageStateChanged(__instance.StringId, (int)value);
+        var message = new VillageStateChanged(__instance, (int)value);
         MessageBroker.Instance.Publish(__instance, message);    
         return true;
     }
@@ -63,12 +62,11 @@ internal class VillagePatches
     [HarmonyPrefix]
     private static bool HearthPrefix(ref Village __instance, ref float value)
     {
-        if (AllowedThread.IsThisThreadAllowed()) return true;
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient) return false;
 
-        var message = new VillageHearthChanged(__instance.StringId, value);
+        var message = new VillageHearthChanged(__instance, value);
         MessageBroker.Instance.Publish(__instance, message);
         return true;
     }
@@ -88,14 +86,13 @@ internal class VillagePatches
     [HarmonyPrefix]
     private static bool TradeBoundPrefix(ref Village __instance, ref Settlement value)
     {
-        if (AllowedThread.IsThisThreadAllowed()) return true;
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient) return false;
 
         if (__instance._tradeBound == value) return false;
 
-        var message = new VillageTradeBoundChanged(__instance.StringId, value.StringId);
+        var message = new VillageTradeBoundChanged(__instance, value);
         MessageBroker.Instance.Publish(__instance, message);
 
         return true;
@@ -117,12 +114,11 @@ internal class VillagePatches
     [HarmonyPrefix]
     private static bool TradeTaxAccumulatedPrefix(ref Village __instance, ref int value)
     {
-        if (AllowedThread.IsThisThreadAllowed()) return true;
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient) return false;
 
-        var message = new VillageTaxAccumulateChanged(__instance.StringId, value);
+        var message = new VillageTaxAccumulateChanged(__instance, value);
         MessageBroker.Instance.Publish(__instance, message);
         return true;
     }
@@ -142,12 +138,11 @@ internal class VillagePatches
     [HarmonyPrefix]
     private static bool LastDemandSatisifiedTimePrefix(ref Village __instance, ref float value)
     {
-        if (AllowedThread.IsThisThreadAllowed()) return true;
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient) return false;
 
-        var message = new VillageDemandTimeChanged(__instance.StringId, value);
+        var message = new VillageDemandTimeChanged(__instance, value);
         MessageBroker.Instance.Publish(__instance, message);
         return true;
     }

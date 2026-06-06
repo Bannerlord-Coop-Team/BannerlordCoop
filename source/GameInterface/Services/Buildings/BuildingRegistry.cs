@@ -1,0 +1,41 @@
+﻿using GameInterface.Registry;
+using System;
+using System.Threading;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Settlements.Buildings;
+
+namespace GameInterface.Services.Buildings;
+
+/// <summary>
+/// Registry for <see cref="Army"/> type
+/// </summary>
+internal class BuildingRegistry : RegistryBase<Building>
+{
+    private const string BuildingIdPrefix = "CoopBuilding";
+    private int InstanceCounter = 0;
+
+    public BuildingRegistry(IRegistryCollection collection) : base(collection) { }
+
+    public override void RegisterAll()
+    {
+        foreach(Settlement settlement in Campaign.Current.Settlements)
+        {
+            if(settlement.Town == null) continue;
+
+            int counter = 0;
+
+            foreach(Building building in settlement.Town.Buildings)
+            {
+                var networkId = settlement.StringId + counter++;
+                if (RegisterExistingObject(networkId, building) == false)
+                    Logger.Error($"Unable to register {building}");
+            }
+        }
+    }
+
+    protected override string GetNewId(Building obj)
+    {
+        return $"{BuildingIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
+    }
+}

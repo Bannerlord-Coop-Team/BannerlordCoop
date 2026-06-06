@@ -26,11 +26,6 @@ public class MockServer : MockNetworkBase, ICoopServer
         peers.Remove(peer);
     }
 
-    public void Dispose()
-    {
-        throw new NotImplementedException();
-    }
-
     public void OnConnectionRequest(ConnectionRequest request)
     {
         throw new NotImplementedException();

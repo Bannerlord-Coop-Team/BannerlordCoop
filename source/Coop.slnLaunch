@@ -1,0 +1,41 @@
+[
+  {
+    "Name": "Server & Client",
+    "Projects": [
+      {
+        "Path": "Coop\\Coop.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "ClientDebug\\ClientDebug.csproj",
+        "Action": "Start"
+      }
+    ]
+  },
+  {
+    "Name": "Server & 2 Clients",
+    "Projects": [
+      {
+        "Path": "Coop\\Coop.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "ClientDebug\\ClientDebug.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "ClientDebug 2\\ClientDebug2.csproj",
+        "Action": "Start"
+      }
+    ]
+  },
+  {
+    "Name": "Server Only",
+    "Projects": [
+      {
+        "Path": "Coop\\Coop.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]

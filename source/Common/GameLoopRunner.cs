@@ -19,7 +19,16 @@ public class GameLoopRunner : IUpdateable
     private readonly object m_QueueLock = new object();
     private int m_GameLoopThreadId;
 
-    public int QueueLength => m_Queue.Count;
+    public int QueueLength
+    {
+        get
+        {
+            lock (m_QueueLock)
+            {
+                return m_Queue.Count;
+            }
+        }
+    }
 
     public bool IsInitialized => m_GameLoopThreadId != 0;
 
@@ -38,17 +47,12 @@ public class GameLoopRunner : IUpdateable
 
         List<(Action, EventWaitHandle)> toBeRun = new List<(Action, EventWaitHandle)>();
 
-        lock (m_Queue)
+        lock (Instance.m_QueueLock)
         {
             while (m_Queue.Count > 0)
             {
                 toBeRun.Add(m_Queue.Dequeue());
             }
-        }
-
-        if (toBeRun.Count > 0)
-        {
-            Logger.Debug("Processing {count} actions in the game loop", toBeRun.Count);
         }
         
         foreach ((Action, EventWaitHandle) task in toBeRun)

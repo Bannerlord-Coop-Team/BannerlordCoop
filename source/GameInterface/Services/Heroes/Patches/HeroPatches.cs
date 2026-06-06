@@ -1,27 +1,28 @@
-﻿using HarmonyLib;
+﻿using GameInterface.Extentions;
+using HarmonyLib;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Services.Heroes.Patches;
-
-[HarmonyPatch(typeof(Hero))]
-internal class HeroPatches
+namespace GameInterface.Services.Heroes.Patches
 {
-
-    [HarmonyPostfix]
-    [HarmonyPatch(MethodType.Constructor)]
-    static void Postfix(Hero __instance)
+    /// <summary>
+    /// Patch for Hero class methods.
+    /// </summary>
+    [HarmonyPatch(typeof(Hero))]
+    public class HeroPatches
     {
-
-        //if(Coop.IsServer)
-        //{
-        //    string stacktrace = Environment.StackTrace;
-        //    Logger.Info($"Creating new hero, {__instance.Name}");
-        //}
-        //else if(CoopClient.Instance.ClientPlaying)
-        //{
-        //    string stacktrace = Environment.StackTrace;
-        //    Logger.Info($"Creating new hero, {__instance.Name}");
-        //}
-
+        /// <summary>
+        /// Patch for determining whether a Hero is a player's hero or not.
+        /// </summary>
+        /// <param name="__instance">hero instance</param>
+        /// <param name="__result">result</param>
+        /// <returns></returns>
+        [HarmonyPrefix]
+        [HarmonyPatch(nameof(Hero.IsHumanPlayerCharacter),MethodType.Getter)]
+        private static bool IsHumanPlayerCharacterPrefix(Hero __instance, ref bool __result)
+        {
+            __result = Campaign.Current.CampaignObjectManager.GetPlayerMobileParties().Any(party => party.LeaderHero == __instance);
+            return false;
+        }
     }
 }

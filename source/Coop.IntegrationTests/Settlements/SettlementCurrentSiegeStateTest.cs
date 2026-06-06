@@ -21,10 +21,7 @@ public class SettlementCurrentSiegeStateTest
     [Fact]
     public void ServerCurrentSiegeStateChanged_Publishes_AllClients()
     {
-        string settlementId = "Settlement1";
-        short siegeState = 1;
-
-        var triggerMessage = new SettlementChangedCurrentSiegeState(settlementId, siegeState);
+        var triggerMessage = new SettlementChangedCurrentSiegeState();
 
         var server = TestEnvironment.Server;
 

@@ -1,46 +1,63 @@
-﻿using Common;
-using GameInterface.Services.Registry;
+﻿using GameInterface.Registry;
+using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
+using HarmonyLib;
+using Serilog;
 using System;
 using System.Collections.Generic;
-using System.Text;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem;
 using System.Linq;
-using TaleWorlds.Core;
-using System.Collections;
-using System.Threading;
+using System.Reflection;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.Armies;
 
 /// <summary>
 /// Registry for <see cref="Army"/> type
 /// </summary>
-internal class ArmyRegistry : RegistryBase<Army>
+internal class ArmyRegistry : AutoRegistryBase<Army>
 {
-    private const string ArmyStringIdPrefix = "CoopArmy";
-    private static int ArmyCounter = 0;
+    public ArmyRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
+    {
+    }
 
-    public ArmyRegistry(IRegistryCollection collection) : base(collection) { }
+    public override IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(Army));
 
-    public override void RegisterAll()
+    public override IEnumerable<MethodBase> DestroyMethods => new MethodBase[]
+    {
+        AccessTools.Method(typeof(Army), nameof(Army.DisperseInternal))
+    };
+
+    public override void RegisterAllObjects()
     {
         IEnumerable<Kingdom> kingdoms = Campaign.Current?.Kingdoms ?? Enumerable.Empty<Kingdom>();
 
-        List<Army> armies = new List<Army>();
-
         foreach (var kingdom in kingdoms)
         {
-            armies.AddRange(kingdom.Armies);
-        }
-
-        foreach (var army in armies)
-        {
-            RegisterNewObject(army, out var _);
+            foreach (var army in kingdom.Armies)
+            {
+                RegisterExistingObject(kingdom.StringId, army);
+            }
         }
     }
 
-    protected override string GetNewId(Army obj)
+    public override void OnClientCreated(Army obj, string id)
     {
-        return $"{ArmyStringIdPrefix}_{Interlocked.Increment(ref ArmyCounter)}";
+        AccessTools.Field(typeof(Army), nameof(Army._parties)).SetValue(obj, new MBList<MobileParty>());
+    }
+
+    public override void OnClientDestroyed(Army obj, string id)
+    {
+    }
+
+    public override void OnServerCreated(Army obj, string id)
+    {
+    }
+
+    public override void OnServerDestroyed(Army obj, string id)
+    {
     }
 }

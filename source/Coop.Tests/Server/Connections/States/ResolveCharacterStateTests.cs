@@ -1,14 +1,17 @@
 ﻿using Autofac;
 using Common.Messaging;
-using Common.Network;
-using Common.Tests.Utils;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using Coop.Tests.Mocks;
-using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Modules;
 using LiteNetLib;
+using Moq;
+using System;
+using System.Collections.Generic;
 using System.Linq;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.Library;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -74,6 +77,56 @@ namespace Coop.Tests.Server.Connections.States
             // Assert
             Assert.IsType<ResolveCharacterState>(connectionLogic.State);
         }
+        
+        [Fact]
+        public void NetworkModuleVersionsValidate_ModulesMatches()
+        {
+            // Arrange
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+
+            var modules = new List<ModuleInfo> { new ModuleInfo("1", true, new ApplicationVersion()) };
+
+            serverComponent.ModuleInfoProviderMock
+                .Setup(mip => mip.GetModuleInfos())
+                .Returns(modules);
+
+            // Act
+            var payload = new MessagePayload<NetworkModuleVersionsValidate>(
+                playerPeer, new NetworkModuleVersionsValidate(modules));
+            currentState.ModuleVersionsValidateHandler(payload);
+
+            // Assert
+            var message = Assert.Single(serverComponent.TestNetwork.GetPeerMessages(playerPeer));
+            Assert.IsType<NetworkModuleVersionsValidated>(message);
+
+            var castedMessage = (NetworkModuleVersionsValidated)message;
+            Assert.True(castedMessage.Matches);
+        }
+
+        [Fact]
+        public void NetworkModuleVersionsValidate_ModulesMismatch()
+        {
+            // Arrange
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+
+            serverComponent.ModuleInfoProviderMock
+                .Setup(mip => mip.GetModuleInfos())
+                .Returns(
+                    new List<ModuleInfo> { new ModuleInfo("1", true, new ApplicationVersion()) }
+                );
+
+            // Act
+            var payload = new MessagePayload<NetworkModuleVersionsValidate>(
+                playerPeer, new NetworkModuleVersionsValidate(new List<ModuleInfo> { new ModuleInfo("MismatchedModule", true, new ApplicationVersion())}));
+            currentState.ModuleVersionsValidateHandler(payload);
+
+            // Assert
+            var message = Assert.Single(serverComponent.TestNetwork.GetPeerMessages(playerPeer));
+            Assert.IsType<NetworkModuleVersionsValidated>(message);
+
+            var castedMessage = (NetworkModuleVersionsValidated)message;
+            Assert.False(castedMessage.Matches);
+        }
 
         [Fact]
         public void NetworkClientValidate_ValidPlayerId()
@@ -82,6 +135,15 @@ namespace Coop.Tests.Server.Connections.States
             var currentState = connectionLogic.SetState<ResolveCharacterState>();
 
             string playerId = "MyPlayer";
+            string heroId = "MyHero";
+
+            serverComponent.HeroInterfaceMock
+                .Setup(i => i.TryResolve<Hero>(playerId, out It.Ref<string>.IsAny))
+                .Callback((string id, out string returnedHeroId) =>
+                {
+                    returnedHeroId = heroId;
+                })
+                .Returns(true);
 
             // Act
             var payload = new MessagePayload<NetworkClientValidate>(
@@ -89,11 +151,14 @@ namespace Coop.Tests.Server.Connections.States
             currentState.ClientValidateHandler(payload);
 
             // Assert
-            var message = Assert.Single(serverComponent.TestMessageBroker.Messages);
-            Assert.IsType<ResolveHero>(message);
+            var messages = serverComponent.TestNetwork.SentNetworkMessages[playerPeer.Id];
 
-            var castedMessage = (ResolveHero)message;
-            Assert.Equal(playerId, castedMessage.PlayerId);
+            var validated = messages.OfType<NetworkClientValidated>();
+
+            var message = Assert.Single(validated);
+
+            Assert.True(message.HeroExists);
+            Assert.Equal(heroId, message.Player.HeroId);
         }
 
         [Fact]
@@ -104,60 +169,24 @@ namespace Coop.Tests.Server.Connections.States
 
             string playerId = "MyPlayer";
 
+            serverComponent.HeroInterfaceMock
+                .Setup(i => i.TryResolve<Hero>(playerId, out It.Ref<string>.IsAny))
+                .Callback((string id, out string returnedHeroId) =>
+                {
+                    returnedHeroId = string.Empty;
+                })
+                .Returns(false);
+
             // Act
             var payload = new MessagePayload<NetworkClientValidate>(
                 differentPeer, new NetworkClientValidate(playerId));
             currentState.ClientValidateHandler(payload);
 
             // Assert
-            Assert.Empty(serverComponent.TestMessageBroker.Messages);
-        }
+            var messages = serverComponent.TestNetwork.SentNetworkMessages
+                .GetValueOrDefault(playerPeer.Id) ?? Enumerable.Empty<IMessage>();
 
-        [Fact]
-        public void ResolveHero_Valid()
-        {
-            // Arrange
-            var currentState = connectionLogic.SetState<ResolveCharacterState>();
-
-            string playerId = "MyPlayer";
-
-            // Act
-            var payload = new MessagePayload<HeroResolved>(
-                playerPeer, new HeroResolved(playerId));
-            currentState.ResolveHeroHandler(payload);
-
-            // Assert
-            Assert.Equal(2, serverComponent.TestNetwork.GetPeerMessages(playerPeer).Count());
-            var message = serverComponent.TestNetwork.GetPeerMessages(playerPeer).First();
-            Assert.IsType<NetworkClientValidated>(message);
-
-            var castedMessage = (NetworkClientValidated)message;
-            Assert.Equal(playerId, castedMessage.HeroId);
-            Assert.True(castedMessage.HeroExists);
-
-            Assert.Single(serverComponent.TestNetwork.GetPeerMessages(differentPeer));
-        }
-
-        [Fact]
-        public void HeroNotFound_Valid()
-        {
-            // Arrange
-            var currentState = connectionLogic.SetState<ResolveCharacterState>();
-
-            // Act
-            var payload = new MessagePayload<ResolveHeroNotFound>(
-                playerPeer, new ResolveHeroNotFound());
-            currentState.HeroNotFoundHandler(payload);
-
-            // Assert
-            var message = Assert.Single(serverComponent.TestNetwork.GetPeerMessages(playerPeer));
-            Assert.IsType<NetworkClientValidated>(message);
-
-            var castedMessage = (NetworkClientValidated)message;
-            Assert.Equal(string.Empty, castedMessage.HeroId);
-            Assert.False(castedMessage.HeroExists);
-
-            Assert.False(serverComponent.TestNetwork.SentNetworkMessages.ContainsKey(differentPeer.Id));
+            Assert.Empty(messages.OfType<NetworkClientValidated>());
         }
     }
 }

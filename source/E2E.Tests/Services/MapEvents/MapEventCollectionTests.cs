@@ -1,107 +1,48 @@
-﻿using Common.Util;
-using E2E.Tests.Environment;
-using E2E.Tests.Util;
-using HarmonyLib;
-using SandBox.GauntletUI.Map;
-using System.Reflection;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.MapEvents;
-using TaleWorlds.CampaignSystem.Party;
+﻿using TaleWorlds.CampaignSystem.MapEvents;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.MapEvents;
-public class MapEventCollectionTests : IDisposable
+
+public class MapEventCollectionTests : MapEventTestBase
 {
-    E2ETestEnvironment TestEnvironment { get; }
+    public MapEventCollectionTests(ITestOutputHelper output) : base(output) { }
 
-    public MapEventCollectionTests(ITestOutputHelper output)
-    {
-        TestEnvironment = new E2ETestEnvironment(output);
-    }
-
-    public void Dispose()
-    {
-        TestEnvironment.Dispose();
-    }
+    [Fact(Skip = "MapEvent._sides is a fixed-size MapEventSide[2] array, not a dynamic collection; AssertCollectionReferenceField does not apply")]
+    public void Server_MapEvent_Sides_IsFixedArray() { }
 
     [Fact]
-    public void Server_MapEvent_Sides_SyncAllClients()
+    public void Server_MapEvent_Initialize_SyncsSidesToClients()
     {
-        // TODO IDK WHY THIS DOESNT WORK IN DOCKER
-        //// Arrange
-        //var server = TestEnvironment.Server;
-
-        //// Act
-        //string? attackerSideId = null;
-        //string? defenderSideId = null;
-        //server.Call(() =>
-        //{
-        //    var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
-        //    var attackerParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
-        //    var defenderParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
-
-        //    // TODO find better way
-        //    mapEvent.MapEventVisual = ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
-
-        //    mapEvent.Initialize(attackerParty.Party, defenderParty.Party);
-
-        //    Assert.True(server.ObjectManager.TryGetId(mapEvent.AttackerSide, out attackerSideId));
-        //    Assert.True(server.ObjectManager.TryGetId(mapEvent.DefenderSide, out defenderSideId));
-        //}, new MethodBase[] { AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)) });
-
-        //// Assert
-        //Assert.NotNull(attackerSideId);
-        //Assert.NotNull(defenderSideId);
-
-        //foreach (var client in TestEnvironment.Clients)
-        //{
-        //    Assert.True(client.ObjectManager.TryGetObject<MapEventSide>(attackerSideId, out var _));
-        //    Assert.True(client.ObjectManager.TryGetObject<MapEventSide>(defenderSideId, out var _));
-        //}
-    }
-
-    [Fact]
-    public void Client_MapEvent_Sides_DoesNothing()
-    {
-        // Arrange
-        var server = TestEnvironment.Server;
-
-        string? mapEventId = null;
-        string? attackerPartyId = null;
-        string? defenderPartyId = null;
-        server.Call(() =>
-        {
-            var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
-            var attackerParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
-            var defenderParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
-
-            Assert.True(server.ObjectManager.TryGetId(mapEvent, out mapEventId));
-            Assert.True(server.ObjectManager.TryGetId(attackerParty, out attackerPartyId));
-            Assert.True(server.ObjectManager.TryGetId(defenderParty, out defenderPartyId));
-        });
-
         // Act
+        var (mapEventId, attackerPartyId, defenderPartyId) = CreateServerMapEventWithParties();
+
+        // Resolve the side IDs from the server
         string? attackerSideId = null;
         string? defenderSideId = null;
+        string? attackerMapEventPartyId = null;
+        string? defenderMapEventPartyId = null;
 
-        var firstClient = TestEnvironment.Clients.First();
-        firstClient.Call(() =>
+        Server.Call(() =>
         {
-            Assert.True(firstClient.ObjectManager.TryGetObject<MobileParty>(attackerPartyId, out var attackerParty));
-            Assert.True(firstClient.ObjectManager.TryGetObject<MobileParty>(defenderPartyId, out var defenderParty));
-            Assert.True(firstClient.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetId(mapEvent.AttackerSide, out attackerSideId));
+            Assert.True(Server.ObjectManager.TryGetId(mapEvent.DefenderSide, out defenderSideId));
+            Assert.True(Server.ObjectManager.TryGetId(mapEvent.AttackerSide.Parties[0], out attackerMapEventPartyId));
+            Assert.True(Server.ObjectManager.TryGetId(mapEvent.DefenderSide.Parties[0], out defenderMapEventPartyId));
+        });
 
-            // TODO find better way
-            mapEvent.MapEventVisual = ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
+        Assert.NotNull(attackerSideId);
+        Assert.NotNull(defenderSideId);
+        Assert.NotNull(attackerMapEventPartyId);
+        Assert.NotNull(defenderMapEventPartyId);
 
-            mapEvent.Initialize(attackerParty.Party, defenderParty.Party);
-
-            Assert.False(server.ObjectManager.TryGetId(mapEvent.AttackerSide, out attackerSideId));
-            Assert.False(server.ObjectManager.TryGetId(mapEvent.DefenderSide, out defenderSideId));
-        }, new MethodBase[] { AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)) });
-
-        // Assert
-        Assert.Null(attackerSideId);
-        Assert.Null(defenderSideId);
+        // Assert — sides and parties propagated to all clients
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEventSide>(attackerSideId, out _));
+            Assert.True(client.ObjectManager.TryGetObject<MapEventSide>(defenderSideId, out _));
+            Assert.True(client.ObjectManager.TryGetObject<MapEventParty>(attackerMapEventPartyId, out _));
+            Assert.True(client.ObjectManager.TryGetObject<MapEventParty>(defenderMapEventPartyId, out _));
+        }
     }
 }

@@ -3,6 +3,7 @@ using Common.Messaging;
 using Coop.Core.Server;
 using Coop.Core.Server.States;
 using Coop.Tests.Mocks;
+using GameInterface.Registry.Messages;
 using GameInterface.Services.GameState.Messages;
 using Xunit;
 using Xunit.Abstractions;

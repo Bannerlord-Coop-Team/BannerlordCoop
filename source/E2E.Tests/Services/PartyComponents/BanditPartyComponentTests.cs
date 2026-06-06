@@ -1,28 +1,26 @@
-﻿using Common.Util;
-using E2E.Tests.Environment;
-using E2E.Tests.Util;
-using E2E.Tests.Util.ObjectBuilders;
-using GameInterface.Services.ObjectManager;
-using System.ComponentModel;
-using System.Reflection;
-using TaleWorlds.CampaignSystem;
+﻿using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
+using TaleWorlds.Localization;
+using TaleWorlds.Library;
 
 namespace E2E.Tests.Services.PartyComponents;
-public class BanditPartyComponentTests : IDisposable
+public class BanditPartyComponentTests : SyncTestBase
 {
-    E2ETestEnvironment TestEnvironment { get; }
-    public BanditPartyComponentTests(ITestOutputHelper output)
+    public BanditPartyComponentTests(ITestOutputHelper output) : base(output)
     {
-        TestEnvironment = new E2ETestEnvironment(output);
+        TestEnvironment.CreateRegisteredObject<BanditPartyComponent>();
+        TestEnvironment.CreateRegisteredObject<Hideout>();
     }
 
-    public void Dispose()
+    [Fact]
+    public void Server_BanditPartyComponent_Properties()
     {
-        TestEnvironment.Dispose();
+        TestEnvironment.AssertProperty<BanditPartyComponent, bool>(nameof(BanditPartyComponent.IsBossParty), true);
+        TestEnvironment.AssertReferenceProperty<BanditPartyComponent, Hideout>(nameof(BanditPartyComponent.Hideout));
     }
 
     [Fact]
@@ -38,8 +36,10 @@ public class BanditPartyComponentTests : IDisposable
         {
             var clan = GameObjectCreator.CreateInitializedObject<Clan>();
             var hideout = GameObjectCreator.CreateInitializedObject<Hideout>();
-            var newParty = BanditPartyComponent.CreateBanditParty("TestId", clan, hideout, true);
-            partyId = newParty.StringId;
+            var template = GameObjectCreator.CreateInitializedObject<PartyTemplateObject>();
+            var newParty = BanditPartyComponent.CreateBanditParty("TestId", clan, hideout, true, template, new CampaignVec2(new Vec2(2, 2), true));
+
+            Assert.True(server.ObjectManager.TryGetId(newParty, out partyId));
         });
 
 
@@ -65,86 +65,17 @@ public class BanditPartyComponentTests : IDisposable
         client1.Call(() =>
         {
             var hideout = GameObjectCreator.CreateInitializedObject<Hideout>();
+            var clan = GameObjectCreator.CreateInitializedObject<Clan>();
+            var template = GameObjectCreator.CreateInitializedObject<PartyTemplateObject>();
             var isBossParty = false;
-            partyComponent = new BanditPartyComponent(hideout, isBossParty);
+            var initArgs = new BanditPartyComponent.InitializationArgs(clan, template, new CampaignVec2(new Vec2(2, 2), true));
+            
+            partyComponent = new BanditPartyComponent(hideout, isBossParty, initArgs);
         });
 
         Assert.NotNull(partyComponent);
 
         // Assert
         Assert.False(client1.ObjectManager.TryGetId(partyComponent, out var _));
-    }
-
-    [Fact]
-    public void ClientUpdateParty_DoesNothing()
-    {
-        // Arrange
-        var server = TestEnvironment.Server;
-        var client1 = TestEnvironment.Clients.First();
-
-        // Create objects on the server and all clients, this returns the "network id" of the object
-        var componentId = TestEnvironment.CreateRegisteredObject<BanditPartyComponent>();
-        var hideoutId = TestEnvironment.CreateRegisteredObject<Hideout>();
-
-        server.Call(() =>
-        {
-            Assert.True(server.ObjectManager.TryGetObject<BanditPartyComponent>(componentId, out var serverComponent));
-            Assert.True(server.ObjectManager.TryGetObject<Hideout>(hideoutId, out var hideout));
-
-            serverComponent.IsBossParty = false;
-            serverComponent.Hideout = hideout;
-        });
-
-        // Act
-        client1.Call(() =>
-        {
-            Assert.True(client1.ObjectManager.TryGetObject<BanditPartyComponent>(componentId, out var clientComponent));
-            clientComponent.IsBossParty = true;
-            clientComponent.Hideout = null;
-        });
-
-        // Assert
-        Assert.True(server.ObjectManager.TryGetObject<BanditPartyComponent>(componentId, out var serverComponent));
-        Assert.False(serverComponent.IsBossParty);
-        Assert.NotNull(serverComponent.Hideout);
-
-        foreach (var client in TestEnvironment.Clients)
-        {
-            Assert.True(client.ObjectManager.TryGetObject<BanditPartyComponent>(componentId, out var clientComponent));
-            Assert.False(clientComponent.IsBossParty);
-            Assert.NotNull(clientComponent.Hideout);
-        }
-    }
-
-    [Fact]
-    public void ServerUpdateParty_SyncAllClients()
-    {
-        // Arrange
-        var server = TestEnvironment.Server;
-        var client1 = TestEnvironment.Clients.First();
-
-        // Create objects on the server and all clients, this returns the "network id" of the object
-        var componentId = TestEnvironment.CreateRegisteredObject<BanditPartyComponent>();
-        var hideoutId = TestEnvironment.CreateRegisteredObject<Hideout>();
-
-
-        // Act
-        server.Call(() =>
-        {
-            Assert.True(server.ObjectManager.TryGetObject<BanditPartyComponent>(componentId, out var serverComponent));
-            Assert.True(server.ObjectManager.TryGetObject<Hideout>(hideoutId, out var hideout));
-
-            serverComponent.IsBossParty = true;
-            serverComponent.Hideout = hideout;
-        });
-
-        // Assert
-        foreach (var client in TestEnvironment.Clients)
-        {
-            Assert.True(client.ObjectManager.TryGetObject<BanditPartyComponent>(componentId, out var clientComponent));
-            Assert.True(client.ObjectManager.TryGetObject<Hideout>(hideoutId, out var hideout));
-            Assert.True(clientComponent.IsBossParty);
-            Assert.Equal(clientComponent.Hideout, hideout);
-        }
     }
 }

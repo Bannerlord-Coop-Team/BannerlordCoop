@@ -6,7 +6,9 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Tests.Bootstrap.Patches.PartyComponents;
 
@@ -16,13 +18,16 @@ internal class CustomPartyComponentPatches
 
     public static IEnumerable<MethodBase> TargetMethods()
     {
-        foreach (var method in AccessTools.GetDeclaredMethods(typeof(CustomPartyComponent)))
+        var methods = new MethodBase[]
         {
-            if (method.Name == nameof(CustomPartyComponent.InitializeQuestPartyProperties))
-            {
-                yield return method;
-            }
-        }
+            AccessTools.Method(typeof(CustomPartyComponent.InitializationArgs), nameof(CustomPartyComponent.InitializationArgs.InitializeCustomPartyPropertiesWithPartyTemplate), 
+            new Type[] { typeof(MobileParty) }),
+
+            AccessTools.Method(typeof(CustomPartyComponent.InitializationArgs), nameof(CustomPartyComponent.InitializationArgs.InitializeCustomPartyPropertiesWithTroopRoster),
+            new Type[] { typeof(MobileParty) }),
+        };
+
+        return methods;
     }
 
     [HarmonyPrefix]

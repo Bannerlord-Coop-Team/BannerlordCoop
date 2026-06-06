@@ -1,53 +1,33 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
-using GameInterface.Services.Fiefs.Messages;
-using GameInterface.Services.Fiefs.Patches;
+using Common.Network;
+using Common.Util;
 using GameInterface.Services.ObjectManager;
+//using GameInterface.Services.Fiefs.Messages;
 using Serilog;
 using TaleWorlds.CampaignSystem.Settlements;
 
-namespace GameInterface.Services.Fiefs.Handlers
+namespace GameInterface.Services.Fiefs.Handlers;
+/// <summary>
+/// Lifetime handler for <see cref="Fief"/> objects.
+/// </summary>
+internal class FiefHandler : IHandler
 {
-    /// <summary>
-    /// Handles FiefState Changes.
-    /// </summary>
-    public class FiefHandler : IHandler
+    private static readonly ILogger Logger = LogManager.GetLogger<FiefHandler>();
+    private readonly IMessageBroker messageBroker;
+    private readonly INetwork network;
+    private readonly IObjectManager objectManager;
+    public FiefHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<FiefHandler>();
+        this.messageBroker = messageBroker;
+        this.network = network;
+        this.objectManager = objectManager;
 
-        private readonly IMessageBroker messageBroker;
-        private readonly IObjectManager objectManager;
+        // TODO: Add messageBroker subscriptions
+    }
 
-        public FiefHandler(IMessageBroker messageBroker, IObjectManager objectManager)
-        {
-            this.messageBroker = messageBroker;
-            this.objectManager = objectManager;
-
-            messageBroker.Subscribe<ChangeFiefFoodStock>(HandleChangeFiefFoodStock);
-
-        }
-
-
-        private void HandleChangeFiefFoodStock(MessagePayload<ChangeFiefFoodStock> payload)
-        {
-            var obj = payload.What;
-
-            if (objectManager.TryGetObject(obj.FiefId, out Fief fief) == false)
-            {
-                Logger.Error("Unable to find Fief ({fiefId})", obj.FiefId);
-                return;
-            }
-
-            FiefPatches.ChangeFiefFoodStock(fief, obj.FoodStockQuantity);
-        }
-
-
-
-        
-        public void Dispose()
-        {
-            
-            messageBroker.Unsubscribe<ChangeFiefFoodStock>(HandleChangeFiefFoodStock);
-        }
+    public void Dispose()
+    {
+        // TODO: Add messageBroker unsubscribing
     }
 }

@@ -1,8 +1,10 @@
 ﻿using Autofac;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Serialization;
 using Common.Tests.Utils;
+using Common.Util;
 using Coop.Core;
 using Coop.Core.Client;
 using Coop.Core.Server;
@@ -10,6 +12,10 @@ using Coop.IntegrationTests.Environment.Instance;
 using Coop.IntegrationTests.Environment.Mock;
 using GameInterface;
 using GameInterface.Policies;
+using GameInterface.Services.Entity;
+using GameInterface.Services.ObjectManager;
+using Serilog;
+using System.Runtime.Remoting;
 
 namespace Coop.IntegrationTests.Environment;
 
@@ -18,10 +24,9 @@ namespace Coop.IntegrationTests.Environment;
 /// </summary>
 public class TestEnvironment
 {
-    private Core.ContainerProvider containerProvider;
-    public IContainer Container => containerProvider.GetContainer();
-
     private readonly TestNetworkRouter networkOrchestrator;
+
+    public readonly ILogger Logger = LogManager.GetLogger<TestEnvironment>();
 
 
     /// <summary>
@@ -57,7 +62,7 @@ public class TestEnvironment
 
     private EnvironmentInstance CreateClient()
     {
-        containerProvider = new Core.ContainerProvider();
+        var containerProvider = new Core.ContainerProvider();
 
         var builder = new ContainerBuilder();
 
@@ -81,12 +86,13 @@ public class TestEnvironment
 
     private EnvironmentInstance CreateServer()
     {
-        containerProvider = new Core.ContainerProvider();
+        var containerProvider = new Core.ContainerProvider();
 
         var builder = new ContainerBuilder();
 
         builder.RegisterModule<ServerModule>();
         builder.RegisterType<MockServer>().AsSelf().As<INetwork>().As<ICoopServer>().InstancePerLifetimeScope();
+        builder.RegisterType<ControlledEntityRegistry>().As<IControlledEntityRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<ServerInstance>().AsSelf();
         builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance();
 
@@ -105,11 +111,9 @@ public class TestEnvironment
 
     private ContainerBuilder AddSharedDependencies(ContainerBuilder builder)
     {
-        if (registerGameInterface)
-        {
-            builder.RegisterModule<GameInterfaceModule>();
-        }
+        builder.RegisterModule<GameInterfaceModule>();
 
+        builder.RegisterInstance(Logger).As<ILogger>().SingleInstance();
         builder.RegisterInstance(networkOrchestrator).AsSelf().SingleInstance();
 
         builder.RegisterType<TestMessageBroker>().AsSelf().As<IMessageBroker>().InstancePerLifetimeScope();
@@ -117,6 +121,35 @@ public class TestEnvironment
         builder.RegisterType<SerializableTypeMapper>().As<ISerializableTypeMapper>().SingleInstance();
 
         return builder;
+    }
+
+    public void RegisterObjectInNetwork<T>(T obj, string? stringId = null)
+    {
+        if (stringId == null)
+        {
+            Server.Call(() =>
+            {
+                var objectManager = Server.Resolve<IObjectManager>();
+                objectManager.AddNewObject(obj, out stringId);
+            });
+        }
+        else
+        {
+            Server.Call(() =>
+            {
+                var objectManager = Server.Resolve<IObjectManager>();
+                objectManager.AddExisting(stringId, obj);
+            });
+        }
+
+        foreach (var client in Clients)
+        {
+            client.Call(() =>
+            {
+                var objectManager = client.Resolve<IObjectManager>();
+                objectManager.AddExisting(stringId, obj);
+            });
+        }
     }
 }
 

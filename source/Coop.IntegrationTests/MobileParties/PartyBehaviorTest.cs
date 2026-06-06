@@ -49,7 +49,7 @@ public class PartyBehaviorTest
     public void ControlledPartyBehaviorUpdated_Publishes_AllClients()
     {
         // Arrange
-        var data = new PartyBehaviorUpdateData("Test_Party", default, default, default, default, default);
+        var data = new PartyBehaviorUpdateData("Test_Party", default, default, default, default, default, default, default, default);
 
         var message = new PartyBehaviorUpdated(ref data);
 

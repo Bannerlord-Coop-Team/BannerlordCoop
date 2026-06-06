@@ -1,19 +1,19 @@
 ﻿using Common.Messaging;
+using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Services.Heroes.Messages
+namespace GameInterface.Services.Heroes.Messages;
+
+/// <summary>
+/// Event from GameInterface for LastTimeStampForActivity.
+/// </summary>
+public readonly struct LastTimeStampChanged : IEvent
 {
-    /// <summary>
-    /// Event from GameInterface for LastTimeStampForActivity
-    /// </summary>
-    public record LastTimeStampChanged : IEvent
-    {
-        public int LastTimeStampForActivity { get; }
-        public string HeroId { get; }
+    public readonly int LastTimeStampForActivity;
+    public readonly Hero Hero;
 
-        public LastTimeStampChanged(int lastTimeStampForActivity, string heroId)
-        {
-            LastTimeStampForActivity = lastTimeStampForActivity;
-            HeroId = heroId;
-        }
+    public LastTimeStampChanged(int lastTimeStampForActivity, Hero hero)
+    {
+        LastTimeStampForActivity = lastTimeStampForActivity;
+        Hero = hero;
     }
 }

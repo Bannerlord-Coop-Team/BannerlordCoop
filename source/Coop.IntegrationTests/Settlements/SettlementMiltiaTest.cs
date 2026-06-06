@@ -19,9 +19,7 @@ public class SettlementMiltiaTest
     [Fact]
     public void ServerSettlementMilitiaChanged_Publishes_AllClients()
     {
-        string settlementId = "Settlement1";
-        float militia = 99.99f;
-        var triggerMessage = new SettlementChangedMilitia(settlementId, militia);
+        var triggerMessage = new SettlementChangedMilitia();
 
 
         var server = TestEnvironment.Server;

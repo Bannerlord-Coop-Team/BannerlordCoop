@@ -1,0 +1,2 @@
+        [HarmonyTranspiler]
+        static IEnumerable<CodeInstruction> TestPropertyMBListChangeTranspiler(IEnumerable<CodeInstruction> instructions) => ListPropertyChangeTranspiler<double, AddMBListPropertyMessage, RemoveMBListPropertyMessage>(instructions, "TestPropertyMBList");

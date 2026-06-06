@@ -6,6 +6,7 @@ using Coop.Core.Server.Services.Time.Handlers;
 using Coop.Core.Server.Services.Time.Messages;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Enum;
+using GameInterface.Services.Heroes.Interaces;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -26,7 +27,7 @@ internal class PeerQueueOverloadedHandler : IHandler
 
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
-    private readonly TimeHandler timeHandler;
+    private readonly ITimeControlInterface timeControlInterface;
     private readonly ILogger logger;
     
 
@@ -37,13 +38,12 @@ internal class PeerQueueOverloadedHandler : IHandler
     public PeerQueueOverloadedHandler(
         IMessageBroker messageBroker,
         INetwork network,
-        TimeHandler timeHandler
+        ITimeControlInterface timeControlInterface
     )
     {
         this.messageBroker = messageBroker;
         this.network = network;
-
-        this.timeHandler = timeHandler;
+        this.timeControlInterface = timeControlInterface;
 
         logger = LogManager.GetLogger<PeerQueueOverloaded>();
 
@@ -53,7 +53,7 @@ internal class PeerQueueOverloadedHandler : IHandler
         messageBroker.Subscribe<PeerQueueOverloaded>(Handle);
 
         // Adds pause policy to time handler
-        timeHandler.AddUnpausePolicy(PlayersOverloadedPolicy);
+        timeControlInterface.AddUnpausePolicy(PlayersOverloadedPolicy);
     }
 
     public void Dispose()
@@ -63,7 +63,7 @@ internal class PeerQueueOverloadedHandler : IHandler
         messageBroker.Unsubscribe<PeerQueueOverloaded>(Handle);
 
         // Removes pause policy from time handler
-        timeHandler.RemoveUnpausePolicy(PlayersOverloadedPolicy);
+        timeControlInterface.RemoveUnpausePolicy(PlayersOverloadedPolicy);
     }
 
     internal void Handle(MessagePayload<PeerQueueOverloaded> payload)
@@ -77,17 +77,10 @@ internal class PeerQueueOverloadedHandler : IHandler
         }
 
         // Store previoes time control mode for resuming
-        if (timeHandler.TryGetTimeControlMode(out TimeControlEnum prevMode))
-        {
-            originalSpeed = prevMode;
-        }
-        else
-        {
-            originalSpeed = TimeControlEnum.Play_1x;
-        }
+        originalSpeed = timeControlInterface.GetTimeControl();
 
         // pause time
-        timeHandler.SetTimeMode(TimeControlEnum.Pause);
+        timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
 
         // notify server and clients that the game is pausing
         var msg = new SendInformationMessage($"{overloadedPeers.Count} clients are catching up, pausing");
@@ -123,7 +116,7 @@ internal class PeerQueueOverloadedHandler : IHandler
         var numPacketsInQueue = peer.GetPacketsCountInReliableQueue(0, true)
                               + peer.GetPacketsCountInReliableQueue(0, false);
 
-        Logger.Information($"Peer {peer.EndPoint} is catching up with {numPacketsInQueue} packets remaining");
+        Logger.Information($"Peer {peer.Address} is catching up with {numPacketsInQueue} packets remaining");
 
         return numPacketsInQueue == 0;
     }
@@ -131,7 +124,7 @@ internal class PeerQueueOverloadedHandler : IHandler
     private void ResumeTime()
     {
         // set game to speed before pause
-        timeHandler.SetTimeMode(originalSpeed);
+        timeControlInterface.ServerSetTimeControl(originalSpeed);
 
         // notify server and all clients that game is resuming
         var msg = new SendInformationMessage("All clients synchronized, resuming");

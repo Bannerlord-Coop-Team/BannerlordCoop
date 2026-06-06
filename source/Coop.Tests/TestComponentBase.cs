@@ -5,6 +5,15 @@ using Common.Serialization;
 using Common.Tests.Utils;
 using Coop.Core;
 using Coop.Tests.Mocks;
+using GameInterface.Registry;
+using GameInterface.Services.Entity;
+using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.Modules;
+using GameInterface.Services.Modules.Validators;
+using GameInterface.Services.ObjectManager;
+using Moq;
+using Serilog;
+using System.Collections.Generic;
 using Xunit.Abstractions;
 
 namespace Coop.Tests;
@@ -16,6 +25,10 @@ internal abstract class TestComponentBase
     public TestMessageBroker TestMessageBroker { get; protected set; }
     public TestNetwork TestNetwork { get; protected set; }
     public IContainer Container { get; protected set; }
+
+    public readonly Mock<IHeroInterface> HeroInterfaceMock = new();
+
+    public readonly Mock<IModuleInfoProvider> ModuleInfoProviderMock = new();
 
     protected TestComponentBase(ITestOutputHelper output)
     {
@@ -45,12 +58,34 @@ internal abstract class TestComponentBase
 
     private ContainerBuilder RegisterCommonTypes(ContainerBuilder builder)
     {
+        var moduleInfoProviderMock = new Mock<IModuleInfoProvider>();
+        moduleInfoProviderMock.Setup(x => x.GetModuleInfos()).Returns(new List<ModuleInfo>());
+        
         builder.RegisterType<SerializableTypeMapper>().As<ISerializableTypeMapper>().InstancePerLifetimeScope();
         builder.RegisterType<ProtoBufSerializer>().As<ICommonSerializer>().InstancePerLifetimeScope();
         builder.RegisterType<TestMessageBroker>().AsSelf().As<IMessageBroker>().InstancePerLifetimeScope();
         builder.RegisterType<ContainerProvider>().As<IContainerProvider>().InstancePerLifetimeScope();
         builder.RegisterType<TestNetwork>().AsSelf().As<INetwork>().InstancePerLifetimeScope();
+        builder.RegisterType<ModuleValidator>().As<IModuleValidator>().SingleInstance();
+
+
+        builder.RegisterType<ObjectManager>().As<IObjectManager>().InstancePerLifetimeScope();
+        builder.RegisterType<RegistryCollection>().As<IRegistryCollection>().InstancePerLifetimeScope();
+        builder.RegisterInstance(new Mock<ILogger>().Object).As<ILogger>().SingleInstance();
+
+        RegisterMock<ILogger>(builder);
+        RegisterMock<IControlledEntityRegistry>(builder);
+        RegisterMock<IHeroInterface>(builder);
+        RegisterMock<IModuleInfoProvider>(builder);
+
         return builder;
+    }
+
+    private void RegisterMock<T>(ContainerBuilder builder) where T : class
+    {
+        var mock = new Mock<T>();
+        builder.RegisterInstance(mock).AsSelf().SingleInstance();
+        builder.RegisterInstance(mock.Object).As<T>().SingleInstance();
     }
 
     private IContainer SetupContainerProvider(ContainerBuilder builder)

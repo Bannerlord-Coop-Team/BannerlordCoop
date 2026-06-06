@@ -9,7 +9,7 @@ namespace GameInterface.Services.GameState.Patches;
 internal class CharacterCreationFinishedPatch
 {
     [HarmonyPostfix]
-    [HarmonyPatch("FinalizeCharacterCreation")]
+    [HarmonyPatch("FinalizeCharacterCreationState")]
     private static void FinalizeCharacterCreation_Patch(ref CharacterCreationState __instance)
     {
         MessageBroker.Instance.Publish(__instance, new CharacterCreationFinished());

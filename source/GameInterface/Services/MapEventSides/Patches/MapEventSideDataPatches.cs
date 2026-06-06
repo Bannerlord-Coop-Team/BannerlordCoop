@@ -1,38 +1,66 @@
-﻿using Common.Logging;
+﻿using System;
+using System.Collections.Generic;
+using System.Reflection;
+using System.Reflection.Emit;
+using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.MapEventSides.Messages;
 using HarmonyLib;
 using Serilog;
-using System;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
-using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MapEventSides.Patches;
 
-[HarmonyPatch(typeof(MapEventSide))]
+[HarmonyPatch]
 internal class MapEventSideDataPatches
 {
     static readonly ILogger Logger = LogManager.GetLogger<MapEventSideDataPatches>();
 
-    [HarmonyPatch(nameof(MapEventSide.LeaderParty), MethodType.Setter)]
-    [HarmonyPrefix]
-    static bool LeaderPartyPrefix(ref MapEventSide __instance, ref PartyBase value)
+    private static IEnumerable<MethodBase> TargetMethods()
     {
-        // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        foreach (var method in AccessTools.GetDeclaredMethods(typeof(MapEventSide)))
+        {
+            yield return method;
+        }
+    }
 
+    [HarmonyTranspiler]
+    private static IEnumerable<CodeInstruction> MapFactionTranspiler(IEnumerable<CodeInstruction> instructions)
+    {
+        var field = AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._mapFaction));
+        var fieldIntercept = AccessTools.Method(typeof(MapEventSideDataPatches), nameof(MapFactionIntercept));
+
+        foreach (var instruction in instructions)
+        {
+            if (instruction.StoresField(field))
+            {
+                yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+            }
+            else
+            {
+                yield return instruction;
+            }
+        }
+    }
+
+    public static void MapFactionIntercept(MapEventSide instance, IFaction newFaction)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed())
+        {
+            instance._mapFaction = newFaction;
+            return;
+        }
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MapEventSide), Environment.StackTrace);
-            return true;
+            Logger.Error("Client tried to update MapFaction");
+            return;
         }
 
-        var message = new MapEventSideMobilePartyChanged(__instance, value.MobileParty);
+        MessageBroker.Instance.Publish(instance, new MapEventSideIFactionChanged(instance, newFaction));
 
-        MessageBroker.Instance.Publish(__instance, message);
-
-        return true;
+        instance._mapFaction = newFaction;
     }
 }

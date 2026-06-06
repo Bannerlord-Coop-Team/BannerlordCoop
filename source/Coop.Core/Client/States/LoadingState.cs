@@ -1,9 +1,9 @@
 ﻿using Common.Messaging;
 using Coop.Core.Client.Services.Heroes.Data;
-using Coop.Core.Common;
+using GameInterface.Registry;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
-using System;
 
 namespace Coop.Core.Client.States;
 
@@ -13,17 +13,22 @@ namespace Coop.Core.Client.States;
 public class LoadingState : ClientStateBase
 {
     private readonly IMessageBroker messageBroker;
+    private readonly IRegistryManager registryManager;
     private readonly IDeferredHeroRepository deferredHeroRepo;
+    private readonly IHeroInterface heroInterface;
 
     public LoadingState(
         IClientLogic logic,
         IMessageBroker messageBroker,
-        IDeferredHeroRepository deferredHeroRepo) : base(logic)
+        IRegistryManager registryManager,
+        IDeferredHeroRepository deferredHeroRepo,
+        IHeroInterface heroInterface) : base(logic)
     {
         this.messageBroker = messageBroker;
+        this.registryManager = registryManager;
         this.deferredHeroRepo = deferredHeroRepo;
+        this.heroInterface = heroInterface;
         messageBroker.Subscribe<CampaignReady>(Handle_CampaignLoaded);
-        messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
     }
 
     public override void Dispose()
@@ -38,14 +43,12 @@ public class LoadingState : ClientStateBase
 
     internal void Handle_CampaignLoaded(MessagePayload<CampaignReady> obj)
     {
-        messageBroker.Publish(this, new RegisterAllGameObjects());
-    }
+        registryManager.RegisterAllGameObjects();
+        registryManager.PatchLifetimes();
 
-    internal void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> obj)
-    {
         InstantiateDeferredHeroes();
 
-        messageBroker.Publish(this, new SwitchToHero(Logic.ControlledHeroId));
+        heroInterface.SwitchToPlayer(Logic.Player);
 
         Logic.EnterCampaignState();
     }

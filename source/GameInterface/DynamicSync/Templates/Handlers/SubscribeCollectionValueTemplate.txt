@@ -1,0 +1,46 @@
+﻿Subscribe<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage>((instanceId, data) => 
+{
+    var valueIds = new List<{{ElementType}}>();
+    for (int i = 0; i < data.Value.Count; i++)
+    {
+        valueIds.Add(data.Value[i]);
+    }
+    network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage(instanceId, valueIds));
+});
+SubscribeNetwork<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage>((instance, data) => 
+{
+    var newValue = new {{MemberType}}();
+    for (int i = 0; i < data.Value.Count; i++)
+    {
+        newValue.Add({{DeserializeMethod}}(data.Value[i]));
+    }
+    {{ 
+    if ReadOnly;
+    }}
+	    AccessTools.Field(typeof({{MemberDeclaringType}}), "{{MemberName}}").SetValue(instance, value);
+    {{
+    else
+    }}
+	    instance.{{MemberName}} = newValue;
+    {{
+    end
+    }}
+});
+Subscribe<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_AddLocalMessage>((instanceId, data) => 
+{
+    network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_AddNetworkMessage(instanceId, ));
+});
+SubscribeNetwork<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_AddNetworkMessage>((instance, {{SerializeMethodName}}(data)) => 
+{
+    instance.{{ MemberName }}.Add({{DeserializeMethod}}(data.Value[i].Value, default({{ElementType}})));
+});
+Subscribe<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_RemoveLocalMessage>((instanceId, data) => 
+{
+    network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_RemoveNetworkMessage(instanceId, {{SerializeMethodName}}(data)));
+});
+SubscribeNetwork<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_RemoveNetworkMessage>((instance, data) => 
+{
+    var element = {{DeserializeMethod}}(data.Value[i].Value);
+    // TODO: Will probably not work
+    instance.{{ MemberName }}.Remove(element);
+});

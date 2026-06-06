@@ -24,7 +24,7 @@ namespace Coop.Core.Client.Services.PartyBases.Handlers
         public void Handle(MessagePayload<NetworkItemRosterUpdate> payload)
         {
             messageBroker.Publish(this, new UpdateItemRoster(
-                    payload.What.PartyBaseID,
+                    payload.What.ItemRosterId,
                     payload.What.ItemID,
                     payload.What.ItemModifierID,
                     payload.What.Amount)

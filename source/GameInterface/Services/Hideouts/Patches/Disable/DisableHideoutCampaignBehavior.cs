@@ -1,6 +1,6 @@
-﻿using HarmonyLib;
+﻿using Common;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Hideouts.Patches.Disable;
 
@@ -8,5 +8,5 @@ namespace GameInterface.Services.Hideouts.Patches.Disable;
 internal class DisableHideoutCampaignBehavior
 {
     [HarmonyPatch(nameof(HideoutCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix() => ModInformation.IsServer;
 }

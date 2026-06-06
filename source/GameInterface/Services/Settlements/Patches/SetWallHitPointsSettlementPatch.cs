@@ -30,8 +30,7 @@ internal class SetWallHitPointsSettlementPatch
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(Settlement), Environment.StackTrace);
+            Logger.Error("Client created managed {name}", typeof(Settlement));
             return true;
         }
 
@@ -39,7 +38,7 @@ internal class SetWallHitPointsSettlementPatch
 
         wallSectionHitPointsRatioList[index] = MBMath.ClampFloat(hitPointsRatio, 0f, 1f);
 
-        MessageBroker.Instance.Publish(__instance, new SettlementWallHitPointsRatioChanged(__instance.StringId, index, hitPointsRatio));
+        MessageBroker.Instance.Publish(__instance, new SettlementWallHitPointsRatioChanged(__instance, index, hitPointsRatio));
 
         return true;
     }

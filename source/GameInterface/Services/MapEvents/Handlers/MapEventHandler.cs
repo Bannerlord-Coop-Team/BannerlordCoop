@@ -2,12 +2,14 @@
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.Services.MapEvents.Handlers;
+
 internal class MapEventHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MapEventHandler>();
@@ -15,71 +17,51 @@ internal class MapEventHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
+    private readonly IMapEventLogger mapEventLogger;
 
-
-    public MapEventHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
+    public MapEventHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager, IMapEventLogger mapEventLogger)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
-        messageBroker.Subscribe<MapEventCreated>(Handle);
-        messageBroker.Subscribe<NetworkCreateMapEvent>(Handle);
+        this.mapEventLogger = mapEventLogger;
 
-        messageBroker.Subscribe<MapEventDestroyed>(Handle);
-        messageBroker.Subscribe<NetworkDestroyMapEvent>(Handle);
+        messageBroker.Subscribe<MapEventBattleStateChangeAttempted>(Handle_MapEventBattleStateChangeAttempted);
+        messageBroker.Subscribe<NetworkChangeBattleState>(Handle_NetworkChangeBattleState);
     }
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<MapEventCreated>(Handle);
-        messageBroker.Unsubscribe<NetworkCreateMapEvent>(Handle);
 
-        messageBroker.Unsubscribe<MapEventDestroyed>(Handle);
-        messageBroker.Unsubscribe<NetworkDestroyMapEvent>(Handle);
+        messageBroker.Unsubscribe<MapEventBattleStateChangeAttempted>(Handle_MapEventBattleStateChangeAttempted);
+        messageBroker.Unsubscribe<NetworkChangeBattleState>(Handle_NetworkChangeBattleState);
     }
 
-    private void Handle(MessagePayload<NetworkDestroyMapEvent> payload)
+    private void Handle_MapEventBattleStateChangeAttempted(MessagePayload<MapEventBattleStateChangeAttempted> payload)
     {
-        if (objectManager.TryGetObject<MapEvent>(payload.What.MapEventId, out var mapEvent) == false)
-        {
-            Logger.Error("Unable to get {type} if from {obj}", nameof(MapEvent), payload.What.MapEventId);
+        if (!objectManager.TryGetIdWithLogging(payload.What.MapEvent, out var mapEventId))
             return;
-        }
 
-        objectManager.Remove(mapEvent);
+        mapEventLogger.DebugMapEventId(mapEventId,
+            "Sending network battle state change. BattleState={BattleState}",
+            payload.What.BattleState);
+
+        var message = new NetworkChangeBattleState(mapEventId, payload.What.BattleState);
+        network.SendAll(message);
     }
 
-    private void Handle(MessagePayload<MapEventDestroyed> payload)
+    private void Handle_NetworkChangeBattleState(MessagePayload<NetworkChangeBattleState> payload)
     {
-        var mapEvent = payload.What.Instance;
-        if (objectManager.TryGetId(mapEvent, out var mapEventId) == false)
-        {
-            Logger.Error("Unable to get {type} if from {obj}", nameof(MapEvent), mapEvent);
+        if (!objectManager.TryGetObjectWithLogging<MapEvent>(payload.What.MapEventId, out var mapEvent))
             return;
+
+        mapEventLogger.DebugMapEvent(mapEvent,
+            "Applying network battle state change. BattleState={BattleState}",
+            payload.What.BattleState);
+
+        using (new AllowedThread())
+        {
+            mapEvent.BattleState = payload.What.BattleState;
         }
-
-        objectManager.Remove(payload.What.Instance);
-
-        network.SendAll(new NetworkDestroyMapEvent(mapEventId));
-    }
-
-    
-
-    private void Handle(MessagePayload<MapEventCreated> payload)
-    {
-        objectManager.AddNewObject(payload.What.Instance, out var id);
-
-        network.SendAll(new NetworkCreateMapEvent(id));
-    }
-
-
-    private void Handle(MessagePayload<NetworkCreateMapEvent> payload)
-    {
-        var newMapEvent = ObjectHelper.SkipConstructor<MapEvent>();
-
-        // TODO find better way of doing this
-        newMapEvent._sides = new MapEventSide[2];
-
-        objectManager.AddExisting(payload.What.MapEventId, newMapEvent);
     }
 }

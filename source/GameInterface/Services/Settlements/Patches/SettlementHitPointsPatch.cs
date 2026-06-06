@@ -21,12 +21,11 @@ internal class SettlementHitPointsPatch
     [HarmonyPrefix]
     private static bool SettlementHitPointsPrefix(ref Settlement __instance, ref float value)
     {
-        if (AllowedThread.IsThisThreadAllowed()) return true;
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient) return false;
 
-        var message = new SettlementChangedSettlementHitPoints(__instance.StringId, value);
+        var message = new SettlementChangedSettlementHitPoints(__instance, value);
 
         MessageBroker.Instance.Publish(__instance, message);
 

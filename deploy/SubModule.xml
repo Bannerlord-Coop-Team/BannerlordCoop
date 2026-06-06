@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Module>
+    <Name value="${name}"/>
+    <Id value="${name}"/>
+    <Version value="${version}"/>
+    <SingleplayerModule value="true"/>
+    <MultiplayerModule value="false"/>
+    <DependedModules>
+        <DependedModule Id="Native" DependentVersion="${game_version}"/>
+        <DependedModule Id="SandBoxCore" DependentVersion="${game_version}"/>
+        <DependedModule Id="Sandbox" DependentVersion="${game_version}"/>
+        <DependedModule Id="CustomBattle" DependentVersion="${game_version}"/>
+        <DependedModule Id="StoryMode" DependentVersion="${game_version}"/>
+    </DependedModules>
+    <SubModules>
+        <SubModule>
+            <Name value="${name}"/>
+            <DLLName value="${name}.dll"/>
+            <SubModuleClassType value="${name}.${main_class}"/>
+            <Tags>
+                <Tag key="DedicatedServerType" value="none" />
+                <Tag key="IsNoRenderModeElement" value="false" />
+            </Tags>
+        </SubModule>
+    </SubModules>
+    <Xmls>
+    </Xmls>
+</Module>

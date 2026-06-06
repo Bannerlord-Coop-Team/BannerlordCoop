@@ -45,20 +45,22 @@ internal class ResponseProtocol<ResponseType> where ResponseType : IMessage
     /// <typeparam name="NotifyType">Message type to send internally after all clients have responeded (or timeout)</typeparam>
     /// <param name="triggerMessage">Message to send to all clients</param>
     /// <param name="notifyMessage">Message to send internally after all clients have responeded (or timeout)</param>
-    public void StartResponseProtocol<TriggerType, NotifyType>(TriggerType triggerMessage, NotifyType notifyMessage)
+    public Task StartResponseProtocol<TriggerType, NotifyType>(TriggerType triggerMessage, NotifyType notifyMessage)
         where TriggerType : IMessage
         where NotifyType : IMessage
     {
         // Send trigger message -> clients respond with response message -> notify message is sent internally
 
         // Wait for responses from all clients (cancles after timeout)
-        Task.WhenAll(responseTasks).ContinueWith(_ =>
+        var task = Task.WhenAll(responseTasks).ContinueWith(_ =>
         {
             messageBroker.Publish(this, notifyMessage);
         });
 
         // Send message to trigger 
         server.SendAll(triggerMessage);
+
+        return task;
     }
 }
 

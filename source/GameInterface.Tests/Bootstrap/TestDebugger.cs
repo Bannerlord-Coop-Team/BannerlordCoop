@@ -110,6 +110,11 @@ namespace GameInterface.Tests.Bootstrap
             throw new NotImplementedException();
         }
 
+        public void SetDebugVector(Vec3 value)
+        {
+            throw new NotImplementedException();
+        }
+
         public void SetTestModeEnabled(bool testModeEnabled)
         {
             throw new NotImplementedException();

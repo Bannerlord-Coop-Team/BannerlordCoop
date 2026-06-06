@@ -1,10 +1,12 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Extentions;
 using GameInterface.Policies;
 using GameInterface.Services.Settlements.Messages;
 using HarmonyLib;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
@@ -37,25 +39,19 @@ public class CollectNotablesToCachePatch
             }
         }
 
-
-        //pub list to server
-        List<string> cacheHeros = new();
-
-        notableCache.ForEach(hero => cacheHeros.Add(hero.StringId));
-
-        var message = new SettlementChangedNotablesCache(__instance.StringId, cacheHeros);
+        var message = new SettlementChangedNotablesCache(__instance, notableCache.ToList());
         MessageBroker.Instance.Publish(__instance, message);
         return false;
     }
 
-    internal static void RunNotablesCacheChange(Settlement settlement, MBList<Hero> heroes)
+    internal static void RunNotablesCacheChange(Settlement settlement, MBList<Hero> heros)
     {
 
         GameLoopRunner.RunOnMainThread(() =>
         {
             using (new AllowedThread())
             {
-                settlement._notablesCache = heroes;
+                settlement._notablesCache = heros;
             }
         });
     }

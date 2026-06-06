@@ -1,38 +1,75 @@
 ﻿using Common;
-using GameInterface.Services.Registry;
+using Common.Util;
+using GameInterface.Registry;
+using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
+using HarmonyLib;
+using Serilog;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using System.Threading;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
+using TaleWorlds.Localization;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Clans;
 
 /// <summary>
 /// Registry class that assosiates <see cref="Clan"/> and a <see cref="string"/> id
 /// </summary>
-internal class ClanRegistry : RegistryBase<Clan>
+internal class ClanRegistry : AutoRegistryBase<Clan>
 {
-    private const string ClanStringIdPrefix = "CoopClan";
-
-    public ClanRegistry(IRegistryCollection collection) : base(collection) { }
-
-    public override void RegisterAll()
+    public ClanRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
-        var objectManager = Campaign.Current?.CampaignObjectManager;
+    }
 
-        if (objectManager == null)
+    public override IEnumerable<MethodBase> Constructors => new MethodBase[] {
+        AccessTools.Constructor(typeof(Clan))
+    };
+
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+    public override void RegisterAllObjects()
+    {
+        var mbObjectManager = Campaign.Current?.CampaignObjectManager;
+
+        if (mbObjectManager == null)
         {
             Logger.Error("Unable to register objects when CampaignObjectManager is null");
             return;
         }
 
-        foreach (var clan in objectManager.Clans)
+        foreach (var clan in mbObjectManager.Clans)
         {
             RegisterExistingObject(clan.StringId, clan);
         }
     }
 
-    protected override string GetNewId(Clan party)
+    public override void OnClientCreated(Clan obj, string id)
     {
-        party.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<Clan>(ClanStringIdPrefix);
-        return party.StringId;
+        using (new AllowedThread())
+        {
+            obj.InitMembers();
+        }
+
+        MBObjectManager.Instance?.RegisterObjectInternalWithoutTypeId(obj, false, out _);
+
+        Campaign.Current?.CampaignObjectManager?.AddClan(obj);
     }
 
+    public override void OnClientDestroyed(Clan obj, string id)
+    {
+    }
+
+    public override void OnServerCreated(Clan obj, string id)
+    {
+    }
+
+    public override void OnServerDestroyed(Clan obj, string id)
+    {
+    }
 }

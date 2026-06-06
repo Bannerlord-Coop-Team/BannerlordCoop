@@ -1,20 +1,19 @@
 ﻿using Common.Messaging;
+using TaleWorlds.CampaignSystem.Settlements;
 
-namespace GameInterface.Services.Towns.Messages
+namespace GameInterface.Services.Towns.Messages;
+
+/// <summary>
+/// Used when the TradeTaxAccumulated changes in a town.
+/// </summary>
+public readonly struct TownTradeTaxAccumulatedChanged : ICommand
 {
-    /// <summary>
-    /// Used when the TradeTaxAccumulated changes in a Town.
-    /// </summary>
-    public record TownTradeTaxAccumulatedChanged : ICommand
+    public readonly Town Town;
+    public readonly int TradeTaxAccumulated;
+
+    public TownTradeTaxAccumulatedChanged(Town town, int tradeTaxAccumulated)
     {
-        public string TownId { get; }
-
-        public int TradeTaxAccumulated { get; }
-
-        public TownTradeTaxAccumulatedChanged(string townId, int tradeTaxAccumulated)
-        {
-            TownId = townId;
-            TradeTaxAccumulated = tradeTaxAccumulated;
-        }
+        Town = town;
+        TradeTaxAccumulated = tradeTaxAccumulated;
     }
 }

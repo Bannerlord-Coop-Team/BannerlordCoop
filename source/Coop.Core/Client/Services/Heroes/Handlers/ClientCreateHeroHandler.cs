@@ -1,9 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.Heroes.Messages;
-using Coop.Core.Server.Services.Heroes.Messages;
 using GameInterface.Services.Heroes.Messages;
-using GameInterface.Services.Heroes.Messages.Lifetime;
 
 namespace Coop.Core.Client.Services.Heroes.Handlers;
 
@@ -20,20 +18,14 @@ internal class ClientCreateHeroHandler : IHandler
         this.messageBroker = messageBroker;
         this.network = network;
 
-        messageBroker.Subscribe<NetworkCreateHero>(Handle_NetworkCreateHero);
         messageBroker.Subscribe<NetworkChangeHeroName>(Handle_NetworkChangeHeroName);
-        messageBroker.Subscribe<HeroCreated>(Handle_HeroCreated);
+        messageBroker.Subscribe<HeroNameChanged>(Handle_HeroNameChanged);
     }
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<NetworkCreateHero>(Handle_NetworkCreateHero);
-    }
-
-    private void Handle_NetworkCreateHero(MessagePayload<NetworkCreateHero> payload)
-    {
-        var message = new CreateHero(payload.What.Data);
-        messageBroker.Publish(this, message);
+        messageBroker.Unsubscribe<NetworkChangeHeroName>(Handle_NetworkChangeHeroName);
+        messageBroker.Unsubscribe<HeroNameChanged>(Handle_HeroNameChanged);
     }
 
     private void Handle_NetworkChangeHeroName(MessagePayload<NetworkChangeHeroName> payload)
@@ -42,9 +34,8 @@ internal class ClientCreateHeroHandler : IHandler
         messageBroker.Publish(this, message);
     }
 
-    private void Handle_HeroCreated(MessagePayload<HeroCreated> payload)
+    private void Handle_HeroNameChanged(MessagePayload<HeroNameChanged> payload)
     {
-        var message = new NetworkHeroCreated();
-        network.SendAll(message);
+        network.SendAll(new NetworkChangeHeroName(payload.What.Data));
     }
 }

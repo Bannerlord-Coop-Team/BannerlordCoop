@@ -3,11 +3,15 @@ using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
 using Common.Serialization;
+using Common.Util;
 using Coop.Core.Client.Services.Heroes.Data;
 using Coop.Core.Common.Configuration;
 using Coop.Core.Server;
 using GameInterface;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Modules;
+using GameInterface.Services.Modules.Validators;
+using GameInterface.Services.ObjectManager;
 
 namespace Coop.Core.Common;
 
@@ -18,6 +22,7 @@ public abstract class CommonModule : Module
 {
     protected override void Load(ContainerBuilder builder)
     {
+        builder.RegisterType<TaleWorldsModuleInfoProvider>().As<IModuleInfoProvider>().SingleInstance();
         builder.RegisterType<StateFactory>().As<IStateFactory>().InstancePerLifetimeScope();
 
         #region Serialization
@@ -37,6 +42,7 @@ public abstract class CommonModule : Module
 
         builder.RegisterType<ControllerIdProvider>().As<IControllerIdProvider>().InstancePerLifetimeScope();
         builder.RegisterType<DeferredHeroRepository>().As<IDeferredHeroRepository>().InstancePerLifetimeScope();
+        builder.RegisterType<ModuleValidator>().As<IModuleValidator>().SingleInstance();
 
         builder.RegisterType<CoopFinalizer>().As<ICoopFinalizer>().InstancePerLifetimeScope();
 
@@ -52,7 +58,8 @@ public abstract class CommonModule : Module
     /// <param name="autoInstantiate">Flag to auto instantiate type when container is built</param>
     protected void RegisterAllTypesWithInterface<TModule, TInterface>(ContainerBuilder builder, bool autoInstantiate = false)
     {
-        foreach (var handlerType in TypeCollector.Collect<TModule, TInterface>())
+        // Namespace is needed to separate client and server handlers being registered with DI
+        foreach (var handlerType in InterfaceCollector.GetInterfaces<TInterface>(typeof(TModule).Namespace))
         {
             var handlerBuilder = builder.RegisterType(handlerType).AsSelf().InstancePerLifetimeScope();
 

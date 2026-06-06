@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Messages;
 
@@ -7,13 +8,13 @@ namespace GameInterface.Services.MobileParties.Messages;
 /// </summary>
 public record ChangedWagePaymentLimit : ICommand
 {
-    public string MobilePartyId { get; }
+    public MobileParty MobileParty { get; }
 
     public int WageAmount { get; }
 
-    public ChangedWagePaymentLimit(string mobilePartyId, int wageAmount)
+    public ChangedWagePaymentLimit(MobileParty mobileParty, int wageAmount)
     {
-        MobilePartyId = mobilePartyId;
+        MobileParty = mobileParty;
         WageAmount = wageAmount;
     }
 }

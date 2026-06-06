@@ -33,6 +33,8 @@ public class CoopClient : CoopNetworkBase, ICoopClient
     private readonly IPacketManager packetManager;
 
     private bool isConnected = false;
+    private bool reconnectPending = false;
+    private DateTime reconnectAfter = DateTime.MinValue;
 
     public CoopClient(
         INetworkConfiguration config,
@@ -51,7 +53,9 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 
     public override void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
     {
-        throw new NotImplementedException();
+        // Common during auto-connect: server not yet listening when client attempts connection.
+        // Log and continue — LiteNetLib will keep retrying within the DisconnectTimeout window.
+        Logger.Warning("Network error from {EndPoint}: {SocketError}", endPoint, socketError);
     }
 
     public override void OnNetworkLatencyUpdate(NetPeer peer, int latency)
@@ -67,7 +71,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 
     public override void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
     {
-        throw new NotImplementedException();
+        Logger.Warning("Received unconnected message from {EndPoint}", remoteEndPoint);
     }
 
     public override void OnPeerConnected(NetPeer peer)
@@ -88,6 +92,14 @@ public class CoopClient : CoopNetworkBase, ICoopClient
             messageBroker.Publish(this, new SendInformationMessage(disconnectInfo.Reason.ToString()));
             messageBroker.Publish(this, new NetworkDisconnected(disconnectInfo));
         }
+        else
+        {
+            // During auto-connect, the client may attempt to connect before the server has finished
+            // registering game objects and opened joining. Schedule a retry until it's accepted.
+            Logger.Warning("Connection attempt failed ({Reason}), retrying in 3 seconds...", disconnectInfo.Reason);
+            reconnectPending = true;
+            reconnectAfter = DateTime.UtcNow.AddSeconds(3);
+        }
     }
 
     public override void Start()
@@ -107,6 +119,14 @@ public class CoopClient : CoopNetworkBase, ICoopClient
     public override void Update(TimeSpan frameTime)
     {
         netManager.PollEvents();
+
+        // Auto-connect retry: fires after a rejection while the server was still loading.
+        if (reconnectPending && DateTime.UtcNow >= reconnectAfter)
+        {
+            reconnectPending = false;
+            Logger.Information("Retrying connection to {Address}:{Port}...", Configuration.Address, Configuration.Port);
+            netManager.Connect(Configuration.Address, Configuration.Port, Configuration.Token);
+        }
     }
 
     public override void SendAll(IPacket packet)

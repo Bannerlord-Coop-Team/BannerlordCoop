@@ -1,19 +1,20 @@
 ﻿using Common.Messaging;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Settlements.Messages;
 
 /// <summary>
-///  Changed of Settlement.LastAttackerParty
+/// Changed Settlement.LastAttackerParty.
 /// </summary>
-public record SettlementChangedLastAttackerParty : IEvent
+public readonly struct SettlementChangedLastAttackerParty : IEvent
 {
-    public string SettlementId { get; }
+    public readonly Settlement Settlement;
+    public readonly MobileParty AttackerParty;
 
-    public string AttackerPartyId { get; }
-
-    public SettlementChangedLastAttackerParty(string settlementId, string attackerPartyId)
+    public SettlementChangedLastAttackerParty(Settlement settlement, MobileParty attackerParty)
     {
-        SettlementId = settlementId;
-        AttackerPartyId = attackerPartyId;
+        Settlement = settlement;
+        AttackerParty = attackerParty;
     }
 }

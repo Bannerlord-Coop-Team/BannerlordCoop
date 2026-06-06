@@ -30,8 +30,7 @@ public class LastAttackerPartySettlementPatch
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(Settlement), Environment.StackTrace);
+            Logger.Error("Client created managed {name}", typeof(Settlement));
             return true;
         }
 
@@ -42,7 +41,7 @@ public class LastAttackerPartySettlementPatch
             if (__instance.LastAttackerParty.StringId == value.StringId) return false;
         }
 
-        var message = new SettlementChangedLastAttackerParty(__instance.StringId, value.StringId);
+        var message = new SettlementChangedLastAttackerParty(__instance, value);
 
         MessageBroker.Instance.Publish(__instance, message);
 

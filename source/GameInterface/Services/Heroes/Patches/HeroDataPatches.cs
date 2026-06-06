@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Heroes.Data;
@@ -16,18 +17,15 @@ internal class HeroDataPatches
     [HarmonyPrefix]
     private static bool Prefix(ref Hero __instance, ref TextObject fullName, ref TextObject firstName)
     {
-        // Allows original method call when called by OverrideTemplateFn 
+        // Allows original method call when called by OverrideTemplateFn
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-        // Skip method if called from client and allow origin
-        if (ModInformation.IsClient) return false;
 
         var data = new HeroChangeNameData(__instance, fullName, firstName);
         var message = new HeroNameChanged(data);
+
         MessageBroker.Instance.Publish(__instance, message);
 
-        // Returning true allows original on the server to run
-        return true;
+        return ModInformation.IsServer;
     }
 
     public static void SetNameOverride(Hero instance, TextObject fullName,  TextObject firstName)

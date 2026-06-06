@@ -13,7 +13,8 @@ namespace GameInterface.Serialization.External
         string stringId;
 
         string[] supporterNotablesIds;
-        string[] lordsIds;
+        string[] deadLordsIds;
+        string[] aliveLordsIds;
         string[] heroesIds;
         string[] companionsIds;
 
@@ -22,37 +23,36 @@ namespace GameInterface.Serialization.External
         {
         }
 
-        private static HashSet<string> excludes = new HashSet<string>
+        public static HashSet<string> Excludes = new HashSet<string>
         {
             "_supporterNotablesCache",
-            "_lordsCache",
+            "_aliveLordsCache",
+            "_deadLordsCache",
             "_heroesCache",
             "_companionsCache",
+            "_defaultPartyTemplate",
         };
 
         protected override void PackInternal()
         {
-            stringId = Object.StringId;
+            stringId = ResolveId(Object);
 
-            base.PackFields();
+            base.PackFields(Excludes);
             
-            supporterNotablesIds = PackIds(Object._supporterNotablesCache);
-            lordsIds = PackIds(Object._lordsCache);
-            heroesIds = PackIds(Object._heroesCache);
-            companionsIds = PackIds(Object._companionsCache);
+            supporterNotablesIds = ResolveIds(Object._supporterNotablesCache);
+            deadLordsIds = ResolveIds(Object._deadLordsCache);
+            aliveLordsIds = ResolveIds(Object._aliveLordsCache);
+            heroesIds = ResolveIds(Object._heroesCache);
+            companionsIds = ResolveIds(Object._companionsCache);
         }
 
         protected override void UnpackInternal()
         {
-            // If the stringId already exists in the object manager use that object
-            if (stringId != null)
+            var resolvedObj = ResolveObject<Clan>(stringId);
+            if (resolvedObj != null)
             {
-                var newObject = ResolveId<Clan>(stringId);
-                if (newObject != null)
-                {
-                    Object = newObject;
-                    return;
-                }
+                Object = resolvedObj;
+                return;
             }
 
             Object.InitMembers();
@@ -60,10 +60,11 @@ namespace GameInterface.Serialization.External
             base.UnpackFields();
 
             // Unpack special cases
-            Object._supporterNotablesCache = ResolveIds<Hero>(supporterNotablesIds).ToMBList();
-            Object._lordsCache = ResolveIds<Hero>(lordsIds).ToMBList();
-            Object._heroesCache = ResolveIds<Hero>(heroesIds).ToMBList();
-            Object._companionsCache = ResolveIds<Hero>(companionsIds).ToMBList();
+            Object._supporterNotablesCache = ResolveObjects<Hero>(supporterNotablesIds).ToMBList();
+            Object._deadLordsCache = ResolveObjects<Hero>(deadLordsIds).ToMBList();
+            Object._aliveLordsCache = ResolveObjects<Hero>(aliveLordsIds).ToMBList();
+            Object._heroesCache = ResolveObjects<Hero>(heroesIds).ToMBList();
+            Object._companionsCache = ResolveObjects<Hero>(companionsIds).ToMBList();
         }
     }
 }

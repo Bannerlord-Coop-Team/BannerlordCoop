@@ -31,13 +31,12 @@ public class GarrisonWagePaymentLimitSettlementPatch
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(Army), Environment.StackTrace);
+            Logger.Error("Client created managed {name}", typeof(Army));
             return true;
         }
 
 
-        var message = new SettlementChangedGarrisonWageLimit(__instance.StringId, value);
+        var message = new SettlementChangedGarrisonWageLimit(__instance, value);
 
         MessageBroker.Instance.Publish(__instance, message);
 

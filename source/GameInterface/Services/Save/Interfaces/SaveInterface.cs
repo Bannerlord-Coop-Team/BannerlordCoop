@@ -1,10 +1,8 @@
 ﻿using Common.Logging;
 using Serilog;
 using System;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
-using TaleWorlds.SaveSystem;
 
 namespace GameInterface.Services.Heroes.Interfaces;
 
@@ -28,6 +26,9 @@ internal class SaveInterface : ISaveInterface
         var saveHandler = Campaign.Current.SaveHandler;
         var dataArgs = saveHandler.GetSaveMetaData();
         var metaData = MBSaveLoad.GetSaveMetaData(dataArgs);
+
+        // Required to properly transfer campaign behaviors
+        CampaignEventDispatcher.Instance.OnBeforeSave();
 
         var saveDriver = new CoopInMemSaveDriver();
         Game.Current.Save(metaData, "TransferSave", saveDriver, (SaveResult) => { });

@@ -34,13 +34,9 @@ public class PartyCreationTests : IDisposable
         {
             var partyComponent = GameObjectCreator.CreateInitializedObject<LordPartyComponent>();
             var clan = GameObjectCreator.CreateInitializedObject<Clan>();
-            var party = MobileParty.CreateParty("This should not set", partyComponent, (party) =>
-            {
-                party.ActualClan = clan;
-                partyComponent.InitializeLordPartyProperties(party, Vec2.Zero, 0, null);
-            });
+            var party = MobileParty.CreateParty("This should not set", partyComponent);
 
-            partyId = party.StringId;
+            Assert.True(server.ObjectManager.TryGetId(party, out partyId));
         });
 
         // Assert
@@ -63,12 +59,10 @@ public class PartyCreationTests : IDisposable
         string? partyId = null;
         client1.Call(() =>
         {
-            var clientParty = MobileParty.CreateParty("This should not set", null, (party) =>
-            {
-            });
+            var clientParty = new MobileParty();
 
             partyId = clientParty.StringId;
-        });
+        }, new[] { AccessTools.Method(typeof(MobileParty), nameof(MobileParty.ResetCached)) });
 
         // Assert
         Assert.False(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var _));

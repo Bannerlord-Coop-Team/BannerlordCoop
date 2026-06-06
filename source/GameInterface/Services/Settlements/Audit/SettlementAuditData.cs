@@ -39,16 +39,14 @@ public record SettlementAuditData
     [ProtoMember(12)]
     public string[] HeroesWithoutPartyCache { get; }
     [ProtoMember(13)]
-    public int NumberOfLordPartiesAt { get; }
-    [ProtoMember(14)]
     public float LastVisitTimeOfOwner { get; }
-    [ProtoMember(15)]
+    [ProtoMember(14)]
     public string ClaimedBy { get; }
-    [ProtoMember(16)]
+    [ProtoMember(15)]
     public float ClaimValue { get; }
-    [ProtoMember(17)]
+    [ProtoMember(16)]
     public int CanBeClaimed { get; }
-    [ProtoMember(18)]
+    [ProtoMember(17)]
     public float[] WallSectionHitPointsRatioList {get;}
 
     // TODO: add more fields/properties for now this will suffice
@@ -57,8 +55,8 @@ public record SettlementAuditData
     {
         StringId = settlement.StringId;
 
-        NumberOfEnemiesSpottedAround = settlement.NumberOfEnemiesSpottedAround;
-        NumberOfAlliesSpottedAround = settlement.NumberOfAlliesSpottedAround;
+        NumberOfEnemiesSpottedAround = settlement.NearbyLandAllyIntensity;
+        NumberOfAlliesSpottedAround = settlement.NearbyLandThreatIntensity;
         BribePaid = settlement.BribePaid;
         SettlementHitPoints = settlement.SettlementHitPoints;
         GarrisonWagePaymentLimit = settlement.GarrisonWagePaymentLimit;
@@ -71,13 +69,11 @@ public record SettlementAuditData
         NotablesCache = settlement._notablesCache.Select(hero => hero.StringId).ToArray();
         HeroesWithoutPartyCache = settlement._heroesWithoutPartyCache.Select(heroCache => heroCache.StringId).ToArray();
 
-        NumberOfLordPartiesAt = settlement.NumberOfLordPartiesAt;
-
         LastVisitTimeOfOwner = settlement.LastVisitTimeOfOwner;
 
-        ClaimedBy = settlement.ClaimedBy?.StringId ?? "";
-        ClaimValue = settlement.ClaimValue;
-        CanBeClaimed = settlement.CanBeClaimed;
+        //ClaimedBy = settlement.ClaimedBy?.StringId ?? "";
+        //ClaimValue = settlement.ClaimValue;
+        //CanBeClaimed = settlement.CanBeClaimed;
 
 
         WallSectionHitPointsRatioList = settlement._settlementWallSectionHitPointsRatioList.ToArray();

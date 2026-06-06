@@ -1,19 +1,19 @@
 ﻿using Common.Messaging;
+using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Services.Heroes.Messages
+namespace GameInterface.Services.Heroes.Messages;
+
+/// <summary>
+/// Event from GameInterface for IsPregnant.
+/// </summary>
+public readonly struct PregnantChanged : IEvent
 {
-    /// <summary>
-    /// Event from GameInterface for IsPregnant
-    /// </summary>
-    public record PregnantChanged : IEvent
-    {
-        public bool IsPregnant { get; }
-        public string HeroId { get; }
+    public readonly Hero Hero;
+    public readonly bool IsPregnant;
 
-        public PregnantChanged(bool isPregnant, string heroId)
-        {
-            IsPregnant = isPregnant;
-            HeroId = heroId;
-        }
+    public PregnantChanged(Hero hero, bool isPregnant)
+    {
+        Hero = hero;
+        IsPregnant = isPregnant;
     }
 }

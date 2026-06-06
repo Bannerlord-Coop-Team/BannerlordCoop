@@ -1,6 +1,5 @@
 ﻿using HarmonyLib;
 using Helpers;
-using TaleWorlds.Core;
 
 namespace GameInterface.Services.CraftingService.Patches
 {
@@ -14,7 +13,7 @@ namespace GameInterface.Services.CraftingService.Patches
         [HarmonyPrefix]
         private static bool OpenCraftingPrefix()
         {
-            return false;
+            return true;
         }
     }
 }

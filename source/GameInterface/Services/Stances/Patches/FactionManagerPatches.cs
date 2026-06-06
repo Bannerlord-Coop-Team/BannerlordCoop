@@ -13,7 +13,7 @@ namespace GameInterface.Services.Stances.Patches
         [HarmonyPrefix]
         private static bool AddStancePrefix()
         {
-            return false;
+            return true;
         }
 
         [HarmonyPatch("RemoveStance")]
@@ -26,13 +26,6 @@ namespace GameInterface.Services.Stances.Patches
         [HarmonyPatch("SetStance")]
         [HarmonyPrefix]
         private static bool SetStancePrefix()
-        {
-            return false;
-        }
-
-        [HarmonyPatch("DeclareAlliance")]
-        [HarmonyPrefix]
-        private static bool DeclareAlliancePrefix()
         {
             return false;
         }

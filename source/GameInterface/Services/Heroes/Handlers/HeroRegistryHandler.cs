@@ -4,6 +4,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.Entity.Data;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.ObjectManager;
 using Serilog;
 
 namespace GameInterface.Services.Heroes.Handlers;
@@ -16,17 +17,20 @@ internal class HeroRegistryHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IControlledEntityRegistry controlledEntityRegistry;
     private readonly IControllerIdProvider controllerIdProvider;
+    private readonly IObjectManager objectManager;
 
     public HeroRegistryHandler(
         IHeroInterface heroInterface,
         IMessageBroker messageBroker,
         IControlledEntityRegistry controlledEntityRegistry,
-        IControllerIdProvider controllerIdProvider)
+        IControllerIdProvider controllerIdProvider,
+        IObjectManager objectManager)
     {
         this.heroInterface = heroInterface;
         this.messageBroker = messageBroker;
         this.controlledEntityRegistry = controlledEntityRegistry;
         this.controllerIdProvider = controllerIdProvider;
+        this.objectManager = objectManager;
         messageBroker.Subscribe<PlayerHeroChanged>(Handle_PlayerHeroChanged);
     }
 
@@ -40,11 +44,16 @@ internal class HeroRegistryHandler : IHandler
         var previousHero = obj.What.PreviousHero;
         var newHero = obj.What.NewHero;
 
-        if (controlledEntityRegistry.TryGetControlledEntity(previousHero.StringId, out ControlledEntity previousHeroEntity))
+        if (objectManager.TryGetIdWithLogging(previousHero, out var previousHeroId) == false) return;
+        if (objectManager.TryGetIdWithLogging(newHero, out var newHeroId) == false) return;
+        //if (objectManager.TryGetIdWithLogging(newHero.PartyBelongedTo, out var partyId) == false) return;
+
+        if (controlledEntityRegistry.TryGetControlledEntity(previousHeroId, out ControlledEntity previousHeroEntity))
         {
             controlledEntityRegistry.RemoveAsControlled(previousHeroEntity);
         }
 
-        controlledEntityRegistry.RegisterAsControlled(controllerIdProvider.ControllerId, newHero.StringId);
+        controlledEntityRegistry.RegisterAsControlled(controllerIdProvider.ControllerId, newHeroId);
+        //controlledEntityRegistry.RegisterAsControlled(controllerIdProvider.ControllerId, partyId);
     }
 }

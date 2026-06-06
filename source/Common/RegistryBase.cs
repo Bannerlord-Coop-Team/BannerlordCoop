@@ -9,6 +9,30 @@ namespace Common;
 public interface IRegistry<T> : IEnumerable<KeyValuePair<string, T>>, IRegistry
 {
     IReadOnlyDictionary<string, T> Objects { get;}
+
+    /// <summary>
+    /// Register an object with a new <see cref="ObjectId"/>
+    /// </summary>
+    /// <param name="obj">Object to register with new <see cref="ObjectId"/></param>
+    /// <returns>True if registration was successful, otherwise false</returns>
+    bool RegisterNewObject(T obj, out string id);
+
+    /// <summary>
+    /// Register an object with an existing <see cref="ObjectId"/>
+    /// </summary>
+    /// <param name="id">Id to associate object with</param>
+    /// <param name="obj">Object to register with <see cref="ObjectId"/></param>
+    /// <returns>True if registration was successful, otherwise false</returns>
+    bool RegisterExistingObject(string id, T obj);
+
+    /// <summary>
+    /// Getter for associated object in the registry
+    /// </summary>
+    /// <typeparam name="T">Type to resolve</typeparam>
+    /// <param name="id">Id to get object for</param>
+    /// <param name="obj">Stored obj, will be default if no id/obj exists</param>
+    /// <returns>True if retrieval was successful, otherwise false</returns>
+    bool TryGetValue(string id, out T obj);
 }
 
 /// <summary>
@@ -30,21 +54,6 @@ public interface IRegistry : IDisposable
     /// Registers all existing objects
     /// </summary>
     void RegisterAll();
-
-    /// <summary>
-    /// Register an object with a new <see cref="ObjectId"/>
-    /// </summary>
-    /// <param name="obj">Object to register with new <see cref="ObjectId"/></param>
-    /// <returns>True if registration was successful, otherwise false</returns>
-    bool RegisterNewObject(object obj, out string id);
-
-    /// <summary>
-    /// Register an object with an existing <see cref="ObjectId"/>
-    /// </summary>
-    /// <param name="id">Id to associate object with</param>
-    /// <param name="obj">Object to register with <see cref="ObjectId"/></param>
-    /// <returns>True if registration was successful, otherwise false</returns>
-    bool RegisterExistingObject(string id, object obj);
 
     /// <summary>
     /// Remove a registered object from the registry.
@@ -70,13 +79,9 @@ public interface IRegistry : IDisposable
     /// <returns>True if retrieval was successful, otherwise false</returns>
     bool TryGetId(object obj, out string id);
 
-
     /// <summary>
-    /// Getter for associated object in the registry
+    /// Clears all registered objects and their associated identifiers from the registry.
+    /// After calling this method, the registry will be empty.
     /// </summary>
-    /// <typeparam name="T">Type to resolve</typeparam>
-    /// <param name="id">Id to get object for</param>
-    /// <param name="obj">Stored obj, will be default if no id/obj exists</param>
-    /// <returns>True if retrieval was successful, otherwise false</returns>
-    bool TryGetValue<T>(string id, out T obj) where T : class;
+    void Clear();
 }

@@ -8,14 +8,14 @@ namespace Coop.Core.Server.Services.Towns.Messages
     /// Server sends this data when a Town Auditor is sent from the debug command.
     /// </summary>
     [ProtoContract(SkipConstructor = true)]
-    public class NetworkChangeTownAuditor : IEvent
+    public readonly struct NetworkChangeTownAuditor : IEvent
     {
         [ProtoMember(1)]
-        public TownAuditorData[] Datas { get; }
+        public readonly TownAuditorData[] AuditData;
         
         public NetworkChangeTownAuditor(TownAuditorData[] townAuditorDatas)
         {
-            Datas = townAuditorDatas;
+            AuditData = townAuditorDatas;
         }
     }
 }

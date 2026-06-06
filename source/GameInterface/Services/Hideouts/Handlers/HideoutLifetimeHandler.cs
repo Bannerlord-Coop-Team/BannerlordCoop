@@ -3,12 +3,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Hideouts.Messages;
-using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
-using System;
-using System.Collections.Generic;
-using System.Text;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Hideouts.Handlers;
@@ -36,9 +31,10 @@ internal class HideoutLifetimeHandler : IHandler
 
     private void Handle_HideoutCreated(MessagePayload<HideoutCreated> payload)
     {
-        objectManager.AddNewObject(payload.What.Hideout, out var newId);
+        var hideout = payload.What.Hideout;
+        objectManager.AddExisting(hideout.StringId, hideout);
 
-        var message = new NetworkCreateHideout(newId);
+        var message = new NetworkCreateHideout(hideout.StringId);
         network.SendAll(message);
     }
 

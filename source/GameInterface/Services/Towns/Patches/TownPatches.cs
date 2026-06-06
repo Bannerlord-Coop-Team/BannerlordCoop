@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Towns.Messages;
+using GameInterface.Utils;
 using HarmonyLib;
 using System.Collections.Generic;
 using System.Reflection;
@@ -25,14 +26,13 @@ namespace GameInterface.Services.Towns.Patches
         [HarmonyPrefix]
         private static bool TownGovernorPrefix(ref Town __instance, ref Hero value)
         {
-            if (AllowedThread.IsThisThreadAllowed()) return true;
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient) return false;
             if (__instance.Governor == value) return false;
 
             
-            var message = new TownGovernorChanged(__instance.StringId, value?.StringId);
+            var message = new TownGovernorChanged(__instance, value);
             MessageBroker.Instance.Publish(__instance, message);
             return true;
         }
@@ -49,96 +49,16 @@ namespace GameInterface.Services.Towns.Patches
 
         }
 
-        [HarmonyPatch(nameof(Town.Prosperity), MethodType.Setter)]
-        [HarmonyPrefix]
-        private static bool TownProsperityPrefix(ref Town __instance, ref float value)
-        {
-            if (AllowedThread.IsThisThreadAllowed()) return true;
-            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-            if (ModInformation.IsClient) return false;
-            if (__instance.Prosperity == value) return false;
-
-            var message = new TownProsperityChanged(__instance.StringId, value);
-            MessageBroker.Instance.Publish(__instance, message);
-            return true;
-        }
-
-        public static void ChangeTownProsperity(Town town, float prosperity)
-        {
-            GameLoopRunner.RunOnMainThread(() =>
-            {
-                using (new AllowedThread())
-                {
-                    town.Prosperity = prosperity;
-                }
-            });
-
-        }
-
-        [HarmonyPatch(nameof(Town.Loyalty), MethodType.Setter)]
-        [HarmonyPrefix]
-        private static bool TownLoyaltyPrefix(ref Town __instance, ref float value)
-        {
-            if (AllowedThread.IsThisThreadAllowed()) return true;
-            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-            if (ModInformation.IsClient) return false;
-            if (__instance.Loyalty == value) return false;
-
-            var message = new TownLoyaltyChanged(__instance.StringId, value);
-            MessageBroker.Instance.Publish(__instance, message);
-            return true;
-        }
-
-        public static void ChangeTownLoyalty(Town town, float loyalty)
-        {
-            GameLoopRunner.RunOnMainThread(() =>
-            {
-                using (new AllowedThread())
-                {
-                    town.Loyalty = loyalty;
-                }
-            });
-
-        }
-
-        [HarmonyPatch(nameof(Town.Security), MethodType.Setter)]
-        [HarmonyPrefix]
-        private static bool TownSecurityPrefix(ref Town __instance, ref float value)
-        {
-            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-            if (ModInformation.IsClient) return false;
-            if (__instance.Security == value) return false;
-
-            var message = new TownSecurityChanged(__instance.StringId, value);
-            MessageBroker.Instance.Publish(__instance, message);
-            return true;
-        }
-
-        public static void ChangeTownSecurity(Town town, float security)
-        {
-            GameLoopRunner.RunOnMainThread(() =>
-            {
-                using (new AllowedThread())
-                {
-                    town.Security = security;
-                }
-            });
-        }
-
         [HarmonyPatch(nameof(Town.LastCapturedBy), MethodType.Setter)]
         [HarmonyPrefix]
         private static bool TownLastCapturedByPrefix(ref Town __instance, ref Clan value)
         {
-            if (AllowedThread.IsThisThreadAllowed()) return true;
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient) return false;
             if (__instance.LastCapturedBy == value) return false;
 
-            var message = new TownLastCapturedByChanged(__instance.StringId, value.StringId);
+            var message = new TownLastCapturedByChanged(__instance, value);
             MessageBroker.Instance.Publish(__instance, message);
             return true;
         }
@@ -175,13 +95,12 @@ namespace GameInterface.Services.Towns.Patches
         [HarmonyPrefix]
         private static bool TownTradeTaxAccumulatedPrefix(ref Town __instance, ref int value)
         {
-            if (AllowedThread.IsThisThreadAllowed()) return true;
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient) return false;
             if (__instance.TradeTaxAccumulated == value) return false;
 
-            var message = new TownTradeTaxAccumulatedChanged(__instance.StringId, value);
+            var message = new TownTradeTaxAccumulatedChanged(__instance, value);
             MessageBroker.Instance.Publish(__instance, message);
             return true;
         }
@@ -201,12 +120,11 @@ namespace GameInterface.Services.Towns.Patches
         [HarmonyPrefix]
         private static bool SetSoldItemsPrefix(Town __instance, IEnumerable<Town.SellLog> logList)
         {
-            if (AllowedThread.IsThisThreadAllowed()) return true;
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient) return false;
 
-            var message = new TownSoldItemsChanged(__instance.StringId, logList);
+            var message = new TownSoldItemsChanged(__instance, logList);
             MessageBroker.Instance.Publish(__instance, message);
             return true;
         }
@@ -262,7 +180,7 @@ namespace GameInterface.Services.Towns.Patches
             if (town.GarrisonAutoRecruitmentIsEnabled == garrisonAutoRecruitmentIsEnabled) return;
 
             town.GarrisonAutoRecruitmentIsEnabled = garrisonAutoRecruitmentIsEnabled;
-            var message = new TownGarrisonAutoRecruitmentIsEnabledChanged(town.StringId, garrisonAutoRecruitmentIsEnabled);
+            var message = new TownGarrisonAutoRecruitmentIsEnabledChanged(town, garrisonAutoRecruitmentIsEnabled);
             MessageBroker.Instance.Publish(town, message);
         }
     }
@@ -306,7 +224,7 @@ namespace GameInterface.Services.Towns.Patches
             if (town.InRebelliousState == rebelliousState) return;
 
             town.InRebelliousState = rebelliousState;
-            var message = new TownInRebelliousStateChanged(town.StringId, rebelliousState);
+            var message = new TownInRebelliousStateChanged(town, rebelliousState);
             MessageBroker.Instance.Publish(town, message);
         }
     }

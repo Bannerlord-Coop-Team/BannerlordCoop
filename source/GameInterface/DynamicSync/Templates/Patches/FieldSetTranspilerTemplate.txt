@@ -1,0 +1,73 @@
+﻿[HarmonyTranspiler]
+private static IEnumerable<CodeInstruction> {{MemberName}}_SetTranspiler(IEnumerable<CodeInstruction> instructions)
+{
+    var fieldIntercept = typeof({{MemberDeclaringType}}_DynamicPatches).GetMethod(nameof({{MemberName}}_Intercept));
+
+    var fieldInfo = AccessTools.Field(typeof({{MemberDeclaringType}}), nameof({{MemberDeclaringType}}.{{MemberName}}));
+
+    GenericPatchHelpers.FieldInterceptCache.TryAdd(fieldInfo, fieldIntercept);
+
+    foreach (var instruction in instructions)
+    {
+        if (instruction.StoresField(fieldInfo))
+        {
+            var callInst = new CodeInstruction(OpCodes.Call, fieldIntercept)
+            {
+                labels = instruction.labels.ToList(),
+                blocks = instruction.blocks.ToList()
+            };
+
+            yield return callInst;
+
+        }
+        else
+        {
+            yield return instruction;
+        }
+    }
+}
+
+{{~ if ReadOnly ~}}
+private static readonly FieldInfo {{MemberName}}FieldInfo = AccessTools.Field(typeof({{MemberDeclaringType}}), "{{MemberName}}");
+{{~ end ~}}
+
+public static void {{MemberName}}_Intercept({{MemberDeclaringType}} instance, {{MemberType}} newValue)
+{
+    var currentValue = instance.{{MemberName}};
+
+    // Skip if value hasn´t changed
+    if (currentValue != null && currentValue.Equals(newValue)) return;
+
+    if (CallOriginalPolicy.IsOriginalAllowed())
+    {
+{{~ if ReadOnly ~}}
+        {{MemberName}}FieldInfo.SetValue(instance, newValue);
+{{~ else ~}}
+		instance.{{MemberName}} = newValue;
+{{~ end ~}}
+        return;
+    }
+
+    if (ModInformation.IsClient)
+    {
+        Logger.Error("Client updated managed {type}", "{{MemberName}}");
+{{~ if ReadOnly ~}}
+	    {{MemberName}}FieldInfo.SetValue(instance, newValue);
+{{~ else ~}}
+		instance.{{MemberName}} = newValue;
+{{~ end ~}}
+        return;
+    }
+
+{{~ if Debug ~}}
+    Logger.Debug("[Server] Publishing local set message for {type}", "{{MemberName}}");
+{{~ end ~}}
+
+    var message = new {{MemberDeclaringType}}_{{MemberName}}_SetLocalMessage(instance, newValue);
+    MessageBroker.Instance.Publish(instance, message);
+{{~ if ReadOnly ~}}
+	{{MemberName}}FieldInfo.SetValue(instance, newValue);
+{{~ else ~}}
+	instance.{{MemberName}} = newValue;
+{{~ end ~}}
+}

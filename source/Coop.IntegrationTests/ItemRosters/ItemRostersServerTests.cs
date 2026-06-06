@@ -14,7 +14,7 @@ namespace Coop.IntegrationTests.ItemRosters
         [Fact]
         public void ServerReceivesItemRosterUpdated_PublishesUpdateItemRoster_AllClients()
         {
-            var triggerMessage = new ItemRosterUpdated("partybase", "item", "modifier", 1);
+            var triggerMessage = new ItemRosterUpdated(null, null, null, 1);
 
             var server = TestEnvironment.Server;
 
@@ -34,7 +34,7 @@ namespace Coop.IntegrationTests.ItemRosters
         [Fact]
         public void ServerReceivesItemRosterCleared_PublishesClearItemRoster_AllClients()
         {
-            var triggerMessage = new ItemRosterCleared("partybase");
+            var triggerMessage = new ItemRosterCleared(null);
 
             var server = TestEnvironment.Server;
 

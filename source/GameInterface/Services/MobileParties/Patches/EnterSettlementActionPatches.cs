@@ -2,13 +2,8 @@
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
-using GameInterface.Services.GameDebug.Patches;
-using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
-using System;
-using System.Runtime.CompilerServices;
-using System.Threading;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -26,10 +21,10 @@ namespace GameInterface.Services.MobileParties.Patches
 
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-            var message = new PartyEnterSettlementAttempted(settlement.StringId, mobileParty.StringId);
+            var message = new PartyEnterSettlementAttempted(settlement, mobileParty);
             MessageBroker.Instance.Publish(mobileParty, message);
 
-            return false;
+            return ModInformation.IsServer;
         }
 
         public static void OverrideApplyForParty(MobileParty mobileParty, Settlement settlement)
@@ -40,7 +35,7 @@ namespace GameInterface.Services.MobileParties.Patches
                 {
                     EnterSettlementAction.ApplyForParty(mobileParty, settlement);
                 }
-            });
+            }, blocking: true);
         }
     }
 }

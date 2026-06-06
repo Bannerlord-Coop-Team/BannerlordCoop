@@ -1,59 +1,52 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
-using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Template.Messages;
+using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Template.Patches;
 
 /// <summary>
-/// TODO fill me out and uncomment HarmonyPatch attributes
+/// This template demonstrates how to create a Harmony patch that controls server-side values.
+/// Patches modify game behavior at runtime and are useful for enforcing server-side rules.
+/// Uncomment the HarmonyPatch attributes when applying this patch.
 /// </summary>
-//[HarmonyPatch(typeof(Campaign))]
+//[HarmonyPatch(typeof(MobileParty))]
 class TemplateServerControlledPatch
 {
-    // See https://harmony.pardeike.net/articles/intro.html on how to use harmony patches
-    //[HarmonyPatch("TimeControlMode")]
+    private static ILogger Logger { get; } = LogManager.GetLogger<TemplateServerControlledPatch>();
+
+    /// <summary>
+    /// Prefix method that intercepts and modifies the behavior of the target method before it runs.
+    /// This ensures that only the server can modify certain values.
+    /// </summary>
+    /// <param name="__instance">The instance of the Campaign class being modified.</param>
+    /// <param name="value">The new value being assigned.</param>
+    /// <remarks>
+    /// See https://harmony.pardeike.net/articles/intro.html on how to use harmony patches
+    /// </remarks>
+    //[HarmonyPatch(nameof(MobileParty.Scout))]
     //[HarmonyPatch(MethodType.Setter)]
     //[HarmonyPrefix]
-    private static bool Prefix(ref Campaign __instance)
+    private static void Prefix(ref MobileParty __instance, float value)
     {
-        // Allows original method call when called by OverrideTemplateFn 
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        // Allow the original method call if it is triggered by OverrideTemplateFn
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
-        // Skip method if called from client and allow origin
-        if (ModInformation.IsClient) return false;
-
-        // Publishing a message to all internal software is done using the message broker
-        // This type of message should be IEvent since it is a reaction to something
-        // Normally sent to a handler in Coop.Core
-        MessageBroker.Instance.Publish(__instance, new TemplateEventMessage());
-
-        // Returning true allows original on the server to run
-        return true;
-    }
-
-    public static void OverrideTemplateFn()
-    {
-        GameLoopRunner.RunOnMainThread(() =>
+        // Prevent clients from modifying server-controlled values
+        if (ModInformation.IsClient)
         {
-            // Allowed thread will call the original function rather than skip or do patch functionality
-            // See if (AllowedThread.IsThisThreadAllowed()) return true; in the method above
-            using (new AllowedThread())
-            {
-                // Do something with the patched instance here
-            }
-        }, blocking: true);
+            Logger.Error("Client attempted to change a server-controlled value: {name}", nameof(Campaign.AverageWage));
+            return;
+        }
 
-
-        // This is equivalant to the using statement above
-        // Only one version is needed
-        GameLoopRunner.RunOnMainThread(() =>
-        {
-            AllowedThread.AllowThisThread();
-            // Do something with the patched instance here
-            AllowedThread.RevokeThisThread();
-        }, blocking: true);
+        // Publish an event message when this value is modified.
+        // This allows other parts of the system to react accordingly.
+        // Use an IEvent message type because this is a reaction, not a command.
+        MessageBroker.Instance.Publish(__instance, new TemplateEventMessage(__instance, value));
     }
 }

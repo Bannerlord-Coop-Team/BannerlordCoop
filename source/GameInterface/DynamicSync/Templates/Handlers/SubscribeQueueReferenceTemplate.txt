@@ -1,0 +1,53 @@
+﻿Subscribe<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage>((instanceId, data) => 
+{
+    var temp = data.Value.ToList();
+    var valueIds = new List<string>();
+    for (int i = 0; i < temp.Count; i++)
+    {
+        if (temp[i] == null) continue;
+        if (!objectManager.TryGetId(temp[i], out string id)) continue;
+        valueIds.Add(id);
+    }
+    network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage(instanceId, valueIds));
+});
+SubscribeNetwork<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage>((instance, data) => 
+{
+    var newValue = new Queue<{{ElementType}}>();
+    for (int i = 0; i < data.Value.Count; i++)
+    {
+        if (!objectManager.TryGetObject<{{ElementType}}>(data.Value[i], out {{ElementType}} element)) continue;
+        newValue.Enqueue(element);
+    }
+    {{ 
+    if ReadOnly;
+    }}
+	    AccessTools.Field(typeof({{MemberDeclaringType}}), "{{MemberName}}").SetValue(instance, value);
+    {{
+    else
+    }}
+	    instance.{{MemberName}} = newValue;
+    {{
+    end
+    }}
+});
+Subscribe<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_AddLocalMessage>((instanceId, data) => 
+{
+    if (!objectManager.TryGetId(data.Value, out string id)) return;
+    network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_AddNetworkMessage(instanceId, id));
+});
+SubscribeNetwork<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_AddNetworkMessage>((instance, data) => 
+{
+    if (!objectManager.TryGetObject<{{ElementType}}>(data.ValueId, out {{ElementType}} element)) return;
+    instance.{{ MemberName }}.Enqueue(element);
+});
+Subscribe<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_RemoveLocalMessage>((instanceId, data) => 
+{
+    if (!objectManager.TryGetId(data.Value, out string id)) return;
+    network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_RemoveNetworkMessage(instanceId, id));
+});
+SubscribeNetwork<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_RemoveNetworkMessage>((instance, data) => 
+{
+    if (!objectManager.TryGetObject<{{ElementType}}>(data.ValueId, out {{ElementType}} element)) return;
+    var elem = instance.{{ MemberName }}.Dequeue();
+    if (elem != element) return; // TODO: Stuff
+});

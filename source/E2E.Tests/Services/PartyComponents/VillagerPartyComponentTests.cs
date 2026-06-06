@@ -1,0 +1,87 @@
+﻿using E2E.Tests.Util;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.Settlements;
+using Xunit.Abstractions;
+
+namespace E2E.Tests.Services.PartyComponents;
+public class VillagerPartyComponentTests : SyncTestBase
+{
+    string ComponentId;
+    public VillagerPartyComponentTests(ITestOutputHelper output) : base(output)
+    {
+        ComponentId = TestEnvironment.CreateRegisteredObject<VillagerPartyComponent>();
+        TestEnvironment.CreateRegisteredObject<Village>();
+    }
+
+    [Fact]
+    public void Server_VillagerPartyComponent_Properties()
+    {
+        Server.ObjectManager.TryGetObject(ComponentId, out VillagerPartyComponent component);
+        component.Village = null;
+        TestEnvironment.AssertReferenceProperty<VillagerPartyComponent, Village>(nameof(VillagerPartyComponent.Village));
+    }
+
+    [Fact]
+    public void ServerCreateParty_SyncAllClients()
+    {
+        // Arrange
+        var server = TestEnvironment.Server;
+
+        // Act
+        string? partyId = null;
+        string? villageId = null;
+
+        server.Call(() =>
+        {
+            var village = GameObjectCreator.CreateInitializedObject<Village>();
+
+            var newVillage = GameObjectCreator.CreateInitializedObject<Village>();
+
+            var newParty = VillagerPartyComponent.CreateVillagerParty("TestId", village);
+            VillagerPartyComponent villagers = (VillagerPartyComponent)newParty.PartyComponent;
+            villagers.Village = newVillage;
+
+            Assert.True(server.ObjectManager.TryGetId(newVillage, out villageId));
+            Assert.True(server.ObjectManager.TryGetId(newParty, out partyId));
+        });
+
+
+        // Assert
+        Assert.NotNull(partyId);
+
+        foreach (var client in TestEnvironment.Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var newParty));
+            Assert.IsType<VillagerPartyComponent>(newParty.PartyComponent);
+            VillagerPartyComponent villagers = (VillagerPartyComponent)newParty.PartyComponent;
+
+            client.ObjectManager.TryGetId(villagers.Village, out string clientVillageId);
+
+            Assert.Equal(villageId, clientVillageId);
+        }
+    }
+
+    [Fact]
+    public void ClientCreateParty_DoesNothing()
+    {
+        // Arrange
+        var server = TestEnvironment.Server;
+        var client1 = TestEnvironment.Clients.First();
+
+        var village = GameObjectCreator.CreateInitializedObject<Village>();
+
+        // Act
+        PartyComponent? partyComponent = null;
+        client1.Call(() =>
+        {
+            partyComponent = new VillagerPartyComponent(village, new VillagerPartyComponent.InitializationArgs());
+        });
+
+        Assert.NotNull(partyComponent);
+
+
+        // Assert
+        Assert.False(client1.ObjectManager.TryGetId(partyComponent, out var _));
+    }
+}

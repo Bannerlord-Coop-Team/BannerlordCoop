@@ -1,20 +1,21 @@
 ﻿using Common.Logging.Attributes;
 using Common.Messaging;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Settlements.Messages;
 
 /// <summary>
-/// Used to let server send message when seigestate changes.
+/// Used to let server send message when siege state changes.
 /// </summary>
 [BatchLogMessage]
-public record SettlementChangedCurrentSiegeState : IEvent
+public readonly struct SettlementChangedCurrentSiegeState : IEvent
 {
-    public string SettlementId { get; }
-    public short CurrentSiegeState { get; }
+    public readonly Settlement Settlement;
+    public readonly short CurrentSiegeState;
 
-    public SettlementChangedCurrentSiegeState(string settlementId, short currentSiegeState)
+    public SettlementChangedCurrentSiegeState(Settlement settlement, short currentSiegeState)
     {
-        SettlementId = settlementId;
+        Settlement = settlement;
         CurrentSiegeState = currentSiegeState;
     }
 }

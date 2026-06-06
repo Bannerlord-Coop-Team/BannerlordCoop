@@ -17,9 +17,7 @@ namespace Coop.IntegrationTests.Towns
         public void ServerTownTradeTaxAccumulatedChanged_Publishes_AllClients()
         {
             // Arrange
-            string townId = "Settlement1";
-            int tradeTaxAccumulated = 60;
-            var triggerMessage = new TownTradeTaxAccumulatedChanged(townId, tradeTaxAccumulated);
+            var triggerMessage = new TownTradeTaxAccumulatedChanged();
 
             var server = TestEnvironment.Server;
 

@@ -1,13 +1,13 @@
 ﻿using Common.Messaging;
 using Coop.Core.Client.Messages;
-using GameInterface.Services.UI.Messages;
+using GameInterface.CoopSessionData.Save.Data;
+using GameInterface.Services.Smithing.Messages;
 
 namespace Coop.Core.Client.Services.Save.Handler
 {
     /// <summary>
     /// Handles save data
     /// </summary>
-    /// TODO update to work
     internal class SaveDataHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;
@@ -29,8 +29,18 @@ namespace Coop.Core.Client.Services.Save.Handler
 
         private void Handle_NetworkGameSaveDataReceived(MessagePayload<NetworkGameSaveDataReceived> obj)
         {
-            messageBroker.Publish(this, new EndLoadingScreen());
+            // The loading screen is intentionally NOT ended here: save data has only just
+            // arrived and the server world has not loaded yet. It is ended once the campaign
+            // is ready (see LoadingState.Handle_CampaignLoaded).
             saveDataMessage = obj.What;
+
+            messageBroker.Publish(this, new InitializeClientCraftingData(saveDataMessage.CraftingPlayerData));
+            // Expand this in the future to handle other CoopSession data types if needed to look something like:
+            /*
+            ICoopSession CoopSession = saveDataMessage.CoopSession;
+            messageBroker.Publish(this, new InitializeCraftingCampaignBehavior(CoopSession.CraftingPlayerData));
+            // Add any other CoopSession data initialisations for clients
+            */
         }
     }
 }

@@ -1,57 +1,55 @@
 ﻿using Common;
-using Common.Extensions;
 using Common.Logging;
+using Common.Messaging;
 using Common.Serialization;
 using Common.Util;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
-using GameInterface.Services.Clans;
 using GameInterface.Services.Entity;
-using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
-using GameInterface.Services.PartyVisuals.Extensions;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players.Data;
-using GameInterface.Services.Registry;
+using SandBox.View.Map.Managers;
 using Serilog;
-using System;
-using System.Diagnostics;
 using System.Linq;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Heroes.Interfaces;
 
 public interface IHeroInterface : IGameAbstraction
 {
     byte[] PackageMainHero();
-    bool TryResolveHero(string controllerId, out string heroId);
-    void SwitchMainHero(string heroId);
+    bool TryResolve<T>(string controllerId, out string heroId);
+    void SwitchToPlayer(Player player);
     /// <summary>
     /// Unpacks and properly constructs hero in the game
     /// </summary>
     /// <param name="bytes">Hero as bytes</param>
     /// <returns>Hero string identifier</returns>
-    Player UnpackHero(string controllerId, byte[] bytes);
+    NetworkPlayerData UnpackHero(string controllerId, byte[] bytes);
 }
 
 internal class HeroInterface : IHeroInterface
 {
     private static readonly ILogger Logger = LogManager.GetLogger<HeroInterface>();
     private readonly IObjectManager objectManager;
+    private readonly IMessageBroker messageBroker;
     private readonly IBinaryPackageFactory binaryPackageFactory;
     private readonly IControlledEntityRegistry entityRegistry;
 
-
-
     public HeroInterface(
+        IMessageBroker messageBroker,
         IBinaryPackageFactory binaryPackageFactory,
         IControlledEntityRegistry entityRegistry,
         IObjectManager objectManager)
     {
         this.objectManager = objectManager;
+        this.messageBroker = messageBroker;
         this.binaryPackageFactory = binaryPackageFactory;
         this.entityRegistry = entityRegistry;
         this.objectManager = objectManager;
@@ -59,17 +57,17 @@ internal class HeroInterface : IHeroInterface
 
     public byte[] PackageMainHero()
     {
-        Hero.MainHero.StringId = string.Empty;
-        Hero.MainHero.PartyBelongedTo.StringId = string.Empty;
-        Hero.MainHero.Clan.StringId = string.Empty;
-        Hero.MainHero.CharacterObject.StringId = string.Empty;
+        objectManager.Remove(Hero.MainHero);
+        objectManager.Remove(Hero.MainHero.PartyBelongedTo);
+        objectManager.Remove(Hero.MainHero.Clan);
+        objectManager.Remove(Hero.MainHero.CharacterObject);
 
         HeroBinaryPackage package = binaryPackageFactory.GetBinaryPackage<HeroBinaryPackage>(Hero.MainHero);
 
         return BinaryFormatterSerializer.Serialize(package);
     }
 
-    public Player UnpackHero(string controllerId, byte[] bytes)
+    public NetworkPlayerData UnpackHero(string controllerId, byte[] bytes)
     {
         Hero hero = null;
 
@@ -81,17 +79,41 @@ internal class HeroInterface : IHeroInterface
         },
         blocking: true);
 
-        entityRegistry.RegisterAsControlled(controllerId, hero.StringId);
+        // Retrieve the Coop-assigned IDs so they can be written back onto each object's
+        // StringId. If null (due to an ID collision fixed in AutoRegistry.RegisterExistingObject),
+        // log and skip — assigning null would corrupt the object in CampaignObjectManager.
+        if (!objectManager.TryGetId(hero, out var heroId))
+            Logger.Error("Failed to retrieve coop ID for hero, StringId will not be updated");
+        if (!objectManager.TryGetId(hero.PartyBelongedTo, out var partyId))
+            Logger.Error("Failed to retrieve coop ID for hero's party (StringId={ExistingId}), StringId will not be updated", hero.PartyBelongedTo?.StringId);
+        if (!objectManager.TryGetId(hero.CharacterObject, out var characterObjectId))
+            Logger.Error("Failed to retrieve coop ID for hero's CharacterObject, StringId will not be updated");
+        if (!objectManager.TryGetId(hero.Clan, out var clanId))
+            Logger.Error("Failed to retrieve coop ID for hero's Clan, StringId will not be updated");
 
-        var playerData = new Player(
-            bytes,
-            hero.StringId,
-            hero.PartyBelongedTo.StringId,
-            hero.CharacterObject.StringId,
-            hero.Clan.StringId
-        );
+        //using (new AllowedThread())
+        //{
+        //    // Guard against null — original code assigned unconditionally which would
+        //    // leave objects with vanilla StringIds (e.g. "main_hero") and crash on load.
+        //    if (heroId != null) hero.StringId = heroId;
+        //    if (partyId != null) hero.PartyBelongedTo.StringId = partyId;
+        //    if (characterObjectId != null) hero.CharacterObject.StringId = characterObjectId;
+        //    if (clanId != null) hero.Clan.StringId = clanId;
+        //}
 
-        return playerData;
+        entityRegistry.RegisterAsControlled(controllerId, heroId);
+        entityRegistry.RegisterAsControlled(controllerId, partyId);
+        entityRegistry.RegisterAsControlled(controllerId, characterObjectId);
+        entityRegistry.RegisterAsControlled(controllerId, clanId);
+
+        return new NetworkPlayerData()
+        {
+            HeroData = bytes,
+            HeroStringId = heroId,
+            PartyStringId = partyId,
+            CharacterObjectStringId = characterObjectId,
+            ClanStringId = clanId
+        };
     }
 
     private Hero UnpackMainHeroInternal(byte[] bytes)
@@ -104,54 +126,80 @@ internal class HeroInterface : IHeroInterface
         return hero;
     }
 
-    public bool TryResolveHero(string controllerId, out string heroId)
+    public bool TryResolve<T>(string controllerId, out string controlledObjectId)
     {
-        heroId = null;
+        controlledObjectId = null;
 
         if (entityRegistry.TryGetControlledEntities(controllerId, out var entities) == false)
         {
-            Logger.Error("Unable to resolve hero for {controllerId}", controllerId);
+            Logger.Warning("Unable to resolve hero for {controllerId}", controllerId);
             return false;
         }
 
-        var resolvedEntity = entities.SingleOrDefault(entity => entity.EntityId.StartsWith(HeroRegistry.HeroStringIdPrefix));
+        var heroEntities = entities.Where(entity => objectManager.TryGetObject<T>(entity.EntityId, out _)).ToList();
 
-        if (resolvedEntity == null)
+        if (heroEntities.Count == 0)
         {
-            Logger.Error("No hero was registered for {controllerId}", controllerId);
+            Logger.Information("No hero was registered for {controllerId}", controllerId);
             return false;
         }
 
-        heroId = resolvedEntity.EntityId;
+        if (heroEntities.Count > 1)
+        {
+            Logger.Warning("Multiple heroes registered for {controllerId}, using first match", controllerId);
+        }
+
+        var resolvedEntity = heroEntities[0];
+
+        controlledObjectId = resolvedEntity.EntityId;
 
         return true;
     }
 
-    public void SwitchMainHero(string heroId)
+    public void SwitchToPlayer(Player player)
     {
-        if(objectManager.TryGetObject(heroId, out Hero resolvedHero))
-        {
-            Logger.Information("Switching to new hero: {heroName}", resolvedHero.Name.ToString());
+        if (!objectManager.TryGetObjectWithLogging(player.HeroId, out Hero playerHero))
+            return;
+        if (!objectManager.TryGetObjectWithLogging(player.MobilePartyId, out MobileParty playerParty))
+            return;
 
-            ChangePlayerCharacterAction.Apply(resolvedHero);
-        }
-        else
+        Campaign.Current.MainParty = playerParty;
+        // This is needed because if the player is ca
+        playerHero.PartyBelongedTo = playerParty;
+
+        Logger.Information("Switching to new hero: {heroName}", playerHero.Name.ToString());
+
+        ChangePlayerCharacterAction.Apply(playerHero);
+
+        Campaign.Current.PlayerDefaultFaction = playerHero.Clan;
+
+        
+
+        if (playerHero.PartyBelongedToAsPrisoner != null)
         {
-            Logger.Warning("Could not find hero with id of: {guid}", heroId);
+            playerHero.PartyBelongedTo = null;
+            messageBroker.Publish(this, new PlayerCaptivityChanged(playerHero.PartyBelongedToAsPrisoner));
         }
     }
 
     private void SetupNewHero(Hero hero)
     {
-        SetupHeroWithObjectManagers(hero);
         SetupNewParty(hero);
+        SetupHeroWithObjectManagers(hero);
     }
 
     private void SetupHeroWithObjectManagers(Hero hero)
     {
-        objectManager.AddNewObject(hero, out var _);
-        objectManager.AddNewObject(hero.PartyBelongedTo, out var _);
-        objectManager.AddNewObject(hero.Clan, out var _);
+        var party = hero.PartyBelongedTo;
+
+        RegisterObject(hero);
+        RegisterObject(party);
+        RegisterObject(hero.Clan);
+
+        RegisterObject(party.StringId, party.ItemRoster);
+        RegisterObject(party.StringId, party.Party);
+        RegisterObject($"{nameof(MobileParty.MemberRoster)}_{party.StringId}", party.MemberRoster);
+        RegisterObject($"{nameof(MobileParty.PrisonRoster)}_{party.StringId}", party.PrisonRoster);
 
         var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
         if (campaignObjectManager == null)
@@ -161,9 +209,6 @@ internal class HeroInterface : IHeroInterface
         }
 
         campaignObjectManager.AddHero(hero);
-
-        var party = hero.PartyBelongedTo;
-
         campaignObjectManager.AddMobileParty(party);
 
         var partyBase = party.Party;
@@ -174,17 +219,34 @@ internal class HeroInterface : IHeroInterface
         partyBase.SetVisualAsDirty();
     }
 
+    private void RegisterObject<T>(T obj) where T : MBObjectBase
+    {
+        using(new AllowedThread())
+        {
+            obj.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<T>($"Player");
+            objectManager.AddExisting($"{typeof(T).Name}_{obj.StringId}", obj);
+        }
+    }
+
+    private void RegisterObject(string prefix, object obj)
+    {
+        objectManager.AddExisting($"{obj.GetType().Name}_{prefix}", obj);
+    }
+
     private void SetupNewParty(Hero hero)
     {
         var party = hero.PartyBelongedTo;
-        party.IsVisible = true;
+
+        using (new AllowedThread())
+        {
+            party.Anchor = new AnchorPoint(party);
+        }
+        
+        party.IsVisible = true;  
         party.Party.SetVisualAsDirty();
 
-        party.RecoverPositionsForNavMeshUpdate();
-        party.CurrentNavigationFace = Campaign.Current.MapSceneWrapper.GetFaceIndex(party.Position2D);
-
-        party.Ai.OnGameInitialized();
-
+        party.CheckPositionsForMapChangeAndUpdateIfNeeded();
+        MobilePartyVisualManager.Current.AddNewPartyVisualForParty(party);
         CampaignEventDispatcher.Instance.OnPartyVisibilityChanged(party.Party);
     }
 }

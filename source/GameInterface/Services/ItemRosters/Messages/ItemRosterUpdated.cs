@@ -1,16 +1,30 @@
 ﻿using Common.Logging.Attributes;
 using Common.Messaging;
+using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Core;
 
-namespace GameInterface.Services.ItemRosters.Messages
+namespace GameInterface.Services.ItemRosters.Messages;
+
+/// <summary> 
+/// Called when an ItemRoster is updated.
+/// </summary>
+[BatchLogMessage]
+public readonly struct ItemRosterUpdated : IEvent
 {
-    /// <summary> 
-    /// Called when an ItemRoster is updated.
-    /// </summary>
-    [BatchLogMessage]
-    public class ItemRosterUpdated : ItemRosterMessageBase, ICommand
+    public readonly ItemRoster Instance;
+    public readonly ItemObject Item;
+    public readonly ItemModifier ItemModifier;
+    public readonly int Amount;
+
+    public ItemRosterUpdated(
+        ItemRoster instance,
+        ItemObject item,
+        ItemModifier itemModifier,
+        int amount)
     {
-        public ItemRosterUpdated(string partyBaseID, string itemID, string itemModifierID, int amount) : base(partyBaseID, itemID, itemModifierID, amount)
-        {
-        }
+        Instance = instance;
+        Item = item;
+        ItemModifier = itemModifier;
+        Amount = amount;
     }
 }

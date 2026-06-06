@@ -27,12 +27,11 @@ namespace GameInterface.Services.Settlements.Patches
 
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client created unmanaged {name}\n"
-                    + "Callstack: {callstack}", typeof(SettlementComponent), Environment.StackTrace);
+                Logger.Error("Client created managed {name}", typeof(SettlementComponent));
                 return false;
             }
 
-            var message = new SettlementComponentGoldChanged(__instance.StringId, value);
+            var message = new SettlementComponentGoldChanged(__instance, value);
 
             MessageBroker.Instance.Publish(__instance, message);
             return true;

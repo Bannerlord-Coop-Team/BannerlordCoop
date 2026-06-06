@@ -1,6 +1,12 @@
-﻿using GameInterface.Services.Registry;
+﻿using GameInterface.Registry;
+using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
+using HarmonyLib;
+using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Reflection;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 
 namespace GameInterface.Services.PartyComponents;
@@ -8,31 +14,41 @@ namespace GameInterface.Services.PartyComponents;
 /// <summary>
 /// Registry for <see cref="PartyComponent"/> objects
 /// </summary>
-internal class PartyComponentRegistry : RegistryBase<PartyComponent>
+internal class PartyComponentRegistry : AutoRegistryBase<PartyComponent>
 {
-    public PartyComponentRegistry(IRegistryCollection collection) : base(collection) { }
-
-    public override IEnumerable<Type> ManagedTypes { get; } = new Type[]
+    public PartyComponentRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
-        typeof(PartyComponent),
-        typeof(WarPartyComponent),
-        typeof(BanditPartyComponent),
-        typeof(CustomPartyComponent),
-        typeof(CaravanPartyComponent),
-        typeof(GarrisonPartyComponent),
-        typeof(LordPartyComponent),
-        typeof(MilitiaPartyComponent),
-        typeof(VillagerPartyComponent),
-    };
-
-    public override void RegisterAll()
-    {
-        // Not required for party component
     }
 
-    protected override string GetNewId(PartyComponent party)
+    public override IEnumerable<MethodBase> Constructors => Array.Empty<MethodBase>();
+
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+    public override void RegisterAllObjects()
     {
-        return Guid.NewGuid().ToString();
+        foreach (var party in MobileParty.All)
+        {
+            if (party?.PartyComponent == null) continue;
+
+            RegisterExistingObject(party.StringId, party.PartyComponent);
+        }
+    }
+
+    public override void OnClientCreated(PartyComponent obj, string id)
+    {
+    }
+
+    public override void OnClientDestroyed(PartyComponent obj, string id)
+    {
+    }
+
+    public override void OnServerCreated(PartyComponent obj, string id)
+    {
+    }
+
+    public override void OnServerDestroyed(PartyComponent obj, string id)
+    {
     }
 }
 

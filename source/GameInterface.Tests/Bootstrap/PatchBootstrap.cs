@@ -1,8 +1,11 @@
 ﻿using Autofac;
 using Common.Messaging;
 using Common.Network;
+using Common.Serialization;
 using Coop.Core.Common.Configuration;
 using Coop.Tests.Mocks;
+using GameInterface.Registry;
+using GameInterface.Surrogates;
 using System;
 using System.Threading;
 
@@ -34,6 +37,7 @@ internal class PatchBootstrap : IDisposable
         builder.RegisterType<MessageBroker>().As<IMessageBroker>().SingleInstance();
         builder.RegisterType<TestNetwork>().As<INetwork>().SingleInstance();
         builder.RegisterType<NetworkConfiguration>().As<INetworkConfiguration>().SingleInstance();
+        builder.RegisterType<SerializableTypeMapper>().As<ISerializableTypeMapper>().SingleInstance();
         builder.RegisterModule<GameInterfaceModule>();
         Container = builder.Build();
 

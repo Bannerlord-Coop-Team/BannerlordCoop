@@ -36,6 +36,6 @@ internal class MethodTimeoutHelper
 
     static void Handle(string callStack)
     {
-        Logger.Error($"Timeout Detected, dumping call stack, \n{callStack}");
+        Logger.Error($"Timeout Detected");
     }
 }

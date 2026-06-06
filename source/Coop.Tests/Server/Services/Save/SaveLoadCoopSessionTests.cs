@@ -1,11 +1,12 @@
 ﻿using Autofac;
-using Coop.Core;
-using Coop.Core.Server;
 using Coop.Core.Server.Services.Save;
-using Coop.Core.Server.Services.Save.Data;
+using GameInterface.CoopSessionData.Save.Data;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Data;
+using GameInterface.Services.Smithing;
 using System;
 using System.Collections.Generic;
+using GameInterface.Services.Players.Data;
 using System.IO;
 using Xunit;
 using Xunit.Abstractions;
@@ -34,14 +35,25 @@ namespace Coop.Tests.Server.Services.Save
         {
             // Setup
             var saveManager = container.Resolve<ICoopSaveManager>();
+            var entityRegistry = container.Resolve<IControlledEntityRegistry>();
 
-            var gameObjectGuids = new GameObjectGuids(new string[] { "Random STR" });
+            const string controllerId = "testController";
+            const string controller2Id = "testController2";
+            const string entityId = "testEntity1";
+            const string entity2Id = "testEntity2";
 
-            ICoopSession sessionData = new CoopSession()
+            Assert.True(entityRegistry.RegisterAsControlled(controllerId, entityId));
+            Assert.True(entityRegistry.RegisterAsControlled(controller2Id, entity2Id));
+
+            var entityMap = entityRegistry.PackageControlledEntities();
+
+            var players = new Player[]
             {
-                UniqueGameId = "SaveManagerTest",
-                GameObjectGuids = gameObjectGuids
+                new Player("PlayerHero","PlayerParty1"),
+                new Player("PlayerHero2","PlayerParty2")
             };
+
+            ICoopSession sessionData = new CoopSession("SaveManagerTest", entityMap, players, new CraftingPlayerData(new(), new(), new()));
 
             string saveFile = sessionData.UniqueGameId;
 
@@ -67,14 +79,25 @@ namespace Coop.Tests.Server.Services.Save
         {
             // Setup
             var saveManager = container.Resolve<ICoopSaveManager>();
+            var entityRegistry = container.Resolve<IControlledEntityRegistry>();
 
-            var gameObjectGuids = new GameObjectGuids(new string[] { "Random STR" });
+            const string controllerId = "testController";
+            const string controller2Id = "testController2";
+            const string entityId = "testEntity1";
+            const string entity2Id = "testEntity2";
 
-            ICoopSession sessionData = new CoopSession()
+            Assert.True(entityRegistry.RegisterAsControlled(controllerId, entityId));
+            Assert.True(entityRegistry.RegisterAsControlled(controller2Id, entity2Id));
+
+            var entityMap = entityRegistry.PackageControlledEntities();
+
+            var players = new Player[]
             {
-                UniqueGameId = "SaveLoadManagerTest",
-                GameObjectGuids = gameObjectGuids,
+                new Player("PlayerHero","PlayerParty1"),
+                new Player("PlayerHero2","PlayerParty2")
             };
+
+            ICoopSession sessionData = new CoopSession("SaveManagerTest", entityMap, players, new CraftingPlayerData(new(), new(), new()));
 
             string saveFile = SAVE_PATH + sessionData.UniqueGameId;
 

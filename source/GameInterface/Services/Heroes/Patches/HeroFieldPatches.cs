@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Heroes.Messages;
@@ -22,17 +23,17 @@ namespace GameInterface.Services.Heroes.Patches
     {
         private static readonly ILogger Logger = LogManager.GetLogger<HeroFieldPatches>();
 
-        private static IEnumerable<MethodBase> TargetMethods()
+        public static IEnumerable<MethodBase> TargetMethods()
         {
             foreach(var method in AccessTools.GetDeclaredMethods(typeof(Hero)))
             {
                 yield return method;
             }
-            yield return AccessTools.Method(typeof(HeroDeveloper), "CheckLevel");
-            yield return AccessTools.Method(typeof(HeroDeveloper), "ClearHeroLevel");
+            yield return AccessTools.Method(typeof(HeroDeveloper), nameof(HeroDeveloper.CheckLevel));
+            yield return AccessTools.Method(typeof(HeroDeveloper), nameof(HeroDeveloper.ClearHeroLevel));
             yield return AccessTools.Method(typeof(MakePregnantAction), nameof(MakePregnantAction.ApplyInternal));
-            yield return AccessTools.Method(typeof(PregnancyCampaignBehavior), "CheckOffspringsToDeliver", new Type[] { typeof(Hero) });
-            yield return AccessTools.Method(typeof(PregnancyCampaignBehavior), "CheckOffspringsToDeliver", new Type[] { typeof(PregnancyCampaignBehavior.Pregnancy) });
+            yield return AccessTools.Method(typeof(PregnancyCampaignBehavior), nameof(PregnancyCampaignBehavior.CheckOffspringsToDeliver));
+            yield return AccessTools.Method(typeof(PregnancyCampaignBehavior), nameof(PregnancyCampaignBehavior.CheckOffspringToDeliver));
             yield return AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.CreateRelativeNotableHero));
             yield return AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.DeliverOffSpring));
         }
@@ -64,12 +65,12 @@ namespace GameInterface.Services.Heroes.Patches
             }
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                Logger.Error("Client updated managed {var}", nameof(Hero.LastTimeStampForActivity));
                 instance.LastTimeStampForActivity = newTimestamp;
                 return;
             }
 
-            MessageBroker.Instance.Publish(instance, new LastTimeStampChanged(newTimestamp, instance.StringId));
+            MessageBroker.Instance.Publish(instance, new LastTimeStampChanged(newTimestamp, instance));
 
             instance.LastTimeStampForActivity = newTimestamp;
         }
@@ -101,12 +102,12 @@ namespace GameInterface.Services.Heroes.Patches
             }
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                Logger.Error("Client updated managed {var}", nameof(Hero._characterObject));
                 instance._characterObject = newCharacterObject;
                 return;
             }
 
-            MessageBroker.Instance.Publish(instance, new CharacterObjectChanged(newCharacterObject.StringId, instance.StringId));
+            MessageBroker.Instance.Publish(instance, new CharacterObjectChanged(newCharacterObject, instance));
 
             instance._characterObject = newCharacterObject;
         }
@@ -138,12 +139,12 @@ namespace GameInterface.Services.Heroes.Patches
             }
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                Logger.Error("Client updated managed {var}", nameof(Hero._firstName));
                 instance._firstName = newName;
                 return;
             }
 
-            MessageBroker.Instance.Publish(instance, new FirstNameChanged(newName.Value, instance.StringId));
+            MessageBroker.Instance.Publish(instance, new FirstNameChanged(newName.Value, instance));
 
             instance._firstName = newName;
         }
@@ -175,125 +176,14 @@ namespace GameInterface.Services.Heroes.Patches
             }
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                Logger.Error("Client updated managed {var}", nameof(Hero._name));
                 instance._name = newName;
                 return;
             }
 
-            MessageBroker.Instance.Publish(instance, new NameChanged(newName.Value, instance.StringId));
+            MessageBroker.Instance.Publish(instance, new NameChanged(newName.Value, instance));
 
             instance._name = newName;
-        }
-
-        [HarmonyTranspiler]
-        static IEnumerable<CodeInstruction> HairTagsTranspiler(IEnumerable<CodeInstruction> instructions)
-        {
-            var hairTagsField = AccessTools.Field(typeof(Hero), nameof(Hero.HairTags));
-            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(HairTagsIntercept));
-
-            foreach (var instruction in instructions)
-            {
-                if (instruction.StoresField(hairTagsField))
-                {
-                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
-                }
-                else
-                {
-                    yield return instruction;
-                }
-            }
-        }
-        public static void HairTagsIntercept(Hero instance, string newTags)
-        {
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                instance.HairTags = newTags;
-                return;
-            }
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                instance.HairTags = newTags;
-                return;
-            }
-
-            MessageBroker.Instance.Publish(instance, new HairTagsChanged(newTags, instance.StringId));
-
-            instance.HairTags = newTags;
-        }
-
-        [HarmonyTranspiler]
-        private static IEnumerable<CodeInstruction> BeardTagsTranspiler(IEnumerable<CodeInstruction> instructions)
-        {
-            var beardTagsField = AccessTools.Field(typeof(Hero), nameof(Hero.BeardTags));
-            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(BeardTagsIntercept));
-
-            foreach (var instruction in instructions)
-            {
-                if (instruction.StoresField(beardTagsField))
-                {
-                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
-                }
-                else
-                {
-                    yield return instruction;
-                }
-            }
-        }
-        public static void BeardTagsIntercept(Hero instance, string newTags)
-        {
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                instance.BeardTags = newTags;
-                return;
-            }
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                instance.BeardTags = newTags;
-                return;
-            }
-
-            MessageBroker.Instance.Publish(instance, new BeardTagsChanged(newTags, instance.StringId));
-
-            instance.BeardTags = newTags;
-        }
-
-        [HarmonyTranspiler]
-        private static IEnumerable<CodeInstruction> TattooTagsTranspiler(IEnumerable<CodeInstruction> instructions)
-        {
-            var tattooTagsField = AccessTools.Field(typeof(Hero), nameof(Hero.TattooTags));
-            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(TattooTagsIntercept));
-
-            foreach (var instruction in instructions)
-            {
-                if (instruction.StoresField(tattooTagsField))
-                {
-                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
-                }
-                else
-                {
-                    yield return instruction;
-                }
-            }
-        }
-        public static void TattooTagsIntercept(Hero instance, string newTags)
-        {
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                instance.TattooTags = newTags;
-                return;
-            }
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                instance.TattooTags = newTags;
-                return;
-            }
-
-            MessageBroker.Instance.Publish(instance, new TattooTagsChanged(newTags, instance.StringId));
-
-            instance.TattooTags = newTags;
         }
 
         [HarmonyTranspiler]
@@ -325,51 +215,14 @@ namespace GameInterface.Services.Heroes.Patches
             }
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                Logger.Error("Client updated managed {var}", nameof(Hero._heroState));
                 instance._heroState = newState;
                 return;
             }
 
-            MessageBroker.Instance.Publish(instance, new HeroStateChanged((int)newState, instance.StringId));
+            MessageBroker.Instance.Publish(instance, new HeroStateChanged((int)newState, instance));
 
             instance._heroState = newState;
-        }
-
-        [HarmonyTranspiler]
-        private static IEnumerable<CodeInstruction> SpcDaysInLocationTranspiler(IEnumerable<CodeInstruction> instructions)
-        {
-            var spcDaysInLocationField = AccessTools.Field(typeof(Hero), nameof(Hero.SpcDaysInLocation));
-            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(SpcDaysInLocationIntercept));
-
-            foreach (var instruction in instructions)
-            {
-                if (instruction.StoresField(spcDaysInLocationField))
-                {
-                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
-                }
-                else
-                {
-                    yield return instruction;
-                }
-            }
-        }
-        public static void SpcDaysInLocationIntercept(Hero instance, int days)
-        {
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                instance.SpcDaysInLocation = days;
-                return;
-            }
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                instance.SpcDaysInLocation = days;
-                return;
-            }
-
-            MessageBroker.Instance.Publish(instance, new SpcDaysInLocationChanged(days, instance.StringId));
-
-            instance.SpcDaysInLocation = days;
         }
 
         [HarmonyTranspiler]
@@ -401,12 +254,12 @@ namespace GameInterface.Services.Heroes.Patches
             }
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                Logger.Error("Client updated managed {var}", nameof(Hero._defaultAge));
                 instance._defaultAge = age;
                 return;
             }
 
-            MessageBroker.Instance.Publish(instance, new DefaultAgeChanged(age, instance.StringId));
+            MessageBroker.Instance.Publish(instance, new DefaultAgeChanged(age, instance));
 
             instance._defaultAge = age;
         }
@@ -438,12 +291,12 @@ namespace GameInterface.Services.Heroes.Patches
             }
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                Logger.Error("Client updated managed {var}", nameof(Hero._birthDay));
                 instance._birthDay = birthDay;
                 return;
             }
 
-            MessageBroker.Instance.Publish(instance, new BirthDayChanged(birthDay.NumTicks, instance.StringId));
+            MessageBroker.Instance.Publish(instance, new BirthDayChanged(birthDay.NumTicks, instance));
 
             instance._birthDay = birthDay;
         }
@@ -475,52 +328,14 @@ namespace GameInterface.Services.Heroes.Patches
             }
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                Logger.Error("Client updated managed {var}", nameof(Hero._power));
                 instance._power = power;
                 return;
             }
 
-            MessageBroker.Instance.Publish(instance, new PowerChanged(power, instance.StringId));
+            MessageBroker.Instance.Publish(instance, new PowerChanged(power, instance));
 
             instance._power = power;
-        }
-        [HarmonyTranspiler]
-        private static IEnumerable<CodeInstruction> CultureTranspiler(IEnumerable<CodeInstruction> instructions)
-        {
-            var valueField = AccessTools.Field(typeof(Hero), nameof(Hero.Culture));
-            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(CultureIntercept));
-
-            foreach (var instruction in instructions)
-            {
-                if (instruction.StoresField(valueField))
-                {
-                    CodeInstruction codeInst = new CodeInstruction(OpCodes.Call, fieldIntercept);
-                    codeInst.labels = instruction.labels;
-                    yield return codeInst;
-                }
-                else
-                {
-                    yield return instruction;
-                }
-            }
-        }
-        public static void CultureIntercept(Hero instance, CultureObject culture)
-        {
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                instance.Culture = culture;
-                return;
-            }
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                instance.Culture = culture;
-                return;
-            }
-
-            MessageBroker.Instance.Publish(instance, new CultureChanged(culture.StringId, instance.StringId));
-
-            instance.Culture = culture;
         }
 
         [HarmonyTranspiler]
@@ -551,12 +366,12 @@ namespace GameInterface.Services.Heroes.Patches
 
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                Logger.Error("Client updated managed {var}", nameof(Hero.HomeSettlement));
                 instance._homeSettlement = settlement;
                 return;
             }
 
-            MessageBroker.Instance.Publish(instance, new HomeSettlementChanged(settlement?.StringId, instance.StringId));
+            MessageBroker.Instance.Publish(instance, new HomeSettlementChanged(settlement, instance));
 
             instance._homeSettlement = settlement;
         }
@@ -588,12 +403,12 @@ namespace GameInterface.Services.Heroes.Patches
             }
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                Logger.Error("Client updated managed {var}", nameof(Hero.IsPregnant));
                 instance.IsPregnant = isPregnant;
                 return;
             }
 
-            MessageBroker.Instance.Publish(instance, new PregnantChanged(isPregnant, instance.StringId));
+            MessageBroker.Instance.Publish(instance, new PregnantChanged(instance, isPregnant));
 
             instance.IsPregnant = isPregnant;
         }

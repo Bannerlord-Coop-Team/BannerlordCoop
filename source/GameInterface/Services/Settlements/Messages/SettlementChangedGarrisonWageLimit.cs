@@ -1,23 +1,21 @@
 ﻿using Common.Logging.Attributes;
 using Common.Messaging;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Settlements.Messages;
 
 /// <summary>
-/// Settlement Client changed garrison wage
+/// Settlement client changed garrison wage limit
 /// </summary>
 [BatchLogMessage]
-public record SettlementChangedGarrisonWageLimit : IEvent
+public readonly struct SettlementChangedGarrisonWageLimit : IEvent
 {
-    public string SettlementId { get; }
-    public int GarrisonWagePaymentLimit { get; }
+    public readonly Settlement Settlement;
+    public readonly int GarrisonWagePaymentLimit;
 
-    public SettlementChangedGarrisonWageLimit(string settlementId, int garrisonWagePaymentLimit)
+    public SettlementChangedGarrisonWageLimit(Settlement settlement, int garrisonWagePaymentLimit)
     {
-        SettlementId = settlementId;
+        Settlement = settlement;
         GarrisonWagePaymentLimit = garrisonWagePaymentLimit;
     }
 }

@@ -31,15 +31,14 @@ internal class BribePaidSettlementPatch
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(Settlement), Environment.StackTrace);
+            Logger.Error("Client created managed {name}", typeof(Settlement));
             return true;
         }
 
         if (__instance.BribePaid == value) return false;
 
 
-        var message = new SettlementChangedBribePaid(__instance.StringId, value);
+        var message = new SettlementChangedBribePaid(__instance, value);
 
         MessageBroker.Instance.Publish(__instance, message);
 

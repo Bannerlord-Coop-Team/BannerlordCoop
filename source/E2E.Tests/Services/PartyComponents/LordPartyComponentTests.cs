@@ -1,6 +1,4 @@
-﻿using E2E.Tests.Environment;
-using E2E.Tests.Util;
-using GameInterface.Services.ObjectManager;
+﻿using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
@@ -9,17 +7,23 @@ using TaleWorlds.Library;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.PartyComponents;
-public class LordPartyComponentTests : IDisposable
+public class LordPartyComponentTests : SyncTestBase
 {
-    E2ETestEnvironment TestEnvironment { get; }
-    public LordPartyComponentTests(ITestOutputHelper output)
+    string ComponentId;
+    public LordPartyComponentTests(ITestOutputHelper output) : base(output)
     {
-        TestEnvironment = new E2ETestEnvironment(output);
+        ComponentId = TestEnvironment.CreateRegisteredObject<LordPartyComponent>();
+        TestEnvironment.CreateRegisteredObject<Hero>();
     }
 
-    public void Dispose()
+    [Fact]
+    public void Server_LordPartyComponent_Fields()
     {
-        TestEnvironment.Dispose();
+        Server.ObjectManager.TryGetObject(ComponentId, out LordPartyComponent component);
+        component._leader = null;
+        TestEnvironment.AssertReferenceField<LordPartyComponent, Hero>(nameof(LordPartyComponent._leader));
+        // _wagePaymentLimit is initialized to 10000 in the LordPartyComponent constructor
+        TestEnvironment.AssertField<LordPartyComponent, int>(nameof(LordPartyComponent._wagePaymentLimit), 5, defaultValue: 10000);
     }
 
     [Fact]
@@ -28,25 +32,29 @@ public class LordPartyComponentTests : IDisposable
         // Arrange
         var server = TestEnvironment.Server;
 
-        var leaderHero = GameObjectCreator.CreateInitializedObject<Hero>();
-        leaderHero.Clan = GameObjectCreator.CreateInitializedObject<Clan>();
-        var spawnSettlement = GameObjectCreator.CreateInitializedObject<Settlement>();
-
         // Act
         string? partyId = null;
+        Hero leaderhero = null;
+        Hero newLeaderHero = null;
 
         server.Call(() =>
         {
-            var newParty = LordPartyComponent.CreateLordParty(null, leaderHero, new Vec2(5, 5), 5, spawnSettlement, leaderHero);
-            partyId = newParty.StringId;
-        });
+            leaderhero = GameObjectCreator.CreateInitializedObject<Hero>();
+            newLeaderHero = GameObjectCreator.CreateInitializedObject<Hero>();
 
+            leaderhero.Clan = GameObjectCreator.CreateInitializedObject<Clan>();
+            var spawnSettlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+            var newParty = LordPartyComponent.CreateLordParty(null, leaderhero, new CampaignVec2(new Vec2(5, 5), true), 5, spawnSettlement, leaderhero);
+
+            Assert.True(server.ObjectManager.TryGetId(newParty, out partyId));
+        });
 
         // Assert
         Assert.NotNull(partyId);
 
         foreach (var client in TestEnvironment.Clients)
         {
+            Assert.NotNull(newLeaderHero);
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var newParty));
             Assert.IsType<LordPartyComponent>(newParty.PartyComponent);
         }
@@ -59,13 +67,19 @@ public class LordPartyComponentTests : IDisposable
         var server = TestEnvironment.Server;
         var client1 = TestEnvironment.Clients.First();
 
-        var leaderHero = GameObjectCreator.CreateInitializedObject<Hero>();
+        Hero leaderHero = null;
+        server.Call(() =>
+        {
+            leaderHero = GameObjectCreator.CreateInitializedObject<Hero>();
+        });
+
 
         // Act
         PartyComponent? partyComponent = null;
+        Settlement setlement = new Settlement();
         client1.Call(() =>
         {
-            partyComponent = new LordPartyComponent(leaderHero, leaderHero);
+            partyComponent = new LordPartyComponent(leaderHero, leaderHero, new LordPartyComponent.InitializationArgs(new CampaignVec2(new Vec2(2, 2), true), 2f, setlement));
         });
 
         Assert.NotNull(partyComponent);

@@ -1,18 +1,20 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.Armies.Data;
-using System.Collections.Generic;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Armies.Messages;
 
 /// <summary>
 /// Event for when a MobileParty is added to an Army
 /// </summary>
-public record MobilePartyInArmyAdded : IEvent
+public readonly struct MobilePartyInArmyAdded : IEvent
 {
-    public ArmyAddPartyData Data { get; }
+    public readonly Army Army;
+    public readonly MobileParty MobileParty;
 
-    public MobilePartyInArmyAdded(ArmyAddPartyData data)
+    public MobilePartyInArmyAdded(Army army, MobileParty mobileParty)
     {
-        Data = data;
+        Army = army;
+        MobileParty = mobileParty;
     }
 }

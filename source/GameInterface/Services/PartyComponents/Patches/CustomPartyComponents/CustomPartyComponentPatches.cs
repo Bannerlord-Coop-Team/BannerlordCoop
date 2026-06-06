@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.ObjectManager;
@@ -10,7 +11,10 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Localization;
 
@@ -57,7 +61,7 @@ public class CustomPartyComponentPatches
         }
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+            Logger.Error("Client updated managed {type}", nameof(instance._name));
             return;
         }
 
@@ -88,14 +92,17 @@ public class CustomPartyComponentPatches
 
     public static void HomeSettlementIntercept(CustomPartyComponent instance, Settlement newSettlement)
     {
+        if (instance._homeSettlement == newSettlement) return;
+
         if (CallOriginalPolicy.IsOriginalAllowed())
         {
             instance._homeSettlement = newSettlement;
             return;
         }
+
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+            Logger.Error("Client updated managed {type}", nameof(instance._homeSettlement));
             return;
         }
 
@@ -136,7 +143,7 @@ public class CustomPartyComponentPatches
         }
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+            Logger.Error("Client updated managed {type}", nameof(instance._owner));
             return;
         }
 
@@ -177,7 +184,7 @@ public class CustomPartyComponentPatches
         }
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+            Logger.Error("Client updated managed {type}", nameof(instance._customPartyBaseSpeed));
             return;
         }
 
@@ -215,7 +222,7 @@ public class CustomPartyComponentPatches
         }
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+            Logger.Error("Client updated managed {type}", nameof(instance._partyMountStringId));
             return;
         }
 
@@ -253,7 +260,7 @@ public class CustomPartyComponentPatches
         }
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+            Logger.Error("Client updated managed {type}", nameof(instance._partyHarnessStringId));
             return;
         }
 
@@ -291,7 +298,7 @@ public class CustomPartyComponentPatches
         }
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+            Logger.Error("Client updated managed {type}", nameof(instance._avoidHostileActions));
             return;
         }
 

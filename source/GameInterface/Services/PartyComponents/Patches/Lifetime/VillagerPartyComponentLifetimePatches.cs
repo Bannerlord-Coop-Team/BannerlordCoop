@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.PartyComponents.Messages;
@@ -30,9 +31,8 @@ internal class VillagerPartyComponentLifetimePatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(VillagerPartyComponent), Environment.StackTrace);
-            return true;
+            Logger.Error("Client created managed {name}", typeof(VillagerPartyComponent));
+            return false;
         }
 
         var message = new PartyComponentCreated(__instance);

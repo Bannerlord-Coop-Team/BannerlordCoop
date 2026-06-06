@@ -1,10 +1,4 @@
-﻿using HarmonyLib;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using TaleWorlds.CampaignSystem;
+﻿using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
@@ -15,8 +9,6 @@ internal class CharacterObjectBuilder : IObjectBuilder
     public object Build()
     {
         var characterObject = new CharacterObject();
-        characterObject.Culture = new CultureObject();
-        characterObject.StringId = "";
 
         characterObject._basicName = new TextObject("Test Character");
         characterObject.DefaultCharacterSkills = new MBCharacterSkills();
@@ -24,13 +16,18 @@ internal class CharacterObjectBuilder : IObjectBuilder
         //List<Equipment> list = characterObject.AllEquipments.Where((Equipment t) => !t.IsEmpty() && !t.IsCivilian).ToList();
         //List<Equipment> list2 = characterObject.AllEquipments.Where((Equipment t) => !t.IsEmpty() && t.IsCivilian).ToList();
 
-        var battleEquipment = new Equipment(false);
-        var civilianEquipment = new Equipment(true);
+        var battleEquipment = new Equipment(Equipment.EquipmentType.Battle);
+        var civilianEquipment = new Equipment(Equipment.EquipmentType.Civilian);
 
         for (int i = 0; i < 12; i++)
         {
-            battleEquipment[i] = new EquipmentElement(new ItemObject());
-            civilianEquipment[i] = new EquipmentElement(new ItemObject());
+            ItemObject battleItem = new ItemObject($"BattleItem_{i}");
+            //battleItem.Effectiveness = i;
+            battleEquipment[i] = new EquipmentElement(battleItem);
+
+            ItemObject civItem = new ItemObject($"CivItem_{i}");
+            //battleItem.Difficulty = i;
+            civilianEquipment[i] = new EquipmentElement(civItem);
         }
 
         var equipment = new MBList<Equipment>()
@@ -48,6 +45,8 @@ internal class CharacterObjectBuilder : IObjectBuilder
         characterObject.BodyPropertyRange = new MBBodyProperty();
 
         characterObject.Culture = (CultureObject)(new CultureBuilder().Build());
+
+        characterObject.DefaultCharacterSkills = new MBCharacterSkills();
 
         return characterObject;
     }

@@ -1,10 +1,4 @@
 ﻿using Common.Util;
-using HarmonyLib;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
@@ -23,11 +17,14 @@ internal class MobilePartyBuilder : IObjectBuilder
         leaderHero.Clan = clan;
         clan.SetLeader(leaderHero);
 
-        var party = LordPartyComponent.CreateLordParty("TestParty", leaderHero, Vec2.Zero, 0, spawnSettlement, leaderHero);
+        var party = LordPartyComponent.CreateLordParty("TestParty", leaderHero, new CampaignVec2(Vec2.Zero, true), 0, spawnSettlement, leaderHero);
 
-        party.LordPartyComponent.SetMobilePartyInternal(party);
+        party.PartyComponent.MobileParty = party;
+        //party.LordPartyComponent.SetMobilePartyInternal(party);
 
         party.Initialize();
+
+        party.ActualClan = clan;
 
         return party;
     }
@@ -40,14 +37,6 @@ internal class MobilePartyBuilder : IObjectBuilder
 
         var partyComponent = componentBuilder.BuildWithHero(hero);
 
-        return MobileParty.CreateParty("This should not set", partyComponent, (party) =>
-        {
-            using (new AllowedThread())
-            {
-                party.ActualClan = clan;
-            }
-
-            partyComponent.InitializeLordPartyProperties(party, Vec2.Zero, 0, null); 
-        });
+        return MobileParty.CreateParty("This should not set", partyComponent);
     }
 }

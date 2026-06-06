@@ -1,7 +1,5 @@
 ﻿using Autofac;
 using Common.Logging;
-using Common.Messaging;
-using Common.Util;
 using Serilog;
 using System;
 using System.Threading;
@@ -13,6 +11,8 @@ public class ContainerProvider
     private static ILogger Logger = LogManager.GetLogger<ContainerProvider>();
 
     private static ILifetimeScope _lifetimeScope;
+
+    public static bool Alive { get; } = _lifetimeScope != null;
 
     public static void SetContainer(ILifetimeScope lifetimeScope)
     {
@@ -26,18 +26,12 @@ public class ContainerProvider
     {
         lifetimeScope = _lifetimeScope;
 
-        if (lifetimeScope == null)
-        {
-            var callStack = Environment.StackTrace;
-            Logger.Error("{name} was not setup properly, try using {setupFnName}\n" +
-                "CallStack: {callStack}",
-                nameof(ContainerProvider),
-                nameof(SetContainer),
-                callStack);
-            return false;
-        }
+        return lifetimeScope != null;
+    }
 
-        return true;
+    public static void Clear()
+    {
+        _lifetimeScope = null;
     }
 
     public static bool TryResolve<T>(out T instance) where T : class
@@ -49,10 +43,7 @@ public class ContainerProvider
         if (container.TryResolve(out instance) == false)
         {
             var callStack = Environment.StackTrace;
-            Logger.Error("Unable to reslove {name}\n" + 
-                "CallStack: {callStack}",
-                typeof(T).Name,
-                callStack);
+            Logger.Error("Unable to reslove {name}", typeof(T).Name);
             return false;
         }
 

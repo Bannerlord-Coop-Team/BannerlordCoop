@@ -27,10 +27,7 @@ namespace Common.Messaging
         public static MessageBroker Instance { 
             get
             {
-                if( instance == null)
-                {
-                    instance = new MessageBroker();
-                }
+                instance ??= new MessageBroker();
                 return instance;
             } 
         }
@@ -47,7 +44,7 @@ namespace Common.Messaging
 
             var msgType = message.GetType();
 
-            messageLogger.LogMessage(source, msgType);
+            messageLogger.LogMessage(source, typeof(T));
 
             if (!subscribers.ContainsKey(typeof(T)))
             {
@@ -68,7 +65,8 @@ namespace Common.Messaging
                     continue;
                 }
 
-                Task.Factory.StartNew(() => weakDelegate.Invoke(new object[] { payload }));
+                // Making synchronous to maintain sequencing of packets
+                weakDelegate.Invoke(new object[] { payload });
             }
         }
 

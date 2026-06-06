@@ -1,5 +1,4 @@
 ﻿using Autofac;
-using Common;
 using Common.LogicStates;
 using Common.Messaging;
 using Common.Network;
@@ -7,33 +6,42 @@ using Coop.Core.Client;
 using Coop.Core.Common.Configuration;
 using Coop.Core.Common.Services.Connection.Messages;
 using Coop.Core.Server;
-using Coop.Core.Surrogates;
 using GameInterface;
+using GameInterface.DynamicSync;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.UI.Messages;
 using System;
-using System.Threading;
 
 namespace Coop.Core
 {
-    public class CoopartiveMultiplayerExperience
+    public class CoopartiveMultiplayerExperience : IDisposable
     {
-        private readonly IMessageBroker messageBroker;
+        private IMessageBroker messageBroker;
         private INetworkConfiguration configuration;
         private IContainer container;
-        private INetwork network;
 
         public CoopartiveMultiplayerExperience()
         {
             // TODO use DI maybe?
             messageBroker = MessageBroker.Instance;
             configuration = new NetworkConfiguration();
-            SurrogateCollection.AssignSurrogates();
 
             messageBroker.Subscribe<AttemptJoin>(Handle);
             messageBroker.Subscribe<HostSaveGame>(Handle);
             messageBroker.Subscribe<EndCoopMode>(Handle);
         }
+
+        public bool Running { get
+            {
+                if (container == null) return false;
+
+                var logic = container.Resolve<ILogic>();
+
+                return logic.RunningState;
+            }
+        }
+
+        public void Dispose() => DestroyContainer();
 
         private void Handle(MessagePayload<AttemptJoin> obj)
         {
@@ -80,10 +88,7 @@ namespace Coop.Core
             GameInterface.ContainerProvider.SetContainer(container);
 
             // Create harmony patches
-            var gameInterface = container.Resolve<IGameInterface>();
-            gameInterface.PatchAll();
-
-            network = container.Resolve<INetwork>();
+            container.Resolve<IGameInterface>().PatchAll();
 
             var logic = container.Resolve<ILogic>();
             logic.Start();
@@ -110,11 +115,12 @@ namespace Coop.Core
             containerProvider.SetProvider(container);
             GameInterface.ContainerProvider.SetContainer(container);
 
-            // Create harmony patches
-            var gameInterface = container.Resolve<IGameInterface>();
-            gameInterface.PatchAll();
+            // Client process does not own the export directory — only the server writes
+            // debug export files. This prevents DebugAutoConnect races on that directory.
+            DynamicSyncConfiguration.ExportFiles = false;
 
-            network = container.Resolve<INetwork>();
+            // Create harmony patches
+            container.Resolve<IGameInterface>().PatchAll();
 
             var logic = container.Resolve<ILogic>();
             logic.Start();
@@ -122,6 +128,7 @@ namespace Coop.Core
 
         private void DestroyContainer()
         {
+            container?.Resolve<IGameInterface>().UnpatchAll();
             container?.Dispose();
             container = null;
         }
