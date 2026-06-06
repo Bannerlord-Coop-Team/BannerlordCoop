@@ -67,6 +67,7 @@ public class ArmyDebugCommand
     // coop.debug.army.create empire town_EN2 lord_1_1 Raider
     // coop.debug.army.mobile_party_add Army_Created_1 lord_1_3_party_1
     // coop.debug.army.destroy Army_Created_1 NotEnoughParty
+    // coop.debug.army.mobile_party_remove Army_Created_1 lord_1_3_party_1
     /// <summary>
     /// Creates a new army on the server and clients
     /// </summary>
@@ -319,7 +320,7 @@ public class ArmyDebugCommand
             return $"Unable to get {nameof(Army)} with {armyId}";
         }
 
-        army.OnRemovePartyInternal(mobileParty); 
+        mobileParty.Army = null;
 
         stringBuilder.AppendLine($"Removed {mobileParty.Name} from {armyId}");
 

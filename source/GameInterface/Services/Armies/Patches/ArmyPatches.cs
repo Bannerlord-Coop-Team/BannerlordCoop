@@ -77,7 +77,13 @@ public class ArmyPatches
         {
             using (new AllowedThread())
             {
-                mobileParty.Army = army;
+                Logger.Error("AddMobilePartyInArmy: army={army}, leaderParty={leader}",
+    army?.Name?.ToString() ?? "null",
+    army?.LeaderParty?.Name?.ToString() ?? "null");
+                army._parties.Add(mobileParty);
+                // Only non-leader parties attach to the leader
+                mobileParty.AttachedTo = mobileParty == army.LeaderParty ? null : army.LeaderParty;
+                mobileParty._army = army;
             }
         });
     }
