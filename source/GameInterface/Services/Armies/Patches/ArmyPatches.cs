@@ -14,6 +14,7 @@ using System;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Localization;
 namespace GameInterface.Services.Armies.Patches;
@@ -77,9 +78,6 @@ public class ArmyPatches
         {
             using (new AllowedThread())
             {
-                Logger.Error("AddMobilePartyInArmy: army={army}, leaderParty={leader}",
-    army?.Name?.ToString() ?? "null",
-    army?.LeaderParty?.Name?.ToString() ?? "null");
                 army._parties.Add(mobileParty);
                 // Only non-leader parties attach to the leader
                 mobileParty.AttachedTo = mobileParty == army.LeaderParty ? null : army.LeaderParty;
@@ -97,6 +95,18 @@ public class ArmyPatches
                 army._parties.Remove(mobileParty);
                 mobileParty.AttachedTo = null;
                 mobileParty._army = null;
+            }
+        });
+    }
+    public static void SetAiBehaviorObject(Army army, IMapPoint mapPoint)
+    {
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            using (new AllowedThread())
+            {
+                // Set field directly to avoid StopTrackingTargetSettlement/StartTrackingTargetSettlement
+                // which are serverside ai behaviors not needed on client
+                army._aiBehaviorObject = mapPoint;
             }
         });
     }
