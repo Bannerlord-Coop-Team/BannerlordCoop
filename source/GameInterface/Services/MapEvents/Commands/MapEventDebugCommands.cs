@@ -186,8 +186,15 @@ public class MapEventDebugCommands
             if (i == survivorIndex)
                 continue;
 
-            enemySide.OnTroopKilled(allTroops[i].Descriptor);
-            killedCount++;
+            try
+            {
+                enemySide.OnTroopKilled(allTroops[i].Descriptor);
+                killedCount++;
+            }
+            catch (Exception ex)
+            {
+
+            }
         }
 
         return $"Killed {killedCount} troops. Survivor: {survivor.Element.Troop?.Name}";

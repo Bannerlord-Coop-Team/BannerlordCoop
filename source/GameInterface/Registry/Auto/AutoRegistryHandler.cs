@@ -70,8 +70,14 @@ class AutoRegistryHandler<T> : IHandler where T : class
                 Environment.StackTrace);
         }
 
-        // Callback before sent on network
-        Registry.OnServerCreated(payload.What.Instance, $"{typeof(T).Name}_{id}");
+        try { 
+            // Callback before sent on network
+            Registry.OnServerCreated(payload.What.Instance, $"{typeof(T).Name}_{id}");
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to run OnClientCreated for {MessageType}", payload.What.GetType());
+        }
 
         Network.SendAll(new NetworkCreateInstance<T>(id));
     }
@@ -106,16 +112,30 @@ class AutoRegistryHandler<T> : IHandler where T : class
                 payload.What.InstanceId);
         }
 
-        // Callback after created on client
-        Registry.OnClientCreated(newInstance, payload.What.InstanceId);
+        try
+        {
+            // Callback after created on client
+            Registry.OnClientCreated(newInstance, payload.What.InstanceId);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to run OnClientCreated for {MessageType}", payload.What.GetType());
+        }
     }
 
     private void Handle_InstanceDestroyed(MessagePayload<InstanceDestroyed<T>> payload)
     {
         if (!ObjectManager.TryGetIdWithLogging(payload.What.Instance, out string id)) return;
 
-        // Callback before object is removed from registry
-        Registry.OnServerDestroyed(payload.What.Instance, id);
+        try
+        {
+            // Callback before object is removed from registry
+            Registry.OnServerDestroyed(payload.What.Instance, id);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to run OnClientCreated for {MessageType}", payload.What.GetType());
+        }
 
         if (Registry.Debug)
         {
@@ -145,8 +165,14 @@ class AutoRegistryHandler<T> : IHandler where T : class
                 payload.What.InstanceId);
         }
 
-        // Callback before object is removed from registry
-        Registry.OnClientDestroyed(obj, payload.What.InstanceId);
+        try { 
+            // Callback before object is removed from registry
+            Registry.OnClientDestroyed(obj, payload.What.InstanceId);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to run OnClientCreated for {MessageType}", payload.What.GetType());
+        }
 
         ObjectManager.Remove(obj);
     }
