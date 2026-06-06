@@ -38,7 +38,11 @@ stubs the genuinely-native calls.
 3. **Load the save** — `MBSaveLoad.LoadSaveGameData(name)` → `MBGameManager.StartNewGame(new SandBoxGameManager(loadResult))`,
    then tick `GameStateManager.Current.OnTick(dt)` until the game manager reports loaded. On success
    `Campaign.Current` is populated from the save.
-4. **CTRL+C** requests a graceful shutdown.
+4. **Tick the campaign** — mirrors `MapState.OnMapModeTick`: each frame `Campaign.RealTick(dt)` then
+   `Campaign.Tick()` (time control set to play so the clock advances). The loop is resilient: it
+   logs the first occurrence of each distinct failure and keeps simulating, so a rare per-tick edge
+   case can't kill the server.
+5. **CTRL+C** requests a graceful shutdown.
 
 The decisive design choice is **letting the real managed data pipeline run** (`MBObjectManager.LoadXML`,
 `Game.SetBasicModels`, `Campaign.OnInitialize`, and a postfix that drives `SandBoxManager.InitializeSandboxXMLs`
@@ -71,6 +75,10 @@ With no argument it falls back to the current directory, then searches upward fo
 
 ## Status
 
-`Campaign` load is complete and verified (full data, e.g. 493 settlements on the `MP` save). Next
-milestone: tick `Campaign` without crashing. A few patches added before the data-loading approach
-landed may now be redundant and can be pruned once confirmed unreached.
+Load and tick both work. On the `MP` save: loads full data (1725 heroes, 1159 parties, 493
+settlements), then ticks continuously with the campaign clock advancing and the simulation running
+(battles resolve, party counts change). After the systematic headless gaps were patched, a 1200-tick
+run produced only ~2 caught errors (rare raid-loot edge cases), which the resilient loop absorbs.
+
+Possible follow-ups: prune patches added before the real-data-loading approach that may now be
+unreached; harden the remaining rare raid/loot edge cases; and add automated tests.

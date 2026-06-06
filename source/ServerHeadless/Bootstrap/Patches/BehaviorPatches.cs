@@ -4,6 +4,7 @@ using System;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CampaignBehaviors.AiBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.TournamentGames;
 
 namespace ServerHeadless.Bootstrap.Patches
@@ -16,11 +17,22 @@ namespace ServerHeadless.Bootstrap.Patches
     [HarmonyPatch]
     internal class BehaviorPatches
     {
-        // Builds a dictionary keyed only by fortification/village settlements, then indexes it by each
-        // lord party's TargetSettlement — which can be a settlement not in the dict (KeyNotFound).
+        // The original keys its dictionary only by fortification/village settlements, then both its
+        // own build step and the later AiHourlyTick lookup index it by an arbitrary TargetSettlement,
+        // which can be a settlement of another kind (KeyNotFound). Pre-seed every settlement as a key
+        // (0) so neither the build nor the lookups miss, then let the original run.
         [HarmonyPatch(typeof(AiVisitSettlementBehavior), "RefreshTheTargetingSettlementDictionary")]
         [HarmonyPrefix]
-        static bool RefreshTheTargetingSettlementDictionaryPrefix() => false;
+        static bool RefreshTheTargetingSettlementDictionaryPrefix(AiVisitSettlementBehavior __instance)
+        {
+            var dict = __instance._numberOfAlliedMobilePartiesTargetingSettlement;
+            dict.Clear();
+            foreach (Settlement settlement in Settlement.All)
+            {
+                dict[settlement] = 0;
+            }
+            return true;
+        }
 
         // Caches bandit counts per hideout; trips over bandit parties whose home settlement doesn't
         // resolve cleanly for this save.

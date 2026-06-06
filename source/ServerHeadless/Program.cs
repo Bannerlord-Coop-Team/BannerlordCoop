@@ -126,7 +126,7 @@ namespace ServerHeadless
                     return 1;
                 }
 
-                Idle();
+                TickCampaign();
             }
             catch (OperationCanceledException)
             {
@@ -294,12 +294,58 @@ namespace ServerHeadless
         }
 
         /// <summary>
-        /// Idles until CTRL+C. (Ticking the campaign is the next milestone.)
+        /// Drives the campaign simulation. Mirrors MapState.OnMapModeTick: each frame calls
+        /// <c>Campaign.RealTick(dt)</c> then <c>Campaign.Tick()</c> (the MapState UI Handler calls are
+        /// null headless). Runs at a fixed timestep until CTRL+C.
         /// </summary>
-        private static void Idle()
+        private static void TickCampaign()
         {
-            Console.WriteLine("[ServerHeadless] Idle. Press CTRL+C to stop.");
-            Shutdown.Token.WaitHandle.WaitOne();
+            Campaign campaign = Campaign.Current;
+
+            // Let campaign time advance (a paused campaign would tick but never progress).
+            campaign.SetTimeControlModeLock(false);
+            campaign.TimeControlMode = CampaignTimeControlMode.UnstoppablePlay;
+
+            Console.WriteLine($"[ServerHeadless] Ticking campaign at {TicksPerSecond} TPS. Press CTRL+C to stop.");
+            Console.WriteLine($"    Start time: {CampaignTime.Now}");
+
+            const float dt = 1f / TicksPerSecond;
+            long tick = 0;
+            long errors = 0;
+            string lastError = null;
+            while (!Shutdown.IsCancellationRequested)
+            {
+                // Resilient tick: the systematic headless gaps are patched out, but an arbitrary save
+                // can still surface a rare edge case (e.g. raid loot) deep in a subsystem. A server
+                // shouldn't die on a single bad tick — log the first occurrence of each distinct
+                // failure and keep simulating.
+                try
+                {
+                    campaign.RealTick(dt);
+                    campaign.Tick();
+                }
+                catch (Exception ex)
+                {
+                    errors++;
+                    string firstFrame = ex.StackTrace?.Split('\n')[0]?.Trim();
+                    string sig = ex.GetType().Name + ": " + firstFrame;
+                    if (sig != lastError)
+                    {
+                        lastError = sig;
+                        Console.WriteLine($"[ServerHeadless] tick error #{errors}: {ex.GetType().Name} {firstFrame}");
+                    }
+                }
+                tick++;
+
+                if (tick % (TicksPerSecond * 5) == 0)
+                {
+                    Console.WriteLine($"[ServerHeadless] tick {tick} — {CampaignTime.Now} — {errors} error(s)");
+                }
+
+                Shutdown.Token.WaitHandle.WaitOne(TimeSpan.FromSeconds(dt));
+            }
+
+            Console.WriteLine($"[ServerHeadless] Stopped after {tick} ticks.");
         }
     }
 }

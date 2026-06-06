@@ -1,4 +1,5 @@
 using HarmonyLib;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.GameComponents;
 using static TaleWorlds.CampaignSystem.ComponentInterfaces.MapWeatherModel;
 
@@ -26,5 +27,15 @@ namespace ServerHeadless.Bootstrap.Patches
             __result = WeatherEvent.Clear;
             return false;
         }
+    }
+
+    /// <summary>
+    /// The periodic weather update walks a node grid sized from the (placeholder) map, which is
+    /// empty headless — its first index throws. Weather is cosmetic, so skip the update entirely.
+    /// </summary>
+    [HarmonyPatch(typeof(MapWeatherCampaignBehavior), "WeatherUpdateTick")]
+    internal class MapWeatherBehaviorPatches
+    {
+        static bool Prefix() => false;
     }
 }
