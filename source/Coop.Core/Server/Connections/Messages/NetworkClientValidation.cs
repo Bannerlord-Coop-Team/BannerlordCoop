@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using GameInterface.Services.Players.Data;
 using ProtoBuf;
 using Serilog;
 
@@ -38,11 +39,11 @@ public record NetworkClientValidated : IResponse
     [ProtoMember(1)]
     public bool HeroExists { get; }
     [ProtoMember(2)]
-    public string HeroId { get; }
+    public Player Player { get; }
 
-    public NetworkClientValidated(bool heroExists, string heroId)
+    public NetworkClientValidated(bool heroExists, Player player)
     {
         HeroExists = heroExists;
-        HeroId = heroId;
+        Player = player;
     }
 }

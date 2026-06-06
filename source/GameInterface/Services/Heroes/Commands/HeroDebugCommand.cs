@@ -1,22 +1,24 @@
 ﻿using Common;
+using Common.Logging;
 using GameInterface.Services.Heroes.Audit;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.ObjectManager.Extensions;
+using Serilog;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text;
-using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
-using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Heroes.Commands;
 
 public class HeroDebugCommand
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<HeroDebugCommand>();
+
     // coop.debug.hero.list
     /// <summary>
     /// Lists all the heroes
@@ -77,7 +79,11 @@ public class HeroDebugCommand
             stringBuilder.AppendLine($"{field.Name} = {field.GetValue(hero)}");
         }
 
-        return stringBuilder.ToString();
+        var results = stringBuilder.ToString();
+
+        Logger.Debug("{Hero}", results);
+
+        return results;
     }
 
     // coop.debug.hero.createHero lord_2_7

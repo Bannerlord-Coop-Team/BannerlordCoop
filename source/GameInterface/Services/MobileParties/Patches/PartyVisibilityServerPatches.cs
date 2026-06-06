@@ -23,23 +23,20 @@ internal class PartyIsSpottedServerPatch
 [HarmonyPatch(typeof(MobileParty))]
 internal class PartyVisibilityOnServerPatch
 {
-    [HarmonyPrefix]
-    [HarmonyPatch(nameof(MobileParty.IsVisible), MethodType.Setter)]
-    private static void PrefixIsVisible(ref bool value)
-    {
-        if (ModInformation.IsServer || Debugger.IsAttached)
-        {
-            value = true;
-        }
-    }
-
-    [HarmonyPostfix]
+    //[HarmonyPostfix]
     [HarmonyPatch(nameof(MobileParty.IsVisible), MethodType.Getter)]
-    private static void PostfixIsVisible(ref bool __result)
+    private static void PostfixIsVisible(MobileParty __instance, ref bool __result)
     {
         if (ModInformation.IsServer || Debugger.IsAttached)
         {
-            __result = true;
+            // Return is active (inactive is player captivity)
+            __result = __instance.IsActive;
+
+            if (__result != __instance._isVisible)
+            {
+                __instance.Party.OnVisibilityChanged(__result);
+                __instance.Party.SetVisualAsDirty();
+            }
         }
     }
 
@@ -49,16 +46,6 @@ internal class PartyVisibilityOnServerPatch
         if (ModInformation.IsServer || Debugger.IsAttached)
         {
             value = true;
-        }
-    }
-
-    [HarmonyPostfix]
-    [HarmonyPatch(nameof(MobileParty.IsVisible), MethodType.Getter)]
-    private static void PostfixIsInspected(ref bool __result)
-    {
-        if (ModInformation.IsServer || Debugger.IsAttached)
-        {
-            __result = true;
         }
     }
 }

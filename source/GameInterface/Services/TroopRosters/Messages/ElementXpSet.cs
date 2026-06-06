@@ -11,13 +11,13 @@ namespace GameInterface.Services.TroopRosters.Messages;
 internal readonly struct ElementXpSet : IEvent
 {
     public readonly TroopRoster TroopRoster;
-    public readonly CharacterObject Character;
+    public readonly int Index;
     public readonly int Number;
 
-    public ElementXpSet(TroopRoster troopRoster, CharacterObject character, int number)
+    public ElementXpSet(TroopRoster troopRoster, int index, int number)
     {
         TroopRoster = troopRoster;
-        Character = character;
+        Index = index;
         Number = number;
     }
 }

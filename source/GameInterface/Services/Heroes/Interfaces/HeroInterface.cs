@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Logging;
+using Common.Messaging;
 using Common.Serialization;
 using Common.Util;
 using GameInterface.Serialization;
@@ -7,6 +8,7 @@ using GameInterface.Serialization.External;
 using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players.Data;
 using SandBox.View.Map.Managers;
 using Serilog;
@@ -22,8 +24,8 @@ namespace GameInterface.Services.Heroes.Interfaces;
 public interface IHeroInterface : IGameAbstraction
 {
     byte[] PackageMainHero();
-    bool TryResolveHero(string controllerId, out string heroId);
-    void SwitchMainHero(string heroId);
+    bool TryResolve<T>(string controllerId, out string heroId);
+    void SwitchToPlayer(Player player);
     /// <summary>
     /// Unpacks and properly constructs hero in the game
     /// </summary>
@@ -36,15 +38,18 @@ internal class HeroInterface : IHeroInterface
 {
     private static readonly ILogger Logger = LogManager.GetLogger<HeroInterface>();
     private readonly IObjectManager objectManager;
+    private readonly IMessageBroker messageBroker;
     private readonly IBinaryPackageFactory binaryPackageFactory;
     private readonly IControlledEntityRegistry entityRegistry;
 
     public HeroInterface(
+        IMessageBroker messageBroker,
         IBinaryPackageFactory binaryPackageFactory,
         IControlledEntityRegistry entityRegistry,
         IObjectManager objectManager)
     {
         this.objectManager = objectManager;
+        this.messageBroker = messageBroker;
         this.binaryPackageFactory = binaryPackageFactory;
         this.entityRegistry = entityRegistry;
         this.objectManager = objectManager;
@@ -121,9 +126,9 @@ internal class HeroInterface : IHeroInterface
         return hero;
     }
 
-    public bool TryResolveHero(string controllerId, out string heroId)
+    public bool TryResolve<T>(string controllerId, out string controlledObjectId)
     {
-        heroId = null;
+        controlledObjectId = null;
 
         if (entityRegistry.TryGetControlledEntities(controllerId, out var entities) == false)
         {
@@ -131,7 +136,7 @@ internal class HeroInterface : IHeroInterface
             return false;
         }
 
-        var heroEntities = entities.Where(entity => objectManager.TryGetObject<Hero>(entity.EntityId, out _)).ToList();
+        var heroEntities = entities.Where(entity => objectManager.TryGetObject<T>(entity.EntityId, out _)).ToList();
 
         if (heroEntities.Count == 0)
         {
@@ -146,24 +151,34 @@ internal class HeroInterface : IHeroInterface
 
         var resolvedEntity = heroEntities[0];
 
-        heroId = resolvedEntity.EntityId;
+        controlledObjectId = resolvedEntity.EntityId;
 
         return true;
     }
 
-    public void SwitchMainHero(string heroId)
+    public void SwitchToPlayer(Player player)
     {
-        if(objectManager.TryGetObject(heroId, out Hero resolvedHero))
-        {
-            Logger.Information("Switching to new hero: {heroName}", resolvedHero.Name.ToString());
+        if (!objectManager.TryGetObjectWithLogging(player.HeroId, out Hero playerHero))
+            return;
+        if (!objectManager.TryGetObjectWithLogging(player.MobilePartyId, out MobileParty playerParty))
+            return;
 
-            ChangePlayerCharacterAction.Apply(resolvedHero);
+        Campaign.Current.MainParty = playerParty;
+        // This is needed because if the player is ca
+        playerHero.PartyBelongedTo = playerParty;
 
-            Campaign.Current.PlayerDefaultFaction = resolvedHero.Clan;
-        }
-        else
+        Logger.Information("Switching to new hero: {heroName}", playerHero.Name.ToString());
+
+        ChangePlayerCharacterAction.Apply(playerHero);
+
+        Campaign.Current.PlayerDefaultFaction = playerHero.Clan;
+
+        
+
+        if (playerHero.PartyBelongedToAsPrisoner != null)
         {
-            Logger.Warning("Could not find hero with id of: {guid}", heroId);
+            playerHero.PartyBelongedTo = null;
+            messageBroker.Publish(this, new PlayerCaptivityChanged(playerHero.PartyBelongedToAsPrisoner));
         }
     }
 
@@ -227,7 +242,7 @@ internal class HeroInterface : IHeroInterface
             party.Anchor = new AnchorPoint(party);
         }
         
-        party.IsVisible = true;
+        party.IsVisible = true;  
         party.Party.SetVisualAsDirty();
 
         party.CheckPositionsForMapChangeAndUpdateIfNeeded();

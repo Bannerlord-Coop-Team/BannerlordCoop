@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.MapEventParties.Messages;
+using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -30,6 +31,12 @@ internal class TakePrisonerActionPatches
             Logger.Error("Client called managed method {methodName}", $"{nameof(TakePrisonerAction)}.{nameof(TakePrisonerAction.Apply)}");
             return;
         }
+
+        if (prisonerCharacter.PartyBelongedTo?.IsPlayerParty() == false)
+            return;
+
+        if (prisonerCharacter.PartyBelongedTo == null)
+            return;
 
         var message = new PrisonerTaken(capturerParty, prisonerCharacter);
         MessageBroker.Instance.Publish(null, message);

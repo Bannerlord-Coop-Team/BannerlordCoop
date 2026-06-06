@@ -2,6 +2,7 @@
 using Coop.Core.Client.Services.Heroes.Data;
 using GameInterface.Registry;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
 
 namespace Coop.Core.Client.States;
@@ -14,16 +15,19 @@ public class LoadingState : ClientStateBase
     private readonly IMessageBroker messageBroker;
     private readonly IRegistryManager registryManager;
     private readonly IDeferredHeroRepository deferredHeroRepo;
+    private readonly IHeroInterface heroInterface;
 
     public LoadingState(
         IClientLogic logic,
         IMessageBroker messageBroker,
         IRegistryManager registryManager,
-        IDeferredHeroRepository deferredHeroRepo) : base(logic)
+        IDeferredHeroRepository deferredHeroRepo,
+        IHeroInterface heroInterface) : base(logic)
     {
         this.messageBroker = messageBroker;
         this.registryManager = registryManager;
         this.deferredHeroRepo = deferredHeroRepo;
+        this.heroInterface = heroInterface;
         messageBroker.Subscribe<CampaignReady>(Handle_CampaignLoaded);
     }
 
@@ -44,7 +48,7 @@ public class LoadingState : ClientStateBase
 
         InstantiateDeferredHeroes();
 
-        messageBroker.Publish(this, new SwitchToHero(Logic.ControlledHeroId));
+        heroInterface.SwitchToPlayer(Logic.Player);
 
         Logic.EnterCampaignState();
     }

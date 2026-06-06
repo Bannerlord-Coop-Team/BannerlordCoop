@@ -49,11 +49,17 @@ internal class MobilePartyDebugCommand
         stringBuilder.AppendLine("Fields:");
         AppendFields(stringBuilder, mobileParty);
 
-        var result = stringBuilder.ToString();
+        var partyResult = stringBuilder.ToString();
 
-        Logger.Debug("{Info}", result);
+        stringBuilder = new StringBuilder();
 
-        return result;
+        AppendFields(stringBuilder, mobileParty.Party);
+
+        var partyBaseResults = stringBuilder.ToString();
+
+        Logger.Debug("{Party}, {PartyBase}", partyResult, partyBaseResults);
+
+        return $"{partyResult}\n{partyBaseResults}";
     }
 
     private static void AppendFields(StringBuilder stringBuilder, object instance)
@@ -78,7 +84,7 @@ internal class MobilePartyDebugCommand
                 }
                 catch (Exception e)
                 {
-                    stringBuilder.AppendLine($"{field.DeclaringType.FullName}.{field.Name}: <failed to get value: {e.GetType().Name}: {e.Message}>");
+                    stringBuilder.AppendLine($"{field.Name}: <failed to get value: {e.GetType().Name}: {e.Message}>");
                     continue;
                 }
 
@@ -86,11 +92,11 @@ internal class MobilePartyDebugCommand
                 var formattedType = GetFriendlyTypeName(field.FieldType);
                 var formattedValue = SafeToString(value);
 
-                stringBuilder.AppendLine($"{field.DeclaringType.FullName}.{formattedName} ({formattedType}): {formattedValue}");
+                stringBuilder.AppendLine($"{formattedName} ({formattedType}): {formattedValue}");
             }
             catch (Exception e)
             {
-                stringBuilder.AppendLine($"{field.DeclaringType.FullName}.{field.Name}: <failed to print field: {e.GetType().Name}: {e.Message}>");
+                stringBuilder.AppendLine($"{field.Name}: <failed to print field: {e.GetType().Name}: {e.Message}>");
             }
         }
     }

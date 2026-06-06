@@ -31,7 +31,6 @@ internal class PartyBaseLifetimeHandler : IHandler
     private void Handle_PartyDestroyed(MessagePayload<InstanceDestroyed<MobileParty>> payload)
     {
         var partyBase = payload.What.Instance.Party;
-
         messageBroker.Publish(this, new InstanceDestroyed<PartyBase>(partyBase));
     }
 }

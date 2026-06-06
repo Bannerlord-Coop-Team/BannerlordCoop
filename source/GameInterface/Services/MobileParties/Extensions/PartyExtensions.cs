@@ -18,6 +18,7 @@ public static class PartyExtensions
     {
         public bool? IsPartyControlled;
         public bool? IsPlayerParty;
+        public bool? IsInConversation;
     }
 
     /// <summary>
@@ -101,6 +102,40 @@ public static class PartyExtensions
 
         return result;
     }
+
+    public static bool IsInConversation(this MobileParty party)
+    {
+        if (party is null)
+        {
+            Logger.Error("{parameterName} was null", nameof(party));
+            return false;
+        }
+
+        var cache = Cache.GetOrCreateValue(party);
+
+        if (cache.IsInConversation.HasValue)
+        {
+            return cache.IsInConversation.Value;
+        }
+
+        var result = false;
+        cache.IsInConversation = result;
+
+        return result;
+    }
+
+    public static bool SetInConversation(this MobileParty party, bool inConversation)
+    {
+        if (party is null)
+        {
+            Logger.Error("{parameterName} was null", nameof(party));
+            return false;
+        }
+
+        var cache = Cache.GetOrCreateValue(party);
+        cache.IsInConversation = inConversation;
+        return inConversation;
+    } 
 
     /// <summary>
     /// Clears all cached values for a specific party.

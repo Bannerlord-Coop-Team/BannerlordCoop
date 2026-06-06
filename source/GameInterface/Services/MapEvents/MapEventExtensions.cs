@@ -10,8 +10,18 @@ public static class MapEventExtensions
     {
         if (mapEvent is null) return false;
 
-        if (mapEvent.InvolvedParties.Any(party => party?.MobileParty?.IsPlayerParty() == true))
-            return true;
+        foreach (var side in mapEvent._sides)
+        {
+            if (side is null) continue;
+
+            foreach (var eventParty in side.Parties)
+            {
+                if (eventParty?.Party?.MobileParty?.IsPlayerParty() == true)
+                {
+                    return true;
+                }
+            }
+        }
 
         return false;
     }
