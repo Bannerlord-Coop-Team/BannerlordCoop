@@ -31,9 +31,4 @@ public class NetworkConfiguration : INetworkConfiguration
     public TimeSpan ObjectCreationTimeout => TimeSpan.FromSeconds(5);
 
     public TimeSpan NetworkPollInterval => TimeSpan.FromMilliseconds(50);
-
-    public void LoadFromFile()
-    {
-        throw new NotImplementedException();
-    }
 }

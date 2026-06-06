@@ -113,6 +113,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 
         netManager.Start();
 
+        Logger.Information("Attempting connection to {Address}:{Port}...", Configuration.Address, Configuration.Port);
         netManager.Connect(Configuration.Address, Configuration.Port, Configuration.Token);
     }
 

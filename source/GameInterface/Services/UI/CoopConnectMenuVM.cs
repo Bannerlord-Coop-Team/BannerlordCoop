@@ -20,7 +20,7 @@ namespace GameInterface.Services.UI
         public string PortText => "Port:";
         public string PasswordText => "Password:";
 
-        public string connectIP = "bannerlordcoop.duckdns.org";
+        public string connectIP = "localhost";
 
         public string connectPort = "4200";
 
