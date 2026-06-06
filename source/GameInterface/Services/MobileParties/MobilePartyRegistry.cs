@@ -108,10 +108,13 @@ internal class MobilePartyRegistry : AutoRegistryBase<MobileParty>
 
     public override void OnServerDestroyed(MobileParty obj, string id)
     {
+        obj.MemberRoster.Clear();
+        obj.PrisonRoster.Clear();
+        obj.Party.SetVisualAsDirty();
+
         var message = new InstanceDestroyed<PartyBase>(obj.Party);
         messageBroker.Publish(this, message);
 
-        if (controlledEntityRegistry.TryGetControlledEntity(id, out var controlledEntity))
-            controlledEntityRegistry.RemoveAsControlled(controlledEntity);
+        
     }
 }

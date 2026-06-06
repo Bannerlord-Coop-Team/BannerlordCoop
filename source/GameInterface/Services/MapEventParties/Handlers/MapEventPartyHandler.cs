@@ -142,8 +142,6 @@ internal class MapEventPartyHandler : IHandler
 
         if (!objectManager.TryGetIdWithLogging(obj.MapEventParty, out var mapEventPartyId))
             return;
-        if (!objectManager.TryGetIdWithLogging(obj.TroopSeed, out var troopId))
-            return;
 
         var message = new NetworkTroopWounded(mapEventPartyId, obj.TroopSeed);
 
@@ -222,14 +220,7 @@ internal class MapEventPartyHandler : IHandler
 
         using (new AllowedThread())
         {
-            try
-            {
-                TakePrisonerAction.ApplyInternal(partyBase, hero);
-            }
-            catch(Exception ex)
-            {
-                Logger.Error(ex, "Failed to run TakePrisonerAction.ApplyInternal");
-            }
+            TakePrisonerAction.ApplyInternal(partyBase, hero);
         }
     }
 }

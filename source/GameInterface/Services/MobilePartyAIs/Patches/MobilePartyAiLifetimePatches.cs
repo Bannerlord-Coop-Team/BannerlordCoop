@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobilePartyAIs.Messages;
 using HarmonyLib;
 using Serilog;
@@ -42,6 +43,11 @@ class MobilePartyAiLifetimePatches
     {
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
+
+        if (__instance.IsPlayerParty())
+        {
+            ;
+        }
 
         if (ModInformation.IsClient)
         {

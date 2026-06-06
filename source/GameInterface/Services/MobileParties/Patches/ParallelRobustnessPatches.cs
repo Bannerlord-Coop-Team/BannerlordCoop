@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -117,10 +118,18 @@ internal class ParallelRobustnessPatches
                 continue;
             }
 
-            MobileParty.CachedPartyVariables localVariables = tickCachePerParty.LocalVariables;
-            mobileParty.FillCurrentTickMoveDataForMovingArmyLeader(ref localVariables, __instance._currentDt, __instance._currentRealDt);
-            mobileParty.TryToMoveThePartyWithCurrentTickMoveData(ref localVariables, ref __instance._gridChangeCount, ref __instance._gridChangeMobilePartyList);
-            mobileParty.ValidateSpeed();
+            try
+            {
+                MobileParty.CachedPartyVariables localVariables = tickCachePerParty.LocalVariables;
+                mobileParty.FillCurrentTickMoveDataForMovingArmyLeader(ref localVariables, __instance._currentDt, __instance._currentRealDt);
+                mobileParty.TryToMoveThePartyWithCurrentTickMoveData(ref localVariables, ref __instance._gridChangeCount, ref __instance._gridChangeMobilePartyList);
+                mobileParty.ValidateSpeed();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Failed to tick moving party {stringId} in ParallelTickArmies", mobileParty.StringId);
+            }
+
         }
 
         return false;
@@ -151,7 +160,7 @@ internal class ParallelRobustnessPatches
             try
             {
                 MobileParty.CachedPartyVariables localVariables = tickCachePerParty.LocalVariables;
-                mobileParty.FillCurrentTickMoveDataForMovingArmyLeader(ref localVariables, __instance._currentDt, __instance._currentRealDt);
+                mobileParty.FillCurrentTickMoveDataForMovingMobileParty(ref localVariables, __instance._currentDt, __instance._currentRealDt);
                 mobileParty.TryToMoveThePartyWithCurrentTickMoveData(ref localVariables, ref __instance._gridChangeCount, ref __instance._gridChangeMobilePartyList);
             }
             catch(Exception ex)

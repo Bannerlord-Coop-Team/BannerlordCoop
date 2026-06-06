@@ -1,3 +1,4 @@
+using Common.Messaging;
 using GameInterface.Serialization;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Entity.Data;
@@ -51,10 +52,10 @@ public class HeroInterfaceTests
         .Setup(x => x.TryGetObject<Hero>(It.IsAny<string>(), out hero))
         .Returns(false);
 
-        var heroInterface = new HeroInterface(NullPackageFactory, registry, objectManagerMock.Object);
+        var heroInterface = CreateHeroInterface(registry, objectManagerMock);
 
         // Act
-        var result = heroInterface.TryResolveHero(ControllerId, out var heroId);
+        var result = heroInterface.TryResolve<Hero>(ControllerId, out var heroId);
 
         // Assert
         Assert.False(result);
@@ -76,10 +77,10 @@ public class HeroInterfaceTests
         .Setup(x => x.TryGetObject<Hero>(It.IsAny<string>(), out hero))
         .Returns(false);
 
-        var heroInterface = new HeroInterface(NullPackageFactory, registry, objectManagerMock.Object);
+        var heroInterface = CreateHeroInterface(registry, objectManagerMock);
 
         // Act
-        var result = heroInterface.TryResolveHero(ControllerId, out var heroId);
+        var result = heroInterface.TryResolve<Hero>(ControllerId, out var heroId);
 
         // Assert
         Assert.False(result);
@@ -102,10 +103,10 @@ public class HeroInterfaceTests
         .Setup(x => x.TryGetObject<Hero>(heroId, out hero))
         .Returns(true);
 
-        var heroInterface = new HeroInterface(NullPackageFactory, registry, objectManagerMock.Object);
+        var heroInterface = CreateHeroInterface(registry, objectManagerMock);
 
         // Act
-        var result = heroInterface.TryResolveHero(ControllerId, out var resolvedId);
+        var result = heroInterface.TryResolve<Hero>(ControllerId, out var resolvedId);
 
         // Assert
         Assert.True(result);
@@ -131,10 +132,10 @@ public class HeroInterfaceTests
         .Setup(x => x.TryGetObject<Hero>(heroId, out hero))
         .Returns(true);
 
-        var heroInterface = new HeroInterface(NullPackageFactory, registry, objectManagerMock.Object);
+        var heroInterface = CreateHeroInterface(registry, objectManagerMock);
 
         // Act
-        var result = heroInterface.TryResolveHero(ControllerId, out var resolvedId);
+        var result = heroInterface.TryResolve<Hero>(ControllerId, out var resolvedId);
 
         // Assert
         Assert.True(result);
@@ -168,13 +169,23 @@ public class HeroInterfaceTests
         .Setup(x => x.TryGetObject<Hero>(heroId2, out hero2))
         .Returns(true);
 
-        var heroInterface = new HeroInterface(NullPackageFactory, registry, objectManagerMock.Object);
+        var heroInterface = CreateHeroInterface(registry, objectManagerMock);
 
         // Act
-        var result = heroInterface.TryResolveHero(ControllerId, out var resolvedId);
+        var result = heroInterface.TryResolve<Hero>(ControllerId, out var resolvedId);
 
         // Assert — no exception, first hero returned
         Assert.True(result);
         Assert.Equal(heroId1, resolvedId);
+    }
+
+    private static HeroInterface CreateHeroInterface(ControlledEntityRegistry registry, Mock<IObjectManager>? objectManagerMock = null)
+    {
+        var messageBrokerMock = new Mock<IMessageBroker>();
+        var binaryPackageFactoryMock = new Mock<IBinaryPackageFactory>();
+
+        objectManagerMock ??= new Mock<IObjectManager>();
+
+        return new HeroInterface(messageBrokerMock.Object, binaryPackageFactoryMock.Object, registry, objectManagerMock.Object);
     }
 }

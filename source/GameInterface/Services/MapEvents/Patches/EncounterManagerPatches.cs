@@ -2,13 +2,13 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
 using Serilog;
 using System;
-using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -40,40 +40,34 @@ internal class EncounterManagerPatches
         return false;
     }
 
-    //[HarmonyPrefix]
-    //[HarmonyPatch(nameof(EncounterManager.HandleEncounterForMobileParty))]
-    //internal static bool HandleEncounterForMobilePartyPatch(ref MobileParty mobileParty, ref float dt)
-    //{
-    //    if (AllowedThread.IsThisThreadAllowed()) return true;
-
-    //    return ModInformation.IsServer;
-    //}
-
-    //[HarmonyPatch(nameof(EncounterManager.StartPartyEncounter))]
-    //[HarmonyPrefix]
-    //public static bool PrefixStartPartyEncounter(PartyBase attackerParty, PartyBase defenderParty)
-    //{
-    //    if (AllowedThread.IsThisThreadAllowed()) return true;
-
-    //    if (ModInformation.IsServer) return true;
-
-    //    var message = new BattleStarted(attackerParty, defenderParty);
-
-    //    if (attackerParty.MobileParty.IsPlayerParty())
-    //    {
-    //        InformationManager.DisplayMessage(new InformationMessage($"Player is engaging in battle with {attackerParty.Name}"));
-    //    }
-
-    //    MessageBroker.Instance.Publish(null, message);
-
-    //    return true;
-    //}
-
     [HarmonyPrefix]
-    [HarmonyPatch(nameof(EncounterManager.Tick))]
-    internal static bool TickPatch(float dt)
+    [HarmonyPatch(nameof(EncounterManager.HandleEncounterForMobileParty))]
+    internal static bool HandleEncounterForMobilePartyPatch(ref MobileParty mobileParty, ref float dt)
     {
-        return ModInformation.IsServer;
+        // Skip this method if party is not controlled
+        if (!mobileParty.IsPartyControlled())
+            return false;
+
+        return true;
+    }
+
+    // EncounterManager.RestartPlayerEncounter is private; patch by name. It is the path that opens the encounter
+    // menu/conversation (it calls PlayerEncounter.Current.Init). Parameter order here is (attacker, defender).
+    [HarmonyPatch("RestartPlayerEncounter")]
+    [HarmonyPrefix]
+    private static bool RestartPlayerEncounterPrefix(PartyBase attackerParty, PartyBase defenderParty)
+    {
+        // Our own server-approved re-run (AllowedThread) runs the real method.
+        if (AllowedThread.IsThisThreadAllowed()) return true;
+
+        // The server runs it locally (authoritative).
+        if (ModInformation.IsServer) return true;
+
+        // Client: gate the encounter restart behind server approval (rate-limited + validated in
+        // ConversationRequestHandler). On approval the handler re-runs this exact method under an AllowedThread.
+        MessageBroker.Instance.Publish(null, new ConversationRequested(defenderParty, attackerParty, forcePlayerOutFromSettlement: false, ConversationRestartSource.EncounterManager));
+
+        return false;
     }
 }
 

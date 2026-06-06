@@ -138,7 +138,7 @@ namespace Coop.Tests.Server.Connections.States
             string heroId = "MyHero";
 
             serverComponent.HeroInterfaceMock
-                .Setup(i => i.TryResolveHero(playerId, out It.Ref<string>.IsAny))
+                .Setup(i => i.TryResolve<Hero>(playerId, out It.Ref<string>.IsAny))
                 .Callback((string id, out string returnedHeroId) =>
                 {
                     returnedHeroId = heroId;
@@ -158,7 +158,7 @@ namespace Coop.Tests.Server.Connections.States
             var message = Assert.Single(validated);
 
             Assert.True(message.HeroExists);
-            Assert.Equal(heroId, message.HeroId);
+            Assert.Equal(heroId, message.Player.HeroId);
         }
 
         [Fact]
@@ -170,7 +170,7 @@ namespace Coop.Tests.Server.Connections.States
             string playerId = "MyPlayer";
 
             serverComponent.HeroInterfaceMock
-                .Setup(i => i.TryResolveHero(playerId, out It.Ref<string>.IsAny))
+                .Setup(i => i.TryResolve<Hero>(playerId, out It.Ref<string>.IsAny))
                 .Callback((string id, out string returnedHeroId) =>
                 {
                     returnedHeroId = string.Empty;

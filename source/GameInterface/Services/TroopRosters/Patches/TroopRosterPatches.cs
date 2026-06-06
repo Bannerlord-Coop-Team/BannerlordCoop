@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
@@ -6,9 +6,6 @@ using GameInterface.Policies;
 using GameInterface.Services.TroopRosters.Messages;
 using HarmonyLib;
 using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
@@ -16,106 +13,133 @@ using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.TroopRosters.Patches;
 
+/// <summary>
+/// Patches required for the TroopRoster
+/// </summary>
 [HarmonyPatch(typeof(TroopRoster))]
 internal class TroopRosterPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<TroopRosterPatches>();
 
-    [HarmonyPatch(nameof(TroopRoster.AddToCounts))]
+    [HarmonyPatch(nameof(TroopRoster.AddToCountsAtIndex))]
     [HarmonyPrefix]
-    private static void PrefixAddToCounts(ref TroopRoster __instance, CharacterObject character, int count, bool insertAtFront,
-    int woundedCount, int xpChange, bool removeDepleted, int index)
+    private static void PrefixAddToCountsAtIndex(TroopRoster __instance, int index, int countChange,
+        int woundedCountChange, int xpChange, bool removeDepleted, ref bool __state)
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client attempted to {methodName} managed {type}", nameof(ItemRoster.AddToCounts), typeof(ItemRoster));
+            Logger.Error("Client attempted to {methodName} on a managed {type}", nameof(TroopRoster.AddToCountsAtIndex), typeof(TroopRoster));
             return;
         }
 
-        var message = new TroopRosterAddToCountsChanged(__instance, character, count, insertAtFront, woundedCount, xpChange, removeDepleted, index);
-
-        MessageBroker.Instance.Publish(__instance, message);
+        MessageBroker.Instance.Publish(__instance,
+            new CountsAtIndexAdded(__instance, index, countChange, woundedCountChange, xpChange, removeDepleted));
     }
 
-    [HarmonyPatch(nameof(TroopRoster.RemoveTroop))]
+    [HarmonyPatch(nameof(TroopRoster.AddNewElement))]
     [HarmonyPrefix]
-    public static void PrefixRemoveTroop(TroopRoster __instance, CharacterObject troop, int numberToRemove, int xp)
+    private static void PrefixAddNewElement(TroopRoster __instance, CharacterObject character, int insertionIndex)
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client attempted to RemoveTroop from a managed {type}", typeof(TroopRoster));
+            Logger.Error("Client attempted to {methodName} on a managed {type}", nameof(TroopRoster.AddNewElement), typeof(TroopRoster));
             return;
         }
 
-        var message = new TroopRemoved(__instance, troop, numberToRemove, xp);
-        MessageBroker.Instance.Publish(__instance, message);
-    }
-
-    [HarmonyPatch(nameof(TroopRoster.WoundTroop))]
-    [HarmonyPrefix]
-    public static void PrefixWoundTroop(TroopRoster __instance, CharacterObject troop, int numberToWound)
-    {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return;
-
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client attempted to WoundTroop from a managed {type}", typeof(TroopRoster));
-            return;
-        }
-
-        var message = new TroopRosterTroopWounded(__instance, troop, numberToWound);
-        MessageBroker.Instance.Publish(__instance, message);
+        MessageBroker.Instance.Publish(__instance, new NewElementAdded(__instance, character, insertionIndex));
     }
 
     [HarmonyPatch(nameof(TroopRoster.RemoveZeroCounts))]
     [HarmonyPrefix]
-    public static void PrefixRemoveZeroCounts(TroopRoster __instance)
+    private static void PrefixRemoveZeroCounts(TroopRoster __instance)
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client attempted to RemoveZeroCounts from a managed {type}", typeof(TroopRoster));
+            Logger.Error("Client attempted to {methodName} on a managed {type}", nameof(TroopRoster.RemoveZeroCounts), typeof(TroopRoster));
             return;
         }
 
-        var message = new ZeroCountsRemoved(__instance);
-        MessageBroker.Instance.Publish(__instance, message);
+        MessageBroker.Instance.Publish(__instance, new ZeroCountsRemoved(__instance));
     }
 
-    [HarmonyPatch(nameof(TroopRoster.AddXpToTroopAtIndex))]
+    [HarmonyPatch(nameof(TroopRoster.SetElementNumber))]
     [HarmonyPrefix]
-    public static void PrefixAddXpToTroopAtIndex(TroopRoster __instance, int index, int xpAmount)
+    private static void PrefixSetElementNumber(TroopRoster __instance, int index, int number)
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client attempted to AddXpToTroopAtIndex from a managed {type}", typeof(TroopRoster));
+            Logger.Error("Client attempted to {methodName} on a managed {type}", nameof(TroopRoster.SetElementNumber), typeof(TroopRoster));
             return;
         }
 
-        var message = new XpAtTroopIndexAdded(__instance, index, xpAmount);
-        MessageBroker.Instance.Publish(__instance, message);
+        MessageBroker.Instance.Publish(__instance, new ElementNumberSet(__instance, index, number));
     }
 
-    [HarmonyPatch(nameof(TroopRoster.Clear))]
+    [HarmonyPatch(nameof(TroopRoster.SetElementWoundedNumber))]
     [HarmonyPrefix]
-    public static void PrefixClear(TroopRoster __instance)
+    private static void PrefixSetElementWoundedNumber(TroopRoster __instance, int index, int number)
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client attempted to Clear from a managed {type}", typeof(TroopRoster));
+            Logger.Error("Client attempted to {methodName} on a managed {type}", nameof(TroopRoster.SetElementWoundedNumber), typeof(TroopRoster));
             return;
         }
 
-        var message = new TroopRosterCleared(__instance);
-        MessageBroker.Instance.Publish(__instance, message);
+        MessageBroker.Instance.Publish(__instance, new ElementWoundedNumberSet(__instance, index, number));
+    }
+
+    [HarmonyPatch(nameof(TroopRoster.SetElementXp))]
+    [HarmonyPrefix]
+    private static void PrefixSetElementXp(TroopRoster __instance, int index, int number)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+
+        if (ModInformation.IsClient)
+        {
+            Logger.Error("Client attempted to {methodName} on a managed {type}", nameof(TroopRoster.SetElementXp), typeof(TroopRoster));
+            return;
+        }
+
+        MessageBroker.Instance.Publish(__instance, new ElementXpSet(__instance, index, number));
+    }
+
+    [HarmonyPatch(nameof(TroopRoster.ShiftTroopToIndex))]
+    [HarmonyPrefix]
+    private static void PrefixShiftTroopToIndex(TroopRoster __instance, int troopIndex, int targetIndex)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+
+        if (ModInformation.IsClient)
+        {
+            Logger.Error("Client attempted to {methodName} on a managed {type}", nameof(TroopRoster.ShiftTroopToIndex), typeof(TroopRoster));
+            return;
+        }
+
+        MessageBroker.Instance.Publish(__instance, new TroopShiftedToIndex(__instance, troopIndex, targetIndex));
+    }
+
+    [HarmonyPatch(nameof(TroopRoster.SwapTroopsAtIndices))]
+    [HarmonyPrefix]
+    private static void PrefixSwapTroopsAtIndices(TroopRoster __instance, int firstIndex, int secondIndex)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+
+        if (ModInformation.IsClient)
+        {
+            Logger.Error("Client attempted to {methodName} on a managed {type}", nameof(TroopRoster.SwapTroopsAtIndices), typeof(TroopRoster));
+            return;
+        }
+
+        MessageBroker.Instance.Publish(__instance, new TroopsSwappedAtIndices(__instance, firstIndex, secondIndex));
     }
 }
 /// <summary>
