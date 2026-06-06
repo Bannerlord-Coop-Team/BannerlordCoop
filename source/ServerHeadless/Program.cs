@@ -125,6 +125,7 @@ namespace ServerHeadless
                     return 1;
                 }
 
+                TestServerSave();
                 TickCampaign();
             }
             catch (OperationCanceledException)
@@ -269,6 +270,23 @@ namespace ServerHeadless
             Console.WriteLine($"[ServerHeadless] Loaded in {ticks} ticks.");
             ReportCampaign();
             return true;
+        }
+
+        /// <summary>
+        /// Exercises the server's state-transfer save (the same PackageGameSaveData request the
+        /// server raises when a client connects) and reports the resulting byte size.
+        /// </summary>
+        private static void TestServerSave()
+        {
+            Console.WriteLine("[ServerHeadless] Packaging campaign save for transfer...");
+            if (CoopServerLauncher.TrySaveCurrentState(out int bytes, out string campaignId))
+            {
+                Console.WriteLine($"[ServerHeadless] Save OK: {bytes:N0} bytes (campaign {campaignId}).");
+            }
+            else
+            {
+                Console.Error.WriteLine($"[ServerHeadless] Save produced {bytes} bytes (empty/failed).");
+            }
         }
 
         private static void ReportCampaign()
