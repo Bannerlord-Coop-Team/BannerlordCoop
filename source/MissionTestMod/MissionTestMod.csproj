@@ -217,10 +217,10 @@
     </PreBuildEvent>
   </PropertyGroup>
   <PropertyGroup>
-    <PostBuildEvent>powershell -ExecutionPolicy Unrestricted ^
-
-            -File "$(SolutionDir)..\deploy.ps1" -SolutionDir "$(SolutionDir)\" ^
-
-            -TargetDir "$(SolutionDir)MissionTestMod\bin\$(Configuration)\\"</PostBuildEvent>
+    <PostBuildEvent>powershell -NoProfile -ExecutionPolicy Unrestricted ^
+-File "$(SolutionDir)..\deploy.ps1" ^
+-SolutionDir "$(SolutionDir)\" ^
+-TargetDir "$(ProjectDir)bin\$(Configuration)\\" ^
+-ConfigPath "$(SolutionDir)..\config_missions.json"</PostBuildEvent>
   </PropertyGroup>
 </Project>

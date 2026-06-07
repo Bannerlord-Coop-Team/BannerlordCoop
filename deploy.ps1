@@ -188,15 +188,15 @@ if (-not (Test-Path -LiteralPath $ModsRoot -PathType Container)) {
 
 Assert-SafeModPath -ModDir $ModDir -ModsRoot $ModsRoot
 
-# Create directories
-New-Item -Force -ItemType Directory -Path $ModDir | Out-Null
-New-Item -Force -ItemType Directory -Path $BinDir | Out-Null
-New-Item -Force -ItemType Directory -Path $MovieModDir | Out-Null
 
 # Clean only deploy-owned outputs
 Write-Output "Cleaning deploy-owned outputs by moving them to Recycle Bin..."
 
 Move-DirectoryChildrenToRecycleBin -Path $ModDir
+
+# Create directories
+New-Item -Force -ItemType Directory -Path "${ModDir}\bin\Win64_Shipping_Client" | Out-Null
+New-Item -Force -ItemType Directory -Path $MovieModDir | Out-Null
 
 # Copy DLLs from target dir to mod folder
 Write-Output "Copying DLLs..."
