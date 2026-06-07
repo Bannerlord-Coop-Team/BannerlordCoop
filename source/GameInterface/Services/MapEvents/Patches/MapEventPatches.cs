@@ -206,15 +206,8 @@ internal class InteractionPatches
         if (!__instance.ContainsPlayerParty())
             return;
 
-        if (!playerBattleAiJoinWindows.TryGetValue(__instance, out var debounce))
-            return;
-
-        // Prevent AI joining after 5 hours
-        if (debounce.Expired)
-        {
-            __result = false;
-            return;
-        }
+        // Prevent any AI party from joining a battle that involves a player
+        __result = false;
     }
 
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.Initialize))]
