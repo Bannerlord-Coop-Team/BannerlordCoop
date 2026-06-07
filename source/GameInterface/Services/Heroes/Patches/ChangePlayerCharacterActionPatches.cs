@@ -19,6 +19,12 @@ internal class ChangePlayerCharacterActionPatches
 
         Hero mainHero = Hero.MainHero;
         MobileParty mainParty = MobileParty.MainParty;
+        // The party belonging to the hero we are switching INTO. In coop, SwitchToPlayer
+        // pre-points MobileParty.MainParty at this same party before calling Apply, so the
+        // "abandoned old party" cleanup below must never target it — otherwise a (re)joining
+        // player whose party is empty (0 members) or only holds a wounded leader would have
+        // their party destroyed and the character deleted.
+        MobileParty targetHeroParty = hero.PartyBelongedTo;
         CampaignVec2 position = MobileParty.MainParty.Anchor.Position;
         CampaignVec2 lastUsedDisembarkPosition = MobileParty.MainParty.Anchor.GetLastUsedDisembarkPosition();
         bool isCurrentlyAtSea = MobileParty.MainParty.IsCurrentlyAtSea;
@@ -53,7 +59,7 @@ internal class ChangePlayerCharacterActionPatches
             MobileParty.MainParty.Anchor.SetLastUsedDisembarkPosition(lastUsedDisembarkPosition);
         }
 
-        if (mainParty != MobileParty.MainParty && mainParty.IsActive)
+        if (mainParty != MobileParty.MainParty && mainParty.IsActive && mainParty != targetHeroParty)
         {
             if (mainParty.MemberRoster.TotalManCount == 0)
             {
