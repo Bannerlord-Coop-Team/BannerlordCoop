@@ -32,7 +32,7 @@ namespace Coop.Tests.Server.States
 
             var payload = new MessagePayload<CampaignReady>(null, new CampaignReady());
             var initialState = Assert.IsType<InitialServerState>(serverLogic.State);
-            initialState.Handle_GameLoaded(payload);
+            initialState.Handle_CampaignReady(payload);
 
             // Assert
             Assert.IsType<ServerRunningState>(serverLogic.State);
