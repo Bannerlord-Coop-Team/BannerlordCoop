@@ -63,13 +63,10 @@ internal class InventoryLogicPatches
         MessageBroker.Instance.Publish(__instance, message);
 
         // Reset rosters so they are set on the server side
-        GameLoopRunner.RunOnMainThread(() => 
+        using (new AllowedThread())
         {
-            using (new AllowedThread())
-            {
-                __instance.Reset(true);
-            }
-        });
+            __instance.Reset(true);
+        }
 
         __result = true;
         return false;
