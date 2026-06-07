@@ -6,11 +6,11 @@ namespace GameInterface.Services.ItemRosters.Messages
     [BatchLogMessage]
     public class ClearItemRoster : ICommand
     {
-        public string PartyBaseID { get; }
+        public string ItemRosterId { get; }
 
-        public ClearItemRoster(string partyBaseID)
+        public ClearItemRoster(string itemRosterId)
         {
-            PartyBaseID = partyBaseID;
+            ItemRosterId = itemRosterId;
         }
     }
 }

@@ -63,15 +63,9 @@ namespace GameInterface.Services.ItemRosters.Patches
             if (ModInformation.IsClient)
             {
                 return false; // Disallow on clients
-            }
+            } 
 
-            if (ItemRosterLookup.TryGetValue(__instance, out var partyBase) == false)
-            {
-                Logger.Error("Unable to find party from item roster");
-                return false;
-            }
-
-            MessageBroker.Instance.Publish(__instance, new ItemRosterCleared(partyBase));
+            MessageBroker.Instance.Publish(__instance, new ItemRosterCleared(__instance));
 
             return true; // Allow on server
         }
