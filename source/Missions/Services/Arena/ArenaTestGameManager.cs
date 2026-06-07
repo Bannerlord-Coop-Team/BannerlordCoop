@@ -1,5 +1,6 @@
 ﻿using Autofac;
 using Common.Logging;
+using GameInterface.Registry;
 using Missions.Services.Network;
 using SandBox;
 using SandBox.Missions.MissionLogics;
@@ -28,15 +29,18 @@ namespace Missions.Services.Arena
         private readonly LiteNetP2PClient _client;
         private readonly CoopArenaController _arenaController;
         private readonly CoopMissionNetworkBehavior _networkBehavior;
+        private readonly IRegistryManager registryManager;
 
         public ArenaTestGameManager(LoadResult loadedGameResult, 
             LiteNetP2PClient client,
             CoopArenaController arenaController,
-            CoopMissionNetworkBehavior networkBehavior) : base(loadedGameResult)
+            CoopMissionNetworkBehavior networkBehavior,
+            IRegistryManager registryManager) : base(loadedGameResult)
         {
             _client = client;
             _arenaController = arenaController;
             _networkBehavior = networkBehavior;
+            this.registryManager = registryManager;
         }
 
         public void StartGame()
@@ -55,6 +59,8 @@ namespace Missions.Services.Arena
         public override void OnLoadFinished()
         {
             base.OnLoadFinished();
+
+            registryManager.RegisterAllGameObjects();
 
             //get the settlement first
             Settlement settlement = Settlement.Find("town_ES3");

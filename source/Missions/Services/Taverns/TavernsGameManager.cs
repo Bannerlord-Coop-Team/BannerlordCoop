@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using Common;
 using Common.Logging;
+using GameInterface.Registry;
 using Missions.Services.Network;
 using SandBox;
 using Serilog;
@@ -27,16 +28,19 @@ namespace Missions.Services.Taverns
         private readonly LiteNetP2PClient _client;
         private readonly CoopMissionNetworkBehavior _networkBehavior;
         private readonly CoopTavernsController _tavernsController;
+        private readonly IRegistryManager registryManager;
 
         public TavernsGameManager(
             LoadResult loadedGameResult, 
             LiteNetP2PClient client,
             CoopMissionNetworkBehavior networkBehavior,
-            CoopTavernsController tavernsController) : base(loadedGameResult)
+            CoopTavernsController tavernsController,
+            IRegistryManager registryManager) : base(loadedGameResult)
         {
             _client = client;
             _networkBehavior = networkBehavior;
             _tavernsController = tavernsController;
+            this.registryManager = registryManager;
         }
 
         public void StartGame()
@@ -56,6 +60,9 @@ namespace Missions.Services.Taverns
         public override void OnLoadFinished()
         {
             base.OnLoadFinished();
+
+            registryManager.RegisterAllGameObjects();
+
             //get the settlement first
             Settlement settlement = Settlement.Find("town_ES3");
 
