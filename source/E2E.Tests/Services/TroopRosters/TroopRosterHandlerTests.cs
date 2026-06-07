@@ -239,6 +239,154 @@ namespace E2E.Tests.Services.TroopRosters
         }
         #endregion
 
+        #region High-level routing: public mutators that delegate to the patched primitives
+        // These exercise the higher-level TroopRoster API rather than the patched primitives
+        // directly, locking in that they continue to route through synced primitives
+        // (AddNewElement / AddToCountsAtIndex / SetElementXp / ...) rather than mutating the
+        // backing data array. If a future game version bypasses the primitives, these regress.
+
+        [Fact]
+        public void Server_AddToCounts_NewTroop_SyncsToClients()
+        {
+            // Act: AddToCounts on an empty roster routes through AddNewElement + AddToCountsAtIndex
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<TroopRoster>(TroopRosterId, out var roster));
+                Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(CharacterId1, out var character));
+
+                roster.AddToCounts(character, 5);
+            });
+
+            // Assert
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<TroopRoster>(TroopRosterId, out var roster));
+                Assert.True(client.ObjectManager.TryGetObject<CharacterObject>(CharacterId1, out var character));
+
+                Assert.Equal(1, roster.Count);
+                Assert.Same(character, roster.GetElementCopyAtIndex(0).Character);
+                Assert.Equal(5, roster.GetElementCopyAtIndex(0).Number);
+            }
+        }
+
+        [Fact]
+        public void Server_AddToCounts_ExistingTroop_SyncsToClients()
+        {
+            // Arrange
+            SeedTroopOnAll(CharacterId1, count: 5);
+
+            // Act: AddToCounts on an existing element routes through AddToCountsAtIndex
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<TroopRoster>(TroopRosterId, out var roster));
+                Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(CharacterId1, out var character));
+
+                roster.AddToCounts(character, 3);
+            });
+
+            // Assert
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<TroopRoster>(TroopRosterId, out var roster));
+                Assert.Equal(8, roster.GetElementCopyAtIndex(0).Number);
+            }
+        }
+
+        [Fact]
+        public void Server_Clear_SyncsToClients()
+        {
+            // Arrange: two populated elements
+            SeedTroopOnAll(CharacterId1, count: 3);
+            SeedTroopOnAll(CharacterId2, count: 4);
+
+            // Act: Clear routes through AddToCountsAtIndex per element
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<TroopRoster>(TroopRosterId, out var roster));
+                Assert.Equal(2, roster.Count);
+
+                roster.Clear();
+            });
+
+            // Assert
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<TroopRoster>(TroopRosterId, out var roster));
+                Assert.Equal(0, roster.Count);
+                Assert.Equal(0, roster.TotalManCount);
+            }
+        }
+
+        [Fact]
+        public void Server_RemoveTroop_SyncsToClients()
+        {
+            // Arrange
+            SeedTroopOnAll(CharacterId1, count: 5);
+
+            // Act: RemoveTroop routes through AddToCountsAtIndex (negative count)
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<TroopRoster>(TroopRosterId, out var roster));
+                Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(CharacterId1, out var character));
+
+                roster.RemoveTroop(character, 2, default, 0);
+            });
+
+            // Assert
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<TroopRoster>(TroopRosterId, out var roster));
+                Assert.Equal(3, roster.GetElementCopyAtIndex(0).Number);
+            }
+        }
+
+        [Fact]
+        public void Server_AddXpToTroop_SyncsToClients()
+        {
+            // Arrange
+            SeedTroopOnAll(CharacterId1, count: 5);
+
+            // Act: AddXpToTroop routes through AddXpToTroopAtIndex -> SetElementXp
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<TroopRoster>(TroopRosterId, out var roster));
+                Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(CharacterId1, out var character));
+
+                roster.AddXpToTroop(character, 100);
+            });
+
+            // Assert
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<TroopRoster>(TroopRosterId, out var roster));
+                Assert.Equal(100, roster.GetElementCopyAtIndex(0).Xp);
+            }
+        }
+
+        [Fact]
+        public void Server_WoundTroop_SyncsToClients()
+        {
+            // Arrange
+            SeedTroopOnAll(CharacterId1, count: 5);
+
+            // Act: WoundTroop routes through AddToCountsAtIndex (wounded count change)
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<TroopRoster>(TroopRosterId, out var roster));
+                Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(CharacterId1, out var character));
+
+                roster.WoundTroop(character, 2, default);
+            });
+
+            // Assert
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<TroopRoster>(TroopRosterId, out var roster));
+                Assert.Equal(2, roster.GetElementCopyAtIndex(0).WoundedNumber);
+            }
+        }
+        #endregion
+
         #region Helpers
         /// <summary>
         /// Adds <paramref name="count"/> of <paramref name="characterId"/> to the roster on the
