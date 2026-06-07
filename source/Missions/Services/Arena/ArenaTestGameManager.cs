@@ -91,6 +91,7 @@ namespace Missions.Services.Arena
             string civilianUpgradeLevelTag = Campaign.Current.Models.LocationModel.GetCivilianUpgradeLevelTag(upgradeLevel);
             Mission currentMission = MissionState.OpenNew("ArenaDuelMission", SandBoxMissions.CreateSandBoxMissionInitializerRecord(location.GetSceneName(upgradeLevel), "", false, DecalAtlasGroup.Battle), (mission) => new MissionBehavior[]
             {
+                /*
                 new MissionOptionsComponent(),
                 new MissionFacialAnimationHandler(),
                 new MissionAgentPanicHandler(),
@@ -100,6 +101,19 @@ namespace Missions.Services.Arena
                 new CampaignMissionComponent(),
                 new EquipmentControllerLeaveLogic(),
                 new MissionAgentHandler(), //new MissionAgentHandler(location, null),
+                */
+
+                new MissionOptionsComponent(),
+                //new ArenaDuelMissionController(duelCharacter, requireCivilianEquipment, spawnBOthSidesWithHorse, onDuelEnd, customAgentHealth),
+                new MissionFacialAnimationHandler(),
+                new MissionAgentPanicHandler(),
+                new AgentHumanAILogic(),
+                new ArenaAgentStateDeciderLogic(),
+                new VisualTrackerMissionBehavior(),
+                new CampaignMissionComponent(),
+                new EquipmentControllerLeaveLogic(),
+                new MissionAgentHandler(),
+                new MissionLocationLogic(location, null),
                 _networkBehavior,
                 _arenaController,
             }, true, true);

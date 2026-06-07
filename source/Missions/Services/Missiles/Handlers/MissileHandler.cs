@@ -59,7 +59,6 @@ namespace Missions.Services.Missiles.Handlers
 
         private readonly static MethodInfo AddMissileSingleUsageAux = typeof(Mission).GetMethod("AddMissileSingleUsageAux", BindingFlags.NonPublic | BindingFlags.Instance);
         private readonly static MethodInfo AddMissileAux = typeof(Mission).GetMethod("AddMissileAux", BindingFlags.NonPublic | BindingFlags.Instance);
-        private readonly static FieldInfo _missiles = typeof(Mission).GetField("_missiles", BindingFlags.NonPublic | BindingFlags.Instance);
 
         private void AgentShootRecieve(MessagePayload<NetworkAgentShoot> payload)
         {
@@ -148,8 +147,8 @@ namespace Missions.Services.Missiles.Handlers
 
             missileEntity.ManualInvalidate();
 
-            var missiles = (Dictionary<int, Mission.Missile>)_missiles.GetValue(Mission.Current);
-            
+            var missiles = Mission.Current._missilesDictionary;
+
             missiles.Add(num, missile);
 
             messageBroker.Publish(this, new PeerMissileAdded(peer, shot.MissileIndex, num));
