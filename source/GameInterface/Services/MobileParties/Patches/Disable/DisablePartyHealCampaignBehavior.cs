@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using Common;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
 namespace GameInterface.Services.MobileParties.Patches;
@@ -7,5 +8,5 @@ namespace GameInterface.Services.MobileParties.Patches;
 internal class DisablePartyHealCampaignBehavior
 {
     [HarmonyPatch(nameof(PartyHealCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix() => ModInformation.IsServer;
 }
