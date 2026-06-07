@@ -30,10 +30,9 @@ namespace GameInterface.Services.ItemRosters.Handlers
         {
             ClearItemRoster msg = payload.What;
 
-            ItemRoster roster;
-            if (!objectManager.TryGetObjectWithLogging(msg.PartyBaseID, out PartyBase partyBase)) return;
+            if (!objectManager.TryGetObjectWithLogging<ItemRoster>(msg.ItemRosterId, out var itemRoster)) return;
 
-            ItemRosterPatch.ClearOverride(partyBase.ItemRoster);
+            ItemRosterPatch.ClearOverride(itemRoster);
         }
 
         public void Dispose()

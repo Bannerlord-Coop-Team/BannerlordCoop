@@ -1,22 +1,23 @@
-﻿using TaleWorlds.Core;
+﻿using Common.Messaging;
+using GameInterface.Services.UI.Messages;
 using SandBox.View;
 using SandBox.ViewModelCollection.SaveLoad;
-using TaleWorlds.Engine.Screens;
-using TaleWorlds.Engine.GauntletUI;
-using TaleWorlds.Library;
 using System;
-using TaleWorlds.MountAndBlade;
-using TaleWorlds.SaveSystem.Load;
-using TaleWorlds.Engine;
-using TaleWorlds.Localization;
 using System.Linq;
-using TaleWorlds.SaveSystem;
-using TaleWorlds.ScreenSystem;
-using TaleWorlds.MountAndBlade.View;
+using TaleWorlds.Core;
+using TaleWorlds.Engine;
+using TaleWorlds.Engine.GauntletUI;
+using TaleWorlds.Engine.Screens;
 using TaleWorlds.InputSystem;
+using TaleWorlds.Library;
+using TaleWorlds.LinQuick;
+using TaleWorlds.Localization;
+using TaleWorlds.MountAndBlade;
+using TaleWorlds.MountAndBlade.View;
+using TaleWorlds.SaveSystem;
+using TaleWorlds.SaveSystem.Load;
+using TaleWorlds.ScreenSystem;
 using TaleWorlds.TwoDimension;
-using Common.Messaging;
-using GameInterface.Services.UI.Messages;
 
 namespace Coop.UI.LoadGameUI
 {
@@ -59,20 +60,23 @@ namespace Coop.UI.LoadGameUI
 		private new SelectedGameVM CurrentSelectedSave;
         public CoopLoadUI() : base(false, false)
         {
-            GetSavedGames().Clear();
-            SaveGameFileInfo[] saveFiles = MBSaveLoad.GetSaveFiles();
-            for (int i = 0; i < saveFiles.Length; i++)
+            Initialize();
+
+            foreach (var group in SaveGroups)
             {
-                SelectedGameVM item = new SelectedGameVM(saveFiles[i], IsSaving, new Action<SavedGameVM>(OnDeleteSavedGame), new Action<SavedGameVM>(OnSaveSelection), new Action(OnCancelLoadSave), new Action(ExecuteDone));
-                GetSavedGames().Add(item);
+                var saves = group.SavedGamesList;
+                for (int i = 0; i < saves.Count; i++)
+                {
+                    saves[i] = new SelectedGameVM(saves[i].Save, IsSaving, OnDeleteSavedGame, OnSaveSelection, OnCancelLoadSave, ExecuteDone);
+                }
             }
             OnSaveSelection(GetSavedGames().FirstOrDefault());
             RefreshValues();
         }
 
-        private void OnSaveSelection(SavedGameVM saveGame)
+        private new void OnSaveSelection(SavedGameVM saveGame)
         {
-            SelectedGameVM save = (SelectedGameVM)saveGame;
+            var save = (SelectedGameVM)saveGame;
             if (save != CurrentSelectedSave)
             {
                 if (CurrentSelectedSave != null)
@@ -90,7 +94,7 @@ namespace Coop.UI.LoadGameUI
 
         public new void ExecuteLoadSave()
         {
-            SelectedGameVM currentSelectedSave = CurrentSelectedSave;
+            var currentSelectedSave = CurrentSelectedSave;
             if (currentSelectedSave == null)
             {
                 return;
@@ -103,11 +107,11 @@ namespace Coop.UI.LoadGameUI
             ScreenManager.PopScreen();
         }
 
-        private void OnCancelLoadSave()
+        private new void OnCancelLoadSave()
         {
         }
 
-        private void OnDeleteSavedGame(SavedGameVM savedGame)
+        private new void OnDeleteSavedGame(SavedGameVM savedGame)
         {
             string titleText = new TextObject("{=QHV8aeEg}Delete Save", null).ToString();
             string text = new TextObject("{=HH2mZq8J}Are you sure you want to delete this save game?", null).ToString();

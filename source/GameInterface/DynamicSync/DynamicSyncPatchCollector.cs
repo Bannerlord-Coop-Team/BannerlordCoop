@@ -5,9 +5,9 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 
-namespace GameInterface.AutoSync;
+namespace GameInterface.DynamicSync;
 
-public interface IAutoSyncPatchCollector : IDisposable
+public interface IDynamicSyncPatchCollector : IDisposable
 {
     void AddPrefix(MethodBase patchMethod, MethodInfo patch);
     void AddPostfix(MethodBase patchMethod, MethodInfo patch);
@@ -16,9 +16,9 @@ public interface IAutoSyncPatchCollector : IDisposable
     void UnpatchAll();
 }
 
-class AutoSyncPatchCollector : IAutoSyncPatchCollector
+class DynamicSyncPatchCollector : IDynamicSyncPatchCollector
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<AutoSyncPatchCollector>();
+    private static readonly ILogger Logger = LogManager.GetLogger<DynamicSyncPatchCollector>();
 
     public static readonly HashSet<(MethodBase, MethodInfo, HarmonyPatchType)> PatchedMethods = new();
 
@@ -27,7 +27,7 @@ class AutoSyncPatchCollector : IAutoSyncPatchCollector
     private readonly List<(MethodBase, MethodInfo)> transpilers = new();
     private readonly List<(MethodBase, MethodInfo)> prefixes = new();
     private readonly List<(MethodBase, MethodInfo)> postfixes = new();
-    public AutoSyncPatchCollector(Harmony harmony)
+    public DynamicSyncPatchCollector(Harmony harmony)
     {
         this.harmony = harmony;
     }

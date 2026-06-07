@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Util;
+using GameInterface.Policies;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Time;
 using HarmonyLib;
@@ -27,7 +28,7 @@ internal class TimePatches
         // to publish the TimeSpeedChanged message.
         // To do this we skip this method if this thread is not "allowed"
         // We set this thread to "allowed" in AllowTimeControlFromControlsPatches
-        if (AllowedThread.IsThisThreadAllowed() == false) return false;
+        if (CallOriginalPolicy.IsOriginalAllowed() == false) return false;
 
         if (value != __instance._timeControlMode)
         {

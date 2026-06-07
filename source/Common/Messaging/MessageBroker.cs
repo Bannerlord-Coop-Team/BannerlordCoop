@@ -65,8 +65,15 @@ namespace Common.Messaging
                     continue;
                 }
 
-                // Making synchronous to maintain sequencing of packets
-                weakDelegate.Invoke(new object[] { payload });
+                try
+                {
+                    // Making synchronous to maintain sequencing of packets
+                    weakDelegate.Invoke(new object[] { payload });
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to run {Method}", (weakDelegate.Instance as WeakDelegate)?.Method.Name ?? "<null>");
+                }
             }
         }
 

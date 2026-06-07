@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using GameInterface.Registry;
+using GameInterface.Registry.Messages;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.MobileParties.Messages;
@@ -26,17 +27,15 @@ public class InitialServerState : ServerStateBase
         this.messageBroker = messageBroker;
         this.network = network;
         this.registryManager = registryManager;
-        messageBroker.Subscribe<CampaignReady>(Handle_GameLoaded);
+        messageBroker.Subscribe<CampaignReady>(Handle_CampaignReady);
     }
-
-
 
     public override void Dispose()
     {
-        messageBroker.Unsubscribe<CampaignReady>(Handle_GameLoaded);
+        messageBroker.Unsubscribe<CampaignReady>(Handle_CampaignReady);
     }
 
-    internal void Handle_GameLoaded(MessagePayload<CampaignReady> payload)
+    internal void Handle_CampaignReady(MessagePayload<CampaignReady> payload)
     {
         // Start server when game is fully loaded
         network.Start();

@@ -15,6 +15,7 @@ using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using static TaleWorlds.Core.Equipment;
 
 namespace GameInterface.Services.Inventory.Interfaces
 {
@@ -32,6 +33,10 @@ namespace GameInterface.Services.Inventory.Interfaces
             SettlementComponent currentSettlementComponent,
             List<(ItemRosterElement, int)> boughtItems,
             List<(ItemRosterElement, int)> soldItems);
+
+        void UpdateRosterWithData(ItemRoster targetItemRoster, ItemRosterElement[] itemRosterElements);
+
+        void UpdateEquipmentWithData(MobileParty mobileParty, Dictionary<CharacterObject, Equipment[]> characterEquipments);
     }
 
     internal class InventoryLogicInterface : IInventoryLogicInterface
@@ -141,8 +146,6 @@ namespace GameInterface.Services.Inventory.Interfaces
                     {
                         MobilePartyHelper.PartyAddSharedXp(ownerHero.PartyBelongedTo, (float)xpBonusForDiscardingItems);
                     }
-
-                    //toRoster.AddToCounts(rosterElement.EquipmentElement, -rosterElement.Amount);
                 }
             }
 
@@ -166,9 +169,51 @@ namespace GameInterface.Services.Inventory.Interfaces
                 // TODO
                 GiveGoldAction.ApplyForCharacterToParty(null, partyBase, totalAmount, false);
             }
+        }
 
-            // No idea what this does
-            //__instance._partyInitialEquipment = new InventoryLogic.PartyEquipment(__instance.OwnerParty);
+        public void UpdateRosterWithData(ItemRoster targetItemRoster, ItemRosterElement[] itemRosterElements)
+        {
+            if (itemRosterElements == null) return;
+
+            targetItemRoster.Clear();
+
+            // Rebuild roster with new data
+            targetItemRoster.Add(itemRosterElements);
+        }
+
+        public void UpdateEquipmentWithData(MobileParty mobileParty, Dictionary<CharacterObject, Equipment[]> characterEquipments)
+        {
+            foreach (KeyValuePair<CharacterObject, Equipment[]> characterEquipment in characterEquipments)
+            {
+                CharacterObject character = characterEquipment.Key;
+
+                foreach (Equipment equipment in characterEquipment.Value)
+                {
+                    Equipment targetEquipment = null;
+                    if (equipment._equipmentType == EquipmentType.Battle)
+                    {
+                        targetEquipment = character.FirstBattleEquipment;
+                    }
+                    else if (equipment._equipmentType == EquipmentType.Civilian)
+                    {
+                        targetEquipment = character.FirstCivilianEquipment;
+                    }
+                    else if (equipment._equipmentType == EquipmentType.Stealth)
+                    {
+                        targetEquipment = character.FirstStealthEquipment;
+                    }
+
+                    if (targetEquipment != null)
+                    {
+                        for (int i = 0; i < EquipmentSlotLength; i++)
+                        {
+                            targetEquipment._itemSlots[i] = equipment._itemSlots[i];
+                        }
+                    }
+                }
+            }
+
+            mobileParty.Party.SetVisualAsDirty();
         }
     }
 }

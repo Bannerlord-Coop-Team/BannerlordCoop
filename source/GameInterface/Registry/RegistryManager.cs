@@ -1,5 +1,5 @@
 ﻿using Common.Messaging;
-using GameInterface.AutoSync;
+using GameInterface.DynamicSync;
 using GameInterface.Registry.Auto;
 using GameInterface.Registry.Messages;
 using GameInterface.Services.MobileParties.Extensions;
@@ -20,14 +20,14 @@ internal class RegistryManager : IRegistryManager
     private readonly IRegistryCollection registryCollection;
     private readonly IMessageBroker messageBroker;
     private readonly IAutoRegistryFactory autoRegistryFactory;
-    private readonly IAutoSyncPatchCollector autoSyncPatchCollector;
+    private readonly IDynamicSyncPatchCollector autoSyncPatchCollector;
 
     public RegistryManager(
         IObjectManager objectManager,
         IRegistryCollection registryCollection,
         IMessageBroker messageBroker,
         IAutoRegistryFactory autoRegistryFactory,
-        IAutoSyncPatchCollector autoSyncPatchCollector)
+        IDynamicSyncPatchCollector autoSyncPatchCollector)
     {
         this.objectManager = objectManager;
         this.registryCollection = registryCollection;
