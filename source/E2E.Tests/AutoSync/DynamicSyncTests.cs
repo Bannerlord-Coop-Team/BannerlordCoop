@@ -40,11 +40,6 @@ public class DynamicSyncTests : IDisposable
             var objectManager = container.Resolve<IObjectManager>();
 
             objectManager.AddExisting(instanceId, testClass);
-
-            var autosyncBuilder = container.Resolve<IAutoSyncBuilder>();
-
-            autosyncBuilder.AddField(AccessTools.Field(typeof(AutoSyncTestClass), nameof(AutoSyncTestClass.MyInt)));
-            autosyncBuilder.Build();
         }
 
         server.Resolve<IDynamicSyncPatchCollector>().PatchAll();

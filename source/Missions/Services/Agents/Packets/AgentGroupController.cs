@@ -1,15 +1,30 @@
-﻿using System;
+﻿using Common.Logging;
+using LiteNetLib;
+using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Packets
 {
+    /// <summary>
+    /// Agent Grouping Controller for agents controlled by a connected peer
+    /// </summary>
     public class AgentGroupController
     {
-        public IReadOnlyDictionary<Guid, Agent> ControlledAgents => m_ControlledAgents;
-        private readonly Dictionary<Guid, Agent> m_ControlledAgents = new Dictionary<Guid, Agent>();
+        private static readonly ILogger Logger = LogManager.GetLogger<AgentGroupController>();
 
+        public IReadOnlyDictionary<Guid, Agent> ControlledAgents => m_ControlledAgents;
+        public NetPeer ControllingPeer { get; }
+
+        public AgentGroupController(NetPeer controllingPeer)
+        {
+            ControllingPeer = controllingPeer;
+        }
+
+        private readonly Dictionary<Guid, Agent> m_ControlledAgents = new Dictionary<Guid, Agent>();
+        
         public bool Contains(Agent agent)
         {
             return m_ControlledAgents.Values.Contains(agent);
@@ -43,7 +58,7 @@ namespace Missions.Services.Agents.Packets
             }
             else
             {
-                throw new InvalidOperationException($"{movement.AgentId} has not been registered as a controlled agent");
+                Logger.Warning($"{movement.AgentId} has not been registered as a controlled agent");
             }
         }
     }

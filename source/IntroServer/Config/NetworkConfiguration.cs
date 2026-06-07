@@ -2,13 +2,14 @@
 using System;
 using System.Net;
 using IntroServer.Server;
+using Common.Network;
 
 namespace IntroServer.Config
 {
     /// <summary>
     ///     Network settings for both client & server.
     /// </summary>
-    public class NetworkConfiguration
+    public class NetworkConfiguration : INetworkConfiguration
     {
         /// <summary>
         ///     ip address of the server in LAN.
@@ -19,7 +20,7 @@ namespace IntroServer.Config
         /// </summary>
         public int LanPort { get; } = 4201;
 
-        private string WanAddressText { get; set; }
+        private string WanAddressText { get; set; } = "144.202.53.18";
         /// <summary>
         ///     ip address of the server in WAN.
         /// </summary>
@@ -71,6 +72,22 @@ namespace IntroServer.Config
 #else
         public NatAddressType NATType { get; } = NatAddressType.External;
 #endif
+
+        public string Address => WanAddressText;
+
+        public int Port => WanPort;
+
+        public string Token => P2PToken;
+
+        public TimeSpan ConnectionTimeout => DisconnectTimeout;
+
+        public int MaxPacketsInQueue => 1000;
+
+        public TimeSpan AuditTimeout => DisconnectTimeout;
+
+        public TimeSpan ObjectCreationTimeout => DisconnectTimeout;
+
+        public TimeSpan NetworkPollInterval => UpdateTime;
         #endregion
     }
 }

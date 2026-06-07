@@ -5,7 +5,7 @@ using System;
 namespace Missions.Services.BoardGames.Messages
 {
     [ProtoContract]
-    public readonly struct BoardGameMoveRequest : INetworkEvent
+    public readonly struct BoardGameMoveRequest : ICommand
     {
         public BoardGameMoveRequest(Guid gameId, int fromIndex, int toIndex)
         {

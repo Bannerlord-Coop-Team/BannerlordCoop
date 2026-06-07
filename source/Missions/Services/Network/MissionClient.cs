@@ -77,7 +77,7 @@ namespace Missions.Services.Network
             _client.SendEvent(request, peer);
             Logger.Information("Sent {AgentType} Join Request for {AgentName}({PlayerID}) to {Peer}",
                 characterObject.IsPlayerCharacter ? "Player" : "Agent",
-                characterObject.Name, request.PlayerId, peer.EndPoint);
+                characterObject.Name, request.PlayerId, peer);
         }
 
         private void Handle_JoinInfo(MessagePayload<MissionJoinInfo> payload)
@@ -92,7 +92,7 @@ namespace Missions.Services.Network
 
             Logger.Information("Spawning {EntityType} called {AgentName}({AgentID}) from {Peer}",
                 joinInfo.CharacterObject.IsPlayerCharacter ? "Player" : "Agent",
-                joinInfo.CharacterObject.Name, newAgentId, netPeer.EndPoint);
+                joinInfo.CharacterObject.Name, newAgentId, netPeer);
             // TODO remove test code
             Agent newAgent = MissionTestGameManager.SpawnAgent(startingPos, joinInfo.CharacterObject);
             _agentRegistry.RegisterNetworkControlledAgent(netPeer, newAgentId, newAgent);

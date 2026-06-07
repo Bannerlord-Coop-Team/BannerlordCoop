@@ -16,6 +16,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using static TaleWorlds.Core.Equipment;
+using MathF = TaleWorlds.Library.MathF;
 
 namespace GameInterface.Services.Inventory.Interfaces
 {
