@@ -232,11 +232,12 @@
     <Content Include="ILLink\ILLink.Descriptors.LibraryBuild.xml" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- Deploy module into the Bannerlord install (mb2 junction). See Deploy.targets. -->
   <PropertyGroup>
-    <PostBuildEvent>powershell -NoProfile -ExecutionPolicy Unrestricted ^
--File "$(SolutionDir)..\deploy.ps1" ^
--SolutionDir "$(SolutionDir)\" ^
--TargetDir "$(ProjectDir)bin\$(Configuration)\\" ^
--ConfigPath "$(SolutionDir)..\config_coop.json"</PostBuildEvent>
+    <ModName>Coop</ModName>
+    <MainClass>CoopMod</MainClass>
+    <ModVersion>v0.0.1</ModVersion>
+    <GameVersion>v1.3.12</GameVersion>
   </PropertyGroup>
+  <Import Project="$(MSBuildProjectDirectory)\..\..\Deploy.targets" />
 </Project>
