@@ -50,6 +50,9 @@ public class LoadingState : ClientStateBase
 
         InstantiateDeferredHeroes();
 
+        // Testing if this is an issue
+        //RegisterPlayerAsControlled();
+
         heroInterface.SwitchToPlayer(Logic.Player);
 
         Logic.EnterCampaignState();
