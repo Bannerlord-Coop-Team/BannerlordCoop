@@ -2,6 +2,7 @@
 using Coop.Core.Client.Services.Heroes.Data;
 using GameInterface;
 using GameInterface.Registry;
+using GameInterface.Services.Entity;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
@@ -17,18 +18,24 @@ public class LoadingState : ClientStateBase
     private readonly IRegistryManager registryManager;
     private readonly IDeferredHeroRepository deferredHeroRepo;
     private readonly IHeroInterface heroInterface;
+    private readonly IControllerIdProvider controllerIdProvider;
+    private readonly IControlledEntityRegistry controlledEntityRegistry;
 
     public LoadingState(
         IClientLogic logic,
         IMessageBroker messageBroker,
         IRegistryManager registryManager,
         IDeferredHeroRepository deferredHeroRepo,
-        IHeroInterface heroInterface) : base(logic)
+        IHeroInterface heroInterface,
+        IControllerIdProvider controllerIdProvider,
+        IControlledEntityRegistry controlledEntityRegistry) : base(logic)
     {
         this.messageBroker = messageBroker;
         this.registryManager = registryManager;
         this.deferredHeroRepo = deferredHeroRepo;
         this.heroInterface = heroInterface;
+        this.controllerIdProvider = controllerIdProvider;
+        this.controlledEntityRegistry = controlledEntityRegistry;
 
         messageBroker.Subscribe<CampaignReady>(Handle_CampaignLoaded);
     }
@@ -49,6 +56,8 @@ public class LoadingState : ClientStateBase
         registryManager.PatchLifetimes();
 
         InstantiateDeferredHeroes();
+
+        RegisterPlayerAsControlled();
 
         heroInterface.SwitchToPlayer(Logic.Player);
 
@@ -87,6 +96,22 @@ public class LoadingState : ClientStateBase
 
     public override void ValidateModules()
     {
+    }
+
+    /// <summary>
+    /// Registers the client's own hero and party as controlled by this client so that
+    /// the client owns its party's movement/AI once it switches to it. Mirrors the
+    /// server registering all parties as controlled when its save loads.
+    /// </summary>
+    private void RegisterPlayerAsControlled()
+    {
+        var player = Logic.Player;
+        if (player == null) return;
+
+        var controllerId = controllerIdProvider.ControllerId;
+
+        controlledEntityRegistry.RegisterAsControlled(controllerId, player.HeroId);
+        controlledEntityRegistry.RegisterAsControlled(controllerId, player.MobilePartyId);
     }
 
     private void InstantiateDeferredHeroes()
