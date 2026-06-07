@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
@@ -18,6 +19,7 @@ class DebugPatches
     [HarmonyPostfix]
     static void Postfix_IsLastSpeedCacheInvalid(MobileParty __instance)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (__instance.IsPlayerParty() || __instance == MobileParty.MainParty)
         {
             ;

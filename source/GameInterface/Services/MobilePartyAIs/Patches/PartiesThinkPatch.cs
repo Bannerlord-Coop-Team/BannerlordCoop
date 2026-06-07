@@ -4,6 +4,7 @@ using HarmonyLib;
 using Serilog;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.MobilePartyAIs.Patches;
 
@@ -24,6 +25,7 @@ internal class PartiesThinkPatch
     [HarmonyPrefix]
     private static bool PartiesThinkPrefix(Campaign __instance, ref float dt)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (ModInformation.IsClient) return false;
 
         if (delay.IsCompleted == false) return false;

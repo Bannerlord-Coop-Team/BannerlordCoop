@@ -2,6 +2,7 @@
 using HarmonyLib;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Heroes.Patches
 {
@@ -21,6 +22,7 @@ namespace GameInterface.Services.Heroes.Patches
         [HarmonyPatch(nameof(Hero.IsHumanPlayerCharacter),MethodType.Getter)]
         private static bool IsHumanPlayerCharacterPrefix(Hero __instance, ref bool __result)
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
             __result = Campaign.Current.CampaignObjectManager.GetPlayerMobileParties().Any(party => party.LeaderHero == __instance);
             return false;
         }

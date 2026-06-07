@@ -1,6 +1,7 @@
 using HarmonyLib;
 using System.Reflection;
 using TaleWorlds.Engine;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.UI.Patches;
 
@@ -34,6 +35,7 @@ internal static class LoadingWindowPatches
     [HarmonyPrefix]
     private static bool DisableGlobalLoadingWindowPrefix()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         // Skip the disable entirely while we are forcing the window to remain visible.
         return !ForceLoadingWindow;
     }

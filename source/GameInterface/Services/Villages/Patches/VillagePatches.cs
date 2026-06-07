@@ -21,7 +21,11 @@ internal class VillagePatches
 {
     [HarmonyPatch("DailyTick")]
     [HarmonyPrefix]
-    private static bool DailyTickPrefix() => ModInformation.IsServer;
+    private static bool DailyTickPrefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return ModInformation.IsServer;
+    }
 
 
     [HarmonyPatch(nameof(Village.VillageState), MethodType.Setter)]
@@ -55,7 +59,11 @@ internal class VillagePatches
     // But good for more investigating soon.
     [HarmonyPatch(nameof(Village.Bound), MethodType.Setter)]
     [HarmonyPrefix]
-    private static bool BoundPrefix() => true;
+    private static bool BoundPrefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return true;
+    }
 
 
     [HarmonyPatch(nameof(Village.Hearth), MethodType.Setter)]

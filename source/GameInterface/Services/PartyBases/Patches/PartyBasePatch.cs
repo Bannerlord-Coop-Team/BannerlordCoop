@@ -2,6 +2,7 @@
 using Helpers;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Party;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.PartyBases.Patches;
 
@@ -12,6 +13,7 @@ internal class PartyBaseHelperPatch
     [HarmonyPrefix]
     public static bool HasFeat(PartyBase party, FeatObject feat, ref bool __result)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (party == null)
             __result = false;
         if (party.LeaderHero != null)

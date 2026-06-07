@@ -33,6 +33,7 @@ internal class PartyLifetimePatches
     [HarmonyPostfix]
     private static void PostfixCtor(MobileParty __instance)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         Logger.Debug("[{Instance}] MobileParty created with name {partyName}, {StringId}", __instance, __instance.Name, __instance.StringId);
     }
 }

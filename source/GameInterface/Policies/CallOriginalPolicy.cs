@@ -7,10 +7,15 @@ namespace GameInterface.Policies;
 
 public class CallOriginalPolicy
 {
+    public static bool DisablePatches = true;
+
     private static readonly ILogger Logger = LogManager.GetLogger<CallOriginalPolicy>();
 
     public static bool IsOriginalAllowed()
     {
+        // Allow original when patches are disabled
+        if (DisablePatches) return true;
+
         // While using allowed thread, allow original call
         if (AllowedThread.IsThisThreadAllowed()) return true;
 

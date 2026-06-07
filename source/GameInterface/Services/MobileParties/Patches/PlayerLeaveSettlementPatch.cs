@@ -8,6 +8,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
@@ -27,6 +28,7 @@ internal class PlayerLeaveSettlementPatch
 
     private static bool Prefix()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         var party = MobileParty.MainParty;
 
         var message = new EndSettlementEncounterAttempted(party);

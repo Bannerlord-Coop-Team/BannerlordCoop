@@ -37,6 +37,7 @@ public static class PartyBehaviorPatch
     [HarmonyPatch("Tick")]
     private static bool TickPrefix(ref MobilePartyAi __instance)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (MobilePartyAiConfig.ENABLED) return true;
             
         // This disables AI

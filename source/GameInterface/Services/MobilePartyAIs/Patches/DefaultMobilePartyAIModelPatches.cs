@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Party;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.MobilePartyAIs.Patches;
 
@@ -20,6 +21,7 @@ internal class DefaultMobilePartyAIModelPatches
         MobileParty targetParty,
         ref bool __result)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (!__result)
             return;
 

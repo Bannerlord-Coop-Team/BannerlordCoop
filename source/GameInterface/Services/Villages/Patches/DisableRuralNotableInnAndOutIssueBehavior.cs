@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using SandBox.Issues;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Villages.Patches;
 
@@ -7,5 +8,9 @@ namespace GameInterface.Services.Villages.Patches;
 internal class DisableRuralNotableInnAndOutIssueBehavior
 {
     [HarmonyPatch(nameof(RuralNotableInnAndOutIssueBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return false;
+    }
 }

@@ -3,6 +3,7 @@ using HarmonyLib;
 using TaleWorlds.CampaignSystem.ViewModelCollection;
 using TaleWorlds.Core.ViewModelCollection.Information;
 using TaleWorlds.MountAndBlade.GauntletUI;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.ItemRosters.Patches;
 
@@ -13,6 +14,7 @@ internal class AllowTooltipProperty
     [HarmonyPrefix]
     private static void PrefixRefreshValue()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         AllowedThread.AllowThisThread();
     }
 
@@ -20,6 +22,7 @@ internal class AllowTooltipProperty
     [HarmonyPostfix]
     private static void PostfixRefreshValue()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         AllowedThread.RevokeThisThread();
     }
 }
@@ -31,6 +34,7 @@ internal class AllowInformationView
     [HarmonyPrefix]
     private static void PrefixRefreshValue()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         AllowedThread.AllowThisThread();
     }
 
@@ -38,6 +42,7 @@ internal class AllowInformationView
     [HarmonyPostfix]
     private static void PostfixRefreshValue()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         AllowedThread.RevokeThisThread();
     }
 }
@@ -49,6 +54,7 @@ internal class AllowTooltipRefresher
     [HarmonyPrefix]
     private static void PrefixRefreshValue()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         AllowedThread.AllowThisThread();
     }
 
@@ -56,6 +62,7 @@ internal class AllowTooltipRefresher
     [HarmonyPostfix]
     private static void PostfixRefreshValue()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         AllowedThread.RevokeThisThread();
     }
 }

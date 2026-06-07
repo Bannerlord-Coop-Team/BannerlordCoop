@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Buildings.Patches
 {
@@ -13,6 +14,7 @@ namespace GameInterface.Services.Buildings.Patches
         [HarmonyPrefix]
         private static bool CurrentLevelPrefix()
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
             return false;
         }
 
@@ -20,6 +22,7 @@ namespace GameInterface.Services.Buildings.Patches
         [HarmonyPrefix]
         private static bool LevelUpPrefix()
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
             return false;
         }
 
@@ -27,6 +30,7 @@ namespace GameInterface.Services.Buildings.Patches
         [HarmonyPrefix]
         private static bool LevelDownPrefix()
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
             return false;
         }
 
@@ -34,6 +38,7 @@ namespace GameInterface.Services.Buildings.Patches
         [HarmonyPrefix]
         private static bool HitPointChangedPrefix()
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
             return false;
         }
     }

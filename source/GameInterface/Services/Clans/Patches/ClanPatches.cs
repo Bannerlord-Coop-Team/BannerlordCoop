@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Clans.Patches
 {
@@ -14,6 +15,7 @@ namespace GameInterface.Services.Clans.Patches
         [HarmonyPrefix]
         static bool PlayerClanGetter()
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
             if (Campaign.Current == null) return false;
 
             return true;

@@ -3,6 +3,7 @@ using GameInterface.Services.Banners.Messages;
 using HarmonyLib;
 using SandBox.GauntletUI.BannerEditor;
 using TaleWorlds.CampaignSystem;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Banners.Patches
 {
@@ -16,6 +17,7 @@ namespace GameInterface.Services.Banners.Patches
         // Postfix: the original OnDone has already applied the edited banner and colors to the clan locally.
         static void Postfix(GauntletBannerEditorScreen __instance)
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return;
             Clan clan = __instance._clan;
 
             if (clan?.Banner == null) return;

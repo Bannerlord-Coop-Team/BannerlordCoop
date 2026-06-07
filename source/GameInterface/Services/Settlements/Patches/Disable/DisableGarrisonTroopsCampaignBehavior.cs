@@ -1,6 +1,7 @@
 ﻿using Common;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Settlements.Patches.Disable;
 
@@ -9,5 +10,9 @@ namespace GameInterface.Services.Settlements.Patches.Disable;
 internal class DisableGarrisonTroopsCampaignBehavior
 {
     [HarmonyPatch(nameof(GarrisonTroopsCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => ModInformation.IsServer;
+    static bool Prefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return ModInformation.IsServer;
+    }
 }

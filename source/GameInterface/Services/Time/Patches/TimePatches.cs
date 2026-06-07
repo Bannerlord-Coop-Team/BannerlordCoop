@@ -9,6 +9,7 @@ using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.ViewModelCollection.Map.MapBar;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Heroes.Patches;
 
@@ -23,6 +24,7 @@ internal class TimePatches
     [HarmonyPatch(MethodType.Setter)]
     private static bool Prefix(ref Campaign __instance, ref CampaignTimeControlMode value)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         // We only want ExecuteTimeControlChange, which is called from the time control button clicks,
         // to publish the TimeSpeedChanged message.
         // To do this we skip this method if this thread is not "allowed"
@@ -42,6 +44,7 @@ internal class TimePatches
     [HarmonyPatch(MethodType.Getter)]
     private static void Postfix(ref CampaignTimeControlMode __result)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         __result = CurrentMode;
     }
 
@@ -62,6 +65,7 @@ internal class AllowTimeControlFromControlsPatches
     [HarmonyPrefix]
     private static bool ExecuteTimeControlChangePrefix(ref MapTimeControlVM __instance, int selectedTimeSpeed)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         using (new AllowedThread())
         {
             int num = selectedTimeSpeed;

@@ -1,6 +1,7 @@
 ﻿using Common;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Settlements;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Settlements.Patches;
 
@@ -13,9 +14,17 @@ internal class EntitiesSpottedSettlementPatch
 {
     [HarmonyPatch(nameof(Settlement.NearbyLandThreatIntensity), MethodType.Setter)]
     [HarmonyPrefix]
-    static bool NumberEnemiesSpottedPrefix() => ModInformation.IsServer;
+    static bool NumberEnemiesSpottedPrefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return ModInformation.IsServer;
+    }
 
     [HarmonyPatch(nameof(Settlement.NearbyLandAllyIntensity), MethodType.Setter)]
     [HarmonyPrefix]
-    static bool NumberAlliesSpottedPrefix() => ModInformation.IsServer;
+    static bool NumberAlliesSpottedPrefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return ModInformation.IsServer;
+    }
 }

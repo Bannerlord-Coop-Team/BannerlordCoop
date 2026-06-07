@@ -9,6 +9,7 @@ using System.Text;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.HeroDevelopers.Patches
 {
@@ -21,6 +22,7 @@ namespace GameInterface.Services.HeroDevelopers.Patches
         [HarmonyPrefix]
         public static bool GainRawXp(ref HeroDeveloper __instance, float rawXp, bool shouldNotify)
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
             // Publish message with data
             var message = new RawXpGain(__instance, rawXp, shouldNotify);
             MessageBroker.Instance.Publish(__instance, message);

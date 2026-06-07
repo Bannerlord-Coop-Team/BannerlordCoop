@@ -23,6 +23,7 @@ internal class PlayerStartCaptivityPatches
     [HarmonyPostfix]
     private static void Postfix_PartyBelongedToAsPrisoner(Hero __instance, PartyBase value)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (ModInformation.IsServer) return;
 
         // Did not change

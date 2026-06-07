@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Kingdoms.Patches
 {
@@ -14,6 +15,7 @@ namespace GameInterface.Services.Kingdoms.Patches
         [HarmonyPrefix]
         public static bool ConsiderPolicyPrefix()
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
             return false;
         }
 
@@ -21,6 +23,7 @@ namespace GameInterface.Services.Kingdoms.Patches
         [HarmonyPostfix]
         public static void ConsiderPolicyPostfix(ref bool __result)
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return;
             __result = false;
         }
     }

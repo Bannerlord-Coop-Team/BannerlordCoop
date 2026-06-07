@@ -9,6 +9,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Party.Patches;
 
@@ -21,6 +22,7 @@ internal class PartyScreenHelperPatches
     [HarmonyPrefix]
     public static bool SellPrisonersDoneHandlerPrefix(ref bool __result, TroopRoster leftPrisonRoster)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         var message = new PrisonersSold(MobileParty.MainParty.Party, leftPrisonRoster);
         MessageBroker.Instance.Publish(null, message);
 
@@ -32,6 +34,7 @@ internal class PartyScreenHelperPatches
     [HarmonyPrefix]
     public static bool DonateGarrisonDoneHandlerPrefix(ref bool __result, TroopRoster leftMemberRoster)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         Settlement currentSettlement = Hero.MainHero.CurrentSettlement;
 
         var message = new GarrisonDonated(currentSettlement, leftMemberRoster);
@@ -45,6 +48,7 @@ internal class PartyScreenHelperPatches
     [HarmonyPrefix]
     public static bool DonatePrisonersDoneHandlerPrefix(ref bool __result, FlattenedTroopRoster rightSideTransferredPrisonerRoster, PartyBase rightParty = null)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (!rightSideTransferredPrisonerRoster.IsEmpty<FlattenedTroopRosterElement>())
         {
             Settlement currentSettlement = Hero.MainHero.CurrentSettlement;
@@ -61,6 +65,7 @@ internal class PartyScreenHelperPatches
     [HarmonyPrefix]
     public static bool ManageGarrisonDoneHandlerPrefix(ref bool __result, TroopRoster leftMemberRoster, TroopRoster leftPrisonRoster)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         Settlement currentSettlement = Hero.MainHero.CurrentSettlement;
 
         var message = new GarrisonManaged(currentSettlement, leftMemberRoster, leftPrisonRoster);
@@ -74,6 +79,7 @@ internal class PartyScreenHelperPatches
     [HarmonyPrefix]
     public static bool HandleReleasedAndTakenPrisonersPrefix(FlattenedTroopRoster takenPrisonerRoster, FlattenedTroopRoster releasedPrisonerRoster)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         var message = new PrisonersReleasedAndTaken(releasedPrisonerRoster, takenPrisonerRoster);
         MessageBroker.Instance.Publish(null, message);
 

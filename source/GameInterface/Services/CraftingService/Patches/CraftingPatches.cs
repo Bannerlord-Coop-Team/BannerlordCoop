@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using Helpers;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.CraftingService.Patches
 {
@@ -13,6 +14,7 @@ namespace GameInterface.Services.CraftingService.Patches
         [HarmonyPrefix]
         private static bool OpenCraftingPrefix()
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
             return true;
         }
     }

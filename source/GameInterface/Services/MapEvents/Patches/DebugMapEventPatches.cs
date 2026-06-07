@@ -8,6 +8,7 @@ using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
@@ -20,6 +21,7 @@ internal class DebugMapEventPatches
     [HarmonyPrefix]
     private static bool PrefixBattleState(TroopUpgradeTracker __instance, ref TroopRosterElement el, PartyBase owner, int __result)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         // Disable on client for now
         if (ModInformation.IsClient)
         {
@@ -34,6 +36,7 @@ internal class DebugMapEventPatches
     [HarmonyPrefix]
     private static void Prefix_BattleState(PartyBase attackerParty, PartyBase defenderParty, Settlement settlement)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         ;
     }
 }

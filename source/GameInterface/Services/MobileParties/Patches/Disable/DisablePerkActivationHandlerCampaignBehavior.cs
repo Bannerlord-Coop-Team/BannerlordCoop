@@ -1,6 +1,7 @@
 ﻿using Common;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
@@ -8,5 +9,9 @@ namespace GameInterface.Services.MobileParties.Patches;
 internal class DisablePerkActivationHandlerCampaignBehavior
 {
     [HarmonyPatch(nameof(PerkActivationHandlerCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => ModInformation.IsServer;
+    static bool Prefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return ModInformation.IsServer;
+    }
 }

@@ -5,6 +5,7 @@ using System.Text;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Incidents;
 using TaleWorlds.Core;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.UI.Patches
 {
@@ -15,6 +16,7 @@ namespace GameInterface.Services.UI.Patches
         [HarmonyPrefix]
         public static bool InvokeIncidentPatch(Incident incident)
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
             return false;
         }
     }

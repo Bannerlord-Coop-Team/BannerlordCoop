@@ -9,6 +9,7 @@ using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.Core;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
@@ -21,6 +22,7 @@ internal class MobilePartyRobustnessPatches
     [HarmonyPostfix]
     private static void Postfix(ref MobileParty __instance, ref AnchorPoint __result)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (__result is null)
         {
             var anchor = new AnchorPoint(__instance);
@@ -33,6 +35,7 @@ internal class MobilePartyRobustnessPatches
     [HarmonyPrefix]
     private static bool Prefix(WarPartyComponent __instance, ref Banner __result)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (__instance.MobileParty == null)
         {
             Logger.Error("WarPartyComponent.GetDefaultComponentBanner: MobileParty is null, returning null banner");

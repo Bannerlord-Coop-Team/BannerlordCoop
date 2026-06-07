@@ -2,6 +2,7 @@
 using HarmonyLib;
 using System.Diagnostics;
 using TaleWorlds.CampaignSystem.Party;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
@@ -13,6 +14,7 @@ internal class PartyIsSpottedServerPatch
 {
     private static void Postfix(ref bool __result)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (ModInformation.IsServer || Debugger.IsAttached)
         {
             __result = true;
@@ -27,6 +29,7 @@ internal class PartyVisibilityOnServerPatch
     [HarmonyPatch(nameof(MobileParty.IsVisible), MethodType.Getter)]
     private static void PostfixIsVisible(MobileParty __instance, ref bool __result)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (ModInformation.IsServer || Debugger.IsAttached)
         {
             // Return is active (inactive is player captivity)
@@ -43,6 +46,7 @@ internal class PartyVisibilityOnServerPatch
     [HarmonyPatch(nameof(MobileParty.IsInspected), MethodType.Setter)]
     private static void PrefixIsInspected(ref bool value)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (ModInformation.IsServer || Debugger.IsAttached)
         {
             value = true;

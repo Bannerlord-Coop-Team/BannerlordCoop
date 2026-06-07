@@ -6,6 +6,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
@@ -16,6 +17,7 @@ internal class RecruitmentCampaignBehaviorPatch
     [HarmonyPatch("CheckRecruiting")]
     private static bool CheckRecruitingPrefix(ref MobileParty mobileParty, ref Settlement settlement)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         // TODO only allow for server and broadcast when it happens
         return true;
     }
@@ -24,6 +26,7 @@ internal class RecruitmentCampaignBehaviorPatch
     [HarmonyPatch("HourlyTickParty")]
     private static bool HourlyTickPartyPrefix(ref MobileParty mobileParty)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         // TODO disable for player parties
         return false;
     }
@@ -32,6 +35,7 @@ internal class RecruitmentCampaignBehaviorPatch
     [HarmonyPostfix]
     public static void UpdateVolunteersOfNotablesInSettlementPostfix(Settlement settlement)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if ((settlement.IsTown && !settlement.Town.InRebelliousState) || (settlement.IsVillage && !settlement.Village.Bound.Town.InRebelliousState))
         {
             Dictionary<Hero, CharacterObject[]> updatedVolunteerTypes = new();
@@ -50,6 +54,7 @@ internal class RecruitmentCampaignBehaviorPatch
     [HarmonyPostfix]
     public static void ApplyInternalPostfix(Hero individual, int number, int bitCode, RecruitmentCampaignBehavior.RecruitingDetail detail)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (detail != RecruitmentCampaignBehavior.RecruitingDetail.VolunteerFromIndividual && detail != RecruitmentCampaignBehavior.RecruitingDetail.VolunteerFromIndividualToGarrison)
         {
             return;

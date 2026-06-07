@@ -6,6 +6,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
@@ -20,6 +21,7 @@ internal class CalculateBaseSpeedPatch
     [HarmonyPostfix]
     private static void CalculateBaseSpeed(ref MobileParty mobileParty, ref ExplainedNumber __result)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if(mobileParty.IsPlayerParty() && mobileParty != MobileParty.MainParty)
         {
             float playerMapMovementSpeedBonusMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerMapMovementSpeedBonusMultiplier();
@@ -46,6 +48,7 @@ internal class GameTextsPatches
     [HarmonyPrefix]
     private static void FindTextPrefix()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (GameTexts._gameTextManager == null)
         {
             var gameTextManager = new GameTextManager();
@@ -68,6 +71,7 @@ internal class PartyMoraleModelRobustnessPatch
     [HarmonyPrefix]
     private static bool Prefix(MobileParty mobileParty, bool includeDescription, ref ExplainedNumber __result)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (mobileParty.IsMilitia && mobileParty.HomeSettlement == null)
         {
             Logger.Debug("DefaultPartyMoraleModel.GetEffectivePartyMorale: skipping militia party {Party} with null HomeSettlement",

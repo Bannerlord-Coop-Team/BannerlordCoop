@@ -2,6 +2,7 @@
 using GameInterface.Services.GameState.Messages;
 using HarmonyLib;
 using SandBox.View.Map;
+using GameInterface.Policies;
 namespace GameInterface.Services.GameState.Patches;
 
 [HarmonyPatch(typeof(MapScreen))]
@@ -14,6 +15,7 @@ internal class GameExitedPatch
     [HarmonyPatch("OnExit")]
     static void OnExit(ref MapScreen __instance)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         MessageBroker.Instance.Publish(__instance, new GameExited());
     }
 }

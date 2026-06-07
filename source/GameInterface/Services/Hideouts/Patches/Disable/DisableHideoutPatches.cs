@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.Settlements;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Hideouts.Patches.Disable
 {
@@ -14,6 +15,7 @@ namespace GameInterface.Services.Hideouts.Patches.Disable
         [HarmonyPatch(nameof(Hideout.IsSpotted), MethodType.Setter)]
         private static bool DisableIsSpotted(ref Hideout __instance)
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
             if (__instance?.Owner?.Settlement != null)
             {
                 __instance.Owner.Settlement.IsVisible = false;

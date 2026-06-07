@@ -22,6 +22,7 @@ public class BattleSimulationUpdatePatch
     [HarmonyPatch(nameof(BattleSimulation.SimulateBattle))]
     static bool PrefixUpdate(BattleSimulation __instance)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         return false;
     }
 }

@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Settlements.Patches.Disable;
 
@@ -13,6 +14,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_town_town_arena_on_consequence")]
     static bool DisableArena()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         return false;
     }
 
@@ -23,6 +25,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_town_town_tavern_on_consequence")]
     static bool DisableTavern()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         return false;
     }
 
@@ -33,6 +36,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_castle_dungeon_on_consequence")]
     static bool DisableCastleDungeon()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         return false;
     }
 
@@ -43,6 +47,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_town_dungeon_on_consequence")]
     static bool DisableTownDungeon()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         return false;
     }
 
@@ -63,6 +68,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_town_town_streets_on_consequence")]
     static bool DisableTownCenter()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         return false;
     }
 
@@ -73,6 +79,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_town_lordshall_on_consequence")]
     static bool DisableTownHall()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         return false;
     }
 
@@ -83,6 +90,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_town_go_to_keep_on_consequence")]
     static bool DisableTownKeep()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         return false;
     }
 
@@ -93,6 +101,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_village_village_center_on_consequence")]
     static bool DisableVillageCenter()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         return false;
     }
 
@@ -103,6 +112,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_castle_lordshall_on_consequence")]
     static bool DisableCastleHall()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         return false;
     }
 
@@ -113,6 +123,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_leave_troops_garrison_on_consequece")]
     static bool DisableGarrison()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         return false;
     }
 
@@ -123,6 +134,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_ui_town_manage_town_on_consequence")]
     static bool DisableTownManagement()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         return false;
     }
 
@@ -133,6 +145,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_ui_town_castle_manage_town_on_consequence")]
     static bool DisableCastleManagement()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         return false;
     }
 
@@ -143,6 +156,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_castle_take_a_walk_around_the_castle_on_consequence")]
     static bool DisableCastleWalkAround()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         return false;
     }
 

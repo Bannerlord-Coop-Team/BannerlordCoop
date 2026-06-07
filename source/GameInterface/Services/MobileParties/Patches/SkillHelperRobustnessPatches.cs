@@ -5,6 +5,7 @@ using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
@@ -45,6 +46,7 @@ internal class SkillHelperRobustnessPatches
     [HarmonyPrefix]
     private static bool Prefix(PartyBase party, ref CharacterObject __result)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (party == null)
         {
             __result = null;
@@ -71,6 +73,7 @@ internal class PartyBaseHelperRobustnessPatches
     [HarmonyPrefix]
     private static bool Prefix(PartyBase party, ref CharacterObject __result)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (party == null)
         {
             __result = null;

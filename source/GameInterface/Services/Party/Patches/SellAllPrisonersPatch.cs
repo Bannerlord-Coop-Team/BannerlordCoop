@@ -6,6 +6,7 @@ using Serilog;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Party.Patches;
 
@@ -18,6 +19,7 @@ internal class SellAllPrisonersPatch
     [HarmonyPrefix]
     public static bool SellAllTransferablePrisonersPrefix()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         TroopRoster availablePrisonersToSell = MobilePartyHelper.GetPlayerPrisonersPlayerCanSell();
 
         var message = new PrisonersSold(MobileParty.MainParty.Party, availablePrisonersToSell);

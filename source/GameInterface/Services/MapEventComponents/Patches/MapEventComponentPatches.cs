@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem.MapEvents;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.MapEventComponents.Patches;
 
@@ -19,6 +20,7 @@ internal class MapEventComponentPatches
     [HarmonyPrefix]
     private static bool ConstructorPrefix(MapEventComponent __instance, MapEvent mapEvent)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         __instance.MapEvent = mapEvent;
         return false;
     }

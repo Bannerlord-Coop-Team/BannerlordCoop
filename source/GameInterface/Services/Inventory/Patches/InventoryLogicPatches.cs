@@ -7,6 +7,7 @@ using Serilog;
 using TaleWorlds.CampaignSystem.Inventory;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Inventory.Patches;
 
@@ -19,6 +20,7 @@ internal class InventoryLogicPatches
     [HarmonyPrefix]
     static bool DoneLogicPrefix(ref InventoryLogic __instance, ref bool __result)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (__instance.IsPreviewingItem)
         {
             __result = false;

@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.GameComponents;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Clans.Patches.Disable;
 
@@ -27,5 +28,9 @@ internal class DisableClanVariablesCampaignBehavior
 
     // Disable on client
     [HarmonyPrefix]
-    static bool Prefix() => ModInformation.IsServer;
+    static bool Prefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return ModInformation.IsServer;
+    }
 }

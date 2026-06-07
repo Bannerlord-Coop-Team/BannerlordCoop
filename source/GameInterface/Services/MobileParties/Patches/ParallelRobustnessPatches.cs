@@ -6,6 +6,7 @@ using System;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
@@ -19,6 +20,7 @@ internal class ParallelRobustnessPatches
     [HarmonyPrefix]
     static bool ParallelCheckExitingSettlements(CampaignTickCacheDataStore __instance, int startInclusive, int endExclusive)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         for (int index = startInclusive; index < endExclusive; ++index)
         {
             MobileParty mobileParty = Campaign.Current.MobileParties[index];
@@ -39,6 +41,7 @@ internal class ParallelRobustnessPatches
     [HarmonyPrefix]
     static bool ParallelInitializeCachedPartyVariables(CampaignTickCacheDataStore __instance, int startInclusive, int endExclusive)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         for (int index = startInclusive; index < endExclusive; ++index)
         {
             MobileParty mobileParty = Campaign.Current.MobileParties[index];
@@ -60,6 +63,7 @@ internal class ParallelRobustnessPatches
     [HarmonyPrefix]
     static bool TargetPartyVariables(CampaignTickCacheDataStore __instance, int startInclusive, int endExclusive)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         for (int i = startInclusive; i < endExclusive; i++)
         {
             var mobileParty = __instance._cacheData[i].MobileParty;
@@ -86,6 +90,7 @@ internal class ParallelRobustnessPatches
     [HarmonyPrefix]
     static bool ParallelArrangePartyIndices(CampaignTickCacheDataStore __instance, int startInclusive, int endExclusive)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         for (int index = startInclusive; index < endExclusive; ++index)
         {
             MobileParty.CachedPartyVariables localVariables = __instance._cacheData[index].LocalVariables;
@@ -107,6 +112,7 @@ internal class ParallelRobustnessPatches
     [HarmonyPrefix]
     static bool ParallelTickArmies(CampaignTickCacheDataStore __instance, int startInclusive, int endExclusive)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         for (int index = startInclusive; index < endExclusive; ++index)
         {
             CampaignTickCacheDataStore.PartyTickCachePerParty tickCachePerParty = __instance._cacheData[__instance._movingArmyLeaderPartyIndices[index]];
@@ -144,6 +150,7 @@ internal class ParallelRobustnessPatches
     [HarmonyPrefix]
     static bool ParallelTickMovingParties(CampaignTickCacheDataStore __instance, int startInclusive, int endExclusive)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         for (int index = startInclusive; index < endExclusive; ++index)
         {
             CampaignTickCacheDataStore.PartyTickCachePerParty tickCachePerParty = __instance._cacheData[__instance._movingPartyIndices[index]];
@@ -182,6 +189,7 @@ internal class ParallelRobustnessPatches
     [HarmonyPrefix]
     static bool ParallelTickStationaryParties(CampaignTickCacheDataStore __instance, int startInclusive, int endExclusive)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         for (int index = startInclusive; index < endExclusive; ++index)
         {
             CampaignTickCacheDataStore.PartyTickCachePerParty tickCachePerParty = __instance._cacheData[__instance._stationaryPartyIndices[index]];

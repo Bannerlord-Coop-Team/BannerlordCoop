@@ -111,6 +111,7 @@ namespace GameInterface.Services.Kingdoms.Patches
         [HarmonyPrefix]
         public static bool AddPolicyPrefix()
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
             return false;
         }
 
@@ -118,6 +119,7 @@ namespace GameInterface.Services.Kingdoms.Patches
         [HarmonyPrefix]
         public static bool RemovePolicyPrefix()
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
             return false;
         }
     }

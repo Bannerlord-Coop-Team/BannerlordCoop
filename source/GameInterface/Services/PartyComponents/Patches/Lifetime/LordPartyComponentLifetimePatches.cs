@@ -57,6 +57,7 @@ internal class LordPartyComponentHomeSettlementPatch
     [HarmonyPrefix]
     private static bool Prefix(LordPartyComponent __instance, ref Settlement __result)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (__instance.Owner == null)
         {
             Logger.Debug("LordPartyComponent.HomeSettlement accessed with null Owner (MobileParty: {Party}, IsClient: {IsClient})",

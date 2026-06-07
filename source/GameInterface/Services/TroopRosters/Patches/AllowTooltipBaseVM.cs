@@ -2,6 +2,7 @@
 using HarmonyLib;
 using TaleWorlds.Core.ViewModelCollection.Information;
 using TaleWorlds.Library;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.TroopRosters.Patches;
 
@@ -12,6 +13,7 @@ internal class AllowTooltipBaseVM
     [HarmonyPrefix]
     private static void PrefixTick()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         AllowedThread.AllowThisThread();
     }
 
@@ -19,6 +21,7 @@ internal class AllowTooltipBaseVM
     [HarmonyPostfix]
     private static void PostfixTick()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         AllowedThread.RevokeThisThread();
     }
 }
@@ -30,6 +33,7 @@ internal class AllowTooltipProperty
     [HarmonyPrefix]
     private static void PrefixTick()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         AllowedThread.AllowThisThread();
     }
 
@@ -37,6 +41,7 @@ internal class AllowTooltipProperty
     [HarmonyPostfix]
     private static void PostfixTick()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         AllowedThread.RevokeThisThread();
     }
 }

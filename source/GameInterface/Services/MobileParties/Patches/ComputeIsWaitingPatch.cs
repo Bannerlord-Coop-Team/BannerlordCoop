@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.Party;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
@@ -14,6 +15,7 @@ class ComputeIsWaitingPatch
     [HarmonyPrefix]
     static bool Prefix(MobileParty __instance, ref bool __result)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (__instance.IsMainParty)
         {
             __result = false;

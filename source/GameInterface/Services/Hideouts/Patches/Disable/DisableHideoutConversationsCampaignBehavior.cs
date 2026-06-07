@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using SandBox.CampaignBehaviors;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Hideouts.Patches.Disable;
 
@@ -7,5 +8,9 @@ namespace GameInterface.Services.Hideouts.Patches.Disable;
 internal class DisableHideoutConversationsCampaignBehavior
 {
     [HarmonyPatch(nameof(HideoutConversationsCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return false;
+    }
 }

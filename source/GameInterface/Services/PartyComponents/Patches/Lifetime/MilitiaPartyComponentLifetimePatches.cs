@@ -54,6 +54,7 @@ internal class MilitiaPartyComponentLifetimePatches
     [HarmonyPrefix]
     private static void SettlementSetterPrefix(MilitiaPartyComponent __instance, Settlement value)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         var current = __instance.Settlement;
         if (value == null)
         {
@@ -81,6 +82,7 @@ internal class MilitiaPartyComponentLifetimePatches
     [HarmonyPrefix]
     private static bool PartyOwnerPrefix(MilitiaPartyComponent __instance, ref Hero __result)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (__instance.Settlement == null || __instance.Settlement.OwnerClan == null)
         {
             Logger.Debug("MilitiaPartyComponent.PartyOwner accessed with null Settlement/OwnerClan (MobileParty: {Party}, Settlement: {Settlement}, IsClient: {IsClient})",
@@ -101,6 +103,7 @@ internal class MilitiaPartyComponentLifetimePatches
     [HarmonyPrefix]
     private static bool NamePrefix(MilitiaPartyComponent __instance, ref TextObject __result)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (__instance.Settlement == null)
         {
             Logger.Debug("MilitiaPartyComponent.Name accessed with null Settlement (MobileParty: {Party}, IsClient: {IsClient})",
@@ -120,6 +123,7 @@ internal class MilitiaPartyComponentLifetimePatches
     [HarmonyPrefix]
     private static bool GetDefaultComponentBannerPrefix(MilitiaPartyComponent __instance, ref Banner __result)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (__instance.Settlement == null)
         {
             Logger.Debug("MilitiaPartyComponent.GetDefaultComponentBanner accessed with null Settlement (MobileParty: {Party}, IsClient: {IsClient})",
@@ -141,6 +145,7 @@ internal class MilitiaPartyComponentLifetimePatches
     [HarmonyPrefix]
     private static bool OnFinalizePrefix(MilitiaPartyComponent __instance)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (__instance.Settlement == null)
         {
             Logger.Warning("MilitiaPartyComponent.OnFinalize called with null Settlement (MobileParty: {Party}, IsClient: {IsClient}) — skipping Settlement.MilitiaPartyComponent = null",
@@ -160,6 +165,7 @@ internal class MilitiaPartyComponentLifetimePatches
     [HarmonyPrefix]
     private static bool OnInitializePrefix(MilitiaPartyComponent __instance)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (__instance.Settlement == null)
         {
             Logger.Warning("MilitiaPartyComponent.OnInitialize called with null Settlement (MobileParty: {Party}, IsClient: {IsClient}) — skipping Settlement.MilitiaPartyComponent = this",

@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.Issues;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
@@ -7,5 +8,9 @@ namespace GameInterface.Services.MobileParties.Patches;
 internal class DisableLordWantsRivalCapturedIssueBehavior
 {
     [HarmonyPatch(nameof(LordWantsRivalCapturedIssueBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return false;
+    }
 }

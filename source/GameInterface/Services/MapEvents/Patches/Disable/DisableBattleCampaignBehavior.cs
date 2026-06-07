@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Battles.Patches.Disable;
 
@@ -7,5 +8,9 @@ namespace GameInterface.Services.Battles.Patches.Disable;
 internal class DisableBattleCampaignBehavior
 {
     [HarmonyPatch(nameof(BattleCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return false;
+    }
 }

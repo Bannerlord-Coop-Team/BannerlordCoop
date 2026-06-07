@@ -4,6 +4,7 @@ using Helpers;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.Inventory;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Inventory.Patches;
 
@@ -21,11 +22,13 @@ internal class InventoryScreenHelperPatches
 
     static void Prefix()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         AllowedThread.AllowThisThread();
     }
 
     static void Postfix()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         AllowedThread.RevokeThisThread();
     }
 }

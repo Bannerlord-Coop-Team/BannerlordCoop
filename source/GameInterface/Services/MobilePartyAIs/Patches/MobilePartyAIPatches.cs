@@ -22,6 +22,7 @@ internal class MobilePartyAIPatches
     [HarmonyPrefix]
     static void Prefix(ref MobilePartyAi __instance)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         // Default path on server
         if (ModInformation.IsServer) return;
 

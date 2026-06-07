@@ -7,6 +7,7 @@ using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.UI.Patches;
 
@@ -18,6 +19,7 @@ internal class RemoveWaitOption
     [HarmonyPatch(nameof(GameMenu.SwitchToMenu))]
     static bool Prefix(string menuId)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         MenuContext currentMenuContext = Campaign.Current.CurrentMenuContext;
         if (currentMenuContext != null)
         {

@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
@@ -12,9 +13,17 @@ internal class PartyTickPatch
 {
     [HarmonyPatch(nameof(CampaignPeriodicEventManager.TickPeriodicEvents))]
     [HarmonyPrefix]
-    static bool TickPeriodicEventsPrefix() => ModInformation.IsServer;
+    static bool TickPeriodicEventsPrefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return ModInformation.IsServer;
+    }
 
     [HarmonyPatch(nameof(CampaignPeriodicEventManager.MobilePartyHourlyTick))]
     [HarmonyPrefix]
-    static bool MobilePartyHourlyTickPrefix() => ModInformation.IsServer;
+    static bool MobilePartyHourlyTickPrefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return ModInformation.IsServer;
+    }
 }

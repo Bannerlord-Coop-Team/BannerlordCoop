@@ -7,6 +7,7 @@ using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.ViewModelCollection.GameMenu.Recruitment;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.TroopRosters.Patches;
 
@@ -17,6 +18,7 @@ public class RecruitmentVMPatches
     [HarmonyPrefix]
     public static bool OnDonePrefix(ref RecruitmentVM __instance)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (ModInformation.IsServer) return true;
 
         var troopsInCart = __instance.TroopsInCart.Select(t => (t.Owner.OwnerHero, t.Character, t.Index)).ToArray();

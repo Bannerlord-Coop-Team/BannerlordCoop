@@ -5,6 +5,7 @@ using SandBox.View.Map.Managers;
 using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.Party;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.PartyVisuals.Patches;
 
@@ -19,6 +20,7 @@ internal class PartyVisualsRobustnessPatches
     [HarmonyPrefix]
     static bool StepSoundsPrefix(MobileParty party)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (!MobilePartyVisualManager.Current._partiesAndVisuals.ContainsKey(party.Party))
         {
             var stringId = party.StringId ?? "<null>";

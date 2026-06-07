@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.CampaignService.Patches;
 
@@ -38,6 +39,7 @@ static class TimeControlModePatch
     [HarmonyPatch(MethodType.Setter)]
     static bool Prefix(Campaign __instance, ref CampaignTimeControlMode value)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         //if (__instance != null && !__instance.TimeControlModeLock &&
         //    value != __instance.TimeControlMode && TimeControl.CanSyncTimeControlMode)
         //{

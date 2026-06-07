@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.Issues;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Arenas.Patches;
 
@@ -7,5 +8,9 @@ namespace GameInterface.Services.Arenas.Patches;
 internal class DisableBettingFraudIssueBehavior
 {
     [HarmonyPatch(nameof(BettingFraudIssueBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return false;
+    }
 }

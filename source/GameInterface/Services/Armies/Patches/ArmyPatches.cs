@@ -40,6 +40,7 @@ public class ArmyPatches
     [HarmonyPrefix]
     static bool OnAddPartyInternalDebugPrefix(ref Army __instance, MobileParty mobileParty)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         __instance._parties.Add(mobileParty);
         mobileParty.Ai.RethinkAtNextHourlyTick = true;
         CampaignEventDispatcher.Instance.OnPartyJoinedArmy(mobileParty);

@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using SandBox.CampaignBehaviors;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.CampaignService.Patches;
 
@@ -7,5 +8,9 @@ namespace GameInterface.Services.CampaignService.Patches;
 internal class DisableStatisticsCampaignBehavior
 {
     [HarmonyPatch(nameof(StatisticsCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return false;
+    }
 }

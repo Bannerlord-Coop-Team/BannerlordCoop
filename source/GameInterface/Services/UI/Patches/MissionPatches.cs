@@ -3,6 +3,7 @@ using HarmonyLib;
 using Serilog;
 using TaleWorlds.Engine;
 using TaleWorlds.MountAndBlade;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.UI.Patches;
 
@@ -15,6 +16,7 @@ internal class MissionPatches
     [HarmonyPostfix]
     static void Postfix()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (LoadingWindow.IsLoadingWindowActive)
             LoadingWindow.DisableGlobalLoadingWindow();
     }

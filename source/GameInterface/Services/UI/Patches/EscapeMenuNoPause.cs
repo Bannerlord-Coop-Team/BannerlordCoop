@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade.ViewModelCollection.EscapeMenu;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.UI.Patches
 {
@@ -17,6 +18,7 @@ namespace GameInterface.Services.UI.Patches
         [HarmonyPrefix]
         static bool OnEscapeMenuToggled(MapScreen __instance, bool isOpened)
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
             GameLoopRunner.RunOnMainThread(() =>
             {
                 __instance.MapCameraView.OnEscapeMenuToggled(isOpened);

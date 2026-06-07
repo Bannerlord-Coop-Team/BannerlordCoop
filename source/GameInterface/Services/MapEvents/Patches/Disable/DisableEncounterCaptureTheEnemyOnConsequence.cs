@@ -3,6 +3,7 @@ using Helpers;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.MapEvents.Patches.Disable;
 
@@ -11,5 +12,9 @@ internal class DisableEncounterCaptureTheEnemyOnConsequence
 {
     [HarmonyPatch(nameof(MenuHelper.EncounterCaptureTheEnemyOnConsequence))]
     [HarmonyPrefix]
-    private static bool PrefixEncounterCaptureTheEnemyOnConsequence() => false;
+    private static bool PrefixEncounterCaptureTheEnemyOnConsequence()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return false;
+    }
 }

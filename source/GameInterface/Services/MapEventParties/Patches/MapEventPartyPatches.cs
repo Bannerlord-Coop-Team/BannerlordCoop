@@ -65,6 +65,7 @@ internal class MapEventPartyPatches
     [HarmonyPrefix]
     private static bool PrefixCommitXpGain(MapEventParty __instance)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (__instance.Party.MobileParty != null)
         {
             int num = 0;

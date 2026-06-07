@@ -2,6 +2,7 @@
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.Localization;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Bandits.Patches
 {
@@ -13,6 +14,7 @@ namespace GameInterface.Services.Bandits.Patches
         [HarmonyPrefix]
         static bool PartyOwnerGetter(BanditPartyComponent __instance)
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
             if (__instance.MobileParty == null) return false;
 
             return true;
@@ -23,6 +25,7 @@ namespace GameInterface.Services.Bandits.Patches
         [HarmonyPrefix]
         static bool NameGetter(BanditPartyComponent __instance, ref TextObject __result)
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
             if (__instance.MobileParty?.MapFaction == null)
             {
                 TextObject textObject = new TextObject("NameFailed - BanditPartyPatch");

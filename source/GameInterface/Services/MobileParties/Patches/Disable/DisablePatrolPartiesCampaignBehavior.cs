@@ -3,6 +3,7 @@ using HarmonyLib;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
@@ -23,5 +24,9 @@ internal class DisablePatrolPartiesCampaignBehavior
         yield return AccessTools.Method(typeof(PatrolPartiesCampaignBehavior), nameof(PatrolPartiesCampaignBehavior.OnBuildingLevelChanged));
     }
 
-    static bool Prefix() => ModInformation.IsServer;
+    static bool Prefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return ModInformation.IsServer;
+    }
 }

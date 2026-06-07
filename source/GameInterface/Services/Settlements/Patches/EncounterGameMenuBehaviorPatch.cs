@@ -7,6 +7,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Settlements.Patches
 {
@@ -18,6 +19,7 @@ namespace GameInterface.Services.Settlements.Patches
         [HarmonyPatch("game_menu_town_outside_on_init")]
         public static bool Prefix(MenuCallbackArgs args)
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
             if (PlayerEncounter.EncounterSettlement != null) return true;
 
             return false;
@@ -27,6 +29,7 @@ namespace GameInterface.Services.Settlements.Patches
         [HarmonyPatch("game_menu_town_town_besiege_on_condition")]
         public static bool CheckFortificationEncounterSettlement(MenuCallbackArgs args)
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
             if (PlayerEncounter.EncounterSettlement != null) return true;
 
             return false;

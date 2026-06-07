@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.CampaignService.Patches;
 
@@ -24,6 +25,7 @@ static class SetTimeSpeedPatch
     [HarmonyPrefix]
     static void Prefix(Campaign __instance, int speed)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
         if (ShouldEnableTimeControlMode(__instance.TimeControlMode, speed))
         {

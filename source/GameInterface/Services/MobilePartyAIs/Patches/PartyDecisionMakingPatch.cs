@@ -1,6 +1,7 @@
 ﻿using Common;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors.AiBehaviors;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.MobilePartyAIs.Patches;
 
@@ -8,33 +9,53 @@ namespace GameInterface.Services.MobilePartyAIs.Patches;
 internal class AiEngagePartyBehaviorPatches
 {
     [HarmonyPatch(nameof(AiEngagePartyBehavior.RegisterEvents))]
-    static bool Prefix() => ModInformation.IsServer;
+    static bool Prefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return ModInformation.IsServer;
+    }
 }
 
 [HarmonyPatch(typeof(AiMilitaryBehavior))]
 internal class DisableAiMilitaryBehavior
 {
     [HarmonyPatch(nameof(AiMilitaryBehavior.RegisterEvents))]
-    static bool Prefix() => ModInformation.IsServer;
+    static bool Prefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return ModInformation.IsServer;
+    }
 }
 
 [HarmonyPatch(typeof(AiPartyThinkBehavior))]
 internal class DisableAiPartyThinkBehavior
 {
     [HarmonyPatch(nameof(AiPartyThinkBehavior.RegisterEvents))]
-    static bool Prefix() => ModInformation.IsServer;
+    static bool Prefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return ModInformation.IsServer;
+    }
 }
 
 [HarmonyPatch(typeof(AiPatrollingBehavior))]
 internal class DisableAiPatrollingBehavior
 {
     [HarmonyPatch(nameof(AiPatrollingBehavior.RegisterEvents))]
-    static bool Prefix() => ModInformation.IsServer;
+    static bool Prefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return ModInformation.IsServer;
+    }
 }
 
 [HarmonyPatch(typeof(AiVisitSettlementBehavior))]
 internal class DisableAiVisitSettlementBehavior
 {
     [HarmonyPatch(nameof(AiVisitSettlementBehavior.RegisterEvents))]
-    static bool Prefix() => ModInformation.IsServer;
+    static bool Prefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return ModInformation.IsServer;
+    }
 }

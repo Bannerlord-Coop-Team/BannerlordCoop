@@ -3,6 +3,7 @@ using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.Localization;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Villages.Patches;
 
@@ -17,6 +18,7 @@ internal class DisableVillageHostileActionMenuPatch
     [HarmonyPostfix]
     private static void Postfix(MenuCallbackArgs args, bool __result)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (ModInformation.IsServer) return;
 
         // The option is already hidden by the game (ex. the player's own village), nothing to do.

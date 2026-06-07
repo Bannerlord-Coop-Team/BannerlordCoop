@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.Core;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Time.Patches
 {
@@ -15,12 +16,17 @@ namespace GameInterface.Services.Time.Patches
 
         // Prevents pausing in menus without their own game state (such as the encyclopedia)
         [HarmonyPatch(nameof(GameStateManager.RegisterActiveStateDisableRequest))]
-        static bool Prefix() => false;
+        static bool Prefix()
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+            return false;
+        }
 
         // Prevents pausing in menus with their own game states (such as the banner editor, party screen, clan screen, etc.)
         [HarmonyPatch(nameof(GameStateManager.OnTick))]
         static void Prefix(ref GameStateManager __instance, float dt)
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return;
             if (!(__instance.ActiveState is MapState))
             {
                 MapState mapState = __instance.LastOrDefault<MapState>();

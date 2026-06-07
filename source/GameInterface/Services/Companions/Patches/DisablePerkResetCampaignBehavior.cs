@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Cheats.Patches
 {
@@ -7,6 +8,10 @@ namespace GameInterface.Services.Cheats.Patches
     internal class DisablePerkResetCampaignBehavior
     {
         [HarmonyPatch(nameof(PerkResetCampaignBehavior.RegisterEvents))]
-        static bool Prefix() => false;
+        static bool Prefix()
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+            return false;
+        }
     }
 }

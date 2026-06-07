@@ -1,6 +1,7 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Caravans.Patches;
 
@@ -8,5 +9,9 @@ namespace GameInterface.Services.Caravans.Patches;
 internal class DisableCaravanAmbushIssueBehavior
 {
     [HarmonyPatch(nameof(CaravanAmbushIssueBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return false;
+    }
 }

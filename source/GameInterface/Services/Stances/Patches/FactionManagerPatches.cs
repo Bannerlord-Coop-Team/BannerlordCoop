@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Stances.Patches
 {
@@ -13,6 +14,7 @@ namespace GameInterface.Services.Stances.Patches
         [HarmonyPrefix]
         private static bool AddStancePrefix()
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
             return true;
         }
 
@@ -20,6 +22,7 @@ namespace GameInterface.Services.Stances.Patches
         [HarmonyPrefix]
         private static bool RemoveStancePrefix()
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
             return false;
         }
 
@@ -27,6 +30,7 @@ namespace GameInterface.Services.Stances.Patches
         [HarmonyPrefix]
         private static bool SetStancePrefix()
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
             return false;
         }
 
@@ -34,6 +38,7 @@ namespace GameInterface.Services.Stances.Patches
         [HarmonyPrefix]
         private static bool DeclareWarPrefix()
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
             return false;
         }
 
@@ -41,6 +46,7 @@ namespace GameInterface.Services.Stances.Patches
         [HarmonyPrefix]
         private static bool SetNeutralPrefix()
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
             return false;
         }
     }

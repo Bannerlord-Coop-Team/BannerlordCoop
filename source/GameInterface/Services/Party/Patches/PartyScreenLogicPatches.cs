@@ -10,6 +10,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Party.Patches;
 
@@ -22,6 +23,7 @@ internal class PartyScreenLogicPatches
     [HarmonyPrefix]
     public static bool DoneLogicPrefix(PartyScreenLogic __instance, ref bool __result, bool isForced)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (Hero.MainHero.Gold < -__instance.CurrentData.PartyGoldChangeAmount && __instance.CurrentData.PartyGoldChangeAmount < 0)
         {
             MBInformationManager.AddQuickInformation(GameTexts.FindText("str_inventory_popup_player_not_enough_gold", null), 0, null, null, "");
@@ -96,6 +98,7 @@ internal class PartyScreenLogicPatches
     [HarmonyPostfix]
     public static void ExecuteTroopPostfix(PartyScreenLogic __instance, PartyScreenLogic.PartyCommand command)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (!__instance.ValidateCommand(command)) return;
 
         // Send message to server to run KillCharacterAction.ApplyByExecution

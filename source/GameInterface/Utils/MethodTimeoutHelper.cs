@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
+using GameInterface.Policies;
 
 namespace GameInterface.Utils;
 
@@ -25,12 +26,14 @@ internal class MethodTimeoutHelper
 
     static void Prefix()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         cts = new CancellationTokenSource();
         TimeoutTask = Task.Delay(1000, cts.Token).ContinueWith(task => { Handle(Environment.StackTrace); }, TaskContinuationOptions.OnlyOnRanToCompletion);
     }
 
     static void Postfix()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         cts.Cancel();
     }
 

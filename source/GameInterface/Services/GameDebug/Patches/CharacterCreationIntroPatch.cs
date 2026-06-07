@@ -5,6 +5,7 @@ using GameInterface.Services.GameDebug.Messages;
 using HarmonyLib;
 using Serilog;
 using TaleworldGameState = TaleWorlds.Core.GameState;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.GameDebug.Patches;
 
@@ -18,6 +19,7 @@ internal class CharacterCreationIntroPatch
     [HarmonyPatch("OnActivate")]
     private static void OnActivate(ref TaleworldGameState __instance)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         Logger.Information("Game State is changing to {state}", __instance.GetType().Name);
 
         MessageBroker.Instance.Publish(__instance, new CharacterCreationStarted());

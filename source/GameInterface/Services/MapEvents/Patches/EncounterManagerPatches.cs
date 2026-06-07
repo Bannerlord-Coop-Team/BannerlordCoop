@@ -13,6 +13,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
@@ -29,6 +30,7 @@ internal class EncounterManagerPatches
     [HarmonyPatch(nameof(EncounterManager.StartSettlementEncounter))]
     private static bool Prefix(MobileParty attackerParty, Settlement settlement)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (ModInformation.IsServer) return true;
 
         if (!attackerParty.IsPartyControlled())
@@ -44,6 +46,7 @@ internal class EncounterManagerPatches
     [HarmonyPatch(nameof(EncounterManager.HandleEncounterForMobileParty))]
     internal static bool HandleEncounterForMobilePartyPatch(ref MobileParty mobileParty, ref float dt)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         // Skip this method if party is not controlled
         if (!mobileParty.IsPartyControlled())
             return false;
@@ -57,6 +60,7 @@ internal class EncounterManagerPatches
     [HarmonyPrefix]
     private static bool RestartPlayerEncounterPrefix(PartyBase attackerParty, PartyBase defenderParty)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         // Our own server-approved re-run (AllowedThread) runs the real method.
         if (AllowedThread.IsThisThreadAllowed()) return true;
 

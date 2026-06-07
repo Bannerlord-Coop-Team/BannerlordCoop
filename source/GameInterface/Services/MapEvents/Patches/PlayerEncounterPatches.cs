@@ -10,6 +10,7 @@ using Serilog;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
@@ -22,6 +23,7 @@ internal class PlayerEncounterPatches
     [HarmonyPrefix]
     public static bool RestartPlayerEncounterPrefix(PartyBase defenderParty, PartyBase attackerParty, bool forcePlayerOutFromSettlement)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         // Our own server-approved re-run (AllowedThread) runs the real RestartPlayerEncounter.
         if (AllowedThread.IsThisThreadAllowed()) return true;
 
@@ -40,6 +42,7 @@ internal class PlayerEncounterPatches
     [HarmonyPrefix]
     public static bool StartBattleInternalPrefix(PlayerEncounter __instance, ref MapEvent __result)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         // Our own handler / replication path (AllowedThread) runs the real creation.
         if (AllowedThread.IsThisThreadAllowed()) return true;
 
@@ -93,6 +96,7 @@ internal class PlayerEncounterPatches
     [HarmonyPrefix]
     public static bool PlayerSurrenderInternalPrefix(ref PlayerEncounter __instance)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (AllowedThread.IsThisThreadAllowed()) return true;
 
         if (ModInformation.IsServer) return true;
@@ -108,6 +112,7 @@ internal class PlayerEncounterPatches
     [HarmonyPrefix]
     private static bool PrefixCheckNearbyPartiesToJoinPlayerMapEvent()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         return false;
     }
 }

@@ -31,6 +31,7 @@ internal class MapEventPatches
     [HarmonyPrefix]
     private static void Prefix_AddInvolvedPartyInternal(MapEvent __instance, MapEventParty mapEventParty)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         // Parties not controlled by the server are player parties
         if (mapEventParty.Party.MobileParty.IsPlayerParty())
         {
@@ -98,6 +99,7 @@ internal class MapEventPatches
     [HarmonyPrefix]
     private static bool Prefix_OnBattleWon(MapEvent __instance)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         var containsPlayer = __instance._sides.Any(side => side.Parties.Any(party => party.Party.MobileParty.IsPlayerParty()));
 
         // Skip on client
@@ -170,6 +172,7 @@ internal class InteractionPatches
         MobileParty mobileParty,
         ref bool __result)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (!__result)
             return;
 
@@ -192,6 +195,7 @@ internal class InteractionPatches
         PartyBase party,
         ref bool __result)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (!__result)
             return;
 
@@ -224,6 +228,7 @@ internal class InteractionPatches
         PartyBase attackerParty,
         PartyBase defenderParty)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (ModInformation.IsClient)
             return;
         

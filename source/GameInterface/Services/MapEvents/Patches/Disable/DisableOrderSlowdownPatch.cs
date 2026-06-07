@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using TaleWorlds.MountAndBlade;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.MapEvents.Patches.Disable;
 
@@ -10,6 +11,7 @@ internal class DisableOrderSlowdownPatch
     [HarmonyPostfix]
     private static void PostfixSlowDownOnOrder(ref bool __result)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         __result = false;
     }
 }

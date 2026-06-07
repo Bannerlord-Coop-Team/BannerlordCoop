@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Heroes.Patches.Disable;
 
@@ -7,5 +8,9 @@ namespace GameInterface.Services.Heroes.Patches.Disable;
 internal class DisableRomanceCampaignBehavior
 {
     [HarmonyPatch(nameof(RomanceCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return false;
+    }
 }

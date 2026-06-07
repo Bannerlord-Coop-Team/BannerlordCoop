@@ -1,6 +1,7 @@
 ﻿using Common;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.CampaignService.Patches;
 
@@ -8,5 +9,9 @@ namespace GameInterface.Services.CampaignService.Patches;
 internal class DisableViewDataTrackerCampaignBehavior
 {
     [HarmonyPatch(nameof(ViewDataTrackerCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => ModInformation.IsClient;
+    static bool Prefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return ModInformation.IsClient;
+    }
 }

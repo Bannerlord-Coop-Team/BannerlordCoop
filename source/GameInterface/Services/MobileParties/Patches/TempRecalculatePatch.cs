@@ -3,6 +3,7 @@ using Common.Logging;
 using HarmonyLib;
 using Serilog;
 using TaleWorlds.CampaignSystem.Party;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
@@ -14,6 +15,7 @@ class TempRecalculatePatch
     [HarmonyPrefix]
     private static bool Prefix(MobileParty __instance)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (__instance.DefaultBehavior == AiBehavior.RaidSettlement)
         {
             if (__instance.TargetSettlement is null) return false;

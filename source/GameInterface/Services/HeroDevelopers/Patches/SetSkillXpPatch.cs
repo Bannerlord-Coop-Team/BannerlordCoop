@@ -9,6 +9,7 @@ using System.Text;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.HeroDevelopers.Patches
 {
@@ -21,6 +22,7 @@ namespace GameInterface.Services.HeroDevelopers.Patches
         [HarmonyPrefix]
         public static bool SetSkillXp(ref HeroDeveloper __instance, PropertyObject skill, float value)
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
             SkillObject skillObject = (SkillObject) skill;
 
             // Publish message with data

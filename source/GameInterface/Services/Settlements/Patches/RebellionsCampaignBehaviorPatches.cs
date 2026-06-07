@@ -1,6 +1,7 @@
 ﻿using Common;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Settlements.Patches;
 
@@ -9,5 +10,9 @@ namespace GameInterface.Services.Settlements.Patches;
 internal class RebellionsCampaignBehaviorPatches
 {
     [HarmonyPatch(nameof(RebellionsCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => ModInformation.IsServer;
+    static bool Prefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return ModInformation.IsServer;
+    }
 }

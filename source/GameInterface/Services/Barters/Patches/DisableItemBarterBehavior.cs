@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors.BarterBehaviors;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Barters.Patches;
 
@@ -7,5 +8,9 @@ namespace GameInterface.Services.Barters.Patches;
 internal class DisableItemBarterBehavior
 {
     [HarmonyPatch(nameof(ItemBarterBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return false;
+    }
 }

@@ -2,6 +2,7 @@
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.PartyBases.Patches;
 
@@ -14,6 +15,7 @@ internal class PartyBaseRobustnessPatches
     [HarmonyPostfix]
     private static void Postfix(ref PartyBase __instance, ref MBReadOnlyList<Ship> __result)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (__result is null)
         {
             __instance._ships = new MBList<Ship>();

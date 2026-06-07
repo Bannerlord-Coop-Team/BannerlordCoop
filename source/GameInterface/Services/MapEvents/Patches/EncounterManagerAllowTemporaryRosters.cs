@@ -3,6 +3,7 @@ using HarmonyLib;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.Encounters;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
@@ -18,11 +19,13 @@ internal class EncounterManagerAllowTemporaryRosters
 
     public static void Prefix()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         AllowedThread.AllowThisThread();
     }
 
     public static void Postfix()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         AllowedThread.RevokeThisThread();
     }
 }

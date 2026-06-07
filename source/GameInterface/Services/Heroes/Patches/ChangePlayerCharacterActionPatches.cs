@@ -6,6 +6,7 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Heroes.Patches;
 
@@ -15,6 +16,7 @@ internal class ChangePlayerCharacterActionPatches
     [HarmonyPatch("Apply")]
     private static bool Prefix(Hero hero)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         MessageBroker.Instance.Publish(null, new PlayerHeroChanged(Hero.MainHero, hero));
 
         Hero mainHero = Hero.MainHero;

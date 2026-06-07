@@ -7,6 +7,7 @@ using HarmonyLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Localization;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Clans.Patches
 {
@@ -18,6 +19,7 @@ namespace GameInterface.Services.Clans.Patches
         // TODO fix
         static bool Prefix(ref Clan __instance, TextObject name, TextObject informalName)
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
             if(AllowedThread.IsThisThreadAllowed()) return true;
 
             if(Campaign.Current.MainParty.ActualClan == __instance)

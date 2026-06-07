@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Banners.Patches;
 
@@ -7,5 +8,9 @@ namespace GameInterface.Services.Banners.Patches;
 internal class DisableBannerCampaignBehavior
 {
     [HarmonyPatch(nameof(BannerCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return false;
+    }
 }

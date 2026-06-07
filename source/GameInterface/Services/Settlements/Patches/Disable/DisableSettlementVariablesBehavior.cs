@@ -2,6 +2,7 @@
 using HarmonyLib;
 using SandBox.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Settlements.Patches.Disable;
 
@@ -10,5 +11,9 @@ namespace GameInterface.Services.Settlements.Patches.Disable;
 internal class DisableSettlementVariablesBehavior
 {
     [HarmonyPatch(nameof(SettlementVariablesBehavior.RegisterEvents))]
-    static bool Prefix() => ModInformation.IsServer;
+    static bool Prefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return ModInformation.IsServer;
+    }
 }

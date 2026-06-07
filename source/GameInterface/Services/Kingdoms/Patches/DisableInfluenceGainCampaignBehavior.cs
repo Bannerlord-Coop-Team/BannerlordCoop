@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Kingdoms.Patches;
 
@@ -7,5 +8,9 @@ namespace GameInterface.Services.Kingdoms.Patches;
 internal class DisableInfluenceGainCampaignBehavior
 {
     [HarmonyPatch(nameof(InfluenceGainCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return false;
+    }
 }

@@ -17,6 +17,7 @@ using TaleWorlds.CampaignSystem.ViewModelCollection.CharacterDeveloper.PerkSelec
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.CharacterDevelopers.Patches
 {
@@ -29,6 +30,7 @@ namespace GameInterface.Services.CharacterDevelopers.Patches
         [HarmonyPrefix]
         public static bool ApplyChanges(ref CharacterDeveloperHeroItemVM __instance)
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
             // Get data from CharacterDeveloperHeroItemVM
             HeroDeveloper heroDeveloper = __instance.HeroDeveloper;
             PerkSelectionVM perkSelection = __instance.PerkSelection;

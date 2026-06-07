@@ -3,6 +3,7 @@ using GameInterface.Services.MobileParties.Messages.Control;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
@@ -15,6 +16,7 @@ internal class SetMainPartyPatch
 {
     private static void Prefix(ref Campaign __instance, ref MobileParty value)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (value?.StringId == null) return;
         if (Campaign.Current?.MainParty == null) return;
 

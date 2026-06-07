@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors.AiBehaviors;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Bandits.Patches;
 
@@ -7,5 +8,9 @@ namespace GameInterface.Services.Bandits.Patches;
 internal class DisableAiBanditPatrollingBehavior
 {
     [HarmonyPatch(nameof(AiLandBanditPatrollingBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return false;
+    }
 }

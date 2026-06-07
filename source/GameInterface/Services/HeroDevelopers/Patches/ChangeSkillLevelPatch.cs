@@ -9,6 +9,7 @@ using System.Text;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.HeroDevelopers.Patches
 {
@@ -21,6 +22,7 @@ namespace GameInterface.Services.HeroDevelopers.Patches
         [HarmonyPrefix]
         public static bool ChangeSkillLevelFromXpChange(ref HeroDeveloper __instance, SkillObject skill, int changeAmount, bool shouldNotify = false)
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
             // Publish message with data
             var message = new SkillLevelChange(__instance, skill, changeAmount, shouldNotify);
             MessageBroker.Instance.Publish(__instance, message);

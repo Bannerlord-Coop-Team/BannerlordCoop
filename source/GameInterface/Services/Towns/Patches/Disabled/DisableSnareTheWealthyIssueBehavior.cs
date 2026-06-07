@@ -1,6 +1,7 @@
 ﻿using HarmonyLib;
 using SandBox.Issues;
 using TaleWorlds.CampaignSystem.Issues;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Towns.Patches.Disabled;
 
@@ -8,5 +9,9 @@ namespace GameInterface.Services.Towns.Patches.Disabled;
 internal class DisableSnareTheWealthyIssueBehavior
 {
     [HarmonyPatch(nameof(SnareTheWealthyIssueBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return false;
+    }
 }

@@ -5,6 +5,7 @@ using System;
 using TaleWorlds.Core;
 using TaleWorlds.SaveSystem;
 using TaleWorlds.SaveSystem.Load;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.Heroes.Patches;
 
@@ -13,6 +14,7 @@ internal class LoadPatches
 {
     static void Postfix(Game __instance, ref LoadResult __result, ref string saveName)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (__result.Successful)
         {
             MessageBroker.Instance.Publish(__instance, new GameLoaded(saveName));

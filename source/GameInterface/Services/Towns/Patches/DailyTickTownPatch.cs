@@ -5,6 +5,7 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem.Settlements;
 using static HarmonyLib.Code;
 using Common;
+using GameInterface.Policies;
 
 
 [HarmonyPatch(typeof(Town), "DailyTick")]
@@ -13,6 +14,7 @@ public static class TownDailyTickPatch
     [HarmonyPrefix]
     private static bool Prefix()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         return ModInformation.IsServer;
     }
 

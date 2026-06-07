@@ -2,6 +2,7 @@
 using Common;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.Core;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.UI.Patches
 {
@@ -12,6 +13,7 @@ namespace GameInterface.Services.UI.Patches
         [HarmonyPrefix]
         public static bool PushStatePatch(TaleWorlds.Core.GameState gameState)
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
             return gameState switch
             {
                 KingdomState => false,

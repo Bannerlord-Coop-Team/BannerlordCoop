@@ -6,6 +6,7 @@ using TaleWorlds.CampaignSystem.ViewModelCollection.Map.MapBar;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
+using GameInterface.Policies;
 
 namespace GameInterface.Services.UI.Patches;
 
@@ -22,6 +23,7 @@ internal class DisablePlayerInfoUpdate
     [HarmonyPrefix]
     static bool Prefix(MapInfoVM __instance, bool updateForced)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         __instance._goldInfo.HasWarning = false;
         if (__instance._goldInfo.IntValue != Hero.MainHero.Gold || updateForced)
         {

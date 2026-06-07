@@ -18,6 +18,7 @@ internal class PartyBasePatch
     [HarmonyPrefix]
     public static void ItemRosterSetterPrefix(PartyBase __instance, ItemRoster value)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (ModInformation.IsClient) return;
 
         ItemRosterLookup.Set(value, __instance);
