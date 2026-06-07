@@ -52,9 +52,6 @@ internal class E2ETestEnvironment : IDisposable
 
         IntegrationEnvironment = new TestEnvironment(output, numClients, registerGameInterface: true);
 
-        // Needs to be before patching
-        SetupAutoSync();
-
         SetupMainHero();
 
         Server.Resolve<TestMessageBroker>().SetStaticInstance();
@@ -90,16 +87,6 @@ internal class E2ETestEnvironment : IDisposable
         finally
         {
             disposeSemiphore.Release();
-        }
-    }
-
-    private void SetupAutoSync()
-    {
-        Server.Resolve<IAutoSyncBuilder>().Build();
-
-        foreach (var client in Clients)
-        {
-            client.Resolve<IAutoSyncBuilder>().Build();
         }
     }
     private void SetupDynamicSync()

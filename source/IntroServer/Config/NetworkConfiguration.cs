@@ -69,6 +69,9 @@ namespace IntroServer.Config
         /// </summary>
 #if DEBUG
         public NatAddressType NATType { get; } = NatAddressType.Internal;
+#else
+        public NatAddressType NATType { get; } = NatAddressType.External;
+#endif
 
         public string Address => WanAddressText;
 
@@ -85,9 +88,6 @@ namespace IntroServer.Config
         public TimeSpan ObjectCreationTimeout => DisconnectTimeout;
 
         public TimeSpan NetworkPollInterval => UpdateTime;
-#else
-        public NatAddressType NATType { get; } = NatAddressType.External;
-#endif
         #endregion
     }
 }
