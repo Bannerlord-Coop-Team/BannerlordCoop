@@ -72,25 +72,48 @@ public class Poller
         // Setup initial start time
         var startTime = DateTime.Now;
 
+        // Track the last error so a fault that recurs every tick doesn't flood the log.
+        string lastError = null;
+        long repeatCount = 0;
+
         while (cts.IsCancellationRequested == false)
         {
             // Calculate the delta time span
             var delta = DateTime.Now - startTime;
 
+            // Poll the function. Never let an exception escape: this loop runs on a
+            // fire-and-forget task, so an unhandled exception would silently kill the
+            // pump with no trace. Log it instead and keep polling.
             try
             {
-                // Poll the function
                 pollingFunction(delta);
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, "Polling failed for {FunctionName}", pollingFunction.Method.Name);
+                if (ex.Message != lastError)
+                {
+                    lastError = ex.Message;
+                    repeatCount = 0;
+                    Logger.Error(ex, "Polling function threw an exception; the poll loop will continue");
+                }
+                else if (++repeatCount % 1000 == 0)
+                {
+                    Logger.Error("Polling function still throwing the same exception ({RepeatCount}x): {Message}", repeatCount, ex.Message);
+                }
             }
 
             startTime = DateTime.Now;
 
             // Wait for the specified interval to elapse before continuing the loop
-            await Task.Delay(pollingInterval, cts.Token);
+            try
+            {
+                await Task.Delay(pollingInterval, cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                // Stop() was called while waiting; exit cleanly.
+                break;
+            }
         }
     }
 
