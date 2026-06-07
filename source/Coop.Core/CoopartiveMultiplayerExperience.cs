@@ -119,9 +119,6 @@ namespace Coop.Core
             // debug export files. This prevents DebugAutoConnect races on that directory.
             DynamicSyncConfiguration.ExportFiles = false;
 
-            // Create harmony patches
-            container.Resolve<IGameInterface>().PatchAll();
-
             var logic = container.Resolve<ILogic>();
             logic.Start();
         }

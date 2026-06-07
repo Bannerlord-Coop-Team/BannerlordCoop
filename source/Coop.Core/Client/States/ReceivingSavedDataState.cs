@@ -4,6 +4,7 @@ using Coop.Core.Client.Services.Heroes.Data;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Common;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.UI.Interfaces;
 using GameInterface.Services.UI.Messages;
 using LiteNetLib;
 
@@ -23,6 +24,7 @@ public class ReceivingSavedDataState : ClientStateBase
         IClientLogic logic,
         IMessageBroker messageBroker,
         IDeferredHeroRepository deferredHeroRepo,
+        ILoadingInterface loadingInterface,
         ICoopFinalizer coopFinalizer) : base(logic)
     {
         this.messageBroker = messageBroker;
@@ -35,7 +37,7 @@ public class ReceivingSavedDataState : ClientStateBase
         // Keep a loading screen up while we receive and load the server world. This is the
         // common state for both new (post character-creation) and returning clients, so the
         // client's local/main-menu view isn't shown during the transition.
-        messageBroker.Publish(this, new StartLoadingScreen());
+        loadingInterface.ShowLoadingScreen();
     }
 
     public override void Dispose()

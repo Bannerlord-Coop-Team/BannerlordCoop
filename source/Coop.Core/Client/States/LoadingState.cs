@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Coop.Core.Client.Services.Heroes.Data;
+using GameInterface;
 using GameInterface.Registry;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Interfaces;
@@ -28,6 +29,7 @@ public class LoadingState : ClientStateBase
         this.registryManager = registryManager;
         this.deferredHeroRepo = deferredHeroRepo;
         this.heroInterface = heroInterface;
+
         messageBroker.Subscribe<CampaignReady>(Handle_CampaignLoaded);
     }
 

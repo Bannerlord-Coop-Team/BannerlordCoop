@@ -2,6 +2,7 @@
 using Common.Network;
 using Common.PacketHandlers;
 using Common.Serialization;
+using Common.Util;
 using LiteNetLib;
 using ProtoBuf.Meta;
 using System;
@@ -21,7 +22,8 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
 
     protected readonly ICommonSerializer serializer;
 
-    private Thread UpdateThread { get; set; }
+    private readonly Poller poller;
+
     private CancellationTokenSource CancellationTokenSource;
     // Guard against double-dispose: finalizer calls Dispose() after explicit Dispose() on reconnect
     private bool _disposed = false;
@@ -33,16 +35,17 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
         Configuration = configuration;
         this.serializer = serializer;
 
-        netManager = new NetManager(this);
+        netManager = new NetManager(this)
+        {
+            // DisconnectTimeout = configuration.ConnectionTimeout.Milliseconds
 
-        // netManager.DisconnectTimeout = configuration.ConnectionTimeout.Milliseconds;
-
-        // Increase disconnect timeout to prevent disconnect during debugging
-        netManager.DisconnectTimeout = 300 * 1000;
+            // Increase disconnect timeout to prevent disconnect during debugging
+            DisconnectTimeout = 300 * 1000
+        };
 
         CancellationTokenSource = new CancellationTokenSource();
-        UpdateThread = new Thread(UpdateThreadMethod);
-        UpdateThread.Start();
+        poller = new Poller(Update, Configuration.NetworkPollInterval);
+        poller.Start();
     }
 
     ~CoopNetworkBase()
@@ -60,23 +63,9 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
 
         CancellationTokenSource.Cancel();
         CancellationTokenSource.Dispose();
-        UpdateThread?.Join(Configuration.ObjectCreationTimeout);
 
         // Tell GC not to run the finalizer — Dispose() already cleaned up, avoids double-call
         GC.SuppressFinalize(this);
-    }
-
-    private void UpdateThreadMethod()
-    {
-        var lastTime = DateTime.Now;
-        while (CancellationTokenSource.IsCancellationRequested == false)
-        {
-            var now = DateTime.Now;
-            TimeSpan deltaTime = now - lastTime;
-            lastTime = now;
-            Update(deltaTime);
-            Thread.Sleep(Configuration.NetworkPollInterval);
-        }
     }
 
     public virtual void SendAllBut(NetManager netManager, NetPeer netPeer, IPacket packet)

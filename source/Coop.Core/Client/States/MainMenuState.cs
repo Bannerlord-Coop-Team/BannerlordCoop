@@ -1,7 +1,10 @@
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Messages;
+using GameInterface;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.UI.Interfaces;
+using GameInterface.Services.UI.Messages;
 
 namespace Coop.Core.Client.States;
 
@@ -12,12 +15,21 @@ public class MainMenuState : ClientStateBase
 {
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
+    private readonly IGameInterface gameInterface;
+    private readonly ILoadingInterface loadingInterface;
 
-    public MainMenuState(IClientLogic logic, IMessageBroker messageBroker, INetwork network) : base(logic)
+    public MainMenuState(
+        IClientLogic logic,
+        IMessageBroker messageBroker,
+        INetwork network,
+        IGameInterface gameInterface,
+        ILoadingInterface loadingInterface) : base(logic)
     {
         this.messageBroker = messageBroker;
         this.network = network;
-
+        this.gameInterface = gameInterface;
+        this.loadingInterface = loadingInterface;
+        loadingInterface.HideLoadingScreen();
         messageBroker.Subscribe<NetworkConnected>(Handle_NetworkConnected);
     }
 
@@ -33,6 +45,8 @@ public class MainMenuState : ClientStateBase
 
     internal void Handle_NetworkConnected(MessagePayload<NetworkConnected> obj)
     {
+        loadingInterface.ShowLoadingScreen();
+        gameInterface.PatchAll();
         Logic.ValidateModules();
     }
 

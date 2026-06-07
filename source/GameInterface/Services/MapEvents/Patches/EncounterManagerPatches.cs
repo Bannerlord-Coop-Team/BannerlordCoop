@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Policies;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MobileParties.Extensions;
@@ -58,7 +59,7 @@ internal class EncounterManagerPatches
     private static bool RestartPlayerEncounterPrefix(PartyBase attackerParty, PartyBase defenderParty)
     {
         // Our own server-approved re-run (AllowedThread) runs the real method.
-        if (AllowedThread.IsThisThreadAllowed()) return true;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         // The server runs it locally (authoritative).
         if (ModInformation.IsServer) return true;

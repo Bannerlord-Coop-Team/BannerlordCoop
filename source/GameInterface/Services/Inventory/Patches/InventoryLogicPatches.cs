@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Inventory.Messages;
@@ -17,7 +18,7 @@ internal class InventoryLogicPatches
 
     [HarmonyPatch(nameof(InventoryLogic.DoneLogic))]
     [HarmonyPrefix]
-    static bool DoneLogicPrefix(ref InventoryLogic __instance, ref bool __result)
+    static bool DoneLogicPrefix(InventoryLogic __instance, ref bool __result)
     {
         if (__instance.IsPreviewingItem)
         {
@@ -58,7 +59,6 @@ internal class InventoryLogicPatches
             __instance.GetSoldItems(),
             PartyBase.MainParty.MemberRoster
         );
-        
 
         MessageBroker.Instance.Publish(__instance, message);
 

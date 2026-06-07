@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Policies;
 using GameInterface.Services.Settlements.Messages;
 using HarmonyLib;
 using System.Collections.Generic;
@@ -67,7 +68,7 @@ public class LastVisitTimeOwnerSettlementActionPatch
     private static void SetLastVisitTimeOfOwner(Settlement instance, float newValue)
     {
 
-        if (AllowedThread.IsThisThreadAllowed())
+        if (CallOriginalPolicy.IsOriginalAllowed())
         {
             instance.LastVisitTimeOfOwner = newValue;
             return;

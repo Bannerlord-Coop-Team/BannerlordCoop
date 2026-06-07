@@ -2,6 +2,7 @@
 using E2E.Tests.Environment;
 using GameInterface.AutoSync;
 using GameInterface.AutoSync.Builders;
+using GameInterface.DynamicSync;
 using GameInterface.Registry;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
@@ -46,7 +47,7 @@ public class AutoSyncTests : IDisposable
             autosyncBuilder.Build();
         }
 
-        server.Resolve<IAutoSyncPatchCollector>().PatchAll();
+        server.Resolve<IDynamicSyncPatchCollector>().PatchAll();
 
         server.Call(() =>
         {
