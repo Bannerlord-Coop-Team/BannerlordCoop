@@ -23,13 +23,13 @@ public class LoadingState : ClientStateBase
         IMessageBroker messageBroker,
         IRegistryManager registryManager,
         IDeferredHeroRepository deferredHeroRepo,
-        IHeroInterface heroInterface,
-        IGameInterface gameInterface) : base(logic)
+        IHeroInterface heroInterface) : base(logic)
     {
         this.messageBroker = messageBroker;
         this.registryManager = registryManager;
         this.deferredHeroRepo = deferredHeroRepo;
         this.heroInterface = heroInterface;
+
         messageBroker.Subscribe<CampaignReady>(Handle_CampaignLoaded);
     }
 

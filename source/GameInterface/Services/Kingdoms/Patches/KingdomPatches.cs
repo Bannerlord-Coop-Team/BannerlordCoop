@@ -24,11 +24,6 @@ namespace GameInterface.Services.Kingdoms.Patches
         [HarmonyPrefix]
         public static bool AddDecisionPrefix(Kingdom __instance, KingdomDecision kingdomDecision, bool ignoreInfluenceCost)
         {
-            if (AllowedThread.IsThisThreadAllowed())
-            {
-                ModifiedAddDecision(__instance, kingdomDecision, ignoreInfluenceCost);
-                return false;
-            }
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient) return false;
@@ -83,7 +78,6 @@ namespace GameInterface.Services.Kingdoms.Patches
         [HarmonyPrefix]
         public static bool RemoveDecisionPrefix(Kingdom __instance, KingdomDecision kingdomDecision)
         {
-            if (AllowedThread.IsThisThreadAllowed()) return true;
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient) return false;

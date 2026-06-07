@@ -10,7 +10,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Players.Data;
-using GameInterface.Services.UI.Messages;
+using GameInterface.Services.UI.Interfaces;
 using NetworkPlayerData = Coop.Core.Server.Connections.Messages.NetworkPlayerData;
 
 namespace Coop.Core.Client.States;
@@ -26,6 +26,7 @@ public class CharacterCreationState : ClientStateBase
     private readonly IRegistryManager registryManager;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IControlledEntityRegistry controlledEntityRegistry;
+    private readonly ILoadingInterface loadingInterface;
     private readonly ICoopFinalizer coopFinalizer;
 
     public CharacterCreationState(
@@ -36,6 +37,7 @@ public class CharacterCreationState : ClientStateBase
         IRegistryManager registryManager,
         IControllerIdProvider controllerIdProvider,
         IControlledEntityRegistry controlledEntityRegistry,
+        ILoadingInterface loadingInterface,
         ICoopFinalizer coopFinalizer) : base(logic)
     {
         this.messageBroker = messageBroker;
@@ -44,7 +46,11 @@ public class CharacterCreationState : ClientStateBase
         this.registryManager = registryManager;
         this.controllerIdProvider = controllerIdProvider;
         this.controlledEntityRegistry = controlledEntityRegistry;
+        this.loadingInterface = loadingInterface;
         this.coopFinalizer = coopFinalizer;
+
+        loadingInterface.HideLoadingScreen();
+
         messageBroker.Subscribe<CharacterCreationFinished>(Handle_CharacterCreationFinished);
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Subscribe<NetworkPlayerData>(Handle_NetworkPlayerData);
@@ -61,7 +67,7 @@ public class CharacterCreationState : ClientStateBase
     {
         // Cover the client's own (character-creation) world with a loading screen until the
         // server campaign is ready, so the local world isn't briefly visible while we join.
-        messageBroker.Publish(this, new StartLoadingScreen());
+        loadingInterface.ShowLoadingScreen();
 
         registryManager.RegisterAllGameObjects();
 

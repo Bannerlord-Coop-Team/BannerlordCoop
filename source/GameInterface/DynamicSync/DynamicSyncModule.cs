@@ -14,6 +14,8 @@ internal class DynamicSyncModule : Module
 {
     protected override void Load(ContainerBuilder builder)
     {
+        builder.RegisterType<DynamicSyncPatchCollector>().As<IDynamicSyncPatchCollector>().InstancePerLifetimeScope();
+
         builder.RegisterType<DynamicSyncRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<DynamicSyncPatcher>().InstancePerLifetimeScope();
         builder.RegisterType<DynamicSyncBuilder>().InstancePerLifetimeScope();

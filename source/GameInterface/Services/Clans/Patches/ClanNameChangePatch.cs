@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Policies;
 using GameInterface.Services.Clans.Messages;
 using HarmonyLib;
 using Serilog;
@@ -20,7 +21,6 @@ namespace GameInterface.Services.Clans.Patches
         static bool Prefix(ref Clan __instance, TextObject name, TextObject informalName)
         {
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-            if(AllowedThread.IsThisThreadAllowed()) return true;
 
             if(Campaign.Current.MainParty.ActualClan == __instance)
             {

@@ -73,10 +73,12 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     {
         if (allowJoining)
         {
+            Logger.Information("Client connection accepted for {Endpoint}", request.RemoteEndPoint);
             request.Accept();
         }
         else
         {
+            Logger.Information("Client connection rejected for {Endpoint}", request.RemoteEndPoint);
             request.Reject();
         }
     }
@@ -133,7 +135,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     public override void Start()
     {
         Logger.Information("Server starting on port {Port}", Configuration.Port);
-        netManager.Start(Configuration.Port);
+        netManager.Start(IPAddress.Any, IPAddress.IPv6Any, Configuration.Port);
     }
 
     public override void SendAll(IPacket packet)

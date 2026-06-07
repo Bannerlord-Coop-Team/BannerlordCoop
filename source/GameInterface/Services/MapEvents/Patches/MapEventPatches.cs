@@ -33,7 +33,7 @@ internal class MapEventPatches
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
         // Parties not controlled by the server are player parties
-        if (mapEventParty.Party.MobileParty.IsPlayerParty())
+        if (mapEventParty.Party.MobileParty?.IsPlayerParty() == true)
         {
             var partiesAdded = new List<MapEventParty>();
 
