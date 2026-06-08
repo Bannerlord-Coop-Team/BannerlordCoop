@@ -17,6 +17,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Heroes.Interfaces;
@@ -164,7 +165,7 @@ internal class HeroInterface : IHeroInterface
             return;
 
         Campaign.Current.MainParty = playerParty;
-        // This is needed because if the player is ca
+        // This is needed because if the player is captured the PartyBelongedTo is null
         playerHero.PartyBelongedTo = playerParty;
 
         Logger.Information("Switching to new hero: {heroName}", playerHero.Name.ToString());
@@ -173,8 +174,10 @@ internal class HeroInterface : IHeroInterface
 
         Campaign.Current.PlayerDefaultFaction = playerHero.Clan;
 
-        
+        // Used to MainHero and CharacterObject
+        Game.Current.PlayerTroop = playerHero.CharacterObject;
 
+        // Recapture if previously captured
         if (playerHero.PartyBelongedToAsPrisoner != null)
         {
             playerHero.PartyBelongedTo = null;

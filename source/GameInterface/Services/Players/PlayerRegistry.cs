@@ -34,7 +34,7 @@ public interface IPlayerRegistry: IEnumerable<Player>
 /// <inheritdoc cref="IPlayerRegistry"/>
 internal class PlayerRegistry : IPlayerRegistry
 {
-    public static readonly ConditionalWeakTable<MobileParty, CachedPrimitive<bool>> IsPlayerPartyCache = new();
+    public static readonly ConditionalWeakTable<MobileParty, Player> PlayerParties = new();
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
@@ -55,7 +55,7 @@ internal class PlayerRegistry : IPlayerRegistry
 
         if (objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var mobileParty))
         {
-            IsPlayerPartyCache.GetValue(mobileParty, _ => new CachedPrimitive<bool>(false)).Value = true;
+            PlayerParties.Add(mobileParty, player);
         }
 
         messageBroker.Publish(this, new PlayerRegistered(player));

@@ -84,7 +84,7 @@ public static class PartyExtensions
             return false;
         }
 
-        return PlayerRegistry.IsPlayerPartyCache.GetValue(party, _ => new CachedPrimitive<bool>(false)).Value;
+        return PlayerRegistry.PlayerParties.TryGetValue(party, out var _);
     }
 
     public static bool IsInConversation(this MobileParty party)
