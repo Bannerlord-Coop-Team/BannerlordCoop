@@ -87,6 +87,26 @@ public class MapEventEnvironmentTests : MapEventTestBase
     }
 
     [Fact]
+    public void PlayerPartyDefeatedInBattle_TakesPlayerHeroCaptive_SyncAllClients()
+    {
+        // Arrange
+        var (heroId, partyId) = CreatePlayerHeroParty();
+        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        // Act — the player party loses a battle; CaptureDefeatedPartyMembers runs on the server. Native removes
+        // the defeated party's leader, so this only captures the hero if the coop patch reads the leader in a
+        // prefix (before native) rather than a postfix.
+        DefeatPlayerPartyInBattle(heroId, partyId, captorPartyId);
+
+        // Assert — the defeated player hero is now a prisoner of the captor on every instance
+        AssertCaptivity(Server, heroId, captorPartyId);
+        foreach (var client in Clients)
+        {
+            AssertCaptivity(client, heroId, captorPartyId);
+        }
+    }
+
+    [Fact]
     public void ServerEndCaptivity_OfPlayerHero_SyncAllClients()
     {
         // Arrange
@@ -153,7 +173,7 @@ public class MapEventEnvironmentTests : MapEventTestBase
         {
             Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Assert.True(
-                GameInterface.Services.MobileParties.Extensions.PartyExtensions.IsPlayerParty(party),
+                GameInterface.Services.MobileParties.Extensions.MobilePartyExtensions.IsPlayer(party),
                 $"Party {partyId} was expected to be a player party on {instance.GetType().Name}");
         });
     }

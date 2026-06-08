@@ -56,7 +56,7 @@ internal class DestroyPartyActionPatch
         // The party then no longer resolves and a subsequent settlement encounter activates an
         // empty/unregistered menu -> null GameMenu NRE in MenuContext.HandleStates.
         // Blocking here also prevents publishing DestroyPartyApplied, so clients keep the party too.
-        if (destroyedParty != null && destroyedParty.IsPlayerParty())
+        if (destroyedParty != null && destroyedParty.IsPlayer())
         {
             Logger.Warning("Blocked DestroyPartyAction for player party {partyName}, {StringId}", destroyedParty.Name, destroyedParty.StringId);
             return false;

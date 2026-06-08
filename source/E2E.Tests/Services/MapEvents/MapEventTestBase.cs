@@ -9,7 +9,9 @@ using Moq;
 using SandBox.GauntletUI.Map;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -305,6 +307,54 @@ public abstract class MapEventTestBase : IDisposable
 
         Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(captorPartyId, out var captor));
         Assert.Equal(captor.Party, hero.PartyBelongedToAsPrisoner);
+    }
+
+    /// <summary>
+    /// Simulates the player party with <paramref name="playerPartyId"/> losing a battle. Builds a real
+    /// <see cref="MapEvent"/> with <paramref name="captorPartyId"/> on the winning side and the player party on
+    /// the losing side, then runs the real <see cref="MapEvent.CaptureDefeatedPartyMembers"/> on the server.
+    /// </summary>
+    /// <remarks>
+    /// This is the path that takes a defeated client captive. The player hero is deliberately NOT made the
+    /// party's <c>LeaderHero</c> (on the server a player party's <c>PartyComponent.Leader</c> is not reliably
+    /// set), so the coop capture must resolve the captured hero from the player registry — which is what
+    /// <c>PlayerStartCaptivityPatches</c> does in a <em>prefix</em> (before native removes the leader and
+    /// scatters members). The native <c>TakePrisonerAction.ApplyInternal</c> mutation is suppressed so the
+    /// assertion deterministically exercises the coop capture/sync path (<c>PrisonerTaken</c> →
+    /// <c>PlayerCaptivityHandler</c> → AutoSynced <see cref="Hero.PartyBelongedToAsPrisoner"/>), not vanilla
+    /// prisoner RNG.
+    /// </remarks>
+    protected void DefeatPlayerPartyInBattle(string playerHeroId, string playerPartyId, string captorPartyId)
+    {
+        var disabledMethods = MapEventDisabledMethods
+            // Native's capture-chance model indexes _sides by WinningSide, which is invalid here because no
+            // battle result was committed (we drive the capture directly). The coop prefix clears the defeated
+            // player party's roster before native's loop, so these (now unused) chances are never dereferenced.
+            .Append(AccessTools.Method(typeof(DefaultBattleRewardModel), nameof(DefaultBattleRewardModel.GetCaptureMemberChancesForWinnerParties)))
+            .ToList();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerPartyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(captorPartyId, out var captorParty));
+
+            // Make the player hero a member of (not leader of) the player party: the capture resolves the hero
+            // from the player registry, and PlayerCaptivityHandler.Handle_PrisonerTaken derives the party from
+            // hero.PartyBelongedTo. This is local server setup; wrap in AllowedThread so it does not re-broadcast.
+            using (new AllowedThread())
+            {
+                playerParty.MemberRoster.AddToCounts(playerHero.CharacterObject, 1);
+                playerHero.PartyBelongedTo = playerParty;
+            }
+
+            // attacker = captor (winner), defender = player party (loser)
+            var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
+            mapEvent.MapEventVisual = MockMapEventVisual();
+            mapEvent.Initialize(captorParty.Party, playerParty.Party);
+
+            mapEvent.CaptureDefeatedPartyMembers(mapEvent.AttackerSide.Parties, mapEvent.DefenderSide.Parties);
+        }, disabledMethods);
     }
 
     // ------------------------------------------------------------------

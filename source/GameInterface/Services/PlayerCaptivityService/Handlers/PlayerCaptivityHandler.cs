@@ -82,7 +82,7 @@ internal class PlayerCaptivityHandler : IHandler
         var hero = obj.PrisonerHero;
         var mobileParty = hero.PartyBelongedTo;
 
-        if (mobileParty?.IsPlayerParty() == false)
+        if (mobileParty?.IsPlayer() == false)
             return;
 
         if (hero.PartyBelongedToAsPrisoner != null)
@@ -135,6 +135,8 @@ internal class PlayerCaptivityHandler : IHandler
     {
         GameLoopRunner.RunOnMainThread(() =>
         {
+            if (Campaign.Current is null) return;
+
             using (new AllowedThread())
             {
                 if (PlayerEncounter.Current != null)

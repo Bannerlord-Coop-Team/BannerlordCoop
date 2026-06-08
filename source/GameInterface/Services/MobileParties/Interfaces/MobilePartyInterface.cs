@@ -1,17 +1,8 @@
-﻿using Common;
-using Common.Logging;
-using Common.Util;
-using GameInterface.Registry.Auto;
+﻿using Common.Logging;
 using GameInterface.Services.Entity;
-using GameInterface.Services.MobileParties.Messages.Behavior;
-using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using System.Reflection;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.MobileParties.Interfaces;
 
@@ -35,7 +26,6 @@ public interface IMobilePartyInterface : IGameAbstraction
 internal class MobilePartyInterface : IMobilePartyInterface
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyInterface>();
-    private static readonly MethodInfo PartyBase_OnFinishLoadState = typeof(PartyBase).GetMethod("OnFinishLoadState", BindingFlags.NonPublic | BindingFlags.Instance);
 
     private readonly IObjectManager objectManager;
     private readonly IControlledEntityRegistry controlledEntityRegistry;
@@ -52,7 +42,7 @@ internal class MobilePartyInterface : IMobilePartyInterface
     {
         party.IsVisible = true;
 
-        PartyBase_OnFinishLoadState.Invoke(party.Party, null);
+        party.Party.OnFinishLoadState();
     }
 
     public void RegisterAllPartiesAsControlled(string ownerId)

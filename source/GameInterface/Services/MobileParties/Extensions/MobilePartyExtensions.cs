@@ -4,25 +4,16 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Serilog;
-using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Extensions;
 
-public static class PartyExtensions
+public static class MobilePartyExtensions
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MobileParty>();
 
-    private static ConditionalWeakTable<MobileParty, PartyCache> Cache = new();
-
-    private sealed class PartyCache
-    {
-        public bool? IsPartyControlled;
-        public bool? IsInConversation;
-    }
-
     /// <summary>
-    /// Check to see if the Party is controlled by a specific MobileParty.
+    /// Check to see if the Party is controlled by this client or server.
     /// </summary>
     /// <param name="party">MobileParty to check that is controlled</param>
     /// <returns>true if is controlled otherwise false.</returns>
@@ -34,11 +25,9 @@ public static class PartyExtensions
             return false;
         }
 
-        var cache = Cache.GetOrCreateValue(party);
-
-        if (cache.IsPartyControlled.HasValue)
+        if (ControlledEntityRegistry.ControlledEntitiesCache.TryGetValue(party, out var cachedValue))
         {
-            return cache.IsPartyControlled.Value;
+            return cachedValue.Value;
         }
 
         if (!ContainerProvider.TryResolve<IControlledEntityRegistry>(out var entityRegistry))
@@ -66,7 +55,8 @@ public static class PartyExtensions
         }
 
         var result = entityRegistry.IsControlledBy(idProvider.ControllerId, partyId);
-        cache.IsPartyControlled = result;
+
+        ControlledEntityRegistry.ControlledEntitiesCache.Add(party, new CachedPrimitive<bool>(result));
 
         return result;
     }
@@ -76,7 +66,7 @@ public static class PartyExtensions
     /// </summary>
     /// <param name="party">The mobile party that may be controlled by a player</param>
     /// <returns>return true if the MobileParty is a player otherwise false.</returns>
-    public static bool IsPlayerParty(this MobileParty party)
+    public static bool IsPlayer(this MobileParty party)
     {
         if (party is null)
         {
@@ -84,56 +74,7 @@ public static class PartyExtensions
             return false;
         }
 
-        return PlayerRegistry.PlayerParties.TryGetValue(party, out var _);
-    }
-
-    public static bool IsInConversation(this MobileParty party)
-    {
-        if (party is null)
-        {
-            Logger.Error("{parameterName} was null", nameof(party));
-            return false;
-        }
-
-        var cache = Cache.GetOrCreateValue(party);
-
-        if (cache.IsInConversation.HasValue)
-        {
-            return cache.IsInConversation.Value;
-        }
-
-        var result = false;
-        cache.IsInConversation = result;
-
-        return result;
-    }
-
-    public static bool SetInConversation(this MobileParty party, bool inConversation)
-    {
-        if (party is null)
-        {
-            Logger.Error("{parameterName} was null", nameof(party));
-            return false;
-        }
-
-        var cache = Cache.GetOrCreateValue(party);
-        cache.IsInConversation = inConversation;
-        return inConversation;
-    } 
-
-    /// <summary>
-    /// Clears all cached values for a specific party.
-    /// Call this when party ownership/player status may have changed.
-    /// </summary>
-    public static void InvalidatePartyCache(this MobileParty party)
-    {
-        if (party is null)
-        {
-            Logger.Error("{parameterName} was null", nameof(party));
-            return;
-        }
-
-        Cache.Remove(party);
+        return PlayerRegistry.PlayerObjects.TryGetValue(party, out var _);
     }
 
     /// <summary>
@@ -147,12 +88,6 @@ public static class PartyExtensions
             return;
         }
 
-        var cache = Cache.GetOrCreateValue(party);
-        cache.IsPartyControlled = null;
-    }
-
-    public static void InvalidateCache()
-    {
-        Cache = new();
+        ControlledEntityRegistry.ControlledEntitiesCache.Remove(party);
     }
 }

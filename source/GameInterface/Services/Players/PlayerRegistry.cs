@@ -7,6 +7,7 @@ using GameInterface.Services.Players.Messages;
 using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Players;
@@ -34,7 +35,7 @@ public interface IPlayerRegistry: IEnumerable<Player>
 /// <inheritdoc cref="IPlayerRegistry"/>
 internal class PlayerRegistry : IPlayerRegistry
 {
-    public static readonly ConditionalWeakTable<MobileParty, Player> PlayerParties = new();
+    public static readonly ConditionalWeakTable<object, Player> PlayerObjects = new();
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
@@ -53,14 +54,21 @@ internal class PlayerRegistry : IPlayerRegistry
 
         if (!_playerMobileParties.Add(player.MobilePartyId)) return false;
 
-        if (objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var mobileParty))
-        {
-            PlayerParties.Add(mobileParty, player);
-        }
+        // Add player objects for IsPlayer extension (i.e. MobilePartyExtensions)
+        AddPlayerObject<MobileParty>(player.MobilePartyId, player);
+        AddPlayerObject<Hero>(player.HeroId, player);
 
         messageBroker.Publish(this, new PlayerRegistered(player));
 
         return true;
+    }
+
+    private void AddPlayerObject<T>(string networkId, Player player)
+    {
+        if (!objectManager.TryGetObjectWithLogging<T>(networkId, out var obj))
+            return;
+
+        PlayerObjects.Add(obj, player);
     }
 
     /// <inheritdoc cref="IPlayerRegistry.Contains(MobileParty)"/>

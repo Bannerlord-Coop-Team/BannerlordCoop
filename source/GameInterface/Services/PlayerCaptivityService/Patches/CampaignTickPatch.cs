@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using GameInterface.Policies;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
 using System;
@@ -15,6 +16,8 @@ internal class CampaignTickPatch
     [HarmonyPostfix]
     private static void Postfix_Tick()
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+
         MessageBroker.Instance.Publish(Campaign.Current, new CampaignTick());
     }
 }
