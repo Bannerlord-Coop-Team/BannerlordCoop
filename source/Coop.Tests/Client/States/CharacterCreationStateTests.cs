@@ -10,6 +10,7 @@ using GameInterface.Registry.Messages;
 using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.UI.Interfaces;
 using LiteNetLib;
 using Moq;
 using Xunit;
@@ -22,6 +23,7 @@ namespace Coop.Tests.Client.States
         private readonly IClientLogic clientLogic;
         private readonly NetPeer serverPeer;
         private readonly ClientTestComponent clientComponent;
+        private readonly Mock<ILoadingInterface> loadingInterfaceMock;
 
         private TestMessageBroker TestMessageBroker => clientComponent.TestMessageBroker;
         private TestNetwork MockNetwork => clientComponent.TestNetwork;
@@ -33,6 +35,7 @@ namespace Coop.Tests.Client.States
 
             serverPeer = MockNetwork.CreatePeer();
             clientLogic = container.Resolve<IClientLogic>()!;
+            loadingInterfaceMock = container.Resolve<Mock<ILoadingInterface>>();
         }
 
         [Fact]
@@ -65,7 +68,10 @@ namespace Coop.Tests.Client.States
             characterCreationState.Handle_CharacterCreationFinished(payload);
 
             // Assert
-            Assert.Single(TestMessageBroker.GetMessagesFromType<NetworkTransferedHero>());
+            Assert.Single(MockNetwork.GetPeerMessagesFromType<NetworkTransferedHero>(serverPeer));
+            loadingInterfaceMock.Verify(x => x.ShowLoadingScreen(
+                "Joining Coop Campaign",
+                "Sending your character to the host..."), Times.Once);
         }
 
         [Fact]

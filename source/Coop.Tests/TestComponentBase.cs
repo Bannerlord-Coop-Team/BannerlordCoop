@@ -7,13 +7,18 @@ using Coop.Core;
 using Coop.Tests.Mocks;
 using GameInterface.Registry;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using GameInterface.Services.Time.Interfaces;
+using GameInterface.Services.UI.Interfaces;
 using Moq;
 using Serilog;
 using System.Collections.Generic;
+using IGameInterface = GameInterface.IGameInterface;
 using Xunit.Abstractions;
 
 namespace Coop.Tests;
@@ -74,9 +79,15 @@ internal abstract class TestComponentBase
         builder.RegisterInstance(new Mock<ILogger>().Object).As<ILogger>().SingleInstance();
 
         RegisterMock<ILogger>(builder);
+        RegisterMock<IGameInterface>(builder);
         RegisterMock<IControlledEntityRegistry>(builder);
         RegisterMock<IHeroInterface>(builder);
         RegisterMock<IModuleInfoProvider>(builder);
+        RegisterMock<IRegistryManager>(builder);
+        RegisterMock<IPlayerRegistry>(builder);
+        RegisterMock<ITimeControlInterface>(builder);
+        RegisterMock<IMapTimeTrackerInterface>(builder);
+        RegisterMock<ILoadingInterface>(builder);
 
         return builder;
     }
