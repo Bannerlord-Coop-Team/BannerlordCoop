@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Messages;
 using GameInterface.Services.Players;
@@ -54,7 +55,7 @@ internal class PartyHealHandler : IHandler
     {
         if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
 
-        if (obj.What.MobileParty?.IsPlayerParty() != true) return
+        if (obj.What.MobileParty?.IsPlayerParty() != true) return;
 
         obj.What.PartyHealCampaignBehavior.TryHealOrWoundParty(obj.What.MobileParty.Party, 4f);
     }
