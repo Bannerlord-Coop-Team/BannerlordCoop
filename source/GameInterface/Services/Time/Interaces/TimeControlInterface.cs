@@ -11,7 +11,6 @@ using Newtonsoft.Json.Linq;
 using Serilog;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
@@ -81,9 +80,25 @@ internal class TimeControlInterface : ITimeControlInterface
     /// <returns>True if unpausing is not allowed, otherwise False</returns>
     private bool UnpauseDisallowed()
     {
-        return unpausePolicies
-            .Where(policy => policy.IsAlive)
-            .Any(policy => policy.Invoke<bool>(Array.Empty<object>()) == false);
+        foreach (var policy in unpausePolicies)
+        {
+            if (policy.IsAlive == false)
+            {
+                continue;
+            }
+
+            if (UnpauseAllowedBy(policy) == false)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool UnpauseAllowedBy(WeakDelegate policy)
+    {
+        return policy.Invoke<bool>(Array.Empty<object>());
     }
 
 
