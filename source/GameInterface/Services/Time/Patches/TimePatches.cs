@@ -59,13 +59,7 @@ internal class TimePatches
 
     internal static TimeControlEnum ConvertSelectedTimeSpeed(int selectedTimeSpeed)
     {
-        return selectedTimeSpeed switch
-        {
-            0 => TimeControlEnum.Pause,
-            1 => TimeControlEnum.Play_1x,
-            2 => TimeControlEnum.Play_2x,
-            _ => timeControlModeConverter.Convert((CampaignTimeControlMode)selectedTimeSpeed),
-        };
+        return timeControlModeConverter.Convert((CampaignTimeControlMode)selectedTimeSpeed);
     }
 
     internal static bool CanApplyTimeControl(TimeControlEnum controlMode)
