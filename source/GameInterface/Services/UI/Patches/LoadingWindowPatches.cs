@@ -1,6 +1,8 @@
+using GameInterface.Services.UI.Interfaces;
 using HarmonyLib;
 using System.Reflection;
 using TaleWorlds.Engine;
+using TaleWorlds.MountAndBlade.GauntletUI;
 
 namespace GameInterface.Services.UI.Patches;
 
@@ -26,15 +28,35 @@ internal static class LoadingWindowPatches
     /// </summary>
     public static bool ForceLoadingWindow { get; set; }
 
-    // Setter is non-public on the engine type; resolve it once via reflection.
-    private static readonly MethodInfo SetIsLoadingWindowActive =
-        AccessTools.PropertySetter(typeof(LoadingWindow), nameof(LoadingWindow.IsLoadingWindowActive));
-
     [HarmonyPatch(nameof(LoadingWindow.DisableGlobalLoadingWindow))]
     [HarmonyPrefix]
     private static bool DisableGlobalLoadingWindowPrefix()
     {
         // Skip the disable entirely while we are forcing the window to remain visible.
         return !ForceLoadingWindow;
+    }
+
+    [HarmonyPatch(nameof(LoadingWindow.EnableGlobalLoadingWindow))]
+    [HarmonyPostfix]
+    private static void EnableGlobalLoadingWindowPostfix()
+    {
+        LoadingInterface.ApplyCurrentLoadingMessage();
+    }
+
+}
+
+[HarmonyPatch]
+internal static class GauntletDefaultLoadingWindowManagerPatches
+{
+    private static MethodBase TargetMethod()
+    {
+        return AccessTools.Method(
+            typeof(GauntletDefaultLoadingWindowManager),
+            "TaleWorlds.Engine.ILoadingWindowManager.EnableLoadingWindow");
+    }
+
+    private static void Postfix()
+    {
+        LoadingInterface.ApplyCurrentLoadingMessage();
     }
 }

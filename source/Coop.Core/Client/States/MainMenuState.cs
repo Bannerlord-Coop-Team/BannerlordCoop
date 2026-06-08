@@ -45,7 +45,9 @@ public class MainMenuState : ClientStateBase
 
     internal void Handle_NetworkConnected(MessagePayload<NetworkConnected> obj)
     {
-        loadingInterface.ShowLoadingScreen();
+        loadingInterface.ShowLoadingScreen(
+            "Connecting to Coop Server",
+            "Validating modules...");
         gameInterface.PatchAll();
         Logic.ValidateModules();
     }

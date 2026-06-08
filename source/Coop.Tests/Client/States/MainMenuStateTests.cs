@@ -6,6 +6,8 @@ using Coop.Core.Client.Messages;
 using Coop.Core.Client.States;
 using Coop.Tests.Mocks;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.UI.Interfaces;
+using Moq;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -15,6 +17,7 @@ namespace Coop.Tests.Client.States
     {
         private readonly IClientLogic clientLogic;
         private readonly ClientTestComponent clientComponent;
+        private readonly Mock<ILoadingInterface> loadingInterfaceMock;
 
         public MainMenuStateTests(ITestOutputHelper output)
         {
@@ -22,6 +25,7 @@ namespace Coop.Tests.Client.States
             var container = clientComponent.Container;
 
             clientLogic = container.Resolve<IClientLogic>()!;
+            loadingInterfaceMock = container.Resolve<Mock<ILoadingInterface>>();
         }
 
         [Fact]
@@ -51,6 +55,9 @@ namespace Coop.Tests.Client.States
 
             // Assert
             Assert.IsType<ValidateModuleState>(clientLogic.State);
+            loadingInterfaceMock.Verify(x => x.ShowLoadingScreen(
+                "Connecting to Coop Server",
+                "Validating modules..."), Times.Once);
         }
 
         [Fact]
