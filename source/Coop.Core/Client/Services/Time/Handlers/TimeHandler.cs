@@ -21,8 +21,7 @@ namespace Coop.Core.Client.Services.Time.Handlers
         private readonly IMessageBroker messageBroker;
         private readonly INetwork network;
         private readonly ITimeControlInterface timeControlInterface;
-        private bool timeControlsLocked;
-        private int loadingPlayers;
+        private TimeControlLockState timeControlLockState = TimeControlLockState.Unlocked;
 
         public TimeHandler(IMessageBroker messageBroker, INetwork network, ITimeControlInterface timeControlInterface)
         {
@@ -47,9 +46,9 @@ namespace Coop.Core.Client.Services.Time.Handlers
         {
             var newMode = obj.What.NewControlMode;
 
-            if (timeControlsLocked && newMode != TimeControlEnum.Pause)
+            if (timeControlLockState.IsLocked && newMode != TimeControlEnum.Pause)
             {
-                messageBroker.Publish(this, new SendInformationMessage(LoadingMessage()));
+                messageBroker.Publish(this, new SendInformationMessage(timeControlLockState.LoadingMessage));
                 return;
             }
 
@@ -70,10 +69,9 @@ namespace Coop.Core.Client.Services.Time.Handlers
 
         internal void Handle_NetworkTimeControlLockChanged(MessagePayload<NetworkTimeControlLockChanged> obj)
         {
-            timeControlsLocked = obj.What.IsLocked;
-            loadingPlayers = timeControlsLocked ? Math.Max(1, obj.What.LoadingPlayers) : 0;
+            timeControlLockState = TimeControlLockState.FromNetworkMessage(obj.What);
 
-            if (timeControlsLocked)
+            if (timeControlLockState.IsLocked)
             {
                 timeControlInterface.ClientSetTimeControl(TimeControlEnum.Pause);
             }
@@ -81,12 +79,29 @@ namespace Coop.Core.Client.Services.Time.Handlers
 
         private bool TimeControlLockPolicy()
         {
-            return timeControlsLocked == false;
+            return timeControlLockState.IsLocked == false;
         }
 
-        private string LoadingMessage()
+        private readonly struct TimeControlLockState
         {
-            return "Time controls disabled, " + loadingPlayers + " player(s) are currently joining the game";
+            public static TimeControlLockState Unlocked => new TimeControlLockState(false, 0);
+
+            public bool IsLocked { get; }
+            public int LoadingPlayers { get; }
+            public string LoadingMessage => "Time controls disabled, " + LoadingPlayers + " player(s) are currently joining the game";
+
+            private TimeControlLockState(bool isLocked, int loadingPlayers)
+            {
+                IsLocked = isLocked;
+                LoadingPlayers = loadingPlayers;
+            }
+
+            public static TimeControlLockState FromNetworkMessage(NetworkTimeControlLockChanged message)
+            {
+                return message.IsLocked
+                    ? new TimeControlLockState(true, Math.Max(1, message.LoadingPlayers))
+                    : Unlocked;
+            }
         }
     }
 }
