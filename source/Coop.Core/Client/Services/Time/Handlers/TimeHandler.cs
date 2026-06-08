@@ -7,7 +7,6 @@ using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Messages;
 using Serilog;
-using System;
 
 namespace Coop.Core.Client.Services.Time.Handlers
 {
@@ -98,9 +97,12 @@ namespace Coop.Core.Client.Services.Time.Handlers
 
             public static TimeControlLockState FromNetworkMessage(NetworkTimeControlLockChanged message)
             {
-                return message.IsLocked
-                    ? new TimeControlLockState(true, Math.Max(1, message.LoadingPlayers))
-                    : Unlocked;
+                if (message.IsLocked == false)
+                {
+                    return Unlocked;
+                }
+
+                return new TimeControlLockState(true, message.LoadingPlayers);
             }
         }
     }
