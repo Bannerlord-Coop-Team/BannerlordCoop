@@ -2,10 +2,13 @@ using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using HarmonyLib;
 using SandBox.GauntletUI.Map;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -44,6 +47,12 @@ public abstract class MapEventTestBase : IDisposable
             // Covers Campaign.Current.MapEventManager.OnMapEventCreated (called inside OnClientCreated)
             // and other campaign-side registration that requires a fully loaded game world.
             AccessTools.Method(mapEventRegistryType, "OnClientCreated"),
+
+            // Reached when a party joins a battle side (AddPartyInternal -> AddInvolvedPartyInternal). It
+            // indexes into renown/influence book-keeping that assumes a fully initialized MapEvent and
+            // throws IndexOutOfRange in the headless environment. It computes display-only values, so
+            // skipping it does not affect what these tests exercise (party-membership replication).
+            AccessTools.Method(typeof(MapEvent), nameof(MapEvent.RecalculateRenownAndInfluenceValuesOnPartyInvolved)),
         };
     }
 
@@ -90,7 +99,7 @@ public abstract class MapEventTestBase : IDisposable
 
             // The visual must exist before Initialize is called; skip its constructor so
             // we do not need a render context.
-            mapEvent.MapEventVisual = ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
+            mapEvent.MapEventVisual = MockMapEventVisual();
 
             mapEvent.Initialize(attackerParty.Party, defenderParty.Party);
 
@@ -120,6 +129,262 @@ public abstract class MapEventTestBase : IDisposable
             {
                 mapEvent.FinalizeEvent();
             }
+        }, MapEventDisabledMethods);
+    }
+
+    // ------------------------------------------------------------------
+    // UI / Context mocking
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// Creates a <see cref="GauntletMapEventVisual"/> without running its constructor. The real visual
+    /// requires a render context (GauntletUI layer + MapState) that does not exist in the headless test
+    /// environment, so every MapEvent in tests is given this stand-in. The UI logic that would normally
+    /// run against it (e.g. <c>MapEventVisualsVM.UpdateMapEventsAux</c>) is wrapped in a Harmony finalizer
+    /// in production (<c>MapEventRobustnessPatches</c>) so it is safe to leave un-initialized here.
+    /// </summary>
+    protected static GauntletMapEventVisual MockMapEventVisual()
+        => ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
+
+    // ------------------------------------------------------------------
+    // Parties joining map events
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// Creates and registers a <see cref="MapEventSide"/> on the server (a battle side of a map event),
+    /// returning its string id. The side is propagated to all clients via the AutoRegistry. Parties can then
+    /// be joined to it with <see cref="JoinPartyToSide"/>.
+    /// </summary>
+    /// <remarks>
+    /// A side is used as the join target instead of driving the full <c>MapEvent.Initialize</c> flow:
+    /// <c>Initialize</c> cannot complete in the headless test environment (it reaches into campaign systems
+    /// that are not loaded), whereas a registered <see cref="MapEventSide"/> exercises the exact replication
+    /// path the game uses when a party reinforces a battle (<c>MapEventSide.AddPartyInternal</c> →
+    /// <c>MapEventSideCollectionPatches</c>).
+    /// </remarks>
+    protected string CreateServerMapEventSide()
+    {
+        return TestEnvironment.CreateRegisteredObject<MapEventSide>(MapEventDisabledMethods);
+    }
+
+    /// <summary>
+    /// Creates a new <see cref="MobileParty"/> on the server and joins it to an existing battle
+    /// <see cref="MapEventSide"/>, mirroring a party reinforcing that side of a battle. The created
+    /// <see cref="MapEventParty"/> and the side membership are propagated to all clients.
+    /// </summary>
+    /// <param name="mapEventSideId">String id of a side created via <see cref="CreateServerMapEventSide"/>.</param>
+    /// <returns>The string id of the <see cref="MapEventParty"/> that joined the side.</returns>
+    protected string JoinPartyToSide(string mapEventSideId)
+    {
+        string? mapEventPartyId = null;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEventSide>(mapEventSideId, out var side));
+
+            var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
+
+            // AddPartyInternal is the vanilla path that reinforces an existing battle side. It is NOT wrapped
+            // in AllowedThread: the collection-add must go through the patched MBList.Add so the server
+            // broadcasts the new party to the clients (MapEventSideCollectionPatches.ListAddOverride).
+            side.AddPartyInternal(party.Party);
+
+            var joined = side.Parties.LastOrDefault(p => p?.Party == party.Party);
+            Assert.NotNull(joined);
+            Assert.True(Server.ObjectManager.TryGetId(joined, out mapEventPartyId));
+        }, MapEventDisabledMethods);
+
+        Assert.NotNull(mapEventPartyId);
+        return mapEventPartyId!;
+    }
+
+    /// <summary>
+    /// Asserts that the <see cref="MapEventParty"/> with <paramref name="mapEventPartyId"/> is part of the
+    /// side with <paramref name="mapEventSideId"/> on the supplied <paramref name="instance"/>.
+    /// </summary>
+    protected void AssertPartyInSide(EnvironmentInstance instance, string mapEventSideId, string mapEventPartyId)
+    {
+        Assert.True(instance.ObjectManager.TryGetObject<MapEventSide>(mapEventSideId, out var side));
+        Assert.True(instance.ObjectManager.TryGetObject<MapEventParty>(mapEventPartyId, out var mapEventParty));
+
+        Assert.Contains(mapEventParty, side.Parties);
+    }
+
+    // ------------------------------------------------------------------
+    // Player party / hero designation
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// Creates a <see cref="Hero"/> and a <see cref="MobileParty"/> that are synced to all instances and
+    /// registers them as a player-controlled party in every instance's <see cref="IPlayerRegistry"/>.
+    /// After this call <c>party.IsPlayerParty()</c> returns true everywhere, which drives the player-specific
+    /// branches in the MapEvent patches (join windows, captivity, surrender, etc.).
+    /// </summary>
+    /// <returns>The string ids of the created player hero and party.</returns>
+    protected (string heroId, string partyId) CreatePlayerHeroParty()
+    {
+        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        RegisterAsPlayerParty(heroId, partyId);
+
+        return (heroId, partyId);
+    }
+
+    /// <summary>
+    /// Registers an already-synced hero/party pair as a player in every instance's player registry.
+    /// </summary>
+    protected void RegisterAsPlayerParty(string heroId, string partyId)
+    {
+        void Register(EnvironmentInstance instance)
+        {
+            instance.Call(() =>
+            {
+                var registry = instance.Resolve<IPlayerRegistry>();
+                registry.AddPlayer(new Player(heroId, partyId));
+
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                Assert.True(registry.Contains(party));
+            });
+        }
+
+        Register(Server);
+        foreach (var client in Clients)
+        {
+            Register(client);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // PlayerCaptivity
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// Makes the hero with <paramref name="heroId"/> a prisoner of the party with
+    /// <paramref name="captorPartyId"/> on the server. <see cref="Hero.PartyBelongedToAsPrisoner"/> is an
+    /// AutoSynced property, so this propagates the captivity state to every client.
+    /// </summary>
+    protected void StartCaptivity(string heroId, string captorPartyId)
+    {
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(captorPartyId, out var captor));
+
+            // Do NOT wrap in AllowedThread: the AutoSynced property broadcasts through its patched setter,
+            // and AllowedThread signals "run the original setter without re-broadcasting" (used by the
+            // receiving side). The server change must go through the intercept so it replicates to clients.
+            hero.PartyBelongedToAsPrisoner = captor.Party;
+
+            Assert.Equal(captor.Party, hero.PartyBelongedToAsPrisoner);
+        }, MapEventDisabledMethods);
+    }
+
+    /// <summary>
+    /// Releases the hero with <paramref name="heroId"/> from captivity on the server, syncing the cleared
+    /// state to all clients.
+    /// </summary>
+    protected void EndCaptivity(string heroId)
+    {
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+
+            hero.PartyBelongedToAsPrisoner = null;
+
+            Assert.Null(hero.PartyBelongedToAsPrisoner);
+        }, MapEventDisabledMethods);
+    }
+
+    /// <summary>
+    /// Asserts that the hero with <paramref name="heroId"/> is a prisoner of the party with
+    /// <paramref name="captorPartyId"/> (or, when <paramref name="captorPartyId"/> is null, that the hero
+    /// is free) on the given <paramref name="instance"/>.
+    /// </summary>
+    protected void AssertCaptivity(EnvironmentInstance instance, string heroId, string? captorPartyId)
+    {
+        Assert.True(instance.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+
+        if (captorPartyId == null)
+        {
+            Assert.Null(hero.PartyBelongedToAsPrisoner);
+            return;
+        }
+
+        Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(captorPartyId, out var captor));
+        Assert.Equal(captor.Party, hero.PartyBelongedToAsPrisoner);
+    }
+
+    // ------------------------------------------------------------------
+    // PlayerEncounter
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// Installs a mocked <see cref="PlayerEncounter"/> as <c>PlayerEncounter.Current</c> on the given
+    /// <paramref name="instance"/>. <see cref="PlayerEncounter"/> is a per-campaign engine singleton whose
+    /// real construction (<c>PlayerEncounter.Start</c>/<c>Init</c>) requires a rendered encounter menu and a
+    /// fully loaded campaign, neither of which exist headlessly. This stand-in lets code paths that consult
+    /// <c>PlayerEncounter.Current</c> (battle start gating, captivity, surrender) run against a controllable
+    /// context. The encounter is local state and is not synchronized between instances.
+    /// </summary>
+    /// <param name="instance">Instance (server or client) to install the encounter on.</param>
+    /// <param name="encounteredPartyId">Optional party the player is encountering.</param>
+    /// <param name="mapEventId">Optional map event attached to the encounter.</param>
+    /// <returns>The mocked <see cref="PlayerEncounter"/>.</returns>
+    protected PlayerEncounter SetMockPlayerEncounter(EnvironmentInstance instance, string? encounteredPartyId = null, string? mapEventId = null)
+    {
+        PlayerEncounter? encounter = null;
+
+        instance.Call(() =>
+        {
+            encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+
+            if (encounteredPartyId != null)
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(encounteredPartyId, out var encountered));
+                encounter._encounteredParty = encountered.Party;
+            }
+
+            if (mapEventId != null)
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+                encounter._mapEvent = mapEvent;
+            }
+
+            Campaign.Current.PlayerEncounter = encounter;
+
+            // PlayerEncounter.Current resolves to Campaign.Current.PlayerEncounter; verify the mock is live.
+            Assert.Same(encounter, PlayerEncounter.Current);
+        }, MapEventDisabledMethods);
+
+        Assert.NotNull(encounter);
+        return encounter!;
+    }
+
+    /// <summary>
+    /// Clears <c>PlayerEncounter.Current</c> on the given <paramref name="instance"/>, simulating the player
+    /// leaving an encounter.
+    /// </summary>
+    protected void ClearPlayerEncounter(EnvironmentInstance instance)
+    {
+        instance.Call(() =>
+        {
+            Campaign.Current.PlayerEncounter = null;
+            Assert.Null(PlayerEncounter.Current);
+        }, MapEventDisabledMethods);
+    }
+
+    /// <summary>
+    /// Asserts whether a <c>PlayerEncounter.Current</c> is active on the given <paramref name="instance"/>.
+    /// </summary>
+    protected void AssertHasPlayerEncounter(EnvironmentInstance instance, bool expected)
+    {
+        instance.Call(() =>
+        {
+            if (expected)
+                Assert.NotNull(PlayerEncounter.Current);
+            else
+                Assert.Null(PlayerEncounter.Current);
         }, MapEventDisabledMethods);
     }
 }
