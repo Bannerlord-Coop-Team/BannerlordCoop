@@ -41,6 +41,9 @@ While ($key -eq 0)
 	{
 		#create junction link for game in project directory
 		New-Item -ItemType Junction -Path .\mb2 -Target $path
+		$COOPLOGdir = $PSScriptRoot + "\COOP_LOG"
+		New-Item -ItemType "directory" -Path $COOPLOGdir
+		[Environment]::SetEnvironmentVariable('COOP_LOG',$COOPLOGdir,[System.EnvironmentVariableTarget]::User)
 		Write-Output "*** Link to the game path succesfully created ***" | Green
 	}
 	elseif ($key -eq 78)

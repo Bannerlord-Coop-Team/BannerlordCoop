@@ -6,6 +6,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.UI.Interfaces;
 
 namespace Coop.Core.Client.States;
 
@@ -20,6 +21,7 @@ public class LoadingState : ClientStateBase
     private readonly IHeroInterface heroInterface;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IControlledEntityRegistry controlledEntityRegistry;
+    private readonly ILoadingInterface loadingInterface;
 
     public LoadingState(
         IClientLogic logic,
@@ -28,7 +30,8 @@ public class LoadingState : ClientStateBase
         IDeferredHeroRepository deferredHeroRepo,
         IHeroInterface heroInterface,
         IControllerIdProvider controllerIdProvider,
-        IControlledEntityRegistry controlledEntityRegistry) : base(logic)
+        IControlledEntityRegistry controlledEntityRegistry,
+        ILoadingInterface loadingInterface) : base(logic)
     {
         this.messageBroker = messageBroker;
         this.registryManager = registryManager;
@@ -36,6 +39,7 @@ public class LoadingState : ClientStateBase
         this.heroInterface = heroInterface;
         this.controllerIdProvider = controllerIdProvider;
         this.controlledEntityRegistry = controlledEntityRegistry;
+        this.loadingInterface = loadingInterface;
 
         messageBroker.Subscribe<CampaignReady>(Handle_CampaignLoaded);
     }
@@ -52,15 +56,34 @@ public class LoadingState : ClientStateBase
 
     internal void Handle_CampaignLoaded(MessagePayload<CampaignReady> obj)
     {
+        loadingInterface.SetLoadingMessage(
+            "Loading Host Campaign",
+            "Registering campaign objects...");
         registryManager.RegisterAllGameObjects();
+
+        loadingInterface.SetLoadingMessage(
+            "Loading Host Campaign",
+            "Applying synced object lifetimes...");
         registryManager.PatchLifetimes();
 
+        loadingInterface.SetLoadingMessage(
+            "Loading Host Campaign",
+            "Creating remote player heroes...");
         InstantiateDeferredHeroes();
 
+        loadingInterface.SetLoadingMessage(
+            "Loading Host Campaign",
+            "Registering player control...");
         RegisterPlayerAsControlled();
 
+        loadingInterface.SetLoadingMessage(
+            "Loading Host Campaign",
+            "Switching to your hero...");
         heroInterface.SwitchToPlayer(Logic.Player);
 
+        loadingInterface.SetLoadingMessage(
+            "Loading Host Campaign",
+            "Entering campaign...");
         Logic.EnterCampaignState();
     }
 

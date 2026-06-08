@@ -7,8 +7,11 @@ using GameInterface.Services.Smithing.Messages;
 using HarmonyLib;
 using Serilog;
 using System;
+using System.Collections.Generic;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.Smithing.Patches
 {
@@ -17,9 +20,9 @@ namespace GameInterface.Services.Smithing.Patches
     {
         private static readonly ILogger Logger = LogManager.GetLogger<CraftingCampaignBehavior>();
 
-        [HarmonyPatch("HourlyTick")]
+        [HarmonyPatch(nameof(CraftingCampaignBehavior.HourlyTick))]
         [HarmonyPrefix]
-        public static bool HourlyTick(ref CraftingCampaignBehavior __instance)
+        public static bool HourlyTickPrefix(ref CraftingCampaignBehavior __instance)
         {
             // Call original if we call this function
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
@@ -27,15 +30,24 @@ namespace GameInterface.Services.Smithing.Patches
             // Only let server handle ticks
             if (ModInformation.IsClient) return false;
 
-            // Update on all clients with message
+            // Replace TaleWorlds implementation to allow stamina recovery outside of settlements
+            foreach (KeyValuePair<Hero, CraftingCampaignBehavior.HeroCraftingRecord> keyValuePair in __instance._heroCraftingRecords)
+            {
+                int maxHeroCraftingStamina = __instance.GetMaxHeroCraftingStamina(keyValuePair.Key);
+                if (keyValuePair.Value.CraftingStamina < maxHeroCraftingStamina)
+                {
+                    keyValuePair.Value.CraftingStamina = MathF.Min(maxHeroCraftingStamina, keyValuePair.Value.CraftingStamina + CraftingCampaignBehavior.GetStaminaHourlyRecoveryRate(keyValuePair.Key));
+                }
+            }
+
+            // Update on all clients with message including up to date crafting records
             var message = new HourTicked(__instance);
             MessageBroker.Instance.Publish(__instance, message);
 
-            // Run on server
-            return true;
+            return false;
         }
 
-        [HarmonyPatch("DailyTickSettlement")]
+        [HarmonyPatch(nameof(CraftingCampaignBehavior.DailyTickSettlement))]
         [HarmonyPrefix]
         public static bool DailyTickSettlement(ref CraftingCampaignBehavior __instance, Settlement settlement)
         {
@@ -52,7 +64,7 @@ namespace GameInterface.Services.Smithing.Patches
             return false;
         }
 
-        [HarmonyPatch("DailyTick")]
+        [HarmonyPatch(nameof(CraftingCampaignBehavior.DailyTick))]
         [HarmonyPrefix]
         public static bool DailyTick(ref CraftingCampaignBehavior __instance)
         {
