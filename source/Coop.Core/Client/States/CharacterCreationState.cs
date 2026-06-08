@@ -67,7 +67,9 @@ public class CharacterCreationState : ClientStateBase
     {
         // Cover the client's own (character-creation) world with a loading screen until the
         // server campaign is ready, so the local world isn't briefly visible while we join.
-        loadingInterface.ShowLoadingScreen();
+        loadingInterface.ShowLoadingScreen(
+            "Joining Coop Campaign",
+            "Sending your character to the host...");
 
         registryManager.RegisterAllGameObjects();
 

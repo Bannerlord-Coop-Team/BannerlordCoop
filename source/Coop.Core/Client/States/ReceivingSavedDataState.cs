@@ -18,6 +18,7 @@ public class ReceivingSavedDataState : ClientStateBase
     private NetworkGameSaveDataReceived saveDataMessage = default;
     private readonly IMessageBroker messageBroker;
     private readonly IDeferredHeroRepository deferredHeroRepo;
+    private readonly ILoadingInterface loadingInterface;
     private readonly ICoopFinalizer coopFinalizer;
 
     public ReceivingSavedDataState(
@@ -29,6 +30,7 @@ public class ReceivingSavedDataState : ClientStateBase
     {
         this.messageBroker = messageBroker;
         this.deferredHeroRepo = deferredHeroRepo;
+        this.loadingInterface = loadingInterface;
         this.coopFinalizer = coopFinalizer;
         messageBroker.Subscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
@@ -37,7 +39,9 @@ public class ReceivingSavedDataState : ClientStateBase
         // Keep a loading screen up while we receive and load the server world. This is the
         // common state for both new (post character-creation) and returning clients, so the
         // client's local/main-menu view isn't shown during the transition.
-        loadingInterface.ShowLoadingScreen();
+        loadingInterface.ShowLoadingScreen(
+            "Joining Coop Campaign",
+            "Waiting for host save data...");
     }
 
     public override void Dispose()
@@ -50,6 +54,9 @@ public class ReceivingSavedDataState : ClientStateBase
     internal void Handle_NetworkGameSaveDataReceived(MessagePayload<NetworkGameSaveDataReceived> obj)
     {
         saveDataMessage = obj.What;
+        loadingInterface.SetLoadingMessage(
+            "Joining Coop Campaign",
+            "Preparing host save data...");
         Logic.EnterMainMenu();
     }
 
@@ -59,6 +66,10 @@ public class ReceivingSavedDataState : ClientStateBase
 
         if (saveData == null) return;
         if (saveData.Length == 0) return;
+
+        loadingInterface.SetLoadingMessage(
+            "Loading Host Campaign",
+            "Loading host save data...");
 
         var commandLoad = new LoadGameSave(saveData);
         messageBroker.Publish(this, commandLoad);
