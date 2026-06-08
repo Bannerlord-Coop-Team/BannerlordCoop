@@ -5,6 +5,7 @@ using E2E.Tests.Util;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
+using Moq;
 using SandBox.GauntletUI.Map;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -37,55 +38,23 @@ public abstract class MapEventTestBase : IDisposable
     {
         TestEnvironment = new E2ETestEnvironment(output);
 
-        // MapEventManager.OnMapEventCreated and CampaignEventDispatcher.OnMapEventEnded cannot be
-        // patched via PatchScope (they are too small and cause InvalidProgramException under Harmony).
-        // Patching MapEventRegistry.OnClientCreated is a single interception point that suppresses both.
-        var mapEventRegistryType = AccessTools.TypeByName("GameInterface.Services.MapEvents.MapEventRegistry");
-
         MapEventDisabledMethods = new List<MethodBase>
         {
-            // Covers Campaign.Current.MapEventManager.OnMapEventCreated (called inside OnClientCreated)
-            // and other campaign-side registration that requires a fully loaded game world.
-            AccessTools.Method(mapEventRegistryType, "OnClientCreated"),
-
-            // Reached when a party joins a battle side (AddPartyInternal -> AddInvolvedPartyInternal). It
-            // indexes into renown/influence book-keeping that assumes a fully initialized MapEvent and
-            // throws IndexOutOfRange in the headless environment. It computes display-only values, so
-            // skipping it does not affect what these tests exercise (party-membership replication).
-            AccessTools.Method(typeof(MapEvent), nameof(MapEvent.RecalculateRenownAndInfluenceValuesOnPartyInvolved)),
+            // MapEvent.Initialize drives the map-event visual's Initialize, which needs a live render
+            // context (GauntletUI layer + map scene). The mocked GauntletMapEventVisual (see
+            // MockMapEventVisual) is constructor-skipped and NREs inside this method, so suppress it: this
+            // is the "UI functionality is mocked" boundary for map events.
+            AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)),
         };
     }
 
     public void Dispose() => TestEnvironment.Dispose();
 
     /// <summary>
-    /// Creates and registers a <see cref="MapEvent"/> on the server, returning its string ID.
-    /// The MapEvent is propagated to all clients via the AutoRegistry.
-    /// </summary>
-    protected string CreateServerMapEvent()
-    {
-        string? id = null;
-        Server.Call(() =>
-        {
-            var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
-
-            // Mirror what MapEventRegistry.OnClientCreated does so the server instance is
-            // fully initialized and safe to finalize later.
-            mapEvent._sides = new MapEventSide[2];
-            mapEvent.WonRounds = new MBList<BattleSideEnum>();
-
-            Assert.True(Server.ObjectManager.TryGetId(mapEvent, out id));
-        }, MapEventDisabledMethods);
-
-        Assert.NotNull(id);
-        return id!;
-    }
-
-    /// <summary>
     /// Creates and registers a <see cref="MapEvent"/> on the server with two <see cref="MobileParty"/>
     /// participants, returning the IDs of the map event, attacker party, and defender party.
     /// </summary>
-    protected (string mapEventId, string attackerPartyId, string defenderPartyId) CreateServerMapEventWithParties()
+    protected MapEventContext CreateServerMapEvent()
     {
         string? mapEventId = null;
         string? attackerPartyId = null;
@@ -101,6 +70,9 @@ public abstract class MapEventTestBase : IDisposable
             // we do not need a render context.
             mapEvent.MapEventVisual = MockMapEventVisual();
 
+            // Construction has already replicated the MapEvent to the clients, where the real
+            // MapEventRegistry.OnClientCreated runs and allocates their _sides array. The synchronous
+            // MapEventSideAssigned replication produced by Initialize therefore lands on a non-null array.
             mapEvent.Initialize(attackerParty.Party, defenderParty.Party);
 
             Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
@@ -112,7 +84,11 @@ public abstract class MapEventTestBase : IDisposable
         Assert.NotNull(attackerPartyId);
         Assert.NotNull(defenderPartyId);
 
-        return (mapEventId!, attackerPartyId!, defenderPartyId!);
+        return new MapEventContext(
+            mapEventId,
+            attackerPartyId,
+            defenderPartyId
+        );
     }
 
     /// <summary>
@@ -125,10 +101,12 @@ public abstract class MapEventTestBase : IDisposable
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
 
-            using (new AllowedThread())
-            {
-                mapEvent.FinalizeEvent();
-            }
+            // Finish through FinishBattle (not FinalizeEvent): FinishBattle is the method the AutoRegistry
+            // watches as the MapEvent destroy hook (MapEventRegistry.DestroyMethods), and it performs the same
+            // finalization work internally (FinishBattle -> FinalizeEventAux). It must NOT run inside an
+            // AllowedThread: LifetimePatches.DestroyPostfix only broadcasts the removal to clients when the
+            // call is *not* an allowed/original-policy call, so wrapping it would silently skip the sync.
+            mapEvent.FinishBattle();
         }, MapEventDisabledMethods);
     }
 
@@ -151,20 +129,30 @@ public abstract class MapEventTestBase : IDisposable
     // ------------------------------------------------------------------
 
     /// <summary>
-    /// Creates and registers a <see cref="MapEventSide"/> on the server (a battle side of a map event),
-    /// returning its string id. The side is propagated to all clients via the AutoRegistry. Parties can then
-    /// be joined to it with <see cref="JoinPartyToSide"/>.
+    /// Creates a real, fully-initialized <see cref="MapEvent"/> on the server and returns the string id of
+    /// its attacker <see cref="MapEventSide"/>. The map event and its sides are propagated to all clients;
+    /// parties can then reinforce that side with <see cref="JoinPartyToSide"/>.
     /// </summary>
     /// <remarks>
-    /// A side is used as the join target instead of driving the full <c>MapEvent.Initialize</c> flow:
-    /// <c>Initialize</c> cannot complete in the headless test environment (it reaches into campaign systems
-    /// that are not loaded), whereas a registered <see cref="MapEventSide"/> exercises the exact replication
-    /// path the game uses when a party reinforces a battle (<c>MapEventSide.AddPartyInternal</c> →
-    /// <c>MapEventSideCollectionPatches</c>).
+    /// The side is taken from an <c>Initialize</c>d map event (not a stand-alone <see cref="MapEventSide"/>)
+    /// so that <c>AddPartyInternal</c> runs against a side whose parent <see cref="MapEvent"/> has a populated
+    /// <c>_sides</c> array. This lets the vanilla reinforcement path
+    /// (<c>MapEventSide.AddPartyInternal</c> → <c>MapEvent.AddInvolvedPartyInternal</c> →
+    /// <c>RecalculateRenownAndInfluenceValuesOnPartyInvolved</c>) execute without suppression.
     /// </remarks>
     protected string CreateServerMapEventSide()
     {
-        return TestEnvironment.CreateRegisteredObject<MapEventSide>(MapEventDisabledMethods);
+        var mapEvent = CreateServerMapEvent();
+
+        string? sideId = null;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEvent.MapEventId, out var me));
+            Assert.True(Server.ObjectManager.TryGetId(me.AttackerSide, out sideId));
+        }, MapEventDisabledMethods);
+
+        Assert.NotNull(sideId);
+        return sideId!;
     }
 
     /// <summary>
@@ -184,10 +172,14 @@ public abstract class MapEventTestBase : IDisposable
 
             var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
 
-            // AddPartyInternal is the vanilla path that reinforces an existing battle side. It is NOT wrapped
-            // in AllowedThread: the collection-add must go through the patched MBList.Add so the server
-            // broadcasts the new party to the clients (MapEventSideCollectionPatches.ListAddOverride).
-            side.AddPartyInternal(party.Party);
+            // Assigning PartyBase.MapEventSide is the vanilla reinforcement entry point: the setter wires the
+            // party's side first (so PartyBase.Side is valid for the renown recalculation) and then calls
+            // MapEventSide.AddPartyInternal internally. Calling AddPartyInternal directly skips that wiring,
+            // leaving Side == None (-1) and throwing IndexOutOfRange in
+            // RecalculateRenownAndInfluenceValuesOnPartyInvolved. It is NOT wrapped in AllowedThread: the
+            // collection-add must go through the patched MBList.Add so the server broadcasts the new party to
+            // the clients (MapEventSideCollectionPatches.ListAddOverride).
+            party.Party.MapEventSide = side;
 
             var joined = side.Parties.LastOrDefault(p => p?.Party == party.Party);
             Assert.NotNull(joined);
