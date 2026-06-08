@@ -20,7 +20,7 @@ internal class TimePatches
 {
     private static CampaignTimeControlMode CurrentMode = CampaignTimeControlMode.Stop;
 
-    private static readonly TimeControlModeConverter timeControlModeConverter = new();
+    internal static ITimeControlModeConverter ModeConverter { get; } = new TimeControlModeConverter();
 
     [HarmonyPatch("TimeControlMode")]
     [HarmonyPatch(MethodType.Setter)]
@@ -34,7 +34,7 @@ internal class TimePatches
 
         if (value != __instance._timeControlMode)
         {
-            var controlMode = timeControlModeConverter.Convert(value);
+            var controlMode = ModeConverter.Convert(value);
             MessageBroker.Instance.Publish(__instance, new TimeSpeedChangedAttempted(controlMode));
         }
 
@@ -55,11 +55,6 @@ internal class TimePatches
         // _timeControlMode is getting set magically somewhere so we use our own value instead
         CurrentMode = value;
         campaign._timeControlMode = value;
-    }
-
-    internal static TimeControlEnum ConvertSelectedTimeSpeed(int selectedTimeSpeed)
-    {
-        return timeControlModeConverter.Convert((CampaignTimeControlMode)selectedTimeSpeed);
     }
 
     internal static bool CanApplyTimeControl(TimeControlEnum controlMode)
@@ -87,7 +82,7 @@ internal class AllowTimeControlFromControlsPatches
     {
         using (new AllowedThread())
         {
-            var controlMode = TimePatches.ConvertSelectedTimeSpeed(selectedTimeSpeed);
+            var controlMode = TimePatches.ModeConverter.Convert((CampaignTimeControlMode)selectedTimeSpeed);
             if (TimePatches.CanApplyTimeControl(controlMode) == false)
             {
                 TimePatches.PublishBlockedTimeControlAttempt(__instance, controlMode);
@@ -125,7 +120,7 @@ internal class CampaignSetTimeSpeedPatches
     [HarmonyPrefix]
     private static bool SetTimeSpeedPrefix(ref Campaign __instance, int speed)
     {
-        var controlMode = TimePatches.ConvertSelectedTimeSpeed(speed);
+        var controlMode = TimePatches.ModeConverter.Convert((CampaignTimeControlMode)speed);
         if (TimePatches.CanApplyTimeControl(controlMode))
         {
             return true;
