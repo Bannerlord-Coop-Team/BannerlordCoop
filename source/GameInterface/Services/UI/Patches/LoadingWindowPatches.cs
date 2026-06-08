@@ -45,6 +45,10 @@ internal static class LoadingWindowPatches
 
 }
 
+/// <summary>
+/// Reapplies coop loading text when the engine directly re-enables a recreated
+/// loading window manager.
+/// </summary>
 [HarmonyPatch]
 internal static class GauntletDefaultLoadingWindowManagerPatches
 {
