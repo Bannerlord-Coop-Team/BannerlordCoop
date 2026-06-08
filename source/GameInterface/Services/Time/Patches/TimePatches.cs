@@ -1,7 +1,9 @@
 ﻿using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
+using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Time;
 using HarmonyLib;
 using SandBox.View.Map;
@@ -54,6 +56,32 @@ internal class TimePatches
         CurrentMode = value;
         campaign._timeControlMode = value;
     }
+
+    internal static TimeControlEnum ConvertSelectedTimeSpeed(int selectedTimeSpeed)
+    {
+        return selectedTimeSpeed switch
+        {
+            0 => TimeControlEnum.Pause,
+            1 => TimeControlEnum.Play_1x,
+            2 => TimeControlEnum.Play_2x,
+            _ => timeControlModeConverter.Convert((CampaignTimeControlMode)selectedTimeSpeed),
+        };
+    }
+
+    internal static bool CanApplyTimeControl(TimeControlEnum controlMode)
+    {
+        if (ContainerProvider.TryResolve<ITimeControlInterface>(out var timeControlInterface) == false)
+        {
+            return true;
+        }
+
+        return timeControlInterface.CanSetTimeControl(controlMode);
+    }
+
+    internal static void PublishBlockedTimeControlAttempt(object source, TimeControlEnum controlMode)
+    {
+        MessageBroker.Instance.Publish(source, new TimeSpeedChangedAttempted(controlMode));
+    }
 }
 
 [HarmonyPatch(typeof(MapTimeControlVM))]
@@ -65,6 +93,13 @@ internal class AllowTimeControlFromControlsPatches
     {
         using (new AllowedThread())
         {
+            var controlMode = TimePatches.ConvertSelectedTimeSpeed(selectedTimeSpeed);
+            if (TimePatches.CanApplyTimeControl(controlMode) == false)
+            {
+                TimePatches.PublishBlockedTimeControlAttempt(__instance, controlMode);
+                return false;
+            }
+
             int num = selectedTimeSpeed;
             if (__instance._timeFlowState == 3 && num == 2)
             {
@@ -86,6 +121,24 @@ internal class AllowTimeControlFromControlsPatches
 
             return false;
         }
+    }
+}
+
+[HarmonyPatch(typeof(Campaign))]
+internal class CampaignSetTimeSpeedPatches
+{
+    [HarmonyPatch(nameof(Campaign.SetTimeSpeed))]
+    [HarmonyPrefix]
+    private static bool SetTimeSpeedPrefix(ref Campaign __instance, int speed)
+    {
+        var controlMode = TimePatches.ConvertSelectedTimeSpeed(speed);
+        if (TimePatches.CanApplyTimeControl(controlMode))
+        {
+            return true;
+        }
+
+        TimePatches.PublishBlockedTimeControlAttempt(__instance, controlMode);
+        return false;
     }
 }
 

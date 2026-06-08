@@ -9,8 +9,7 @@ using System.Linq;
 namespace Coop.Core.Server.Connections;
 
 /// <summary>
-/// Manages client connections while one or more connections is receiving the game state
-/// through a save transfer
+/// Manages client connections while one or more connections is joining the campaign.
 /// </summary>
 public interface IClientRegistry : IDisposable
 {
@@ -26,6 +25,8 @@ public class ClientRegistry : IClientRegistry
 
     private static HashSet<Type> loadingStates = new HashSet<Type>
     {
+        typeof(ResolveCharacterState),
+        typeof(CreateCharacterState),
         typeof(TransferSaveState),
         typeof(LoadingState),
     };

@@ -21,6 +21,7 @@ namespace GameInterface.Services.Heroes.Interaces;
 public interface ITimeControlInterface : IGameAbstraction
 {
     void AddUnpausePolicy(Func<bool> policy);
+    bool CanSetTimeControl(TimeControlEnum timeMode);
     TimeControlEnum GetTimeControl();
     void RemoveUnpausePolicy(Func<bool> policy);
     void ClientSetTimeControl(TimeControlEnum newMode);
@@ -69,6 +70,11 @@ internal class TimeControlInterface : ITimeControlInterface
         unpausePolicies.Remove(policy);
     }
 
+    public bool CanSetTimeControl(TimeControlEnum timeMode)
+    {
+        return timeMode == TimeControlEnum.Pause || UnpauseDisallowed() == false;
+    }
+
     /// <summary>
     /// If any unpause policy fails, unpausing is not allowed
     /// </summary>
@@ -77,9 +83,7 @@ internal class TimeControlInterface : ITimeControlInterface
     {
         return unpausePolicies
             .Where(policy => policy.IsAlive)
-            .Select(policy => policy.Instance as Func<bool>)
-            .Where(policy => policy != null)
-            .Any(policy => policy() == false);
+            .Any(policy => policy.Invoke<bool>(Array.Empty<object>()) == false);
     }
 
 
@@ -95,7 +99,7 @@ internal class TimeControlInterface : ITimeControlInterface
             return;
         }
 
-        if (timeMode != TimeControlEnum.Pause && UnpauseDisallowed())
+        if (CanSetTimeControl(timeMode) == false)
         {
             timeMode = TimeControlEnum.Pause;
         }
