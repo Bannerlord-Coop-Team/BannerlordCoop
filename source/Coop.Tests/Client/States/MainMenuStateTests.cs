@@ -57,6 +57,9 @@ namespace Coop.Tests.Client.States
             Assert.IsType<ValidateModuleState>(clientLogic.State);
             loadingInterfaceMock.Verify(x => x.ShowLoadingScreen(
                 "Connecting to Coop Server",
+                "Applying patches..."), Times.Once);
+            loadingInterfaceMock.Verify(x => x.SetLoadingMessage(
+                "Connecting to Coop Server",
                 "Validating modules..."), Times.Once);
         }
 

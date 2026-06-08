@@ -47,8 +47,11 @@ public class MainMenuState : ClientStateBase
     {
         loadingInterface.ShowLoadingScreen(
             "Connecting to Coop Server",
-            "Validating modules...");
+            "Applying patches...");
         gameInterface.PatchAll();
+        loadingInterface.SetLoadingMessage(
+            "Connecting to Coop Server",
+            "Validating modules...");
         Logic.ValidateModules();
     }
 
