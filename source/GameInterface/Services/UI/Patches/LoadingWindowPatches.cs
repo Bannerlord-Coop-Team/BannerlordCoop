@@ -42,7 +42,6 @@ internal static class LoadingWindowPatches
     {
         LoadingInterface.ApplyCurrentLoadingMessage();
     }
-
 }
 
 /// <summary>
