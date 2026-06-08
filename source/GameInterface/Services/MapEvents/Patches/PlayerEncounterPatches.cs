@@ -111,4 +111,25 @@ internal class PlayerEncounterPatches
     {
         return false;
     }
+
+    // When an open-map encounter finishes on a client (e.g. you close a conversation with a lord party), the
+    // player party is usually still engaging that party. PlayerEncounter.Current then becomes null, so on the next
+    // tick EncounterManager.HandleEncounterForMobileParty re-fires RestartPlayerEncounter, which we gate and the
+    // server re-approves — reopening the conversation in a loop. Native's encounter-leave consequences all
+    // SetMoveModeHold to disengage; do the same here so the party stops engaging and the loop ends.
+    [HarmonyPatch(nameof(PlayerEncounter.Finish))]
+    [HarmonyPostfix]
+    private static void FinishPostfix()
+    {
+        if (ModInformation.IsServer) return;
+
+        // Skip our own server-approved restart: RestartPlayerEncounter calls Finish internally, and we run that
+        // under an AllowedThread. Holding there would fight the restart we just asked the server to authorize.
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+
+        // Don't interfere with battle flow.
+        if (MobileParty.MainParty.MapEvent != null) return;
+
+        MobileParty.MainParty.SetMoveModeHold();
+    }
 }

@@ -164,6 +164,8 @@ internal class PlayerCaptivityHandler : IHandler
             playerCaptivity._captorParty = payload.What.CaptorParty;
             playerCaptivity._captorParty.SetAsCameraFollowParty();
             playerCaptivity._captorParty.UpdateVisibilityAndInspected(MobileParty.MainParty.Position, 0f);
+
+            GameMenu.SwitchToMenu(playerCaptivity._captorParty.IsSettlement ? "settlement_wait" : "prisoner_wait");
         });
     }
 

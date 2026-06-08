@@ -12,11 +12,6 @@ namespace GameInterface.Services.MobileParties.Interfaces;
 public interface IMobilePartyInterface : IGameAbstraction
 {
     /// <summary>
-    /// Handles the initialization of a newly transfered party
-    /// </summary>
-    /// <param name="party"></param>
-    void ManageNewPlayerParty(MobileParty party);
-    /// <summary>
     /// Registers all parties in the game as controlled by <paramref name="ownerId"/>.
     /// </summary>
     /// <param name="ownerId">Owner to assign all parties</param>
@@ -36,13 +31,6 @@ internal class MobilePartyInterface : IMobilePartyInterface
     {
         this.objectManager = objectManager;
         this.controlledEntityRegistry = controlledEntityRegistry;
-    }
-
-    public void ManageNewPlayerParty(MobileParty party)
-    {
-        party.IsVisible = true;
-
-        party.Party.OnFinishLoadState();
     }
 
     public void RegisterAllPartiesAsControlled(string ownerId)

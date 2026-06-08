@@ -6,6 +6,7 @@ using Common.Util;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.PlayerCaptivityService.Messages;
@@ -18,6 +19,7 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using TaleWorlds.Engine;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Heroes.Interfaces;
@@ -27,12 +29,7 @@ public interface IHeroInterface : IGameAbstraction
     byte[] PackageMainHero();
     bool TryResolve<T>(string controllerId, out string heroId);
     void SwitchToPlayer(Player player);
-    /// <summary>
-    /// Unpacks and properly constructs hero in the game
-    /// </summary>
-    /// <param name="bytes">Hero as bytes</param>
-    /// <returns>Hero string identifier</returns>
-    NetworkPlayerData UnpackHero(string controllerId, byte[] bytes);
+    Hero UnpackHero(string controllerId, byte[] bytes);
 }
 
 internal class HeroInterface : IHeroInterface
@@ -68,12 +65,12 @@ internal class HeroInterface : IHeroInterface
         return BinaryFormatterSerializer.Serialize(package);
     }
 
-    public NetworkPlayerData UnpackHero(string controllerId, byte[] bytes)
+    public Hero UnpackHero(string controllerId, byte[] bytes)
     {
         Hero hero = null;
 
         GameLoopRunner.RunOnMainThread(() => {
-            using(new AllowedThread())
+            using (new AllowedThread())
             {
                 hero = UnpackMainHeroInternal(bytes);
             }
@@ -92,29 +89,12 @@ internal class HeroInterface : IHeroInterface
         if (!objectManager.TryGetId(hero.Clan, out var clanId))
             Logger.Error("Failed to retrieve coop ID for hero's Clan, StringId will not be updated");
 
-        //using (new AllowedThread())
-        //{
-        //    // Guard against null — original code assigned unconditionally which would
-        //    // leave objects with vanilla StringIds (e.g. "main_hero") and crash on load.
-        //    if (heroId != null) hero.StringId = heroId;
-        //    if (partyId != null) hero.PartyBelongedTo.StringId = partyId;
-        //    if (characterObjectId != null) hero.CharacterObject.StringId = characterObjectId;
-        //    if (clanId != null) hero.Clan.StringId = clanId;
-        //}
-
         entityRegistry.RegisterAsControlled(controllerId, heroId);
         entityRegistry.RegisterAsControlled(controllerId, partyId);
         entityRegistry.RegisterAsControlled(controllerId, characterObjectId);
         entityRegistry.RegisterAsControlled(controllerId, clanId);
 
-        return new NetworkPlayerData()
-        {
-            HeroData = bytes,
-            HeroStringId = heroId,
-            PartyStringId = partyId,
-            CharacterObjectStringId = characterObjectId,
-            ClanStringId = clanId
-        };
+        return hero;
     }
 
     private Hero UnpackMainHeroInternal(byte[] bytes)
@@ -137,7 +117,9 @@ internal class HeroInterface : IHeroInterface
             return false;
         }
 
-        var heroEntities = entities.Where(entity => objectManager.TryGetObject<T>(entity.EntityId, out _)).ToList();
+        var heroEntities = entities
+            .Where(entity => objectManager.TryGetObject<T>(entity.EntityId, out _))
+            .ToList();
 
         if (heroEntities.Count == 0)
         {
@@ -150,9 +132,7 @@ internal class HeroInterface : IHeroInterface
             Logger.Warning("Multiple heroes registered for {controllerId}, using first match", controllerId);
         }
 
-        var resolvedEntity = heroEntities[0];
-
-        controlledObjectId = resolvedEntity.EntityId;
+        controlledObjectId = heroEntities.Single().EntityId;
 
         return true;
     }
@@ -165,17 +145,17 @@ internal class HeroInterface : IHeroInterface
             return;
 
         Campaign.Current.MainParty = playerParty;
+        Campaign.Current.PlayerDefaultFaction = playerHero.Clan;
+
+        // Used to MainHero and CharacterObject
+        Game.Current.PlayerTroop = playerHero.CharacterObject;
         // This is needed because if the player is captured the PartyBelongedTo is null
+        // Causing ChangePlayerCharacterAction to fail
         playerHero.PartyBelongedTo = playerParty;
 
         Logger.Information("Switching to new hero: {heroName}", playerHero.Name.ToString());
 
         ChangePlayerCharacterAction.Apply(playerHero);
-
-        Campaign.Current.PlayerDefaultFaction = playerHero.Clan;
-
-        // Used to MainHero and CharacterObject
-        Game.Current.PlayerTroop = playerHero.CharacterObject;
 
         // Recapture if previously captured
         if (playerHero.PartyBelongedToAsPrisoner != null)
@@ -187,23 +167,21 @@ internal class HeroInterface : IHeroInterface
 
     private void SetupNewHero(Hero hero)
     {
-        SetupNewParty(hero);
-        SetupHeroWithObjectManagers(hero);
-    }
-
-    private void SetupHeroWithObjectManagers(Hero hero)
-    {
         var party = hero.PartyBelongedTo;
 
-        RegisterObject(hero);
-        RegisterObject(party);
-        RegisterObject(hero.Clan);
+        using (new AllowedThread())
+        {
+            party.Anchor = new AnchorPoint(party);
+        }
 
-        RegisterObject(party.StringId, party.ItemRoster);
-        RegisterObject(party.StringId, party.Party);
-        RegisterObject($"{nameof(MobileParty.MemberRoster)}_{party.StringId}", party.MemberRoster);
-        RegisterObject($"{nameof(MobileParty.PrisonRoster)}_{party.StringId}", party.PrisonRoster);
+        party.Party.OnFinishLoadState();
+        party.IsVisible = true;
 
+        party.CheckPositionsForMapChangeAndUpdateIfNeeded();
+        MobilePartyVisualManager.Current.AddNewPartyVisualForParty(party);
+        CampaignEventDispatcher.Instance.OnPartyVisibilityChanged(party.Party);
+
+        // Add to game managed lists
         var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
         if (campaignObjectManager == null)
         {
@@ -213,43 +191,41 @@ internal class HeroInterface : IHeroInterface
 
         campaignObjectManager.AddHero(hero);
         campaignObjectManager.AddMobileParty(party);
-
-        var partyBase = party.Party;
-
         campaignObjectManager.AddClan(hero.Clan);
 
-        partyBase.GetPartyVisual().OnStartup();
-        partyBase.SetVisualAsDirty();
+        AssignHeroNetworkIds(hero);
+    }
+
+    public void AssignHeroNetworkIds(Hero hero)
+    {
+        var party = hero.PartyBelongedTo;
+
+        RegisterObject(hero);
+        RegisterObject(party);
+        RegisterObject(hero.Clan);
+        //RegisterObject(hero.CharacterObject); TODO
+
+        RegisterObject(party.StringId, party.ItemRoster);
+        RegisterObject(party.StringId, party.Party);
+        RegisterObject($"{nameof(MobileParty.MemberRoster)}_{party.StringId}", party.MemberRoster);
+        RegisterObject($"{nameof(MobileParty.PrisonRoster)}_{party.StringId}", party.PrisonRoster);
     }
 
     private void RegisterObject<T>(T obj) where T : MBObjectBase
     {
-        using(new AllowedThread())
+        if (ModInformation.IsServer)
         {
-            obj.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<T>($"Player");
-            objectManager.AddExisting($"{typeof(T).Name}_{obj.StringId}", obj);
+            using (new AllowedThread())
+            {
+                obj.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<T>($"Player");
+            }
         }
+
+        objectManager.AddExisting($"{typeof(T).Name}_{obj.StringId}", obj);
     }
 
     private void RegisterObject(string prefix, object obj)
     {
         objectManager.AddExisting($"{obj.GetType().Name}_{prefix}", obj);
-    }
-
-    private void SetupNewParty(Hero hero)
-    {
-        var party = hero.PartyBelongedTo;
-
-        using (new AllowedThread())
-        {
-            party.Anchor = new AnchorPoint(party);
-        }
-        
-        party.IsVisible = true;  
-        party.Party.SetVisualAsDirty();
-
-        party.CheckPositionsForMapChangeAndUpdateIfNeeded();
-        MobilePartyVisualManager.Current.AddNewPartyVisualForParty(party);
-        CampaignEventDispatcher.Instance.OnPartyVisibilityChanged(party.Party);
     }
 }

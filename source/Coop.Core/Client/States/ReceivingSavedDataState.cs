@@ -1,12 +1,9 @@
 ﻿using Common.Messaging;
 using Coop.Core.Client.Messages;
 using Coop.Core.Client.Services.Heroes.Data;
-using Coop.Core.Client.Services.MobileParties.Messages;
-using Coop.Core.Common;
+using Coop.Core.Client.Services.Heroes.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.UI.Interfaces;
-using GameInterface.Services.UI.Messages;
-using LiteNetLib;
 
 namespace Coop.Core.Client.States;
 
@@ -19,22 +16,20 @@ public class ReceivingSavedDataState : ClientStateBase
     private readonly IMessageBroker messageBroker;
     private readonly IDeferredHeroRepository deferredHeroRepo;
     private readonly ILoadingInterface loadingInterface;
-    private readonly ICoopFinalizer coopFinalizer;
 
     public ReceivingSavedDataState(
         IClientLogic logic,
         IMessageBroker messageBroker,
         IDeferredHeroRepository deferredHeroRepo,
-        ILoadingInterface loadingInterface,
-        ICoopFinalizer coopFinalizer) : base(logic)
+        ILoadingInterface loadingInterface) : base(logic)
     {
         this.messageBroker = messageBroker;
         this.deferredHeroRepo = deferredHeroRepo;
         this.loadingInterface = loadingInterface;
-        this.coopFinalizer = coopFinalizer;
+
         messageBroker.Subscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
-        messageBroker.Subscribe<NetworkNewPartyCreated>(Handle_NetworkNewPartyCreated);
+        messageBroker.Subscribe<NetworkNewPlayerHeroCreated>(Handle_NetworkNewPlayerHeroCreated);
 
         // Keep a loading screen up while we receive and load the server world. This is the
         // common state for both new (post character-creation) and returning clients, so the
@@ -48,7 +43,7 @@ public class ReceivingSavedDataState : ClientStateBase
     {
         messageBroker.Unsubscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
         messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
-        messageBroker.Unsubscribe<NetworkNewPartyCreated>(Handle_NetworkNewPartyCreated);
+        messageBroker.Unsubscribe<NetworkNewPlayerHeroCreated>(Handle_NetworkNewPlayerHeroCreated);
     }
 
     internal void Handle_NetworkGameSaveDataReceived(MessagePayload<NetworkGameSaveDataReceived> obj)
@@ -77,10 +72,9 @@ public class ReceivingSavedDataState : ClientStateBase
         Logic.LoadSavedData();
     }
 
-    private void Handle_NetworkNewPartyCreated(MessagePayload<NetworkNewPartyCreated> obj)
+    private void Handle_NetworkNewPlayerHeroCreated(MessagePayload<NetworkNewPlayerHeroCreated> obj)
     {
-        var peer = (NetPeer)obj.Who;
-        deferredHeroRepo.AddDeferredHero(peer, obj.What.PlayerId, obj.What.PlayerHero);
+        deferredHeroRepo.AddDeferredHero(obj.What);
     }
 
     public override void EnterMainMenu()

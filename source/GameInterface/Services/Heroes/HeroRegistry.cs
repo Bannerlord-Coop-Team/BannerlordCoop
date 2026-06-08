@@ -56,7 +56,7 @@ internal class HeroRegistry : AutoRegistryBase<Hero>
             AccessTools.Field(typeof(Hero), nameof(Hero.VolunteerTypes)).SetValue(obj, new CharacterObject[6]);
         }
 
-        MBObjectManager.Instance?.RegisterPresumedObject(obj);
+        MBObjectManager.Instance?.RegisterObjectInternalWithoutTypeId(obj, false, out _);
 
         Campaign.Current?.CampaignObjectManager?.OnHeroAdded(obj);
     }

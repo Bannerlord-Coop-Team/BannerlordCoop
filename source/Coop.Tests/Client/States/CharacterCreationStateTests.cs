@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Tests.Utils;
 using Coop.Core.Client;
+using Coop.Core.Client.Messages;
 using Coop.Core.Client.States;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Tests.Mocks;
@@ -10,6 +11,7 @@ using GameInterface.Registry.Messages;
 using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Players.Data;
 using GameInterface.Services.UI.Interfaces;
 using LiteNetLib;
 using Moq;
@@ -44,12 +46,13 @@ namespace Coop.Tests.Client.States
             // Arrange
             var characterCreationState = clientLogic.SetState<CharacterCreationState>();
 
-            var playerHeroRegistered = new NewPlayerHeroRegistered(null, null);
-            var payload = new MessagePayload<NetworkPlayerData>(
-                this, new NetworkPlayerData(playerHeroRegistered));
+            var player = new Player("MyHeroId", "MyPartyId");
+
+            var payload = new MessagePayload<NetworkHeroRecieved>(
+                this, new NetworkHeroRecieved(player));
 
             // Act
-            characterCreationState.Handle_NetworkPlayerData(payload);
+            characterCreationState.Handle_NetworkHeroRecieved(payload);
 
             // Assert
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
@@ -68,7 +71,7 @@ namespace Coop.Tests.Client.States
             characterCreationState.Handle_CharacterCreationFinished(payload);
 
             // Assert
-            Assert.Single(MockNetwork.GetPeerMessagesFromType<NetworkTransferedHero>(serverPeer));
+            Assert.Single(MockNetwork.GetPeerMessagesFromType<NetworkTransferNewHero>(serverPeer));
             loadingInterfaceMock.Verify(x => x.ShowLoadingScreen(
                 "Joining Coop Campaign",
                 "Sending your character to the host..."), Times.Once);

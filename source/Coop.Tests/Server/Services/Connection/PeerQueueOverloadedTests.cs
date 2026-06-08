@@ -5,9 +5,9 @@ using Coop.Core.Server.Services.Time.Messages;
 using Coop.Tests.Extensions;
 using Coop.Tests.Mocks;
 using GameInterface.Services.Heroes.Enum;
-using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Heroes.Interaces;
+using Moq;
 using System;
-using System.Linq;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -29,6 +29,10 @@ public class PeerQueueOverloadedTests
     public void PeerQueueOverloadedReceived_Publishes_SetTimeControlMode()
     {
         // Arrange
+        /// Time control (and the NetworkChangeTimeControlMode broadcast) now lives behind ITimeControlInterface,
+        /// which is mocked in tests; assert the handler drives it rather than sending the network message itself.
+        var timeControlMock = serverComponent.Container.Resolve<Mock<ITimeControlInterface>>();
+
         /// Create a new peer on the test network
         var netPeer = TestNetwork.CreatePeer();
         /// Set peer queue length greater than 0 so <see cref="PeerQueueOverloadedHandler.Poll"/> does not resume the game
@@ -39,20 +43,18 @@ public class PeerQueueOverloadedTests
         TestMessageBroker.Publish(this, new PeerQueueOverloaded(netPeer));
 
         // Assert
-        /// 1 of each pause message is sent
-        Assert.Single(TestNetwork.GetPeerMessagesFromType<NetworkChangeTimeControlMode>(netPeer));
-
-        /// Gets the last internal and network message of their respected types for asserting below
-        var networkMsg = TestNetwork.GetPeerMessagesFromType<NetworkChangeTimeControlMode>(netPeer).Last();
-
-        /// Game is commanded to pause internally and throughout the network
-        Assert.Equal(TimeControlEnum.Pause, networkMsg.NewControlMode);
+        /// An overloaded peer pauses the game exactly once
+        timeControlMock.Verify(t => t.ServerSetTimeControl(TimeControlEnum.Pause), Times.Once());
     }
 
     [Fact]
     public void ClientsCatchUp_Publishes_ResumeMessages()
     {
         // Arrange
+        var timeControlMock = serverComponent.Container.Resolve<Mock<ITimeControlInterface>>();
+        /// The handler captures the current speed (GetTimeControl) before pausing and restores it on resume.
+        timeControlMock.Setup(t => t.GetTimeControl()).Returns(TimeControlEnum.Play_1x);
+
         var peerOverloadedHandler = serverComponent.Container.Resolve<PeerQueueOverloadedHandler>();
 
         var netPeer = TestNetwork.CreatePeer();
@@ -71,13 +73,8 @@ public class PeerQueueOverloadedTests
         peerOverloadedHandler.Poll(TimeSpan.Zero);
 
         // Assert
-        /// When the game resumes, a resume message is sent internally and over the network
-        /// 2 messages exist because the server forces a pause before resuming
-        Assert.Equal(2, TestNetwork.GetPeerMessagesFromType<NetworkChangeTimeControlMode>(netPeer).Count());
-
-        var networkMsg = TestNetwork.GetPeerMessagesFromType<NetworkChangeTimeControlMode>(netPeer).Last();
-
-        /// Resume value defaults to <see cref="TimeControlEnum.Play_1x"/>
-        Assert.Equal(TimeControlEnum.Play_1x, networkMsg.NewControlMode);
+        /// The server forces a pause when overloaded, then resumes at the pre-pause speed once the queue clears.
+        timeControlMock.Verify(t => t.ServerSetTimeControl(TimeControlEnum.Pause), Times.Once());
+        timeControlMock.Verify(t => t.ServerSetTimeControl(TimeControlEnum.Play_1x), Times.Once());
     }
 }

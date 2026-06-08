@@ -43,20 +43,8 @@ internal class PlayerStartCaptivityPatches
         // Did not change
         if (__state == value) return;
 
-        try
-        {
-            if (__instance == Hero.MainHero)
-            {
-                ;
-            }
-        }
-        catch (Exception)
-        {
-
-        }
-
         // Skip if not main hero
-        if (__instance.IsHeroControlled()) return;
+        if (!__instance.IsHeroControlled()) return;
 
         var message = new PlayerCaptivityChanged(value);
         MessageBroker.Instance.Publish(null, message);

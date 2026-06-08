@@ -23,7 +23,6 @@ internal class HeroAuditor : IAuditor
 
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
-    private readonly HeroRegistry heroRegistry;
     private readonly IObjectManager objectManager;
     private readonly INetworkConfiguration configuration;
     private TaskCompletionSource<string> tcs;
@@ -31,13 +30,11 @@ internal class HeroAuditor : IAuditor
     public HeroAuditor(
         IMessageBroker messageBroker,
         INetwork network,
-        HeroRegistry heroRegistry,
         IObjectManager objectManager,
         INetworkConfiguration configuration)
     {
         this.messageBroker = messageBroker;
         this.network = network;
-        this.heroRegistry = heroRegistry;
         this.objectManager = objectManager;
         this.configuration = configuration;
         messageBroker.Subscribe<RequestHeroAudit>(Handle_Request);
