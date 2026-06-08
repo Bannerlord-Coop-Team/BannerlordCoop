@@ -5,6 +5,7 @@ using GameInterface.Registry;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.UI.Interfaces;
 
 namespace Coop.Core.Client.States;
 
@@ -45,16 +46,34 @@ public class LoadingState : ClientStateBase
 
     internal void Handle_CampaignLoaded(MessagePayload<CampaignReady> obj)
     {
+        loadingInterface.SetLoadingMessage(
+            "Loading Host Campaign",
+            "Registering campaign objects...");
         registryManager.RegisterAllGameObjects();
+
+        loadingInterface.SetLoadingMessage(
+            "Loading Host Campaign",
+            "Applying synced object lifetimes...");
         registryManager.PatchLifetimes();
 
+        loadingInterface.SetLoadingMessage(
+            "Loading Host Campaign",
+            "Creating remote player heroes...");
         InstantiateDeferredHeroes();
 
-        // Testing if this is an issue
-        //RegisterPlayerAsControlled();
+        loadingInterface.SetLoadingMessage(
+            "Loading Host Campaign",
+            "Registering player control...");
+        RegisterPlayerAsControlled();
 
+        loadingInterface.SetLoadingMessage(
+            "Loading Host Campaign",
+            "Switching to your hero...");
         heroInterface.SwitchToPlayer(Logic.Player);
 
+        loadingInterface.SetLoadingMessage(
+            "Loading Host Campaign",
+            "Entering campaign...");
         Logic.EnterCampaignState();
     }
 
