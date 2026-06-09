@@ -7,15 +7,15 @@ namespace Coop.Core.Server.Connections.Messages;
 /// Here transfer event that contains the data to reconstruct that hero
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-public record NetworkTransferedHero : IEvent
+public readonly struct NetworkTransferNewHero : IEvent
 {
     [ProtoMember(1)]
-    public string PlayerId { get; }
+    public readonly string PlayerId;
 
     [ProtoMember(2)]
-    public byte[] PlayerHero { get; }
+    public readonly byte[] PlayerHero;
 
-    public NetworkTransferedHero(string playerId, byte[] playerHero)
+    public NetworkTransferNewHero(string playerId, byte[] playerHero)
     {
         PlayerId = playerId;
         PlayerHero = playerHero;

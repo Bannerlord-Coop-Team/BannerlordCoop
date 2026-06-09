@@ -34,18 +34,10 @@ internal class TakePrisonerActionPatches
             return true;
         }
 
-        // Only player-party captures are replicated through PrisonerTaken; everything else keeps vanilla
-        // behaviour (its roster moves sync normally through the TroopRoster patches).
         var prisonerParty = prisonerCharacter.PartyBelongedTo;
         if (prisonerParty?.IsPlayerParty() != true)
             return true;
 
-        // Apply the capture once under AllowedThread so the member/prison roster moves do NOT also broadcast
-        // through the TroopRoster patches. Otherwise the client applies the hero removal twice - once from the
-        // roster sync and once from NetworkTakePrisoner -> ApplyInternal - which corrupts its roster (wrong
-        // troop count, missing hero). The capture is replicated authoritatively via PrisonerTaken instead.
-        // Apply clears the hero's PartyBelongedTo, so the prisoner's party is captured above and carried on
-        // the message for handlers that need it.
         using (new AllowedThread())
         {
             TakePrisonerAction.Apply(capturerParty, prisonerCharacter);

@@ -172,7 +172,7 @@ internal class MapEventCreationCoordinator : IHandler
         // and registers the new MapEvent (broadcasting it to clients) before we read back its id.
         GameLoopRunner.RunOnMainThread(() =>
         {
-            if (attacker.MobileParty?.IsPlayerParty() == true && 
+            if (attacker.MobileParty?.IsPlayer() == true && 
                 defender.MobileParty?.IsCurrentlyEngagingParty == true && 
                 defender.MobileParty?.ShortTermTargetParty == attacker.MobileParty)
             {

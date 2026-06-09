@@ -212,15 +212,12 @@
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- Deploy module into the Bannerlord install (mb2 junction). See Deploy.targets. -->
   <PropertyGroup>
-    <PreBuildEvent>
-    </PreBuildEvent>
+    <ModName>MissionTestMod</ModName>
+    <MainClass>TestMod</MainClass>
+    <ModVersion>v0.0.1</ModVersion>
+    <GameVersion>v1.3.12</GameVersion>
   </PropertyGroup>
-  <PropertyGroup>
-    <PostBuildEvent>powershell -NoProfile -ExecutionPolicy Unrestricted ^
--File "$(SolutionDir)..\deploy.ps1" ^
--SolutionDir "$(SolutionDir)\" ^
--TargetDir "$(ProjectDir)bin\$(Configuration)\\" ^
--ConfigPath "$(SolutionDir)..\config_missions.json"</PostBuildEvent>
-  </PropertyGroup>
+  <Import Project="$(MSBuildProjectDirectory)\..\..\Deploy.targets" />
 </Project>

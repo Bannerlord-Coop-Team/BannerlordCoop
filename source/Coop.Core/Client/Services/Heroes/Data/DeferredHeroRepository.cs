@@ -1,4 +1,7 @@
-﻿using LiteNetLib;
+﻿using Common.Messaging;
+using Coop.Core.Client.Services.Heroes.Messages;
+using GameInterface.Services.Players.Data;
+using LiteNetLib;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -6,24 +9,23 @@ namespace Coop.Core.Client.Services.Heroes.Data;
 
 public interface IDeferredHeroRepository
 {
-    void AddDeferredHero(NetPeer peer, string controllerId, byte[] heroData);
+    void AddDeferredHero(NetworkNewPlayerHeroCreated message);
 
-    IEnumerable<TransferredHeroData> GetAllDeferredHeroes();
+    IEnumerable<NetworkNewPlayerHeroCreated> GetAllDeferredHeroes();
 
     void Clear();
 }
 
 internal class DeferredHeroRepository : IDeferredHeroRepository
 {
-    private readonly List<TransferredHeroData> repository = new List<TransferredHeroData>();
+    private readonly List<NetworkNewPlayerHeroCreated> repository = new List<NetworkNewPlayerHeroCreated>();
 
-    public void AddDeferredHero(NetPeer peer, string controllerId, byte[] heroData)
+    public void AddDeferredHero(NetworkNewPlayerHeroCreated message)
     {
-        var hero = new TransferredHeroData(peer, controllerId, heroData);
-        repository.Add(hero);
+        repository.Add(message);
     }
 
     public void Clear() => repository.Clear();
 
-    public IEnumerable<TransferredHeroData> GetAllDeferredHeroes() => repository.AsEnumerable();
+    public IEnumerable<NetworkNewPlayerHeroCreated> GetAllDeferredHeroes() => repository.AsEnumerable();
 }

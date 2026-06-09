@@ -32,7 +32,7 @@ internal class MapEventPatches
     private static void Prefix_AddInvolvedPartyInternal(MapEvent __instance, MapEventParty mapEventParty)
     {
         // Parties not controlled by the server are player parties
-        if (mapEventParty.Party.MobileParty?.IsPlayerParty() == true)
+        if (mapEventParty.Party.MobileParty?.IsPlayer() == true)
         {
             var partiesAdded = new List<MapEventParty>();
 
@@ -98,7 +98,7 @@ internal class MapEventPatches
     [HarmonyPrefix]
     private static bool Prefix_OnBattleWon(MapEvent __instance)
     {
-        var containsPlayer = __instance._sides.Any(side => side.Parties.Any(party => party.Party.MobileParty.IsPlayerParty()));
+        var containsPlayer = __instance._sides.Any(side => side.Parties.Any(party => party.Party.MobileParty.IsPlayer()));
 
         // Skip on client
         if (ModInformation.IsClient)
@@ -176,7 +176,7 @@ internal class InteractionPatches
         if (ModInformation.IsClient)
             return;
 
-        if (__instance.MobileParty?.IsPlayerParty() == true && mobileParty?.IsPlayerParty() == true)
+        if (__instance.MobileParty?.IsPlayer() == true && mobileParty?.IsPlayer() == true)
         {  
             __result = false;
             return;
@@ -199,7 +199,7 @@ internal class InteractionPatches
             return;
 
         // Always allow players to join
-        if (party.MobileParty?.IsPlayerParty() == true)
+        if (party.MobileParty?.IsPlayer() == true)
             return;
 
         // Allow AI to join if no players are involved
@@ -220,8 +220,8 @@ internal class InteractionPatches
         if (ModInformation.IsClient)
             return;
         
-        var attackerIsPlayer = attackerParty.MobileParty?.IsPlayerParty() == true;
-        var defenderIsPlayer = defenderParty.MobileParty?.IsPlayerParty() == true;
+        var attackerIsPlayer = attackerParty.MobileParty?.IsPlayer() == true;
+        var defenderIsPlayer = defenderParty.MobileParty?.IsPlayer() == true;
 
         // Only create a join window for battles that started with a player party.
         if (!attackerIsPlayer && !defenderIsPlayer)
