@@ -189,11 +189,16 @@ internal class HeroInterface : IHeroInterface
             return;
         }
 
+        // Assign the network StringIds BEFORE adding to the CampaignObjectManager. FindNextUniqueStringId derives
+        // the next "PlayerN" from CampaignObjectType.MaxCreatedPostfixIndex, which is cached in OnItemAdded when an
+        // object is *added* (using the StringId at that instant). If we add first (with the deserialized
+        // "main_hero" id) and rename afterwards, that cache never learns about the assigned "PlayerN", so the next
+        // hero computes — and collides with — the same id.
+        AssignHeroNetworkIds(hero);
+
         campaignObjectManager.AddHero(hero);
         campaignObjectManager.AddMobileParty(party);
         campaignObjectManager.AddClan(hero.Clan);
-
-        AssignHeroNetworkIds(hero);
     }
 
     public void AssignHeroNetworkIds(Hero hero)

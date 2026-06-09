@@ -76,14 +76,17 @@ namespace Coop.Tests.Server.Connections.States
             byte[] data = new byte[1];
             string campaignId = "12345";
 
+            // No CoopSession mock needed: Handle_GameSaveDataPackaged reads CoopSession?.CraftingPlayerData,
+            // which is null-safe.
+
             // Act
             var payload = new MessagePayload<GameSaveDataPackaged>(
                 null, new GameSaveDataPackaged(data, campaignId));
             currentState.Handle_GameSaveDataPackaged(payload);
 
             // Assert — the save data is sent only to the joining peer. Time-control pausing now goes through the
-            // mocked ITimeControlInterface (see TransferSaveState ctor), so it no longer produces a counted
-            // broadcast here; only the directed NetworkGameSaveDataReceived reaches the wire.
+            // mocked ITimeControlInterface (TransferSaveState ctor), so it no longer produces a counted broadcast
+            // here; only the directed NetworkGameSaveDataReceived reaches the wire.
             var message = Assert.Single(serverComponent.TestNetwork.GetPeerMessages(playerPeer));
             var castedMessage = Assert.IsType<NetworkGameSaveDataReceived>(message);
             Assert.Equal(data, castedMessage.GameSaveData);

@@ -1,7 +1,5 @@
 ﻿using Common.Messaging;
 using Coop.Core.Client.Messages;
-using Coop.Core.Client.Services.Heroes.Data;
-using Coop.Core.Client.Services.Heroes.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.UI.Interfaces;
 
@@ -14,22 +12,20 @@ public class ReceivingSavedDataState : ClientStateBase
 {
     private NetworkGameSaveDataReceived saveDataMessage = default;
     private readonly IMessageBroker messageBroker;
-    private readonly IDeferredHeroRepository deferredHeroRepo;
     private readonly ILoadingInterface loadingInterface;
 
     public ReceivingSavedDataState(
         IClientLogic logic,
         IMessageBroker messageBroker,
-        IDeferredHeroRepository deferredHeroRepo,
         ILoadingInterface loadingInterface) : base(logic)
     {
         this.messageBroker = messageBroker;
-        this.deferredHeroRepo = deferredHeroRepo;
         this.loadingInterface = loadingInterface;
 
         messageBroker.Subscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
-        messageBroker.Subscribe<NetworkNewPlayerHeroCreated>(Handle_NetworkNewPlayerHeroCreated);
+        // NetworkNewPlayerHeroCreated is handled by the persistent RemotePlayerHeroHandler for the whole client
+        // lifetime, so it is captured here AND during LoadingState without a per-state subscription gap.
 
         // Keep a loading screen up while we receive and load the server world. This is the
         // common state for both new (post character-creation) and returning clients, so the
@@ -43,7 +39,6 @@ public class ReceivingSavedDataState : ClientStateBase
     {
         messageBroker.Unsubscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
         messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
-        messageBroker.Unsubscribe<NetworkNewPlayerHeroCreated>(Handle_NetworkNewPlayerHeroCreated);
     }
 
     internal void Handle_NetworkGameSaveDataReceived(MessagePayload<NetworkGameSaveDataReceived> obj)
@@ -70,11 +65,6 @@ public class ReceivingSavedDataState : ClientStateBase
         messageBroker.Publish(this, commandLoad);
 
         Logic.LoadSavedData();
-    }
-
-    private void Handle_NetworkNewPlayerHeroCreated(MessagePayload<NetworkNewPlayerHeroCreated> obj)
-    {
-        deferredHeroRepo.AddDeferredHero(obj.What);
     }
 
     public override void EnterMainMenu()

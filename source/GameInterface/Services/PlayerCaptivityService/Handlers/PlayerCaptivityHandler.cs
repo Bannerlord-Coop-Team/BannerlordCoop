@@ -316,8 +316,8 @@ internal class PlayerCaptivityHandler : IHandler
     {
         foreach (var player in playerRegistry)
         {
-            if (objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero) &&
-                objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var mobileParty))
+            if (objectManager.TryGetObject<Hero>(player.HeroId, out var hero) &&
+                objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var mobileParty))
             {
                 yield return (hero, mobileParty);
             }
