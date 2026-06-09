@@ -6,11 +6,14 @@ using Coop.Core.Server.Connections.States;
 using Coop.Tests.Mocks;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Modules;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Moq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
@@ -138,31 +141,23 @@ namespace Coop.Tests.Server.Connections.States
             // Arrange
             var currentState = connectionLogic.SetState<ResolveCharacterState>();
 
-            string playerId = "MyPlayer";
-            string heroId = "MyHero";
-            string partyId = "MyParty";
+            
 
-            var heroInterfaceMock = serverComponent.Container.Resolve<Mock<IHeroInterface>>();
+            var player = new Player("MyPlayer", "MyHero", "MyParty", "MyClan");
 
-            heroInterfaceMock
-                .Setup(i => i.TryResolve<Hero>(playerId, out It.Ref<string>.IsAny))
-                .Callback((string id, out string returnedHeroId) =>
+            var playerManagerMock = serverComponent.Container.Resolve<Mock<IPlayerManager>>();
+
+            playerManagerMock
+                .Setup(i => i.TryGetPlayer(player.ControllerId, out It.Ref<Player>.IsAny))
+                .Callback((string id, out Player returnedPlayer) =>
                 {
-                    returnedHeroId = heroId;
-                })
-                .Returns(true);
-
-            heroInterfaceMock
-                .Setup(i => i.TryResolve<MobileParty>(playerId, out It.Ref<string>.IsAny))
-                .Callback((string id, out string returnedPartyId) =>
-                {
-                    returnedPartyId = partyId;
+                    returnedPlayer = player;
                 })
                 .Returns(true);
 
             // Act
             var payload = new MessagePayload<NetworkClientValidate>(
-                playerPeer, new NetworkClientValidate(playerId));
+                playerPeer, new NetworkClientValidate(player.ControllerId));
             currentState.Handle_ClientValidate(payload);
 
             // Assert
@@ -173,7 +168,7 @@ namespace Coop.Tests.Server.Connections.States
             var message = Assert.Single(validated);
 
             Assert.True(message.HeroExists);
-            Assert.Equal(heroId, message.Player.HeroId);
+            Assert.Equal(player, message.Player);
         }
 
         [Fact]
@@ -185,11 +180,11 @@ namespace Coop.Tests.Server.Connections.States
             string playerId = "MyPlayer";
 
             serverComponent.Container
-                .Resolve<Mock<IHeroInterface>>()
-                .Setup(i => i.TryResolve<Hero>(playerId, out It.Ref<string>.IsAny))
-                .Callback((string id, out string returnedHeroId) =>
+                .Resolve<Mock<IPlayerManager>>()
+                .Setup(i => i.TryGetPlayer(playerId, out It.Ref<Player>.IsAny))
+                .Callback((string id, out Player? returnedPlayer) =>
                 {
-                    returnedHeroId = string.Empty;
+                    returnedPlayer = null;
                 })
                 .Returns(false);
 

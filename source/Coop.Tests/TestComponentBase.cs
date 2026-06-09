@@ -6,10 +6,12 @@ using Common.Tests.Utils;
 using Coop.Core;
 using Coop.Tests.Mocks;
 using GameInterface.CoopSessionData;
+using GameInterface.DynamicSync;
 using GameInterface.Registry;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.ObjectManager;
@@ -71,11 +73,10 @@ internal abstract class TestComponentBase
 
         builder.RegisterType<ObjectManager>().As<IObjectManager>().InstancePerLifetimeScope();
         builder.RegisterType<RegistryCollection>().As<IRegistryCollection>().InstancePerLifetimeScope();
-        builder.RegisterInstance(new Mock<ILogger>().Object).As<ILogger>().SingleInstance();
 
         RegisterMock<ILogger>(builder);
         RegisterMock<IGameInterface>(builder);
-        RegisterMock<IControlledEntityRegistry>(builder);
+        RegisterMock<IDynamicSyncPatchCollector>(builder);
         RegisterMock<IHeroInterface>(builder);
         RegisterMock<IModuleInfoProvider>(builder);
         RegisterMock<IRegistryManager>(builder);
@@ -85,6 +86,7 @@ internal abstract class TestComponentBase
         RegisterMock<ILoadingInterface>(builder);
         RegisterMock<ICoopSessionProvider>(builder);
         RegisterMock<ITroopRosterInterface>(builder);
+        RegisterMock<IMobilePartyInterface>(builder);
 
         return builder;
     }
