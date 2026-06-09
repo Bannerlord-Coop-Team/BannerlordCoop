@@ -4,7 +4,6 @@ using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
 namespace GameInterface.Services.Heroes.Patches.Disable;
 
-
 [HarmonyPatch(typeof(HeroAgentSpawnCampaignBehavior))]
 internal class DisableHeroAgentSpawnCampaignBehavior
 {

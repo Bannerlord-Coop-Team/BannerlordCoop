@@ -43,9 +43,15 @@ namespace GameInterface.Services.ItemRosters
 
             foreach (Settlement settlement in objectManager.Settlements)
             {
-                if (settlement.ItemRoster == null) continue;
+                if (settlement.ItemRoster != null)
+                {
+                    RegisterExistingObject(settlement.StringId, settlement.ItemRoster);
+                }
 
-                RegisterExistingObject(settlement.StringId, settlement.ItemRoster);
+                if (settlement.Stash != null)
+                {
+                    RegisterExistingObject(settlement.StringId + "_stash", settlement.Stash);
+                }
             }
         }
 
