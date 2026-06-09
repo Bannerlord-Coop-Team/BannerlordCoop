@@ -4,6 +4,7 @@ using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using Coop.Tests.Mocks;
+using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Modules;
 using LiteNetLib;
 using Moq;
@@ -11,6 +12,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
 using Xunit;
 using Xunit.Abstractions;
@@ -86,14 +88,15 @@ namespace Coop.Tests.Server.Connections.States
 
             var modules = new List<ModuleInfo> { new ModuleInfo("1", true, new ApplicationVersion()) };
 
-            serverComponent.ModuleInfoProviderMock
+            serverComponent.Container
+                .Resolve<Mock<IModuleInfoProvider>>()
                 .Setup(mip => mip.GetModuleInfos())
                 .Returns(modules);
 
             // Act
             var payload = new MessagePayload<NetworkModuleVersionsValidate>(
                 playerPeer, new NetworkModuleVersionsValidate(modules));
-            currentState.ModuleVersionsValidateHandler(payload);
+            currentState.Handle_ModuleVersionsValidate(payload);
 
             // Assert
             var message = Assert.Single(serverComponent.TestNetwork.GetPeerMessages(playerPeer));
@@ -109,7 +112,8 @@ namespace Coop.Tests.Server.Connections.States
             // Arrange
             var currentState = connectionLogic.SetState<ResolveCharacterState>();
 
-            serverComponent.ModuleInfoProviderMock
+            serverComponent.Container
+                .Resolve<Mock<IModuleInfoProvider>>()
                 .Setup(mip => mip.GetModuleInfos())
                 .Returns(
                     new List<ModuleInfo> { new ModuleInfo("1", true, new ApplicationVersion()) }
@@ -118,7 +122,7 @@ namespace Coop.Tests.Server.Connections.States
             // Act
             var payload = new MessagePayload<NetworkModuleVersionsValidate>(
                 playerPeer, new NetworkModuleVersionsValidate(new List<ModuleInfo> { new ModuleInfo("MismatchedModule", true, new ApplicationVersion())}));
-            currentState.ModuleVersionsValidateHandler(payload);
+            currentState.Handle_ModuleVersionsValidate(payload);
 
             // Assert
             var message = Assert.Single(serverComponent.TestNetwork.GetPeerMessages(playerPeer));
@@ -136,8 +140,11 @@ namespace Coop.Tests.Server.Connections.States
 
             string playerId = "MyPlayer";
             string heroId = "MyHero";
+            string partyId = "MyParty";
 
-            serverComponent.HeroInterfaceMock
+            var heroInterfaceMock = serverComponent.Container.Resolve<Mock<IHeroInterface>>();
+
+            heroInterfaceMock
                 .Setup(i => i.TryResolve<Hero>(playerId, out It.Ref<string>.IsAny))
                 .Callback((string id, out string returnedHeroId) =>
                 {
@@ -145,10 +152,18 @@ namespace Coop.Tests.Server.Connections.States
                 })
                 .Returns(true);
 
+            heroInterfaceMock
+                .Setup(i => i.TryResolve<MobileParty>(playerId, out It.Ref<string>.IsAny))
+                .Callback((string id, out string returnedPartyId) =>
+                {
+                    returnedPartyId = partyId;
+                })
+                .Returns(true);
+
             // Act
             var payload = new MessagePayload<NetworkClientValidate>(
                 playerPeer, new NetworkClientValidate(playerId));
-            currentState.ClientValidateHandler(payload);
+            currentState.Handle_ClientValidate(payload);
 
             // Assert
             var messages = serverComponent.TestNetwork.SentNetworkMessages[playerPeer.Id];
@@ -169,7 +184,8 @@ namespace Coop.Tests.Server.Connections.States
 
             string playerId = "MyPlayer";
 
-            serverComponent.HeroInterfaceMock
+            serverComponent.Container
+                .Resolve<Mock<IHeroInterface>>()
                 .Setup(i => i.TryResolve<Hero>(playerId, out It.Ref<string>.IsAny))
                 .Callback((string id, out string returnedHeroId) =>
                 {
@@ -180,7 +196,7 @@ namespace Coop.Tests.Server.Connections.States
             // Act
             var payload = new MessagePayload<NetworkClientValidate>(
                 differentPeer, new NetworkClientValidate(playerId));
-            currentState.ClientValidateHandler(payload);
+            currentState.Handle_ClientValidate(payload);
 
             // Assert
             var messages = serverComponent.TestNetwork.SentNetworkMessages

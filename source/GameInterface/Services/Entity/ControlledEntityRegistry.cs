@@ -1,6 +1,8 @@
 ﻿using Common;
+using Common.Caching;
 using Common.Logging;
 using GameInterface.Services.Entity.Data;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MobileParties.Extensions;
 using ProtoBuf;
 using Serilog;
@@ -9,6 +11,8 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 
@@ -93,6 +97,11 @@ public interface IControlledEntityRegistry
 internal class ControlledEntityRegistry : IControlledEntityRegistry
 {
     private static readonly ILogger Logger = LogManager.GetLogger<ControlledEntityRegistry>();
+
+    /// <summary>
+    /// Cache used by MobilePartyExtensions to check if this client or server has control over this party
+    /// </summary>
+    public static ConditionalWeakTable<object, CachedPrimitive<bool>> ControlledEntitiesCache = new();
 
     [ProtoMember(1)]
     private readonly ConcurrentDictionary<string, HashSet<ControlledEntity>> controlledEntities = new ConcurrentDictionary<string, HashSet<ControlledEntity>>();
@@ -201,15 +210,22 @@ internal class ControlledEntityRegistry : IControlledEntityRegistry
             return false;
         }
 
-        PartyExtensions.InvalidateCache();
+        InvalidateControlledEntities();
 
         return result;
+    }
+
+    public static void InvalidateControlledEntities()
+    {
+        ControlledEntitiesCache = new();
     }
 
     public bool RemoveAsControlled(ControlledEntity entityId)
     {
         var result = controlledEntities.TryRemove(entityId.OwnerId, out var _);
         result &= controllerIdLookup.TryRemove(entityId.EntityId, out _);
+
+        InvalidateControlledEntities();
 
         return result;
     }

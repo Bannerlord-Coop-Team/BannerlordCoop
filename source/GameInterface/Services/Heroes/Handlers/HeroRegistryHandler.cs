@@ -11,22 +11,19 @@ namespace GameInterface.Services.Heroes.Handlers;
 
 internal class HeroRegistryHandler : IHandler
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<NewHeroHandler>();
+    private static readonly ILogger Logger = LogManager.GetLogger<HeroRegistryHandler>();
 
-    private readonly IHeroInterface heroInterface;
     private readonly IMessageBroker messageBroker;
     private readonly IControlledEntityRegistry controlledEntityRegistry;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IObjectManager objectManager;
 
     public HeroRegistryHandler(
-        IHeroInterface heroInterface,
         IMessageBroker messageBroker,
         IControlledEntityRegistry controlledEntityRegistry,
         IControllerIdProvider controllerIdProvider,
         IObjectManager objectManager)
     {
-        this.heroInterface = heroInterface;
         this.messageBroker = messageBroker;
         this.controlledEntityRegistry = controlledEntityRegistry;
         this.controllerIdProvider = controllerIdProvider;

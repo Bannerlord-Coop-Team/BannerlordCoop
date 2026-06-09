@@ -50,11 +50,20 @@ function Move-FileToRecycleBin {
         return
     }
 
-    [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile(
-        $Path,
-        [Microsoft.VisualBasic.FileIO.UIOption]::OnlyErrorDialogs,
-        [Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin
-    )
+    try {
+        [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile(
+            $Path,
+            [Microsoft.VisualBasic.FileIO.UIOption]::OnlyErrorDialogs,
+            [Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin
+        )
+    }
+    catch {
+        # Recycle Bin can reject some items (junctions/reparse points, volumes
+        # without a Recycle Bin) with "The system call level is not correct".
+        # Fall back to a permanent delete so cleanup still succeeds.
+        Write-Output "Recycle failed for '${Path}', deleting permanently: $($_.Exception.Message)"
+        Remove-Item -LiteralPath $Path -Force -ErrorAction Stop
+    }
 }
 
 function Move-DirectoryChildrenToRecycleBin {
@@ -69,19 +78,34 @@ function Move-DirectoryChildrenToRecycleBin {
     }
 
     Get-ChildItem -LiteralPath $Path -Force | ForEach-Object {
-        if ($_.PSIsContainer) {
-            [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory(
-                $_.FullName,
-                [Microsoft.VisualBasic.FileIO.UIOption]::OnlyErrorDialogs,
-                [Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin
-            )
+        $item = $_
+        $isContainer = $item.PSIsContainer
+        # A directory junction/symlink is a reparse point; treat it as a leaf so
+        # we remove the link itself rather than recursing into the target.
+        $isReparsePoint = ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -eq [System.IO.FileAttributes]::ReparsePoint
+
+        try {
+            if ($isContainer -and -not $isReparsePoint) {
+                [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory(
+                    $item.FullName,
+                    [Microsoft.VisualBasic.FileIO.UIOption]::OnlyErrorDialogs,
+                    [Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin
+                )
+            }
+            else {
+                [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile(
+                    $item.FullName,
+                    [Microsoft.VisualBasic.FileIO.UIOption]::OnlyErrorDialogs,
+                    [Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin
+                )
+            }
         }
-        else {
-            [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile(
-                $_.FullName,
-                [Microsoft.VisualBasic.FileIO.UIOption]::OnlyErrorDialogs,
-                [Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin
-            )
+        catch {
+            # Recycle Bin can reject some items (junctions/reparse points, volumes
+            # without a Recycle Bin) with "The system call level is not correct".
+            # Fall back to a permanent delete so cleanup still succeeds.
+            Write-Output "Recycle failed for '$($item.FullName)', deleting permanently: $($_.Exception.Message)"
+            Remove-Item -LiteralPath $item.FullName -Force -Recurse -ErrorAction Stop
         }
     }
 }
@@ -192,7 +216,9 @@ Assert-SafeModPath -ModDir $ModDir -ModsRoot $ModsRoot
 # Clean only deploy-owned outputs
 Write-Output "Cleaning deploy-owned outputs by moving them to Recycle Bin..."
 
-Move-DirectoryChildrenToRecycleBin -Path $ModDir
+Move-DirectoryChildrenToRecycleBin -Path $BinDir
+Move-DirectoryChildrenToRecycleBin -Path $MovieModDir
+Move-FileToRecycleBin -Path $SubModuleOutputPath
 
 # Create directories
 New-Item -Force -ItemType Directory -Path "${ModDir}\bin\Win64_Shipping_Client" | Out-Null

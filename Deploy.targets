@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Deploy.targets
+
+  Deploys a built module into the Bannerlord install via the `mb2` junction
+  (see memory: build-environment / deploy-wipes-module). Replaces the old
+  deploy.ps1 + config_*.json + PostBuildEvent pipeline.
+
+  A consuming .csproj must set these properties before importing this file:
+
+    <ModName>      Coop          Module folder name + DLL/class name root
+    <MainClass>    CoopMod       SubModule class type (ModName.MainClass)
+    <ModVersion>   v0.0.1        Module version
+    <GameVersion>  v1.3.12       Depended-module game version
+
+  Behavior vs. the old deploy.ps1:
+    - Incremental: skips entirely when nothing changed (Inputs/Outputs), and
+      Copy uses SkipUnchangedFiles. No more wipe-and-recreate of the module
+      folder, so an empty build output can no longer delete the live module.
+    - No-ops cleanly when the mb2 junction is absent (CI / fresh checkout)
+      instead of throwing.
+-->
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <PropertyGroup>
+    <!-- This file lives at the repo root; locate everything relative to it. -->
+    <RepoRoot>$(MSBuildThisFileDirectory)</RepoRoot>
+    <ModsRoot>$(RepoRoot)mb2\Modules</ModsRoot>
+    <DeploySourceDir>$(RepoRoot)deploy</DeploySourceDir>
+    <UIMoviesDir>$(RepoRoot)UIMovies</UIMoviesDir>
+    <SubModuleTemplate>$(DeploySourceDir)\SubModule.xml</SubModuleTemplate>
+
+    <ModDir>$(ModsRoot)\$(ModName)</ModDir>
+    <ModBinDir>$(ModDir)\bin\Win64_Shipping_Client</ModBinDir>
+    <ModPrefabDir>$(ModDir)\GUI\Prefabs</ModPrefabDir>
+
+    <DeployStamp>$(IntermediateOutputPath)deploy.stamp</DeployStamp>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- All build outputs (DLLs) for this project. -->
+    <DeployDllFiles Include="$(TargetDir)**\*.dll" />
+
+    <!-- Static module files (start-*.bat, instructions); SubModule.xml is templated separately. -->
+    <DeployStaticFiles Include="$(DeploySourceDir)\**\*"
+                       Exclude="$(SubModuleTemplate)" />
+
+    <!-- UI movie prefabs (copied into GUI\Prefabs). -->
+    <UIMovieFiles Include="$(UIMoviesDir)\**\*" Condition="Exists('$(UIMoviesDir)')" />
+  </ItemGroup>
+
+  <Target Name="DeployToGame"
+          AfterTargets="Build"
+          Condition="'$(ModName)' != '' and Exists('$(ModsRoot)')"
+          Inputs="@(DeployDllFiles);@(DeployStaticFiles);@(UIMovieFiles);$(SubModuleTemplate)"
+          Outputs="$(DeployStamp)">
+
+    <Message Importance="high" Text="Deploying $(ModName) -> $(ModDir)" />
+
+    <MakeDir Directories="$(ModBinDir);$(ModPrefabDir);$(IntermediateOutputPath)" />
+
+    <!-- DLLs -->
+    <Copy SourceFiles="@(DeployDllFiles)"
+          DestinationFolder="$(ModBinDir)"
+          SkipUnchangedFiles="true" />
+
+    <!-- Static deploy files, preserving any subfolder structure -->
+    <Copy SourceFiles="@(DeployStaticFiles)"
+          DestinationFiles="@(DeployStaticFiles->'$(ModDir)\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+
+    <!-- UI movie prefabs -->
+    <Copy SourceFiles="@(UIMovieFiles)"
+          DestinationFiles="@(UIMovieFiles->'$(ModPrefabDir)\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+
+    <!-- SubModule.xml: substitute tokens from the template into the module folder -->
+    <WriteLinesToFile
+        File="$(ModDir)\SubModule.xml"
+        Lines="$([System.IO.File]::ReadAllText('$(SubModuleTemplate)').Replace('${name}','$(ModName)').Replace('${main_class}','$(MainClass)').Replace('${version}','$(ModVersion)').Replace('${game_version}','$(GameVersion)'))"
+        Overwrite="true" />
+
+    <Touch Files="$(DeployStamp)" AlwaysCreate="true" />
+  </Target>
+
+</Project>

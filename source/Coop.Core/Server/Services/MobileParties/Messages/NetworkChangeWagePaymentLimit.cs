@@ -6,6 +6,7 @@ namespace Coop.Core.Server.Services.MobileParties.Messages;
 /// <summary>
 /// Sent to all other clients then the requestor of changing pay limit
 /// </summary>
+[ProtoContract]
 public record NetworkChangeWagePaymentLimit : IEvent
 {
     [ProtoMember(1)]

@@ -55,7 +55,7 @@ internal class PartyHealHandler : IHandler
     {
         if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
 
-        if (obj.What.MobileParty?.IsPlayerParty() != true) return;
+        if (obj.What.MobileParty?.IsPlayer() != true) return;
 
         obj.What.PartyHealCampaignBehavior.TryHealOrWoundParty(obj.What.MobileParty.Party, 4f);
     }

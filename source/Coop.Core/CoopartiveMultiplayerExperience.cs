@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common;
 using Common.LogicStates;
 using Common.Messaging;
 using Common.Network;
@@ -76,6 +77,8 @@ namespace Coop.Core
         {
             DestroyContainer();
 
+            ModInformation.IsServer = true;
+
             var containerProvider = new ContainerProvider();
 
             ContainerBuilder builder = new ContainerBuilder();
@@ -97,6 +100,8 @@ namespace Coop.Core
         public void StartAsClient(INetworkConfiguration configuration = null)
         {
             DestroyContainer();
+
+            ModInformation.IsServer = false;
 
             var containerProvider = new ContainerProvider();
 
