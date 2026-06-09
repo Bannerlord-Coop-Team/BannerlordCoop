@@ -56,6 +56,7 @@ namespace Coop.Tests.Server.Connections.States
 
             // Act
             clientRegistry.PlayerJoiningHandler(connectPayload);
+            clientRegistry.ConnectionStates[playerPeer].SetState<TransferSaveState>();
             Assert.True(clientRegistry.PlayersLoading);
             clientRegistry.PlayerDisconnectedHandler(disconnectPayload);
 
@@ -87,13 +88,17 @@ namespace Coop.Tests.Server.Connections.States
             var connectionLogic = clientRegistry.ConnectionStates[playerPeer];
 
             // Assert
-            Assert.True(clientRegistry.PlayersLoading);
-            Assert.Contains(playerPeer, clientRegistry.LoadingPeers);
+            // Character resolution/creation happen before the save snapshot is taken,
+            // so time is free to unpause during them.
+            Assert.False(clientRegistry.PlayersLoading);
+            Assert.Empty(clientRegistry.LoadingPeers);
 
             connectionLogic.SetState<CreateCharacterState>();
-            Assert.True(clientRegistry.PlayersLoading);
-            Assert.Contains(playerPeer, clientRegistry.LoadingPeers);
+            Assert.False(clientRegistry.PlayersLoading);
+            Assert.Empty(clientRegistry.LoadingPeers);
 
+            // The save is packaged in TransferSaveState and consumed through LoadingState,
+            // so time must stay locked across that window.
             connectionLogic.SetState<TransferSaveState>();
             Assert.True(clientRegistry.PlayersLoading);
             Assert.Contains(playerPeer, clientRegistry.LoadingPeers);

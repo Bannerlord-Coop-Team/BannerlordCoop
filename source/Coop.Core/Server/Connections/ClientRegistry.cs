@@ -26,8 +26,6 @@ public class ClientRegistry : IClientRegistry
 
     private static HashSet<Type> loadingStates = new HashSet<Type>
     {
-        typeof(ResolveCharacterState),
-        typeof(CreateCharacterState),
         typeof(TransferSaveState),
         typeof(LoadingState),
     };
