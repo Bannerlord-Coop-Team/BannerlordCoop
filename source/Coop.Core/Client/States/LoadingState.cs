@@ -17,7 +17,6 @@ public class LoadingState : ClientStateBase
 {
     private readonly IMessageBroker messageBroker;
     private readonly IRegistryManager registryManager;
-    private readonly IDeferredHeroRepository deferredHeroRepo;
     private readonly IHeroInterface heroInterface;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IControlledEntityRegistry controlledEntityRegistry;
@@ -27,7 +26,6 @@ public class LoadingState : ClientStateBase
         IClientLogic logic,
         IMessageBroker messageBroker,
         IRegistryManager registryManager,
-        IDeferredHeroRepository deferredHeroRepo,
         IHeroInterface heroInterface,
         IControllerIdProvider controllerIdProvider,
         IControlledEntityRegistry controlledEntityRegistry,
@@ -35,7 +33,6 @@ public class LoadingState : ClientStateBase
     {
         this.messageBroker = messageBroker;
         this.registryManager = registryManager;
-        this.deferredHeroRepo = deferredHeroRepo;
         this.heroInterface = heroInterface;
         this.controllerIdProvider = controllerIdProvider;
         this.controlledEntityRegistry = controlledEntityRegistry;
@@ -65,11 +62,6 @@ public class LoadingState : ClientStateBase
             "Loading Host Campaign",
             "Applying synced object lifetimes...");
         registryManager.PatchLifetimes();
-
-        loadingInterface.SetLoadingMessage(
-            "Loading Host Campaign",
-            "Creating remote player heroes...");
-        InstantiateDeferredHeroes();
 
         loadingInterface.SetLoadingMessage(
             "Loading Host Campaign",
@@ -135,16 +127,5 @@ public class LoadingState : ClientStateBase
 
         controlledEntityRegistry.RegisterAsControlled(controllerId, player.HeroId);
         controlledEntityRegistry.RegisterAsControlled(controllerId, player.MobilePartyId);
-    }
-
-    private void InstantiateDeferredHeroes()
-    {
-        foreach (var newHero in deferredHeroRepo.GetAllDeferredHeroes())
-        {
-            var message = new RegisterNewPlayerHero(newHero.NetPeer, newHero.ControllerId, newHero.HeroData);
-            messageBroker.Publish(this, message);
-        }
-
-        deferredHeroRepo.Clear();
     }
 }

@@ -21,11 +21,16 @@ namespace E2E.Tests.Environment;
 /// </summary>
 public class TestEnvironment
 {
+    public EnvironmentInstance Server { get; }
+
+    public IEnumerable<EnvironmentInstance> Clients { get; }
+
     private ContainerProvider containerProvider;
     public IContainer Container => containerProvider.GetContainer();
 
-    private readonly TestNetworkRouter networkOrchestrator;
+    private readonly TestNetworkRouter networkOrchestrator = new();
 
+    private readonly bool registerGameInterface;
 
     /// <summary>
     /// Constructor for TestEnvironment
@@ -34,9 +39,6 @@ public class TestEnvironment
     public TestEnvironment(ITestOutputHelper output, int numClients = 2, bool registerGameInterface = false)
     {
         this.registerGameInterface = registerGameInterface;
-
-        // Setup test network
-        networkOrchestrator = new TestNetworkRouter();
 
         Server = CreateServer(output);
 
@@ -51,12 +53,6 @@ public class TestEnvironment
 
         Clients = clients;
     }
-
-    public IEnumerable<EnvironmentInstance> Clients { get; }
-    public EnvironmentInstance Server { get; }
-
-
-    private readonly bool registerGameInterface;
 
     private EnvironmentInstance CreateClient(ITestOutputHelper output)
     {

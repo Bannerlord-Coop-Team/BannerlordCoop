@@ -12,12 +12,12 @@ public class MapEventLifetimeTests : MapEventTestBase
     public void ServerCreate_MapEvent_SyncAllClients()
     {
         // Act
-        var mapEventId = CreateServerMapEvent();
+        var mapEventCtx = CreateServerMapEvent();
 
         // Assert
         foreach (var client in Clients)
         {
-            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventId, out _));
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out _));
         }
     }
 
@@ -44,20 +44,20 @@ public class MapEventLifetimeTests : MapEventTestBase
     public void ServerDestroy_MapEvent_SyncAllClients()
     {
         // Arrange
-        var mapEventId = CreateServerMapEvent();
+        var mapEventCtx = CreateServerMapEvent();
 
         foreach (var client in Clients)
         {
-            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventId, out _));
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out _));
         }
 
         // Act
-        DestroyServerMapEvent(mapEventId);
+        DestroyServerMapEvent(mapEventCtx.MapEventId);
 
         // Assert
         foreach (var client in Clients)
         {
-            Assert.False(client.ObjectManager.TryGetObject<MapEvent>(mapEventId, out _));
+            Assert.False(client.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out _));
         }
     }
 
@@ -65,22 +65,22 @@ public class MapEventLifetimeTests : MapEventTestBase
     public void ClientDestroy_MapEvent_DoesNothing()
     {
         // Arrange
-        var mapEventId = CreateServerMapEvent();
+        var mapEventCtx = CreateServerMapEvent();
         var firstClient = Clients.First();
 
         // Act — a client calling FinalizeEvent must not remove the MapEvent from any peer
         firstClient.Call(() =>
         {
-            Assert.True(firstClient.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+            Assert.True(firstClient.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out var mapEvent));
             mapEvent.FinalizeEvent();
         }, MapEventDisabledMethods);
 
         // Assert — the event must still be registered everywhere
-        Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out _));
+        Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out _));
 
         foreach (var client in Clients)
         {
-            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventId, out _));
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out _));
         }
     }
 }

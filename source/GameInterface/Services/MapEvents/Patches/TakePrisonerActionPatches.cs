@@ -32,12 +32,6 @@ internal class TakePrisonerActionPatches
             return;
         }
 
-        if (prisonerCharacter.PartyBelongedTo?.IsPlayerParty() == false)
-            return;
-
-        if (prisonerCharacter.PartyBelongedTo == null)
-            return;
-
         var message = new PrisonerTaken(capturerParty, prisonerCharacter);
         MessageBroker.Instance.Publish(null, message);
     }

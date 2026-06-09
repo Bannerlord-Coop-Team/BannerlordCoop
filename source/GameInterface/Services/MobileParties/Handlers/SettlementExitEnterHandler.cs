@@ -117,10 +117,22 @@ internal class SettlementExitEnterHandler : IHandler
         {
             using (new AllowedThread())
             {
-                // Set to move hold to prevent party from re-entering settlement immediately after encounter ends
-                MobileParty.MainParty.SetMoveModeHold();
+                var mainParty = MobileParty.MainParty;
+
+                // Mirror the native leave consequence (game_menu_settlement_leave_on_consequence). The party must
+                // be moved to the settlement gate (outside) BEFORE finishing — LeaveSettlementAction only clears
+                // CurrentSettlement, it does not reposition. Without this the party is still on the settlement
+                // when the encounter ends, so EncounterManager.HandleEncounterForMobileParty immediately re-fires
+                // StartSettlementEncounter and the player is put right back in.
+                if (mainParty.CurrentSettlement != null)
+                    mainParty.Position = mainParty.CurrentSettlement.GatePosition;
 
                 PlayerEncounter.Finish(true);
+
+                // Hold AFTER finishing: Finish -> LeaveSettlementAction resets party behavior, which would
+                // otherwise clobber the hold and let the party walk straight back into the settlement.
+                mainParty.SetMoveModeHold();
+
                 Campaign.Current.SaveHandler.SignalAutoSave();
             }
         });

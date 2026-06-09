@@ -20,8 +20,8 @@ using GameInterface.Services.UI.Interfaces;
 using Moq;
 using Serilog;
 using System.Collections.Generic;
-using IGameInterface = GameInterface.IGameInterface;
 using Xunit.Abstractions;
+using IGameInterface = GameInterface.IGameInterface;
 
 namespace Coop.Tests;
 
@@ -32,10 +32,6 @@ internal abstract class TestComponentBase
     public TestMessageBroker TestMessageBroker { get; protected set; }
     public TestNetwork TestNetwork { get; protected set; }
     public IContainer Container { get; protected set; }
-
-    public readonly Mock<IHeroInterface> HeroInterfaceMock = new();
-
-    public readonly Mock<IModuleInfoProvider> ModuleInfoProviderMock = new();
 
     protected TestComponentBase(ITestOutputHelper output)
     {
@@ -65,9 +61,6 @@ internal abstract class TestComponentBase
 
     private ContainerBuilder RegisterCommonTypes(ContainerBuilder builder)
     {
-        var moduleInfoProviderMock = new Mock<IModuleInfoProvider>();
-        moduleInfoProviderMock.Setup(x => x.GetModuleInfos()).Returns(new List<ModuleInfo>());
-        
         builder.RegisterType<SerializableTypeMapper>().As<ISerializableTypeMapper>().InstancePerLifetimeScope();
         builder.RegisterType<ProtoBufSerializer>().As<ICommonSerializer>().InstancePerLifetimeScope();
         builder.RegisterType<TestMessageBroker>().AsSelf().As<IMessageBroker>().InstancePerLifetimeScope();
@@ -92,6 +85,8 @@ internal abstract class TestComponentBase
         RegisterMock<ITroopRosterInterface>(builder);
         RegisterMock<IMapTimeTrackerInterface>(builder);
         RegisterMock<ILoadingInterface>(builder);
+        RegisterMock<ICoopSessionProvider>(builder);
+        RegisterMock<ITroopRosterInterface>(builder);
 
         return builder;
     }

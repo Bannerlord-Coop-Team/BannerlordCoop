@@ -19,6 +19,9 @@ public class ServerRunningState : ServerStateBase
         this.messageBroker = messageBroker;
         this.network = network;
 
+        // Start server
+        network.Start();
+
         loadingInterface.HideLoadingScreen();
 
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);

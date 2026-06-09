@@ -28,10 +28,10 @@ public class ModuleValidatorTests
         var validator = new ModuleValidator();
 
         // Act
-        var result = validator.Validate(serverModules, clientModules);
+        var result = validator.Validate(serverModules, clientModules, out var error);
 
         // Assert
-        Assert.Null(result);
+        Assert.True(result);
     }
 
     [Fact]
@@ -52,10 +52,11 @@ public class ModuleValidatorTests
         var validator = new ModuleValidator();
 
         // Act
-        var result = validator.Validate(serverModules, clientModules);
+        var result = validator.Validate(serverModules, clientModules, out var error);
 
         // Assert
-        Assert.Equal("To join the server the module 'ModuleB' with version 'v1.2.0.352' is required.", result);
+        Assert.False(result);
+        Assert.Equal("To join the server the module 'ModuleB' with version 'v1.2.0.352' is required.", error);
     }
 
     [Fact]
@@ -77,10 +78,11 @@ public class ModuleValidatorTests
         var validator = new ModuleValidator();
 
         // Act
-        var result = validator.Validate(serverModules, clientModules);
+        var result = validator.Validate(serverModules, clientModules, out var error);
 
         // Assert
-        Assert.Equal("Wrong version of module 'ModuleB' detected. Server uses 'v1.2.0.352', client uses 'v1.1.0.352'.", result);
+        Assert.False(result);
+        Assert.Equal("Wrong version of module 'ModuleB' detected. Server uses 'v1.2.0.352', client uses 'v1.1.0.352'.", error);
     }
 
     [Fact]
@@ -103,9 +105,10 @@ public class ModuleValidatorTests
         var validator = new ModuleValidator();
 
         // Act
-        var result = validator.Validate(serverModules, clientModules);
+        var result = validator.Validate(serverModules, clientModules, out var error);
 
         // Assert
-        Assert.Equal("Server does not support module 'ModuleC'.", result);
+        Assert.False(result);
+        Assert.Equal("Server does not support module 'ModuleC'.", error);
     }
 }

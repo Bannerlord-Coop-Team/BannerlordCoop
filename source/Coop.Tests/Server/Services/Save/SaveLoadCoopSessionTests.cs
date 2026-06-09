@@ -35,7 +35,10 @@ namespace Coop.Tests.Server.Services.Save
         {
             // Setup
             var saveManager = container.Resolve<ICoopSaveManager>();
-            var entityRegistry = container.Resolve<IControlledEntityRegistry>();
+            // Use a real registry: the container's IControlledEntityRegistry is a shared test mock (see
+            // TestComponentBase) whose RegisterAsControlled returns default(false). The save manager only needs
+            // the packaged entity map, so a standalone real registry is sufficient and deterministic.
+            var entityRegistry = new ControlledEntityRegistry();
 
             const string controllerId = "testController";
             const string controller2Id = "testController2";
@@ -79,7 +82,10 @@ namespace Coop.Tests.Server.Services.Save
         {
             // Setup
             var saveManager = container.Resolve<ICoopSaveManager>();
-            var entityRegistry = container.Resolve<IControlledEntityRegistry>();
+            // Use a real registry: the container's IControlledEntityRegistry is a shared test mock (see
+            // TestComponentBase) whose RegisterAsControlled returns default(false). The save manager only needs
+            // the packaged entity map, so a standalone real registry is sufficient and deterministic.
+            var entityRegistry = new ControlledEntityRegistry();
 
             const string controllerId = "testController";
             const string controller2Id = "testController2";

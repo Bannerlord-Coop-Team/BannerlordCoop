@@ -1,10 +1,9 @@
-﻿using Common.Messaging;
-using GameInterface.Services.MobileParties.Extensions;
-using GameInterface.Services.ObjectManager;
+﻿using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players.Data;
-using GameInterface.Services.Players.Messages;
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Players;
@@ -28,16 +27,17 @@ public interface IPlayerRegistry: IEnumerable<Player>
     /// <returns>true if the <paramref name="mobileParty"/> is a player otherwise false.</returns>
     bool Contains(MobileParty mobileParty);
 }
+
 /// <inheritdoc cref="IPlayerRegistry"/>
 internal class PlayerRegistry : IPlayerRegistry
 {
-    private readonly IMessageBroker messageBroker;
+    public static readonly ConditionalWeakTable<object, Player> PlayerObjects = new();
+
     private readonly IObjectManager objectManager;
     private readonly HashSet<Player> _players = new HashSet<Player>();
     private readonly HashSet<string> _playerMobileParties = new HashSet<string>();
 
-    public PlayerRegistry(IMessageBroker messageBroker, IObjectManager objectManager) {
-        this.messageBroker = messageBroker;
+    public PlayerRegistry(IObjectManager objectManager) {
         this.objectManager = objectManager;
     }
 
@@ -48,14 +48,19 @@ internal class PlayerRegistry : IPlayerRegistry
 
         if (!_playerMobileParties.Add(player.MobilePartyId)) return false;
 
-        if (objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var mobileParty))
-        {
-            mobileParty.InvalidatePartyCache();
-        }
-
-        messageBroker.Publish(this, new PlayerRegistered(player));
+        // Add player objects for IsPlayer extension (i.e. MobilePartyExtensions)
+        AddPlayerObject<MobileParty>(player.MobilePartyId, player);
+        AddPlayerObject<Hero>(player.HeroId, player);
 
         return true;
+    }
+
+    private void AddPlayerObject<T>(string networkId, Player player)
+    {
+        if (!objectManager.TryGetObjectWithLogging<T>(networkId, out var obj))
+            return;
+
+        PlayerObjects.Add(obj, player);
     }
 
     /// <inheritdoc cref="IPlayerRegistry.Contains(MobileParty)"/>

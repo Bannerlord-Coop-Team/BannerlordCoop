@@ -2,6 +2,7 @@
 
 using Common.Messaging;
 using Common.Network;
+using Coop.Core.Client.Messages;
 using Coop.Core.Common;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Registry;
@@ -11,7 +12,6 @@ using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.UI.Interfaces;
-using NetworkPlayerData = Coop.Core.Server.Connections.Messages.NetworkPlayerData;
 
 namespace Coop.Core.Client.States;
 
@@ -53,14 +53,14 @@ public class CharacterCreationState : ClientStateBase
 
         messageBroker.Subscribe<CharacterCreationFinished>(Handle_CharacterCreationFinished);
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
-        messageBroker.Subscribe<NetworkPlayerData>(Handle_NetworkPlayerData);
+        messageBroker.Subscribe<NetworkHeroRecieved>(Handle_NetworkHeroRecieved);
     }
 
     public override void Dispose()
     {
         messageBroker.Unsubscribe<CharacterCreationFinished>(Handle_CharacterCreationFinished);
         messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
-        messageBroker.Unsubscribe<NetworkPlayerData>(Handle_NetworkPlayerData);
+        messageBroker.Unsubscribe<NetworkHeroRecieved>(Handle_NetworkHeroRecieved);
     }
 
     internal void Handle_CharacterCreationFinished(MessagePayload<CharacterCreationFinished> obj)
@@ -79,17 +79,18 @@ public class CharacterCreationState : ClientStateBase
         // Clear all registries so next time the game is loaded, it re-registers loaded save objects
         registryManager.ClearAllRegistries();
 
-        network.SendAll(new NetworkTransferedHero(playerId, data));
+        network.SendAll(new NetworkTransferNewHero(playerId, data));
     }
 
-    internal void Handle_NetworkPlayerData(MessagePayload<NetworkPlayerData> obj)
+    internal void Handle_NetworkHeroRecieved(MessagePayload<NetworkHeroRecieved> obj)
     {
-        Logic.Player = new Player(obj.What.HeroStringId, obj.What.PartyStringId);
+        var player = obj.What.Player;
+        Logic.Player = player;
 
         var controllerId = controllerIdProvider.ControllerId;
 
-        controlledEntityRegistry.RegisterAsControlled(controllerId, obj.What.HeroStringId);
-        controlledEntityRegistry.RegisterAsControlled(controllerId, obj.What.PartyStringId);
+        controlledEntityRegistry.RegisterAsControlled(controllerId, player.MobilePartyId);
+        controlledEntityRegistry.RegisterAsControlled(controllerId, player.HeroId);
 
         Logic.LoadSavedData();
     }

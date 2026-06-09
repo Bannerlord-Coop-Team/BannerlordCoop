@@ -3,12 +3,15 @@ using HarmonyLib;
 using SandBox;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
+using TaleWorlds.CampaignSystem.Map;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
+using TaleWorlds.ModuleManager;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.ObjectSystem;
-using TaleWorlds.ModuleManager;
 
 namespace E2E.Tests.Environment.Instance;
 public class GameInstance
@@ -39,6 +42,9 @@ public class GameInstance
                 Game = Game.CreateGame(Campaign, GameManager);
                 MBObjectManager = MBObjectManager.Instance;
 
+                Campaign.SiegeEventManager = new SiegeEventManager();
+                Campaign.MapEventManager = new MapEventManager();
+                Campaign.MapMarkerManager = new MapMarkerManager();
 
                 RegisterType<ItemObject>(MBObjectManager);
                 RegisterType<Settlement>(MBObjectManager);
