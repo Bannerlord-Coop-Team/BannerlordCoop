@@ -9,7 +9,8 @@ using System.Linq;
 namespace Coop.Core.Server.Connections;
 
 /// <summary>
-/// Manages client connections while one or more connections is joining the campaign.
+/// Manages client connections while one or more connections is receiving the game state
+/// through a save transfer
 /// </summary>
 public interface IClientRegistry : IDisposable
 {
