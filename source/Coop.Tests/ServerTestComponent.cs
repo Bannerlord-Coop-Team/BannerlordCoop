@@ -17,9 +17,6 @@ internal class ServerTestComponent : TestComponentBase
     {
         var builder = new ContainerBuilder();
         builder.RegisterModule<ServerModule>();
-        builder.RegisterType<ControlledEntityRegistry>().As<IControlledEntityRegistry>().InstancePerLifetimeScope();
-        builder.RegisterInstance(new Mock<IMobilePartyInterface>().Object).As<IMobilePartyInterface>().SingleInstance();
-        builder.RegisterInstance(new Mock<IDynamicSyncPatchCollector>().Object).As<IDynamicSyncPatchCollector>();
         builder.RegisterModule<RegistryModule>();
         Container = BuildContainer(builder);
     }
