@@ -81,7 +81,7 @@ internal class MapEventSidePatches
 
         var isPlayerParty = AccessTools.Method(
             typeof(MobilePartyExtensions),
-            nameof(MobilePartyExtensions.IsPlayer),
+            nameof(MobilePartyExtensions.IsPlayerParty),
             new[] { typeof(MobileParty) });
 
         if (getMainParty is null)

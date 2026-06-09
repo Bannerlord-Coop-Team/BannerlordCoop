@@ -18,18 +18,18 @@ internal class PartyHealHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
-    private readonly IPlayerRegistry playerRegistry;
+    private readonly IPlayerManager playerManager;
 
     public PartyHealHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        IPlayerRegistry playerRegistry)
+        IPlayerManager playerRegistry)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
-        this.playerRegistry = playerRegistry;
+        this.playerManager = playerRegistry;
 
         messageBroker.Subscribe<PartyHealHourlyTick>(Handle_PartyHealHourlyTick);
         messageBroker.Subscribe<PartyHealQuarterDailyTick>(Handle_PartyHealQuarterDailyTick);
@@ -43,7 +43,7 @@ internal class PartyHealHandler : IHandler
 
     private void Handle_PartyHealHourlyTick(MessagePayload<PartyHealHourlyTick> obj)
     {
-        foreach (var player in playerRegistry)
+        foreach (var player in playerManager.Players)
         {
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var mobileParty)) continue;
 
@@ -55,7 +55,7 @@ internal class PartyHealHandler : IHandler
     {
         if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
 
-        if (obj.What.MobileParty?.IsPlayer() != true) return;
+        if (obj.What.MobileParty?.IsPlayerParty() != true) return;
 
         obj.What.PartyHealCampaignBehavior.TryHealOrWoundParty(obj.What.MobileParty.Party, 4f);
     }

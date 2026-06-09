@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.HeroDevelopers.Messages;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Serilog;
@@ -18,13 +19,13 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
         private readonly INetwork network;
-        private readonly IPlayerRegistry playerRegistry;
+        private readonly IPlayerManager playerRegistry;
 
         public PerkActivationHandler(
             IMessageBroker messageBroker,
             IObjectManager objectManager,
             INetwork network,
-            IPlayerRegistry playerRegistry)
+            IPlayerManager playerRegistry)
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
@@ -99,7 +100,7 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
             }
 
             // Substitute for Hero == Hero.MainHero
-            if (playerRegistry.Contains(hero.PartyBelongedTo) && (perk == DefaultPerks.OneHanded.Prestige || perk == DefaultPerks.TwoHanded.Hope || perk == DefaultPerks.Athletics.ImposingStature || perk == DefaultPerks.Bow.MerryMen || perk == DefaultPerks.Tactics.HordeLeader || perk == DefaultPerks.Scouting.MountedScouts || perk == DefaultPerks.Leadership.Authority || perk == DefaultPerks.Leadership.LeaderOfMasses || perk == DefaultPerks.Leadership.UltimateLeader))
+            if (hero.PartyBelongedTo?.IsPlayerParty() == true && (perk == DefaultPerks.OneHanded.Prestige || perk == DefaultPerks.TwoHanded.Hope || perk == DefaultPerks.Athletics.ImposingStature || perk == DefaultPerks.Bow.MerryMen || perk == DefaultPerks.Tactics.HordeLeader || perk == DefaultPerks.Scouting.MountedScouts || perk == DefaultPerks.Leadership.Authority || perk == DefaultPerks.Leadership.LeaderOfMasses || perk == DefaultPerks.Leadership.UltimateLeader))
             {
                 hero.PartyBelongedTo.MemberRoster.UpdateVersion();
             }

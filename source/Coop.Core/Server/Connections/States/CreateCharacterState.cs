@@ -1,17 +1,18 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using Coop.Core.Client.Messages;
 using Coop.Core.Client.Services.Heroes.Messages;
-using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.Heroes.Interfaces;
-using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Serilog;
+using TaleWorlds.CampaignSystem;
 
 namespace Coop.Core.Server.Connections.States;
 
@@ -22,10 +23,10 @@ public class CreateCharacterState : ConnectionStateBase
 {
     private readonly ILogger Logger = LogManager.GetLogger<CreateCharacterState>();
     private readonly IObjectManager objectManager;
-    private IMessageBroker messageBroker;
-    private INetwork network;
+    private readonly IMessageBroker messageBroker;
+    private readonly INetwork network;
     private readonly IHeroInterface heroInterface;
-    private readonly IPlayerRegistry playerRegistry;
+    private readonly IPlayerManager playerRegistry;
 
     public CreateCharacterState(
         IConnectionLogic connectionLogic,
@@ -33,7 +34,7 @@ public class CreateCharacterState : ConnectionStateBase
         IMessageBroker messageBroker,
         INetwork network,
         IHeroInterface heroInterface,
-        IPlayerRegistry playerRegistry)
+        IPlayerManager playerRegistry)
         : base(connectionLogic)
     {
         this.objectManager = objectManager;
@@ -58,27 +59,42 @@ public class CreateCharacterState : ConnectionStateBase
         var controllerId = obj.What.PlayerId;
         var data = obj.What.PlayerHero;
 
-        var hero = heroInterface.UnpackHero(controllerId, data);
+        Logger.Debug("Unpacking hero for {ControllerId}", controllerId);
 
-        if (!objectManager.TryGetIdWithLogging(hero, out var heroId))
+        var hero = heroInterface.ServerUnpackHero(data);
+
+        if (!TryCreatePlayer(controllerId, hero, out var player))
+        {
+            Logger.Error("Failed to create player");
             return;
-        if (!objectManager.TryGetIdWithLogging(hero.PartyBelongedTo, out var partyId))
-            return;
-
-        var player = new Player(heroId, partyId);
-
-        Logger.Debug("New hero created with id: {id}", heroId);
+        }
 
         if (!playerRegistry.AddPlayer(player))
             Logger.Error("Player has been already added.");
 
         // Send created to all other clients
-        network.SendAllBut(netPeer, new NetworkNewPlayerHeroCreated(controllerId, player, data));
+        var message = new NetworkNewPlayerHeroCreated(controllerId, player, data);
+        network.SendAllBut(netPeer, message);
 
         // Respond with ids for the creating client
         network.Send(netPeer, new NetworkHeroRecieved(player));
 
         ConnectionLogic.TransferSave();
+    }
+
+    private bool TryCreatePlayer(string controllerId, Hero hero, out Player player)
+    {
+        player = null;
+
+        if (!objectManager.TryGetIdWithLogging(hero, out var heroId))
+            return false;
+        if (!objectManager.TryGetIdWithLogging(hero.PartyBelongedTo, out var mobilePartyId))
+            return false;
+        if (!objectManager.TryGetIdWithLogging(hero.Clan, out var clanId))
+            return false;
+
+        player = new Player(controllerId, heroId, mobilePartyId, clanId);
+        return true;
     }
 
     public override void CreateCharacter()

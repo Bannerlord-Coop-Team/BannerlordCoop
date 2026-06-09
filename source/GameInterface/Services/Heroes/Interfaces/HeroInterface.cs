@@ -6,20 +6,18 @@ using Common.Util;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Services.Entity;
-using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players.Data;
 using SandBox.View.Map.Managers;
 using Serilog;
+using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
-using TaleWorlds.Engine;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Heroes.Interfaces;
@@ -27,9 +25,9 @@ namespace GameInterface.Services.Heroes.Interfaces;
 public interface IHeroInterface : IGameAbstraction
 {
     byte[] PackageMainHero();
-    bool TryResolve<T>(string controllerId, out string heroId);
     void SwitchToPlayer(Player player);
-    Hero UnpackHero(string controllerId, byte[] bytes);
+    Hero ServerUnpackHero(byte[] bytes);
+    Hero ClientUnpackHero(byte[] bytes, Player player);
 }
 
 internal class HeroInterface : IHeroInterface
@@ -38,18 +36,15 @@ internal class HeroInterface : IHeroInterface
     private readonly IObjectManager objectManager;
     private readonly IMessageBroker messageBroker;
     private readonly IBinaryPackageFactory binaryPackageFactory;
-    private readonly IControlledEntityRegistry entityRegistry;
 
     public HeroInterface(
         IMessageBroker messageBroker,
         IBinaryPackageFactory binaryPackageFactory,
-        IControlledEntityRegistry entityRegistry,
         IObjectManager objectManager)
     {
         this.objectManager = objectManager;
         this.messageBroker = messageBroker;
         this.binaryPackageFactory = binaryPackageFactory;
-        this.entityRegistry = entityRegistry;
         this.objectManager = objectManager;
     }
 
@@ -65,76 +60,37 @@ internal class HeroInterface : IHeroInterface
         return BinaryFormatterSerializer.Serialize(package);
     }
 
-    public Hero UnpackHero(string controllerId, byte[] bytes)
+    public Hero ServerUnpackHero(byte[] bytes)
+    {
+        // Host: unpack and fully set up the hero on the main thread, assigning fresh "Player" network ids.
+        return UnpackHero(bytes, AssignServerHeroNetworkIds);
+    }
+
+    public Hero ClientUnpackHero(byte[] bytes, Player player)
+    {
+        // Client: unpack and set up on the main thread, reusing the ids the host already assigned (carried by
+        // the Player). Unpacking and setup MUST happen in one main-thread pass — splitting them across threads
+        // corrupts the campaign's object/StringId bookkeeping and the next save.
+        return UnpackHero(bytes, hero => AssignClientHeroNetworkIds(hero, player));
+    }
+
+    private Hero UnpackHero(byte[] bytes, Action<Hero> assignNetworkIds)
     {
         Hero hero = null;
 
         GameLoopRunner.RunOnMainThread(() => {
             using (new AllowedThread())
             {
-                hero = UnpackMainHeroInternal(bytes);
+                hero = BinaryFormatterSerializer
+                    .Deserialize<HeroBinaryPackage>(bytes)
+                    .Unpack<Hero>(binaryPackageFactory);
+
+                SetupNewHero(hero, assignNetworkIds);
             }
         },
         blocking: true);
 
-        // Retrieve the Coop-assigned IDs so they can be written back onto each object's
-        // StringId. If null (due to an ID collision fixed in AutoRegistry.RegisterExistingObject),
-        // log and skip — assigning null would corrupt the object in CampaignObjectManager.
-        if (!objectManager.TryGetId(hero, out var heroId))
-            Logger.Error("Failed to retrieve coop ID for hero, StringId will not be updated");
-        if (!objectManager.TryGetId(hero.PartyBelongedTo, out var partyId))
-            Logger.Error("Failed to retrieve coop ID for hero's party (StringId={ExistingId}), StringId will not be updated", hero.PartyBelongedTo?.StringId);
-        if (!objectManager.TryGetId(hero.CharacterObject, out var characterObjectId))
-            Logger.Error("Failed to retrieve coop ID for hero's CharacterObject, StringId will not be updated");
-        if (!objectManager.TryGetId(hero.Clan, out var clanId))
-            Logger.Error("Failed to retrieve coop ID for hero's Clan, StringId will not be updated");
-
-        entityRegistry.RegisterAsControlled(controllerId, heroId);
-        entityRegistry.RegisterAsControlled(controllerId, partyId);
-        entityRegistry.RegisterAsControlled(controllerId, characterObjectId);
-        entityRegistry.RegisterAsControlled(controllerId, clanId);
-
         return hero;
-    }
-
-    private Hero UnpackMainHeroInternal(byte[] bytes)
-    {
-        HeroBinaryPackage package = BinaryFormatterSerializer.Deserialize<HeroBinaryPackage>(bytes);
-        var hero = package.Unpack<Hero>(binaryPackageFactory);
-
-        SetupNewHero(hero);
-
-        return hero;
-    }
-
-    public bool TryResolve<T>(string controllerId, out string controlledObjectId)
-    {
-        controlledObjectId = null;
-
-        if (entityRegistry.TryGetControlledEntities(controllerId, out var entities) == false)
-        {
-            Logger.Warning("Unable to resolve hero for {controllerId}", controllerId);
-            return false;
-        }
-
-        var heroEntities = entities
-            .Where(entity => objectManager.TryGetObject<T>(entity.EntityId, out _))
-            .ToList();
-
-        if (heroEntities.Count == 0)
-        {
-            Logger.Information("No hero was registered for {controllerId}", controllerId);
-            return false;
-        }
-
-        if (heroEntities.Count > 1)
-        {
-            Logger.Warning("Multiple heroes registered for {controllerId}, using first match", controllerId);
-        }
-
-        controlledObjectId = heroEntities.Single().EntityId;
-
-        return true;
     }
 
     public void SwitchToPlayer(Player player)
@@ -165,14 +121,11 @@ internal class HeroInterface : IHeroInterface
         }
     }
 
-    private void SetupNewHero(Hero hero)
+    private void SetupNewHero(Hero hero, Action<Hero> assignNetworkIds)
     {
         var party = hero.PartyBelongedTo;
 
-        using (new AllowedThread())
-        {
-            party.Anchor = new AnchorPoint(party);
-        }
+        party.Anchor = new AnchorPoint(party);
 
         party.Party.OnFinishLoadState();
         party.IsVisible = true;
@@ -194,43 +147,77 @@ internal class HeroInterface : IHeroInterface
         // object is *added* (using the StringId at that instant). If we add first (with the deserialized
         // "main_hero" id) and rename afterwards, that cache never learns about the assigned "PlayerN", so the next
         // hero computes — and collides with — the same id.
-        AssignHeroNetworkIds(hero);
+        assignNetworkIds(hero);
 
         campaignObjectManager.AddHero(hero);
         campaignObjectManager.AddMobileParty(party);
         campaignObjectManager.AddClan(hero.Clan);
     }
 
-    public void AssignHeroNetworkIds(Hero hero)
+    /// <summary>
+    /// Host: assign fresh, campaign-unique "Player" StringIds to the hero graph and register them.
+    /// </summary>
+    private void AssignServerHeroNetworkIds(Hero hero)
     {
         var party = hero.PartyBelongedTo;
 
-        RegisterObject(hero);
-        RegisterObject(party);
-        RegisterObject(hero.Clan);
-        //RegisterObject(hero.CharacterObject); TODO
+        RegisterPrimary(hero, NewServerStringId(hero));
+        RegisterPrimary(party, NewServerStringId(party));
+        RegisterPrimary(hero.Clan, NewServerStringId(hero.Clan));
+        //RegisterPrimary(hero.CharacterObject, NewServerStringId(hero.CharacterObject)); TODO
 
-        RegisterObject(party.StringId, party.ItemRoster);
-        RegisterObject(party.StringId, party.Party);
-        RegisterObject($"{nameof(MobileParty.MemberRoster)}_{party.StringId}", party.MemberRoster);
-        RegisterObject($"{nameof(MobileParty.PrisonRoster)}_{party.StringId}", party.PrisonRoster);
+        RegisterPartyChildren(party);
     }
 
-    private void RegisterObject<T>(T obj) where T : MBObjectBase
+    /// <summary>
+    /// Client: reuse the ids the host already chose (carried by <paramref name="player"/>). The same StringIds
+    /// are stamped onto the received objects so every derived id and the campaign bookkeeping match the host.
+    /// </summary>
+    private void AssignClientHeroNetworkIds(Hero hero, Player player)
     {
-        if (ModInformation.IsServer)
-        {
-            using (new AllowedThread())
-            {
-                obj.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<T>($"Player");
-            }
-        }
+        var party = hero.PartyBelongedTo;
 
+        RegisterPrimary(hero, StripTypePrefix(player.HeroId, hero));
+        RegisterPrimary(party, StripTypePrefix(player.MobilePartyId, party));
+        RegisterPrimary(hero.Clan, StripTypePrefix(player.ClanId, hero.Clan));
+        //characterObject TODO
+
+        RegisterPartyChildren(party);
+    }
+
+    private string NewServerStringId<T>(T obj) where T : MBObjectBase
+        => Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<T>("Player");
+
+    private void RegisterPrimary<T>(T obj, string stringId) where T : MBObjectBase
+    {
+        // Caller runs inside the unpack's AllowedThread/main-thread pass, so the StringId set is permitted.
+        obj.StringId = stringId;
         objectManager.AddExisting($"{typeof(T).Name}_{obj.StringId}", obj);
     }
 
-    private void RegisterObject(string prefix, object obj)
+    private void RegisterPartyChildren(MobileParty party)
     {
-        objectManager.AddExisting($"{obj.GetType().Name}_{prefix}", obj);
+        // PartyBase + rosters have no StringId of their own; key them off the party's so host and client match.
+        RegisterChild(party.ItemRoster, party.StringId);
+        RegisterChild(party.Party, party.StringId);
+        RegisterChild(party.MemberRoster, $"{nameof(MobileParty.MemberRoster)}_{party.StringId}");
+        RegisterChild(party.PrisonRoster, $"{nameof(MobileParty.PrisonRoster)}_{party.StringId}");
+    }
+
+    private void RegisterChild(object obj, string suffix)
+    {
+        objectManager.AddExisting($"{obj.GetType().Name}_{suffix}", obj);
+    }
+
+    /// <summary>
+    /// Recovers the StringId from a registered id (e.g. "MobileParty_Player1" -> "Player1") by stripping the
+    /// leading "{TypeName}_" prefix the registration scheme adds.
+    /// </summary>
+    private static string StripTypePrefix<T>(string registeredId, T obj) where T : MBObjectBase
+    {
+        var prefix = $"{typeof(T).Name}_";
+        return registeredId != null && registeredId.StartsWith(prefix)
+            ? registeredId.Substring(prefix.Length)
+            : registeredId;
     }
 }

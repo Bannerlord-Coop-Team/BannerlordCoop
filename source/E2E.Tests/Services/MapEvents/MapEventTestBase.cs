@@ -210,7 +210,7 @@ public abstract class MapEventTestBase : IDisposable
 
     /// <summary>
     /// Creates a <see cref="Hero"/> and a <see cref="MobileParty"/> that are synced to all instances and
-    /// registers them as a player-controlled party in every instance's <see cref="IPlayerRegistry"/>.
+    /// registers them as a player-controlled party in every instance's <see cref="IPlayerManager"/>.
     /// After this call <c>party.IsPlayerParty()</c> returns true everywhere, which drives the player-specific
     /// branches in the MapEvent patches (join windows, captivity, surrender, etc.).
     /// </summary>
@@ -234,7 +234,7 @@ public abstract class MapEventTestBase : IDisposable
         {
             instance.Call(() =>
             {
-                var registry = instance.Resolve<IPlayerRegistry>();
+                var registry = instance.Resolve<IPlayerManager>();
                 registry.AddPlayer(new Player(heroId, partyId));
 
                 Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));

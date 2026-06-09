@@ -98,7 +98,7 @@ internal class ConversationRequestHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<PartyBase>(request.DefenderId, out var defender)) return;
 
         // Reject: a conversation between two human players is not driven through PlayerEncounter.Init.
-        if (attacker.MobileParty?.IsPlayer() == true && defender.MobileParty?.IsPlayer() == true)
+        if (attacker.MobileParty?.IsPlayerParty() == true && defender.MobileParty?.IsPlayerParty() == true)
         {
             Logger.Debug(
                 "Rejecting conversation request: both parties are players. AttackerId={AttackerId}, DefenderId={DefenderId}",
