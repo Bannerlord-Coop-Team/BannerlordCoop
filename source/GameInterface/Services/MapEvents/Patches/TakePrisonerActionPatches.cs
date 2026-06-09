@@ -35,7 +35,7 @@ internal class TakePrisonerActionPatches
         }
 
         var prisonerParty = prisonerCharacter.PartyBelongedTo;
-        if (prisonerParty?.IsPlayer() != true)
+        if (prisonerParty?.IsPlayerParty() != true)
             return true;
 
         using (new AllowedThread())

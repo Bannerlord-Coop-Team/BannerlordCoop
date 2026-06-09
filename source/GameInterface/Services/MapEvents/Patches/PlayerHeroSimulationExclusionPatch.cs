@@ -44,6 +44,6 @@ internal class PlayerHeroSimulationExclusionPatch
 
         // Each connected player leads their own party; exclude that hero the same way vanilla excludes
         // the main character, while leaving companions to participate as they do in single-player.
-        return party != null && party.LeaderHero == hero && party.IsPlayer();
+        return party != null && party.LeaderHero == hero && party.IsPlayerParty();
     }
 }

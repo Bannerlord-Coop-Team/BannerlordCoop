@@ -79,24 +79,24 @@ internal class PlayerCaptivityHandler : IHandler
     {
         var obj = payload.What;
 
-        var hero = obj.PrisonerHero;
         // The capture already cleared hero.PartyBelongedTo, so read the party from the message.
         var mobileParty = obj.PrisonerParty;
 
-        if (mobileParty?.IsPlayerParty() == false)
+        if (mobileParty?.IsPlayerParty() != true)
             return;
 
-        if (hero.PartyBelongedToAsPrisoner != null)
+        // TakePrisonerAction has already run (see TakePrisonerActionPatches): the hero is in the captor's
+        // prison roster and PartyBelongedTo/PartyBelongedToAsPrisoner are set. All that remains is the
+        // coop-specific teardown vanilla only performs for the host's MainParty - empty and deactivate the
+        // now-leaderless player party so it leaves the map. Without this the captive party stays active at
+        // the captor's position (pinned there by Handle_CampaignTick) and the captor keeps re-encountering
+        // it, spawning a fresh map event against the player every tick. Guard on IsActive so a repeated
+        // capture for the same party is a no-op (and so we don't re-clear an already-freed party).
+        if (!mobileParty.IsActive)
             return;
 
-        hero.PartyBelongedToAsPrisoner = payload.What.CapturerParty;
-        hero.PartyBelongedTo = null;
-
-        mobileParty.MemberRoster.RemoveTroop(hero.CharacterObject);
         mobileParty.MemberRoster.Clear();
         mobileParty.PrisonRoster.Clear();
-        
-        payload.What.CapturerParty.PrisonRoster.AddToCounts(hero.CharacterObject, 1);
 
         mobileParty.IsActive = false;
         mobileParty.ChangePartyLeader(null);
