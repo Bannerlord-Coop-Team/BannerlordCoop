@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.ObjectManager;
+﻿using GameInterface.Services.Entity;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players.Data;
 using System.Collections;
 using System.Collections.Generic;
@@ -31,14 +32,20 @@ public interface IPlayerRegistry: IEnumerable<Player>
 /// <inheritdoc cref="IPlayerRegistry"/>
 internal class PlayerRegistry : IPlayerRegistry
 {
-    public static readonly ConditionalWeakTable<object, Player> PlayerObjects = new();
+    // Key is controlled entity, value is unused so we just initialize it to an object
+    public static readonly ConditionalWeakTable<object, object> PlayerObjects = new();
 
     private readonly IObjectManager objectManager;
+    private readonly IControlledEntityRegistry entityRegistry;
+    private readonly IControllerIdProvider controllerIdProvider;
     private readonly HashSet<Player> _players = new HashSet<Player>();
     private readonly HashSet<string> _playerMobileParties = new HashSet<string>();
 
-    public PlayerRegistry(IObjectManager objectManager) {
+    public PlayerRegistry(IObjectManager objectManager, IControlledEntityRegistry entityRegistry, IControllerIdProvider controllerIdProvider)
+    {
         this.objectManager = objectManager;
+        this.entityRegistry = entityRegistry;
+        this.controllerIdProvider = controllerIdProvider;
     }
 
     /// <inheritdoc cref="IPlayerRegistry.AddPlayer(Player)"/>
@@ -49,18 +56,23 @@ internal class PlayerRegistry : IPlayerRegistry
         if (!_playerMobileParties.Add(player.MobilePartyId)) return false;
 
         // Add player objects for IsPlayer extension (i.e. MobilePartyExtensions)
-        AddPlayerObject<MobileParty>(player.MobilePartyId, player);
-        AddPlayerObject<Hero>(player.HeroId, player);
+        AddPlayerObject<MobileParty>(player.MobilePartyId);
+        AddPlayerObject<Hero>(player.HeroId);
+        AddPlayerObject<Clan>(player.ClanId);
+        AddPlayerObject<CharacterObject>(player.CharacterObjectId);
 
         return true;
     }
 
-    private void AddPlayerObject<T>(string networkId, Player player)
+    private void AddPlayerObject<T>(string networkId)
     {
         if (!objectManager.TryGetObjectWithLogging<T>(networkId, out var obj))
             return;
 
-        PlayerObjects.Add(obj, player);
+        // Sets the value if it does not exist
+        PlayerObjects.GetValue(obj, _ => new object());
+
+        entityRegistry.RegisterAsControlled(controllerIdProvider.ControllerId, networkId);
     }
 
     /// <inheritdoc cref="IPlayerRegistry.Contains(MobileParty)"/>

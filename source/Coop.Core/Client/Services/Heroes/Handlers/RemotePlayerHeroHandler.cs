@@ -3,10 +3,15 @@ using Common.Messaging;
 using Coop.Core.Client.Messages;
 using Coop.Core.Client.Services.Heroes.Data;
 using Coop.Core.Client.Services.Heroes.Messages;
+using GameInterface.Services.Entity;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using Serilog;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
 
 namespace Coop.Core.Client.Services.Heroes.Handlers;
 
@@ -26,19 +31,21 @@ internal class RemotePlayerHeroHandler : IHandler
     private static readonly ILogger Logger = LogManager.GetLogger<RemotePlayerHeroHandler>();
 
     private readonly IMessageBroker messageBroker;
+    private readonly IObjectManager objectManager;
     private readonly IHeroInterface heroInterface;
     private readonly IPlayerRegistry playerRegistry;
     private readonly IDeferredHeroRepository deferredHeroRepo;
-
     private bool campaignReady;
 
     public RemotePlayerHeroHandler(
         IMessageBroker messageBroker,
+        IObjectManager objectManager,
         IHeroInterface heroInterface,
         IPlayerRegistry playerRegistry,
         IDeferredHeroRepository deferredHeroRepo)
     {
         this.messageBroker = messageBroker;
+        this.objectManager = objectManager;
         this.heroInterface = heroInterface;
         this.playerRegistry = playerRegistry;
         this.deferredHeroRepo = deferredHeroRepo;
@@ -90,9 +97,21 @@ internal class RemotePlayerHeroHandler : IHandler
 
     private void CreatePlayerHero(NetworkNewPlayerHeroCreated message)
     {
-        heroInterface.UnpackHero(message.ControllerId, message.HeroData);
+        var player = message.Player;
+
+        var hero = heroInterface.UnpackHero(message.HeroData);
+
+        objectManager.AddExisting(player.HeroId, hero);
+        objectManager.AddExisting(player.MobilePartyId, hero.PartyBelongedTo);
+        objectManager.AddExisting(player.ClanId, hero.Clan);
+        objectManager.AddExisting(player.CharacterObjectId, hero.CharacterObject);
+
+        heroInterface.SetupNewHero(hero);
 
         if (!playerRegistry.AddPlayer(message.Player))
-            Logger.Error("Player {HeroId} has already been added.", message.Player?.HeroId);
+        {
+            Logger.Error("Player {HeroId} has already been added.", message.Player.HeroId);
+            return;
+        }
     }
 }

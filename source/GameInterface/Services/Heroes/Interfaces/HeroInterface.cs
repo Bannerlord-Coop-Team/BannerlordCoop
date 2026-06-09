@@ -6,9 +6,7 @@ using Common.Util;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Services.Entity;
-using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players.Data;
 using SandBox.View.Map.Managers;
@@ -19,7 +17,6 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
-using TaleWorlds.Engine;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Heroes.Interfaces;
@@ -29,7 +26,9 @@ public interface IHeroInterface : IGameAbstraction
     byte[] PackageMainHero();
     bool TryResolve<T>(string controllerId, out string heroId);
     void SwitchToPlayer(Player player);
-    Hero UnpackHero(string controllerId, byte[] bytes);
+    Hero UnpackHero(byte[] bytes);
+    Player CreateAndAssignHeroNetworkIds(Hero hero);
+    void SetupNewHero(Hero hero);
 }
 
 internal class HeroInterface : IHeroInterface
@@ -65,44 +64,19 @@ internal class HeroInterface : IHeroInterface
         return BinaryFormatterSerializer.Serialize(package);
     }
 
-    public Hero UnpackHero(string controllerId, byte[] bytes)
+    public Hero UnpackHero(byte[] bytes)
     {
         Hero hero = null;
 
         GameLoopRunner.RunOnMainThread(() => {
             using (new AllowedThread())
             {
-                hero = UnpackMainHeroInternal(bytes);
+                hero = BinaryFormatterSerializer
+                    .Deserialize<HeroBinaryPackage>(bytes)
+                    .Unpack<Hero>(binaryPackageFactory);
             }
         },
         blocking: true);
-
-        // Retrieve the Coop-assigned IDs so they can be written back onto each object's
-        // StringId. If null (due to an ID collision fixed in AutoRegistry.RegisterExistingObject),
-        // log and skip — assigning null would corrupt the object in CampaignObjectManager.
-        if (!objectManager.TryGetId(hero, out var heroId))
-            Logger.Error("Failed to retrieve coop ID for hero, StringId will not be updated");
-        if (!objectManager.TryGetId(hero.PartyBelongedTo, out var partyId))
-            Logger.Error("Failed to retrieve coop ID for hero's party (StringId={ExistingId}), StringId will not be updated", hero.PartyBelongedTo?.StringId);
-        if (!objectManager.TryGetId(hero.CharacterObject, out var characterObjectId))
-            Logger.Error("Failed to retrieve coop ID for hero's CharacterObject, StringId will not be updated");
-        if (!objectManager.TryGetId(hero.Clan, out var clanId))
-            Logger.Error("Failed to retrieve coop ID for hero's Clan, StringId will not be updated");
-
-        entityRegistry.RegisterAsControlled(controllerId, heroId);
-        entityRegistry.RegisterAsControlled(controllerId, partyId);
-        entityRegistry.RegisterAsControlled(controllerId, characterObjectId);
-        entityRegistry.RegisterAsControlled(controllerId, clanId);
-
-        return hero;
-    }
-
-    private Hero UnpackMainHeroInternal(byte[] bytes)
-    {
-        HeroBinaryPackage package = BinaryFormatterSerializer.Deserialize<HeroBinaryPackage>(bytes);
-        var hero = package.Unpack<Hero>(binaryPackageFactory);
-
-        SetupNewHero(hero);
 
         return hero;
     }
@@ -165,7 +139,7 @@ internal class HeroInterface : IHeroInterface
         }
     }
 
-    private void SetupNewHero(Hero hero)
+    public void SetupNewHero(Hero hero)
     {
         var party = hero.PartyBelongedTo;
 
@@ -189,44 +163,40 @@ internal class HeroInterface : IHeroInterface
             return;
         }
 
-        // Assign the network StringIds BEFORE adding to the CampaignObjectManager. FindNextUniqueStringId derives
-        // the next "PlayerN" from CampaignObjectType.MaxCreatedPostfixIndex, which is cached in OnItemAdded when an
-        // object is *added* (using the StringId at that instant). If we add first (with the deserialized
-        // "main_hero" id) and rename afterwards, that cache never learns about the assigned "PlayerN", so the next
-        // hero computes — and collides with — the same id.
-        AssignHeroNetworkIds(hero);
-
         campaignObjectManager.AddHero(hero);
         campaignObjectManager.AddMobileParty(party);
         campaignObjectManager.AddClan(hero.Clan);
     }
 
-    public void AssignHeroNetworkIds(Hero hero)
+    public Player CreateAndAssignHeroNetworkIds(Hero hero)
     {
         var party = hero.PartyBelongedTo;
 
-        RegisterObject(hero);
-        RegisterObject(party);
-        RegisterObject(hero.Clan);
-        //RegisterObject(hero.CharacterObject); TODO
+        var heroId = RegisterObject(hero);
+        var partyId = RegisterObject(party);
+        var clanId = RegisterObject(hero.Clan);
+        var characterObjectId = RegisterObject(hero.CharacterObject);
 
         RegisterObject(party.StringId, party.ItemRoster);
         RegisterObject(party.StringId, party.Party);
         RegisterObject($"{nameof(MobileParty.MemberRoster)}_{party.StringId}", party.MemberRoster);
         RegisterObject($"{nameof(MobileParty.PrisonRoster)}_{party.StringId}", party.PrisonRoster);
+
+        return new Player(heroId, partyId, clanId, characterObjectId);
     }
 
-    private void RegisterObject<T>(T obj) where T : MBObjectBase
+    private string RegisterObject<T>(T obj) where T : MBObjectBase
     {
-        if (ModInformation.IsServer)
+        using (new AllowedThread())
         {
-            using (new AllowedThread())
-            {
-                obj.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<T>($"Player");
-            }
+            obj.StringId = $"Player_{objectManager.GetUniqueTypeId(obj)}";
         }
 
-        objectManager.AddExisting($"{typeof(T).Name}_{obj.StringId}", obj);
+        var id = $"{typeof(T).Name}_{obj.StringId}";
+
+        objectManager.AddExisting(id, obj);
+
+        return id;
     }
 
     private void RegisterObject(string prefix, object obj)

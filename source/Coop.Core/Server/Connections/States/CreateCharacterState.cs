@@ -58,22 +58,20 @@ public class CreateCharacterState : ConnectionStateBase
         var controllerId = obj.What.PlayerId;
         var data = obj.What.PlayerHero;
 
-        var hero = heroInterface.UnpackHero(controllerId, data);
+        Logger.Debug("Unpacking hero for {ControllerId}", controllerId);
 
-        if (!objectManager.TryGetIdWithLogging(hero, out var heroId))
-            return;
-        if (!objectManager.TryGetIdWithLogging(hero.PartyBelongedTo, out var partyId))
-            return;
+        var hero = heroInterface.UnpackHero(data);
 
-        var player = new Player(heroId, partyId);
+        var player = heroInterface.CreateAndAssignHeroNetworkIds(hero);
 
-        Logger.Debug("New hero created with id: {id}", heroId);
+        heroInterface.SetupNewHero(hero);
 
         if (!playerRegistry.AddPlayer(player))
             Logger.Error("Player has been already added.");
 
         // Send created to all other clients
-        network.SendAllBut(netPeer, new NetworkNewPlayerHeroCreated(controllerId, player, data));
+        var message = new NetworkNewPlayerHeroCreated(controllerId, player, data);
+        network.SendAllBut(netPeer, message);
 
         // Respond with ids for the creating client
         network.Send(netPeer, new NetworkHeroRecieved(player));

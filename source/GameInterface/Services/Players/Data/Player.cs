@@ -2,17 +2,23 @@
 
 namespace GameInterface.Services.Players.Data;
 
-[ProtoContract(SkipConstructor = true)]
-public class Player
+[ProtoContract]
+public readonly struct Player
 {
     [ProtoMember(1)]
-    public string HeroId { get; }
+    public readonly string HeroId;
     [ProtoMember(2)]
-    public string MobilePartyId { get; }
+    public readonly string MobilePartyId;
+    [ProtoMember(3)]
+    public readonly string ClanId;
+    [ProtoMember(4)]
+    public readonly string CharacterObjectId;
 
-    public Player(string heroId, string mobilePartyId)
+    public Player(string heroId, string mobilePartyId, string clanId, string characterObjectId)
     {
         HeroId = heroId;
         MobilePartyId = mobilePartyId;
+        ClanId = clanId;
+        CharacterObjectId = characterObjectId;
     }
 }

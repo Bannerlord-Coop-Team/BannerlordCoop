@@ -45,6 +45,8 @@ internal class EncounterManagerPatches
     [HarmonyPatch(nameof(EncounterManager.HandleEncounterForMobileParty))]
     internal static bool HandleEncounterForMobilePartyPatch(ref MobileParty mobileParty, ref float dt)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
         // Skip this method if party is not controlled
         if (!mobileParty.IsPartyControlled())
             return false;

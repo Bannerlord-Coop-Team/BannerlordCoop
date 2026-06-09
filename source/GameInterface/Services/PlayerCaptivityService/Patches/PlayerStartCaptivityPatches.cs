@@ -71,9 +71,9 @@ internal class PlayerStartCaptivityPatches
 
             // A player party's leader (PartyComponent.Leader) is not reliably set on the server, so resolve the
             // captured hero from the authoritative player registry rather than party.LeaderHero.
-            if (!TryGetRegisteredPlayerHero(defeatedParty, out var playerHero))
+            if (defeatedParty.LeaderHero == null)
             {
-                Logger.Error("Defeated player party {PartyId} has no registered hero, skipping prisoner capture", defeatedParty.StringId);
+                Logger.Error("Defeated player party {PartyId} has no hero, skipping prisoner capture", defeatedParty.StringId);
                 continue;
             }
 
@@ -82,20 +82,7 @@ internal class PlayerStartCaptivityPatches
             {
                 captorParty = captorParty.MobileParty.HomeSettlement.Party;
             }
-            TakePrisonerAction.Apply(captorParty, playerHero);
+            TakePrisonerAction.Apply(captorParty, defeatedParty.LeaderHero);
         }
-    }
-
-    private static bool TryGetRegisteredPlayerHero(MobileParty party, out Hero hero)
-    {
-        hero = null;
-
-        if (!PlayerRegistry.PlayerObjects.TryGetValue(party, out var player))
-            return false;
-
-        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
-            return false;
-
-        return objectManager.TryGetObject(player.HeroId, out hero);
     }
 }
