@@ -18,7 +18,7 @@ internal class PartyHealHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
-    private readonly IPlayerManager playerRegistry;
+    private readonly IPlayerManager playerManager;
 
     public PartyHealHandler(
         IMessageBroker messageBroker,
@@ -29,7 +29,7 @@ internal class PartyHealHandler : IHandler
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
-        this.playerRegistry = playerRegistry;
+        this.playerManager = playerRegistry;
 
         messageBroker.Subscribe<PartyHealHourlyTick>(Handle_PartyHealHourlyTick);
         messageBroker.Subscribe<PartyHealQuarterDailyTick>(Handle_PartyHealQuarterDailyTick);
@@ -43,7 +43,7 @@ internal class PartyHealHandler : IHandler
 
     private void Handle_PartyHealHourlyTick(MessagePayload<PartyHealHourlyTick> obj)
     {
-        foreach (var player in playerRegistry)
+        foreach (var player in playerManager.Players)
         {
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var mobileParty)) continue;
 

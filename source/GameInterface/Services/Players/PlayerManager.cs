@@ -14,8 +14,10 @@ namespace GameInterface.Services.Players;
 /// <summary>
 /// Keeps track & managers all players on the server/client. 
 /// </summary>
-public interface IPlayerManager : IEnumerable<Player>
+public interface IPlayerManager
 {
+    IReadOnlyCollection<Player> Players { get; }
+
     /// <summary>
     /// Adds a player to the registry
     /// </summary>
@@ -33,6 +35,8 @@ public class PlayerManager : IPlayerManager
     private readonly ILogger logger;
     private readonly IObjectManager objectManager;
     private readonly IControllerIdProvider controllerIdProvider;
+
+    public IReadOnlyCollection<Player> Players => _players;
     private readonly HashSet<Player> _players = new HashSet<Player>();
 
     public PlayerManager(ILogger logger, IObjectManager objectManager, IControllerIdProvider controllerIdProvider)
@@ -81,16 +85,6 @@ public class PlayerManager : IPlayerManager
     public static bool TryGetControlledObjectInfo(object obj, out ControlledObjectInfo info)
     {
         return PlayerObjects.TryGetValue(obj, out info);
-    }
-
-    public IEnumerator<Player> GetEnumerator()
-    {
-        return _players.GetEnumerator();
-    }
-
-    IEnumerator IEnumerable.GetEnumerator()
-    {
-        return _players.GetEnumerator();
     }
 }
 

@@ -34,7 +34,7 @@ internal class PlayerCaptivityHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IMessageBroker messageBroker;
-    private readonly IPlayerManager playerRegistry;
+    private readonly IPlayerManager playerManager;
 
     public PlayerCaptivityHandler(
         IObjectManager objectManager,
@@ -45,7 +45,7 @@ internal class PlayerCaptivityHandler : IHandler
         this.objectManager = objectManager;
         this.network = network;
         this.messageBroker = messageBroker;
-        this.playerRegistry = playerRegistry;
+        this.playerManager = playerRegistry;
 
         messageBroker.Subscribe<PrisonerTaken>(Handle_PrisonerTaken);
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
@@ -314,7 +314,7 @@ internal class PlayerCaptivityHandler : IHandler
 
     private IEnumerable<(Hero, MobileParty)> PlayerHeros()
     {
-        foreach (var player in playerRegistry)
+        foreach (var player in playerManager)
         {
             if (objectManager.TryGetObject<Hero>(player.HeroId, out var hero) &&
                 objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var mobileParty))

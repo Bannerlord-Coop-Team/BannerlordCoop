@@ -107,31 +107,31 @@ internal class HeroInterface : IHeroInterface
 
     public void SetupNewHero(Hero hero)
     {
-        var party = hero.PartyBelongedTo;
-
         using (new AllowedThread())
         {
+            var party = hero.PartyBelongedTo;
+
             party.Anchor = new AnchorPoint(party);
+
+            party.Party.OnFinishLoadState();
+            party.IsVisible = true;
+
+            party.CheckPositionsForMapChangeAndUpdateIfNeeded();
+            MobilePartyVisualManager.Current.AddNewPartyVisualForParty(party);
+            CampaignEventDispatcher.Instance.OnPartyVisibilityChanged(party.Party);
+
+            // Add to game managed lists
+            var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
+            if (campaignObjectManager == null)
+            {
+                Logger.Error("{type} was null when trying to register a {managedType}", typeof(CampaignObjectManager), typeof(Hero));
+                return;
+            }
+
+            campaignObjectManager.AddHero(hero);
+            campaignObjectManager.AddMobileParty(party);
+            campaignObjectManager.AddClan(hero.Clan);
         }
-
-        party.Party.OnFinishLoadState();
-        party.IsVisible = true;
-
-        party.CheckPositionsForMapChangeAndUpdateIfNeeded();
-        MobilePartyVisualManager.Current.AddNewPartyVisualForParty(party);
-        CampaignEventDispatcher.Instance.OnPartyVisibilityChanged(party.Party);
-
-        // Add to game managed lists
-        var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
-        if (campaignObjectManager == null)
-        {
-            Logger.Error("{type} was null when trying to register a {managedType}", typeof(CampaignObjectManager), typeof(Hero));
-            return;
-        }
-
-        campaignObjectManager.AddHero(hero);
-        campaignObjectManager.AddMobileParty(party);
-        campaignObjectManager.AddClan(hero.Clan);
     }
 
     public void CreateAndAssignHeroNetworkIds(Hero hero)
