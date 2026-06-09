@@ -34,13 +34,13 @@ internal class PlayerCaptivityHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IMessageBroker messageBroker;
-    private readonly IPlayerRegistry playerRegistry;
+    private readonly IPlayerManager playerRegistry;
 
     public PlayerCaptivityHandler(
         IObjectManager objectManager,
         INetwork network,
         IMessageBroker messageBroker,
-        IPlayerRegistry playerRegistry)
+        IPlayerManager playerRegistry)
     {
         this.objectManager = objectManager;
         this.network = network;
@@ -82,7 +82,7 @@ internal class PlayerCaptivityHandler : IHandler
         var hero = obj.PrisonerHero;
         var mobileParty = hero.PartyBelongedTo;
 
-        if (mobileParty?.IsPlayer() == false)
+        if (mobileParty?.IsPlayerParty() == false)
             return;
 
         if (hero.PartyBelongedToAsPrisoner != null)

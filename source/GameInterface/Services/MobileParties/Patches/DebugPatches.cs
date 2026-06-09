@@ -18,7 +18,7 @@ class DebugPatches
     [HarmonyPostfix]
     static void Postfix_IsLastSpeedCacheInvalid(MobileParty __instance)
     {
-        if (__instance.IsPlayer() || __instance == MobileParty.MainParty)
+        if (__instance.IsPlayerParty() || __instance == MobileParty.MainParty)
         {
             ;
         }

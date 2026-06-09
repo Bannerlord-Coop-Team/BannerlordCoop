@@ -109,7 +109,7 @@ namespace Coop.Tests.Server.Connections.States
         {
             var objectManager = serverComponent.Container.Resolve<IObjectManager>();
             var heroInterfaceMock = serverComponent.Container.Resolve<Mock<IHeroInterface>>();
-            var playerRegistryMock = serverComponent.Container.Resolve<Mock<IPlayerRegistry>>();
+            var playerRegistryMock = serverComponent.Container.Resolve<Mock<IPlayerManager>>();
 
             // Construct stubs without running constructors (no live campaign required) and wire the hero to a party.
             var party = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));

@@ -18,13 +18,13 @@ internal class PartyHealHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
-    private readonly IPlayerRegistry playerRegistry;
+    private readonly IPlayerManager playerRegistry;
 
     public PartyHealHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        IPlayerRegistry playerRegistry)
+        IPlayerManager playerRegistry)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -55,7 +55,7 @@ internal class PartyHealHandler : IHandler
     {
         if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
 
-        if (obj.What.MobileParty?.IsPlayer() != true) return;
+        if (obj.What.MobileParty?.IsPlayerParty() != true) return;
 
         obj.What.PartyHealCampaignBehavior.TryHealOrWoundParty(obj.What.MobileParty.Party, 4f);
     }

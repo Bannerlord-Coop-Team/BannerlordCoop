@@ -34,7 +34,7 @@ internal class BattleHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IMapEventLogger mapEventLogger;
-    private readonly IPlayerRegistry playerRegistry;
+    private readonly IPlayerManager playerRegistry;
     private readonly ITimeControlInterface timeControlInterface;
 
     public BattleHandler(
@@ -42,7 +42,7 @@ internal class BattleHandler : IHandler
         IObjectManager objectManager,
         INetwork network,
         IMapEventLogger mapEventLogger,
-        IPlayerRegistry playerRegistry,
+        IPlayerManager playerRegistry,
         ITimeControlInterface timeControlInterface)
     {
         this.messageBroker = messageBroker;

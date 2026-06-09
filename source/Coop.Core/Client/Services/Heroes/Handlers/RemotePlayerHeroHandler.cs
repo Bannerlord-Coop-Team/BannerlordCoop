@@ -33,7 +33,7 @@ internal class RemotePlayerHeroHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly IHeroInterface heroInterface;
-    private readonly IPlayerRegistry playerRegistry;
+    private readonly IPlayerManager playerRegistry;
     private readonly IDeferredHeroRepository deferredHeroRepo;
     private bool campaignReady;
 
@@ -41,7 +41,7 @@ internal class RemotePlayerHeroHandler : IHandler
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         IHeroInterface heroInterface,
-        IPlayerRegistry playerRegistry,
+        IPlayerManager playerRegistry,
         IDeferredHeroRepository deferredHeroRepo)
     {
         this.messageBroker = messageBroker;
@@ -99,6 +99,12 @@ internal class RemotePlayerHeroHandler : IHandler
     {
         var player = message.Player;
 
+        if (!playerRegistry.AddPlayer(message.Player))
+        {
+            Logger.Error("Player {HeroId} has already been added.", message.Player.HeroId);
+            return;
+        }
+            
         var hero = heroInterface.UnpackHero(message.HeroData);
 
         objectManager.AddExisting(player.HeroId, hero);
@@ -108,10 +114,6 @@ internal class RemotePlayerHeroHandler : IHandler
 
         heroInterface.SetupNewHero(hero);
 
-        if (!playerRegistry.AddPlayer(message.Player))
-        {
-            Logger.Error("Player {HeroId} has already been added.", message.Player.HeroId);
-            return;
-        }
+        
     }
 }

@@ -24,10 +24,9 @@ namespace GameInterface.Services.Heroes.Interfaces;
 public interface IHeroInterface : IGameAbstraction
 {
     byte[] PackageMainHero();
-    bool TryResolve<T>(string controllerId, out string heroId);
     void SwitchToPlayer(Player player);
     Hero UnpackHero(byte[] bytes);
-    Player CreateAndAssignHeroNetworkIds(Hero hero);
+    void CreateAndAssignHeroNetworkIds(Hero hero);
     void SetupNewHero(Hero hero);
 }
 
@@ -37,18 +36,15 @@ internal class HeroInterface : IHeroInterface
     private readonly IObjectManager objectManager;
     private readonly IMessageBroker messageBroker;
     private readonly IBinaryPackageFactory binaryPackageFactory;
-    private readonly IControlledEntityRegistry entityRegistry;
 
     public HeroInterface(
         IMessageBroker messageBroker,
         IBinaryPackageFactory binaryPackageFactory,
-        IControlledEntityRegistry entityRegistry,
         IObjectManager objectManager)
     {
         this.objectManager = objectManager;
         this.messageBroker = messageBroker;
         this.binaryPackageFactory = binaryPackageFactory;
-        this.entityRegistry = entityRegistry;
         this.objectManager = objectManager;
     }
 
@@ -79,36 +75,6 @@ internal class HeroInterface : IHeroInterface
         blocking: true);
 
         return hero;
-    }
-
-    public bool TryResolve<T>(string controllerId, out string controlledObjectId)
-    {
-        controlledObjectId = null;
-
-        if (entityRegistry.TryGetControlledEntities(controllerId, out var entities) == false)
-        {
-            Logger.Warning("Unable to resolve hero for {controllerId}", controllerId);
-            return false;
-        }
-
-        var heroEntities = entities
-            .Where(entity => objectManager.TryGetObject<T>(entity.EntityId, out _))
-            .ToList();
-
-        if (heroEntities.Count == 0)
-        {
-            Logger.Information("No hero was registered for {controllerId}", controllerId);
-            return false;
-        }
-
-        if (heroEntities.Count > 1)
-        {
-            Logger.Warning("Multiple heroes registered for {controllerId}, using first match", controllerId);
-        }
-
-        controlledObjectId = heroEntities.Single().EntityId;
-
-        return true;
     }
 
     public void SwitchToPlayer(Player player)
@@ -168,7 +134,7 @@ internal class HeroInterface : IHeroInterface
         campaignObjectManager.AddClan(hero.Clan);
     }
 
-    public Player CreateAndAssignHeroNetworkIds(Hero hero)
+    public void CreateAndAssignHeroNetworkIds(Hero hero)
     {
         var party = hero.PartyBelongedTo;
 
@@ -181,8 +147,6 @@ internal class HeroInterface : IHeroInterface
         RegisterObject(party.StringId, party.Party);
         RegisterObject($"{nameof(MobileParty.MemberRoster)}_{party.StringId}", party.MemberRoster);
         RegisterObject($"{nameof(MobileParty.PrisonRoster)}_{party.StringId}", party.PrisonRoster);
-
-        return new Player(heroId, partyId, clanId, characterObjectId);
     }
 
     private string RegisterObject<T>(T obj) where T : MBObjectBase

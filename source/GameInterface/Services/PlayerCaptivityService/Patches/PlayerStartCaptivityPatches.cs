@@ -44,7 +44,7 @@ internal class PlayerStartCaptivityPatches
         if (__state == value) return;
 
         // Skip if not main hero
-        if (!__instance.IsHeroControlled()) return;
+        if (!__instance.IsControlledByThisInstance()) return;
 
         var message = new PlayerCaptivityChanged(value);
         MessageBroker.Instance.Publish(null, message);
@@ -66,7 +66,7 @@ internal class PlayerStartCaptivityPatches
             var defeatedParty = party.Party?.MobileParty;
 
             // Skip AI parties
-            if (defeatedParty?.IsPlayer() != true)
+            if (defeatedParty?.IsPlayerParty() != true)
                 continue;
 
             // A player party's leader (PartyComponent.Leader) is not reliably set on the server, so resolve the

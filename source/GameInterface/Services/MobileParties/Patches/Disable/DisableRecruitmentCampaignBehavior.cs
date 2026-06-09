@@ -17,5 +17,5 @@ internal class DisableRecruitmentCampaignBehavior
     [HarmonyPatch(nameof(RecruitmentCampaignBehavior.CheckRecruiting))]
     [HarmonyPrefix]
     /// Only allow recruiting for AI parties
-    static bool PrefixCheckRecruiting(MobileParty mobileParty) => !mobileParty.IsPlayer();
+    static bool PrefixCheckRecruiting(MobileParty mobileParty) => !mobileParty.IsPlayerParty();
 }

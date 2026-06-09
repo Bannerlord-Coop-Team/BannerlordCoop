@@ -32,7 +32,7 @@ internal class EncounterManagerPatches
     {
         if (ModInformation.IsServer) return true;
 
-        if (!attackerParty.IsPartyControlled())
+        if (!attackerParty.IsControlledByThisInstance())
             return false;
 
         var message = new StartSettlementEncounterAttempted(attackerParty, settlement);
@@ -48,7 +48,7 @@ internal class EncounterManagerPatches
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         // Skip this method if party is not controlled
-        if (!mobileParty.IsPartyControlled())
+        if (!mobileParty.IsControlledByThisInstance())
             return false;
 
         return true;
