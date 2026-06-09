@@ -23,12 +23,10 @@ internal class MobilePartyRegistry : AutoRegistryBase<MobileParty>
 {
     public override bool Debug => true;
 
-    private readonly IControlledEntityRegistry controlledEntityRegistry;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IMessageBroker messageBroker;
 
     public MobilePartyRegistry(
-        IControlledEntityRegistry controlledEntityRegistry,
         IControllerIdProvider controllerIdProvider,
         IMessageBroker messageBroker,
         ILogger logger,
@@ -36,7 +34,6 @@ internal class MobilePartyRegistry : AutoRegistryBase<MobileParty>
         IObjectManager objectManager)
         : base(logger, autoRegistryFactory, objectManager)
     {
-        this.controlledEntityRegistry = controlledEntityRegistry;
         this.controllerIdProvider = controllerIdProvider;
         this.messageBroker = messageBroker;
     }
@@ -103,7 +100,6 @@ internal class MobilePartyRegistry : AutoRegistryBase<MobileParty>
 
     public override void OnServerCreated(MobileParty obj, string id)
     {
-        controlledEntityRegistry.RegisterAsControlled(controllerIdProvider.ControllerId, id);
     }
 
     public override void OnServerDestroyed(MobileParty obj, string id)

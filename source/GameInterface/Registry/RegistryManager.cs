@@ -44,7 +44,6 @@ internal class RegistryManager : IRegistryManager
     public void RegisterAllGameObjects()
     {
         autoRegistryFactory.RegisterAll();
-        ControlledEntityRegistry.InvalidateControlledEntities();
 
         messageBroker.Publish(this, new AllGameObjectsRegistered());
     }
@@ -53,6 +52,5 @@ internal class RegistryManager : IRegistryManager
     {
         registryCollection.ClearRegistries();
         objectManager.Clear();
-        ControlledEntityRegistry.InvalidateControlledEntities();
     }
 }

@@ -79,7 +79,7 @@ internal abstract class TestComponentBase
         RegisterMock<IHeroInterface>(builder);
         RegisterMock<IModuleInfoProvider>(builder);
         RegisterMock<IRegistryManager>(builder);
-        RegisterMock<IPlayerRegistry>(builder);
+        RegisterMock<IPlayerManager>(builder);
         RegisterMock<ITimeControlInterface>(builder);
         RegisterMock<IMapTimeTrackerInterface>(builder);
         RegisterMock<ILoadingInterface>(builder);

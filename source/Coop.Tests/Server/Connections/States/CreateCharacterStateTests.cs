@@ -101,7 +101,7 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         /// <summary>
-        /// Configures the mocked <see cref="IHeroInterface.UnpackHero"/> to return a hero whose hero/party are
+        /// Configures the mocked <see cref="IHeroInterface.ServerUnpackHero"/> to return a hero whose hero/party are
         /// registered in the (real) object manager, so <see cref="CreateCharacterState.Handle_NetworkTransferNewHero"/>
         /// can resolve their ids instead of early-returning.
         /// </summary>
@@ -109,7 +109,7 @@ namespace Coop.Tests.Server.Connections.States
         {
             var objectManager = serverComponent.Container.Resolve<IObjectManager>();
             var heroInterfaceMock = serverComponent.Container.Resolve<Mock<IHeroInterface>>();
-            var playerRegistryMock = serverComponent.Container.Resolve<Mock<IPlayerRegistry>>();
+            var playerRegistryMock = serverComponent.Container.Resolve<Mock<IPlayerManager>>();
 
             // Construct stubs without running constructors (no live campaign required) and wire the hero to a party.
             var party = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
@@ -120,7 +120,7 @@ namespace Coop.Tests.Server.Connections.States
             Assert.True(objectManager.AddExisting("MobileParty_test", party));
 
             heroInterfaceMock
-                .Setup(h => h.UnpackHero(It.IsAny<string>(), It.IsAny<byte[]>()))
+                .Setup(h => h.ServerUnpackHero(It.IsAny<byte[]>()))
                 .Returns(hero);
             playerRegistryMock
                 .Setup(p => p.AddPlayer(It.IsAny<Player>()))

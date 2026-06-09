@@ -55,7 +55,7 @@ public static class PartyBehaviorPatch
 
         if (BehaviorIsSame(ref __instance, ref newAiBehavior, ref interactablePoint, ref bestTargetPoint)) return false;
 
-        if (__instance._mobileParty.IsPartyControlled() == false) return false;
+        if (__instance._mobileParty.IsControlledByThisInstance() == false) return false;
 
         var message = new PartyBehaviorChangeAttempted(__instance, newAiBehavior, interactablePoint, bestTargetPoint);
         MessageBroker.Instance.Publish(__instance, message);
