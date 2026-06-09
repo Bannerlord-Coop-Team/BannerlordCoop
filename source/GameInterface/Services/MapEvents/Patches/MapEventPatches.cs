@@ -32,7 +32,7 @@ internal class MapEventPatches
     private static void Prefix_AddInvolvedPartyInternal(MapEvent __instance, MapEventParty mapEventParty)
     {
         // Parties not controlled by the server are player parties
-        if (mapEventParty.Party.MobileParty?.IsPlayer() == true)
+        if (mapEventParty.Party.MobileParty?.IsPlayerParty() == true)
         {
             var partiesAdded = new List<MapEventParty>();
 
@@ -98,7 +98,7 @@ internal class MapEventPatches
     [HarmonyPrefix]
     private static bool Prefix_OnBattleWon(MapEvent __instance)
     {
-        var containsPlayer = __instance._sides.Any(side => side.Parties.Any(party => party.Party.MobileParty.IsPlayer()));
+        var containsPlayer = __instance._sides.Any(side => side.Parties.Any(party => party.Party.MobileParty.IsPlayerParty()));
 
         // Skip on client
         if (ModInformation.IsClient)
@@ -128,7 +128,7 @@ internal class MapEventPatches
 
         // Don't update if a player is involved
         // Prevents server from instantly finishing the battle and waits for client finish request
-        if (__instance.InvolvedParties.Any(x => !x.MobileParty.IsPartyControlled()))
+        if (__instance.InvolvedParties.Any(x => !x.MobileParty.IsControlledByThisInstance()))
             return false;
 
         return true;
@@ -176,7 +176,7 @@ internal class InteractionPatches
         if (ModInformation.IsClient)
             return;
 
-        if (__instance.MobileParty?.IsPlayer() == true && mobileParty?.IsPlayer() == true)
+        if (__instance.MobileParty?.IsPlayerParty() == true && mobileParty?.IsPlayerParty() == true)
         {  
             __result = false;
             return;
@@ -199,7 +199,7 @@ internal class InteractionPatches
             return;
 
         // Always allow players to join
-        if (party.MobileParty?.IsPlayer() == true)
+        if (party.MobileParty?.IsPlayerParty() == true)
             return;
 
         // Allow AI to join if no players are involved
@@ -220,8 +220,8 @@ internal class InteractionPatches
         if (ModInformation.IsClient)
             return;
         
-        var attackerIsPlayer = attackerParty.MobileParty?.IsPlayer() == true;
-        var defenderIsPlayer = defenderParty.MobileParty?.IsPlayer() == true;
+        var attackerIsPlayer = attackerParty.MobileParty?.IsPlayerParty() == true;
+        var defenderIsPlayer = defenderParty.MobileParty?.IsPlayerParty() == true;
 
         // Only create a join window for battles that started with a player party.
         if (!attackerIsPlayer && !defenderIsPlayer)
