@@ -44,7 +44,7 @@ class MobilePartyAiLifetimePatches
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
-        if (__instance.IsPlayer())
+        if (__instance.IsPlayerParty())
         {
             ;
         }

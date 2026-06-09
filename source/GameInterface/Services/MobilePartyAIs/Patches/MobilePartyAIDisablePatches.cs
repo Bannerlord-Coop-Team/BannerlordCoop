@@ -16,6 +16,6 @@ internal class MobilePartyAIDisablePatches
         // Run original if we called it
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        return ModInformation.IsServer || __instance._mobileParty.IsPartyControlled();
+        return ModInformation.IsServer || __instance._mobileParty.IsControlledByThisInstance();
     }
 }

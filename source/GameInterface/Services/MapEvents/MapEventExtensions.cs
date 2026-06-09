@@ -16,7 +16,7 @@ public static class MapEventExtensions
 
             foreach (var eventParty in side.Parties)
             {
-                if (eventParty?.Party?.MobileParty?.IsPlayer() == true)
+                if (eventParty?.Party?.MobileParty?.IsPlayerParty() == true)
                 {
                     return true;
                 }

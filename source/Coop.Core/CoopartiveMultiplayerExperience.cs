@@ -124,6 +124,11 @@ namespace Coop.Core
             // debug export files. This prevents DebugAutoConnect races on that directory.
             DynamicSyncConfiguration.ExportFiles = false;
 
+#if DEBUG
+            // For debugging faster, normally this is done after connection
+            container.Resolve<IGameInterface>().PatchAll();
+#endif
+
             var logic = container.Resolve<ILogic>();
             logic.Start();
         }

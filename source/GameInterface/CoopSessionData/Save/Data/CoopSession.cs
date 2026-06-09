@@ -1,11 +1,6 @@
-﻿using Autofac.Features.OwnedInstances;
-using Common;
-using GameInterface.Services.Entity.Data;
+﻿using GameInterface.Services.Players.Data;
 using GameInterface.Services.Smithing;
-using GameInterface.Services.Players.Data;
 using ProtoBuf;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace GameInterface.CoopSessionData.Save.Data;
 
@@ -16,7 +11,6 @@ namespace GameInterface.CoopSessionData.Save.Data;
 public interface ICoopSession
 {
     string UniqueGameId { get; }
-    Dictionary<string, HashSet<ControlledEntity>> ControlledEntityMap { get; }
     Player[] Players { get; }
     CraftingPlayerData CraftingPlayerData { get; }
 }
@@ -28,41 +22,14 @@ public class CoopSession : ICoopSession
     [ProtoMember(1)]
     public string UniqueGameId { get; }
     [ProtoMember(2)]
-    public Dictionary<string, HashSet<ControlledEntity>> ControlledEntityMap { get; }
-    [ProtoMember(3)]
     public Player[] Players { get; }
-    [ProtoMember(4)]
+    [ProtoMember(3)]
     public CraftingPlayerData CraftingPlayerData { get; }
 
-    public CoopSession(string uniqueGameId, Dictionary<string, HashSet<ControlledEntity>>  controlledEntityMap, Player[] players, CraftingPlayerData craftingPlayerData)
+    public CoopSession(string uniqueGameId, Player[] players, CraftingPlayerData craftingPlayerData)
     {
         UniqueGameId = uniqueGameId;
-        ControlledEntityMap = controlledEntityMap;
         Players = players;
         CraftingPlayerData = craftingPlayerData;
-    }
-
-    public override bool Equals(object obj)
-    {
-        if (obj is CoopSession session == false) return false;
-
-        if (UniqueGameId != session.UniqueGameId) return false;
-
-        if (ControlledEntityMap.Count != session.ControlledEntityMap.Count) return false;
-
-        if (ControlledEntityMap.Zip(session.ControlledEntityMap, (l, r) =>
-        {
-            return l.Key == r.Key && l.Value.SetEquals(r.Value);
-        }).All(x => x) == false) return false;
-
-        return true;
-    }
-
-    public override int GetHashCode()
-    {
-        int hash = 1236898;
-        hash = (hash * 31) + UniqueGameId.GetHashCode();
-        hash = (hash * 31) + ControlledEntityMap.GetHashCode();
-        return hash;
     }
 }

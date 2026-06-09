@@ -22,11 +22,11 @@ public class SessionCraftingPlayerDataInterface : ISessionCraftingPlayerDataInte
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SessionCraftingPlayerDataInterface>();
     private ICoopSessionProvider coopSessionProvider;
-    private readonly IPlayerRegistry playerRegistry;
+    private readonly IPlayerManager playerRegistry;
     private readonly IObjectManager objectManager;
     private CraftingPlayerData CraftingPlayerData => coopSessionProvider.CoopSession.CraftingPlayerData;
 
-    public SessionCraftingPlayerDataInterface(ICoopSessionProvider coopSessionProvider, IPlayerRegistry playerRegistry, IObjectManager objectManager)
+    public SessionCraftingPlayerDataInterface(ICoopSessionProvider coopSessionProvider, IPlayerManager playerRegistry, IObjectManager objectManager)
     {
         this.coopSessionProvider = coopSessionProvider;
         this.playerRegistry = playerRegistry;

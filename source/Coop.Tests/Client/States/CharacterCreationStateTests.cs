@@ -46,7 +46,7 @@ namespace Coop.Tests.Client.States
             // Arrange
             var characterCreationState = clientLogic.SetState<CharacterCreationState>();
 
-            var player = new Player("MyHeroId", "MyPartyId");
+            var player = new Player("MyControllerId", "MyHeroId", "MyPartyId", "MyClanId");
 
             var payload = new MessagePayload<NetworkHeroRecieved>(
                 this, new NetworkHeroRecieved(player));

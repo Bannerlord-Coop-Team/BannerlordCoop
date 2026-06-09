@@ -1,4 +1,5 @@
 using E2E.Tests.Environment.Instance;
+using GameInterface.Services.MobileParties.Extensions;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -173,7 +174,7 @@ public class MapEventEnvironmentTests : MapEventTestBase
         {
             Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Assert.True(
-                GameInterface.Services.MobileParties.Extensions.MobilePartyExtensions.IsPlayer(party),
+                MobilePartyExtensions.IsPlayerParty(party),
                 $"Party {partyId} was expected to be a player party on {instance.GetType().Name}");
         });
     }

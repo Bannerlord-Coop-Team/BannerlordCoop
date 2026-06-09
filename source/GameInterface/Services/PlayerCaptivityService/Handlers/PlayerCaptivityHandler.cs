@@ -34,18 +34,18 @@ internal class PlayerCaptivityHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IMessageBroker messageBroker;
-    private readonly IPlayerRegistry playerRegistry;
+    private readonly IPlayerManager playerManager;
 
     public PlayerCaptivityHandler(
         IObjectManager objectManager,
         INetwork network,
         IMessageBroker messageBroker,
-        IPlayerRegistry playerRegistry)
+        IPlayerManager playerRegistry)
     {
         this.objectManager = objectManager;
         this.network = network;
         this.messageBroker = messageBroker;
-        this.playerRegistry = playerRegistry;
+        this.playerManager = playerRegistry;
 
         messageBroker.Subscribe<PrisonerTaken>(Handle_PrisonerTaken);
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
@@ -83,7 +83,10 @@ internal class PlayerCaptivityHandler : IHandler
         // The capture already cleared hero.PartyBelongedTo, so read the party from the message.
         var mobileParty = obj.PrisonerParty;
 
-        if (mobileParty == null || !mobileParty.IsPlayer())
+        if (mobileParty?.IsPlayerParty() == false)
+            return;
+
+        if (hero.PartyBelongedToAsPrisoner != null)
             return;
 
         hero.PartyBelongedToAsPrisoner = payload.What.CapturerParty;
@@ -324,7 +327,7 @@ internal class PlayerCaptivityHandler : IHandler
 
     private IEnumerable<(Hero, MobileParty)> PlayerHeros()
     {
-        foreach (var player in playerRegistry)
+        foreach (var player in playerManager.Players)
         {
             if (objectManager.TryGetObject<Hero>(player.HeroId, out var hero) &&
                 objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var mobileParty))
