@@ -111,13 +111,17 @@ namespace Coop.Tests.Server.Connections.States
             var heroInterfaceMock = serverComponent.Container.Resolve<Mock<IHeroInterface>>();
             var playerRegistryMock = serverComponent.Container.Resolve<Mock<IPlayerManager>>();
 
-            // Construct stubs without running constructors (no live campaign required) and wire the hero to a party.
+            // Construct stubs without running constructors (no live campaign required) and wire the hero to a party
+            // and clan. CreateCharacterState.TryCreatePlayer resolves ids for the hero, its party, and its clan.
             var party = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
             var hero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
+            var clan = (Clan)FormatterServices.GetUninitializedObject(typeof(Clan));
             hero._partyBelongedTo = party;
+            hero._clan = clan;
 
             Assert.True(objectManager.AddExisting("Hero_test", hero));
             Assert.True(objectManager.AddExisting("MobileParty_test", party));
+            Assert.True(objectManager.AddExisting("Clan_test", clan));
 
             heroInterfaceMock
                 .Setup(h => h.ServerUnpackHero(It.IsAny<byte[]>()))
