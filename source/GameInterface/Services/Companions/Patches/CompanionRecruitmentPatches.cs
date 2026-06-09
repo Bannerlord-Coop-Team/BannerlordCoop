@@ -1,6 +1,5 @@
 ﻿using Common.Logging;
 using Common.Messaging;
-using GameInterface.Services.Companions.Handlers;
 using GameInterface.Services.Companions.Messages;
 using HarmonyLib;
 using Serilog;
