@@ -30,14 +30,8 @@ namespace GameInterface.Services.UI.Patches
         // directly under "Load" (between "Load" and "Save And Exit").
         private const int ResyncButtonIndex = 6;
 
-        /// <summary>
-        /// Set when the resync button has just been inserted — which happens only here, on
-        /// the campaign-map escape menu. <see cref="EscapeMenuPanelHeightPatch"/> consumes
-        /// this on the immediately-following "EscapeMenu" movie load so the panel resize is
-        /// applied only to the map menu. The same "EscapeMenu" movie/prefab is reused by
-        /// character creation and the education screen, which must keep their stock layout.
-        /// Read and written only on the UI thread during a single escape-menu open.
-        /// </summary>
+        // Set by the button patch (which only runs for the map menu); consumed by the resize
+        // patch below.
         internal static bool ResyncButtonInserted;
 
         [HarmonyPostfix]
@@ -88,23 +82,16 @@ namespace GameInterface.Services.UI.Patches
             if (!ModInformation.IsClient) return;
             if (__result == null || __result.MovieName != EscapeMenuMovieName) return;
 
-            // Only the campaign-map escape menu carries the resync button, so only it should
-            // be resized. The same "EscapeMenu" movie is also loaded by character creation and
-            // the education screen; consume the one-shot flag the button patch set on the
-            // immediately-preceding MapScreen.GetEscapeMenuItems so those keep their stock layout.
+            // Character creation and the education screen use this same movie, so only resize
+            // the map menu (the one the button was just added to).
             if (!EscapeMenuResyncButtonPatch.ResyncButtonInserted) return;
             EscapeMenuResyncButtonPatch.ResyncButtonInserted = false;
 
-            Widget panel = __result.RootWidget?.FindChild(EscapeMenuPanelId, includeAllChildren: true);
-            if (panel == null) return;
-
+            Widget panel = __result.RootWidget.FindChild(EscapeMenuPanelId, includeAllChildren: true);
             panel.HeightSizePolicy = SizePolicy.CoverChildren;
 
             Widget buttons = panel.FindChild(ButtonsContainerId, includeAllChildren: true);
-            if (buttons != null)
-            {
-                buttons.MarginBottom = ButtonsContainerBottomMargin;
-            }
+            buttons.MarginBottom = ButtonsContainerBottomMargin;
         }
     }
 }
