@@ -83,7 +83,7 @@ internal class PlayerCaptivityHandler : IHandler
         // The capture already cleared hero.PartyBelongedTo, so read the party from the message.
         var mobileParty = obj.PrisonerParty;
 
-        if (mobileParty == null || !mobileParty.IsPlayerParty())
+        if (mobileParty == null || !mobileParty.IsPlayer())
             return;
 
         hero.PartyBelongedToAsPrisoner = payload.What.CapturerParty;

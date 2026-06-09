@@ -41,7 +41,7 @@ internal class PlayerDefeatCapturePatch
             return;
 
         var playerParties = defeatedParties
-            .Where(p => p.Party.MobileParty?.IsPlayerParty() == true)
+            .Where(p => p.Party.MobileParty?.IsPlayer() == true)
             .ToList();
 
         if (playerParties.Count == 0)
@@ -69,7 +69,7 @@ internal class PlayerDefeatCapturePatch
 
         // Keep player parties out of vanilla's RemovePartyLeader / fugitive / destroy path.
         defeatedParties = new MBList<MapEventParty>(
-            defeatedParties.Where(p => p.Party.MobileParty?.IsPlayerParty() != true));
+            defeatedParties.Where(p => p.Party.MobileParty?.IsPlayer() != true));
     }
 
     /// <summary>Mirror of the winner selection vanilla uses when imprisoning the main hero.</summary>
