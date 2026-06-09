@@ -7,6 +7,7 @@ namespace GameInterface.Services.Heroes.Patches;
 internal class HeroMetPatches
 {
     // Replace this later with a dictionary to properly manage each player knowing of every hero
+    // HeroKnownInformationCampaignBehavior is what mostly manages this property
     [HarmonyPatch(nameof(Hero.IsKnownToPlayer), MethodType.Getter)]
     [HarmonyPrefix]
     public static bool IsKnownToPlayerGetterPrefix(ref bool __result)

@@ -3,7 +3,7 @@ using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
 
-namespace GameInterface.Services.Companions.Patches
+namespace GameInterface.Services.Companions.Patches.Disable
 {
     [HarmonyPatch(typeof(CompanionsCampaignBehavior))]
     internal class DisableCompanionsCampaignBehavior

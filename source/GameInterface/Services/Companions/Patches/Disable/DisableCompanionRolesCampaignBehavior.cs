@@ -1,14 +1,13 @@
 ﻿using HarmonyLib;
-using SandBox.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
-namespace GameInterface.Services.Cheats.Patches
+namespace GameInterface.Services.Companions.Patches.Disable
 {
     [HarmonyPatch(typeof(CompanionRolesCampaignBehavior))]
     
     internal class DisableCompanionRolesCampaignBehavior
     {
         [HarmonyPatch(nameof(CompanionRolesCampaignBehavior.RegisterEvents))]
-        static bool Prefix() => false;
+        static bool Prefix() => true;
     }
 }
