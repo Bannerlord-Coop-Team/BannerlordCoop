@@ -2,7 +2,7 @@
 
 namespace GameInterface.Services.Players.Data;
 
-[ProtoContract]
+[ProtoContract(SkipConstructor = true)]
 public class Player
 {
     [ProtoMember(1)]
@@ -13,15 +13,12 @@ public class Player
     public readonly string MobilePartyId;
     [ProtoMember(4)]
     public readonly string ClanId;
-    [ProtoMember(5)]
-    public readonly string CharacterObjectId;
 
-    public Player(string controllerId, string heroId, string mobilePartyId, string clanId, string characterObjectId)
+    public Player(string controllerId, string heroId, string mobilePartyId, string clanId)
     {
         ControllerId = controllerId;
         HeroId = heroId;
         MobilePartyId = mobilePartyId;
         ClanId = clanId;
-        CharacterObjectId = characterObjectId;
     }
 }

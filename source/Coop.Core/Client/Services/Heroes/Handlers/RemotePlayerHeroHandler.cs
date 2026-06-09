@@ -6,7 +6,6 @@ using Coop.Core.Client.Services.Heroes.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Interfaces;
-using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using Serilog;
@@ -31,7 +30,6 @@ internal class RemotePlayerHeroHandler : IHandler
     private static readonly ILogger Logger = LogManager.GetLogger<RemotePlayerHeroHandler>();
 
     private readonly IMessageBroker messageBroker;
-    private readonly IObjectManager objectManager;
     private readonly IHeroInterface heroInterface;
     private readonly IPlayerManager playerRegistry;
     private readonly IDeferredHeroRepository deferredHeroRepo;
@@ -39,13 +37,11 @@ internal class RemotePlayerHeroHandler : IHandler
 
     public RemotePlayerHeroHandler(
         IMessageBroker messageBroker,
-        IObjectManager objectManager,
         IHeroInterface heroInterface,
         IPlayerManager playerRegistry,
         IDeferredHeroRepository deferredHeroRepo)
     {
         this.messageBroker = messageBroker;
-        this.objectManager = objectManager;
         this.heroInterface = heroInterface;
         this.playerRegistry = playerRegistry;
         this.deferredHeroRepo = deferredHeroRepo;
@@ -105,15 +101,7 @@ internal class RemotePlayerHeroHandler : IHandler
             return;
         }
             
-        var hero = heroInterface.UnpackHero(message.HeroData);
-
-        objectManager.AddExisting(player.HeroId, hero);
-        objectManager.AddExisting(player.MobilePartyId, hero.PartyBelongedTo);
-        objectManager.AddExisting(player.ClanId, hero.Clan);
-        objectManager.AddExisting(player.CharacterObjectId, hero.CharacterObject);
-
-        heroInterface.SetupNewHero(hero);
-
-        
+        // Unpack + set up in one main-thread pass, registering the host's ids carried by the Player.
+        heroInterface.ClientUnpackHero(message.HeroData, player);
     }
 }

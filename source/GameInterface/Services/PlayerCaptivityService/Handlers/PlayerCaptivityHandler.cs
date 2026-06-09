@@ -314,7 +314,7 @@ internal class PlayerCaptivityHandler : IHandler
 
     private IEnumerable<(Hero, MobileParty)> PlayerHeros()
     {
-        foreach (var player in playerManager)
+        foreach (var player in playerManager.Players)
         {
             if (objectManager.TryGetObject<Hero>(player.HeroId, out var hero) &&
                 objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var mobileParty))

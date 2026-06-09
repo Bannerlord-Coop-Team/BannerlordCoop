@@ -239,7 +239,7 @@ internal class BattleHandler : IHandler
 
     private bool AllPlayersInMapEvents()
     {
-        return playerRegistry.All(player =>
+        return playerRegistry.Players.All(player =>
         {
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var playerParty))
                 return false;

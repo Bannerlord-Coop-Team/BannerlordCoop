@@ -53,7 +53,7 @@ internal class SaveGameHandler : IHandler
         CraftingPlayerData craftingPlayerData = coopSessionProvider.CoopSession.CraftingPlayerData;
         craftingPlayerData ??= new(new(), new(), new());
 
-        CoopSession session = new CoopSession(saveName, playerRegistry.ToArray(), craftingPlayerData);
+        CoopSession session = new CoopSession(saveName, playerRegistry.Players.ToArray(), craftingPlayerData);
         coopSessionProvider.CoopSession = session;
 
         saveManager.SaveCoopSession(saveName, session);

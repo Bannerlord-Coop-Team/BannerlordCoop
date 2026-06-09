@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
@@ -60,11 +61,7 @@ public class CreateCharacterState : ConnectionStateBase
 
         Logger.Debug("Unpacking hero for {ControllerId}", controllerId);
 
-        var hero = heroInterface.UnpackHero(data);
-
-        heroInterface.CreateAndAssignHeroNetworkIds(hero);
-
-        heroInterface.SetupNewHero(hero);
+        var hero = heroInterface.ServerUnpackHero(data);
 
         if (!TryCreatePlayer(controllerId, hero, out var player))
         {
@@ -95,10 +92,8 @@ public class CreateCharacterState : ConnectionStateBase
             return false;
         if (!objectManager.TryGetIdWithLogging(hero.Clan, out var clanId))
             return false;
-        if (!objectManager.TryGetIdWithLogging(hero.CharacterObject, out var characterObjectId))
-            return false;
 
-        player = new Player(controllerId, heroId, mobilePartyId, clanId, characterObjectId);
+        player = new Player(controllerId, heroId, mobilePartyId, clanId);
         return true;
     }
 

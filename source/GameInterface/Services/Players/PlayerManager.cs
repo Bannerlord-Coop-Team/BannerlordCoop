@@ -55,7 +55,6 @@ public class PlayerManager : IPlayerManager
         AddPlayerObject<MobileParty>(player.ControllerId, player.MobilePartyId);
         AddPlayerObject<Hero>(player.ControllerId, player.HeroId);
         AddPlayerObject<Clan>(player.ControllerId, player.ClanId);
-        AddPlayerObject<CharacterObject>(player.ControllerId, player.CharacterObjectId);
 
         return true;
     }
