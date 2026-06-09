@@ -56,9 +56,10 @@ internal class PlayerCaptivityHandler : IHandler
         var obj = payload.What;
 
         var hero = obj.PrisonerHero;
-        var mobileParty = hero.PartyBelongedTo;
+        // The capture already cleared hero.PartyBelongedTo, so read the party from the message.
+        var mobileParty = obj.PrisonerParty;
 
-        if (mobileParty?.IsPlayerParty() == false)
+        if (mobileParty == null || !mobileParty.IsPlayerParty())
             return;
 
         hero.PartyBelongedToAsPrisoner = payload.What.CapturerParty;
@@ -201,6 +202,11 @@ internal class PlayerCaptivityHandler : IHandler
         // (HandleEncounterForMobileParty), which would otherwise re-initiate the battle instantly.
         if (partyBelongedToAsPrisoner != null && partyBelongedToAsPrisoner.IsMobile && !playerParty.IsCurrentlyAtSea)
             playerParty.TeleportPartyToOutSideOfEncounterRadius();
+
+        // Rebuild the map mesh after the roster/leader/position are all restored. The mounted-count recalc
+        // settles after the party visual was last built during captivity, so without this the map figure
+        // stays on the stale (on-foot) mesh even though the party is mounted again.
+        playerParty.Party.SetVisualAsDirty();
 
         var message = new NetworkPlayerCaptivityEnded();
         network.Send(payload.Who as NetPeer, message);
