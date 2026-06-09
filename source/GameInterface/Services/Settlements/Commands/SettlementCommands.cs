@@ -504,4 +504,38 @@ internal class SettlementCommands
 
         return $"Successfully set the SettlementComponent ({settlementComponentId}) IsOwnerUnassigned to '{args[1]}'";
     }
+
+    /// <summary>
+    /// Set OwnerClan of a settlement from Hero Id
+    /// </summary>
+    [CommandLineArgumentFunction("set_ownerclan", "coop.debug.settlements")]
+    public static string SetOwnerClan(List<string> strings)
+    {
+        if (ModInformation.IsClient) return "Command can only be run on the server.";
+
+        if (strings.Count != 2) return "Invalid usage, expected \"set_ownerclan <settlementName> <heroId>\"";
+
+        StringBuilder stringBuilder = new StringBuilder();
+        foreach (var settlement in Settlement.All)
+        {
+            if (settlement.Name.ToString() == strings[0])
+            {
+                foreach (var hero in Hero.AllAliveHeroes)
+                {
+                    if (hero.StringId == strings[1])
+                    {
+                        settlement.Town.ChangeClanInternal(hero.Clan);
+                        stringBuilder.AppendLine("Settlement has a new owner.");
+                    }
+                }
+            }
+        }
+
+        string result = stringBuilder.ToString();
+        if (result.Length > 0)
+        {
+            return result;
+        }
+        return "Settlement or hero not found.";
+    }
 }
