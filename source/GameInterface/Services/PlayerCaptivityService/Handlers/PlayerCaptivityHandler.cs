@@ -195,6 +195,13 @@ internal class PlayerCaptivityHandler : IHandler
         playerParty.Position = payload.What.PlayerPartyPosition;
         playerParty.IgnoreForHours(4);
 
+        // Separate the freed party from a still-hostile mobile captor. The position set above places the
+        // party back where it was captured (next to the captor), and IgnoreForHours only stops the captor
+        // from attacking - it does not stop the freed party's own client-side encounter detection
+        // (HandleEncounterForMobileParty), which would otherwise re-initiate the battle instantly.
+        if (partyBelongedToAsPrisoner != null && partyBelongedToAsPrisoner.IsMobile && !playerParty.IsCurrentlyAtSea)
+            playerParty.TeleportPartyToOutSideOfEncounterRadius();
+
         var message = new NetworkPlayerCaptivityEnded();
         network.Send(payload.Who as NetPeer, message);
     }
