@@ -59,7 +59,7 @@ public class MapEventEnvironmentTests : MapEventTestBase
     public void CreatePlayerHeroParty_RegistersPlayerParty_OnAllInstances()
     {
         // Act
-        var (_, partyId) = CreatePlayerHeroParty();
+        var (_, partyId) = CreatePlayerHeroParty("MyControllerId");
 
         // Assert — the party is recognized as a player party everywhere
         AssertIsPlayerParty(Server, partyId);
@@ -73,7 +73,7 @@ public class MapEventEnvironmentTests : MapEventTestBase
     public void ServerStartCaptivity_OfPlayerHero_SyncAllClients()
     {
         // Arrange
-        var (heroId, _) = CreatePlayerHeroParty();
+        var (heroId, _) = CreatePlayerHeroParty("MyControllerId");
         var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
 
         // Act
@@ -91,7 +91,7 @@ public class MapEventEnvironmentTests : MapEventTestBase
     public void PlayerPartyDefeatedInBattle_TakesPlayerHeroCaptive_SyncAllClients()
     {
         // Arrange
-        var (heroId, partyId) = CreatePlayerHeroParty();
+        var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
         var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
 
         // Act — the player party loses a battle; CaptureDefeatedPartyMembers runs on the server. Native removes
@@ -111,7 +111,7 @@ public class MapEventEnvironmentTests : MapEventTestBase
     public void ServerEndCaptivity_OfPlayerHero_SyncAllClients()
     {
         // Arrange
-        var (heroId, _) = CreatePlayerHeroParty();
+        var (heroId, _) = CreatePlayerHeroParty("MyControllerId");
         var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         StartCaptivity(heroId, captorPartyId);
 

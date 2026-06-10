@@ -24,7 +24,7 @@ namespace GameInterface.Tests
             ModModule = new ModuleInfo("TestModule2", false, modVersion);
         }
 
-        public List<ModuleInfo> GetModuleInfos()
+        public IEnumerable<ModuleInfo> GetModuleInfos()
         {
             return new List<ModuleInfo>
             {
@@ -48,7 +48,7 @@ namespace GameInterface.Tests
             ModModule = new ModuleInfo("TestModule2", false, modVersion);
         }
 
-        public List<ModuleInfo> GetModuleInfos()
+        public IEnumerable<ModuleInfo> GetModuleInfos()
         {
             return new List<ModuleInfo>
             {
