@@ -58,14 +58,14 @@ internal class TroopRosterInterface : ITroopRosterInterface
 
     public void UpdateWithData(TroopRoster targetTroopRoster, TroopRosterData packedTroopRosterElements, Hero mainHero)
     {
-        if (packedTroopRosterElements.Data == null) return;
-
         // Clear without removing MainHero (causes issues if MainHero is removed)
         for (int i = targetTroopRoster._count - 1; i >= 0; i--)
         {
             if (targetTroopRoster.data[i].Character?.HeroObject == mainHero) continue;
             targetTroopRoster.AddToCounts(targetTroopRoster.data[i].Character, -targetTroopRoster.data[i].Number, false, -targetTroopRoster.data[i].WoundedNumber, 0, true);
         }
+
+        if (packedTroopRosterElements.Data == null) return;
 
         // Rebuild roster with new data
         foreach (var troopRosterElementData in packedTroopRosterElements.Data)

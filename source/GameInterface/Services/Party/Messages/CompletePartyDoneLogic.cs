@@ -46,15 +46,18 @@ internal readonly struct CompletePartyDoneLogic : ICommand
     public readonly string LeftPartyId;
 
     [ProtoMember(12)]
-    public readonly int PartyGoldChangeAmount;
+    public readonly string LeftPrisonerRosterId;
 
     [ProtoMember(13)]
-    public readonly int PartyInfluenceChangeAmount;
+    public readonly int PartyGoldChangeAmount;
 
     [ProtoMember(14)]
-    public readonly int PartyMoraleChangeAmount;
+    public readonly int PartyInfluenceChangeAmount;
 
     [ProtoMember(15)]
+    public readonly int PartyMoraleChangeAmount;
+
+    [ProtoMember(16)]
     public readonly bool DoNotApplyGoldTransactions;
 
     public CompletePartyDoneLogic(
@@ -69,6 +72,7 @@ internal readonly struct CompletePartyDoneLogic : ICommand
         ItemRosterElement[] rightOwnerPartyItemRosterData,
         UpgradedTroopHistoryData upgradedTroopHistoryIds,
         string leftPartyId,
+        string leftPrisonerRosterId,
         int partyGoldChangeAmount,
         int partyInfluenceChangeAmount,
         int partyMoraleChangeAmount,
@@ -85,6 +89,7 @@ internal readonly struct CompletePartyDoneLogic : ICommand
         RightOwnerPartyItemRosterData = rightOwnerPartyItemRosterData;
         UpgradedTroopHistoryIds = upgradedTroopHistoryIds;
         LeftPartyId = leftPartyId;
+        LeftPrisonerRosterId = leftPrisonerRosterId;
         PartyGoldChangeAmount = partyGoldChangeAmount;
         PartyInfluenceChangeAmount = partyInfluenceChangeAmount;
         PartyMoraleChangeAmount = partyMoraleChangeAmount;

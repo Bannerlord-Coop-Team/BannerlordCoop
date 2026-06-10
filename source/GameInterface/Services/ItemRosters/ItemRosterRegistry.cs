@@ -50,7 +50,7 @@ namespace GameInterface.Services.ItemRosters
 
                 if (settlement.Stash != null)
                 {
-                    RegisterExistingObject(settlement.StringId + "_stash", settlement.Stash);
+                    RegisterExistingObject($"{settlement.StringId}_stash", settlement.Stash);
                 }
             }
         }
