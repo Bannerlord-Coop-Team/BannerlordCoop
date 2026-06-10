@@ -3,10 +3,14 @@ using Common.Messaging;
 using Coop.Core.Client.Messages;
 using Coop.Core.Client.Services.Heroes.Data;
 using Coop.Core.Client.Services.Heroes.Messages;
+using GameInterface.Services.Entity;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using Serilog;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
 
 namespace Coop.Core.Client.Services.Heroes.Handlers;
 
@@ -27,15 +31,14 @@ internal class RemotePlayerHeroHandler : IHandler
 
     private readonly IMessageBroker messageBroker;
     private readonly IHeroInterface heroInterface;
-    private readonly IPlayerRegistry playerRegistry;
+    private readonly IPlayerManager playerRegistry;
     private readonly IDeferredHeroRepository deferredHeroRepo;
-
     private bool campaignReady;
 
     public RemotePlayerHeroHandler(
         IMessageBroker messageBroker,
         IHeroInterface heroInterface,
-        IPlayerRegistry playerRegistry,
+        IPlayerManager playerRegistry,
         IDeferredHeroRepository deferredHeroRepo)
     {
         this.messageBroker = messageBroker;
@@ -90,9 +93,15 @@ internal class RemotePlayerHeroHandler : IHandler
 
     private void CreatePlayerHero(NetworkNewPlayerHeroCreated message)
     {
-        heroInterface.UnpackHero(message.ControllerId, message.HeroData);
+        var player = message.Player;
 
         if (!playerRegistry.AddPlayer(message.Player))
-            Logger.Error("Player {HeroId} has already been added.", message.Player?.HeroId);
+        {
+            Logger.Error("Player {HeroId} has already been added.", message.Player.HeroId);
+            return;
+        }
+            
+        // Unpack + set up in one main-thread pass, registering the host's ids carried by the Player.
+        heroInterface.ClientUnpackHero(message.HeroData, player);
     }
 }

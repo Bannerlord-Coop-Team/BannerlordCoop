@@ -2,6 +2,8 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Smithing.Messages;
@@ -22,13 +24,13 @@ namespace GameInterface.Services.Smithing.Handlers
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
         private readonly INetwork network;
-        private readonly IPlayerRegistry playerRegistry;
+        private readonly IPlayerManager playerRegistry;
 
         public CraftingCampaignBehaviorTickHandler(
             IMessageBroker messageBroker,
             IObjectManager objectManager,
             INetwork network,
-            IPlayerRegistry playerRegistry)
+            IPlayerManager playerRegistry)
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
@@ -97,7 +99,7 @@ namespace GameInterface.Services.Smithing.Handlers
                 foreach (MobileParty mobileParty in obj.Settlement.Parties)
                 {
                     // Prevents adding town orders with player hero order owners
-                    if (mobileParty.LeaderHero != null && !mobileParty.IsMainParty && !playerRegistry.Contains(mobileParty))
+                    if (mobileParty.LeaderHero != null && !mobileParty.IsMainParty && !mobileParty.IsPlayerParty())
                     {
                         list.Add(mobileParty.LeaderHero);
                     }
@@ -105,7 +107,7 @@ namespace GameInterface.Services.Smithing.Handlers
                 foreach (Hero hero in list)
                 {
                     // Prevents adding town orders with player hero order owners
-                    if (hero != Hero.MainHero && !playerRegistry.Contains(hero.PartyBelongedTo) && MBRandom.RandomFloat <= 0.05f)
+                    if (hero != Hero.MainHero && !hero.IsPlayerHero() && MBRandom.RandomFloat <= 0.05f)
                     {
                         int availableSlot = obj.CraftingCampaignBehavior.CraftingOrders[obj.Settlement.Town].GetAvailableSlot();
                         if (availableSlot <= -1)

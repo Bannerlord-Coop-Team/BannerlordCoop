@@ -28,7 +28,7 @@ public class MapEventUpdatePatch
 
         // Don't update if a player is involved
         // Prevents server from instantly finishing the battle and waits for client finish request
-        if (__instance.InvolvedParties.Any(x => !x.MobileParty.IsPartyControlled()))
+        if (__instance.InvolvedParties.Any(x => !x.MobileParty.IsControlledByThisInstance()))
             return false;
 
         return true;

@@ -101,7 +101,7 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         /// <summary>
-        /// Configures the mocked <see cref="IHeroInterface.UnpackHero"/> to return a hero whose hero/party are
+        /// Configures the mocked <see cref="IHeroInterface.ServerUnpackHero"/> to return a hero whose hero/party are
         /// registered in the (real) object manager, so <see cref="CreateCharacterState.Handle_NetworkTransferNewHero"/>
         /// can resolve their ids instead of early-returning.
         /// </summary>
@@ -109,18 +109,22 @@ namespace Coop.Tests.Server.Connections.States
         {
             var objectManager = serverComponent.Container.Resolve<IObjectManager>();
             var heroInterfaceMock = serverComponent.Container.Resolve<Mock<IHeroInterface>>();
-            var playerRegistryMock = serverComponent.Container.Resolve<Mock<IPlayerRegistry>>();
+            var playerRegistryMock = serverComponent.Container.Resolve<Mock<IPlayerManager>>();
 
-            // Construct stubs without running constructors (no live campaign required) and wire the hero to a party.
+            // Construct stubs without running constructors (no live campaign required) and wire the hero to a party
+            // and clan. CreateCharacterState.TryCreatePlayer resolves ids for the hero, its party, and its clan.
             var party = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
             var hero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
+            var clan = (Clan)FormatterServices.GetUninitializedObject(typeof(Clan));
             hero._partyBelongedTo = party;
+            hero._clan = clan;
 
             Assert.True(objectManager.AddExisting("Hero_test", hero));
             Assert.True(objectManager.AddExisting("MobileParty_test", party));
+            Assert.True(objectManager.AddExisting("Clan_test", clan));
 
             heroInterfaceMock
-                .Setup(h => h.UnpackHero(It.IsAny<string>(), It.IsAny<byte[]>()))
+                .Setup(h => h.ServerUnpackHero(It.IsAny<byte[]>()))
                 .Returns(hero);
             playerRegistryMock
                 .Setup(p => p.AddPlayer(It.IsAny<Player>()))

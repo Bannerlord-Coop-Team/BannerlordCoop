@@ -10,6 +10,7 @@ using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.UI.Interfaces;
 
@@ -25,8 +26,8 @@ public class CharacterCreationState : ClientStateBase
     private readonly IHeroInterface heroInterface;
     private readonly IRegistryManager registryManager;
     private readonly IControllerIdProvider controllerIdProvider;
-    private readonly IControlledEntityRegistry controlledEntityRegistry;
     private readonly ILoadingInterface loadingInterface;
+    private readonly IPlayerManager playerManager;
     private readonly ICoopFinalizer coopFinalizer;
 
     public CharacterCreationState(
@@ -36,8 +37,8 @@ public class CharacterCreationState : ClientStateBase
         IHeroInterface heroInterface,
         IRegistryManager registryManager,
         IControllerIdProvider controllerIdProvider,
-        IControlledEntityRegistry controlledEntityRegistry,
         ILoadingInterface loadingInterface,
+        IPlayerManager playerManager,
         ICoopFinalizer coopFinalizer) : base(logic)
     {
         this.messageBroker = messageBroker;
@@ -45,8 +46,8 @@ public class CharacterCreationState : ClientStateBase
         this.heroInterface = heroInterface;
         this.registryManager = registryManager;
         this.controllerIdProvider = controllerIdProvider;
-        this.controlledEntityRegistry = controlledEntityRegistry;
         this.loadingInterface = loadingInterface;
+        this.playerManager = playerManager;
         this.coopFinalizer = coopFinalizer;
 
         loadingInterface.HideLoadingScreen();
@@ -84,13 +85,7 @@ public class CharacterCreationState : ClientStateBase
 
     internal void Handle_NetworkHeroRecieved(MessagePayload<NetworkHeroRecieved> obj)
     {
-        var player = obj.What.Player;
-        Logic.Player = player;
-
-        var controllerId = controllerIdProvider.ControllerId;
-
-        controlledEntityRegistry.RegisterAsControlled(controllerId, player.MobilePartyId);
-        controlledEntityRegistry.RegisterAsControlled(controllerId, player.HeroId);
+        Logic.Player = obj.What.Player;
 
         Logic.LoadSavedData();
     }

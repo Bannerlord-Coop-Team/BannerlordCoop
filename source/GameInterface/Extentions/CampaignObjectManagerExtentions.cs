@@ -10,7 +10,7 @@ namespace GameInterface.Extentions
     {
         public static List<MobileParty> GetPlayerMobileParties(this CampaignObjectManager campaignObjectManager)
         {
-            return campaignObjectManager._mobileParties.Where(party => party.IsPlayer()).ToList();
+            return campaignObjectManager._mobileParties.Where(party => party.IsPlayerParty()).ToList();
         }
     }
 }
