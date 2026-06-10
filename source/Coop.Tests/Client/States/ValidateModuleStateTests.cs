@@ -66,7 +66,7 @@ namespace Coop.Tests.Client.States
 
             var heroExists = true;
             var payload = new MessagePayload<NetworkClientValidated>(
-                this, new NetworkClientValidated(heroExists, new Player("12345", "111")));
+                this, new NetworkClientValidated(heroExists, new Player("12345", "111", "12345", "12345")));
 
             // Act
             validateState.Handle_NetworkClientValidated(payload);
@@ -83,7 +83,7 @@ namespace Coop.Tests.Client.States
 
             var heroExists = false;
             var payload = new MessagePayload<NetworkClientValidated>(
-                this, new NetworkClientValidated(heroExists, new Player("12345", "111")));
+                this, new NetworkClientValidated(heroExists, new Player("12345", "111", "12345", "12345")));
 
             // Act
             validateState.Handle_NetworkClientValidated(payload);

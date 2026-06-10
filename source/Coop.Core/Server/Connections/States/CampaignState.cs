@@ -16,14 +16,13 @@ public class CampaignState : ConnectionStateBase
     public CampaignState(IConnectionLogic connectionLogic, IMessageBroker messageBroker) : base(connectionLogic)
     {
         messageBroker.Subscribe<NetworkPlayerMissionEntered>(PlayerMissionEnteredHandler);
-        messageBroker.Subscribe<NetworkPlayerData>(NetworkPlayerDataHandler);
+
         this.messageBroker = messageBroker;
     }
 
     public override void Dispose()
     {
         messageBroker.Unsubscribe<NetworkPlayerMissionEntered>(PlayerMissionEnteredHandler);
-        messageBroker.Unsubscribe<NetworkPlayerData>(NetworkPlayerDataHandler);
     }
 
     internal void PlayerMissionEnteredHandler(MessagePayload<NetworkPlayerMissionEntered> obj)
@@ -34,13 +33,6 @@ public class CampaignState : ConnectionStateBase
         {
             ConnectionLogic.EnterMission();
         }
-    }
-
-    private void NetworkPlayerDataHandler(MessagePayload<NetworkPlayerData> obj)
-    {
-        var peer = obj.Who as NetPeer;
-
-        messageBroker.Publish(this, new RegisterNewPlayerHero(peer, obj.What.PlayerId, obj.What.HeroData));
     }
 
     public override void CreateCharacter()

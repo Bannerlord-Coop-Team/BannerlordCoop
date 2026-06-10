@@ -2,7 +2,7 @@
 using GameInterface.DynamicSync;
 using GameInterface.Registry.Auto;
 using GameInterface.Registry.Messages;
-using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
 
 namespace GameInterface.Registry;
@@ -44,7 +44,6 @@ internal class RegistryManager : IRegistryManager
     public void RegisterAllGameObjects()
     {
         autoRegistryFactory.RegisterAll();
-        PartyExtensions.InvalidateCache();
 
         messageBroker.Publish(this, new AllGameObjectsRegistered());
     }
@@ -53,6 +52,5 @@ internal class RegistryManager : IRegistryManager
     {
         registryCollection.ClearRegistries();
         objectManager.Clear();
-        PartyExtensions.InvalidateCache();
     }
 }

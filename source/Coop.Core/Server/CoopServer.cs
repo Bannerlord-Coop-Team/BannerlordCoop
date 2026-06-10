@@ -40,7 +40,6 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     private readonly IMessageBroker messageBroker;
     private readonly IPacketManager packetManager;
-    private bool allowJoining = false;
 
     public CoopServer(
         INetworkConfiguration configuration, 
@@ -52,9 +51,6 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         // Dependancy assignment
         this.messageBroker = messageBroker;
         this.packetManager = packetManager;
-        messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
-
-        ModInformation.IsServer = true;
 
         // Netmanager initialization
         netManager.NatPunchEnabled = true;
@@ -63,24 +59,10 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         controllerIdProvider.SetControllerId(ServerControllerId);
     }
 
-    public override void Dispose()
-    {
-        messageBroker.Unsubscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
-        base.Dispose();
-    }
-
     public override void OnConnectionRequest(ConnectionRequest request)
     {
-        if (allowJoining)
-        {
-            Logger.Information("Client connection accepted for {Endpoint}", request.RemoteEndPoint);
-            request.Accept();
-        }
-        else
-        {
-            Logger.Information("Client connection rejected for {Endpoint}", request.RemoteEndPoint);
-            request.Reject();
-        }
+        Logger.Information("Client connection accepted for {Endpoint}", request.RemoteEndPoint);
+        request.Accept();
     }
 
     public void OnNatIntroductionRequest(IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token)
@@ -146,7 +128,6 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void SendAllBut(NetPeer ignoredPeer, IPacket packet)
     {
-        CheckNetworkQueueOverloaded(ignoredPeer);
         SendAllBut(netManager, ignoredPeer, packet);
     }
 
@@ -165,10 +146,5 @@ public class CoopServer : CoopNetworkBase, ICoopServer
                 messageBroker.Publish(this, new PeerQueueOverloaded(netPeer));
             }
         }
-    }
-
-    private void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> obj)
-    {
-        allowJoining = true;
     }
 }

@@ -4,17 +4,23 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
-[HarmonyPatch(typeof(CampaignPeriodicEventManager))]
+[HarmonyPatch]
 internal class PartyTickPatch
 {
-    [HarmonyPatch(nameof(CampaignPeriodicEventManager.TickPeriodicEvents))]
+    [HarmonyPatch(typeof(CampaignPeriodicEventManager), nameof(CampaignPeriodicEventManager.TickPeriodicEvents))]
     [HarmonyPrefix]
-    static bool TickPeriodicEventsPrefix() => ModInformation.IsServer;
+    static bool Prefix_TickPeriodicEvents() => ModInformation.IsServer;
 
-    [HarmonyPatch(nameof(CampaignPeriodicEventManager.MobilePartyHourlyTick))]
+    [HarmonyPatch(typeof(CampaignPeriodicEventManager), nameof(CampaignPeriodicEventManager.MobilePartyHourlyTick))]
     [HarmonyPrefix]
-    static bool MobilePartyHourlyTickPrefix() => ModInformation.IsServer;
+    static bool Prefix_MobilePartyHourlyTick() => ModInformation.IsServer;
+
+
+    [HarmonyPatch(typeof(MobileParty), nameof(MobileParty.HourlyTick))]
+    [HarmonyPrefix]
+    static bool Prefix_HourlyTick() => ModInformation.IsServer;
 }

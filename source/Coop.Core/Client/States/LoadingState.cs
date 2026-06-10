@@ -6,6 +6,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Players;
 using GameInterface.Services.UI.Interfaces;
 
 namespace Coop.Core.Client.States;
@@ -17,28 +18,25 @@ public class LoadingState : ClientStateBase
 {
     private readonly IMessageBroker messageBroker;
     private readonly IRegistryManager registryManager;
-    private readonly IDeferredHeroRepository deferredHeroRepo;
     private readonly IHeroInterface heroInterface;
     private readonly IControllerIdProvider controllerIdProvider;
-    private readonly IControlledEntityRegistry controlledEntityRegistry;
+    private readonly IPlayerManager playerRegistry;
     private readonly ILoadingInterface loadingInterface;
 
     public LoadingState(
         IClientLogic logic,
         IMessageBroker messageBroker,
         IRegistryManager registryManager,
-        IDeferredHeroRepository deferredHeroRepo,
         IHeroInterface heroInterface,
         IControllerIdProvider controllerIdProvider,
-        IControlledEntityRegistry controlledEntityRegistry,
+        IPlayerManager playerRegistry,
         ILoadingInterface loadingInterface) : base(logic)
     {
         this.messageBroker = messageBroker;
         this.registryManager = registryManager;
-        this.deferredHeroRepo = deferredHeroRepo;
         this.heroInterface = heroInterface;
         this.controllerIdProvider = controllerIdProvider;
-        this.controlledEntityRegistry = controlledEntityRegistry;
+        this.playerRegistry = playerRegistry;
         this.loadingInterface = loadingInterface;
 
         messageBroker.Subscribe<CampaignReady>(Handle_CampaignLoaded);
@@ -65,11 +63,6 @@ public class LoadingState : ClientStateBase
             "Loading Host Campaign",
             "Applying synced object lifetimes...");
         registryManager.PatchLifetimes();
-
-        loadingInterface.SetLoadingMessage(
-            "Loading Host Campaign",
-            "Creating remote player heroes...");
-        InstantiateDeferredHeroes();
 
         loadingInterface.SetLoadingMessage(
             "Loading Host Campaign",
@@ -129,22 +122,7 @@ public class LoadingState : ClientStateBase
     private void RegisterPlayerAsControlled()
     {
         var player = Logic.Player;
-        if (player == null) return;
 
-        var controllerId = controllerIdProvider.ControllerId;
-
-        controlledEntityRegistry.RegisterAsControlled(controllerId, player.HeroId);
-        controlledEntityRegistry.RegisterAsControlled(controllerId, player.MobilePartyId);
-    }
-
-    private void InstantiateDeferredHeroes()
-    {
-        foreach (var newHero in deferredHeroRepo.GetAllDeferredHeroes())
-        {
-            var message = new RegisterNewPlayerHero(newHero.NetPeer, newHero.ControllerId, newHero.HeroData);
-            messageBroker.Publish(this, message);
-        }
-
-        deferredHeroRepo.Clear();
+        playerRegistry.AddPlayer(player);
     }
 }
