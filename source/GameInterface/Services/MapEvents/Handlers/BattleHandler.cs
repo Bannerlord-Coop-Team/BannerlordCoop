@@ -64,6 +64,9 @@ internal class BattleHandler : IHandler
         messageBroker.Subscribe<AttackMissionAttempted>(Handle_AttackMissionAttempted);
         messageBroker.Subscribe<NetworkAttackMissionAttempted>(Handle_NetworkAttackMissionAttempted);
         messageBroker.Subscribe<NetworkStartAttackMission>(Handle_NetworkStartAttackMission);
+
+        messageBroker.Subscribe<PlayerJoinBattleAttempted>(Handle_PlayerJoinBattleAttempted);
+        messageBroker.Subscribe<NetworkRequestJoinBattle>(Handle_NetworkRequestJoinBattle);
     }
 
     public void Dispose()
@@ -80,6 +83,47 @@ internal class BattleHandler : IHandler
         messageBroker.Unsubscribe<AttackMissionAttempted>(Handle_AttackMissionAttempted);
         messageBroker.Unsubscribe<NetworkAttackMissionAttempted>(Handle_NetworkAttackMissionAttempted);
         messageBroker.Unsubscribe<NetworkStartAttackMission>(Handle_NetworkStartAttackMission);
+
+        messageBroker.Unsubscribe<PlayerJoinBattleAttempted>(Handle_PlayerJoinBattleAttempted);
+        messageBroker.Unsubscribe<NetworkRequestJoinBattle>(Handle_NetworkRequestJoinBattle);
+    }
+
+    /// <summary>[Client] Bridge the local player's battle join to a server request.</summary>
+    private void Handle_PlayerJoinBattleAttempted(MessagePayload<PlayerJoinBattleAttempted> payload)
+    {
+        var data = payload.What;
+
+        if (!objectManager.TryGetIdWithLogging(data.MapEvent, out var mapEventId)) return;
+        if (!objectManager.TryGetIdWithLogging(data.JoiningParty, out var partyId)) return;
+
+        mapEventLogger.DebugMapEvent(data.MapEvent, "Requesting server to join battle. PartyId={PartyId}, Side={Side}", partyId, data.Side);
+
+        // On a client, SendAll targets the server (its only connected peer).
+        network.SendAll(new NetworkRequestJoinBattle(mapEventId, partyId, data.Side));
+    }
+
+    /// <summary>[Server] Perform the authoritative join; the native add replicates to all clients.</summary>
+    private void Handle_NetworkRequestJoinBattle(MessagePayload<NetworkRequestJoinBattle> payload)
+    {
+        if (!ModInformation.IsServer) return;
+
+        var data = payload.What;
+
+        if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.MapEventId, out var mapEvent)) return;
+        if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.PartyId, out var party)) return;
+
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            if (party.MapEventSide != null)
+            {
+                Logger.Warning("Ignoring join request: party {PartyId} is already in a map event", data.PartyId);
+                return;
+            }
+
+            // The setter runs the native MapEventSide.AddPartyInternal on the server (NOT under AllowedThread), so the
+            // AddIntercept publishes the battle-party add and it replicates to every client through the map-event sync.
+            party.MapEventSide = mapEvent.GetMapEventSide(data.Side);
+        });
     }
 
     private void Handle_AttackMissionAttempted(MessagePayload<AttackMissionAttempted> payload)

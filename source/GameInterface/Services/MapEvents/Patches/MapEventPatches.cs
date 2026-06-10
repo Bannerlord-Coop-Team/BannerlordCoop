@@ -163,26 +163,6 @@ internal class InteractionPatches
 
     private static readonly ConditionalWeakTable<MobileParty, PlayerBattleAiJoinWindow> interactionDebounce = new();
 
-    [HarmonyPatch(typeof(PartyBase), "TaleWorlds.CampaignSystem.Map.IInteractablePoint.CanPartyInteract")]
-    [HarmonyPostfix]
-    private static void Postfix_CanPartyInteract(
-        PartyBase __instance,
-        MobileParty mobileParty,
-        ref bool __result)
-    {
-        if (!__result)
-            return;
-
-        if (ModInformation.IsClient)
-            return;
-
-        if (__instance.MobileParty?.IsPlayerParty() == true && mobileParty?.IsPlayerParty() == true)
-        {  
-            __result = false;
-            return;
-        }
-    }
-
     private static readonly ConditionalWeakTable<MapEvent, PlayerBattleAiJoinWindow> playerBattleAiJoinWindows = new();
 
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.CanPartyJoinBattle))]
@@ -192,14 +172,21 @@ internal class InteractionPatches
         PartyBase party,
         ref bool __result)
     {
-        if (!__result)
+        // Always allow a player party to join, on both client and server. The joining client evaluates this when
+        // building the encounter "join the battle" menu options; native can return false there (e.g. war state /
+        // side expectations not matching on the client), which would hide the join option. Force it true so the
+        // player can always join.
+        if (party.MobileParty?.IsPlayerParty() == true)
+        {
+            __result = true;
             return;
+        }
 
+        // AI gating below is server-authoritative only.
         if (ModInformation.IsClient)
             return;
 
-        // Always allow players to join
-        if (party.MobileParty?.IsPlayerParty() == true)
+        if (!__result)
             return;
 
         // Allow AI to join if no players are involved

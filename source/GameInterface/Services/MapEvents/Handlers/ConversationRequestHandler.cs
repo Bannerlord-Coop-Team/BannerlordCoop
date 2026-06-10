@@ -97,22 +97,32 @@ internal class ConversationRequestHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<PartyBase>(request.AttackerId, out var attacker)) return;
         if (!objectManager.TryGetObjectWithLogging<PartyBase>(request.DefenderId, out var defender)) return;
 
-        // Reject: a conversation between two human players is not driven through PlayerEncounter.Init.
-        if (attacker.MobileParty?.IsPlayerParty() == true && defender.MobileParty?.IsPlayerParty() == true)
-        {
-            Logger.Debug(
-                "Rejecting conversation request: both parties are players. AttackerId={AttackerId}, DefenderId={DefenderId}",
-                request.AttackerId, request.DefenderId);
-            return;
-        }
+        // A party joining an existing battle: exactly one party is already in a map event, and the other is being
+        // brought into it through PlayerEncounter (StartBattleInternal then adopts the existing event instead of
+        // creating a new one). Allow this even between two players so PvP parties can join each other's battles.
+        var attackerInMapEvent = attacker.MapEvent != null;
+        var defenderInMapEvent = defender.MapEvent != null;
+        var isJoinExistingBattle = attackerInMapEvent ^ defenderInMapEvent;
 
-        // Reject: a party already in a battle must not (re)open an encounter conversation.
-        if (attacker.MapEvent != null || defender.MapEvent != null)
+        if (!isJoinExistingBattle)
         {
-            Logger.Debug(
-                "Rejecting conversation request: a party is already in a map event. AttackerId={AttackerId}, DefenderId={DefenderId}",
-                request.AttackerId, request.DefenderId);
-            return;
+            // Reject: a conversation between two human players is not driven through PlayerEncounter.Init.
+            if (attacker.MobileParty?.IsPlayerParty() == true && defender.MobileParty?.IsPlayerParty() == true)
+            {
+                Logger.Debug(
+                    "Rejecting conversation request: both parties are players. AttackerId={AttackerId}, DefenderId={DefenderId}",
+                    request.AttackerId, request.DefenderId);
+                return;
+            }
+
+            // Reject: both parties are already in (separate) battles; do not (re)open an encounter conversation.
+            if (attackerInMapEvent || defenderInMapEvent)
+            {
+                Logger.Debug(
+                    "Rejecting conversation request: a party is already in a map event. AttackerId={AttackerId}, DefenderId={DefenderId}",
+                    request.AttackerId, request.DefenderId);
+                return;
+            }
         }
 
         Logger.Debug(
@@ -130,23 +140,30 @@ internal class ConversationRequestHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<PartyBase>(message.DefenderId, out var defender)) return;
         if (!objectManager.TryGetObjectWithLogging<PartyBase>(message.AttackerId, out var attacker)) return;
 
-        if (PlayerEncounter.Current != null)
+        // RestartPlayerEncounter activates the encounter game menu, which builds and sorts the UI's menu-item
+        // binding list. That must happen on the game main thread: doing it on the network thread races with the
+        // UI thread and corrupts the list (null entries -> NRE in GameMenuVM's item sort). Marshal onto the main
+        // thread before touching encounter/menu state.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            Logger.Warning("Conversation allowed but PlayerEncounter.Current is not null; cannot restart encounter");
-            return;
-        }
+            if (PlayerEncounter.Current != null)
+            {
+                Logger.Warning("Conversation allowed but PlayerEncounter.Current is not null; cannot restart encounter");
+                return;
+            }
 
-        using (new AllowedThread())
-        {
-            if (message.Source == ConversationRestartSource.EncounterManager)
+            using (new AllowedThread())
             {
-                EncounterManager.RestartPlayerEncounter(attacker, defender);
+                if (message.Source == ConversationRestartSource.EncounterManager)
+                {
+                    EncounterManager.RestartPlayerEncounter(attacker, defender);
+                }
+                else
+                {
+                    // PlayerEncounter.RestartPlayerEncounter(defenderParty, attackerParty, forcePlayerOutFromSettlement)
+                    PlayerEncounter.RestartPlayerEncounter(defender, attacker, message.ForcePlayerOutFromSettlement);
+                }
             }
-            else
-            {
-                // PlayerEncounter.RestartPlayerEncounter(defenderParty, attackerParty, forcePlayerOutFromSettlement)
-                PlayerEncounter.RestartPlayerEncounter(defender, attacker, message.ForcePlayerOutFromSettlement);
-            }
-        }
+        });
     }
 }

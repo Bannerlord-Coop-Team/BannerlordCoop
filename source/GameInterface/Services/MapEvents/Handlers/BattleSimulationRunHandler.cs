@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -71,6 +72,7 @@ internal class BattleSimulationRunHandler : IHandler
         messageBroker.Subscribe<NetworkAdvanceBattleSimulation>(Handle_NetworkAdvanceBattleSimulation);
         messageBroker.Subscribe<NetworkBattleSimulationRound>(Handle_NetworkBattleSimulationRound);
         messageBroker.Subscribe<NetworkBattleSimulationFinished>(Handle_NetworkBattleSimulationFinished);
+        messageBroker.Subscribe<NetworkOpenBattleSimulation>(Handle_NetworkOpenBattleSimulation);
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
     }
 
@@ -82,6 +84,7 @@ internal class BattleSimulationRunHandler : IHandler
         messageBroker.Unsubscribe<NetworkAdvanceBattleSimulation>(Handle_NetworkAdvanceBattleSimulation);
         messageBroker.Unsubscribe<NetworkBattleSimulationRound>(Handle_NetworkBattleSimulationRound);
         messageBroker.Unsubscribe<NetworkBattleSimulationFinished>(Handle_NetworkBattleSimulationFinished);
+        messageBroker.Unsubscribe<NetworkOpenBattleSimulation>(Handle_NetworkOpenBattleSimulation);
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
     }
 
@@ -152,6 +155,11 @@ internal class BattleSimulationRunHandler : IHandler
             }
         }, blocking: true);
 
+        // Mirror the simulation onto every other client in this map event. Each client opens the window only if its
+        // own party is in the event; the requesting client and uninvolved clients ignore it. The requester keeps
+        // pacing; spectators replay passively.
+        network.SendAll(new NetworkOpenBattleSimulation(mapEventId));
+
         mapEventLogger.DebugMapEvent(mapEvent, "Battle simulation set up; awaiting client-paced advances");
     }
 
@@ -192,8 +200,10 @@ internal class BattleSimulationRunHandler : IHandler
                     batched.AddRange(changes);
             }
 
+            // Broadcast to everyone: the pacer and the spectators (clients in this event) all replay these rounds.
+            // Clients not in the event ignore rounds for a map event they have no active playback for.
             if (batched.Count > 0)
-                network.Send(sim.Peer, new NetworkBattleSimulationRound(mapEventId, batched.ToArray()));
+                network.SendAll(new NetworkBattleSimulationRound(mapEventId, batched.ToArray()));
 
             if (sim.MapEvent.HasWinner)
             {
@@ -210,7 +220,7 @@ internal class BattleSimulationRunHandler : IHandler
             }
 
             mapEventLogger.DebugMapEvent(sim.MapEvent, "Server-side battle simulation finished. BattleState={BattleState}", sim.MapEvent.BattleState);
-            network.Send(sim.Peer, new NetworkBattleSimulationFinished(mapEventId));
+            network.SendAll(new NetworkBattleSimulationFinished(mapEventId));
         }
     }
 
@@ -225,6 +235,12 @@ internal class BattleSimulationRunHandler : IHandler
         // Add/Remove, and BattleSimulationReplay's round queue is drained on the main-thread tick.
         GameLoopRunner.RunOnMainThread(() =>
         {
+            // Rounds are broadcast to everyone; only clients actually playing this simulation (the pacer and the
+            // in-event spectators) replay them. Checked here (not on the network thread) so it observes the Begin
+            // done by NetworkOpenBattleSimulation, which is queued onto the main thread before this.
+            if (!BattleSimulationReplay.IsActiveFor(message.MapEventId))
+                return;
+
             var resolved = new List<BattleSimulationReplay.ResolvedChange>(message.Changes.Length);
             foreach (var change in message.Changes)
             {
@@ -250,6 +266,10 @@ internal class BattleSimulationRunHandler : IHandler
         // Both the encounter state and the replay's finish flag belong to the main-thread tick.
         GameLoopRunner.RunOnMainThread(() =>
         {
+            // Broadcast to everyone; only a client actually playing this simulation finishes it.
+            if (!BattleSimulationReplay.IsActiveFor(payload.What.MapEventId))
+                return;
+
             if (PlayerEncounter.CurrentBattleSimulation == null)
             {
                 Logger.Warning("Received {Message} but no battle simulation is active", nameof(NetworkBattleSimulationFinished));
@@ -257,6 +277,52 @@ internal class BattleSimulationRunHandler : IHandler
             }
 
             BattleSimulationReplay.RequestFinish();
+        });
+    }
+
+    /// <summary>
+    /// [Client] Another player started an auto-resolve simulation for a map event. If this client's own party is in
+    /// that event (and it isn't the initiator), open the same simulation window as a passive spectator so it can
+    /// watch the server-streamed results. Clients not in the event ignore it.
+    /// </summary>
+    private void Handle_NetworkOpenBattleSimulation(MessagePayload<NetworkOpenBattleSimulation> payload)
+    {
+        if (!ModInformation.IsClient)
+            return;
+
+        var mapEventId = payload.What.MapEventId;
+
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            // Initiator already has it open and is pacing it.
+            if (BattleSimulationReplay.IsActiveFor(mapEventId))
+                return;
+
+            if (!objectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent) || mapEvent == null)
+                return;
+
+            // Only a player actually in this battle (in its encounter) spectates it.
+            if (PlayerEncounter.Current == null || PlayerEncounter.Battle != mapEvent)
+                return;
+
+            if (PlayerEncounter.CurrentBattleSimulation != null)
+                return;
+
+            var mapState = Game.Current.GameStateManager.LastOrDefault<MapState>();
+            if (mapState == null)
+            {
+                Logger.Warning("Cannot open spectator battle simulation: no active MapState");
+                return;
+            }
+
+            // Spectator mode must be set before StartBattleSimulation: its postfix checks it to avoid requesting a
+            // second authoritative run. InitSimulation(null, null) builds the scoreboard from the event's parties
+            // (full battle); the streamed rounds then drive it.
+            BattleSimulationReplay.Begin(mapEventId, spectator: true);
+            PlayerEncounter.InitSimulation(null, null);
+            mapState.StartBattleSimulation();
+
+            mapEventLogger.DebugMapEvent(mapEvent, "Opened spectator battle simulation window");
         });
     }
 
