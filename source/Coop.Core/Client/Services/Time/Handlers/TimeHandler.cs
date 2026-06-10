@@ -22,8 +22,7 @@ namespace Coop.Core.Client.Services.Time.Handlers
         private readonly INetwork network;
         private readonly ITimeControlInterface timeControlInterface;
         private TimeControlLockState timeControlLockState = TimeControlLockState.Unlocked;
-        private bool fastForwardBlockedByMapEvent;
-        private int playersInMapEvent;
+        private MapEventFastForwardState mapEventState = MapEventFastForwardState.NotBlocked;
 
         public TimeHandler(IMessageBroker messageBroker, INetwork network, ITimeControlInterface timeControlInterface)
         {
@@ -56,10 +55,9 @@ namespace Coop.Core.Client.Services.Time.Handlers
                 return;
             }
 
-            if (fastForwardBlockedByMapEvent && newMode == TimeControlEnum.Play_2x)
+            if (mapEventState.IsBlocked && newMode == TimeControlEnum.Play_2x)
             {
-                messageBroker.Publish(this, new SendInformationMessage(
-                    MapEventTimeControlMessages.FastForwardBlocked(playersInMapEvent)));
+                messageBroker.Publish(this, new SendInformationMessage(mapEventState.BlockedMessage));
                 return;
             }
 
@@ -71,15 +69,14 @@ namespace Coop.Core.Client.Services.Time.Handlers
 
         internal void Handle_NetworkMapEventLockChanged(MessagePayload<NetworkMapEventLockChanged> obj)
         {
-            var wasBlocked = fastForwardBlockedByMapEvent;
-            fastForwardBlockedByMapEvent = obj.What.FastForwardBlocked;
-            playersInMapEvent = obj.What.PlayersInMapEvent;
+            var wasBlocked = mapEventState.IsBlocked;
+            mapEventState = MapEventFastForwardState.FromNetworkMessage(obj.What);
 
-            if (fastForwardBlockedByMapEvent && !wasBlocked)
+            if (mapEventState.IsBlocked && !wasBlocked)
             {
                 messageBroker.Publish(this, new SendInformationMessage(MapEventTimeControlMessages.FastForwardDisabled));
             }
-            else if (!fastForwardBlockedByMapEvent && wasBlocked)
+            else if (!mapEventState.IsBlocked && wasBlocked)
             {
                 messageBroker.Publish(this, new SendInformationMessage(MapEventTimeControlMessages.FastForwardEnabled));
             }
@@ -131,6 +128,25 @@ namespace Coop.Core.Client.Services.Time.Handlers
                 }
 
                 return new TimeControlLockState(true, message.LoadingPlayers);
+            }
+        }
+
+        private readonly struct MapEventFastForwardState
+        {
+            public static MapEventFastForwardState NotBlocked => new MapEventFastForwardState(0);
+
+            public int PlayersInMapEvent { get; }
+            public bool IsBlocked => PlayersInMapEvent > 0;
+            public string BlockedMessage => MapEventTimeControlMessages.FastForwardBlocked(PlayersInMapEvent);
+
+            private MapEventFastForwardState(int playersInMapEvent)
+            {
+                PlayersInMapEvent = playersInMapEvent;
+            }
+
+            public static MapEventFastForwardState FromNetworkMessage(NetworkMapEventLockChanged message)
+            {
+                return new MapEventFastForwardState(message.PlayersInMapEvent);
             }
         }
     }

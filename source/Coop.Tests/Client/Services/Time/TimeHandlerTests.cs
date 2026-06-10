@@ -154,7 +154,7 @@ namespace Coop.Tests.Client.Services.Time
 
             // Act
             handler.Handle_NetworkMapEventLockChanged(
-                new MessagePayload<NetworkMapEventLockChanged>(null, new NetworkMapEventLockChanged(true, 1)));
+                new MessagePayload<NetworkMapEventLockChanged>(null, new NetworkMapEventLockChanged(1)));
 
             // Assert
             var message = Assert.Single(broker.GetMessagesFromType<SendInformationMessage>());
@@ -171,11 +171,11 @@ namespace Coop.Tests.Client.Services.Time
             var handler = new TimeHandler(broker, network, mockTimeControlInterface.Object);
 
             handler.Handle_NetworkMapEventLockChanged(
-                new MessagePayload<NetworkMapEventLockChanged>(null, new NetworkMapEventLockChanged(true, 1)));
+                new MessagePayload<NetworkMapEventLockChanged>(null, new NetworkMapEventLockChanged(1)));
 
             // Act
             handler.Handle_NetworkMapEventLockChanged(
-                new MessagePayload<NetworkMapEventLockChanged>(null, new NetworkMapEventLockChanged(false, 0)));
+                new MessagePayload<NetworkMapEventLockChanged>(null, new NetworkMapEventLockChanged(0)));
 
             // Assert
             Assert.Contains(
@@ -194,9 +194,9 @@ namespace Coop.Tests.Client.Services.Time
 
             // Act
             handler.Handle_NetworkMapEventLockChanged(
-                new MessagePayload<NetworkMapEventLockChanged>(null, new NetworkMapEventLockChanged(true, 1)));
+                new MessagePayload<NetworkMapEventLockChanged>(null, new NetworkMapEventLockChanged(1)));
             handler.Handle_NetworkMapEventLockChanged(
-                new MessagePayload<NetworkMapEventLockChanged>(null, new NetworkMapEventLockChanged(true, 2)));
+                new MessagePayload<NetworkMapEventLockChanged>(null, new NetworkMapEventLockChanged(2)));
 
             // Assert
             Assert.Single(
@@ -215,7 +215,7 @@ namespace Coop.Tests.Client.Services.Time
             var handler = new TimeHandler(broker, network, mockTimeControlInterface.Object);
 
             handler.Handle_NetworkMapEventLockChanged(
-                new MessagePayload<NetworkMapEventLockChanged>(null, new NetworkMapEventLockChanged(true, 3)));
+                new MessagePayload<NetworkMapEventLockChanged>(null, new NetworkMapEventLockChanged(3)));
 
             // Act
             handler.Handle_TimeSpeedChanged(
@@ -239,7 +239,7 @@ namespace Coop.Tests.Client.Services.Time
             var handler = new TimeHandler(broker, network, mockTimeControlInterface.Object);
 
             handler.Handle_NetworkMapEventLockChanged(
-                new MessagePayload<NetworkMapEventLockChanged>(null, new NetworkMapEventLockChanged(true, 1)));
+                new MessagePayload<NetworkMapEventLockChanged>(null, new NetworkMapEventLockChanged(1)));
 
             // Act
             handler.Handle_TimeSpeedChanged(

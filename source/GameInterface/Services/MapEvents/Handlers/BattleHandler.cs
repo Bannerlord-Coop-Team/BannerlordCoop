@@ -311,7 +311,7 @@ internal class BattleHandler : IHandler
         var isBlocked = count > 0;
         lastBroadcastPlayersInMapEvent = count;
 
-        network.SendAll(new NetworkMapEventLockChanged(isBlocked, count));
+        network.SendAll(new NetworkMapEventLockChanged(count));
 
         if (isBlocked && !wasBlocked)
             messageBroker.Publish(this, new SendInformationMessage(MapEventTimeControlMessages.FastForwardDisabled));

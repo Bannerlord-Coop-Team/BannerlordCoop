@@ -4,22 +4,18 @@ using ProtoBuf;
 namespace Coop.Core.Server.Services.Time.Messages;
 
 /// <summary>
-/// Server-controlled notification that fast-forwarding has become (un)available
-/// because players are in map events. Carries the current number of players in a
-/// map event so clients can report it when a blocked fast-forward is attempted.
+/// Server-controlled notification of how many players are currently in a map event.
+/// Zero means fast-forward is available again; any positive count means it is blocked,
+/// and clients report that count when a blocked fast-forward is attempted.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public readonly struct NetworkMapEventLockChanged : IEvent
 {
     [ProtoMember(1)]
-    public readonly bool FastForwardBlocked;
-
-    [ProtoMember(2)]
     public readonly int PlayersInMapEvent;
 
-    public NetworkMapEventLockChanged(bool fastForwardBlocked, int playersInMapEvent)
+    public NetworkMapEventLockChanged(int playersInMapEvent)
     {
-        FastForwardBlocked = fastForwardBlocked;
         PlayersInMapEvent = playersInMapEvent;
     }
 }
