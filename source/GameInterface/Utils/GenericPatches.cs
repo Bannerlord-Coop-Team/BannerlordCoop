@@ -449,6 +449,27 @@ namespace GameInterface.Utils
             return PropertyTranspiler<TItem, TSetMessage>(patchedInstructions, propertyName);
         }
 
+        public static IEnumerable<CodeInstruction> QueueClearTranspiler<TItem>(IEnumerable<CodeInstruction> instructions)
+        {
+            var clearMethod = typeof(Queue<TItem>).GetMethod(nameof(Queue<TItem>.Clear));
+            var clearIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(QueueClearIntercept)).MakeGenericMethod();
+
+            foreach ( var instruction in instructions )
+            {
+                if (instruction.Calls(clearMethod))
+                {
+                    yield return new CodeInstruction(OpCodes.Call, clearIntercept);
+                }
+
+                yield return instruction;
+            }
+        }
+
+        public static void QueueClearIntercept<TItem>(Queue<TItem> queue)
+        {
+            // message
+        }
+
         /// <summary>
         /// Intercept that gets called when an item is added from the collection
         /// </summary>

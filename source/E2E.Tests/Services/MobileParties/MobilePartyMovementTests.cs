@@ -2,6 +2,8 @@
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using HarmonyLib;
 using SandBox;
 using System.Reflection;
@@ -17,6 +19,7 @@ public class MobilePartyMovementTests : SyncTestBase
 {
     private readonly string ServerId = "TestServer";
 
+    private readonly string HeroId = "TestHero";
     private readonly string MobilePartyId = "TestParty";
     private readonly string TargetPartyId = "TargetParty";
     private readonly string TargetSettlementId = "TargetSettlement";
@@ -31,8 +34,9 @@ public class MobilePartyMovementTests : SyncTestBase
         TargetPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         TargetSettlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
 
-        var controller = TestEnvironment.Server.Container.Resolve<IControlledEntityRegistry>();
-        controller.RegisterAsControlled(ServerId, MobilePartyId);
+        var playerManager = TestEnvironment.Server.Container.Resolve<IPlayerManager>();
+
+        playerManager.AddPlayer(new Player(ServerId, HeroId, MobilePartyId, "MyClan"));
 
         var clientNum = 1;
 
