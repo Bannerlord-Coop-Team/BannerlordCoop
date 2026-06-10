@@ -6,6 +6,7 @@ using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.MapEvents;
 using Serilog;
 
 namespace Coop.Core.Client.Services.Time.Handlers
@@ -21,6 +22,8 @@ namespace Coop.Core.Client.Services.Time.Handlers
         private readonly INetwork network;
         private readonly ITimeControlInterface timeControlInterface;
         private TimeControlLockState timeControlLockState = TimeControlLockState.Unlocked;
+        private bool fastForwardBlockedByMapEvent;
+        private int playersInMapEvent;
 
         public TimeHandler(IMessageBroker messageBroker, INetwork network, ITimeControlInterface timeControlInterface)
         {
@@ -31,6 +34,7 @@ namespace Coop.Core.Client.Services.Time.Handlers
             messageBroker.Subscribe<TimeSpeedChangedAttempted>(Handle_TimeSpeedChanged);
             messageBroker.Subscribe<NetworkChangeTimeControlMode>(Handle_NetworkTimeSpeedChanged);
             messageBroker.Subscribe<NetworkTimeControlLockChanged>(Handle_NetworkTimeControlLockChanged);
+            messageBroker.Subscribe<NetworkMapEventLockChanged>(Handle_NetworkMapEventLockChanged);
         }
 
         public void Dispose()
@@ -38,6 +42,7 @@ namespace Coop.Core.Client.Services.Time.Handlers
             messageBroker.Unsubscribe<TimeSpeedChangedAttempted>(Handle_TimeSpeedChanged);
             messageBroker.Unsubscribe<NetworkChangeTimeControlMode>(Handle_NetworkTimeSpeedChanged);
             messageBroker.Unsubscribe<NetworkTimeControlLockChanged>(Handle_NetworkTimeControlLockChanged);
+            messageBroker.Unsubscribe<NetworkMapEventLockChanged>(Handle_NetworkMapEventLockChanged);
             timeControlInterface.RemoveUnpausePolicy(TimeControlLockPolicy);
         }
 
@@ -51,10 +56,33 @@ namespace Coop.Core.Client.Services.Time.Handlers
                 return;
             }
 
+            if (fastForwardBlockedByMapEvent && newMode == TimeControlEnum.Play_2x)
+            {
+                messageBroker.Publish(this, new SendInformationMessage(
+                    MapEventTimeControlMessages.FastForwardBlocked(playersInMapEvent)));
+                return;
+            }
+
             Logger.Verbose("Client changing time to {mode} from server", newMode);
 
             var payload = new NetworkRequestTimeSpeedChange(newMode);
             network.SendAll(payload);
+        }
+
+        internal void Handle_NetworkMapEventLockChanged(MessagePayload<NetworkMapEventLockChanged> obj)
+        {
+            var wasBlocked = fastForwardBlockedByMapEvent;
+            fastForwardBlockedByMapEvent = obj.What.FastForwardBlocked;
+            playersInMapEvent = obj.What.PlayersInMapEvent;
+
+            if (fastForwardBlockedByMapEvent && !wasBlocked)
+            {
+                messageBroker.Publish(this, new SendInformationMessage(MapEventTimeControlMessages.FastForwardDisabled));
+            }
+            else if (!fastForwardBlockedByMapEvent && wasBlocked)
+            {
+                messageBroker.Publish(this, new SendInformationMessage(MapEventTimeControlMessages.FastForwardEnabled));
+            }
         }
 
         internal void Handle_NetworkTimeSpeedChanged(MessagePayload<NetworkChangeTimeControlMode> obj)

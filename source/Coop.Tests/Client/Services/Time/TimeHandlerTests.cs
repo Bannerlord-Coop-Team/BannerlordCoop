@@ -7,6 +7,7 @@ using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.MapEvents;
 using Moq;
 using System;
 using System.Linq;
@@ -140,6 +141,115 @@ namespace Coop.Tests.Client.Services.Time
             var localMessage = Assert.Single(broker.GetMessagesFromType<SendInformationMessage>());
             Assert.Equal("Time controls disabled, 2 player(s) are currently joining the game", localMessage.Text);
             Assert.False(network.SentNetworkMessages.ContainsKey(peer.Id));
+        }
+
+        [Fact]
+        public void NetworkMapEventLockChanged_WhenBecomesBlocked_PublishesFastForwardDisabledMessage()
+        {
+            // Arrange
+            var broker = new TestMessageBroker();
+            var network = new TestNetwork();
+            var mockTimeControlInterface = new Mock<ITimeControlInterface>();
+            var handler = new TimeHandler(broker, network, mockTimeControlInterface.Object);
+
+            // Act
+            handler.Handle_NetworkMapEventLockChanged(
+                new MessagePayload<NetworkMapEventLockChanged>(null, new NetworkMapEventLockChanged(true, 1)));
+
+            // Assert
+            var message = Assert.Single(broker.GetMessagesFromType<SendInformationMessage>());
+            Assert.Equal(MapEventTimeControlMessages.FastForwardDisabled, message.Text);
+        }
+
+        [Fact]
+        public void NetworkMapEventLockChanged_WhenBecomesUnblocked_PublishesFastForwardEnabledMessage()
+        {
+            // Arrange
+            var broker = new TestMessageBroker();
+            var network = new TestNetwork();
+            var mockTimeControlInterface = new Mock<ITimeControlInterface>();
+            var handler = new TimeHandler(broker, network, mockTimeControlInterface.Object);
+
+            handler.Handle_NetworkMapEventLockChanged(
+                new MessagePayload<NetworkMapEventLockChanged>(null, new NetworkMapEventLockChanged(true, 1)));
+
+            // Act
+            handler.Handle_NetworkMapEventLockChanged(
+                new MessagePayload<NetworkMapEventLockChanged>(null, new NetworkMapEventLockChanged(false, 0)));
+
+            // Assert
+            Assert.Contains(
+                broker.GetMessagesFromType<SendInformationMessage>(),
+                m => m.Text == MapEventTimeControlMessages.FastForwardEnabled);
+        }
+
+        [Fact]
+        public void NetworkMapEventLockChanged_WhenStillBlocked_DoesNotRepeatAnnouncement()
+        {
+            // Arrange
+            var broker = new TestMessageBroker();
+            var network = new TestNetwork();
+            var mockTimeControlInterface = new Mock<ITimeControlInterface>();
+            var handler = new TimeHandler(broker, network, mockTimeControlInterface.Object);
+
+            // Act
+            handler.Handle_NetworkMapEventLockChanged(
+                new MessagePayload<NetworkMapEventLockChanged>(null, new NetworkMapEventLockChanged(true, 1)));
+            handler.Handle_NetworkMapEventLockChanged(
+                new MessagePayload<NetworkMapEventLockChanged>(null, new NetworkMapEventLockChanged(true, 2)));
+
+            // Assert
+            Assert.Single(
+                broker.GetMessagesFromType<SendInformationMessage>(),
+                m => m.Text == MapEventTimeControlMessages.FastForwardDisabled);
+        }
+
+        [Fact]
+        public void TimeSpeedChanged_WhenFastForwardBlockedByMapEvent_ReportsCountAndDoesNotForward()
+        {
+            // Arrange
+            var broker = new TestMessageBroker();
+            var network = new TestNetwork();
+            var peer = network.CreatePeer();
+            var mockTimeControlInterface = new Mock<ITimeControlInterface>();
+            var handler = new TimeHandler(broker, network, mockTimeControlInterface.Object);
+
+            handler.Handle_NetworkMapEventLockChanged(
+                new MessagePayload<NetworkMapEventLockChanged>(null, new NetworkMapEventLockChanged(true, 3)));
+
+            // Act
+            handler.Handle_TimeSpeedChanged(
+                new MessagePayload<TimeSpeedChangedAttempted>(null, new TimeSpeedChangedAttempted(TimeControlEnum.Play_2x)));
+
+            // Assert
+            Assert.Contains(
+                broker.GetMessagesFromType<SendInformationMessage>(),
+                m => m.Text == MapEventTimeControlMessages.FastForwardBlocked(3));
+            Assert.False(network.SentNetworkMessages.ContainsKey(peer.Id));
+        }
+
+        [Fact]
+        public void TimeSpeedChanged_WhenFastForwardBlockedByMapEvent_StillAllowsNormalSpeed()
+        {
+            // Arrange
+            var broker = new TestMessageBroker();
+            var network = new TestNetwork();
+            var peer = network.CreatePeer();
+            var mockTimeControlInterface = new Mock<ITimeControlInterface>();
+            var handler = new TimeHandler(broker, network, mockTimeControlInterface.Object);
+
+            handler.Handle_NetworkMapEventLockChanged(
+                new MessagePayload<NetworkMapEventLockChanged>(null, new NetworkMapEventLockChanged(true, 1)));
+
+            // Act
+            handler.Handle_TimeSpeedChanged(
+                new MessagePayload<TimeSpeedChangedAttempted>(null, new TimeSpeedChangedAttempted(TimeControlEnum.Play_1x)));
+
+            // Assert
+            var sent = network.GetPeerMessages(peer);
+            Assert.Single(sent);
+            Assert.IsType<NetworkRequestTimeSpeedChange>(sent.First());
+            Assert.Equal(TimeControlEnum.Play_1x, ((NetworkRequestTimeSpeedChange)sent.First()).NewControlMode);
         }
     }
 }
