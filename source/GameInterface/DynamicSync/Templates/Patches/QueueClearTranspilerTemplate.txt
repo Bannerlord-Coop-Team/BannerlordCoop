@@ -1,15 +1,49 @@
-﻿[HarmonyTranspiler]
+[HarmonyTranspiler]
 public static IEnumerable<CodeInstruction> Transpiler_{{ MemberName }}_QueueClear(IEnumerable<CodeInstruction> instructions)
 {
     var clearMethod = typeof({{ MemberType }}).GetMethod(nameof({{ MemberType }}.Clear));
     var clearIntercept = typeof({{ MemberDeclaringType }}_DynamicPatches)
         .GetMethod(nameof(Intercept_QueueClear_{{ MemberName }}));
+    var memberField = AccessTools.Field(typeof({{ MemberDeclaringType }}), "{{ MemberName }}");
+    var memberGetter = AccessTools.PropertyGetter(typeof({{ MemberDeclaringType }}), "{{ MemberName }}");
 
-    foreach ( var instruction in instructions )
+    bool LoadsMember(CodeInstruction code) =>
+        (memberField != null && code.LoadsField(memberField)) ||
+        (memberGetter != null && code.Calls(memberGetter));
+
+    var codes = new List<CodeInstruction>(instructions);
+
+    for (int i = 0; i < codes.Count; i++)
     {
-        if (instruction.Calls(clearMethod))
+        var instruction = codes[i];
+
+        // Match '<owner>.{{ MemberName }}.Clear()': the member load directly followed by Queue<T>.Clear().
+        // The owner reference is on the stack right before the member load, so it is duplicated there
+        // and rides under the queue until the intercept call consumes both: [owner] -> dup -> [owner, owner]
+        // -> member load -> [owner, queue] -> call intercept(instance, queue). This works no matter how
+        // the owner was loaded (ldarg.0 in instance methods, another argument in static helpers, a local, ...).
+        if (LoadsMember(instruction) && i + 1 < codes.Count && codes[i + 1].Calls(clearMethod))
         {
-            yield return new CodeInstruction(OpCodes.Call, clearIntercept);
+            var clearCall = codes[i + 1];
+
+            // Branches that targeted the member load must land on the dup so the owner is still duplicated
+            yield return new CodeInstruction(OpCodes.Dup)
+            {
+                labels = instruction.labels.ToList(),
+                blocks = instruction.blocks.ToList(),
+            };
+
+            instruction.labels.Clear();
+            instruction.blocks.Clear();
+            yield return instruction;
+
+            yield return new CodeInstruction(OpCodes.Call, clearIntercept)
+            {
+                labels = clearCall.labels.ToList(),
+                blocks = clearCall.blocks.ToList(),
+            };
+
+            i++; // the original Clear call has been replaced by the intercept
             continue;
         }
 
@@ -17,7 +51,7 @@ public static IEnumerable<CodeInstruction> Transpiler_{{ MemberName }}_QueueClea
     }
 }
 
-public static void Intercept_QueueClear_{{ MemberName }}({{ MemberType }} queue)
+public static void Intercept_QueueClear_{{ MemberName }}({{ MemberDeclaringType }} instance, {{ MemberType }} queue)
 {
     // Allows original method call if this thread is allowed
     if (CallOriginalPolicy.IsOriginalAllowed())
@@ -34,8 +68,8 @@ public static void Intercept_QueueClear_{{ MemberName }}({{ MemberType }} queue)
         return;
     }
 
-    var message = new Local_{{ MemberDeclaringType}}_{{ MemberName }}_QueueClear(queue);
-    MessageBroker.Instance.Publish(queue, message);
+    var message = new Local_{{ MemberDeclaringType}}_{{ MemberName }}_QueueClear(instance);
+    MessageBroker.Instance.Publish(instance, message);
 
     queue.Clear();
 }

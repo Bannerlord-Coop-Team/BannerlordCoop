@@ -70,7 +70,10 @@ public class TownQueueSyncTests : SyncTestBase
         foreach (var client in Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject(townId, out Town clientTown));
-            Assert.Equal(2, clientTown.BuildingsInProgress.Count);
+            Assert.True(Server.ObjectManager.TryGetObject(townId, out Town serverTown));
+            Assert.True(2 == clientTown.BuildingsInProgress.Count,
+                $"client count={clientTown.BuildingsInProgress.Count}, server count={serverTown.BuildingsInProgress.Count}, " +
+                $"sameInstance={ReferenceEquals(serverTown, clientTown)}, sameQueue={ReferenceEquals(serverTown.BuildingsInProgress, clientTown.BuildingsInProgress)}");
         }
 
         // Act — clear the queue on the server through the generated queue clear intercept,
@@ -85,7 +88,7 @@ public class TownQueueSyncTests : SyncTestBase
         {
             Assert.True(Server.ObjectManager.TryGetObject(townId, out Town serverTown));
 
-            clearIntercept.Invoke(null, new object[] { serverTown.BuildingsInProgress });
+            clearIntercept.Invoke(null, new object[] { serverTown, serverTown.BuildingsInProgress });
 
             Assert.Empty(serverTown.BuildingsInProgress);
         });

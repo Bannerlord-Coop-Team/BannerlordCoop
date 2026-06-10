@@ -1,4 +1,4 @@
-﻿messageBroker.Subscribe((MessagePayload<Local_{{ MemberDeclaringType }}_{{ MemberName }}_QueueClear> payload) =>
+﻿SubscribeTracked((MessagePayload<Local_{{ MemberDeclaringType }}_{{ MemberName }}_QueueClear> payload) =>
 {
     var data = payload.What;
 
@@ -11,11 +11,11 @@
     network.SendAll(new Network_{{ MemberDeclaringType }}_{{ MemberName }}_ClearQueue(instanceId));
 });
 
-messageBroker.Subscribe((MessagePayload<Network_{{ MemberDeclaringType}}_{{ MemberName }}_ClearQueue> payload) =>
+SubscribeTracked((MessagePayload<Network_{{ MemberDeclaringType}}_{{ MemberName }}_ClearQueue> payload) =>
 {
     var data = payload.What;
 
-    if (!objectManager.TryGetObjectWithLogging(data.InstanceId, out {{ MemberType }} instance))
+    if (!objectManager.TryGetObjectWithLogging(data.InstanceId, out {{ MemberDeclaringType }} instance))
         return;
 
     try
@@ -25,7 +25,7 @@ messageBroker.Subscribe((MessagePayload<Network_{{ MemberDeclaringType}}_{{ Memb
             {{~ if Debug ~}}
             Logger.Debug("[Client] Clearing Queue {MemberName}", "{{MemberDeclaringType}}.{{MemberName}}");
             {{~ end ~}}
-            instance.Clear();
+            instance.{{ MemberName }}.Clear();
         }
     }
     catch (Exception ex)
