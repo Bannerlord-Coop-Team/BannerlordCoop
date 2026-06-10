@@ -127,7 +127,7 @@ internal class PartyDoneLogicHandler : IHandler
             troopRosterInterface.UpdateWithData(leftParty.MemberRoster, obj.What.LeftMemberRosterData, mainHero);
             troopRosterInterface.UpdateWithData(leftParty.PrisonRoster, obj.What.LeftPrisonerRosterData, mainHero);
         }
-        else if (leftPrisonerRoster != null) // Prisoner management doesn't have a set party, only the roster
+        else if (leftPrisonerRoster != null) // Prisoner management doesn't have a set party
         {
             troopRosterInterface.UpdateWithData(leftPrisonerRoster, obj.What.LeftPrisonerRosterData, mainHero);
         }
