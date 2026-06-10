@@ -1,14 +1,16 @@
 ﻿[HarmonyTranspiler]
 public static IEnumerable<CodeInstruction> Transpiler_{{ MemberName }}_QueueClear(IEnumerable<CodeInstruction> instructions)
 {
-    var clearMethod = typeof(Queue<{{ MemberType }}>).GetMethod(nameof({{ MemberType }}.Clear));
-    var clearIntercept = typeof({{ MemberDeclaringType }}_DynamicPatches).GetMethod(nameof(QueueClearIntercept));
+    var clearMethod = typeof({{ MemberType }}).GetMethod(nameof({{ MemberType }}.Clear));
+    var clearIntercept = typeof({{ MemberDeclaringType }}_DynamicPatches)
+        .GetMethod(nameof(Intercept_QueueClear_{{ MemberName }}));
 
     foreach ( var instruction in instructions )
     {
         if (instruction.Calls(clearMethod))
         {
             yield return new CodeInstruction(OpCodes.Call, clearIntercept);
+            continue;
         }
 
         yield return instruction;
