@@ -23,7 +23,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_town_town_tavern_on_consequence")]
     static bool DisableTavern()
     {
-        return false;
+        return true;
     }
 
     /// <summary>
