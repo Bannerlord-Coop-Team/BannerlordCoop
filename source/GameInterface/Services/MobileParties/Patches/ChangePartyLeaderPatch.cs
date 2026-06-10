@@ -1,6 +1,7 @@
 using Common;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -25,6 +26,9 @@ internal class ChangePartyLeaderPatch
 
         // The server is authoritative for party leadership; clients apply it via NetworkChangePartyLeader.
         if (!ModInformation.IsServer) return;
+
+        // Only player parties' leaders are synced; AI leadership churn would just spam the network.
+        if (!__instance.IsPlayerParty()) return;
 
         MessageBroker.Instance.Publish(__instance, new PartyLeaderChanged(__instance, newLeader));
     }

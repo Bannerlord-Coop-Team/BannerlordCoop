@@ -1,3 +1,4 @@
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -53,19 +54,24 @@ internal class PartyLeaderHandler : IHandler
     /// <summary>[Client] Apply the leader change.</summary>
     private void Handle_NetworkChangePartyLeader(MessagePayload<NetworkChangePartyLeader> payload)
     {
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(payload.What.MobilePartyId, out var mobileParty))
-            return;
-
-        Hero newLeader = null;
-        if (payload.What.LeaderHeroId != null && !objectManager.TryGetObjectWithLogging(payload.What.LeaderHeroId, out newLeader))
-            return;
-
-        using (new AllowedThread())
+        // Resolve and apply on the main thread: objectManager can be mutated concurrently by the main
+        // thread's Add/Remove, and ChangePartyLeader must only run there.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            mobileParty.ChangePartyLeader(newLeader);
-        }
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(payload.What.MobilePartyId, out var mobileParty))
+                return;
 
-        // The leader drives the party's map figure; rebuild it so the change is reflected visually.
-        mobileParty.Party.SetVisualAsDirty();
+            Hero newLeader = null;
+            if (payload.What.LeaderHeroId != null && !objectManager.TryGetObjectWithLogging(payload.What.LeaderHeroId, out newLeader))
+                return;
+
+            using (new AllowedThread())
+            {
+                mobileParty.ChangePartyLeader(newLeader);
+            }
+
+            // The leader drives the party's map figure; rebuild it so the change is reflected visually.
+            mobileParty.Party.SetVisualAsDirty();
+        });
     }
 }

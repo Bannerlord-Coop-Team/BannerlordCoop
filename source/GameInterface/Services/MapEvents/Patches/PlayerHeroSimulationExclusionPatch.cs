@@ -1,4 +1,4 @@
-using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.Heroes.Extensions;
 using HarmonyLib;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.GameComponents;
@@ -18,7 +18,7 @@ namespace GameInterface.Services.MapEvents.Patches;
 /// which (combined with <c>KillCharacterAction</c> also removing the dead hero) drives the party roster
 /// negative.
 ///
-/// We mirror the vanilla exclusion for every registered player's main hero by removing them from the
+/// We mirror the vanilla exclusion for every player-controlled hero by removing them from the
 /// prioritized spawn list the model builds. Patching the public, virtual
 /// <c>EnqueueTroopSpawnProbabilitiesAccordingToUnitSpawnPrioritization</c> (rather than the private,
 /// inline-prone <c>CanTroopJoinBattle</c>) makes the exclusion reliable.
@@ -34,16 +34,10 @@ internal class PlayerHeroSimulationExclusionPatch
         if (includePlayer || priorityList == null)
             return;
 
-        priorityList.RemoveAll(entry => IsPlayerMainHero(entry.Item1));
-    }
-
-    private static bool IsPlayerMainHero(FlattenedTroopRosterElement element)
-    {
-        var hero = element.Troop?.HeroObject;
-        var party = hero?.PartyBelongedTo;
-
-        // Each connected player leads their own party; exclude that hero the same way vanilla excludes
-        // the main character, while leaving companions to participate as they do in single-player.
-        return party != null && party.LeaderHero == hero && party.IsPlayerParty();
+        // Exclude every player-controlled hero (those registered in the player manager), the same way
+        // vanilla excludes the main character — a player hero is kept out of the sim even when it isn't its
+        // party's leader. Companions aren't player-controlled, so they still participate as in single-player.
+        // The null-conditional keeps non-hero troops out and avoids IsPlayerHero's null-argument logging.
+        priorityList.RemoveAll(entry => entry.Item1.Troop?.HeroObject?.IsPlayerHero() == true);
     }
 }

@@ -2,12 +2,14 @@ using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Messages;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
 using Serilog;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -69,6 +71,7 @@ internal class BattleSimulationRunHandler : IHandler
         messageBroker.Subscribe<NetworkAdvanceBattleSimulation>(Handle_NetworkAdvanceBattleSimulation);
         messageBroker.Subscribe<NetworkBattleSimulationRound>(Handle_NetworkBattleSimulationRound);
         messageBroker.Subscribe<NetworkBattleSimulationFinished>(Handle_NetworkBattleSimulationFinished);
+        messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
     }
 
     public void Dispose()
@@ -79,6 +82,7 @@ internal class BattleSimulationRunHandler : IHandler
         messageBroker.Unsubscribe<NetworkAdvanceBattleSimulation>(Handle_NetworkAdvanceBattleSimulation);
         messageBroker.Unsubscribe<NetworkBattleSimulationRound>(Handle_NetworkBattleSimulationRound);
         messageBroker.Unsubscribe<NetworkBattleSimulationFinished>(Handle_NetworkBattleSimulationFinished);
+        messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
     }
 
     /// <summary>[Client] Begin local playback and ask the server to set the simulation up.</summary>
@@ -171,6 +175,12 @@ internal class BattleSimulationRunHandler : IHandler
 
         GameLoopRunner.RunOnMainThread(() =>
         {
+            // Accumulate every round resolved in this advance into one update. Normal playback advances
+            // a single round per call (one packet per round, as before), but a "skip" resolves the whole
+            // remaining battle in one advance: batching keeps that from flooding the peer's outbound
+            // queue with a packet per round.
+            var batched = new List<BattleSimTroopChange>();
+
             int rounds = 0;
             while (rounds < maxRounds && rounds < MaxSimulationRounds && !sim.MapEvent.HasWinner)
             {
@@ -179,20 +189,15 @@ internal class BattleSimulationRunHandler : IHandler
 
                 var changes = sim.Observer.FlushRound();
                 if (changes.Length > 0)
-                    network.Send(sim.Peer, new NetworkBattleSimulationRound(mapEventId, changes));
+                    batched.AddRange(changes);
             }
+
+            if (batched.Count > 0)
+                network.Send(sim.Peer, new NetworkBattleSimulationRound(mapEventId, batched.ToArray()));
 
             if (sim.MapEvent.HasWinner)
             {
-                // End the simulation session: commit XP and release the simulation troop allocations,
-                // mirroring MapEvent.SimulateBattleRoundEndSession.
-                foreach (var side in sim.MapEvent._sides)
-                {
-                    sim.MapEvent.CommitXpGains();
-                    side.EndSimulation();
-                }
-
-                sim.MapEvent.BattleObserver = sim.PreviousObserver;
+                EndSimulationSession(sim);
                 finished = true;
             }
         }, blocking: true);
@@ -216,34 +221,107 @@ internal class BattleSimulationRunHandler : IHandler
         if (message.Changes == null || message.Changes.Length == 0)
             return;
 
-        var resolved = new List<BattleSimulationReplay.ResolvedChange>(message.Changes.Length);
-        foreach (var change in message.Changes)
+        // Resolve and enqueue on the main thread: objectManager can be mutated by the main thread's
+        // Add/Remove, and BattleSimulationReplay's round queue is drained on the main-thread tick.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            if (!objectManager.TryGetObject<PartyBase>(change.PartyId, out var party))
-                continue;
+            var resolved = new List<BattleSimulationReplay.ResolvedChange>(message.Changes.Length);
+            foreach (var change in message.Changes)
+            {
+                if (!objectManager.TryGetObject<PartyBase>(change.PartyId, out var party))
+                    continue;
 
-            if (!TryResolveCharacterObject(change.CharacterId, change.IsHero, out var character))
-                continue;
+                if (!TryResolveCharacterObject(change.CharacterId, change.IsHero, out var character))
+                    continue;
 
-            resolved.Add(new BattleSimulationReplay.ResolvedChange(
-                (BattleSideEnum)change.Side, party, character,
-                change.Number, change.NumberKilled, change.NumberWounded, change.NumberRouted, change.KillCount, change.NumberReadyToUpgrade));
-        }
+                resolved.Add(new BattleSimulationReplay.ResolvedChange(
+                    (BattleSideEnum)change.Side, party, character,
+                    change.Number, change.NumberKilled, change.NumberWounded, change.NumberRouted, change.KillCount, change.NumberReadyToUpgrade));
+            }
 
-        if (resolved.Count > 0)
-            BattleSimulationReplay.EnqueueRound(resolved.ToArray());
+            if (resolved.Count > 0)
+                BattleSimulationReplay.EnqueueRound(resolved.ToArray());
+        });
     }
 
     /// <summary>[Client] Server finished simulating: end playback once the queued rounds drain.</summary>
     private void Handle_NetworkBattleSimulationFinished(MessagePayload<NetworkBattleSimulationFinished> payload)
     {
-        if (PlayerEncounter.CurrentBattleSimulation == null)
+        // Both the encounter state and the replay's finish flag belong to the main-thread tick.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            Logger.Warning("Received {Message} but no battle simulation is active", nameof(NetworkBattleSimulationFinished));
+            if (PlayerEncounter.CurrentBattleSimulation == null)
+            {
+                Logger.Warning("Received {Message} but no battle simulation is active", nameof(NetworkBattleSimulationFinished));
+                return;
+            }
+
+            BattleSimulationReplay.RequestFinish();
+        });
+    }
+
+    /// <summary>
+    /// [Server] The pacing client dropped: finish and tear down any simulations it was driving so the
+    /// swapped-in observer is restored and the tracking entry doesn't leak.
+    /// </summary>
+    private void Handle_PlayerDisconnected(MessagePayload<PlayerDisconnected> payload)
+    {
+        if (!ModInformation.IsServer)
             return;
+
+        var peer = payload.What.PlayerId;
+
+        List<KeyValuePair<string, ActiveSimulation>> orphaned;
+        lock (simLock)
+        {
+            orphaned = activeSimulations.Where(entry => entry.Value.Peer == peer).ToList();
         }
 
-        BattleSimulationReplay.RequestFinish();
+        if (orphaned.Count == 0)
+            return;
+
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            foreach (var entry in orphaned)
+            {
+                var sim = entry.Value;
+
+                // No client left to pace the playback, so resolve whatever remains and let the battle
+                // reach its decision (casualties still sync to the other clients via the troop-roster
+                // patches) instead of leaving the map event half-simulated.
+                int rounds = 0;
+                while (rounds < MaxSimulationRounds && !sim.MapEvent.HasWinner)
+                {
+                    rounds++;
+                    sim.MapEvent.SimulatePlayerEncounterBattle();
+                }
+
+                EndSimulationSession(sim);
+                mapEventLogger.DebugMapEvent(sim.MapEvent, "Battle simulation client disconnected; finished server-side. BattleState={BattleState}", sim.MapEvent.BattleState);
+            }
+        }, blocking: true);
+
+        lock (simLock)
+        {
+            foreach (var entry in orphaned)
+                activeSimulations.Remove(entry.Key);
+        }
+    }
+
+    /// <summary>
+    /// [Server, main thread] End the simulation session: commit XP and release the simulation troop
+    /// allocations (mirroring <c>MapEvent.SimulateBattleRoundEndSession</c>), then restore the observer
+    /// that was swapped out when the simulation began.
+    /// </summary>
+    private static void EndSimulationSession(ActiveSimulation sim)
+    {
+        foreach (var side in sim.MapEvent._sides)
+        {
+            sim.MapEvent.CommitXpGains();
+            side.EndSimulation();
+        }
+
+        sim.MapEvent.BattleObserver = sim.PreviousObserver;
     }
 
     private bool TryResolveCharacterObject(string objectId, bool isHero, out CharacterObject characterObject)

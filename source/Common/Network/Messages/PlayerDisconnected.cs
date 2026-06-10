@@ -1,10 +1,11 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using LiteNetLib;
 
-namespace Coop.Core.Server.Connections.Messages;
+namespace Common.Network.Messages;
 
 /// <summary>
-/// A player has disconnected
+/// A player has disconnected. Lives in Common so both the networking layer (which raises it) and
+/// GameInterface server-side handlers (which release per-peer state) can reference it.
 /// </summary>
 public record PlayerDisconnected : IEvent
 {

@@ -9,6 +9,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.MapEvents.Patches;
@@ -26,7 +27,11 @@ namespace GameInterface.Services.MapEvents.Patches;
 /// We pre-empt that: for each defeated player party we take its hero prisoner through the normal
 /// <see cref="TakePrisonerAction"/> (which the mod already syncs via <c>PrisonerTaken</c> and uses to
 /// deactivate — not destroy — the party), then remove those parties from the list vanilla processes so it
-/// never runs its destroy path on them.
+/// never runs its destroy path on them. Running first also clears the captured hero from the player party's
+/// roster, so native's loop no longer re-processes it.
+///
+/// This is the single authoritative prefix for player-party defeat capture; the captivity service used to
+/// carry a near-duplicate prefix on the same method, which has been removed in favour of this one.
 /// </remarks>
 [HarmonyPatch(typeof(MapEvent), "CaptureDefeatedPartyMembers")]
 internal class PlayerDefeatCapturePatch
@@ -34,10 +39,15 @@ internal class PlayerDefeatCapturePatch
     private static readonly ILogger Logger = LogManager.GetLogger<PlayerDefeatCapturePatch>();
 
     [HarmonyPrefix]
-    private static void Prefix(MBReadOnlyList<MapEventParty> winnerParties, ref MBReadOnlyList<MapEventParty> defeatedParties)
+    private static void Prefix(MapEvent __instance, MBReadOnlyList<MapEventParty> winnerParties, ref MBReadOnlyList<MapEventParty> defeatedParties)
     {
         // Defeat resolution is authoritative on the server.
         if (!ModInformation.IsServer)
+            return;
+
+        // A retreating side flees rather than being captured/destroyed: leave vanilla's retreat handling
+        // untouched and don't take prisoners in that case.
+        if (__instance.RetreatingSide != BattleSideEnum.None)
             return;
 
         var playerParties = defeatedParties

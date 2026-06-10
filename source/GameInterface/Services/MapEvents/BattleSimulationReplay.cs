@@ -98,17 +98,15 @@ internal static class BattleSimulationReplay
         while (arrivedRounds.Count > 0)
             ApplyRound(simulation, arrivedRounds.Dequeue());
 
-        // Finish only once the server is done and all streamed rounds have been shown.
-        if (finishRequested && arrivedRounds.Count == 0)
+        // The queue is fully drained above, so reaching here with finishRequested means the server is
+        // done and every streamed round has been shown: finish playback.
+        if (finishRequested)
         {
             simulation.IsSimulationFinished = true;
             simulation.BattleObserver?.BattleResultsReady();
             mapEventId = null;
             return;
         }
-
-        if (finishRequested)
-            return; // draining the tail; no more rounds to request
 
         int state = GetSimulationState(simulation);
         switch (state)
