@@ -149,6 +149,17 @@ internal class HeroInterface : IHeroInterface
         // hero computes — and collides with — the same id.
         assignNetworkIds(hero);
 
+        // The unpacked CharacterObject still carries the sender's MBGUID and IsRegistered flag. The Add* calls
+        // below re-mint hero/party/clan ids, but a CharacterObject is owned by MBObjectManager, which only mints
+        // ids on registration — so register it (after its StringId is final). Left unregistered, the transfer
+        // save's load either skips it silently (hero falls back to the default character) or, with
+        // a unique StringId, crashes adding the foreign MBGUID to the registry's GUID table.
+        var characterObject = hero.CharacterObject;
+        MBObjectManager.Instance?.RegisterObject(characterObject);
+        if (characterObject.StringId != hero.StringId)
+            Logger.Error("CharacterObject was renamed to {newId} during registration; expected {expectedId}",
+                characterObject.StringId, hero.StringId);
+
         campaignObjectManager.AddHero(hero);
         campaignObjectManager.AddMobileParty(party);
         campaignObjectManager.AddClan(hero.Clan);
@@ -164,7 +175,10 @@ internal class HeroInterface : IHeroInterface
         RegisterPrimary(hero, NewServerStringId(hero));
         RegisterPrimary(party, NewServerStringId(party));
         RegisterPrimary(hero.Clan, NewServerStringId(hero.Clan));
-        //RegisterPrimary(hero.CharacterObject, NewServerStringId(hero.CharacterObject)); TODO
+        // CharacterObject is 1:1 with its hero and isn't tracked by the CampaignObjectManager, so we can't mint a
+        // "PlayerN" id for it via FindNextUniqueStringId (that only knows campaign object types). Reuse the hero's
+        // freshly-assigned unique StringId; the type-prefixed coop key ("CharacterObject_PlayerN") keeps it distinct.
+        RegisterPrimary(hero.CharacterObject, hero.StringId);
 
         RegisterPartyChildren(party);
     }
@@ -180,7 +194,7 @@ internal class HeroInterface : IHeroInterface
         RegisterPrimary(hero, StripTypePrefix(player.HeroId, hero));
         RegisterPrimary(party, StripTypePrefix(player.MobilePartyId, party));
         RegisterPrimary(hero.Clan, StripTypePrefix(player.ClanId, hero.Clan));
-        //characterObject TODO
+        RegisterPrimary(hero.CharacterObject, StripTypePrefix(player.CharacterObjectId, hero.CharacterObject));
 
         RegisterPartyChildren(party);
     }

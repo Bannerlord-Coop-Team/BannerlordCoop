@@ -143,7 +143,7 @@ namespace Coop.Tests.Server.Connections.States
 
             
 
-            var player = new Player("MyPlayer", "MyHero", "MyParty", "MyClan");
+            var player = new Player("MyPlayer", "MyHero", "MyParty", "MyClan", "MyCharacter");
 
             var playerManagerMock = serverComponent.Container.Resolve<Mock<IPlayerManager>>();
 

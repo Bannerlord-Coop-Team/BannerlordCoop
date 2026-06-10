@@ -38,8 +38,8 @@ namespace Coop.Tests.Server.Services.Save
 
             var players = new Player[]
             {
-                new Player("MyPlayer1", "MyHero1","MyParty1", "MyClan1"),
-                new Player("MyPlayer2", "MyHero2","MyParty2", "MyClan2"),
+                new Player("MyPlayer1", "MyHero1","MyParty1", "MyClan1", "MyCharacter1"),
+                new Player("MyPlayer2", "MyHero2","MyParty2", "MyClan2", "MyCharacter2"),
             };
 
             ICoopSession sessionData = new CoopSession("SaveManagerTest", players, new CraftingPlayerData(new(), new(), new()));
@@ -71,8 +71,8 @@ namespace Coop.Tests.Server.Services.Save
 
             var players = new Player[]
             {
-                new Player("MyPlayer1", "MyHero1","MyParty1", "MyClan1"),
-                new Player("MyPlayer2", "MyHero2","MyParty2", "MyClan2"),
+                new Player("MyPlayer1", "MyHero1","MyParty1", "MyClan1", "MyCharacter1"),
+                new Player("MyPlayer2", "MyHero2","MyParty2", "MyClan2", "MyCharacter2"),
             };
 
             ICoopSession sessionData = new CoopSession("SaveManagerTest", players, new CraftingPlayerData(new(), new(), new()));
