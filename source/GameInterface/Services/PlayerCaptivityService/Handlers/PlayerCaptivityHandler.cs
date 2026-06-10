@@ -321,7 +321,7 @@ internal class PlayerCaptivityHandler : IHandler
 
             if (captorParty == null) continue;
 
-            mobileParty.Position = hero.PartyBelongedToAsPrisoner.Position;
+            mobileParty.Position = captorParty.Position;
         }
     }
 
