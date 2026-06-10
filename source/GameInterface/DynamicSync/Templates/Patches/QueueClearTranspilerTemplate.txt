@@ -1,8 +1,8 @@
 ﻿[HarmonyTranspiler]
 public static IEnumerable<CodeInstruction> Transpiler_{{ MemberName }}_QueueClear(IEnumerable<CodeInstruction> instructions)
 {
-    var clearMethod = typeof(Queue<{{ MemberType }}>).GetMethod(nameof(Queue<{{ MemberType }}>.Clear));
-    var clearIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(QueueClearIntercept)).MakeGenericMethod();
+    var clearMethod = typeof(Queue<{{ MemberType }}>).GetMethod(nameof({{ MemberType }}.Clear));
+    var clearIntercept = typeof({{ MemberDeclaringType }}_DynamicPatches).GetMethod(nameof(QueueClearIntercept));
 
     foreach ( var instruction in instructions )
     {
@@ -15,7 +15,7 @@ public static IEnumerable<CodeInstruction> Transpiler_{{ MemberName }}_QueueClea
     }
 }
 
-public static void Intercept_QueueClear_{{ MemberName }}<{{ MemberType }}>(Queue<{{ MemberType }}> queue)
+public static void Intercept_QueueClear_{{ MemberName }}({{ MemberType }} queue)
 {
     // Allows original method call if this thread is allowed
     if (CallOriginalPolicy.IsOriginalAllowed())
@@ -33,7 +33,7 @@ public static void Intercept_QueueClear_{{ MemberName }}<{{ MemberType }}>(Queue
     }
 
     var message = new Local_{{ MemberDeclaringType}}_{{ MemberName }}_QueueClear(queue);
-    MessageBroker.Instance.Publish(instance, message);
+    MessageBroker.Instance.Publish(queue, message);
 
     queue.Clear();
 }

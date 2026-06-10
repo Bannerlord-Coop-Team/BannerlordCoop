@@ -15,7 +15,7 @@ public class DynamicSyncFieldQueueBuilder : DynamicSyncBuilderBase
     {
     }
 
-    public string GetTranspiler(Debuggable<FieldInfo> fieldItem)
+    public IEnumerable<string> GetTranspilers(Debuggable<FieldInfo> fieldItem)
     {
         var fieldInfo = fieldItem.Value;
 
@@ -23,7 +23,8 @@ public class DynamicSyncFieldQueueBuilder : DynamicSyncBuilderBase
 
         string changeTemplate = TemplateParser.Parse("Patches.FieldQueueChangeTranspilerTemplate", GetTemplateData(fieldItem));
 
-        return string.Join(Environment.NewLine, setTemplate, changeTemplate);
+        yield return string.Join(Environment.NewLine, setTemplate, changeTemplate);
+        yield return TemplateParser.Parse("Patches.QueueClearTranspilerTemplate", GetTemplateData(fieldItem));
     }
 
 
@@ -37,24 +38,22 @@ public class DynamicSyncFieldQueueBuilder : DynamicSyncBuilderBase
         string localAddMessage = TemplateParser.Parse("Messages.LocalCollectionAddMessageTemplate", templateData);
         string localRemoveMessage = TemplateParser.Parse("Messages.LocalCollectionRemoveMessageTemplate", templateData);
         string localClearMessage = TemplateParser.Parse("Messages.LocalQueueClearMessageTemplate", templateData);
+        string networkClearMessage = TemplateParser.Parse("Messages.NetworkQueueClearMessageTemplate", templateData);
 
         string networkMessage;
         string networkAddMessage;
         string networkRemoveMessage;
-        string networkClearMessage;
         if (RuntimeTypeModel.Default.CanSerialize(GetElementType(fieldInfo.FieldType)))
         {
             networkMessage = TemplateParser.Parse("Messages.NetworkCollectionSetValueMessageTemplate", templateData);
             networkAddMessage = TemplateParser.Parse("Messages.NetworkCollectionAddValueMessageTemplate", templateData);
             networkRemoveMessage = TemplateParser.Parse("Messages.NetworkCollectionRemoveValueMessageTemplate", templateData);
-            networkClearMessage = TemplateParser.Parse("Messages.LocalQueueClearMessageTemplate", templateData);
         }
         else
         {
             networkMessage = TemplateParser.Parse("Messages.NetworkCollectionSetReferenceMessageTemplate", templateData);
             networkAddMessage = TemplateParser.Parse("Messages.NetworkCollectionAddReferenceMessageTemplate", templateData);
             networkRemoveMessage = TemplateParser.Parse("Messages.NetworkCollectionRemoveReferenceMessageTemplate", templateData);
-            networkClearMessage = TemplateParser.Parse("Messages.NetworkQueueClearMessageTemplate", templateData);
         }
 
         DynamicSyncConfiguration.ExportFile($"{fieldInfo.DeclaringType.Name}/{fieldInfo.DeclaringType.Name}_{fieldInfo.Name}_SetLocalMessage.cs", localMessage);

@@ -1,7 +1,13 @@
 ﻿messageBroker.Subscribe((MessagePayload<Local_{{ MemberDeclaringType }}_{{ MemberName }}_QueueClear> payload) =>
 {
     var data = payload.What;
-    if (!objectManager.TryGetIdWithLogging(data.Instance, out var instanceId)) return;
+
+    if (!objectManager.TryGetIdWithLogging(data.Instance, out var instanceId))
+        return;
+
+    {{~ if Debug ~}}
+    Logger.Debug("[Server] Broadcasting clear queue {MemberName}", "{{MemberDeclaringType}}.{{MemberName}}");
+    {{~ end ~}}
 
     network.SendAll(new Network_{{ MemberDeclaringType }}_{{ MemberName }}_ClearQueue(instanceId));
 });
@@ -9,12 +15,17 @@
 messageBroker.Subscribe((MessagePayload<Network_{{ MemberDeclaringType}}_{{ MemberName }}_ClearQueue> payload) =>
 {
     var data = payload.What;
-    if (!objectManager.TryGetObjectWithLogging(data.InstanceId, out {{ MemberType }} instance)) return;
+
+    if (!objectManager.TryGetObjectWithLogging(data.InstanceId, out {{ MemberType }} instance))
+        return;
 
     try
     {
         using (new AllowedThread())
         {
+            {{~ if Debug ~}}
+            Logger.Debug("[Client] Clearing Queue {MemberName}", "{{MemberDeclaringType}}.{{MemberName}}");
+            {{~ end ~}}
             instance.Clear();
         }
     }
