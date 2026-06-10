@@ -215,12 +215,12 @@ public abstract class MapEventTestBase : IDisposable
     /// branches in the MapEvent patches (join windows, captivity, surrender, etc.).
     /// </summary>
     /// <returns>The string ids of the created player hero and party.</returns>
-    protected (string heroId, string partyId) CreatePlayerHeroParty()
+    protected (string heroId, string partyId) CreatePlayerHeroParty(string controllerId)
     {
         var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
         var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
 
-        RegisterAsPlayerParty(heroId, partyId);
+        RegisterAsPlayerParty(controllerId, heroId, partyId);
 
         return (heroId, partyId);
     }
@@ -228,17 +228,17 @@ public abstract class MapEventTestBase : IDisposable
     /// <summary>
     /// Registers an already-synced hero/party pair as a player in every instance's player registry.
     /// </summary>
-    protected void RegisterAsPlayerParty(string heroId, string partyId)
+    protected void RegisterAsPlayerParty(string controllerId, string heroId, string partyId)
     {
         void Register(EnvironmentInstance instance)
         {
             instance.Call(() =>
             {
                 var registry = instance.Resolve<IPlayerManager>();
-                registry.AddPlayer(new Player(heroId, partyId));
+                registry.AddPlayer(new Player(controllerId, heroId, partyId, "MyClanId"));
 
                 Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
-                Assert.True(registry.Contains(party));
+                Assert.True(registry.TryGetPlayer(controllerId, out var _));
             });
         }
 

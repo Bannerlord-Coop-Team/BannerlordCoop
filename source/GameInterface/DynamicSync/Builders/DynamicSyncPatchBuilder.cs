@@ -108,9 +108,9 @@ namespace GameInterface.DynamicSync.Builders
                 {
                     usings.Add(DynamicSyncUtils.GetNamespace(propertyInfo.PropertyType.GetGenericArguments()[0]));
                     prefixes.Add(dynamicSyncPropertyQueueBuilder.GetPrefix(propertyItem));
-                    transpilers.Add(dynamicSyncPropertyQueueBuilder.GetTranspiler(propertyItem));
+                    transpilers.AddRange(dynamicSyncPropertyQueueBuilder.GetTranspilers(propertyItem));
                     messages.AddRange(dynamicSyncPropertyQueueBuilder.GetMessages(propertyItem));
-                    messageHandlers.Add(dynamicSyncPropertyQueueBuilder.GetSubscription(propertyItem));
+                    messageHandlers.AddRange(dynamicSyncPropertyQueueBuilder.GetSubscriptions(propertyItem));
                 }
             }
 
@@ -150,9 +150,9 @@ namespace GameInterface.DynamicSync.Builders
                 else if (fieldInfo.FieldType.Name.Contains("Queue"))
                 {
                     usings.Add(DynamicSyncUtils.GetNamespace(fieldInfo.FieldType.GetGenericArguments()[0]));
-                    transpilers.Add(dynamicSyncFieldQueueBuilder.GetTranspiler(fieldItem));
+                    transpilers.AddRange(dynamicSyncFieldQueueBuilder.GetTranspilers(fieldItem));
                     messages.AddRange(dynamicSyncFieldQueueBuilder.GetMessages(fieldItem));
-                    messageHandlers.Add(dynamicSyncFieldQueueBuilder.GetSubscription(fieldItem));
+                    messageHandlers.AddRange(dynamicSyncFieldQueueBuilder.GetSubscriptions(fieldItem));
                 }
                 else if (fieldInfo.FieldType.Name.Contains("PropertyOwner"))
                 {

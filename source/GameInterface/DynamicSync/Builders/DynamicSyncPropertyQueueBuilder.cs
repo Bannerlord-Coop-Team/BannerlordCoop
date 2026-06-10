@@ -17,9 +17,10 @@ namespace GameInterface.DynamicSync.Builders
         public string GetPrefix(Debuggable<PropertyInfo> propertyItem) => DynamicSyncUtils.GetPrefix(propertyItem);
 
 
-        public string GetTranspiler(Debuggable<PropertyInfo> propertyItem)
+        public IEnumerable<string> GetTranspilers(Debuggable<PropertyInfo> propertyItem)
         {
-            return TemplateParser.Parse("Patches.PropertyQueueChangeTranspilerTemplate", GetTemplateData(propertyItem));
+            yield return TemplateParser.Parse("Patches.PropertyQueueChangeTranspilerTemplate", GetTemplateData(propertyItem));
+            yield return TemplateParser.Parse("Patches.QueueClearTranspilerTemplate", GetTemplateData(propertyItem));
         }
 
 
@@ -32,6 +33,8 @@ namespace GameInterface.DynamicSync.Builders
 
             string localAddMessage = TemplateParser.Parse("Messages.LocalCollectionAddMessageTemplate", templateData);
             string localRemoveMessage = TemplateParser.Parse("Messages.LocalCollectionRemoveMessageTemplate", templateData);
+            string localClearMessage = TemplateParser.Parse("Messages.LocalQueueClearMessageTemplate", templateData);
+            string networkClearMessage = TemplateParser.Parse("Messages.NetworkQueueClearMessageTemplate", templateData);
 
             string networkMessage;
             string networkAddMessage;
@@ -58,27 +61,34 @@ namespace GameInterface.DynamicSync.Builders
             DynamicSyncConfiguration.ExportFile($"{propertyInfo.DeclaringType.Name}/{propertyInfo.DeclaringType.Name}_{propertyInfo.Name}_RemoveLocalMessage.cs", localRemoveMessage);
             DynamicSyncConfiguration.ExportFile($"{propertyInfo.DeclaringType.Name}/{propertyInfo.DeclaringType.Name}_{propertyInfo.Name}_RemoveNetworkMessage.cs", networkRemoveMessage);
 
+            DynamicSyncConfiguration.ExportFile($"{propertyInfo.DeclaringType.Name}/Local_{propertyInfo.DeclaringType.Name}_{propertyInfo.Name}_QueueClear.cs", localClearMessage);
+            DynamicSyncConfiguration.ExportFile($"{propertyInfo.DeclaringType.Name}/Network_{propertyInfo.DeclaringType.Name}_{propertyInfo.Name}_QueueClear.cs", networkClearMessage);
+
             yield return localMessage;
             yield return localAddMessage;
             yield return localRemoveMessage;
+            yield return localClearMessage;
             yield return networkMessage;
             yield return networkAddMessage;
             yield return networkRemoveMessage;
+            yield return networkClearMessage;
         }
 
-        public string GetSubscription(Debuggable<PropertyInfo> propertyItem)
+        public IEnumerable<string> GetSubscriptions(Debuggable<PropertyInfo> propertyItem)
         {
             var propertyInfo = propertyItem.Value;
 
             var templateData = GetTemplateData(propertyItem);
             if (RuntimeTypeModel.Default.CanSerialize(GetElementType(propertyInfo.PropertyType)))
             {
-                return TemplateParser.Parse("Handlers.SubscribeQueueValueTemplate", templateData);
+                yield return TemplateParser.Parse("Handlers.SubscribeQueueValueTemplate", templateData);
             }
             else
             {
-                return TemplateParser.Parse("Handlers.SubscribeQueueReferenceTemplate", templateData);
+                yield return TemplateParser.Parse("Handlers.SubscribeQueueReferenceTemplate", templateData);
             }
+
+            yield return TemplateParser.Parse("Handlers.SubscribeQueueClearTemplate", templateData);
         }
 
         private string GetQueueTypeName(Type type)
