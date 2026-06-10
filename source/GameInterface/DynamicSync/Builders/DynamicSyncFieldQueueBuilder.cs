@@ -36,21 +36,25 @@ public class DynamicSyncFieldQueueBuilder : DynamicSyncBuilderBase
 
         string localAddMessage = TemplateParser.Parse("Messages.LocalCollectionAddMessageTemplate", templateData);
         string localRemoveMessage = TemplateParser.Parse("Messages.LocalCollectionRemoveMessageTemplate", templateData);
+        string localClearMessage = TemplateParser.Parse("Messages.LocalQueueClearMessageTemplate", templateData);
 
         string networkMessage;
         string networkAddMessage;
         string networkRemoveMessage;
+        string networkClearMessage;
         if (RuntimeTypeModel.Default.CanSerialize(GetElementType(fieldInfo.FieldType)))
         {
             networkMessage = TemplateParser.Parse("Messages.NetworkCollectionSetValueMessageTemplate", templateData);
             networkAddMessage = TemplateParser.Parse("Messages.NetworkCollectionAddValueMessageTemplate", templateData);
             networkRemoveMessage = TemplateParser.Parse("Messages.NetworkCollectionRemoveValueMessageTemplate", templateData);
+            networkClearMessage = TemplateParser.Parse("Messages.LocalQueueClearMessageTemplate", templateData);
         }
         else
         {
             networkMessage = TemplateParser.Parse("Messages.NetworkCollectionSetReferenceMessageTemplate", templateData);
             networkAddMessage = TemplateParser.Parse("Messages.NetworkCollectionAddReferenceMessageTemplate", templateData);
             networkRemoveMessage = TemplateParser.Parse("Messages.NetworkCollectionRemoveReferenceMessageTemplate", templateData);
+            networkClearMessage = TemplateParser.Parse("Messages.NetworkQueueClearMessageTemplate", templateData);
         }
 
         DynamicSyncConfiguration.ExportFile($"{fieldInfo.DeclaringType.Name}/{fieldInfo.DeclaringType.Name}_{fieldInfo.Name}_SetLocalMessage.cs", localMessage);
@@ -62,27 +66,34 @@ public class DynamicSyncFieldQueueBuilder : DynamicSyncBuilderBase
         DynamicSyncConfiguration.ExportFile($"{fieldInfo.DeclaringType.Name}/{fieldInfo.DeclaringType.Name}_{fieldInfo.Name}_RemoveLocalMessage.cs", localRemoveMessage);
         DynamicSyncConfiguration.ExportFile($"{fieldInfo.DeclaringType.Name}/{fieldInfo.DeclaringType.Name}_{fieldInfo.Name}_RemoveNetworkMessage.cs", networkRemoveMessage);
 
+        DynamicSyncConfiguration.ExportFile($"{fieldInfo.DeclaringType.Name}/Local_{fieldInfo.DeclaringType.Name}_{fieldInfo.Name}_QueueClear.cs", localClearMessage);
+        DynamicSyncConfiguration.ExportFile($"{fieldInfo.DeclaringType.Name}/Network_{fieldInfo.DeclaringType.Name}_{fieldInfo.Name}_QueueClear.cs", networkClearMessage);
+
         yield return localMessage;
         yield return localAddMessage;
         yield return localRemoveMessage;
+        yield return localClearMessage;
         yield return networkMessage;
         yield return networkAddMessage;
         yield return networkRemoveMessage;
+        yield return networkClearMessage;
     }
 
-    public string GetSubscription(Debuggable<FieldInfo> fieldItem)
+    public IEnumerable<string> GetSubscriptions(Debuggable<FieldInfo> fieldItem)
     {
         var fieldInfo = fieldItem.Value;
 
         var templateData = GetTemplateData(fieldItem);
         if (RuntimeTypeModel.Default.CanSerialize(GetElementType(fieldInfo.FieldType)))
         {
-            return TemplateParser.Parse("Handlers.SubscribeQueueValueTemplate", templateData);
+            yield return TemplateParser.Parse("Handlers.SubscribeQueueValueTemplate", templateData);
         }
         else
         {
-            return TemplateParser.Parse("Handlers.SubscribeQueueReferenceTemplate", templateData);
+            yield return TemplateParser.Parse("Handlers.SubscribeQueueReferenceTemplate", templateData);
         }
+
+        yield return TemplateParser.Parse("Handlers.SubscribeQueueClearTemplate", templateData);
     }
 
     private string GetQueueTypeNames(Type type)

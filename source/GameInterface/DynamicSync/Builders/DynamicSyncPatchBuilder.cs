@@ -152,7 +152,7 @@ namespace GameInterface.DynamicSync.Builders
                     usings.Add(DynamicSyncUtils.GetNamespace(fieldInfo.FieldType.GetGenericArguments()[0]));
                     transpilers.Add(dynamicSyncFieldQueueBuilder.GetTranspiler(fieldItem));
                     messages.AddRange(dynamicSyncFieldQueueBuilder.GetMessages(fieldItem));
-                    messageHandlers.Add(dynamicSyncFieldQueueBuilder.GetSubscription(fieldItem));
+                    messageHandlers.AddRange(dynamicSyncFieldQueueBuilder.GetSubscriptions(fieldItem));
                 }
                 else if (fieldInfo.FieldType.Name.Contains("PropertyOwner"))
                 {

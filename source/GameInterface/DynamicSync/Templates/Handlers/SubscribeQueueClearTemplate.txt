@@ -1,0 +1,25 @@
+﻿messageBroker.Subscribe((MessagePayload<Local_{{ MemberDeclaringType }}_{{ MemberName }}_QueueClear> payload) =>
+{
+    var data = payload.What;
+    if (!objectManager.TryGetIdWithLogging(data.Instance, out var instanceId)) return;
+
+    network.SendAll(new Network_{{ MemberDeclaringType }}_{{ MemberName }}_ClearQueue(instanceId));
+});
+
+messageBroker.Subscribe((MessagePayload<Network_{{ MemberDeclaringType}}_{{ MemberName }}_ClearQueue> payload) =>
+{
+    var data = payload.What;
+    if (!objectManager.TryGetObjectWithLogging(data.InstanceId, out {{ MemberType }} instance)) return;
+
+    try
+    {
+        using (new AllowedThread())
+        {
+            instance.Clear();
+        }
+    }
+    catch (Exception ex)
+    {
+        Logger.Error(ex, "Failed to run message handler");
+    }
+});
