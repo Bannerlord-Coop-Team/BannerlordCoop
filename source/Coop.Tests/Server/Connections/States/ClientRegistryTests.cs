@@ -1,5 +1,6 @@
 ﻿using Autofac;
 using Common.Messaging;
+using Common.Network.Messages;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
