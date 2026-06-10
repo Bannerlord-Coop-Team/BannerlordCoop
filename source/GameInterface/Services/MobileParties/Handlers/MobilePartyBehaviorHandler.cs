@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MobileParties.Data;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.MobilePartyAIs;
@@ -28,20 +29,17 @@ internal class MobilePartyBehaviorHandler : IHandler
     private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyBehaviorHandler>();
 
     private readonly IMessageBroker messageBroker;
-    private readonly IControlledEntityRegistry controlledEntityRegistry;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IMobilePartyInterface mobilePartyInterface;
     private readonly IObjectManager objectManager;
 
     public MobilePartyBehaviorHandler(
         IMessageBroker messageBroker,
-        IControlledEntityRegistry controlledEntityRegistry,
         IControllerIdProvider controllerIdProvider,
         IMobilePartyInterface mobilePartyInterface,
         IObjectManager objectManager)
     {
         this.messageBroker = messageBroker;
-        this.controlledEntityRegistry = controlledEntityRegistry;
         this.controllerIdProvider = controllerIdProvider;
         this.mobilePartyInterface = mobilePartyInterface;
         this.objectManager = objectManager;
@@ -67,7 +65,7 @@ internal class MobilePartyBehaviorHandler : IHandler
         if (!objectManager.TryGetId(partyAi._mobileParty, out var partyId))
             return;
 
-        if (!controlledEntityRegistry.IsControlledBy(controllerId, partyId))
+        if (!partyAi._mobileParty.IsControlledByThisInstance())
             return;
 
         string interactablePointId = null;

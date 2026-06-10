@@ -40,8 +40,11 @@ public class PartyVisualLifetimeHandler : IHandler
 
     private void Handle(MessagePayload<PartyVisualCreated> payload)
     {
-        objectManager.AddNewObject(payload.What.MobilePartyVisual, out var visualId);
-        objectManager.TryGetId(payload.What.PartyBase, out string partyBaseId);
+        if (!objectManager.AddNewObject(payload.What.MobilePartyVisual, out var visualId))
+            return;
+
+        if (!objectManager.TryGetIdWithLogging(payload.What.PartyBase, out string partyBaseId))
+            return;
 
         network.SendAll(new NetworkCreatePartyVisual(visualId, partyBaseId));
     }
@@ -50,7 +53,8 @@ public class PartyVisualLifetimeHandler : IHandler
     {
         if (payload.What.PartyBaseId == null) return;
 
-        objectManager.TryGetObject<PartyBase>(payload.What.PartyBaseId, out var partyBase);
+        if (!objectManager.TryGetObjectWithLogging<PartyBase>(payload.What.PartyBaseId, out var partyBase))
+            return;
 
         using(new AllowedThread())
         {
@@ -73,10 +77,8 @@ public class PartyVisualLifetimeHandler : IHandler
 
     private void Handle(MessagePayload<NetworkDestroyPartyVisual> payload)
     {
-        if (!objectManager.TryGetObject(payload.What.PartyVisualId, out MobilePartyVisual partyVisual))
-        {
+        if (!objectManager.TryGetObjectWithLogging(payload.What.PartyVisualId, out MobilePartyVisual partyVisual))
             return;
-        }
 
         GameLoopRunner.RunOnMainThread(() =>
         {

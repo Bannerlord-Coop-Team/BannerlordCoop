@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common;
 using Common.LogicStates;
 using Common.Messaging;
 using Common.Network;
@@ -76,6 +77,8 @@ namespace Coop.Core
         {
             DestroyContainer();
 
+            ModInformation.IsServer = true;
+
             var containerProvider = new ContainerProvider();
 
             ContainerBuilder builder = new ContainerBuilder();
@@ -98,6 +101,8 @@ namespace Coop.Core
         {
             DestroyContainer();
 
+            ModInformation.IsServer = false;
+
             var containerProvider = new ContainerProvider();
 
             ContainerBuilder builder = new ContainerBuilder();
@@ -119,8 +124,10 @@ namespace Coop.Core
             // debug export files. This prevents DebugAutoConnect races on that directory.
             DynamicSyncConfiguration.ExportFiles = false;
 
-            // Create harmony patches
+#if DEBUG
+            // For debugging faster, normally this is done after connection
             container.Resolve<IGameInterface>().PatchAll();
+#endif
 
             var logic = container.Resolve<ILogic>();
             logic.Start();

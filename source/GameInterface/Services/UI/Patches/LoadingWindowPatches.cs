@@ -1,6 +1,8 @@
+using GameInterface.Services.UI.Interfaces;
 using HarmonyLib;
 using System.Reflection;
 using TaleWorlds.Engine;
+using TaleWorlds.MountAndBlade.GauntletUI;
 
 namespace GameInterface.Services.UI.Patches;
 
@@ -24,11 +26,7 @@ internal static class LoadingWindowPatches
     /// <summary>
     /// While true, native attempts to disable the global loading window are ignored.
     /// </summary>
-    public static bool ForceLoadingWindow { get; private set; }
-
-    // Setter is non-public on the engine type; resolve it once via reflection.
-    private static readonly MethodInfo SetIsLoadingWindowActive =
-        AccessTools.PropertySetter(typeof(LoadingWindow), nameof(LoadingWindow.IsLoadingWindowActive));
+    public static bool ForceLoadingWindow { get; set; }
 
     [HarmonyPatch(nameof(LoadingWindow.DisableGlobalLoadingWindow))]
     [HarmonyPrefix]
@@ -38,27 +36,30 @@ internal static class LoadingWindowPatches
         return !ForceLoadingWindow;
     }
 
-    /// <summary>
-    /// Begins forcing the loading window to stay visible. Must run on the main thread.
-    /// </summary>
-    public static void Begin()
+    [HarmonyPatch(nameof(LoadingWindow.EnableGlobalLoadingWindow))]
+    [HarmonyPostfix]
+    private static void EnableGlobalLoadingWindowPostfix()
     {
-        ForceLoadingWindow = true;
+        LoadingInterface.ApplyCurrentLoadingMessage();
+    }
+}
 
-        // Mark the window active even if no manager exists yet (e.g. mid state-transition),
-        // so the engine re-enables it the next time the manager is (re)initialized.
-        SetIsLoadingWindowActive?.Invoke(null, new object[] { true });
-
-        // Show it immediately if a manager is already present.
-        LoadingWindow.EnableGlobalLoadingWindow();
+/// <summary>
+/// Reapplies coop loading text when the engine directly re-enables a recreated
+/// loading window manager.
+/// </summary>
+[HarmonyPatch]
+internal static class GauntletDefaultLoadingWindowManagerPatches
+{
+    private static MethodBase TargetMethod()
+    {
+        return AccessTools.Method(
+            typeof(GauntletDefaultLoadingWindowManager),
+            "TaleWorlds.Engine.ILoadingWindowManager.EnableLoadingWindow");
     }
 
-    /// <summary>
-    /// Stops forcing and hides the loading window. Must run on the main thread.
-    /// </summary>
-    public static void End()
+    private static void Postfix()
     {
-        ForceLoadingWindow = false;
-        LoadingWindow.DisableGlobalLoadingWindow();
+        LoadingInterface.ApplyCurrentLoadingMessage();
     }
 }

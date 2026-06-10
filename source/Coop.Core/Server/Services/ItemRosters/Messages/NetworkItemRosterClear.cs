@@ -12,11 +12,11 @@ namespace Coop.Core.Server.Services.ItemRosters.Messages
     public class NetworkItemRosterClear : IMessage
     {
         [ProtoMember(1)]
-        public string PartyBaseID { get; }
+        public string ItemRosterId { get; }
 
-        public NetworkItemRosterClear(string partyBaseID)
+        public NetworkItemRosterClear(string itemRosterId)
         {
-            PartyBaseID = partyBaseID;
+            ItemRosterId = itemRosterId;
         }
     }
 }

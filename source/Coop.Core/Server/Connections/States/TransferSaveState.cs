@@ -51,7 +51,7 @@ public class TransferSaveState : ConnectionStateBase
             payload.GameSaveData,
             payload.CampaignID,
             null, // TODO manage controlled objects
-            coopSessionProvider.CoopSession.CraftingPlayerData);
+            coopSessionProvider.CoopSession?.CraftingPlayerData);
 
         network.Send(peer, networkEvent);
 

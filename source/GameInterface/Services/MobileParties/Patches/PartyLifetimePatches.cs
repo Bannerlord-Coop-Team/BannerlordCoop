@@ -5,6 +5,7 @@ using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.MobileParties.Data;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Lifetime;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
@@ -43,19 +44,33 @@ internal class DestroyPartyActionPatch
     private static readonly ILogger Logger = LogManager.GetLogger<DestroyPartyActionPatch>();
     [HarmonyPatch(nameof(DestroyPartyAction.Apply))]
     [HarmonyPrefix]
-    private static void PrefixApply(PartyBase destroyerParty, MobileParty destroyedParty)
+    private static bool PrefixApply(PartyBase destroyerParty, MobileParty destroyedParty)
     {
 
-        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+        // Never destroy a party owned by a connected player. On the server a remote player's party
+        // is NOT MobileParty.MainParty, so vanilla's main-party guard does not protect it; a lost/
+        // finalized MapEvent (MapEventSide.HandleMapEventEndForPartyInternal) would call
+        // DestroyPartyAction.Apply on MobileParty_Player and remove it from the object manager.
+        // The party then no longer resolves and a subsequent settlement encounter activates an
+        // empty/unregistered menu -> null GameMenu NRE in MenuContext.HandleStates.
+        // Blocking here also prevents publishing DestroyPartyApplied, so clients keep the party too.
+        if (destroyedParty != null && destroyedParty.IsPlayerParty())
+        {
+            Logger.Warning("Blocked DestroyPartyAction for player party {partyName}, {StringId}", destroyedParty.Name, destroyedParty.StringId);
+            return false;
+        }
 
         if (ModInformation.IsClient)
         {
             Logger.Error("Client attempted to apply DestroyPartyAction for party {partyName}, {StringId}", destroyedParty.Name, destroyedParty.StringId);
-            return;
+            return true;
         }
 
         var message = new DestroyPartyApplied(destroyerParty, destroyedParty);
         MessageBroker.Instance.Publish(null, message);
+        return true;
     }
 
     [HarmonyPatch(nameof(DestroyPartyAction.ApplyForDisbanding))]

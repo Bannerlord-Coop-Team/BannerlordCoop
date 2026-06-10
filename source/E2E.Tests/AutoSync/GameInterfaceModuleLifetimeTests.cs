@@ -2,7 +2,7 @@ using Autofac;
 using Common;
 using E2E.Tests.Environment;
 using GameInterface;
-using GameInterface.AutoSync;
+using GameInterface.DynamicSync;
 using GameInterface.Tests.Bootstrap;
 using HarmonyLib;
 using System.Collections.Generic;
@@ -21,7 +21,7 @@ namespace E2E.Tests.AutoSync;
 /// <para>
 /// Production teardown (<c>CoopartiveMultiplayerExperience.DestroyContainer</c>) only calls
 /// <see cref="Harmony.UnpatchAll()"/> and disposes the container. That removes the live Harmony
-/// patches but never calls <see cref="IAutoSyncPatchCollector.UnpatchAll"/>, and the collector's
+/// patches but never calls <see cref="IDynamicSyncPatchCollector.UnpatchAll"/>, and the collector's
 /// <c>patchedMethods</c> bookkeeping is <c>static</c> — it survives the container.
 /// </para>
 ///
@@ -30,7 +30,7 @@ namespace E2E.Tests.AutoSync;
 /// patches. Because <see cref="AutoRegistryFactory"/> uses <b>stable</b> patch methods
 /// (<c>LifetimePatches&lt;T&gt;.CreatePrefix</c>/<c>DestroyPostfix</c>), the
 /// <c>(method, patch, type)</c> key is identical to the first run, so it is still present in the
-/// static set. <see cref="IAutoSyncPatchCollector.PatchAll"/> then logs "already patched" and skips
+/// static set. <see cref="IDynamicSyncPatchCollector.PatchAll"/> then logs "already patched" and skips
 /// it, silently leaving the patch off for the whole second session.
 /// </para>
 /// </summary>
@@ -78,7 +78,7 @@ public class GameInterfaceModuleLifetimeTests
             var firstEnv = new TestEnvironment(output, numClients: 0, registerGameInterface: true);
             harmony = firstEnv.Server.Container.Resolve<Harmony>();
 
-            var firstCollector = firstEnv.Server.Container.Resolve<IAutoSyncPatchCollector>();
+            var firstCollector = firstEnv.Server.Container.Resolve<IDynamicSyncPatchCollector>();
             firstCollector.AddPrefix(target, patch);
             firstCollector.PatchAll();
             Assert.Contains(target, harmony.GetPatchedMethods());
@@ -104,7 +104,7 @@ public class GameInterfaceModuleLifetimeTests
                 var harmony2 = secondEnv.Server.Container.Resolve<Harmony>();
                 Assert.Same(harmony, harmony2);
 
-                var secondCollector = secondEnv.Server.Container.Resolve<IAutoSyncPatchCollector>();
+                var secondCollector = secondEnv.Server.Container.Resolve<IDynamicSyncPatchCollector>();
                 secondCollector.AddPrefix(target, patch);
                 secondCollector.PatchAll();
 
@@ -121,7 +121,7 @@ public class GameInterfaceModuleLifetimeTests
         {
             // Clean up so this test cannot affect any other test in the process.
             harmony?.UnpatchAll(harmony.Id);
-            AutoSyncPatchCollector.PatchedMethods.Remove((target, patch, HarmonyPatchType.Prefix));
+            DynamicSyncPatchCollector.PatchedMethods.Remove((target, patch, HarmonyPatchType.Prefix));
         }
     }
 }

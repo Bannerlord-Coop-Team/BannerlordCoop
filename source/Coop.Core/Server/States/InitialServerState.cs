@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using GameInterface.Registry;
+using GameInterface.Registry.Messages;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.MobileParties.Messages;
@@ -13,34 +14,26 @@ namespace Coop.Core.Server.States;
 public class InitialServerState : ServerStateBase
 {
     private readonly IMessageBroker messageBroker;
-    private readonly INetwork network;
     private readonly IRegistryManager registryManager;
 
     public InitialServerState(
         IServerLogic context,
         IMessageBroker messageBroker,
-        INetwork network,
         IRegistryManager registryManager) : 
         base(context)
     {
         this.messageBroker = messageBroker;
-        this.network = network;
         this.registryManager = registryManager;
-        messageBroker.Subscribe<CampaignReady>(Handle_GameLoaded);
+        messageBroker.Subscribe<CampaignReady>(Handle_CampaignReady);
     }
-
-
 
     public override void Dispose()
     {
-        messageBroker.Unsubscribe<CampaignReady>(Handle_GameLoaded);
+        messageBroker.Unsubscribe<CampaignReady>(Handle_CampaignReady);
     }
 
-    internal void Handle_GameLoaded(MessagePayload<CampaignReady> payload)
+    internal void Handle_CampaignReady(MessagePayload<CampaignReady> payload)
     {
-        // Start server when game is fully loaded
-        network.Start();
-
         // Remove server party
         messageBroker.Publish(this, new RemoveMainParty());
 

@@ -35,25 +35,14 @@ namespace Coop.Tests.Server.Services.Save
         {
             // Setup
             var saveManager = container.Resolve<ICoopSaveManager>();
-            var entityRegistry = container.Resolve<IControlledEntityRegistry>();
-
-            const string controllerId = "testController";
-            const string controller2Id = "testController2";
-            const string entityId = "testEntity1";
-            const string entity2Id = "testEntity2";
-
-            Assert.True(entityRegistry.RegisterAsControlled(controllerId, entityId));
-            Assert.True(entityRegistry.RegisterAsControlled(controller2Id, entity2Id));
-
-            var entityMap = entityRegistry.PackageControlledEntities();
 
             var players = new Player[]
             {
-                new Player("PlayerHero","PlayerParty1"),
-                new Player("PlayerHero2","PlayerParty2")
+                new Player("MyPlayer1", "MyHero1","MyParty1", "MyClan1"),
+                new Player("MyPlayer2", "MyHero2","MyParty2", "MyClan2"),
             };
 
-            ICoopSession sessionData = new CoopSession("SaveManagerTest", entityMap, players, new CraftingPlayerData(new(), new(), new()));
+            ICoopSession sessionData = new CoopSession("SaveManagerTest", players, new CraftingPlayerData(new(), new(), new()));
 
             string saveFile = sessionData.UniqueGameId;
 
@@ -79,25 +68,14 @@ namespace Coop.Tests.Server.Services.Save
         {
             // Setup
             var saveManager = container.Resolve<ICoopSaveManager>();
-            var entityRegistry = container.Resolve<IControlledEntityRegistry>();
-
-            const string controllerId = "testController";
-            const string controller2Id = "testController2";
-            const string entityId = "testEntity1";
-            const string entity2Id = "testEntity2";
-
-            Assert.True(entityRegistry.RegisterAsControlled(controllerId, entityId));
-            Assert.True(entityRegistry.RegisterAsControlled(controller2Id, entity2Id));
-
-            var entityMap = entityRegistry.PackageControlledEntities();
 
             var players = new Player[]
             {
-                new Player("PlayerHero","PlayerParty1"),
-                new Player("PlayerHero2","PlayerParty2")
+                new Player("MyPlayer1", "MyHero1","MyParty1", "MyClan1"),
+                new Player("MyPlayer2", "MyHero2","MyParty2", "MyClan2"),
             };
 
-            ICoopSession sessionData = new CoopSession("SaveManagerTest", entityMap, players, new CraftingPlayerData(new(), new(), new()));
+            ICoopSession sessionData = new CoopSession("SaveManagerTest", players, new CraftingPlayerData(new(), new(), new()));
 
             string saveFile = SAVE_PATH + sessionData.UniqueGameId;
 
@@ -107,7 +85,18 @@ namespace Coop.Tests.Server.Services.Save
             ICoopSession savedSession = saveManager.LoadCoopSession(saveFile);
 
             // Verification
-            Assert.Equal(sessionData, savedSession);
+            // CoopSession/Player are plain data classes without value equality, so the round-tripped
+            // session is compared field-by-field rather than via whole-object Assert.Equal.
+            Assert.NotNull(savedSession);
+            Assert.Equal(sessionData.UniqueGameId, savedSession.UniqueGameId);
+            Assert.Equal(sessionData.Players.Length, savedSession.Players.Length);
+            for (int i = 0; i < sessionData.Players.Length; i++)
+            {
+                Assert.Equal(sessionData.Players[i].ControllerId, savedSession.Players[i].ControllerId);
+                Assert.Equal(sessionData.Players[i].HeroId, savedSession.Players[i].HeroId);
+                Assert.Equal(sessionData.Players[i].MobilePartyId, savedSession.Players[i].MobilePartyId);
+                Assert.Equal(sessionData.Players[i].ClanId, savedSession.Players[i].ClanId);
+            }
         }
 
         [Fact]

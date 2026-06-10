@@ -32,7 +32,7 @@ internal class MapEventPatches
     private static void Prefix_AddInvolvedPartyInternal(MapEvent __instance, MapEventParty mapEventParty)
     {
         // Parties not controlled by the server are player parties
-        if (mapEventParty.Party.MobileParty.IsPlayerParty())
+        if (mapEventParty.Party.MobileParty?.IsPlayerParty() == true)
         {
             var partiesAdded = new List<MapEventParty>();
 
@@ -128,7 +128,7 @@ internal class MapEventPatches
 
         // Don't update if a player is involved
         // Prevents server from instantly finishing the battle and waits for client finish request
-        if (__instance.InvolvedParties.Any(x => !x.MobileParty.IsPartyControlled()))
+        if (__instance.InvolvedParties.Any(x => !x.MobileParty.IsControlledByThisInstance()))
             return false;
 
         return true;
@@ -206,15 +206,8 @@ internal class InteractionPatches
         if (!__instance.ContainsPlayerParty())
             return;
 
-        if (!playerBattleAiJoinWindows.TryGetValue(__instance, out var debounce))
-            return;
-
-        // Prevent AI joining after 5 hours
-        if (debounce.Expired)
-        {
-            __result = false;
-            return;
-        }
+        // Prevent any AI party from joining a battle that involves a player
+        __result = false;
     }
 
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.Initialize))]
