@@ -64,6 +64,8 @@ internal class BattleHandler : IHandler
         messageBroker.Subscribe<AttackMissionAttempted>(Handle_AttackMissionAttempted);
         messageBroker.Subscribe<NetworkAttackMissionAttempted>(Handle_NetworkAttackMissionAttempted);
         messageBroker.Subscribe<NetworkStartAttackMission>(Handle_NetworkStartAttackMission);
+
+        timeControlInterface.AddFastForwardPolicy(FastForwardWhilePlayerInMapEventPolicy);
     }
 
     public void Dispose()
@@ -80,6 +82,8 @@ internal class BattleHandler : IHandler
         messageBroker.Unsubscribe<AttackMissionAttempted>(Handle_AttackMissionAttempted);
         messageBroker.Unsubscribe<NetworkAttackMissionAttempted>(Handle_NetworkAttackMissionAttempted);
         messageBroker.Unsubscribe<NetworkStartAttackMission>(Handle_NetworkStartAttackMission);
+
+        timeControlInterface.RemoveFastForwardPolicy(FastForwardWhilePlayerInMapEventPolicy);
     }
 
     private void Handle_AttackMissionAttempted(MessagePayload<AttackMissionAttempted> payload)
@@ -185,6 +189,11 @@ internal class BattleHandler : IHandler
 
     private void Handle_MapEventInvolvedPartiesAdded(MessagePayload<MapEventInvolvedPartiesAdded> payload)
     {
+        // This message is published only when a player party joins an already-running
+        // battle. PlayerJoinedBattle only fires for battles created with a player, so
+        // this is where the fast-forward cap is applied for reinforcement joins.
+        CapFastForwardForMapEvent();
+
         var message = payload.What;
         if (!objectManager.TryGetIdWithLogging(message.MapEvent, out var mapEventSideId))
             return;
@@ -234,7 +243,36 @@ internal class BattleHandler : IHandler
         if (AllPlayersInMapEvents())
         {
             timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
+            return;
         }
+
+        // A player started a battle while others remain on the map.
+        CapFastForwardForMapEvent();
+    }
+
+    /// <summary>
+    /// Drops the campaign out of fast-forward when a player is in a map event. The
+    /// fast-forward policy then keeps it capped at normal speed until every player
+    /// has left their map event. Runs on the server only.
+    /// </summary>
+    private void CapFastForwardForMapEvent()
+    {
+        if (ModInformation.IsClient)
+            return;
+
+        if (timeControlInterface.GetTimeControl() == TimeControlEnum.Play_2x)
+        {
+            timeControlInterface.ServerSetTimeControl(TimeControlEnum.Play_1x);
+        }
+    }
+
+    /// <summary>
+    /// Fast-forwarding the campaign map is not allowed while any player is in a map event.
+    /// </summary>
+    /// <returns>True if fast-forwarding is allowed, otherwise false</returns>
+    private bool FastForwardWhilePlayerInMapEventPolicy()
+    {
+        return AnyPlayerInMapEvent() == false;
     }
 
     private bool AllPlayersInMapEvents()
@@ -242,6 +280,20 @@ internal class BattleHandler : IHandler
         return playerRegistry.Players.All(player =>
         {
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var playerParty))
+                return false;
+
+            return playerParty.MapEvent != null;
+        });
+    }
+
+    private bool AnyPlayerInMapEvent()
+    {
+        // Backs the fast-forward policy, which is evaluated on every time-control
+        // change, so this uses the non-logging lookup to avoid spamming the log
+        // when a party is momentarily unresolved.
+        return playerRegistry.Players.Any(player =>
+        {
+            if (!objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty))
                 return false;
 
             return playerParty.MapEvent != null;
