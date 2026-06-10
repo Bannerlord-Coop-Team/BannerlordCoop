@@ -8,7 +8,6 @@
     {{~ if Debug ~}}
     Logger.Debug("[Server] Broadcasting clear queue {MemberName}", "{{MemberDeclaringType}}.{{MemberName}}");
     {{~ end ~}}
-
     network.SendAll(new Network_{{ MemberDeclaringType }}_{{ MemberName }}_ClearQueue(instanceId));
 });
 
