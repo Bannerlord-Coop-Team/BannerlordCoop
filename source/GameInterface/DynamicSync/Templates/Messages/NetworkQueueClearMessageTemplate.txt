@@ -1,0 +1,22 @@
+﻿using Common.Messaging;
+using GameInterface.Utils.NetworkEvents;
+using ProtoBuf;
+using System.Collections.Generic;
+using System.Reflection;
+{{~ for library in Libraries ~}}
+using {{ library }};
+{{~ end ~}}
+
+namespace DynamicSync;
+
+[ProtoContract(SkipConstructor = true)]
+public readonly struct Network_{{ MemberDeclaringType}}_{{ MemberName }}_ClearQueue : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string InstanceId;
+
+    public Network_{{ MemberDeclaringType}}_{{ MemberName }}_ClearQueue(string instanceId)
+    {
+        InstanceId = instanceId;
+    }
+}
