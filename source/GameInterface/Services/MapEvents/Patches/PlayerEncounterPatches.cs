@@ -26,8 +26,9 @@ internal class PlayerEncounterPatches
         // Our own server-approved re-run (AllowedThread) runs the real RestartPlayerEncounter.
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        // The server runs RestartPlayerEncounter locally (authoritative).
-        if (ModInformation.IsServer) return true;
+        // The server runs RestartPlayerEncounter locally (authoritative), unless the targeted party is held in a
+        // conversation by another player.
+        if (ModInformation.IsServer) return ConversationPartyHold.CanHostRestartEncounter(attackerParty, defenderParty);
 
         // Client: gate the encounter restart behind server approval. The send is rate-limited in
         // ConversationRequestHandler (max 1 request / 500ms) so a retried restart does not spam the server. On
@@ -35,6 +36,18 @@ internal class PlayerEncounterPatches
         MessageBroker.Instance.Publish(null, new ConversationRequested(defenderParty, attackerParty, forcePlayerOutFromSettlement, ConversationRestartSource.PlayerEncounter));
 
         return false;
+    }
+
+    // After the host's encounter (re)starts, hold the encountered AI party so it stays in place and cannot be
+    // interacted with by others while the host converses with it. Marking happens in the postfix because the
+    // restart's internal Finish releases the host's previous engagement first.
+    [HarmonyPatch(nameof(PlayerEncounter.RestartPlayerEncounter))]
+    [HarmonyPostfix]
+    public static void RestartPlayerEncounterPostfix()
+    {
+        if (!ModInformation.IsServer) return;
+
+        ConversationPartyHold.EngageHostEncounteredParty();
     }
 
     [HarmonyPatch("StartBattleInternal")]
@@ -121,11 +134,19 @@ internal class PlayerEncounterPatches
     [HarmonyPostfix]
     private static void FinishPostfix()
     {
-        if (ModInformation.IsServer) return;
+        if (ModInformation.IsServer)
+        {
+            // The host's encounter is over: release the AI party held for the host's conversation, if any.
+            ConversationPartyHold.EndHostEngagement();
+            return;
+        }
 
         // Skip our own server-approved restart: RestartPlayerEncounter calls Finish internally, and we run that
         // under an AllowedThread. Holding there would fight the restart we just asked the server to authorize.
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
+
+        // The server holds the AI party this player was conversing with; tell it the encounter is over.
+        MessageBroker.Instance.Publish(null, new ConversationEnded());
 
         // Don't interfere with battle flow.
         if (MobileParty.MainParty.MapEvent != null) return;
