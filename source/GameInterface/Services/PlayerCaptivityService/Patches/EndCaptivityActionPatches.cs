@@ -27,6 +27,9 @@ internal class EndCaptivityActionPatches
             return true;
         }
 
+        PlayerCaptivityLogger.Debug("EndCaptivityAction.ApplyInternal intercepted for {HeroId}: detail={Detail} facilitator={FacilitatorId}, publishing EndPlayerCaptivityAttempted",
+            prisoner?.StringId, detail, facilitatior?.StringId);
+
         var message = new EndPlayerCaptivityAttempted(prisoner, detail, facilitatior);
         MessageBroker.Instance.Publish(prisoner, message);
 

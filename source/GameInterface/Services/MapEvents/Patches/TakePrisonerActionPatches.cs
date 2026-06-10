@@ -20,15 +20,15 @@ internal class TakePrisonerActionPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<TakePrisonerActionPatches>();
 
-    [HarmonyPatch(nameof(TakePrisonerAction.Apply))]
+    [HarmonyPatch(nameof(TakePrisonerAction.ApplyInternal))]
     [HarmonyPrefix]
-    private static void PrefixApply(PartyBase capturerParty, Hero prisonerCharacter)
+    private static void Prefix_ApplyInternal(PartyBase capturerParty, Hero prisonerCharacter)
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client called managed method {methodName}", $"{nameof(TakePrisonerAction)}.{nameof(TakePrisonerAction.Apply)}");
+            Logger.Error("Client called managed method {methodName}", $"{nameof(TakePrisonerAction)}.{nameof(TakePrisonerAction.ApplyInternal)}");
             return;
         }
 

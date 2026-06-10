@@ -82,11 +82,21 @@ internal class PlayerCaptivityHandler : IHandler
         var hero = obj.PrisonerHero;
         var mobileParty = hero.PartyBelongedTo;
 
-        if (mobileParty?.IsPlayer() == false)
-            return;
+        PlayerCaptivityLogger.Debug("Handle_PrisonerTaken: hero={HeroId} party={PartyId} captor={CaptorId}",
+            hero?.StringId, mobileParty?.StringId, payload.What.CapturerParty?.MobileParty?.StringId);
+
+        //if (mobileParty?.IsPlayerParty() == false)
+        //{
+        //    PlayerCaptivityLogger.Debug("Handle_PrisonerTaken: skipping, {HeroId} is not in a player party", hero?.StringId);
+        //    return;
+        //}
 
         if (hero.PartyBelongedToAsPrisoner != null)
+        {
+            PlayerCaptivityLogger.Debug("Handle_PrisonerTaken: skipping, {HeroId} is already a prisoner of {CaptorId}",
+                hero.StringId, hero.PartyBelongedToAsPrisoner?.MobileParty?.StringId);
             return;
+        }
 
         hero.PartyBelongedToAsPrisoner = payload.What.CapturerParty;
         hero.PartyBelongedTo = null;
@@ -106,6 +116,9 @@ internal class PlayerCaptivityHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(payload.What.MapEvent, out string mapEventId)) return;
         if (!objectManager.TryGetIdWithLogging(payload.What.PlayerParty, out string playerParty)) return;
 
+        PlayerCaptivityLogger.Debug("Handle_PlayerSurrendered: broadcasting surrender of party={PartyId} in mapEvent={MapEventId}",
+            playerParty, mapEventId);
+
         var message = new NetworkPlayerSurrendered(playerParty, mapEventId);
 
         network.SendAll(message);
@@ -115,6 +128,9 @@ internal class PlayerCaptivityHandler : IHandler
     {
         if (!objectManager.TryGetObjectWithLogging(payload.What.MapEventId, out MapEvent mapEvent)) return;
         if (!objectManager.TryGetObjectWithLogging(payload.What.PlayerParty, out MobileParty playerParty)) return;
+
+        PlayerCaptivityLogger.Debug("Handle_NetworkPlayerSurrendered: applying surrender for party={PartyId} in mapEvent={MapEventId}",
+            playerParty.StringId, payload.What.MapEventId);
 
         try
         {
@@ -149,12 +165,17 @@ internal class PlayerCaptivityHandler : IHandler
             var captorParty = payload.What.CaptorParty;
             if (captorParty == null)
             {
+                PlayerCaptivityLogger.Debug("Handle_PlayerCaptivityChanged: captor cleared, releasing main party");
+
                 PartyBase.MainParty.UpdateVisibilityAndInspected(MobileParty.MainParty.Position, 0f);
                 PartyBase.MainParty.SetAsCameraFollowParty();
 
                 playerCaptivity._captorParty = null;
                 return;
             }
+
+            PlayerCaptivityLogger.Debug("Handle_PlayerCaptivityChanged: captor set to {CaptorId} (isSettlement={IsSettlement})",
+                captorParty.IsMobile ? captorParty.MobileParty?.StringId : captorParty.Settlement?.StringId, captorParty.IsSettlement);
 
             playerCaptivity._captivityStartTime = CampaignTime.Now;
             playerCaptivity._lastCheckTime = CampaignTime.Now;
@@ -173,6 +194,9 @@ internal class PlayerCaptivityHandler : IHandler
     private void Handle_PlayerCaptivityEnded(MessagePayload<EndPlayerCaptivityAttempted> payload)
     {
         var data = payload.What;
+
+        PlayerCaptivityLogger.Debug("Handle_PlayerCaptivityEnded (client): hero={HeroId} detail={Detail} facilitator={FacilitatorId}",
+            data.PlayerHero?.StringId, data.Detail, data.Facilitator?.StringId);
 
         if (!objectManager.TryGetIdWithLogging(data.PlayerHero, out string heroId)) return;
 
@@ -205,6 +229,9 @@ internal class PlayerCaptivityHandler : IHandler
         if (payload.What.FacilitatorId != null && !objectManager.TryGetObjectWithLogging(payload.What.FacilitatorId, out facilitator))
             return;
 
+        PlayerCaptivityLogger.Debug("Handle_NetworkEndPlayerCaptivityAttempted (server): hero={HeroId} party={PartyId} detail={Detail} facilitator={FacilitatorId}",
+            playerHero.StringId, playerParty.StringId, payload.What.Detail, facilitator?.StringId);
+
         // PlayerCaptivity.EndCaptivityInternal
         EndPlayerCaptivityInternal(playerHero, playerParty, payload.What.Detail, facilitator);
 
@@ -236,7 +263,8 @@ internal class PlayerCaptivityHandler : IHandler
 
     private void Handle_NetworkPlayerCaptivityEnded(MessagePayload<NetworkPlayerCaptivityEnded> payload)
     {
-        
+        PlayerCaptivityLogger.Debug("Handle_NetworkPlayerCaptivityEnded (client): leaving captivity menus/encounter");
+
         if (PlayerEncounter.Current != null)
         {
             PlayerEncounter.LeaveSettlement();

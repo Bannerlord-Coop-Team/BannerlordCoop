@@ -37,6 +37,11 @@
     <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="Services\MapEvents\Messages\Join\**" />
+    <EmbeddedResource Remove="Services\MapEvents\Messages\Join\**" />
+    <None Remove="Services\MapEvents\Messages\Join\**" />
+  </ItemGroup>
+  <ItemGroup>
     <None Remove="DynamicSync\Templates\Handlers\SubscribePropertyOwnerReferenceTemplate.txt" />
     <None Remove="DynamicSync\Templates\Messages\LocalPropertyOwnerSetMessageTemplate.txt" />
     <None Remove="DynamicSync\Templates\Messages\NetworkPropertyOwnerSetReferenceMessageTemplate.txt" />
@@ -341,6 +346,5 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Services\Kingdoms\Commands\" />
-    <Folder Include="Services\MapEvents\Messages\Join\" />
   </ItemGroup>
 </Project>

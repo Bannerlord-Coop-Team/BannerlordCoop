@@ -10,19 +10,7 @@ public static class MapEventExtensions
     {
         if (mapEvent is null) return false;
 
-        foreach (var side in mapEvent._sides)
-        {
-            if (side is null) continue;
-
-            foreach (var eventParty in side.Parties)
-            {
-                if (eventParty?.Party?.MobileParty?.IsPlayer() == true)
-                {
-                    return true;
-                }
-            }
-        }
-
-        return false;
+        // Prevent any parties from joining a player battle
+        return mapEvent.InvolvedParties.Any(party => party.MobileParty?.IsPlayerParty() == true);
     }
 }
