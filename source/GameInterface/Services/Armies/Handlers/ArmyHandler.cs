@@ -95,8 +95,7 @@ public class ArmyHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(obj.Army, out var armyId)) return;
 
         bool isSettlement = obj.AiBehaviorObject is Settlement;
-        var pointToResolve = isSettlement ? (object)(Settlement)obj.AiBehaviorObject : (MobileParty)obj.AiBehaviorObject;
-        if (!objectManager.TryGetIdWithLogging(pointToResolve, out var objectId)) return;
+        if (!objectManager.TryGetIdWithLogging(obj.AiBehaviorObject, out var objectId)) return;
 
         var message = new NetworkSetArmyAiBehaviorObject(armyId, objectId, isSettlement);
 
