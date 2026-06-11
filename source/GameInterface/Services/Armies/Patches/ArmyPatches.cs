@@ -31,7 +31,6 @@ public class ArmyPatches
     [HarmonyPrefix]
     static bool OnAddPartyInternalPrefix(ref Army __instance, MobileParty mobileParty)
     {
-        if (AllowedThread.IsThisThreadAllowed()) return true;
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient) return false;
@@ -46,7 +45,6 @@ public class ArmyPatches
     [HarmonyPrefix]
     static bool OnRemovePartyInternalPrefix(ref Army __instance, MobileParty mobileParty)
     {
-        if (AllowedThread.IsThisThreadAllowed()) return true;
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient)

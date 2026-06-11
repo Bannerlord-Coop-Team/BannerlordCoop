@@ -10,7 +10,6 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
 namespace GameInterface.DynamicSync.Builders;
 

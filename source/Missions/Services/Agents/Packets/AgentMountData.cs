@@ -31,8 +31,8 @@ namespace Missions.Services.Agents.Packets
             //Currently not doing anything afaik
             if (mountAgent.GetCurrentAction(1) == ActionIndexCache.act_none || mountAgent.GetCurrentAction(1).Index != MountAction1Index)
             {
-                string mActionName2 = MBAnimation.GetActionNameWithCode(MountAction1Index);
-                mountAgent.SetActionChannel(1, ActionIndexCache.Create(mActionName2), additionalFlags: MountAction1Flag, startProgress: MountAction1Progress);
+                string mActionName2 = MBAPI.IMBAnimation.GetActionNameWithCode(MountAction1Index);
+                mountAgent.SetActionChannel(1, ActionIndexCache.Create(mActionName2), additionalFlags: (AnimFlags)MountAction1Flag, startProgress: MountAction1Progress);
             }
             else
             {

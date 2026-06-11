@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Policies;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.PlayerCaptivityService.Messages;
@@ -23,7 +24,7 @@ internal class PlayerEncounterPatches
     public static bool RestartPlayerEncounterPrefix(PartyBase defenderParty, PartyBase attackerParty, bool forcePlayerOutFromSettlement)
     {
         // Our own server-approved re-run (AllowedThread) runs the real RestartPlayerEncounter.
-        if (AllowedThread.IsThisThreadAllowed()) return true;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         // The server runs RestartPlayerEncounter locally (authoritative).
         if (ModInformation.IsServer) return true;
@@ -41,7 +42,7 @@ internal class PlayerEncounterPatches
     public static bool StartBattleInternalPrefix(PlayerEncounter __instance, ref MapEvent __result)
     {
         // Our own handler / replication path (AllowedThread) runs the real creation.
-        if (AllowedThread.IsThisThreadAllowed()) return true;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         // The server is authoritative and creates the MapEvent locally.
         if (ModInformation.IsServer) return true;
@@ -93,7 +94,7 @@ internal class PlayerEncounterPatches
     [HarmonyPrefix]
     public static bool PlayerSurrenderInternalPrefix(ref PlayerEncounter __instance)
     {
-        if (AllowedThread.IsThisThreadAllowed()) return true;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsServer) return true;
 
@@ -109,5 +110,29 @@ internal class PlayerEncounterPatches
     private static bool PrefixCheckNearbyPartiesToJoinPlayerMapEvent()
     {
         return false;
+    }
+
+    // When an open-map encounter finishes on a client (e.g. you close a conversation with a lord party), the
+    // player party is usually still engaging that party. PlayerEncounter.Current then becomes null, so on the next
+    // tick EncounterManager.HandleEncounterForMobileParty re-fires RestartPlayerEncounter, which we gate and the
+    // server re-approves — reopening the conversation in a loop. Native's encounter-leave consequences all
+    // SetMoveModeHold to disengage; do the same here so the party stops engaging and the loop ends.
+    [HarmonyPatch(nameof(PlayerEncounter.Finish))]
+    [HarmonyPostfix]
+    private static void FinishPostfix()
+    {
+        if (ModInformation.IsServer) return;
+
+        // Skip our own server-approved restart: RestartPlayerEncounter calls Finish internally, and we run that
+        // under an AllowedThread. Holding there would fight the restart we just asked the server to authorize.
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+
+        // The server holds the AI party this player was conversing with; tell it the encounter is over.
+        MessageBroker.Instance.Publish(null, new ConversationEnded());
+
+        // Don't interfere with battle flow.
+        if (MobileParty.MainParty.MapEvent != null) return;
+
+        MobileParty.MainParty.SetMoveModeHold();
     }
 }

@@ -49,9 +49,9 @@ public class ItemRosterMessageHandler : IHandler
     {
         var message = payload.What;
 
-        if (!objectManager.TryGetIdWithLogging(message.PartyBase, out var partyBaseId)) return;
+        if (!objectManager.TryGetIdWithLogging(message.ItemRoster, out var itemRosterId)) return;
 
-        network.SendAll(new NetworkItemRosterClear(partyBaseId));
+        network.SendAll(new NetworkItemRosterClear(itemRosterId));
     }
 
     public void Dispose()

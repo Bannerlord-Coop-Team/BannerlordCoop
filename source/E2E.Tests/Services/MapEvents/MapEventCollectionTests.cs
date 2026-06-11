@@ -14,7 +14,7 @@ public class MapEventCollectionTests : MapEventTestBase
     public void Server_MapEvent_Initialize_SyncsSidesToClients()
     {
         // Act
-        var (mapEventId, attackerPartyId, defenderPartyId) = CreateServerMapEventWithParties();
+        var mapEventCtx = CreateServerMapEvent();
 
         // Resolve the side IDs from the server
         string? attackerSideId = null;
@@ -24,7 +24,7 @@ public class MapEventCollectionTests : MapEventTestBase
 
         Server.Call(() =>
         {
-            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out var mapEvent));
             Assert.True(Server.ObjectManager.TryGetId(mapEvent.AttackerSide, out attackerSideId));
             Assert.True(Server.ObjectManager.TryGetId(mapEvent.DefenderSide, out defenderSideId));
             Assert.True(Server.ObjectManager.TryGetId(mapEvent.AttackerSide.Parties[0], out attackerMapEventPartyId));

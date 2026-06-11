@@ -47,6 +47,10 @@ namespace Common.Serialization
         public JsonSerializerOptions JsonOptions { get; set; } = new JsonSerializerOptions()
         {
             WriteIndented = true,
+            // Several serialized data types (e.g. Player) expose their state as public fields
+            // and rebuild via a parameterized constructor. Without this, fields are silently
+            // dropped on write and the constructor fails to bind on read.
+            IncludeFields = true,
         };
 
         /// <inheritdoc/>
@@ -77,7 +81,7 @@ namespace Common.Serialization
         {
             using StreamReader readStream = new(filePath, Encoding);
             var jsonText = readStream.ReadToEnd();
-            return JsonSerializer.Deserialize<T>(jsonText);
+            return JsonSerializer.Deserialize<T>(jsonText, JsonOptions);
         }
     }
 }

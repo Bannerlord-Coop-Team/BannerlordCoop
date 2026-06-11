@@ -2,12 +2,11 @@
 
 using Common.Messaging;
 using Common.Network;
-using Coop.Core.Client.Services.MobileParties.Messages;
+using Coop.Core.Client.Messages;
 using Coop.Core.Common;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.GameState.Messages;
-using GameInterface.Services.Heroes.Messages;
-using LiteNetLib;
+using GameInterface.Services.UI.Interfaces;
 
 namespace Coop.Core.Client.States;
 
@@ -21,33 +20,36 @@ public class CampaignState : ClientStateBase
 
     public CampaignState(
         IClientLogic logic,
-        IMessageBroker messageBroker, 
-        INetwork network, 
+        IMessageBroker messageBroker,
+        INetwork network,
+        ILoadingInterface loadingInterface,
         ICoopFinalizer coopFinalizer) : base(logic)
     {
         this.messageBroker = messageBroker;
         this.coopFinalizer = coopFinalizer;
-        messageBroker.Subscribe<NetworkNewPartyCreated>(Handle_NetworkNewPartyCreated);
 
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Subscribe<MissionStateEntered>(Handle_MissionStateEntered);
 
-        
+        loadingInterface.SetLoadingMessage(
+            "Loading Host Campaign",
+            "Creating remote player heroes...");
+
+        // Campaign is fully loaded and our hero is switched in. Signal the persistent RemotePlayerHeroHandler so
+        // it drains any remote heroes deferred during loading and starts instantiating further ones immediately.
+        // (Remote-hero creation lives in that handler so the NetworkNewPlayerHeroCreated message is never dropped
+        // in the gap between the loading states.)
+        messageBroker.Publish(this, new ClientCampaignEntered());
+
         network.SendAll(new NetworkPlayerCampaignEntered());
+
+        loadingInterface.HideLoadingScreen();
     }
 
     public override void Dispose()
     {
-        messageBroker.Unsubscribe<NetworkNewPartyCreated>(Handle_NetworkNewPartyCreated);
-
         messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Unsubscribe<MissionStateEntered>(Handle_MissionStateEntered);
-    }
-
-    private void Handle_NetworkNewPartyCreated(MessagePayload<NetworkNewPartyCreated> obj)
-    {
-        var message = new RegisterNewPlayerHero((NetPeer)obj.Who, obj.What.PlayerId, obj.What.PlayerHero);
-        messageBroker.Publish(this, message);
     }
 
     internal void Handle_MissionStateEntered(MessagePayload<MissionStateEntered> obj)
@@ -59,7 +61,6 @@ public class CampaignState : ClientStateBase
     {
         coopFinalizer.Finalize("Client has been stopped");
     }
-    
 
     public override void EnterMissionState()
     {

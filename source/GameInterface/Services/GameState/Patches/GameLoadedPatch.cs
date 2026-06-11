@@ -17,6 +17,6 @@ internal class GameLoadedPatch
         // I think this is because opening the escape menu is supposed to call this but it never opens here
         Game.Current.GameStateManager.UnregisterActiveStateDisableRequest(MapScreen.Instance);
 
-        MessageBroker.Instance.Publish(null, new CampaignReady());
+       MessageBroker.Instance.Publish(null, new CampaignReady());
     }
 }

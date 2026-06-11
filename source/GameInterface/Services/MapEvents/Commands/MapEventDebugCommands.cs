@@ -114,7 +114,14 @@ public class MapEventDebugCommands
         UniqueTroopDescriptor descriptor = randomEntry.Key;
         FlattenedTroopRosterElement troopElement = randomEntry.Value;
 
-        enemySide.OnTroopKilled(descriptor);
+        try
+        {
+            enemySide.OnTroopKilled(descriptor);
+        }
+        catch (Exception ex)
+        {
+            return $"Failed to kill random troop: {ex.Message}";
+        }
 
         return $"Killed random troop: {troopElement.Troop?.Name}";
     }
@@ -186,8 +193,15 @@ public class MapEventDebugCommands
             if (i == survivorIndex)
                 continue;
 
-            enemySide.OnTroopKilled(allTroops[i].Descriptor);
-            killedCount++;
+            try
+            {
+                enemySide.OnTroopKilled(allTroops[i].Descriptor);
+                killedCount++;
+            }
+            catch (Exception ex)
+            {
+
+            }
         }
 
         return $"Killed {killedCount} troops. Survivor: {survivor.Element.Troop?.Name}";

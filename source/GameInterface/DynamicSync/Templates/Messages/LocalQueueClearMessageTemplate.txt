@@ -1,0 +1,15 @@
+﻿using Common.Messaging;
+using GameInterface.Utils.LocalEvents;
+{{~ for library in Libraries ~}}
+using {{ library }};
+{{~ end ~}}
+    
+public readonly struct Local_{{ MemberDeclaringType}}_{{ MemberName }}_QueueClear : IEvent
+{
+    public readonly {{ MemberDeclaringType }} Instance;
+
+    public Local_{{ MemberDeclaringType}}_{{ MemberName }}_QueueClear({{ MemberDeclaringType }} instance)
+    {
+        Instance = instance;
+    }
+}

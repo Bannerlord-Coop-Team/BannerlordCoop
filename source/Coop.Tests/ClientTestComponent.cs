@@ -1,6 +1,6 @@
 ﻿using Autofac;
 using Coop.Core.Client;
-using GameInterface.AutoSync;
+using GameInterface.DynamicSync;
 using GameInterface.Registry;
 using GameInterface.Services.Entity;
 using Moq;
@@ -14,8 +14,6 @@ internal class ClientTestComponent : TestComponentBase
     {
         var builder = new ContainerBuilder();
         builder.RegisterModule<ClientModule>();
-        builder.RegisterType<ControlledEntityRegistry>().As<IControlledEntityRegistry>().InstancePerLifetimeScope();
-        builder.RegisterInstance(new Mock<IAutoSyncPatchCollector>().Object).As<IAutoSyncPatchCollector>();
         builder.RegisterModule<RegistryModule>();
 
         Container = BuildContainer(builder);

@@ -1,9 +1,13 @@
 ﻿using Common.Messaging;
 using Coop.Core.Client.Services.Heroes.Data;
+using GameInterface;
 using GameInterface.Registry;
+using GameInterface.Services.Entity;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Players;
+using GameInterface.Services.UI.Interfaces;
 
 namespace Coop.Core.Client.States;
 
@@ -14,20 +18,27 @@ public class LoadingState : ClientStateBase
 {
     private readonly IMessageBroker messageBroker;
     private readonly IRegistryManager registryManager;
-    private readonly IDeferredHeroRepository deferredHeroRepo;
     private readonly IHeroInterface heroInterface;
+    private readonly IControllerIdProvider controllerIdProvider;
+    private readonly IPlayerManager playerRegistry;
+    private readonly ILoadingInterface loadingInterface;
 
     public LoadingState(
         IClientLogic logic,
         IMessageBroker messageBroker,
         IRegistryManager registryManager,
-        IDeferredHeroRepository deferredHeroRepo,
-        IHeroInterface heroInterface) : base(logic)
+        IHeroInterface heroInterface,
+        IControllerIdProvider controllerIdProvider,
+        IPlayerManager playerRegistry,
+        ILoadingInterface loadingInterface) : base(logic)
     {
         this.messageBroker = messageBroker;
         this.registryManager = registryManager;
-        this.deferredHeroRepo = deferredHeroRepo;
         this.heroInterface = heroInterface;
+        this.controllerIdProvider = controllerIdProvider;
+        this.playerRegistry = playerRegistry;
+        this.loadingInterface = loadingInterface;
+
         messageBroker.Subscribe<CampaignReady>(Handle_CampaignLoaded);
     }
 
@@ -43,13 +54,29 @@ public class LoadingState : ClientStateBase
 
     internal void Handle_CampaignLoaded(MessagePayload<CampaignReady> obj)
     {
+        loadingInterface.SetLoadingMessage(
+            "Loading Host Campaign",
+            "Registering campaign objects...");
         registryManager.RegisterAllGameObjects();
+
+        loadingInterface.SetLoadingMessage(
+            "Loading Host Campaign",
+            "Applying synced object lifetimes...");
         registryManager.PatchLifetimes();
 
-        InstantiateDeferredHeroes();
+        loadingInterface.SetLoadingMessage(
+            "Loading Host Campaign",
+            "Registering player control...");
+        RegisterPlayerAsControlled();
 
+        loadingInterface.SetLoadingMessage(
+            "Loading Host Campaign",
+            "Switching to your hero...");
         heroInterface.SwitchToPlayer(Logic.Player);
 
+        loadingInterface.SetLoadingMessage(
+            "Loading Host Campaign",
+            "Entering campaign...");
         Logic.EnterCampaignState();
     }
 
@@ -87,14 +114,15 @@ public class LoadingState : ClientStateBase
     {
     }
 
-    private void InstantiateDeferredHeroes()
+    /// <summary>
+    /// Registers the client's own hero and party as controlled by this client so that
+    /// the client owns its party's movement/AI once it switches to it. Mirrors the
+    /// server registering all parties as controlled when its save loads.
+    /// </summary>
+    private void RegisterPlayerAsControlled()
     {
-        foreach (var newHero in deferredHeroRepo.GetAllDeferredHeroes())
-        {
-            var message = new RegisterNewPlayerHero(newHero.NetPeer, newHero.ControllerId, newHero.HeroData);
-            messageBroker.Publish(this, message);
-        }
+        var player = Logic.Player;
 
-        deferredHeroRepo.Clear();
+        playerRegistry.AddPlayer(player);
     }
 }

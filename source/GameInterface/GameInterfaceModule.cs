@@ -36,9 +36,8 @@ public class GameInterfaceModule : Module
         builder.RegisterType<GameInterface>().As<IGameInterface>().InstancePerLifetimeScope().AutoActivate();
         builder.RegisterType<BinaryPackageFactory>().As<IBinaryPackageFactory>().InstancePerLifetimeScope();
         builder.RegisterType<ControllerIdProvider>().As<IControllerIdProvider>().InstancePerLifetimeScope();
-        builder.RegisterType<ControlledEntityRegistry>().As<IControlledEntityRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<TimeControlModeConverter>().As<ITimeControlModeConverter>().InstancePerLifetimeScope();
-        builder.RegisterType<PlayerRegistry>().As<IPlayerRegistry>().InstancePerLifetimeScope();
+        builder.RegisterType<PlayerManager>().As<IPlayerManager>().InstancePerLifetimeScope();
         builder.RegisterType<MapEventLogger>().As<IMapEventLogger>().InstancePerLifetimeScope();
 
         builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
@@ -46,7 +45,6 @@ public class GameInterfaceModule : Module
         builder.RegisterModule<ServiceModule>();
         builder.RegisterModule<ObjectManagerModule>();
         builder.RegisterModule<RegistryModule>();
-        builder.RegisterModule<AutoSyncModule>();
         builder.RegisterModule<DynamicSyncModule>();
 
 

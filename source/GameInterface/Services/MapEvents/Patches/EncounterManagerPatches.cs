@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Policies;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MobileParties.Extensions;
@@ -31,7 +32,7 @@ internal class EncounterManagerPatches
     {
         if (ModInformation.IsServer) return true;
 
-        if (!attackerParty.IsPartyControlled())
+        if (!attackerParty.IsControlledByThisInstance())
             return false;
 
         var message = new StartSettlementEncounterAttempted(attackerParty, settlement);
@@ -44,8 +45,10 @@ internal class EncounterManagerPatches
     [HarmonyPatch(nameof(EncounterManager.HandleEncounterForMobileParty))]
     internal static bool HandleEncounterForMobilePartyPatch(ref MobileParty mobileParty, ref float dt)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
         // Skip this method if party is not controlled
-        if (!mobileParty.IsPartyControlled())
+        if (!mobileParty.IsControlledByThisInstance())
             return false;
 
         return true;
@@ -58,7 +61,7 @@ internal class EncounterManagerPatches
     private static bool RestartPlayerEncounterPrefix(PartyBase attackerParty, PartyBase defenderParty)
     {
         // Our own server-approved re-run (AllowedThread) runs the real method.
-        if (AllowedThread.IsThisThreadAllowed()) return true;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         // The server runs it locally (authoritative).
         if (ModInformation.IsServer) return true;

@@ -75,7 +75,7 @@ namespace Missions.Services.Network
 
         public virtual void HandlePacket(NetPeer peer, IPacket packet)
         {
-            Logger.Verbose("Received message {Packet} from {Peer}", packet, peer.EndPoint);
+            Logger.Verbose("Received message {Packet} from {Peer}", packet, peer);
             object payload = ProtoBufSerializer.Deserialize(packet.Data);
 
             Type type = payload.GetType();
@@ -96,7 +96,7 @@ namespace Missions.Services.Network
             var delegates = m_Subscribers[T];
             if (delegates == null || delegates.Count == 0) return;
 
-            Logger.Debug("Received {PacketType} from {Peer}: {Payload}", type.Name, peer.EndPoint, payload);
+            Logger.Debug("Received {PacketType} from {Peer}: {Payload}", type.Name, peer, payload);
 
             foreach (var handler in delegates)
             {

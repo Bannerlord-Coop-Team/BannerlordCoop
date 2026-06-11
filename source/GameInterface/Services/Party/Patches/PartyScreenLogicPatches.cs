@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using Common.Util;
 using GameInterface.Services.Party.Messages;
 using HarmonyLib;
 using Serilog;
@@ -10,6 +11,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using MathF = TaleWorlds.Library.MathF;
 
 namespace GameInterface.Services.Party.Patches;
 
@@ -75,6 +77,10 @@ internal class PartyScreenLogicPatches
 
             // Manage changing rosters on the server
             __instance.CurrentData.ResetUsing(__instance._initialData);
+            using (new AllowedThread())
+            {
+                __instance.Reset(true);
+            }
 
             //__instance.FireCampaignRelatedEvents(); // Managed on server
             __instance.SetPartyGoldChangeAmount(0);

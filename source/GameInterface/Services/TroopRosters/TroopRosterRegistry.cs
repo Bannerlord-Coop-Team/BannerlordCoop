@@ -11,6 +11,7 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.TroopRosters;
@@ -57,6 +58,13 @@ internal class TroopRosterRegistry : AutoRegistryBase<TroopRoster>
             }
 
             RegisterExistingObject($"{nameof(MobileParty.PrisonRoster)}_{party.StringId}", party.PrisonRoster);
+        }
+
+        foreach (var settlement in Settlement.All)
+        {
+            if (settlement?.Party?.PrisonRoster == null) continue;
+
+            RegisterExistingObject($"{nameof(Settlement.Party.PrisonRoster)}_{settlement.StringId}", settlement.Party.PrisonRoster);
         }
     }
 

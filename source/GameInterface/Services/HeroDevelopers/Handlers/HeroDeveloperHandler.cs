@@ -10,6 +10,7 @@ using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using MathF = TaleWorlds.Library.MathF;
 
 namespace GameInterface.Services.HeroDevelopers.Handlers
 {

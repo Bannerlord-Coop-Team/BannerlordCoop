@@ -43,7 +43,7 @@ namespace Coop.Core.Server.Services.Connection.Handlers
 
         internal void Handle_NetworkConnected(MessagePayload<PackageGameSaveData> obj)
         {
-            messageBroker.Publish(this, new SendInformationMessage("A player is joining the game, pausing"));
+            SendLoadingMessage();
         }
 
         private void PlayerCampaignEnteredHandler(MessagePayload<PlayerCampaignEntered> obj)
@@ -59,15 +59,20 @@ namespace Coop.Core.Server.Services.Connection.Handlers
 
         private void AttemptedTimeSpeedChanged(MessagePayload<TimeSpeedChangedAttempted> obj)
         {
-            if (AnyLoaders())
-            {
-                int loadingPeers = clientRegistry.LoadingPeers.Count;
+            SendLoadingMessage();
+        }
 
-                string loadingMessage = "Time controls disabled, " + loadingPeers + " player(s) are currently joining the game";
+        private void SendLoadingMessage()
+        {
+            if (!AnyLoaders()) return;
 
-                messageBroker.Publish(this, new SendInformationMessage(loadingMessage));
-                network.SendAll(new SendInformationMessage(loadingMessage));
-            }
+            int loadingPeers = clientRegistry.LoadingPeers.Count;
+
+            string loadingMessage = "Time controls disabled, " + loadingPeers + " player(s) are currently joining the game";
+            var message = new SendInformationMessage(loadingMessage);
+
+            messageBroker.Publish(this, message);
+            network.SendAll(message);
         }
 
         private bool AnyLoaders()

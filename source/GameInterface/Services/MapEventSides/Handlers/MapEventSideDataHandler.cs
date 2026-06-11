@@ -186,7 +186,7 @@ internal class MapEventSideDataHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<MapEvent>(payload.What.MapEventId, out var mapEvent)) return;
         if (!objectManager.TryGetObjectWithLogging<MapEventSide>(payload.What.MapEventSideId, out var mapEventSide)) return;
 
-        using (new AllowedThread())
+        using(new AllowedThread())
         {
             mapEvent._sides[(int)payload.What.Side] = mapEventSide;
         }

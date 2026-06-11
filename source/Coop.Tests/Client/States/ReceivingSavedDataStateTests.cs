@@ -6,6 +6,8 @@ using Coop.Core.Client.States;
 using Coop.Tests.Mocks;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Smithing;
+using GameInterface.Services.UI.Interfaces;
+using Moq;
 using System;
 using System.Linq;
 using Xunit;
@@ -17,6 +19,7 @@ namespace Coop.Tests.Client.States
     {
         private readonly IClientLogic clientLogic;
         private readonly ClientTestComponent clientComponent;
+        private readonly Mock<ILoadingInterface> loadingInterfaceMock;
 
         public ReceivingSavedDataStateTests(ITestOutputHelper output)
         {
@@ -24,6 +27,19 @@ namespace Coop.Tests.Client.States
             var container = clientComponent.Container;
 
             clientLogic = container.Resolve<IClientLogic>()!;
+            loadingInterfaceMock = container.Resolve<Mock<ILoadingInterface>>();
+        }
+
+        [Fact]
+        public void StateEntered_Shows_LoadingProgressMessage()
+        {
+            // Act
+            clientLogic.SetState<ReceivingSavedDataState>();
+
+            // Assert
+            loadingInterfaceMock.Verify(x => x.ShowLoadingScreen(
+                "Joining Coop Campaign",
+                "Waiting for host save data..."), Times.Once);
         }
 
         [Fact]
@@ -44,6 +60,9 @@ namespace Coop.Tests.Client.States
             // Assert
             var message = Assert.Single(clientComponent.TestMessageBroker.Messages);
             Assert.IsType<EnterMainMenu>(message);
+            loadingInterfaceMock.Verify(x => x.SetLoadingMessage(
+                "Joining Coop Campaign",
+                "Preparing host save data..."), Times.Once);
         }
 
         [Fact]
@@ -73,6 +92,9 @@ namespace Coop.Tests.Client.States
             Assert.Equal(gameSaveData, loadSaveMessage.SaveData);
 
             Assert.IsType<LoadingState>(clientLogic.State);
+            loadingInterfaceMock.Verify(x => x.SetLoadingMessage(
+                "Loading Host Campaign",
+                "Loading host save data..."), Times.Once);
         }
 
         [Fact]

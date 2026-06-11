@@ -1,11 +1,7 @@
 ﻿using Common.Messaging;
 using Coop.Core.Client.Messages;
-using Coop.Core.Client.Services.Heroes.Data;
-using Coop.Core.Client.Services.MobileParties.Messages;
-using Coop.Core.Common;
 using GameInterface.Services.GameState.Messages;
-using GameInterface.Services.UI.Messages;
-using LiteNetLib;
+using GameInterface.Services.UI.Interfaces;
 
 namespace Coop.Core.Client.States;
 
@@ -16,38 +12,41 @@ public class ReceivingSavedDataState : ClientStateBase
 {
     private NetworkGameSaveDataReceived saveDataMessage = default;
     private readonly IMessageBroker messageBroker;
-    private readonly IDeferredHeroRepository deferredHeroRepo;
-    private readonly ICoopFinalizer coopFinalizer;
+    private readonly ILoadingInterface loadingInterface;
 
     public ReceivingSavedDataState(
         IClientLogic logic,
         IMessageBroker messageBroker,
-        IDeferredHeroRepository deferredHeroRepo,
-        ICoopFinalizer coopFinalizer) : base(logic)
+        ILoadingInterface loadingInterface) : base(logic)
     {
         this.messageBroker = messageBroker;
-        this.deferredHeroRepo = deferredHeroRepo;
-        this.coopFinalizer = coopFinalizer;
+        this.loadingInterface = loadingInterface;
+
         messageBroker.Subscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
-        messageBroker.Subscribe<NetworkNewPartyCreated>(Handle_NetworkNewPartyCreated);
+        // NetworkNewPlayerHeroCreated is handled by the persistent RemotePlayerHeroHandler for the whole client
+        // lifetime, so it is captured here AND during LoadingState without a per-state subscription gap.
 
         // Keep a loading screen up while we receive and load the server world. This is the
         // common state for both new (post character-creation) and returning clients, so the
         // client's local/main-menu view isn't shown during the transition.
-        messageBroker.Publish(this, new StartLoadingScreen());
+        loadingInterface.ShowLoadingScreen(
+            "Joining Coop Campaign",
+            "Waiting for host save data...");
     }
 
     public override void Dispose()
     {
         messageBroker.Unsubscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
         messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
-        messageBroker.Unsubscribe<NetworkNewPartyCreated>(Handle_NetworkNewPartyCreated);
     }
 
     internal void Handle_NetworkGameSaveDataReceived(MessagePayload<NetworkGameSaveDataReceived> obj)
     {
         saveDataMessage = obj.What;
+        loadingInterface.SetLoadingMessage(
+            "Joining Coop Campaign",
+            "Preparing host save data...");
         Logic.EnterMainMenu();
     }
 
@@ -58,16 +57,14 @@ public class ReceivingSavedDataState : ClientStateBase
         if (saveData == null) return;
         if (saveData.Length == 0) return;
 
+        loadingInterface.SetLoadingMessage(
+            "Loading Host Campaign",
+            "Loading host save data...");
+
         var commandLoad = new LoadGameSave(saveData);
         messageBroker.Publish(this, commandLoad);
 
         Logic.LoadSavedData();
-    }
-
-    private void Handle_NetworkNewPartyCreated(MessagePayload<NetworkNewPartyCreated> obj)
-    {
-        var peer = (NetPeer)obj.Who;
-        deferredHeroRepo.AddDeferredHero(peer, obj.What.PlayerId, obj.What.PlayerHero);
     }
 
     public override void EnterMainMenu()

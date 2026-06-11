@@ -6,6 +6,7 @@ using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
+using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Serilog;
@@ -27,53 +28,51 @@ public class ResolveCharacterState : ConnectionStateBase
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IModuleValidator moduleValidator;
-    private readonly IHeroInterface heroInterface;
+    private readonly IPlayerManager playerManager;
     private readonly IModuleInfoProvider moduleInfoProvider;
     public ResolveCharacterState(IConnectionLogic connectionLogic,
         IMessageBroker messageBroker,
         INetwork network,
         IModuleValidator moduleValidator,
-        IHeroInterface heroInterface,
+        IPlayerManager playerManager,
         IModuleInfoProvider moduleInfoProvider) 
         : base(connectionLogic)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.moduleValidator = moduleValidator;
-        this.heroInterface = heroInterface;
+        this.playerManager = playerManager;
         this.moduleInfoProvider = moduleInfoProvider;
 
-        messageBroker.Subscribe<NetworkClientValidate>(ClientValidateHandler);
-        messageBroker.Subscribe<NetworkModuleVersionsValidate>(ModuleVersionsValidateHandler);
+        messageBroker.Subscribe<NetworkClientValidate>(Handle_ClientValidate);
+        messageBroker.Subscribe<NetworkModuleVersionsValidate>(Handle_ModuleVersionsValidate);
     }
 
     public override void Dispose()
     {
-        messageBroker.Unsubscribe<NetworkClientValidate>(ClientValidateHandler);
-        messageBroker.Unsubscribe<NetworkModuleVersionsValidate>(ModuleVersionsValidateHandler);
+        messageBroker.Unsubscribe<NetworkClientValidate>(Handle_ClientValidate);
+        messageBroker.Unsubscribe<NetworkModuleVersionsValidate>(Handle_ModuleVersionsValidate);
     }
 
-    internal void ModuleVersionsValidateHandler(MessagePayload<NetworkModuleVersionsValidate> obj)
+    internal void Handle_ModuleVersionsValidate(MessagePayload<NetworkModuleVersionsValidate> obj)
     {
         var clientModules = obj.What.Modules;
         var serverModules = moduleInfoProvider.GetModuleInfos();
 
-        var result = moduleValidator.Validate(serverModules, clientModules.Select(ConvertToModuleInfo).ToList());
+        var result = moduleValidator.Validate(serverModules, clientModules.Select(ConvertToModuleInfo), out var error);
 
-        var validateMessage = new NetworkModuleVersionsValidated(result == null, result);
+        var validateMessage = new NetworkModuleVersionsValidated(result, error);
         var playerPeer = ConnectionLogic.Peer;
         network.Send(playerPeer, validateMessage);
     }
 
-    internal void ClientValidateHandler(MessagePayload<NetworkClientValidate> obj)
+    internal void Handle_ClientValidate(MessagePayload<NetworkClientValidate> obj)
     {
         var peer = obj.Who as NetPeer;
         if (peer != ConnectionLogic.Peer) return;
 
-        if (heroInterface.TryResolve<Hero>(obj.What.PlayerId, out string heroId) &&
-            heroInterface.TryResolve<MobileParty>(obj.What.PlayerId, out string mobilePartyId))
+        if (playerManager.TryGetPlayer(obj.What.PlayerId, out var player))
         {
-            var player = new Player(heroId, mobilePartyId);
             network.Send(peer, new NetworkClientValidated(true, player));
             ConnectionLogic.TransferSave();
         }

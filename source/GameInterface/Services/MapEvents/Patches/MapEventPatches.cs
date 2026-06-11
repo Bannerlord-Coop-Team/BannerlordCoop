@@ -32,7 +32,7 @@ internal class MapEventPatches
     private static void Prefix_AddInvolvedPartyInternal(MapEvent __instance, MapEventParty mapEventParty)
     {
         // Parties not controlled by the server are player parties
-        if (mapEventParty.Party.MobileParty.IsPlayerParty())
+        if (mapEventParty.Party.MobileParty?.IsPlayerParty() == true)
         {
             var partiesAdded = new List<MapEventParty>();
 
@@ -66,6 +66,18 @@ internal class MapEventPatches
         MessageBroker.Instance.Publish(__instance, message);
 
         return false;
+    }
+
+    [HarmonyPatch(nameof(MapEvent.FinalizeEventAux))]
+    [HarmonyPostfix]
+    private static void Postfix_FinalizeEventAux(MapEvent __instance)
+    {
+        // By this point the event's parties have left it, so the server can
+        // re-evaluate whether any player is still in a map event.
+        if (ModInformation.IsClient)
+            return;
+
+        MessageBroker.Instance.Publish(__instance, new MapEventFinalized(__instance));
     }
 
     [HarmonyPatch(nameof(MapEvent.BattleState), MethodType.Setter)]
@@ -128,7 +140,7 @@ internal class MapEventPatches
 
         // Don't update if a player is involved
         // Prevents server from instantly finishing the battle and waits for client finish request
-        if (__instance.InvolvedParties.Any(x => !x.MobileParty.IsPartyControlled()))
+        if (__instance.InvolvedParties.Any(x => !x.MobileParty.IsControlledByThisInstance()))
             return false;
 
         return true;
@@ -177,9 +189,17 @@ internal class InteractionPatches
             return;
 
         if (__instance.MobileParty?.IsPlayerParty() == true && mobileParty?.IsPlayerParty() == true)
-        {  
+        {
             __result = false;
             return;
+        }
+
+        // A party held in a conversation with a player can only be interacted with by that player's party. This is
+        // the hard stop that keeps other AI parties from starting an encounter or battle with it, since
+        // OnPartyInteraction only runs when this check passes.
+        if (ConversationPartyHold.IsInteractionBlocked(__instance, mobileParty))
+        {
+            __result = false;
         }
     }
 
@@ -206,15 +226,8 @@ internal class InteractionPatches
         if (!__instance.ContainsPlayerParty())
             return;
 
-        if (!playerBattleAiJoinWindows.TryGetValue(__instance, out var debounce))
-            return;
-
-        // Prevent AI joining after 5 hours
-        if (debounce.Expired)
-        {
-            __result = false;
-            return;
-        }
+        // Prevent any AI party from joining a battle that involves a player
+        __result = false;
     }
 
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.Initialize))]

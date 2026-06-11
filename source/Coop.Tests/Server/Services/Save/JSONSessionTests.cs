@@ -2,10 +2,11 @@
 using GameInterface.CoopSessionData.Save.Data;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Data;
-using GameInterface.Services.Smithing;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.Smithing;
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using Xunit;
@@ -29,19 +30,12 @@ namespace Coop.Tests.Server.Services.Save
         {
             var gameObjectGuids = new GameObjectGuids(new string[] { "Random STR" });
 
-            var entityRegistry = new ControlledEntityRegistry();
-
-            const string controllerId = "testController";
-            const string entityId = "testEntity1";
-
-            Assert.True(entityRegistry.RegisterAsControlled(controllerId, entityId));
-
             var players = new Player[]
             {
-                new Player("PlayerHero","PlayerParty1")
+                new Player("MyPlayer", "MyHero", "MyParty", "MyClan", "MyCharacter")
             };
 
-            var sessionData = new CoopSession("TestId", entityRegistry.PackageControlledEntities(), players, new CraftingPlayerData(new(), new(), new()));
+            var sessionData = new CoopSession("TestId", players, new CraftingPlayerData(new(), new(), new()));
 
             string saveFile = SAVE_PATH + sessionData.UniqueGameId + ".json";
 
