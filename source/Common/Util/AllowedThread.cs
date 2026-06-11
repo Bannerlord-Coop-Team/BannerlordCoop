@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Threading;
 
 namespace Common.Util;
 
@@ -15,13 +13,15 @@ namespace Common.Util;
 /// scope while the outer action is still running. With a plain set instead of a count, the
 /// inner dispose would revoke the outer scope too, re-enabling patch interception for the
 /// remainder of the outer action.
+/// The count lives in a [ThreadStatic] field, so reading or changing it never locks or
+/// contends with other threads; it is read on every patched call.
 /// WARNING: Please remember to revoke the thread after the process is completed; prefer
 /// using (new AllowedThread()) so the allowance is released even when the action throws.
 /// </remarks>
 public class AllowedThread : IDisposable
 {
-    public static int CurrentThreadId => Thread.CurrentThread.ManagedThreadId;
-    private static readonly Dictionary<int, int> _allowedThreadIds = new Dictionary<int, int>();
+    [ThreadStatic]
+    private static int _allowedCount;
 
     public AllowedThread()
     {
@@ -39,11 +39,7 @@ public class AllowedThread : IDisposable
     /// </summary>
     public static void AllowThisThread()
     {
-        lock (_allowedThreadIds)
-        {
-            _allowedThreadIds.TryGetValue(CurrentThreadId, out var count);
-            _allowedThreadIds[CurrentThreadId] = count + 1;
-        }
+        _allowedCount++;
     }
 
     /// <summary>
@@ -52,26 +48,11 @@ public class AllowedThread : IDisposable
     /// </summary>
     public static void RevokeThisThread()
     {
-        lock (_allowedThreadIds)
+        if (_allowedCount > 0)
         {
-            if (!_allowedThreadIds.TryGetValue(CurrentThreadId, out var count)) return;
-
-            if (count <= 1)
-            {
-                _allowedThreadIds.Remove(CurrentThreadId);
-            }
-            else
-            {
-                _allowedThreadIds[CurrentThreadId] = count - 1;
-            }
+            _allowedCount--;
         }
     }
 
-    public static bool IsThisThreadAllowed()
-    {
-        lock (_allowedThreadIds)
-        {
-            return _allowedThreadIds.ContainsKey(CurrentThreadId);
-        }
-    }
+    public static bool IsThisThreadAllowed() => _allowedCount > 0;
 }
