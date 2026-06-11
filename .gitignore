@@ -549,3 +549,5 @@ source/.idea
 !*MissionTestMod.csproj.user
 # CodeRush
 /source/.cr/personal
+# ServerHeadless dev scratch helper (machine-specific paths)
+source/ServerHeadless/run.ps1

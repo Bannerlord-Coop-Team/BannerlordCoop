@@ -68,6 +68,18 @@ internal class MapEventPatches
         return false;
     }
 
+    [HarmonyPatch(nameof(MapEvent.FinalizeEventAux))]
+    [HarmonyPostfix]
+    private static void Postfix_FinalizeEventAux(MapEvent __instance)
+    {
+        // By this point the event's parties have left it, so the server can
+        // re-evaluate whether any player is still in a map event.
+        if (ModInformation.IsClient)
+            return;
+
+        MessageBroker.Instance.Publish(__instance, new MapEventFinalized(__instance));
+    }
+
     [HarmonyPatch(nameof(MapEvent.BattleState), MethodType.Setter)]
     [HarmonyPrefix]
     private static bool Prefix_BattleState(MapEvent __instance, BattleState value)

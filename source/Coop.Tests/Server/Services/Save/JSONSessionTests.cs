@@ -32,7 +32,7 @@ namespace Coop.Tests.Server.Services.Save
 
             var players = new Player[]
             {
-                new Player("MyPlayer", "MyHero", "MyParty", "MyClan")
+                new Player("MyPlayer", "MyHero", "MyParty", "MyClan", "MyCharacter")
             };
 
             var sessionData = new CoopSession("TestId", players, new CraftingPlayerData(new(), new(), new()));

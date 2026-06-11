@@ -92,8 +92,10 @@ public class CreateCharacterState : ConnectionStateBase
             return false;
         if (!objectManager.TryGetIdWithLogging(hero.Clan, out var clanId))
             return false;
+        if (!objectManager.TryGetIdWithLogging(hero.CharacterObject, out var characterObjectId))
+            return false;
 
-        player = new Player(controllerId, heroId, mobilePartyId, clanId);
+        player = new Player(controllerId, heroId, mobilePartyId, clanId, characterObjectId);
         return true;
     }
 
