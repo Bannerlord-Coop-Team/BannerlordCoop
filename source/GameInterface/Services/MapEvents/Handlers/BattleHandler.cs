@@ -174,13 +174,23 @@ internal class BattleHandler : IHandler
 
     private void Handle_NetworkMapEventFinalized(MessagePayload<NetworkMapEventFinalized> payload)
     {
-        if (PlayerEncounter.Current != null)
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            // TODO determine force out of settlement
-            PlayerEncounter.Finish(true);
-        }
-        
-        GameMenu.ExitToLast();
+            if (Campaign.Current == null) return;
+
+            // When this battle ended with the local player captured, the captivity flow owns the UI:
+            // PlayerCaptivityClientHandler has switched to the prisoner menu and leaves the encounter
+            // itself. Exiting menus here would close the capture screen.
+            if (PlayerCaptivity.IsCaptive) return;
+
+            if (PlayerEncounter.Current != null)
+            {
+                // TODO determine force out of settlement
+                PlayerEncounter.Finish(true);
+            }
+
+            GameMenu.ExitToLast();
+        });
     }
 
     private void Handle_MapEventInvolvedPartiesAdded(MessagePayload<MapEventInvolvedPartiesAdded> payload)

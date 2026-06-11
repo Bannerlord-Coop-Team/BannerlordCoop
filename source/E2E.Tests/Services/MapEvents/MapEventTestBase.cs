@@ -321,7 +321,7 @@ public abstract class MapEventTestBase : IDisposable
     /// <c>PlayerStartCaptivityPatches</c> does in a <em>prefix</em> (before native removes the leader and
     /// scatters members). The native <c>TakePrisonerAction.ApplyInternal</c> mutation is suppressed so the
     /// assertion deterministically exercises the coop capture/sync path (<c>PrisonerTaken</c> →
-    /// <c>PlayerCaptivityHandler</c> → AutoSynced <see cref="Hero.PartyBelongedToAsPrisoner"/>), not vanilla
+    /// <c>PlayerCaptivityServerHandler</c> → AutoSynced <see cref="Hero.PartyBelongedToAsPrisoner"/>), not vanilla
     /// prisoner RNG.
     /// </remarks>
     protected void DefeatPlayerPartyInBattle(string playerHeroId, string playerPartyId, string captorPartyId)
@@ -340,8 +340,8 @@ public abstract class MapEventTestBase : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(captorPartyId, out var captorParty));
 
             // Make the player hero a member of (not leader of) the player party: the capture resolves the hero
-            // from the player registry, and PlayerCaptivityHandler.Handle_PrisonerTaken derives the party from
-            // hero.PartyBelongedTo. This is local server setup; wrap in AllowedThread so it does not re-broadcast.
+            // from the player registry, and PlayerCaptivityServerHandler.Handle_PrisonerTaken derives the party
+            // from hero.PartyBelongedTo. This is local server setup; wrap in AllowedThread so it does not re-broadcast.
             using (new AllowedThread())
             {
                 playerParty.MemberRoster.AddToCounts(playerHero.CharacterObject, 1);
