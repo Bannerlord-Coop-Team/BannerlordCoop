@@ -3,8 +3,11 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using Coop.Core.Server.Services.Time.Messages;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
+using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
@@ -37,6 +40,10 @@ internal class BattleHandler : IHandler
     private readonly IPlayerManager playerRegistry;
     private readonly ITimeControlInterface timeControlInterface;
 
+    // Server-side: number of players in a map event at the last broadcast, used to
+    // detect when fast-forward becomes (un)available and to keep clients informed.
+    private int lastBroadcastPlayersInMapEvent;
+
     public BattleHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
@@ -64,6 +71,11 @@ internal class BattleHandler : IHandler
         messageBroker.Subscribe<AttackMissionAttempted>(Handle_AttackMissionAttempted);
         messageBroker.Subscribe<NetworkAttackMissionAttempted>(Handle_NetworkAttackMissionAttempted);
         messageBroker.Subscribe<NetworkStartAttackMission>(Handle_NetworkStartAttackMission);
+
+        messageBroker.Subscribe<MapEventFinalized>(Handle_MapEventFinalized);
+        messageBroker.Subscribe<TimeSpeedChangedAttempted>(Handle_TimeSpeedChangedAttempted);
+
+        timeControlInterface.AddFastForwardPolicy(FastForwardWhilePlayerInMapEventPolicy);
     }
 
     public void Dispose()
@@ -80,6 +92,11 @@ internal class BattleHandler : IHandler
         messageBroker.Unsubscribe<AttackMissionAttempted>(Handle_AttackMissionAttempted);
         messageBroker.Unsubscribe<NetworkAttackMissionAttempted>(Handle_NetworkAttackMissionAttempted);
         messageBroker.Unsubscribe<NetworkStartAttackMission>(Handle_NetworkStartAttackMission);
+
+        messageBroker.Unsubscribe<MapEventFinalized>(Handle_MapEventFinalized);
+        messageBroker.Unsubscribe<TimeSpeedChangedAttempted>(Handle_TimeSpeedChangedAttempted);
+
+        timeControlInterface.RemoveFastForwardPolicy(FastForwardWhilePlayerInMapEventPolicy);
     }
 
     private void Handle_AttackMissionAttempted(MessagePayload<AttackMissionAttempted> payload)
@@ -185,6 +202,13 @@ internal class BattleHandler : IHandler
 
     private void Handle_MapEventInvolvedPartiesAdded(MessagePayload<MapEventInvolvedPartiesAdded> payload)
     {
+        // This message is published when a player party joins a battle (a fresh one
+        // during MapEvent.Initialize, or an already-running one as a reinforcement);
+        // the joining party's MapEventSide is already set by this point, so the live
+        // count is accurate.
+        CapFastForwardForMapEvent();
+        RefreshFastForwardState();
+
         var message = payload.What;
         if (!objectManager.TryGetIdWithLogging(message.MapEvent, out var mapEventSideId))
             return;
@@ -235,6 +259,89 @@ internal class BattleHandler : IHandler
         {
             timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
         }
+        else
+        {
+            // A player started a battle while others remain on the map.
+            CapFastForwardForMapEvent();
+        }
+
+        RefreshFastForwardState();
+    }
+
+    private void Handle_MapEventFinalized(MessagePayload<MapEventFinalized> payload)
+    {
+        // A map event ended; its parties have left it, so re-evaluate whether
+        // fast-forward should become available again.
+        RefreshFastForwardState(finalizedMapEvent: payload.What.MapEvent);
+    }
+
+    private void Handle_TimeSpeedChangedAttempted(MessagePayload<TimeSpeedChangedAttempted> payload)
+    {
+        // Notify the host (clients are notified by their own time handler) when they
+        // try to fast-forward while it is blocked by a map event.
+        if (ModInformation.IsClient)
+            return;
+
+        if (payload.What.NewControlMode != TimeControlEnum.Play_2x)
+            return;
+
+        var playersInMapEvent = CountPlayersInMapEvents();
+        if (playersInMapEvent == 0)
+            return;
+
+        messageBroker.Publish(this, new SendInformationMessage(
+            MapEventTimeControlMessages.FastForwardBlocked(playersInMapEvent)));
+    }
+
+    /// <summary>
+    /// Recomputes how many players are in a map event and, when that crosses the
+    /// 0 / non-0 boundary, announces it locally and informs clients. Server only.
+    /// </summary>
+    /// <param name="finalizedMapEvent">A map event being finalized, excluded from the count.</param>
+    private void RefreshFastForwardState(MapEvent finalizedMapEvent = null)
+    {
+        if (ModInformation.IsClient)
+            return;
+
+        var count = CountPlayersInMapEvents(finalizedMapEvent);
+        if (count == lastBroadcastPlayersInMapEvent)
+            return;
+
+        var wasBlocked = lastBroadcastPlayersInMapEvent > 0;
+        var isBlocked = count > 0;
+        lastBroadcastPlayersInMapEvent = count;
+
+        network.SendAll(new NetworkMapEventLockChanged(count));
+
+        if (isBlocked && !wasBlocked)
+            messageBroker.Publish(this, new SendInformationMessage(MapEventTimeControlMessages.FastForwardDisabled));
+        else if (!isBlocked && wasBlocked)
+            messageBroker.Publish(this, new SendInformationMessage(MapEventTimeControlMessages.FastForwardEnabled));
+    }
+
+    /// <summary>
+    /// Drops the campaign out of fast-forward when a player is in a map event. The
+    /// fast-forward policy then keeps it capped at normal speed until every player
+    /// has left their map event. Runs on the server only.
+    /// </summary>
+    private void CapFastForwardForMapEvent()
+    {
+        if (ModInformation.IsClient)
+            return;
+
+        if (timeControlInterface.GetTimeControl() == TimeControlEnum.Play_2x)
+        {
+            timeControlInterface.ServerSetTimeControl(TimeControlEnum.Play_1x);
+        }
+    }
+
+    /// <summary>
+    /// Fast-forwarding the campaign map is not allowed while any player is in a map event.
+    /// </summary>
+    /// <returns>True if fast-forwarding is allowed, otherwise false</returns>
+    private bool FastForwardWhilePlayerInMapEventPolicy()
+    {
+        return AnyPlayerInMapEvent() == false;
     }
 
     private bool AllPlayersInMapEvents()
@@ -245,6 +352,22 @@ internal class BattleHandler : IHandler
                 return false;
 
             return playerParty.MapEvent != null;
+        });
+    }
+
+    private bool AnyPlayerInMapEvent() => CountPlayersInMapEvents() > 0;
+
+    private int CountPlayersInMapEvents(MapEvent excluding = null)
+    {
+        // Backs the fast-forward policy and messaging, which are evaluated on every
+        // time-control change, so this uses the non-logging lookup to avoid spamming
+        // the log when a party is momentarily unresolved.
+        return playerRegistry.Players.Count(player =>
+        {
+            if (!objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty))
+                return false;
+
+            return playerParty.MapEvent != null && playerParty.MapEvent != excluding;
         });
     }
 }
