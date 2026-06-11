@@ -5,6 +5,8 @@ using Coop.Core.Client;
 using Coop.Core.Client.States;
 using GameInterface.Registry.Messages;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.UI.Interfaces;
+using Moq;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -14,6 +16,7 @@ namespace Coop.Tests.Client.States
     {
         private readonly IClientLogic clientLogic;
         private readonly ClientTestComponent clientComponent;
+        private readonly Mock<ILoadingInterface> loadingInterfaceMock;
 
         public LoadingStateTests(ITestOutputHelper output)
         {
@@ -21,6 +24,7 @@ namespace Coop.Tests.Client.States
             var container = clientComponent.Container;
 
             clientLogic = container.Resolve<IClientLogic>()!;
+            loadingInterfaceMock = container.Resolve<Mock<ILoadingInterface>>();
         }
 
         [Fact]
@@ -37,6 +41,24 @@ namespace Coop.Tests.Client.States
 
             // Assert
             Assert.IsType<CampaignState>(clientLogic.State);
+            loadingInterfaceMock.Verify(x => x.SetLoadingMessage(
+                "Loading Host Campaign",
+                "Registering campaign objects..."), Times.Once);
+            loadingInterfaceMock.Verify(x => x.SetLoadingMessage(
+                "Loading Host Campaign",
+                "Applying synced object lifetimes..."), Times.Once);
+            loadingInterfaceMock.Verify(x => x.SetLoadingMessage(
+                "Loading Host Campaign",
+                "Creating remote player heroes..."), Times.Once);
+            loadingInterfaceMock.Verify(x => x.SetLoadingMessage(
+                "Loading Host Campaign",
+                "Registering player control..."), Times.Once);
+            loadingInterfaceMock.Verify(x => x.SetLoadingMessage(
+                "Loading Host Campaign",
+                "Switching to your hero..."), Times.Once);
+            loadingInterfaceMock.Verify(x => x.SetLoadingMessage(
+                "Loading Host Campaign",
+                "Entering campaign..."), Times.Once);
         }
 
         [Fact]

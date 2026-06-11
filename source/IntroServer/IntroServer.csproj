@@ -13,4 +13,8 @@
     <PackageReference Include="System.Reflection.Primitives" Version="4.3.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Common\Common.csproj" />
+  </ItemGroup>
+
 </Project>

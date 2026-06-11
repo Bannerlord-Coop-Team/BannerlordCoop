@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Policies;
 using GameInterface.Services.MobileParties.Messages;
 using HarmonyLib;
 using System.Collections.Generic;
@@ -50,7 +51,7 @@ internal class WageChangesSettlementPatch
 
     private static void SetWagePaymentLimitOverride(MobileParty instance, int newValue)
     {
-        if (ModInformation.IsServer || AllowedThread.IsThisThreadAllowed())
+        if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed())
         {
             instance.SetWagePaymentLimit(newValue);
             return;

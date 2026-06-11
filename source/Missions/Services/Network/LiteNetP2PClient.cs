@@ -1,18 +1,22 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Network;
+using Common.Network.Data;
+using Common.PacketHandlers;
 using Common.Serialization;
+using Common.Util;
 using IntroServer.Config;
 using IntroServer.Data;
 using IntroServer.Server;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using Missions.Services.Network.Messages;
-using Missions.Services.Network.PacketHandlers;
+using ProtoBuf.Meta;
 using Serilog;
 using Serilog.Events;
 using System;
-using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
@@ -20,31 +24,39 @@ using Version = System.Version;
 
 namespace Missions.Services.Network
 {
-    public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateable, IDisposable
+    public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateable, IDisposable, IP2PClient
     {
         private static readonly ILogger Logger = LogManager.GetLogger<LiteNetP2PClient>();
-        private static readonly Dictionary<PacketType, List<IPacketHandler>> PacketHandlers = new Dictionary<PacketType, List<IPacketHandler>>();
-        
-        public int ConnectedPeersCount => _netManager.ConnectedPeersCount;
+        public int ConnectedPeersCount => netManager.ConnectedPeersCount;
 
         public NetPeer PeerServer { get; private set; }
         public int Priority => 2;
 
-        private string _instance;
+        public IPacketManager PacketManager { get; private set; }
+        public INetworkConfiguration Configuration { get; }
+
+        private string instance;
 
         private readonly Guid id = Guid.NewGuid();
-        private readonly BatchLogger<PacketType> _batchLogger = new BatchLogger<PacketType>(LogEventLevel.Verbose, 10000);
-        private readonly NetManager _netManager;
-        private readonly NetworkConfiguration _networkConfig;
-        private readonly Version _version = typeof(MissionTestServer).Assembly.GetName().Version;
-        private readonly IMessageBroker _messageBroker;
-        private readonly Poller _poller;
-        public LiteNetP2PClient(NetworkConfiguration config, IMessageBroker messageBroker)
+        private readonly NetManager netManager;
+        private readonly NetworkConfiguration networkConfig;
+        private readonly ICommonSerializer serializer;
+        private readonly Version version = typeof(MissionTestServer).Assembly.GetName().Version;
+        private readonly IMessageBroker messageBroker;
+        private readonly Poller poller;
+        
+        public LiteNetP2PClient(
+            NetworkConfiguration config,
+            ICommonSerializer serializer,
+            IMessageBroker messageBroker,
+            IPacketManager packetManager)
         {
-            _networkConfig = config;
-            _messageBroker = messageBroker;
+            PacketManager = packetManager;
+            networkConfig = config;
+            this.serializer = serializer;
+            this.messageBroker = messageBroker;
 
-            _netManager = new NetManager(this)
+            netManager = new NetManager(this)
             {
                 NatPunchEnabled = true,
                 //DisconnectTimeout = config.DisconnectTimeout.Milliseconds,
@@ -52,12 +64,8 @@ namespace Missions.Services.Network
                 //ReconnectDelay = config.ReconnectDelay.Milliseconds,
             };
 
-            _netManager.NatPunchModule.Init(this);
-
-            _netManager.Start();
-
-            _poller = new Poller(Update, TimeSpan.FromMilliseconds(1000/60));
-            _poller.Start();
+            poller = new Poller(Update, TimeSpan.FromMilliseconds(1000 / 120));
+            netManager.NatPunchModule.Init(this);
         }
 
         ~LiteNetP2PClient()
@@ -67,123 +75,113 @@ namespace Missions.Services.Network
 
         public void Dispose()
         {
-            _batchLogger.Dispose();
             Stop();
         }
 
-        public void AddHandler(IPacketHandler handler)
+        public void Start()
         {
-            if (PacketHandlers.ContainsKey(handler.PacketType))
+            if (netManager.IsRunning == false)
             {
-                PacketHandlers[handler.PacketType].Add(handler);
-            }
-            else
-            {
-                PacketHandlers.Add(handler.PacketType, new List<IPacketHandler> { handler });
-            }
-        }
-
-        public void RemoveHandler(IPacketHandler handler)
-        {
-            if (PacketHandlers.TryGetValue(handler.PacketType, out List<IPacketHandler> list))
-            {
-                list.Remove(handler);
-            }
-        }
-
-        public void Update(TimeSpan frameTime)
-        {
-            _netManager.PollEvents();
-            _netManager.NatPunchModule.PollEvents();
-        }
-
-        public bool ConnectToP2PServer()
-        {
-            Logger.Information("Connecting to P2P Server");
-            string connectionAddress;
-            int port;
-            if (_networkConfig.NATType == NatAddressType.Internal)
-            {
-                connectionAddress = _networkConfig.LanAddress.ToString();
-                port = _networkConfig.LanPort;
-            }
-            else
-            {
-                connectionAddress = _networkConfig.WanAddress.ToString();
-                port = _networkConfig.WanPort;
-            }
-
-            ClientInfo clientInfo = new ClientInfo(
-                id,
-                _version);
-
-            PeerServer = _netManager.Connect(connectionAddress,
-                                            port,
-                                            clientInfo.ToString());
-
-            return PeerServer != null;
-        }
-
-        public void NatPunch(string instance)
-        {
-            _instance = instance;
-            TryPunch(instance);
-        }
-
-        private void TryPunch(string instance)
-        {
-            string token = $"{instance}%{id}";
-            if (_networkConfig.NATType == NatAddressType.Internal)
-            {
-                _netManager.NatPunchModule.SendNatIntroduceRequest(_networkConfig.LanAddress.ToString(), _networkConfig.LanPort, token);
-            }
-            else if (_networkConfig.NATType == NatAddressType.External)
-            {
-                _netManager.NatPunchModule.SendNatIntroduceRequest(_networkConfig.WanAddress.ToString(), _networkConfig.WanPort, token);
+                Logger.Debug("Starting Client");
+                netManager.Start();
+                poller.Start();
             }
         }
 
         public void Stop()
         {
-            _poller.Stop();
-            _netManager.DisconnectAll();
-            _netManager.Stop();
+            Logger.Debug("Stopping Client");
+            poller.Stop();
+            netManager.DisconnectAll();
+            netManager.Stop();
         }
 
-        public void SendEvent(INetworkEvent networkEvent, NetPeer peer)
+        public void Update(TimeSpan frameTime)
         {
-            EventPacket eventPacket = new EventPacket(networkEvent);
-
-            Send(eventPacket, peer);
+            netManager.PollEvents();
+            netManager.NatPunchModule.PollEvents();
         }
 
-        public void SendAllEvent(INetworkEvent networkEvent)
+        public bool ConnectToP2PServer()
         {
-            EventPacket eventPacket = new EventPacket(networkEvent);
+            Start();
 
-            SendAll(eventPacket);
-        }
-
-        public void Send(IPacket packet, NetPeer peer)
-        {
-            NetDataWriter writer = new NetDataWriter();
-
-            try
+            Logger.Information("Connecting to P2P Server");
+            string connectionAddress;
+            int port;
+            if (networkConfig.NATType == NatAddressType.Internal)
             {
-                writer.PutBytesWithLength(ProtoBufSerializer.Serialize(packet));
-                peer.Send(writer, packet.DeliveryMethod);
+                connectionAddress = networkConfig.LanAddress.ToString();
+                port = networkConfig.LanPort;
             }
-            catch(Exception ex)
+            else
             {
-                Logger.Error("Serialization failed: {ErrMessage}", ex.Message);
+                connectionAddress = networkConfig.WanAddress.ToString();
+                port = networkConfig.WanPort;
+            }
+
+            Logger.Information($"Connecting to {connectionAddress}:{port}");
+
+            ClientInfo clientInfo = new ClientInfo(
+                id,
+                version);
+
+            PeerServer = netManager.Connect(connectionAddress,
+                                            port,
+                                            clientInfo.ToString());
+
+            Task connectionTask = Task.Run(WaitForConnection);
+
+            return connectionTask.Wait(TimeSpan.FromSeconds(1));
+        }
+
+        private async Task WaitForConnection()
+        {
+            while (PeerServer.ConnectionState != ConnectionState.Connected)
+            {
+                await Task.Delay(100);
+            }
+        }
+
+        public void NatPunch(string instance)
+        {
+            this.instance = instance;
+            TryPunch(instance);
+        }
+
+        private void TryPunch(string instance)
+        {
+            Logger.Verbose("Attempting NAT Punch");
+
+            ConnectionToken token = new ConnectionToken(id, instance, networkConfig.NATType);
+            if (networkConfig.NATType == NatAddressType.Internal)
+            {
+                netManager.NatPunchModule.SendNatIntroduceRequest(networkConfig.LanAddress.ToString(), networkConfig.LanPort, token);
+            }
+            else if (networkConfig.NATType == NatAddressType.External)
+            {
+                netManager.NatPunchModule.SendNatIntroduceRequest(networkConfig.WanAddress.ToString(), networkConfig.WanPort, token);
+            }
+        }
+
+        public void Send(NetPeer netPeer, IPacket packet)
+        {
+            byte[] data = serializer.Serialize(packet);
+            netPeer.Send(data, packet.DeliveryMethod);
+        }
+
+        public void SendAllBut(NetPeer netPeer, IPacket packet)
+        {
+            foreach (var peer in netManager.ConnectedPeerList.Where(peer => peer != netPeer))
+            {
+                Send(peer, packet);
             }
         }
 
         public void SendAll(IPacket packet)
         {
-            NetDataWriter writer = new NetDataWriter();
-            writer.PutBytesWithLength(ProtoBufSerializer.Serialize(packet));
-            _netManager.SendToAll(writer, packet.DeliveryMethod);
+            byte[] data = serializer.Serialize(packet);
+            netManager.SendToAll(data, packet.DeliveryMethod);
         }
 
         public void OnNatIntroductionRequest(IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token)
@@ -193,10 +191,20 @@ namespace Missions.Services.Network
 
         public void OnNatIntroductionSuccess(IPEndPoint targetEndPoint, NatAddressType type, string token)
         {
-            if (type == _networkConfig.NATType)
+            if (ConnectionToken.TryParse(token, out var connectionToken) == false)
+            {
+                Logger.Warning("Unable to parse connection token: {tokenString}", token);
+                return;
+            }
+
+            if (type == connectionToken.NatType)
             {
                 Logger.Information("Connecting P2P: {TargetEndPoint}", targetEndPoint);
-                _netManager.Connect(targetEndPoint, token);
+                netManager.Connect(targetEndPoint, token);
+            }
+            else
+            {
+                Logger.Debug("Expected {expected} but got {actual}", type, connectionToken.NatType);
             }
         }
 
@@ -204,41 +212,32 @@ namespace Missions.Services.Network
         {
             if (PeerServer != null && peer != PeerServer)
             {
-                Task.Factory.StartNew(async () =>
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(.5));
-                    var peerConnectedEvent = new PeerConnected(peer);
-                    _messageBroker.Publish(this, peerConnectedEvent);
-                });
+                var peerConnectedEvent = new PeerConnected(peer);
+                messageBroker.Publish(this, peerConnectedEvent);
             }
-            Logger.Information("{LocalPort} received connection from {peer}", _netManager.LocalPort, peer.EndPoint);
+
+            Logger.Verbose("{LocalPort} received connection from {peer}", netManager.LocalPort, peer);
         }
 
         public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
         {
-            if (PeerServer != null && peer != PeerServer)
+            if (PeerServer != peer)
             {
                 var peerDisconnectedEvent = new PeerDisconnected(peer, disconnectInfo);
-                _messageBroker.Publish(this, peerDisconnectedEvent);
+                messageBroker.Publish(this, peerDisconnectedEvent);
             }
+            else
+            {
+                ServerDisconnected serverDisconnected = new ServerDisconnected(disconnectInfo);
+                messageBroker.Publish(this, serverDisconnected);
+            }
+
+            Logger.Verbose("{LocalPort} received disconnected from {peer}", netManager.LocalPort, peer);
         }
 
         public void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
         {
-
-        }
-        
-        public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, DeliveryMethod deliveryMethod)
-        {
-            IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(reader.GetBytesWithLength());
-            if (PacketHandlers.TryGetValue(packet.PacketType, out var handlers))
-            {
-                _batchLogger.Log(packet.PacketType);
-                foreach (var handler in handlers)
-                {
-                    handler.HandlePacket(peer, packet);
-                }
-            }
+            Logger.Error("Network error {socketError} sending to {endpoint}", socketError, endPoint);
         }
 
         public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
@@ -253,20 +252,58 @@ namespace Missions.Services.Network
 
         public void OnConnectionRequest(ConnectionRequest request)
         {
-            string[] data = request.Data.GetString().Split('%');
+            string token = request.Data.GetString();
 
-            if (data.Length != 2) return;
+            if (ConnectionToken.TryParse(token, out var connectionToken) == false) return;
 
-            string instance = data[0];
-
-            if (_instance == instance)
+            if (instance == connectionToken.InstanceName)
             {
                 request.Accept();
             }
             else
             {
+                Logger.Error("Incoming connection was a part of a different instance," +
+                    "this means there is an issue with the server");
                 request.Reject();
             }
+        }
+
+        public void Send(NetPeer netPeer, IMessage message)
+        {
+            var data = SerializeMessage(message);
+            var eventPacket = new MessagePacket(data);
+            Send(netPeer, eventPacket);
+        }
+
+        public void SendAll(IMessage message)
+        {
+            var data = SerializeMessage(message);
+            var eventPacket = new MessagePacket(data);
+            SendAll(eventPacket);
+        }
+
+        public void SendAllBut(NetPeer excludedPeer, IMessage message)
+        {
+            var data = SerializeMessage(message);
+            var eventPacket = new MessagePacket(data);
+            SendAllBut(excludedPeer, eventPacket);
+        }
+
+        private byte[] SerializeMessage(IMessage message)
+        {
+            if (RuntimeTypeModel.Default.IsDefined(message.GetType()) == false)
+            {
+                throw new ArgumentException($"Type {message.GetType().Name} is not serializable.");
+            }
+
+            return serializer.Serialize(message);
+        }
+
+        public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
+        {
+            var packet = serializer.Deserialize<IPacket>(reader.GetRemainingBytes());
+
+            PacketManager.HandleReceive(peer, packet);
         }
     }
 }

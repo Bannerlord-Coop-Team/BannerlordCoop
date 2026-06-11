@@ -1,53 +1,281 @@
-# arguments
-param([string]$SolutionDir,
-      [string]$TargetDir);
+# deploy.ps1
 
-$Libs = $Libs -split ','
+param(
+    [Parameter(Mandatory = $true)]
+    [string]$SolutionDir,
 
-Write-Output "*** deploy.ps1 ***"
-Write-Output "SolutionDir:   ${SolutionDir}"
-Write-Output "TargetDir:     ${TargetDir}"
+    [Parameter(Mandatory = $true)]
+    [string]$TargetDir,
 
-# path to required files
-$SolutionDir            = $SolutionDir.Trim('"')
-$BaseDir                = "${SolutionDir}..\"
-$BaseDirWithoutQuotes   = $BaseDir.Trim('"')
-$DeployDir              = "${BaseDirWithoutQuotes}deploy\"
-$ConfigPath             = "${BaseDirWithoutQuotes}config.json"
-$TemplateDir            = "${BaseDirWithoutQuotes}template"
-$UIMovieDir             = "${BaseDirWithoutQuotes}UIMovies"
+    [Parameter(Mandatory = $true)]
+    [string]$ConfigPath
+)
 
-# create output directory structure
-Remove-Item $DeployDir -Recurse
-New-Item -ItemType Directory -Force -Path $DeployDir | Out-Null
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
 
-# read config
-$config = Get-Content -Raw -Path $ConfigPath | ConvertFrom-Json
-Write-Output $config
+Add-Type -AssemblyName Microsoft.VisualBasic
 
-# write SubModule.xml
-$subModuleContent = Get-Content -path "${TemplateDir}\SubModule.xml" -Raw
-$subModuleContent = $subModuleContent.replace('${name}', $config.name)
-$subModuleContent = $subModuleContent.replace('${main_class}', $config.main_class)
-$subModuleContent = $subModuleContent.replace('${version}', $config.version)
-$subModuleContent = $subModuleContent.replace('${game_version}', $config.game_version)
-$subModuleContent | Out-File -Encoding utf8 -FilePath "${DeployDir}\SubModule.xml"
+function Normalize-PathString {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
 
-# copy to games mod folder
-if(Test-Path (${BaseDir} + $config.modsDir))
-{
-    $ModDir = ${BaseDir} + $config.modsDir + "\" + $config.name
-    Remove-Item "${ModDir}\*" -Recurse -Force -ErrorAction Ignore
-    New-Item -Force -ItemType Directory -Path "${ModDir}" | Out-Null
-    New-Item -Force -ItemType Directory -Path "${ModDir}\bin" | Out-Null
-    New-Item -Force -ItemType Directory -Path "${ModDir}\bin\Win64_Shipping_Client" | Out-Null
-    $ModSourceDir = ${SolutionDir} + "\" + $config.name
-    Get-ChildItem -Path "${ModSourceDir}\bin\Debug" -Filter "*.dll" -Recurse -ErrorAction Ignore | Where { $_.PSIsContainer -eq $false } | Copy-Item -Destination "${ModDir}\bin\Win64_Shipping_Client"
-    Get-ChildItem -Path "${ModSourceDir}\bin\Release" -Filter "*.dll" -Recurse -ErrorAction Ignore | Where { $_.PSIsContainer -eq $false } | Copy-Item -Destination "${ModDir}\bin\Win64_Shipping_Client"
-    Copy-Item -Force "${DeployDir}\SubModule.xml" -Destination "${ModDir}\"
+    return $Path.Trim('"')
 }
 
-# write Movie Prefabs
-$MovieModDir = ${BaseDir} + $config.modsDir + "\" + $config.name + "\GUI\Prefabs"
-New-Item -Force -ItemType Directory -Path "${MovieModDir}" | Out-Null
-Copy-Item -Force "${UIMovieDir}\*" -Recurse -Destination "${MovieModDir}\"
+function Assert-NotEmpty {
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowNull()]
+        [object]$Value,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Name
+    )
+
+    if ($null -eq $Value -or [string]::IsNullOrWhiteSpace($Value.ToString())) {
+        throw "${Name} is missing or empty."
+    }
+}
+
+function Move-FileToRecycleBin {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        return
+    }
+
+    try {
+        [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile(
+            $Path,
+            [Microsoft.VisualBasic.FileIO.UIOption]::OnlyErrorDialogs,
+            [Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin
+        )
+    }
+    catch {
+        # Recycle Bin can reject some items (junctions/reparse points, volumes
+        # without a Recycle Bin) with "The system call level is not correct".
+        # Fall back to a permanent delete so cleanup still succeeds.
+        Write-Output "Recycle failed for '${Path}', deleting permanently: $($_.Exception.Message)"
+        Remove-Item -LiteralPath $Path -Force -ErrorAction Stop
+    }
+}
+
+function Move-DirectoryChildrenToRecycleBin {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Container)) {
+        Write-Output "Directory does not exist, skipping cleanup: ${Path}"
+        return
+    }
+
+    Get-ChildItem -LiteralPath $Path -Force | ForEach-Object {
+        $item = $_
+        $isContainer = $item.PSIsContainer
+        # A directory junction/symlink is a reparse point; treat it as a leaf so
+        # we remove the link itself rather than recursing into the target.
+        $isReparsePoint = ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -eq [System.IO.FileAttributes]::ReparsePoint
+
+        try {
+            if ($isContainer -and -not $isReparsePoint) {
+                [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory(
+                    $item.FullName,
+                    [Microsoft.VisualBasic.FileIO.UIOption]::OnlyErrorDialogs,
+                    [Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin
+                )
+            }
+            else {
+                [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile(
+                    $item.FullName,
+                    [Microsoft.VisualBasic.FileIO.UIOption]::OnlyErrorDialogs,
+                    [Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin
+                )
+            }
+        }
+        catch {
+            # Recycle Bin can reject some items (junctions/reparse points, volumes
+            # without a Recycle Bin) with "The system call level is not correct".
+            # Fall back to a permanent delete so cleanup still succeeds.
+            Write-Output "Recycle failed for '$($item.FullName)', deleting permanently: $($_.Exception.Message)"
+            Remove-Item -LiteralPath $item.FullName -Force -Recurse -ErrorAction Stop
+        }
+    }
+}
+
+function Assert-SafeModPath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ModDir,
+
+        [Parameter(Mandatory = $true)]
+        [string]$ModsRoot
+    )
+
+    $resolvedModsRoot = [System.IO.Path]::GetFullPath($ModsRoot)
+    $resolvedModDir = [System.IO.Path]::GetFullPath($ModDir)
+
+    if ($resolvedModDir -eq $resolvedModsRoot) {
+        throw "Refusing to deploy because ModDir equals ModsRoot: ${resolvedModDir}"
+    }
+
+    if ($resolvedModDir.Length -lt 10) {
+        throw "Refusing to deploy to suspiciously short path: ${resolvedModDir}"
+    }
+
+    if (-not $resolvedModDir.StartsWith($resolvedModsRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to deploy because ModDir is not inside ModsRoot. ModDir: ${resolvedModDir}, ModsRoot: ${resolvedModsRoot}"
+    }
+
+    if (-not ($resolvedModDir -like "*\Modules\*")) {
+        throw "Refusing to deploy because ModDir does not look like a Bannerlord Modules path: ${resolvedModDir}"
+    }
+}
+
+Write-Output "*** deploy.ps1 ***"
+
+# Normalize incoming paths
+$SolutionDir = Normalize-PathString $SolutionDir
+$TargetDir = Normalize-PathString $TargetDir
+$ConfigPath = Normalize-PathString $ConfigPath
+
+# Resolve config relative to current working directory if needed
+$ConfigPath = [System.IO.Path]::GetFullPath($ConfigPath)
+
+Write-Output "SolutionDir:   ${SolutionDir}"
+Write-Output "TargetDir:     ${TargetDir}"
+Write-Output "ConfigPath:    ${ConfigPath}"
+
+if (-not (Test-Path -LiteralPath $SolutionDir -PathType Container)) {
+    throw "SolutionDir does not exist: ${SolutionDir}"
+}
+
+if (-not (Test-Path -LiteralPath $TargetDir -PathType Container)) {
+    throw "TargetDir does not exist: ${TargetDir}"
+}
+
+if (-not (Test-Path -LiteralPath $ConfigPath -PathType Leaf)) {
+    throw "Config file does not exist: ${ConfigPath}"
+}
+
+# Path to required files
+$BaseDir = Join-Path $SolutionDir ".."
+$BaseDir = [System.IO.Path]::GetFullPath($BaseDir)
+
+$DeployDir = Join-Path $BaseDir "deploy"
+$SubModuleTemplatePath = Join-Path $DeployDir "SubModule.xml"
+$UIMovieDir = Join-Path $BaseDir "UIMovies"
+
+Write-Output "BaseDir:       ${BaseDir}"
+Write-Output "DeployDir:     ${DeployDir}"
+Write-Output "UIMovieDir:    ${UIMovieDir}"
+
+if (-not (Test-Path -LiteralPath $DeployDir -PathType Container)) {
+    throw "Deploy directory does not exist: ${DeployDir}"
+}
+
+if (-not (Test-Path -LiteralPath $SubModuleTemplatePath -PathType Leaf)) {
+    throw "SubModule.xml template does not exist: ${SubModuleTemplatePath}"
+}
+
+# Read config
+$config = Get-Content -Raw -LiteralPath $ConfigPath | ConvertFrom-Json
+
+Assert-NotEmpty $config.modsDir "config.modsDir"
+Assert-NotEmpty $config.name "config.name"
+Assert-NotEmpty $config.main_class "config.main_class"
+Assert-NotEmpty $config.version "config.version"
+Assert-NotEmpty $config.game_version "config.game_version"
+
+$ModsRoot = Join-Path $BaseDir $config.modsDir
+$ModDir = Join-Path $ModsRoot $config.name
+$BinDir = Join-Path $ModDir "bin\Win64_Shipping_Client"
+$MovieModDir = Join-Path $ModDir "GUI\Prefabs"
+$SubModuleOutputPath = Join-Path $ModDir "SubModule.xml"
+
+Write-Output "Mod name:      $($config.name)"
+Write-Output "ModsRoot:      ${ModsRoot}"
+Write-Output "ModDir:        ${ModDir}"
+Write-Output "BinDir:        ${BinDir}"
+Write-Output "MovieModDir:   ${MovieModDir}"
+
+if (-not (Test-Path -LiteralPath $ModsRoot -PathType Container)) {
+    throw "Mods root does not exist: ${ModsRoot}"
+}
+
+Assert-SafeModPath -ModDir $ModDir -ModsRoot $ModsRoot
+
+
+# Clean only deploy-owned outputs
+Write-Output "Cleaning deploy-owned outputs by moving them to Recycle Bin..."
+
+Move-DirectoryChildrenToRecycleBin -Path $BinDir
+Move-DirectoryChildrenToRecycleBin -Path $MovieModDir
+Move-FileToRecycleBin -Path $SubModuleOutputPath
+
+# Create directories
+New-Item -Force -ItemType Directory -Path "${ModDir}\bin\Win64_Shipping_Client" | Out-Null
+New-Item -Force -ItemType Directory -Path $MovieModDir | Out-Null
+
+# Copy DLLs from target dir to mod folder
+Write-Output "Copying DLLs..."
+
+Get-ChildItem -LiteralPath $TargetDir -Filter "*.dll" -Recurse -ErrorAction Ignore |
+    Where-Object { $_.PSIsContainer -eq $false } |
+    Copy-Item -Force -Destination $BinDir
+
+# Write SubModule.xml to mod folder
+Write-Output "Writing SubModule.xml..."
+
+$subModuleContent = Get-Content -LiteralPath $SubModuleTemplatePath -Raw
+$subModuleContent = $subModuleContent.Replace('${name}', $config.name)
+$subModuleContent = $subModuleContent.Replace('${main_class}', $config.main_class)
+$subModuleContent = $subModuleContent.Replace('${version}', $config.version)
+$subModuleContent = $subModuleContent.Replace('${game_version}', $config.game_version)
+
+$subModuleContent | Out-File -Encoding utf8 -FilePath $SubModuleOutputPath
+
+# Copy all deploy files except SubModule.xml to mod folder
+Write-Output "Copying deploy files..."
+
+Get-ChildItem -LiteralPath $DeployDir -Recurse -Force |
+    Where-Object {
+        $_.PSIsContainer -eq $false -and
+        $_.Name -ne "SubModule.xml"
+    } |
+    ForEach-Object {
+        $relativePath = $_.FullName.Substring($DeployDir.Length).TrimStart('\', '/')
+        $destinationPath = Join-Path $ModDir $relativePath
+        $destinationDir = Split-Path -Parent $destinationPath
+
+        New-Item -Force -ItemType Directory -Path $destinationDir | Out-Null
+        Copy-Item -Force -LiteralPath $_.FullName -Destination $destinationPath
+    }
+
+# Copy UI movie prefabs
+if (Test-Path -LiteralPath $UIMovieDir -PathType Container) {
+    Write-Output "Copying UI movie prefabs..."
+
+    Get-ChildItem -LiteralPath $UIMovieDir -Recurse -Force |
+        Where-Object { $_.PSIsContainer -eq $false } |
+        ForEach-Object {
+            $relativePath = $_.FullName.Substring($UIMovieDir.Length).TrimStart('\', '/')
+            $destinationPath = Join-Path $MovieModDir $relativePath
+            $destinationDir = Split-Path -Parent $destinationPath
+
+            New-Item -Force -ItemType Directory -Path $destinationDir | Out-Null
+            Copy-Item -Force -LiteralPath $_.FullName -Destination $destinationPath
+        }
+}
+else {
+    Write-Output "UIMovies directory does not exist, skipping: ${UIMovieDir}"
+}
+
+Write-Output "Deploy complete."

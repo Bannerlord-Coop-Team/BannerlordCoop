@@ -16,6 +16,7 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
+using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Environment;
@@ -51,14 +52,11 @@ internal class E2ETestEnvironment : IDisposable
 
         IntegrationEnvironment = new TestEnvironment(output, numClients, registerGameInterface: true);
 
-        // Needs to be before patching
-        SetupAutoSync();
-
         SetupMainHero();
 
         Server.Resolve<TestMessageBroker>().SetStaticInstance();
         Server.Resolve<IGameInterface>().PatchAll();
-        Server.Resolve<IAutoSyncPatchCollector>().PatchAll();
+        Server.Resolve<IDynamicSyncPatchCollector>().PatchAll();
 
         SetupDynamicSync();
 
@@ -89,16 +87,6 @@ internal class E2ETestEnvironment : IDisposable
         finally
         {
             disposeSemiphore.Release();
-        }
-    }
-
-    private void SetupAutoSync()
-    {
-        Server.Resolve<IAutoSyncBuilder>().Build();
-
-        foreach (var client in Clients)
-        {
-            client.Resolve<IAutoSyncBuilder>().Build();
         }
     }
     private void SetupDynamicSync()
@@ -1083,6 +1071,43 @@ internal class E2ETestEnvironment : IDisposable
 
                 Assert.Same(clientReference, fieldInfo.GetValue(clientInstance));
                 Assert.NotNull(clientReference);
+            }
+        }
+        public void AssertPropertyOwnerField<TDeclaring, TItem>(string fieldName)
+            where TItem : MBObjectBase
+        {
+            var expectedId = testEnvironment.CreateRegisteredObject<TItem>();
+            var fieldInfo = AccessTools.Field(typeof(TDeclaring), fieldName);
+            var intercept = testEnvironment.GetCollectionAddIntercept(fieldInfo);
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
+                var ownerBefore = (PropertyOwner<TItem>)fieldInfo.GetValue(clientInstance);
+                Assert.NotNull(ownerBefore);
+            }
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
+                Assert.True(Server.ObjectManager.TryGetObject<TItem>(expectedId, out var serverTrait));
+
+                var owner = (PropertyOwner<TItem>)fieldInfo.GetValue(serverInstance);
+                Assert.NotNull(owner);
+                intercept.Invoke(null, new object[] { owner, serverTrait, 1, serverInstance });
+
+                Assert.Equal(1, owner.GetPropertyValue(serverTrait));
+            });
+
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
+                Assert.True(client.ObjectManager.TryGetObject<TItem>(expectedId, out var clientTrait));
+
+                var owner = (PropertyOwner<TItem>)fieldInfo.GetValue(clientInstance);
+                Assert.NotNull(clientInstance);
+                Assert.NotNull(owner);
+                Assert.Equal(1, owner.GetPropertyValue(clientTrait));
+                Assert.NotNull(owner);
+                Assert.Equal(1, owner.GetPropertyValue(clientTrait));
             }
         }
 

@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Inventory.Messages;
@@ -6,7 +7,6 @@ using HarmonyLib;
 using Serilog;
 using TaleWorlds.CampaignSystem.Inventory;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.Inventory.Patches;
@@ -18,23 +18,12 @@ internal class InventoryLogicPatches
 
     [HarmonyPatch(nameof(InventoryLogic.DoneLogic))]
     [HarmonyPrefix]
-    static bool DoneLogicPrefix(ref InventoryLogic __instance, ref bool __result)
+    static bool DoneLogicPrefix(InventoryLogic __instance, ref bool __result)
     {
         if (__instance.IsPreviewingItem)
         {
             __result = false;
             return false;
-        }
-        SettlementComponent currentSettlementComponent = __instance.CurrentSettlementComponent;
-        MobileParty currentMobileParty = __instance.CurrentMobileParty;
-        PartyBase partyBase = null;
-        if (currentMobileParty != null)
-        {
-            partyBase = currentMobileParty.Party;
-        }
-        else if (currentSettlementComponent != null)
-        {
-            partyBase = currentSettlementComponent.Owner;
         }
 
         if (__instance.InventoryListener != null && __instance.IsTrading && __instance.OwnerCharacter.HeroObject.Gold - __instance.TotalAmount < 0)
@@ -54,11 +43,12 @@ internal class InventoryLogicPatches
             }
         }
 
+        // Send rosters and equipment slots to server to manage
         var message = new TradeAttempted(
             __instance._rosters[0],
             __instance._rosters[1],
             __instance.IsTrading,
-            __instance.IsDiscardDonating,
+            __instance.CanGainXpFromDiscarding,
             __instance.OwnerParty.LeaderHero,
             __instance.TotalAmount,
             __instance.InventoryListener.GetGold(),
@@ -66,7 +56,8 @@ internal class InventoryLogicPatches
             __instance.CurrentMobileParty,
             __instance.CurrentSettlementComponent,
             __instance.GetBoughtItems(),
-            __instance.GetSoldItems()
+            __instance.GetSoldItems(),
+            PartyBase.MainParty.MemberRoster
         );
 
         MessageBroker.Instance.Publish(__instance, message);

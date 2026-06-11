@@ -109,7 +109,7 @@ internal class ClientSettlementHandler : IHandler
     {
         var obj = payload.What;
 
-        var message = new ChangeMobileParty(obj.SettlementId, obj.MobilePartyId, obj.NumberOfLordParties, obj.AddMobileParty);
+        var message = new ChangeMobileParty(obj.SettlementId, obj.MobilePartyId, obj.AddMobileParty);
         messageBroker.Publish(this, message);
 
     }

@@ -23,7 +23,6 @@ internal class SettlementSync : IDynamicSync
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._lastAttackerParty)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._name)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._nextLocatable)));
-        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._numberOfLordPartiesAt)));
         //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.NumberOfLordPartiesTargeting)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._position)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._readyMilitia)));
@@ -48,6 +47,7 @@ internal class SettlementSync : IDynamicSync
         //dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.IsVisible)));
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.CurrentSiegeState)));
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.GatePosition)));
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.LocationComplex))); // Might not be needed
 
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.NearbyLandThreatIntensity)));
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.NearbyNavalThreatIntensity)));
@@ -56,11 +56,9 @@ internal class SettlementSync : IDynamicSync
 
         //// Target Methods
         dynamicSyncRegistry.AddTargetMethod(typeof(Settlement), AccessTools.Method(typeof(SettlementClaimantCampaignBehavior), nameof(SettlementClaimantCampaignBehavior.OnSettlementOwnerChanged)));
-        dynamicSyncRegistry.AddTargetMethod(typeof(Settlement), AccessTools.Method(typeof(KingdomManager), nameof(KingdomManager.UpdateLordPartyVariablesRelatedToSettlements)));
         dynamicSyncRegistry.AddTargetMethod(typeof(Settlement), AccessTools.Method(typeof(MilitiaPartyComponent), nameof(MilitiaPartyComponent.OnInitialize)));
         dynamicSyncRegistry.AddTargetMethod(typeof(Settlement), AccessTools.Method(typeof(MilitiaPartyComponent), nameof(MilitiaPartyComponent.OnFinalize)));
         dynamicSyncRegistry.AddTargetMethod(typeof(Settlement), AccessTools.Method(typeof(EnterSettlementAction), nameof(EnterSettlementAction.ApplyInternal)));
         dynamicSyncRegistry.AddTargetMethod(typeof(Settlement), AccessTools.Method(typeof(PlayerTownVisitCampaignBehavior), nameof(PlayerTownVisitCampaignBehavior.OnSettlementEntered)));
-        dynamicSyncRegistry.AddTargetMethod(typeof(Settlement), AccessTools.Method(typeof(KingdomManager), nameof(KingdomManager.UpdateLordPartyVariablesRelatedToSettlements)));
     }
 }

@@ -22,7 +22,6 @@ internal class MobilePartyAuditor : IAuditor
 
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
-    private readonly MobilePartyRegistry mobilePartyRegistry;
     private readonly IObjectManager objectManager;
     private readonly INetworkConfiguration configuration;
     private TaskCompletionSource<string> tcs;
@@ -30,13 +29,11 @@ internal class MobilePartyAuditor : IAuditor
     public MobilePartyAuditor(
         IMessageBroker messageBroker,
         INetwork network,
-        MobilePartyRegistry mobilePartyRegistry,
         IObjectManager objectManager,
         INetworkConfiguration configuration)
     {
         this.messageBroker = messageBroker;
         this.network = network;
-        this.mobilePartyRegistry = mobilePartyRegistry;
         this.objectManager = objectManager;
         this.configuration = configuration;
         messageBroker.Subscribe<RequestMobilePartyAudit>(Handle_Request);

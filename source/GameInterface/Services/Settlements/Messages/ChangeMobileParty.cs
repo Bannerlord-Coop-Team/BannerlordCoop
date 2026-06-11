@@ -12,14 +12,12 @@ public record ChangeMobileParty : ICommand
 {
     public string SettlementId { get; }
     public string MobilePartyId { get; }
-    public int NumberOfLordParties { get; }
     public bool AddMobileParty { get; }
 
-    public ChangeMobileParty(string settlementId, string mobilePartyId, int numberOfLordParties, bool addMobileParty)
+    public ChangeMobileParty(string settlementId, string mobilePartyId, bool addMobileParty)
     {
         SettlementId = settlementId;
         MobilePartyId = mobilePartyId;
-        NumberOfLordParties = numberOfLordParties;
         AddMobileParty = addMobileParty;
     }
 }

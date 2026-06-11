@@ -51,6 +51,7 @@ internal class HeroHelper
         hero._characterObject = heroData.CharacterObject;
         hero._firstName = new TextObject("My First Name");
         hero._name = new TextObject("My Name");
+        hero._originClan = heroData.Clan;
         hero.EncyclopediaText = new TextObject("My EEncyclopedia Text");
         hero.IsFemale = ReflectionExtensions.Random<bool>();
         hero._battleEquipment = (Equipment)FormatterServices.GetUninitializedObject(typeof(Equipment));
@@ -245,6 +246,8 @@ internal class HeroHelper
             party._customHomeSettlement = CreateSettlement("Custom Home Settlement");
             party._actualClan = clan;
             party._partyComponent = CreateLordPartyComponent(leader);
+            party.FirstMate = leader;
+            party.Navigator = leader;
 
             var partyBase = CreatePartyBase(party);
 

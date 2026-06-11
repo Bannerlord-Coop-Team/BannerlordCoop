@@ -1,53 +1,23 @@
-﻿using E2E.Tests.Environment;
-using E2E.Tests.Util;
-using HarmonyLib;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
-using TaleWorlds.CampaignSystem;
+﻿using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem.MapEvents;
-using TaleWorlds.CampaignSystem.Party;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.MapEvents;
-public class MapEventLifetimeTests : IDisposable
+
+public class MapEventLifetimeTests : MapEventTestBase
 {
-    E2ETestEnvironment TestEnvironment { get; }
-
-    public MapEventLifetimeTests(ITestOutputHelper output)
-    {
-        TestEnvironment = new E2ETestEnvironment(output);
-    }
-
-    public void Dispose()
-    {
-        TestEnvironment.Dispose();
-    }
+    public MapEventLifetimeTests(ITestOutputHelper output) : base(output) { }
 
     [Fact]
     public void ServerCreate_MapEvent_SyncAllClients()
     {
-        // Arrange
-        var server = TestEnvironment.Server;
-
         // Act
-        string? mapEventId = null;
-        server.Call(() =>
-        {
-            var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
-
-            Assert.True(server.ObjectManager.TryGetId(mapEvent, out mapEventId));
-        });
+        var mapEventCtx = CreateServerMapEvent();
 
         // Assert
-        Assert.NotNull(mapEventId);
-
-        foreach (var client in TestEnvironment.Clients)
+        foreach (var client in Clients)
         {
-            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var _));
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out _));
         }
     }
 
@@ -55,51 +25,39 @@ public class MapEventLifetimeTests : IDisposable
     public void ClientCreate_MapEvent_DoesNothing()
     {
         // Arrange
-        var server = TestEnvironment.Server;
-
-        // Act
+        var firstClient = Clients.First();
         string? mapEventId = null;
 
-        var firstClient = TestEnvironment.Clients.First();
+        // Act — clients must not be able to authoritatively create MapEvents
         firstClient.Call(() =>
         {
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
-
             Assert.False(firstClient.ObjectManager.TryGetId(mapEvent, out mapEventId));
-        });
+        }, MapEventDisabledMethods);
 
         // Assert
         Assert.Null(mapEventId);
+        Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId ?? string.Empty, out _));
     }
 
     [Fact]
     public void ServerDestroy_MapEvent_SyncAllClients()
     {
         // Arrange
-        var server = TestEnvironment.Server;
+        var mapEventCtx = CreateServerMapEvent();
+
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out _));
+        }
 
         // Act
-        string? mapEventId = null;
-        server.Call(() =>
-        {
-            var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
-            var attackerParty = GameObjectCreator.CreateInitializedObject<MobileParty>().Party;
-            var defenderParty = GameObjectCreator.CreateInitializedObject<MobileParty>().Party;
-
-            Assert.True(server.ObjectManager.TryGetId(mapEvent, out mapEventId));
-
-            mapEvent.MapEventVisual = Moq.Mock.Of<IMapEventVisual>();
-
-            mapEvent.Initialize(attackerParty, defenderParty);
-            mapEvent.FinalizeEvent();
-        }, disabledMethods: new MethodBase[] { AccessTools.Method(typeof(MapEventSide), nameof(MapEventSide.HandleMapEventEnd)) });
+        DestroyServerMapEvent(mapEventCtx.MapEventId);
 
         // Assert
-        Assert.NotNull(mapEventId);
-
-        foreach (var client in TestEnvironment.Clients)
+        foreach (var client in Clients)
         {
-            Assert.False(client.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var _));
+            Assert.False(client.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out _));
         }
     }
 
@@ -107,33 +65,22 @@ public class MapEventLifetimeTests : IDisposable
     public void ClientDestroy_MapEvent_DoesNothing()
     {
         // Arrange
-        var server = TestEnvironment.Server;
+        var mapEventCtx = CreateServerMapEvent();
+        var firstClient = Clients.First();
 
-        string? mapEventId = null;
-        server.Call(() =>
-        {
-            var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
-
-            Assert.True(server.ObjectManager.TryGetId(mapEvent, out mapEventId));
-        });
-
-        Assert.NotNull(mapEventId);
-
-        // Act
-        var firstClient = TestEnvironment.Clients.First();
+        // Act — a client calling FinalizeEvent must not remove the MapEvent from any peer
         firstClient.Call(() =>
         {
-            Assert.True(firstClient.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
-
+            Assert.True(firstClient.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out var mapEvent));
             mapEvent.FinalizeEvent();
-        });
+        }, MapEventDisabledMethods);
 
-        // Assert
-        Assert.NotNull(mapEventId);
+        // Assert — the event must still be registered everywhere
+        Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out _));
 
-        foreach (var client in TestEnvironment.Clients)
+        foreach (var client in Clients)
         {
-            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var _));
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out _));
         }
     }
 }

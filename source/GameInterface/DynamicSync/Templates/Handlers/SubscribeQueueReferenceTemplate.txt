@@ -21,7 +21,7 @@ SubscribeNetwork<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetNe
     {{ 
     if ReadOnly;
     }}
-	    DynamicSync.Constants.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, newValue);
+	    AccessTools.Field(typeof({{MemberDeclaringType}}), "{{MemberName}}").SetValue(instance, value);
     {{
     else
     }}

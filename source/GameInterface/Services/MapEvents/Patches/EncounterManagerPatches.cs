@@ -2,6 +2,8 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Policies;
+using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
@@ -22,8 +24,6 @@ namespace GameInterface.Services.MapEvents.Patches;
 [HarmonyPatch(typeof(EncounterManager))]
 internal class EncounterManagerPatches
 {
-    private const bool Enabled = false;
-
     private static ILogger Logger = LogManager.GetLogger<EncounterManagerPatches>();
 
     [HarmonyPrefix]
@@ -32,7 +32,7 @@ internal class EncounterManagerPatches
     {
         if (ModInformation.IsServer) return true;
 
-        if (!attackerParty.IsPartyControlled())
+        if (!attackerParty.IsControlledByThisInstance())
             return false;
 
         var message = new StartSettlementEncounterAttempted(attackerParty, settlement);
@@ -45,68 +45,32 @@ internal class EncounterManagerPatches
     [HarmonyPatch(nameof(EncounterManager.HandleEncounterForMobileParty))]
     internal static bool HandleEncounterForMobilePartyPatch(ref MobileParty mobileParty, ref float dt)
     {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
         // Skip this method if party is not controlled
-        if (!mobileParty.IsPartyControlled())
+        if (!mobileParty.IsControlledByThisInstance())
             return false;
 
         return true;
     }
 
-    [HarmonyPatch(nameof(EncounterManager.StartPartyEncounter))]
+    // EncounterManager.RestartPlayerEncounter is private; patch by name. It is the path that opens the encounter
+    // menu/conversation (it calls PlayerEncounter.Current.Init). Parameter order here is (attacker, defender).
+    [HarmonyPatch("RestartPlayerEncounter")]
     [HarmonyPrefix]
-    public static bool Prefix(PartyBase attackerParty, PartyBase defenderParty)
+    private static bool RestartPlayerEncounterPrefix(PartyBase attackerParty, PartyBase defenderParty)
     {
-        if (!Enabled) return false;
+        // Our own server-approved re-run (AllowedThread) runs the real method.
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        if (AllowedThread.IsThisThreadAllowed()) return true;
+        // The server runs it locally (authoritative).
+        if (ModInformation.IsServer) return true;
 
-        if (ModInformation.IsClient) return true;
+        // Client: gate the encounter restart behind server approval (rate-limited + validated in
+        // ConversationRequestHandler). On approval the handler re-runs this exact method under an AllowedThread.
+        MessageBroker.Instance.Publish(null, new ConversationRequested(defenderParty, attackerParty, forcePlayerOutFromSettlement: false, ConversationRestartSource.EncounterManager));
 
-        var message = new BattleStarted(attackerParty, defenderParty);
-
-        if (attackerParty.MobileParty.IsPlayerParty())
-        {
-            InformationManager.DisplayMessage(new InformationMessage($"Player is engaging in battle with {attackerParty.Name}"));
-        }
-
-        MessageBroker.Instance.Publish(null, message);
-
-        return true;
-    }
-
-    [HarmonyPrefix]
-    [HarmonyPatch(nameof(EncounterManager.Tick))]
-    internal static bool TickPatch(float dt)
-    {
-        return ModInformation.IsServer;
-    }
-
-    internal static void OverrideOnPartyInteraction(PartyBase attacker, PartyBase defender)
-    {
-        GameLoopRunner.RunOnMainThread(() =>
-        {
-            try
-            {
-                using var _ = new AllowedThread();
-                if (defender.IsMobile)
-                {
-                    if (attacker.MobileParty.IsPartyControlled() == true)
-                    {
-                        InformationManager.DisplayMessage(new InformationMessage("Started encounter"));
-                    }
-                    EncounterManager.StartPartyEncounter(attacker, defender);
-                    return;
-                }
-                if (defender.IsSettlement)
-                {
-                    EncounterManager.StartSettlementEncounter(attacker.MobileParty, defender.Settlement);
-                }
-            }
-            catch(Exception ex)
-            {
-                Logger.Error(ex, "Failed to start party encounter");
-            }
-        });
+        return false;
     }
 }
 

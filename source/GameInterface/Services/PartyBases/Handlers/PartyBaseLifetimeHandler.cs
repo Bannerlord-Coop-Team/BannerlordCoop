@@ -1,12 +1,9 @@
-﻿using Common.Logging;
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Network;
-using Common.Util;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.MobileParties.Messages.Lifetime;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.PartyBases.Messages;
 using Serilog;
-using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.PartyBases.Handlers;
@@ -23,50 +20,17 @@ internal class PartyBaseLifetimeHandler : IHandler
         this.messageBroker = messageBroker;
         this.logger = logger;
 
-        messageBroker.Subscribe<PartyDestroyed>(Handle_PartyDestroyed);
-        messageBroker.Subscribe<NetworkDestroyPartyBase>(Handle_NetworkDestroyPartyBase);
+        messageBroker.Subscribe<InstanceDestroyed<MobileParty>>(Handle_PartyDestroyed);
     }
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<PartyDestroyed>(Handle_PartyDestroyed);
-        messageBroker.Unsubscribe<NetworkDestroyPartyBase>(Handle_NetworkDestroyPartyBase);
+        messageBroker.Unsubscribe<InstanceDestroyed<MobileParty>>(Handle_PartyDestroyed);
     }
 
-    private void Handle_PartyDestroyed(MessagePayload<PartyDestroyed> payload)
+    private void Handle_PartyDestroyed(MessagePayload<InstanceDestroyed<MobileParty>> payload)
     {
         var partyBase = payload.What.Instance.Party;
-
-        if (objectManager.TryGetId(partyBase, out var id) == false)
-        {
-            logger.Error("Unable to get id for {type} attached to party with id {id}", typeof(PartyBase), payload.What.Instance.StringId);
-            return;
-        }
-
-        if (objectManager.Remove(partyBase) == false)
-        {
-            logger.Error("Unable to remove {type} with id {baseId} attached to party with id {partyId}", typeof(PartyBase), id, payload.What.Instance.StringId);
-            return;
-        }
-
-        var message = new NetworkDestroyPartyBase(id);
-        network.SendAll(message);
-    }
-
-    private void Handle_NetworkDestroyPartyBase(MessagePayload<NetworkDestroyPartyBase> payload)
-    {
-        var id = payload.What.Id;
-
-        if (objectManager.TryGetObject<PartyBase>(id, out var partyBase) == false)
-        {
-            logger.Error("Unable to get {type} with id {id}", typeof(PartyBase), id);
-            return;
-        }
-
-        if (objectManager.Remove(partyBase) == false)
-        {
-            logger.Error("Unable to remove {type} with id {id}", typeof(PartyBase), id);
-            return;
-        }
+        messageBroker.Publish(this, new InstanceDestroyed<PartyBase>(partyBase));
     }
 }

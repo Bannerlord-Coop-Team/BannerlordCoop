@@ -5,12 +5,11 @@ using Autofac.Core.Resolving.Pipeline;
 using Common.Logging;
 using Common.PacketHandlers;
 using GameInterface.AutoSync;
-using GameInterface.DynamicSync;
 using GameInterface.Registry;
-using GameInterface.Registry.Auto;
 using GameInterface.Serialization;
 using GameInterface.Services;
 using GameInterface.Services.Entity;
+using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Time;
@@ -24,7 +23,7 @@ namespace GameInterface;
 public class GameInterfaceModule : Module
 {
     // TODO move to config
-    public const string HarmonyId = "TaleWorlds.MountAndBlade.Bannerlord.Coop";
+    public const string HarmonyId = "Bannerlord.Coop";
 
     private static readonly Harmony harmony = new Harmony(HarmonyId);
 
@@ -37,16 +36,15 @@ public class GameInterfaceModule : Module
         builder.RegisterType<GameInterface>().As<IGameInterface>().InstancePerLifetimeScope().AutoActivate();
         builder.RegisterType<BinaryPackageFactory>().As<IBinaryPackageFactory>().InstancePerLifetimeScope();
         builder.RegisterType<ControllerIdProvider>().As<IControllerIdProvider>().InstancePerLifetimeScope();
-        builder.RegisterType<ControlledEntityRegistry>().As<IControlledEntityRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<TimeControlModeConverter>().As<ITimeControlModeConverter>().InstancePerLifetimeScope();
-        builder.RegisterType<PlayerRegistry>().As<IPlayerRegistry>().InstancePerLifetimeScope();
+        builder.RegisterType<PlayerManager>().As<IPlayerManager>().InstancePerLifetimeScope();
+        builder.RegisterType<MapEventLogger>().As<IMapEventLogger>().InstancePerLifetimeScope();
 
         builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
 
         builder.RegisterModule<ServiceModule>();
         builder.RegisterModule<ObjectManagerModule>();
         builder.RegisterModule<RegistryModule>();
-        builder.RegisterModule<AutoSyncModule>();
         builder.RegisterModule<DynamicSyncModule>();
 
 

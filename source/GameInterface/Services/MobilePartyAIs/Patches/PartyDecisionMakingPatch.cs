@@ -1,40 +1,34 @@
 ﻿using Common;
+using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
+using System.Collections.Generic;
+using System.Reflection;
 using TaleWorlds.CampaignSystem.CampaignBehaviors.AiBehaviors;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobilePartyAIs.Patches;
 
-[HarmonyPatch(typeof(AiEngagePartyBehavior))]
+[HarmonyPatch]
 internal class AiEngagePartyBehaviorPatches
 {
-    [HarmonyPatch(nameof(AiEngagePartyBehavior.RegisterEvents))]
+    private static IEnumerable<MethodBase> TargetMethods() => new MethodBase[]
+    {
+        AccessTools.Method(typeof(AiEngagePartyBehavior), nameof(AiEngagePartyBehavior.RegisterEvents)),
+        AccessTools.Method(typeof(AiMilitaryBehavior), nameof(AiMilitaryBehavior.RegisterEvents)),
+        AccessTools.Method(typeof(AiPartyThinkBehavior), nameof(AiPartyThinkBehavior.RegisterEvents)),
+        AccessTools.Method(typeof(AiVisitSettlementBehavior), nameof(AiVisitSettlementBehavior.RegisterEvents))
+    };
+
     static bool Prefix() => ModInformation.IsServer;
 }
 
-[HarmonyPatch(typeof(AiMilitaryBehavior))]
-internal class DisableAiMilitaryBehavior
+/// <summary>
+/// Player parties are client-authoritative and driven by player input. Skip the server's autonomous
+/// per-party AI decision tick for them so it never orders a player party to move on its own
+/// (e.g. GoToSettlement). NPC parties are unaffected, and this behavior is already disabled on clients.
+/// </summary>
+[HarmonyPatch(typeof(AiPartyThinkBehavior), nameof(AiPartyThinkBehavior.PartyHourlyAiTick))]
+internal class SkipPlayerPartyAiThinkPatch
 {
-    [HarmonyPatch(nameof(AiMilitaryBehavior.RegisterEvents))]
-    static bool Prefix() => ModInformation.IsServer;
-}
-
-[HarmonyPatch(typeof(AiPartyThinkBehavior))]
-internal class DisableAiPartyThinkBehavior
-{
-    [HarmonyPatch(nameof(AiPartyThinkBehavior.RegisterEvents))]
-    static bool Prefix() => ModInformation.IsServer;
-}
-
-[HarmonyPatch(typeof(AiPatrollingBehavior))]
-internal class DisableAiPatrollingBehavior
-{
-    [HarmonyPatch(nameof(AiPatrollingBehavior.RegisterEvents))]
-    static bool Prefix() => ModInformation.IsServer;
-}
-
-[HarmonyPatch(typeof(AiVisitSettlementBehavior))]
-internal class DisableAiVisitSettlementBehavior
-{
-    [HarmonyPatch(nameof(AiVisitSettlementBehavior.RegisterEvents))]
-    static bool Prefix() => ModInformation.IsServer;
+    static bool Prefix(MobileParty mobileParty) => mobileParty == null || !mobileParty.IsPlayerParty();
 }

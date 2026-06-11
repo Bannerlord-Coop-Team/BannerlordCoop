@@ -168,7 +168,7 @@ public class SettlementHandler : IHandler
             return;
         }
 
-        MobilePartyCachePatch.RunMobileParty(settlement, mobileParty, obj.NumberOfLordParties, obj.AddMobileParty);
+        MobilePartyCachePatch.RunMobileParty(settlement, mobileParty, obj.AddMobileParty);
     }
 
     private void HandleHeroRemoveWithoutParty(MessagePayload<ChangeSettlementHeroWithoutPartyRemove> payload)

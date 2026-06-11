@@ -1,9 +1,12 @@
 ﻿using Common.Messaging;
-using Coop.Core.Server.Services.Save.Data;
+using GameInterface.CoopSessionData;
+using GameInterface.CoopSessionData.Save.Data;
 using GameInterface.Registry.Messages;
-using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Messages;
-using GameInterface.Services.MobileParties.Interfaces;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
+using GameInterface.Services.Smithing;
+using System.Linq;
 
 namespace Coop.Core.Server.Services.Save.Handlers;
 
@@ -14,25 +17,20 @@ internal class SaveGameHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;
     private readonly ICoopSaveManager saveManager;
-    private readonly ICoopServer coopServer;
-    private readonly IControllerIdProvider controllerIdProvider;
-    private readonly IControlledEntityRegistry controlledEntityRegistry;
-    private readonly IMobilePartyInterface mobilePartyInterface;
+    private readonly ICoopSessionProvider coopSessionProvider;
+    private readonly IPlayerManager playerRegistry;
 
     public SaveGameHandler(
         IMessageBroker messageBroker,
         ICoopSaveManager saveManager,
-        ICoopServer coopServer,
-        IControllerIdProvider controllerIdProvider,
-        IControlledEntityRegistry controlledEntityRegistry,
-        IMobilePartyInterface mobilePartyInterface) 
+        ICoopSessionProvider coopSessionProvider,
+        IPlayerManager playerRegistry) 
     {
         this.messageBroker = messageBroker;
         this.saveManager = saveManager;
-        this.coopServer = coopServer;
-        this.controllerIdProvider = controllerIdProvider;
-        this.controlledEntityRegistry = controlledEntityRegistry;
-        this.mobilePartyInterface = mobilePartyInterface;
+        this.coopSessionProvider = coopSessionProvider;
+        this.playerRegistry = playerRegistry;
+
         messageBroker.Subscribe<GameSaved>(Handle_GameSaved);
         messageBroker.Subscribe<GameLoaded>(Handle_GameLoaded);
 
@@ -52,9 +50,11 @@ internal class SaveGameHandler : IHandler
         var saveName = obj.What.SaveName;
         messageBroker.Publish(this, new PackageObjectGuids());
 
-        var controlledEntities = controlledEntityRegistry.PackageControlledEntities();
+        CraftingPlayerData craftingPlayerData = coopSessionProvider.CoopSession.CraftingPlayerData;
+        craftingPlayerData ??= new(new(), new(), new());
 
-        CoopSession session = new CoopSession(saveName, controlledEntities);
+        CoopSession session = new CoopSession(saveName, playerRegistry.Players.ToArray(), craftingPlayerData);
+        coopSessionProvider.CoopSession = session;
 
         saveManager.SaveCoopSession(saveName, session);
     }
@@ -63,11 +63,20 @@ internal class SaveGameHandler : IHandler
     private void Handle_GameLoaded(MessagePayload<GameLoaded> obj)
     {
         savedSession = saveManager.LoadCoopSession(obj.What.SaveName);
+        if(savedSession == null)
+        {
+            savedSession = new CoopSession(obj.What.SaveName, new Player[0], new CraftingPlayerData(new(), new(), new()));
+        }
+        coopSessionProvider.CoopSession = savedSession;
     }
 
     private void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> obj)
     {
-        controlledEntityRegistry.LoadControlledEntities(savedSession.ControlledEntityMap);
-        mobilePartyInterface.RegisterAllPartiesAsControlled(controllerIdProvider.ControllerId);
+        if (savedSession.Players == null) return;
+
+        foreach (var player in savedSession.Players)
+        {
+            playerRegistry.AddPlayer(player);
+        }
     }
 }

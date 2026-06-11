@@ -6,6 +6,7 @@ using Common.Util;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.ObjectManager;
+using JetBrains.Annotations;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -38,6 +39,10 @@ internal class MapEventSideDataHandler : IHandler
 
         messageBroker.Subscribe<MapEventSideAssigned>(Handle_MapEventSideAssigned);
         messageBroker.Subscribe<NetworkAssignMapEventSide>(Handle_NetworkAssignMapEventSide);
+
+        messageBroker.Subscribe<MapEventPartyBattlePartyAdded>(Handle_MapEventPartyBattlePartyAdded);
+        messageBroker.Subscribe<NetworkAddBattleParty>(Handle_NetworkAddBattleParty);
+
     }
 
     public void Dispose()
@@ -181,9 +186,33 @@ internal class MapEventSideDataHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<MapEvent>(payload.What.MapEventId, out var mapEvent)) return;
         if (!objectManager.TryGetObjectWithLogging<MapEventSide>(payload.What.MapEventSideId, out var mapEventSide)) return;
 
-        using (new AllowedThread())
+        using(new AllowedThread())
         {
             mapEvent._sides[(int)payload.What.Side] = mapEventSide;
+        }
+    }
+
+    private void Handle_MapEventPartyBattlePartyAdded(MessagePayload<MapEventPartyBattlePartyAdded> payload)
+    {
+        if (!objectManager.TryGetIdWithLogging(payload.What.MapEventParty, out var mapEventPartyId))
+            return;
+        if (!objectManager.TryGetIdWithLogging(payload.What.MapEventSide, out var mapEventSideId))
+            return;
+
+        var message = new NetworkAddBattleParty(mapEventSideId, mapEventPartyId);
+        network.SendAll(message);
+    }
+
+    private void Handle_NetworkAddBattleParty(MessagePayload<NetworkAddBattleParty> payload)
+    {
+        if (!objectManager.TryGetObjectWithLogging<MapEventSide>(payload.What.MapEventSideId, out var mapEventSide))
+            return;
+        if (!objectManager.TryGetObjectWithLogging<MapEventParty>(payload.What.MapEventPartyId, out var mapEventParty))
+            return;
+
+        using (new AllowedThread())
+        {
+            mapEventSide._battleParties.Add(mapEventParty);
         }
     }
 }

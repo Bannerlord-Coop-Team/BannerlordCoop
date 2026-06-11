@@ -1,18 +1,23 @@
 ﻿using Common.Logging;
 using HarmonyLib;
 using Serilog;
+using System;
+using System.Reflection;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.Core;
-using TaleWorlds.Library;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
-[HarmonyPatch(typeof(MobileParty))]
+[HarmonyPatch]
 internal class MobilePartyRobustnessPatches
 {
-    [HarmonyPatch(nameof(MobileParty.Anchor), MethodType.Getter)]
+    private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyRobustnessPatches>();
+
+    [HarmonyPatch(typeof(MobileParty), nameof(MobileParty.Anchor), MethodType.Getter)]
     [HarmonyPostfix]
     private static void Postfix(ref MobileParty __instance, ref AnchorPoint __result)
     {
@@ -23,19 +28,8 @@ internal class MobilePartyRobustnessPatches
             __result = anchor;
         }
     }
-}
 
-/// <summary>
-/// Guards against NullReferenceException in <see cref="WarPartyComponent.Clan"/>
-/// when <see cref="PartyComponent.MobileParty"/> is null during a multiplayer sync
-/// transition, which causes <see cref="WarPartyComponent.GetDefaultComponentBanner"/>
-/// to NRE before it can null-check the result.
-/// </summary>
-[HarmonyPatch(typeof(WarPartyComponent), nameof(WarPartyComponent.GetDefaultComponentBanner))]
-internal class WarPartyComponentBannerRobustnessPatch
-{
-    private static readonly ILogger Logger = LogManager.GetLogger<WarPartyComponentBannerRobustnessPatch>();
-
+    [HarmonyPatch(typeof(WarPartyComponent), nameof(WarPartyComponent.GetDefaultComponentBanner))]
     [HarmonyPrefix]
     private static bool Prefix(WarPartyComponent __instance, ref Banner __result)
     {
@@ -46,5 +40,17 @@ internal class WarPartyComponentBannerRobustnessPatch
             return false;
         }
         return true;
+    }
+
+    [HarmonyPatch(typeof(DefaultPartySpeedCalculatingModel), nameof(DefaultPartySpeedCalculatingModel.CalculateFinalSpeed))]
+    [HarmonyFinalizer]
+    private static Exception Finalizer_CalculateFinalSpeed(Exception __exception, MethodBase __originalMethod)
+    {
+        if (__exception != null)
+        {
+            Logger.Error(__exception, "Failed to run {Method}", $"{__originalMethod.DeclaringType}.{__originalMethod.Name}");
+        }
+
+        return null;
     }
 }

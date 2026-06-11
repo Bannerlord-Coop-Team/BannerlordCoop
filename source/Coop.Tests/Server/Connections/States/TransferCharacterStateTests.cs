@@ -7,8 +7,11 @@ using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using Coop.Tests.Mocks;
+using GameInterface.CoopSessionData;
+using GameInterface.CoopSessionData.Save.Data;
 using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
+using Moq;
 using System.Linq;
 using Xunit;
 using Xunit.Abstractions;
@@ -73,19 +76,25 @@ namespace Coop.Tests.Server.Connections.States
             byte[] data = new byte[1];
             string campaignId = "12345";
 
+            // No CoopSession mock needed: Handle_GameSaveDataPackaged reads CoopSession?.CraftingPlayerData,
+            // which is null-safe.
+
             // Act
             var payload = new MessagePayload<GameSaveDataPackaged>(
                 null, new GameSaveDataPackaged(data, campaignId));
             currentState.Handle_GameSaveDataPackaged(payload);
 
-            // Assert
-            Assert.Equal(2, serverComponent.TestNetwork.GetPeerMessages(playerPeer).Count());
-            var message = serverComponent.TestNetwork.GetPeerMessages(playerPeer).Last();
+            // Assert — the save data is sent only to the joining peer. Time-control pausing now goes through the
+            // mocked ITimeControlInterface (TransferSaveState ctor), so it no longer produces a counted broadcast
+            // here; only the directed NetworkGameSaveDataReceived reaches the wire.
+            var message = Assert.Single(serverComponent.TestNetwork.GetPeerMessages(playerPeer));
             var castedMessage = Assert.IsType<NetworkGameSaveDataReceived>(message);
             Assert.Equal(data, castedMessage.GameSaveData);
             Assert.Equal(campaignId, castedMessage.CampaignID);
 
-            Assert.Single(serverComponent.TestNetwork.GetPeerMessages(differentPeer));
+            // GetPeerMessages indexes the backing dictionary directly and would throw for a peer that never
+            // received anything, so assert the absence of the key instead.
+            Assert.False(serverComponent.TestNetwork.SentNetworkMessages.ContainsKey(differentPeer.Id));
         }
     }
 }

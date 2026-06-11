@@ -245,13 +245,6 @@ internal class SettlementAuditor : IAuditor
             {
                 sb.AppendLine($"settlement._herosWithoutPartyCache list dont contain same items");
                 errHeroesWithoutPartyCache++;
-            } 
-            
-
-            if (settlement.NumberOfLordPartiesAt != audit.NumberOfLordPartiesAt)
-            {
-                sb.AppendLine($"settlement.NumberOfLordPartiesAt {settlement.NumberOfLordPartiesAt}!= {audit.NumberOfLordPartiesAt}");
-                errNumberOfLordPartiesAt++;
             }
 
             if (settlement.LastVisitTimeOfOwner != audit.LastVisitTimeOfOwner)

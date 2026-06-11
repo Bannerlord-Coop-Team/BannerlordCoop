@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.GameDebug.Interfaces;
 using GameInterface.Services.GameDebug.Messages;
-using GameInterface.Services.UI.Messages;
+using GameInterface.Services.UI.Interfaces;
 
 namespace GameInterface.Services.GameDebug.Handlers
 {
@@ -9,12 +9,13 @@ namespace GameInterface.Services.GameDebug.Handlers
     {
         private readonly IDebugGameInterface gameDebugInterface;
         private readonly IMessageBroker messageBroker;
+        private readonly ILoadingInterface loadingInterface;
 
-        public LoadDebugGameHandler(IDebugGameInterface gameDebugInterface, IMessageBroker messageBroker)
+        public LoadDebugGameHandler(IDebugGameInterface gameDebugInterface, IMessageBroker messageBroker, ILoadingInterface loadingInterface)
         {
             this.gameDebugInterface = gameDebugInterface;
             this.messageBroker = messageBroker;
-
+            this.loadingInterface = loadingInterface;
             messageBroker.Subscribe<LoadDebugGame>(Handle);
 
             // TODO move to different service
@@ -29,7 +30,7 @@ namespace GameInterface.Services.GameDebug.Handlers
 
         private void Handle(MessagePayload<LoadDebugGame> payload)
         {
-            messageBroker.Publish(this, new StartLoadingScreen());
+            loadingInterface.ShowLoadingScreen();
             gameDebugInterface.LoadDebugGame();
         }
 

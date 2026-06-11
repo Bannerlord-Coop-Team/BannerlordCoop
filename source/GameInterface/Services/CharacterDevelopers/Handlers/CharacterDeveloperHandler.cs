@@ -4,25 +4,13 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.CharacterDevelopers.Messages;
-using GameInterface.Services.CharacterDevelopers.Patches;
-using GameInterface.Services.CraftingService.Messages;
-using GameInterface.Services.Heroes.Handlers;
-using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
 using System.Collections.Generic;
-using System.Reflection;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Xml.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
-using TaleWorlds.CampaignSystem.Extensions;
-using TaleWorlds.CampaignSystem.ViewModelCollection.CharacterDeveloper;
 using TaleWorlds.Core;
-using TaleWorlds.Diamond;
-using TaleWorlds.TwoDimension.Standalone;
 
 namespace GameInterface.Services.CharacterDevelopers.Handlers
 {
@@ -61,15 +49,9 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
         private void Handle(MessagePayload<NetworkApplyChangesServer> obj)
         {
             // Send to all clients and apply on server
-            GameLoopRunner.RunOnMainThread(() =>
-            {
-                using (new AllowedThread())
-                {
-                    NetworkApplyChangesClients changes = new(obj.What);
-                    network.SendAll(changes);
-                    ApplyChanges(changes);
-                }
-            });
+            NetworkApplyChangesClients changes = new(obj.What);
+            network.SendAll(changes);
+            ApplyChanges(changes);
         }
 
         private void Handle(MessagePayload<NetworkApplyChangesClients> obj)
@@ -153,12 +135,12 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
                 return;
             }
 
-            addPerks(obj.PerkIds, hero.HeroDeveloper);
-            addAttributes(obj.AttributeIds, obj.AttributeIncreases, hero.HeroDeveloper);
-            addFocuses(obj.SkillIds, obj.SkillFocusLevels, obj.SkillOrgFocusAmounts, hero.HeroDeveloper);
+            AddPerks(obj.PerkIds, hero.HeroDeveloper);
+            AddAttributes(obj.AttributeIds, obj.AttributeIncreases, hero.HeroDeveloper);
+            AddFocuses(obj.SkillIds, obj.SkillFocusLevels, obj.SkillOrgFocusAmounts, hero.HeroDeveloper);
         }
 
-        private void addPerks(List<string> perkIds, HeroDeveloper heroDeveloper)
+        private void AddPerks(List<string> perkIds, HeroDeveloper heroDeveloper)
         {
             if (perkIds != null)
             {
@@ -175,7 +157,7 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
             }
         }
 
-        private void addAttributes(List<string> attributeIds, List<int> attributeIncreases, HeroDeveloper heroDeveloper)
+        private void AddAttributes(List<string> attributeIds, List<int> attributeIncreases, HeroDeveloper heroDeveloper)
         {
             if (attributeIds != null)
             {
@@ -198,7 +180,7 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
             }
         }
 
-        private void addFocuses(List<string> skillIds, List<int> skillFocusLevels, List<int> skillOrgFocusAmounts, HeroDeveloper heroDeveloper)
+        private void AddFocuses(List<string> skillIds, List<int> skillFocusLevels, List<int> skillOrgFocusAmounts, HeroDeveloper heroDeveloper)
         {
             if (skillIds != null)
             {

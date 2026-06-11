@@ -10,9 +10,9 @@ Subscribe<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMess
 SubscribeNetwork<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage>((instance, data) => 
 {
     var type = DynamicSync.Constants.TypeMapReverse[data.ValueTypeIndex];
-    if (!objectManager.TryGetObject(type, data.ValueId, out object value) && data.ValueId != null) return;
+    if (!objectManager.TryGetObjectWithLogging(type, data.ValueId, out object value) && data.ValueId != null) return;
 {{~ if ReadOnly ~}}
-	DynamicSync.Constants.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, {{MemberType}} value);
+	AccessTools.Field(typeof({{MemberDeclaringType}}), "{{MemberName}}").SetValue(instance, value);
 {{~ else ~}}
 	using (new AllowedThread())
 	{
@@ -29,7 +29,7 @@ SubscribeNetworkReference<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName
 {{~ end ~}}
 
     {{~ if ReadOnly ~}}
-	    DynamicSync.Constants.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, value);
+        AccessTools.Field(typeof({{MemberDeclaringType}}), "{{MemberName}}").SetValue(instance, value);
     {{~ else ~}}
         using (new AllowedThread())
 	    {

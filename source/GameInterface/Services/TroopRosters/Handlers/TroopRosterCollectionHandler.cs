@@ -41,11 +41,14 @@ namespace GameInterface.Services.TroopRosters.Handlers
         {
             var data = payload.What;
 
-            if (!objectManager.TryGetId(data.Instance, out string RosterId)) return;
+            if (!objectManager.TryGetIdWithLogging(data.Instance, out string troopRosterId)) return;
 
-            objectManager.TryGetId(data.Value.Character, out string CharacterId);
+            if (!objectManager.TryGetIdWithLogging(data.Value.Character, out string characterObjectId))
+                return;
 
-            network.SendAll(new NetworkUpdateTroopRosterData(RosterId, CharacterId,
+            network.SendAll(new NetworkUpdateTroopRosterData(
+                troopRosterId,
+                characterObjectId,
                 data.Value._number,
                 data.Value._woundedNumber,
                 data.Value._xp,

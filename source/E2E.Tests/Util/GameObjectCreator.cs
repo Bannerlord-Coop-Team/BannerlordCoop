@@ -1,5 +1,6 @@
 ﻿using E2E.Tests.Util.ObjectBuilders;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
@@ -33,6 +34,7 @@ internal class GameObjectCreator
         { typeof(CustomPartyComponent), new CustomPartyComponentBuilder() },
         { typeof(MapEvent), new MapEventBuilder() },
         { typeof(MapEventSide), new MapEventSideBuilder() },
+        { typeof(MapEventParty), new MapEventPartyBuilder() },
         { typeof(BesiegerCamp), new BesiegerCampBuilder() },
         { typeof(SiegeEvent), new SiegeEventBuilder() },
         { typeof(SiegeStrategy), new SiegeStrategyBuilder() },
@@ -46,7 +48,6 @@ internal class GameObjectCreator
         { typeof(TroopRoster), new TroopRosterBuilder() },
         { typeof(EquipmentElement), new EquipmentElementBuilder() },
         { typeof(ItemObject), new ItemObjectBuilder() },
-        { typeof(MapEventParty), new MapEventPartyBuilder() },
         { typeof(Alley), new AlleyBuilder() },
         { typeof(Equipment), new EquipmentBuilder() },
         { typeof(MBCharacterSkills), new DefaultBuilder<MBCharacterSkills>() },
@@ -58,6 +59,8 @@ internal class GameObjectCreator
         { typeof(GarrisonPartyComponent), new GarrisonPartyComponentBuilder() },
         { typeof(VillageType), new VillageTypeBuilder() },
         { typeof(VillagerPartyComponent), new VillagerPartyComponentBuilder() },
+        { typeof(TraitObject), new TraitObjectBuilder() },
+        { typeof(PropertyOwner<TraitObject>), new PropertyOwnerBuilder() }
     };
 
     public static T CreateInitializedObject<T>()

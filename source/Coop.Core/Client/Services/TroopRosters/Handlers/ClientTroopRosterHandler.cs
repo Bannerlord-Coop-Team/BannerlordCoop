@@ -2,7 +2,6 @@
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.TroopRosters.Messages;
-using Coop.Core.Server.Services.TroopRosters.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Messages;
 using Serilog;
@@ -22,8 +21,13 @@ public class ClientTroopRosterHandler : IHandler
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
-        messageBroker.Subscribe<NetworkChangeTroopRosterAddtoCounts>(HandleAddToCounts);
+
         messageBroker.Subscribe<RecruitmentAttempted>(HandleOnRecruitmentDone);
+    }
+
+    public void Dispose()
+    {
+        messageBroker.Unsubscribe<RecruitmentAttempted>(HandleOnRecruitmentDone);
     }
 
     private void HandleOnRecruitmentDone(MessagePayload<RecruitmentAttempted> payload)
@@ -43,26 +47,12 @@ public class ClientTroopRosterHandler : IHandler
 
         if (troops.Count <= 0)
         {
-            Logger.Warning("No troops in card");
+            Logger.Warning("No troops in cart");
             return;
         }
 
         var message = new ClientRequestRecruitment(mobilePartyId, troops.ToArray());
 
         network.SendAll(message);
-    }
-    private void HandleAddToCounts(MessagePayload<NetworkChangeTroopRosterAddtoCounts> payload)
-    {
-        var obj = payload.What;
-        var message = new ChangeTroopRostersAddToCounts(obj.MobilePartyId, obj.CharacterId, obj.Count, obj.InsertAtFront, obj.WoundedCount, obj.XpChanged, obj.RemoveDepleted, obj.Index);
-
-        Logger.Debug("[Client] Setting troop roster counts for MobilePartyId: {MobilePartyId}, CharacterId: {CharacterId}", obj.MobilePartyId, obj.CharacterId);
-
-        messageBroker.Publish(this, message);
-    }
-    public void Dispose()
-    {
-        messageBroker.Unsubscribe<NetworkChangeTroopRosterAddtoCounts>(HandleAddToCounts);
-        messageBroker.Unsubscribe<RecruitmentAttempted>(HandleOnRecruitmentDone);
     }
 }

@@ -31,6 +31,18 @@ namespace GameInterface.Utils
             this.network = network;
         }
 
+        /// <summary>
+        /// Subscribes directly to a message type while still unsubscribing when the handler is disposed.
+        /// Use this instead of calling <see cref="IMessageBroker.Subscribe{T}"/> directly, otherwise the
+        /// subscription leaks past the handler's lifetime.
+        /// </summary>
+        protected void SubscribeTracked<TMessage>(Action<MessagePayload<TMessage>> payloadHandler)
+            where TMessage : IMessage
+        {
+            messageBroker.Subscribe(payloadHandler);
+            disposeFunctions.Add(() => messageBroker.Unsubscribe(payloadHandler));
+        }
+
         protected void Subscribe<TValue, TMessage>(Action<string, TMessage> messageHandler)
             where TMessage : GenericEvent<TInstance, TValue>
         {

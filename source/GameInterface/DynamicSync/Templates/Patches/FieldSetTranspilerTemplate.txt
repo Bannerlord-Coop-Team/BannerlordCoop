@@ -27,6 +27,10 @@ private static IEnumerable<CodeInstruction> {{MemberName}}_SetTranspiler(IEnumer
     }
 }
 
+{{~ if ReadOnly ~}}
+private static readonly FieldInfo {{MemberName}}FieldInfo = AccessTools.Field(typeof({{MemberDeclaringType}}), "{{MemberName}}");
+{{~ end ~}}
+
 public static void {{MemberName}}_Intercept({{MemberDeclaringType}} instance, {{MemberType}} newValue)
 {
     var currentValue = instance.{{MemberName}};
@@ -37,7 +41,7 @@ public static void {{MemberName}}_Intercept({{MemberDeclaringType}} instance, {{
     if (CallOriginalPolicy.IsOriginalAllowed())
     {
 {{~ if ReadOnly ~}}
-	    DynamicSync.Constants.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, newValue);
+        {{MemberName}}FieldInfo.SetValue(instance, newValue);
 {{~ else ~}}
 		instance.{{MemberName}} = newValue;
 {{~ end ~}}
@@ -48,7 +52,7 @@ public static void {{MemberName}}_Intercept({{MemberDeclaringType}} instance, {{
     {
         Logger.Error("Client updated managed {type}", "{{MemberName}}");
 {{~ if ReadOnly ~}}
-	    DynamicSync.Constants.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, newValue);
+	    {{MemberName}}FieldInfo.SetValue(instance, newValue);
 {{~ else ~}}
 		instance.{{MemberName}} = newValue;
 {{~ end ~}}
@@ -62,7 +66,7 @@ public static void {{MemberName}}_Intercept({{MemberDeclaringType}} instance, {{
     var message = new {{MemberDeclaringType}}_{{MemberName}}_SetLocalMessage(instance, newValue);
     MessageBroker.Instance.Publish(instance, message);
 {{~ if ReadOnly ~}}
-	DynamicSync.Constants.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, newValue);
+	{{MemberName}}FieldInfo.SetValue(instance, newValue);
 {{~ else ~}}
 	instance.{{MemberName}} = newValue;
 {{~ end ~}}

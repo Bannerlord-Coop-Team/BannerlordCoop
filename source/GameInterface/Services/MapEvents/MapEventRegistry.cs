@@ -4,12 +4,16 @@ using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
+using SandBox.GauntletUI.Map;
 using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.MapEvents;
 
@@ -28,7 +32,7 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 
     public override IEnumerable<MethodBase> DestroyMethods => new MethodBase[]
     {
-        AccessTools.Method(typeof(MapEvent), nameof(MapEvent.FinalizeEventAux))
+        AccessTools.Method(typeof(MapEvent), nameof(MapEvent.FinishBattle))
     };
 
     public override void RegisterAllObjects()
@@ -47,6 +51,9 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
         {
             obj.StringId = id;
             obj._sides = new MapEventSide[2];
+            obj.WonRounds = new MBList<BattleSideEnum>();
+
+            Campaign.Current.MapEventManager.OnMapEventCreated(obj);
         }
     }
 
@@ -57,7 +64,9 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
             using (new AllowedThread())
             {
                 obj.Component?.FinishComponent();
-                obj.FinalizeEventAux();
+                obj.FinishBattle();
+
+                Campaign.Current.MapEventManager.Tick();
             }
         });
     }

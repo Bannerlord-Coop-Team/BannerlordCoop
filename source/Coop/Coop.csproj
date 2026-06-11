@@ -5,6 +5,7 @@
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{2C1C41C6-591A-4092-A01A-FEEE1B53185F}</ProjectGuid>
+    <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Coop</RootNamespace>
@@ -36,7 +37,7 @@
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
+    <OutputPath>bin\DebugAutoConnect\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -231,9 +232,12 @@
     <Content Include="ILLink\ILLink.Descriptors.LibraryBuild.xml" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- Deploy module into the Bannerlord install (mb2 junction). See Deploy.targets. -->
   <PropertyGroup>
-    <PostBuildEvent>powershell -ExecutionPolicy Unrestricted ^
-            -File "$(SolutionDir)..\deploy.ps1" -SolutionDir "$(SolutionDir)\" ^
-            -TargetDir "$(SolutionDir)Coop\bin\$(Configuration)\\"</PostBuildEvent>
+    <ModName>Coop</ModName>
+    <MainClass>CoopMod</MainClass>
+    <ModVersion>v0.0.1</ModVersion>
+    <GameVersion>v1.3.12</GameVersion>
   </PropertyGroup>
+  <Import Project="$(MSBuildProjectDirectory)\..\..\Deploy.targets" />
 </Project>

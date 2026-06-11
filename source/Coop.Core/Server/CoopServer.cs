@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Messages;
 using Common.PacketHandlers;
 using Common.Serialization;
 using Coop.Core.Common.Network;
@@ -40,7 +41,6 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     private readonly IMessageBroker messageBroker;
     private readonly IPacketManager packetManager;
-    private bool allowJoining = false;
 
     public CoopServer(
         INetworkConfiguration configuration, 
@@ -52,9 +52,6 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         // Dependancy assignment
         this.messageBroker = messageBroker;
         this.packetManager = packetManager;
-        messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
-
-        ModInformation.IsServer = true;
 
         // Netmanager initialization
         netManager.NatPunchEnabled = true;
@@ -63,22 +60,10 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         controllerIdProvider.SetControllerId(ServerControllerId);
     }
 
-    public override void Dispose()
-    {
-        messageBroker.Unsubscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
-        base.Dispose();
-    }
-
     public override void OnConnectionRequest(ConnectionRequest request)
     {
-        if (allowJoining)
-        {
-            request.Accept();
-        }
-        else
-        {
-            request.Reject();
-        }
+        Logger.Information("Client connection accepted for {Endpoint}", request.RemoteEndPoint);
+        request.Accept();
     }
 
     public void OnNatIntroductionRequest(IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token)
@@ -132,7 +117,8 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void Start()
     {
-        netManager.Start(Configuration.Port);
+        Logger.Information("Server starting on port {Port}", Configuration.Port);
+        netManager.Start(IPAddress.Any, IPAddress.IPv6Any, Configuration.Port);
     }
 
     public override void SendAll(IPacket packet)
@@ -143,7 +129,6 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void SendAllBut(NetPeer ignoredPeer, IPacket packet)
     {
-        CheckNetworkQueueOverloaded(ignoredPeer);
         SendAllBut(netManager, ignoredPeer, packet);
     }
 
@@ -162,10 +147,5 @@ public class CoopServer : CoopNetworkBase, ICoopServer
                 messageBroker.Publish(this, new PeerQueueOverloaded(netPeer));
             }
         }
-    }
-
-    private void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> obj)
-    {
-        allowJoining = true;
     }
 }

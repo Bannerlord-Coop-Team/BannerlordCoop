@@ -13,18 +13,15 @@ public readonly struct SettlementChangedMobileParty : IEvent
 {
     public readonly Settlement Settlement;
     public readonly MobileParty MobileParty;
-    public readonly int NumberOfLordParties;
     public readonly bool AddMobileParty;
 
     public SettlementChangedMobileParty(
         Settlement settlement,
         MobileParty mobileParty,
-        int numberOfLordParties,
         bool addMobileParty)
     {
         Settlement = settlement;
         MobileParty = mobileParty;
-        NumberOfLordParties = numberOfLordParties;
         AddMobileParty = addMobileParty;
     }
 }

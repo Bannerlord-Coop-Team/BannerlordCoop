@@ -19,16 +19,23 @@ internal class ClientCreateHeroHandler : IHandler
         this.network = network;
 
         messageBroker.Subscribe<NetworkChangeHeroName>(Handle_NetworkChangeHeroName);
+        messageBroker.Subscribe<HeroNameChanged>(Handle_HeroNameChanged);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkChangeHeroName>(Handle_NetworkChangeHeroName);
+        messageBroker.Unsubscribe<HeroNameChanged>(Handle_HeroNameChanged);
     }
 
     private void Handle_NetworkChangeHeroName(MessagePayload<NetworkChangeHeroName> payload)
     {
         var message = new ChangeHeroName(payload.What.Data);
         messageBroker.Publish(this, message);
+    }
+
+    private void Handle_HeroNameChanged(MessagePayload<HeroNameChanged> payload)
+    {
+        network.SendAll(new NetworkChangeHeroName(payload.What.Data));
     }
 }
