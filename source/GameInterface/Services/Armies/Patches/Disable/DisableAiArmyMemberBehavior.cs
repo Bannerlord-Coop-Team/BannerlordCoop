@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using Common;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors.AiBehaviors;
 
 namespace GameInterface.Services.Armies.Patches.Disable;
@@ -7,5 +8,5 @@ namespace GameInterface.Services.Armies.Patches.Disable;
 internal class DisableAiArmyMemberBehavior
 {
     [HarmonyPatch(nameof(AiArmyMemberBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix() => ModInformation.IsServer;
 }
