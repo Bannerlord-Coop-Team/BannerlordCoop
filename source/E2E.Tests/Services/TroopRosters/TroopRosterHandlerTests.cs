@@ -411,7 +411,13 @@ namespace E2E.Tests.Services.TroopRosters
                     Assert.True(instance.ObjectManager.TryGetObject<TroopRoster>(TroopRosterId, out var roster));
                     Assert.True(instance.ObjectManager.TryGetObject<CharacterObject>(characterId, out var character));
 
-                    roster.AddToCounts(character, count);
+                    // Seed via AddNewElement + AddToCountsAtIndex, which AllowedThread suppresses.
+                    // AddToCounts must not be used here: TroopRosterAddToCountsPatch intentionally
+                    // publishes sync for AddToCounts even on an allowed thread (the recruitment flow
+                    // runs under AllowedThread), so seeding through it would sync the seed too.
+                    roster.AddNewElement(character, -1);
+                    var index = roster.FindIndexOfTroop(character);
+                    roster.AddToCountsAtIndex(index, count, woundedCountChange: 0, xpChange: 0, removeDepleted: false);
                 }
             });
         }

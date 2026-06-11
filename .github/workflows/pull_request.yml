@@ -25,12 +25,16 @@ jobs:
         run: |
           ln -s /home/mb2 BannerlordCoop
           
+      # CoopTests.slnf contains the test projects that can build and run on Linux (plus their
+      # production dependencies such as Coop.Core and GameInterface). The full solution includes
+      # legacy net472 projects (Coop, Missions, ClientDebug, MissionTestMod and the
+      # Missions-dependent MissionTests) that require Windows.
       - name: Build Solution
         run: |
           cd BannerlordCoop/source
-          dotnet build Coop.Core -c Release
-      
+          dotnet build CoopTests.slnf -c Release
+
       - name: Run Unit Tests
         run: |
           cd BannerlordCoop/source
-          dotnet test -c Release --consoleLoggerParameters:ErrorsOnly
+          dotnet test CoopTests.slnf -c Release --no-build --consoleLoggerParameters:ErrorsOnly
