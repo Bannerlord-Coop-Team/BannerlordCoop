@@ -4,7 +4,7 @@ using ProtoBuf;
 namespace GameInterface.Services.MapEvents.Messages.Start;
 
 /// <summary>
-/// Server -> Client response carrying the object-manager id of the authoritatively created
+/// Server -&gt; Client response carrying the object-manager id of the authoritatively created
 /// <see cref="TaleWorlds.CampaignSystem.MapEvents.MapEvent"/>, correlated to the original request by <see cref="RequestId"/>.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]

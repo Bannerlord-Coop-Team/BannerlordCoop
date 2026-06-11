@@ -4,7 +4,7 @@ using ProtoBuf;
 namespace GameInterface.Services.MapEvents.Messages.Conversation;
 
 /// <summary>
-/// Client -> Server request to run <c>PlayerEncounter.RestartPlayerEncounter</c> for the given parties. The server
+/// Client -&gt; Server request to run <c>PlayerEncounter.RestartPlayerEncounter</c> for the given parties. The server
 /// validates it and, if allowed, replies with <see cref="NetworkAllowConversation"/>. Rejected requests receive no
 /// response.
 /// </summary>

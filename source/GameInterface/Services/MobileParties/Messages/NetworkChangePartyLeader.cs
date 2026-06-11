@@ -4,7 +4,7 @@ using ProtoBuf;
 namespace GameInterface.Services.MobileParties.Messages;
 
 /// <summary>
-/// [Server -> Client] Replicates a party leader change. <see cref="LeaderHeroId"/> is null when the
+/// [Server -&gt; Client] Replicates a party leader change. <see cref="LeaderHeroId"/> is null when the
 /// party is left without a leader (e.g. while its leader is a prisoner).
 /// </summary>
 [ProtoContract(SkipConstructor = true)]

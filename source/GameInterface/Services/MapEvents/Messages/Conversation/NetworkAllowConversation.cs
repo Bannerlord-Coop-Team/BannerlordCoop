@@ -4,7 +4,7 @@ using ProtoBuf;
 namespace GameInterface.Services.MapEvents.Messages.Conversation;
 
 /// <summary>
-/// Server -> Client approval to run <c>PlayerEncounter.RestartPlayerEncounter</c> with the supplied parameters. The
+/// Server -&gt; Client approval to run <c>PlayerEncounter.RestartPlayerEncounter</c> with the supplied parameters. The
 /// client re-runs it for these parties under an <see cref="Common.Util.AllowedThread"/> so the original (now approved)
 /// executes.
 /// </summary>

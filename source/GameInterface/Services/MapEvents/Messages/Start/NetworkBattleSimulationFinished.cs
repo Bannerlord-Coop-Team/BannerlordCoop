@@ -4,7 +4,7 @@ using ProtoBuf;
 namespace GameInterface.Services.MapEvents.Messages.Start;
 
 /// <summary>
-/// [Server -> Client] Sent to the requesting client once the server has finished running the
+/// [Server -&gt; Client] Sent to the requesting client once the server has finished running the
 /// authoritative simulation for the map event. The client uses it to close its open simulation
 /// screen, by which point all casualty / <c>BattleState</c> sync messages have already been applied.
 /// </summary>
