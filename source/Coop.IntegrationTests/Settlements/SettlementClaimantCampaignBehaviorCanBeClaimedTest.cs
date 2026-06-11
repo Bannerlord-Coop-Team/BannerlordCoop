@@ -1,8 +1,9 @@
-﻿using Coop.IntegrationTests.Environment;
+using Coop.IntegrationTests.Environment;
 using GameInterface.Services.Settlements.Messages;
 using Coop.Core.Server.Services.Settlements.Messages;
 using Coop.IntegrationTests.Environment.Instance;
 
+using TaleWorlds.CampaignSystem.Settlements;
 namespace Coop.IntegrationTests.Settlements;
 
 /// <summary>
@@ -17,7 +18,13 @@ public class SettlementClaimantCampaignBehaviorCanBeClaimedTest
     {
         int CanBeClaimed = 10;
 
-        var triggerMessage = new SettlementClaimantCanBeClaimedChanged(null, CanBeClaimed);
+        var settlement = TestEnvironment.Server.CreateRegisteredObject<Settlement>("settlement1");
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.CreateRegisteredObject<Settlement>("settlement1");
+        }
+
+        var triggerMessage = new SettlementClaimantCanBeClaimedChanged(settlement, CanBeClaimed);
 
         var server = TestEnvironment.Server;
 

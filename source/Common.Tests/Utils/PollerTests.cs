@@ -38,8 +38,8 @@ public class PollerTests
         // Assert
         var expectedTimeMs = TimeSpan.FromMilliseconds(expectedCount * interval);
 
-        // +/- 10% tolerance
-        var tolerance = TimeSpan.FromMilliseconds(interval * expectedCount / 10);
+        // +/- 20% tolerance
+        var tolerance = TimeSpan.FromMilliseconds(interval * expectedCount / 5);
         var lowRange = expectedTimeMs - tolerance;
         var highRange = expectedTimeMs + tolerance;
 

@@ -29,19 +29,34 @@ namespace IntroductionServerTests
 
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterType<MessageBroker>().As<IMessageBroker>().SingleInstance();
+            // ObjectManager takes a Serilog ILogger; production injects it via GameInterfaceModule's
+            // parameter resolver, so this standalone container has to register one itself.
+            builder.RegisterInstance(Common.Logging.LogManager.GetLogger<GameInterface.Services.ObjectManager.ObjectManager>()).As<Serilog.ILogger>();
             builder.RegisterType<GameInterface.Services.ObjectManager.ObjectManager>().As<IObjectManager>().InstancePerLifetimeScope();
             builder.RegisterType<BinaryPackageFactory>().As<IBinaryPackageFactory>().AutoActivate().SingleInstance();
 
             ContainerProvider.SetContainer(builder.Build());
         }
 
+        /// <summary>
+        /// Registers a surrogate unless the type is already handled by the (process-wide) default
+        /// runtime model. Mirrors SurrogateCollection.AddSurrogate: once any serializer has been
+        /// generated for a type, protobuf-net freezes it and a repeated SetSurrogate throws.
+        /// </summary>
+        private static void TrySetSurrogate<T, TSurrogate>()
+        {
+            if (RuntimeTypeModel.Default.CanSerialize(typeof(T))) return;
+
+            RuntimeTypeModel.Default.SetSurrogate<T, TSurrogate>();
+        }
+
         [Fact]
         public void Serialize_Test()
         {
-            RuntimeTypeModel.Default.SetSurrogate<Vec3, Vec3Surrogate>();
-            RuntimeTypeModel.Default.SetSurrogate<Vec2, Vec2Surrogate>();
-            RuntimeTypeModel.Default.SetSurrogate<CharacterObject, CharacterObjectSurrogate>();
-            RuntimeTypeModel.Default.SetSurrogate<Equipment, EquipmentSurrogate>();
+            TrySetSurrogate<Vec3, Vec3Surrogate>();
+            TrySetSurrogate<Vec2, Vec2Surrogate>();
+            TrySetSurrogate<CharacterObject, CharacterObjectSurrogate>();
+            TrySetSurrogate<Equipment, EquipmentSurrogate>();
 
             var character = (CharacterObject)FormatterServices.GetUninitializedObject(typeof(CharacterObject));
 
@@ -67,11 +82,11 @@ namespace IntroductionServerTests
         [Fact]
         public void Serialize2_Test()
         {
-            RuntimeTypeModel.Default.SetSurrogate<Vec3, Vec3Surrogate>();
-            RuntimeTypeModel.Default.SetSurrogate<Vec2, Vec2Surrogate>();
-            RuntimeTypeModel.Default.SetSurrogate<CharacterObject, CharacterObjectSurrogate>();
-            RuntimeTypeModel.Default.SetSurrogate<AttackCollisionData, AttackCollisionDataSurrogate>();
-            RuntimeTypeModel.Default.SetSurrogate<Blow, BlowSurrogate>();
+            TrySetSurrogate<Vec3, Vec3Surrogate>();
+            TrySetSurrogate<Vec2, Vec2Surrogate>();
+            TrySetSurrogate<CharacterObject, CharacterObjectSurrogate>();
+            TrySetSurrogate<AttackCollisionData, AttackCollisionDataSurrogate>();
+            TrySetSurrogate<Blow, BlowSurrogate>();
 
             var attackerGuid = Guid.NewGuid();
 
