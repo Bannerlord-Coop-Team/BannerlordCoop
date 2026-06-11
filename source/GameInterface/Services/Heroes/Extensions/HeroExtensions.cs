@@ -10,7 +10,7 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Heroes.Extensions;
 
-internal static class HeroExtensions
+public static class HeroExtensions
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MobileParty>();
 

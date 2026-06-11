@@ -1,4 +1,5 @@
 using E2E.Tests.Environment.Instance;
+using GameInterface.Services.Entity;
 using GameInterface.Services.MobileParties.Extensions;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -104,6 +105,169 @@ public class MapEventEnvironmentTests : MapEventTestBase
         foreach (var client in Clients)
         {
             AssertCaptivity(client, heroId, captorPartyId);
+        }
+    }
+
+    [Fact]
+    public void PlayerLosesBattle_CaptureSyncs_ViaBattleStateResult()
+    {
+        // Arrange
+        var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
+        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        // Act — the player loses the battle and the result is committed the way the live game does it: a
+        // client sets the winning BattleState, which the server applies authoritatively and captures there.
+        DefeatPlayerByBattleStateSync(heroId, partyId, captorPartyId);
+
+        // Assert — the capture replicated to every instance (the bug: under AllowedThread the server captured
+        // natively without replication, so clients saw no capture and the party was never parked).
+        AssertCaptivity(Server, heroId, captorPartyId);
+        foreach (var client in Clients)
+        {
+            AssertCaptivity(client, heroId, captorPartyId);
+        }
+
+        // ...and the captured player party was parked (deactivated) on the server.
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.False(party.IsActive, "Captured player party should be deactivated on the server");
+        });
+    }
+
+    [Fact]
+    public void ClientWoundsControlledHero_RequestsHitPoints_SyncsToServerAndClients()
+    {
+        // The hero is controlled by one specific client (its controller id matches the player's).
+        var owningClient = Clients.First();
+        owningClient.Resolve<IControllerIdProvider>().SetControllerId("MyControllerId");
+
+        var (heroId, _) = CreatePlayerHeroParty("MyControllerId");
+
+        // The owning client wounds its hero locally, exactly as its mission does
+        // (Mission.OnAgentRemoved -> Hero.set_HitPoints). HitPoints is server-authoritative, so this must be
+        // forwarded to the server rather than stay a client-only change.
+        owningClient.Call(() =>
+        {
+            Assert.True(owningClient.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            hero.HitPoints = 1;
+        });
+
+        // The server received the request and applied it authoritatively...
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            Assert.Equal(1, hero.HitPoints);
+        });
+
+        // ...and the authoritative value replicated back to every client.
+        foreach (var client in Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+                Assert.Equal(1, hero.HitPoints);
+            });
+        }
+    }
+
+    [Fact]
+    public void ReleasedHero_IsHealed_NotWounded_SyncAllClients()
+    {
+        // Arrange — the player loses a battle and is taken prisoner.
+        var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
+        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        DefeatPlayerPartyInBattle(heroId, partyId, captorPartyId);
+
+        // Model the lost battle wounding the hero (HitPoints is a server-authoritative synced property).
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            hero.HitPoints = 1;
+        });
+
+        // The wound replicates to every client.
+        foreach (var client in Clients)
+        {
+            AssertHeroHitPoints(client, heroId, expectFull: false);
+        }
+
+        // Act — the captor is defeated and the player is freed.
+        ReleasePlayerAfterCaptorDefeated(heroId);
+
+        // Assert — the released hero is restored to full health everywhere, so it is no longer shown wounded
+        // in the party roster (vanilla never re-adds a released hero as wounded).
+        AssertHeroHitPoints(Server, heroId, expectFull: true);
+        AssertNoWoundedInParty(Server, partyId);
+        foreach (var client in Clients)
+        {
+            AssertHeroHitPoints(client, heroId, expectFull: true);
+            AssertNoWoundedInParty(client, partyId);
+        }
+    }
+
+    private void AssertNoWoundedInParty(EnvironmentInstance instance, string partyId)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(
+                party.MemberRoster.TotalWoundedHeroes == 0,
+                $"[{instance.GetType().Name}] released party should have no wounded heroes: wounded={party.MemberRoster.TotalWoundedHeroes}");
+        });
+    }
+
+    private void AssertHeroHitPoints(EnvironmentInstance instance, string heroId, bool expectFull)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            if (expectFull)
+            {
+                Assert.True(
+                    hero.HitPoints == hero.MaxHitPoints,
+                    $"[{instance.GetType().Name}] released hero should be at full health: HitPoints={hero.HitPoints} Max={hero.MaxHitPoints}");
+            }
+            else
+            {
+                Assert.True(
+                    hero.HitPoints < hero.MaxHitPoints,
+                    $"[{instance.GetType().Name}] hero should be wounded: HitPoints={hero.HitPoints} Max={hero.MaxHitPoints}");
+            }
+        });
+    }
+
+    [Fact]
+    public void CaptorDefeated_ReleasesPlayer_AndRestoresParty()
+    {
+        // Arrange — the player loses a battle and is taken prisoner by the captor party. Capture parks the
+        // player party (emptied + deactivated) and makes the hero the captor's prisoner.
+        var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
+        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        DefeatPlayerPartyInBattle(heroId, partyId, captorPartyId);
+
+        AssertCaptivity(Server, heroId, captorPartyId);
+
+        // Act — the captor party is later defeated by another party, which frees its prisoners after the
+        // battle (the scenario that previously left the player captive with a vanished party).
+        ReleasePlayerAfterCaptorDefeated(heroId);
+
+        // Assert — the player is freed on every instance...
+        AssertCaptivity(Server, heroId, null);
+        foreach (var client in Clients)
+        {
+            AssertCaptivity(client, heroId, null);
+        }
+
+        // ...and its party is restored to the map on the authoritative server...
+        AssertPlayerPartyRestored(Server, heroId, partyId);
+
+        // ...with the released hero re-added to the party roster on every client too. The release re-adds the
+        // hero on the server (AddElementToMemberRoster); without that replicating, the freed party shows 0
+        // troops on the client.
+        foreach (var client in Clients)
+        {
+            AssertHeroInPartyRoster(client, heroId, partyId);
         }
     }
 

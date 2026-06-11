@@ -28,7 +28,6 @@ namespace GameInterface.Tests.Bootstrap.Modules
             builder.RegisterInstance(new Mock<INetwork>().Object).As<INetwork>();
             builder.RegisterInstance(new Mock<IDynamicSyncPatchCollector>().Object).As<IDynamicSyncPatchCollector>();
             builder.RegisterInstance(new Mock<ISerializableTypeMapper>().Object).As<ISerializableTypeMapper>();
-            builder.RegisterInstance(new Mock<ISerializableTypeMapper>().Object).As<ISerializableTypeMapper>();
             builder.RegisterInstance(new Mock<IControllerIdProvider>().Object).As<IControllerIdProvider>();
             builder.RegisterModule<RegistryModule>();
         }

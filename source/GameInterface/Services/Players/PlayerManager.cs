@@ -25,6 +25,13 @@ public interface IPlayerManager
     /// <returns>if the player was added to the registry</returns>
     bool AddPlayer(Player player);
     bool TryGetPlayer(string controllerId, out Player player);
+
+    /// <summary>
+    /// Checks whether the given game object (hero, party, clan) belongs to a registered player.
+    /// </summary>
+    /// <param name="obj">The game object to look up</param>
+    /// <returns>true if the object is player controlled</returns>
+    bool Contains(object obj);
 }
 
 /// <inheritdoc cref="IPlayerManager"/>
@@ -61,6 +68,10 @@ public class PlayerManager : IPlayerManager
 
     private void AddPlayerObject<T>(string controllerId, string networkId)
     {
+        // Not every player has every object (e.g. no clan yet)
+        if (string.IsNullOrEmpty(networkId))
+            return;
+
         if (!objectManager.TryGetObjectWithLogging<T>(networkId, out var obj))
             return;
 
@@ -79,6 +90,12 @@ public class PlayerManager : IPlayerManager
         player = _players.SingleOrDefault(player => player.ControllerId == controllerId);
 
         return player != null;
+    }
+
+    /// <inheritdoc cref="IPlayerManager.Contains(object)"/>
+    public bool Contains(object obj)
+    {
+        return obj != null && PlayerObjects.TryGetValue(obj, out _);
     }
 
     public static bool TryGetControlledObjectInfo(object obj, out ControlledObjectInfo info)

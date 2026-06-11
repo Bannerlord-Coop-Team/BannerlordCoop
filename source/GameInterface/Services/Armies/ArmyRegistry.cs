@@ -1,8 +1,11 @@
-﻿using GameInterface.Registry;
+﻿using Common;
+using Common.Util;
+using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
+using Serilog.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -48,9 +51,23 @@ internal class ArmyRegistry : AutoRegistryBase<Army>
     {
         AccessTools.Field(typeof(Army), nameof(Army._parties)).SetValue(obj, new MBList<MobileParty>());
     }
-
+    // DisperseInternal doesnt work since  it accesses LeaderParty.Position, tick events, and
+    // CampaignEventDispatcher which arent initialized on client objects (SkipConstructor).
+    // Just clean up the fields directly.
     public override void OnClientDestroyed(Army obj, string id)
     {
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            using (new AllowedThread())
+            {
+                foreach (var party in obj._parties)
+                {
+                    party.AttachedTo = null;
+                    party._army = null;
+                }
+                obj._parties.Clear();
+            }
+        });
     }
 
     public override void OnServerCreated(Army obj, string id)

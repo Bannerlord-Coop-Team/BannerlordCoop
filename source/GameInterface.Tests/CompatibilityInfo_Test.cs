@@ -33,7 +33,7 @@ namespace GameInterface.Tests
             };
         }
     }
-    
+
     public class TestModuleProvider2 : IModuleInfoProvider
     {
         public static ModuleInfo GameModule { get; private set; }
