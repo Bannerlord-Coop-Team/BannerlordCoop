@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Messages;
 using Common.PacketHandlers;
 using Common.Serialization;
 using Coop.Core.Common.Network;
