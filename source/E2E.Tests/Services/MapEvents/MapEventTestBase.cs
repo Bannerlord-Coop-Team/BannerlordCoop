@@ -465,6 +465,25 @@ public abstract class MapEventTestBase : IDisposable
         });
     }
 
+    /// <summary>
+    /// Asserts the released hero <paramref name="heroId"/> is back in its party <paramref name="partyId"/>'s
+    /// member roster on the given <paramref name="instance"/> (party activation is not asserted, so this is
+    /// safe to use on clients where <see cref="MobileParty.IsActive"/> is not synced). This is the symptom of
+    /// the "released party has 0 troops" bug — the server re-adds the hero and that add must replicate.
+    /// </summary>
+    protected void AssertHeroInPartyRoster(EnvironmentInstance instance, string heroId, string partyId)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+
+            Assert.True(
+                party.MemberRoster.Contains(hero.CharacterObject),
+                $"Released hero {heroId} should be back in party {partyId} on {instance.GetType().Name} (count={party.MemberRoster.TotalManCount})");
+        });
+    }
+
     // ------------------------------------------------------------------
     // PlayerEncounter
     // ------------------------------------------------------------------
