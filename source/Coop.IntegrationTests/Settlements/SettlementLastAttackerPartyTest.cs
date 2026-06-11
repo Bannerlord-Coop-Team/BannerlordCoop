@@ -1,8 +1,10 @@
-﻿using Coop.Core.Server.Services.Settlements.Messages;
+using Coop.Core.Server.Services.Settlements.Messages;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Settlements.Messages;
 
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 namespace Coop.IntegrationTests.Settlements;
 
 /// <summary>
@@ -15,7 +17,19 @@ public class SettlementLastAttackerPartyTest
     [Fact]
     public void ServerLastAttackerPartyChanged_Publishes_AllClients()
     {
-        var triggerMessage = new SettlementChangedLastAttackerParty();
+        var settlement = TestEnvironment.Server.CreateRegisteredObject<Settlement>("settlement1");
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.CreateRegisteredObject<Settlement>("settlement1");
+        }
+
+        var attackerParty = TestEnvironment.Server.CreateRegisteredObject<MobileParty>("attackerParty1");
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.CreateRegisteredObject<MobileParty>("attackerParty1");
+        }
+
+        var triggerMessage = new SettlementChangedLastAttackerParty(settlement, attackerParty);
 
         var server = TestEnvironment.Server;
 

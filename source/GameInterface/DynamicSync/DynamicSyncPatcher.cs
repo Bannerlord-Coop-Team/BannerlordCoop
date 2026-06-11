@@ -56,17 +56,12 @@ public class DynamicSyncPatcher
 
     public void PatchAll()
     {
-        if (DynamicSyncConfiguration.Enabled)
-        { 
-            if (Assembly == null)
-                Assembly = dynamicSyncBuilder.Build();
+        if (!DynamicSyncConfiguration.Enabled) return;
 
-            harmony.PatchAllUncategorized(Assembly);
-            BindHandlers(Assembly);
-        }
-        else
-        {
-            BindHandlers(Assembly.GetAssembly(typeof(DynamicSyncPatcher)));
-        }
+        if (Assembly == null)
+            Assembly = dynamicSyncBuilder.Build();
+
+        harmony.PatchAllUncategorized(Assembly);
+        BindHandlers(Assembly);
     }
 }
