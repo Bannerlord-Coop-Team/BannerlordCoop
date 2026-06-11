@@ -33,6 +33,12 @@
     <None Remove="Services\Parties\**" />
   </ItemGroup>
   <ItemGroup>
+	<AssemblyAttribute Include="Xunit.CollectionBehaviorAttribute">
+	  <_Parameter1>DisableTestParallelization = true</_Parameter1>
+	  <_Parameter1_IsLiteral>true</_Parameter1_IsLiteral>
+	</AssemblyAttribute>
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Autofac" Version="8.2.0" />
     <PackageReference Include="Krafs.Publicizer" Version="2.3.0">
       <PrivateAssets>all</PrivateAssets>

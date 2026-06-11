@@ -1,7 +1,9 @@
+using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Util;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.Library;
@@ -44,6 +46,62 @@ public class PartyDestructionTests : IDisposable
         {
             Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             party.RemoveParty();
+        });
+
+        // Assert
+        Assert.False(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var _));
+
+        foreach (var client in TestEnvironment.Clients)
+        {
+            Assert.False(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var _));
+        }
+    }
+
+    [Fact]
+    public void ServerDestroyPartyWithNullDestroyer_SyncAllClients()
+    {
+        // Arrange
+        var server = TestEnvironment.Server;
+
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        // Act
+        // Vanilla passes a null destroyer for despawn-style destructions (e.g. patrol culling).
+        server.Call(() =>
+        {
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            DestroyPartyAction.Apply(null, party);
+        });
+
+        // Assert
+        Assert.False(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var _));
+
+        foreach (var client in TestEnvironment.Clients)
+        {
+            Assert.False(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var _));
+        }
+    }
+
+    [Fact]
+    public void ServerNestedDestroyParty_SyncAllClients()
+    {
+        // Arrange
+        var server = TestEnvironment.Server;
+
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        // Act
+        // A destroy can run as a vanilla side effect nested inside another replicated action,
+        // where patches are skipped via AllowedThread (e.g. a settlement ownership change culling
+        // its patrol). It must still replicate to clients.
+        server.Call(() =>
+        {
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+
+            using (new AllowedThread())
+            {
+                DestroyPartyAction.Apply(null, party);
+            }
         });
 
         // Assert
