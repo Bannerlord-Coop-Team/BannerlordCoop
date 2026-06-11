@@ -92,6 +92,12 @@ internal class PlayerStartCaptivityPatches
                 continue;
             }
 
+            // OnBattleWon commits the results twice on the server (the coop OnBattleWon prefix, then native
+            // OnBattleWon for a non-player map event), so this prefix can run twice for the same battle. Skip
+            // a hero already taken prisoner on the first pass to avoid a duplicate capture.
+            if (playerHero.IsPrisoner)
+                continue;
+
             PartyBase captorParty = winnerParties.WhereQ((MapEventParty x) => x.Party.MemberRoster.TotalManCount > 0).MaxBy((MapEventParty x) => x.ContributionToBattle).Party;
             if (captorParty.IsMobile && (captorParty.MobileParty.IsMilitia || captorParty.MobileParty.IsGarrison))
             {

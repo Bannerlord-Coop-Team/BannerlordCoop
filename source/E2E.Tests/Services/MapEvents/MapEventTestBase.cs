@@ -359,6 +359,67 @@ public abstract class MapEventTestBase : IDisposable
     }
 
     /// <summary>
+    /// Simulates the player losing a battle through the <em>real</em> result path: a client resolves the
+    /// battle and sets <see cref="MapEvent.BattleState"/> to a victory for the captor's side, which syncs to
+    /// the server (<c>MapEventHandler.Handle_NetworkChangeBattleState</c>) and there runs
+    /// <c>OnBattleWon</c> → <c>CalculateAndCommitMapEventResults</c> → <c>CaptureDefeatedPartyMembers</c> →
+    /// the coop capture. This is the route the live game uses (unlike <see cref="DefeatPlayerPartyInBattle"/>,
+    /// which calls <c>CaptureDefeatedPartyMembers</c> directly); it specifically guards against the server
+    /// applying the battle state inside an <c>AllowedThread</c>, which would bypass the coop capture/sync.
+    /// </summary>
+    /// <remarks>
+    /// The captor is the attacker (winner) and the player party the defender (loser). The loot/result-commit
+    /// steps of <c>CalculateAndCommitMapEventResults</c> need a live campaign world, so they are disabled —
+    /// only the capture step is exercised.
+    /// </remarks>
+    protected void DefeatPlayerByBattleStateSync(string playerHeroId, string playerPartyId, string captorPartyId)
+    {
+        string? mapEventId = null;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerPartyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(captorPartyId, out var captorParty));
+
+            using (new AllowedThread())
+            {
+                playerParty.MemberRoster.AddToCounts(playerHero.CharacterObject, 1);
+                playerHero.PartyBelongedTo = playerParty;
+            }
+
+            // attacker = captor (winner), defender = player party (loser). Construction replicates the
+            // MapEvent (and its sides) to the clients, so the client below can resolve and finish it.
+            var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
+            mapEvent.MapEventVisual = MockMapEventVisual();
+            mapEvent.Initialize(captorParty.Party, playerParty.Party);
+
+            Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
+        }, MapEventDisabledMethods);
+
+        Assert.NotNull(mapEventId);
+
+        var disabledMethods = MapEventDisabledMethods
+            .Append(AccessTools.Method(typeof(DefaultBattleRewardModel), nameof(DefaultBattleRewardModel.GetCaptureMemberChancesForWinnerParties)))
+            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyCasualties"))
+            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyItems"))
+            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyPrisoners"))
+            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyShips"))
+            .Append(AccessTools.Method(typeof(MapEvent), "CalculateMapEventResults"))
+            .Append(AccessTools.Method(typeof(MapEvent), "CommitCalculatedMapEventResults"))
+            .ToList();
+
+        // The client that fought the battle commits the result. Setting BattleState publishes the change,
+        // which the server applies authoritatively — capturing the defeated player there.
+        var client = Clients.First();
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out var clientMapEvent));
+            clientMapEvent.BattleState = BattleState.AttackerVictory;
+        }, disabledMethods);
+    }
+
+    /// <summary>
     /// Frees the player hero the way native does when its captor party is defeated in battle:
     /// <see cref="MapEvent.LootDefeatedPartyPrisoners"/> calls
     /// <see cref="EndCaptivityAction.ApplyByReleasedAfterBattle"/> for each freed prisoner. Invoking that

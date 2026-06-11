@@ -108,6 +108,33 @@ public class MapEventEnvironmentTests : MapEventTestBase
     }
 
     [Fact]
+    public void PlayerLosesBattle_CaptureSyncs_ViaBattleStateResult()
+    {
+        // Arrange
+        var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
+        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        // Act — the player loses the battle and the result is committed the way the live game does it: a
+        // client sets the winning BattleState, which the server applies authoritatively and captures there.
+        DefeatPlayerByBattleStateSync(heroId, partyId, captorPartyId);
+
+        // Assert — the capture replicated to every instance (the bug: under AllowedThread the server captured
+        // natively without replication, so clients saw no capture and the party was never parked).
+        AssertCaptivity(Server, heroId, captorPartyId);
+        foreach (var client in Clients)
+        {
+            AssertCaptivity(client, heroId, captorPartyId);
+        }
+
+        // ...and the captured player party was parked (deactivated) on the server.
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.False(party.IsActive, "Captured player party should be deactivated on the server");
+        });
+    }
+
+    [Fact]
     public void CaptorDefeated_ReleasesPlayer_AndRestoresParty()
     {
         // Arrange — the player loses a battle and is taken prisoner by the captor party. Capture parks the
