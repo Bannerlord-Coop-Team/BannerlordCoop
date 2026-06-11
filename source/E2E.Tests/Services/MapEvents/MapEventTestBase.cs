@@ -235,7 +235,7 @@ public abstract class MapEventTestBase : IDisposable
             instance.Call(() =>
             {
                 var registry = instance.Resolve<IPlayerManager>();
-                registry.AddPlayer(new Player(controllerId, heroId, partyId, "MyClanId"));
+                registry.AddPlayer(new Player(controllerId, heroId, partyId, "MyClanId", "MyCharacterId"));
 
                 Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
                 Assert.True(registry.TryGetPlayer(controllerId, out var _));
