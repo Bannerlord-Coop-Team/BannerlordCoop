@@ -1,5 +1,4 @@
 ﻿using HarmonyLib;
-using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Hideouts.Patches.Disable

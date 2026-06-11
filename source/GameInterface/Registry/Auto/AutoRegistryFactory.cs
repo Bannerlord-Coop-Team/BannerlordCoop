@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Common.Serialization;
-using GameInterface.AutoSync;
+using GameInterface.DynamicSync;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using System;
@@ -25,7 +25,7 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
     IRegistryCollection Collection { get; }
     IMessageBroker MessageBroker { get; }
     INetwork Network { get; }
-    IAutoSyncPatchCollector SyncPatchCollector { get; }
+    IDynamicSyncPatchCollector PatchCollector { get; }
     IObjectManager ObjectManager { get; }
     ISerializableTypeMapper TypeMapper { get; }
     List<IDisposable> Disposables { get; } = new List<IDisposable>();
@@ -36,14 +36,14 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
         IRegistryCollection collection,
         IMessageBroker messageBroker,
         INetwork network,
-        IAutoSyncPatchCollector syncPatchCollector,
+        IDynamicSyncPatchCollector syncPatchCollector,
         IObjectManager objectManager,
         ISerializableTypeMapper typeMapper)
     {
         Collection = collection;
         MessageBroker = messageBroker;
         Network = network;
-        SyncPatchCollector = syncPatchCollector;
+        PatchCollector = syncPatchCollector;
         ObjectManager = objectManager;
         TypeMapper = typeMapper;
     }
@@ -73,14 +73,14 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
         {
             var patch = AccessTools.Method(typeof(LifetimePatches<T>), nameof(LifetimePatches<T>.CreatePrefix));
 
-            SyncPatchCollector.AddPrefix(ctor, patch);
+            PatchCollector.AddPrefix(ctor, patch);
         }
 
         foreach (var destroy in autoRegistry.DestroyMethods)
         {
             var patch = AccessTools.Method(typeof(LifetimePatches<T>), nameof(LifetimePatches<T>.DestroyPostfix));
 
-            SyncPatchCollector.AddPostfix(destroy, patch);
+            PatchCollector.AddPostfix(destroy, patch);
         }
 
         RegisterAllCallbacks.Add(autoRegistry.RegisterAllObjects);

@@ -1,6 +1,8 @@
 ﻿using Common;
+using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
@@ -9,5 +11,11 @@ namespace GameInterface.Services.MobileParties.Patches;
 internal class DisableRecruitmentCampaignBehavior
 {
     [HarmonyPatch(nameof(RecruitmentCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => ModInformation.IsServer;
+    [HarmonyPrefix]
+    static bool PrefixRegisterEvents() => ModInformation.IsServer;
+
+    [HarmonyPatch(nameof(RecruitmentCampaignBehavior.CheckRecruiting))]
+    [HarmonyPrefix]
+    /// Only allow recruiting for AI parties
+    static bool PrefixCheckRecruiting(MobileParty mobileParty) => !mobileParty.IsPlayerParty();
 }

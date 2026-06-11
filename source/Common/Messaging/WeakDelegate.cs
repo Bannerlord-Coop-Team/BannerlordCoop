@@ -12,6 +12,8 @@ namespace Common.Messaging
         public bool IsAlive => reference.IsAlive;
         public object Instance => reference.Target;
 
+        public MethodInfo Method => method;
+
         private WeakReference reference;
         private MethodInfo method;
 

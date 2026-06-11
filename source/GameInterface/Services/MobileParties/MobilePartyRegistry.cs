@@ -1,4 +1,4 @@
-﻿using Autofac.Features.OwnedInstances;
+﻿using Common;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Registry.Auto;
@@ -9,11 +9,9 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.ViewModelCollection.Party;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.MobileParties;
@@ -25,12 +23,10 @@ internal class MobilePartyRegistry : AutoRegistryBase<MobileParty>
 {
     public override bool Debug => true;
 
-    private readonly IControlledEntityRegistry controlledEntityRegistry;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IMessageBroker messageBroker;
 
     public MobilePartyRegistry(
-        IControlledEntityRegistry controlledEntityRegistry,
         IControllerIdProvider controllerIdProvider,
         IMessageBroker messageBroker,
         ILogger logger,
@@ -38,19 +34,17 @@ internal class MobilePartyRegistry : AutoRegistryBase<MobileParty>
         IObjectManager objectManager)
         : base(logger, autoRegistryFactory, objectManager)
     {
-        this.controlledEntityRegistry = controlledEntityRegistry;
         this.controllerIdProvider = controllerIdProvider;
         this.messageBroker = messageBroker;
     }
 
-    public override IEnumerable<MethodBase> Constructors => new MethodBase[] {
-        AccessTools.Constructor(typeof(MobileParty), new Type[0])
-    };
+    public override IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(MobileParty));
 
-    public override IEnumerable<MethodBase> DestroyMethods => new MethodBase[]
-    {
-        AccessTools.Method(typeof(MobileParty), nameof(MobileParty.RemoveParty))
-    };
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+    //    new MethodBase[]
+    //{
+    //    AccessTools.Method(typeof(MobileParty), nameof(MobileParty.RemoveParty))
+    //};
 
 
     public override void RegisterAllObjects()
@@ -77,24 +71,46 @@ internal class MobilePartyRegistry : AutoRegistryBase<MobileParty>
 
         MBObjectManager.Instance?.RegisterObjectInternalWithoutTypeId(obj, false, out _);
 
-        Campaign.Current?.CampaignObjectManager?.AddMobileParty(obj);
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            Campaign.Current?.CampaignObjectManager?.AddMobileParty(obj);
+        });
     }
 
     public override void OnClientDestroyed(MobileParty obj, string id)
     {
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            using (new AllowedThread())
+            {
+                try
+                {
+                    Campaign.Current.MobilePartyLocator.RemoveLocatable(obj);
+                    Campaign.Current.VisualTrackerManager.RemoveTrackedObject(obj, true);
+                    CampaignEventDispatcher.Instance.OnPartyRemoved(obj.Party);
+                    Campaign.Current.CampaignObjectManager.RemoveMobileParty(obj);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to remove party");
+                }
+            }
+        });
     }
 
     public override void OnServerCreated(MobileParty obj, string id)
     {
-        controlledEntityRegistry.RegisterAsControlled(controllerIdProvider.ControllerId, id);
     }
 
     public override void OnServerDestroyed(MobileParty obj, string id)
     {
+        obj.MemberRoster.Clear();
+        obj.PrisonRoster.Clear();
+        obj.Party.SetVisualAsDirty();
+
         var message = new InstanceDestroyed<PartyBase>(obj.Party);
         messageBroker.Publish(this, message);
 
-        if (controlledEntityRegistry.TryGetControlledEntity(id, out var controlledEntity))
-            controlledEntityRegistry.RemoveAsControlled(controlledEntity);
+        
     }
 }

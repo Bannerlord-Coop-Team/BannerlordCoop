@@ -1,11 +1,19 @@
-﻿using HarmonyLib;
+﻿using Common;
+using HarmonyLib;
+using System.Collections.Generic;
+using System.Reflection;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
 namespace GameInterface.Services.Villages.Patches;
 
-[HarmonyPatch(typeof(VillageHostileActionCampaignBehavior))]
+[HarmonyPatch]
 internal class DisableVillageHostileActionCampaignBehavior
 {
-    [HarmonyPatch(nameof(VillageHostileActionCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    private static IEnumerable<MethodBase> TargetMethods()
+    {
+        yield return AccessTools.Method(typeof(VillageHostileActionCampaignBehavior), nameof(VillageHostileActionCampaignBehavior.OnItemsLooted));
+        yield return AccessTools.Method(typeof(VillageHostileActionCampaignBehavior), nameof(VillageHostileActionCampaignBehavior.OnMapEventEnded));
+    }
+
+    static bool Prefix() => ModInformation.IsServer;
 }

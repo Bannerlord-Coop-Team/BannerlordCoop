@@ -9,9 +9,9 @@ public readonly struct OnTroopKilledAttempted : IEvent
     public readonly MapEventParty MapEventParty;
     public readonly int TroopSeed;
 
-    public OnTroopKilledAttempted(MapEventParty mapEventParty, int troop)
+    public OnTroopKilledAttempted(MapEventParty mapEventParty, int troopSeed)
     {
         MapEventParty = mapEventParty;
-        TroopSeed = troop;
+        TroopSeed = troopSeed;
     }
 }

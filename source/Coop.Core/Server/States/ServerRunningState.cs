@@ -3,6 +3,7 @@ using Common.Network;
 using Coop.Core.Common.Services.Connection.Messages;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.UI.Interfaces;
 
 namespace Coop.Core.Server.States;
 
@@ -14,10 +15,14 @@ public class ServerRunningState : ServerStateBase
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
 
-    public ServerRunningState(IServerLogic logic, IMessageBroker messageBroker, INetwork network) : base(logic)
-    {
+    public ServerRunningState(IServerLogic logic, IMessageBroker messageBroker, INetwork network, ILoadingInterface loadingInterface) : base(logic)    {
         this.messageBroker = messageBroker;
         this.network = network;
+
+        // Start server
+        network.Start();
+
+        loadingInterface.HideLoadingScreen();
 
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
     }

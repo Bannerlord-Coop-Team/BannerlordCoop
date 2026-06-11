@@ -2,20 +2,26 @@
 
 namespace GameInterface.Services.Players.Data;
 
-/// <summary>
-/// Holds information about the players.
-/// </summary>
 [ProtoContract(SkipConstructor = true)]
-public record Player
+public class Player
 {
     [ProtoMember(1)]
-    public byte[] HeroData { get; set; }
+    public readonly string ControllerId;
     [ProtoMember(2)]
-    public string HeroStringId { get; set; }
+    public readonly string HeroId;
     [ProtoMember(3)]
-    public string PartyStringId { get; set; }
+    public readonly string MobilePartyId;
     [ProtoMember(4)]
-    public string CharacterObjectStringId { get; set; }
+    public readonly string ClanId;
     [ProtoMember(5)]
-    public string ClanStringId { get; set; }
+    public readonly string CharacterObjectId;
+
+    public Player(string controllerId, string heroId, string mobilePartyId, string clanId, string characterObjectId)
+    {
+        ControllerId = controllerId;
+        HeroId = heroId;
+        MobilePartyId = mobilePartyId;
+        ClanId = clanId;
+        CharacterObjectId = characterObjectId;
+    }
 }

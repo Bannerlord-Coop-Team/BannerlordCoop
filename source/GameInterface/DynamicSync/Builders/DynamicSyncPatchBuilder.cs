@@ -7,7 +7,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using TaleWorlds.Library;
 
 namespace GameInterface.DynamicSync.Builders
 {
@@ -25,6 +24,7 @@ namespace GameInterface.DynamicSync.Builders
         private readonly DynamicSyncFieldQueueBuilder dynamicSyncFieldQueueBuilder;
         private readonly DynamicSyncConstantsBuilder dynamicSyncConstantsBuilder;
         private readonly DynamicSyncPropertyListBuilder dynamicSyncPropertyListBuilder;
+        private readonly DynamicSyncFieldPropertyOwnerBuilder dynamicSyncFieldPropertyOwnerBuilder;
 
         public DynamicSyncPatchBuilder(IObjectManager objectManager,
             DynamicSyncPropertyBuilder dynamicSyncPropertyBuilder,
@@ -37,7 +37,8 @@ namespace GameInterface.DynamicSync.Builders
             DynamicSyncFieldListBuilder dynamicSyncFieldListBuilder,
             DynamicSyncPropertyQueueBuilder dynamicSyncPropertyQueueBuilder,
             DynamicSyncFieldQueueBuilder dynamicSyncFieldQueueBuilder,
-            DynamicSyncConstantsBuilder dynamicSyncConstantsBuilder
+            DynamicSyncConstantsBuilder dynamicSyncConstantsBuilder,
+            DynamicSyncFieldPropertyOwnerBuilder dynamicSyncFieldPropertyOwnerBuilder
             )
         {
             this.objectManager = objectManager;
@@ -52,8 +53,8 @@ namespace GameInterface.DynamicSync.Builders
             this.dynamicSyncPropertyQueueBuilder = dynamicSyncPropertyQueueBuilder;
             this.dynamicSyncFieldQueueBuilder = dynamicSyncFieldQueueBuilder;
             this.dynamicSyncConstantsBuilder = dynamicSyncConstantsBuilder;
+            this.dynamicSyncFieldPropertyOwnerBuilder = dynamicSyncFieldPropertyOwnerBuilder;
         }
-
         public List<SyntaxTree> Build(Type declaringType, DynamicSyncRegistryItem dynamicRegistryItem)
         {
             List<string> prefixes = new List<string>();
@@ -107,9 +108,9 @@ namespace GameInterface.DynamicSync.Builders
                 {
                     usings.Add(DynamicSyncUtils.GetNamespace(propertyInfo.PropertyType.GetGenericArguments()[0]));
                     prefixes.Add(dynamicSyncPropertyQueueBuilder.GetPrefix(propertyItem));
-                    transpilers.Add(dynamicSyncPropertyQueueBuilder.GetTranspiler(propertyItem));
+                    transpilers.AddRange(dynamicSyncPropertyQueueBuilder.GetTranspilers(propertyItem));
                     messages.AddRange(dynamicSyncPropertyQueueBuilder.GetMessages(propertyItem));
-                    messageHandlers.Add(dynamicSyncPropertyQueueBuilder.GetSubscription(propertyItem));
+                    messageHandlers.AddRange(dynamicSyncPropertyQueueBuilder.GetSubscriptions(propertyItem));
                 }
             }
 
@@ -149,9 +150,16 @@ namespace GameInterface.DynamicSync.Builders
                 else if (fieldInfo.FieldType.Name.Contains("Queue"))
                 {
                     usings.Add(DynamicSyncUtils.GetNamespace(fieldInfo.FieldType.GetGenericArguments()[0]));
-                    transpilers.Add(dynamicSyncFieldQueueBuilder.GetTranspiler(fieldItem));
+                    transpilers.AddRange(dynamicSyncFieldQueueBuilder.GetTranspilers(fieldItem));
                     messages.AddRange(dynamicSyncFieldQueueBuilder.GetMessages(fieldItem));
-                    messageHandlers.Add(dynamicSyncFieldQueueBuilder.GetSubscription(fieldItem));
+                    messageHandlers.AddRange(dynamicSyncFieldQueueBuilder.GetSubscriptions(fieldItem));
+                }
+                else if (fieldInfo.FieldType.Name.Contains("PropertyOwner"))
+                {
+                    usings.Add(DynamicSyncUtils.GetNamespace(fieldInfo.FieldType.GetGenericArguments()[0]));
+                    transpilers.Add(dynamicSyncFieldPropertyOwnerBuilder.GetTranspiler(fieldItem));
+                    messages.AddRange(dynamicSyncFieldPropertyOwnerBuilder.GetMessages(fieldItem));
+                    messageHandlers.Add(dynamicSyncFieldPropertyOwnerBuilder.GetSubscription(fieldItem));
                 }
             }
 

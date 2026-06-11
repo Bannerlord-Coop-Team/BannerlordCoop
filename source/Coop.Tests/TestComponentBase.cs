@@ -5,15 +5,25 @@ using Common.Serialization;
 using Common.Tests.Utils;
 using Coop.Core;
 using Coop.Tests.Mocks;
+using GameInterface.CoopSessionData;
+using GameInterface.DynamicSync;
 using GameInterface.Registry;
+using GameInterface.Services.Entity;
+using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using GameInterface.Services.Time.Interfaces;
+using GameInterface.Services.TroopRosters.Interfaces;
+using GameInterface.Services.UI.Interfaces;
 using Moq;
 using Serilog;
 using System.Collections.Generic;
 using Xunit.Abstractions;
+using IGameInterface = GameInterface.IGameInterface;
 
 namespace Coop.Tests;
 
@@ -24,10 +34,6 @@ internal abstract class TestComponentBase
     public TestMessageBroker TestMessageBroker { get; protected set; }
     public TestNetwork TestNetwork { get; protected set; }
     public IContainer Container { get; protected set; }
-
-    public readonly Mock<IHeroInterface> HeroInterfaceMock = new();
-
-    public readonly Mock<IModuleInfoProvider> ModuleInfoProviderMock = new();
 
     protected TestComponentBase(ITestOutputHelper output)
     {
@@ -57,9 +63,6 @@ internal abstract class TestComponentBase
 
     private ContainerBuilder RegisterCommonTypes(ContainerBuilder builder)
     {
-        var moduleInfoProviderMock = new Mock<IModuleInfoProvider>();
-        moduleInfoProviderMock.Setup(x => x.GetModuleInfos()).Returns(new List<ModuleInfo>());
-        
         builder.RegisterType<SerializableTypeMapper>().As<ISerializableTypeMapper>().InstancePerLifetimeScope();
         builder.RegisterType<ProtoBufSerializer>().As<ICommonSerializer>().InstancePerLifetimeScope();
         builder.RegisterType<TestMessageBroker>().AsSelf().As<IMessageBroker>().InstancePerLifetimeScope();
@@ -70,19 +73,30 @@ internal abstract class TestComponentBase
 
         builder.RegisterType<ObjectManager>().As<IObjectManager>().InstancePerLifetimeScope();
         builder.RegisterType<RegistryCollection>().As<IRegistryCollection>().InstancePerLifetimeScope();
-        builder.RegisterInstance(new Mock<ILogger>().Object).As<ILogger>().SingleInstance();
 
-        RegisterMocks(builder);
+        RegisterMock<ILogger>(builder);
+        RegisterMock<IGameInterface>(builder);
+        RegisterMock<IDynamicSyncPatchCollector>(builder);
+        RegisterMock<IHeroInterface>(builder);
+        RegisterMock<IModuleInfoProvider>(builder);
+        RegisterMock<IRegistryManager>(builder);
+        RegisterMock<IPlayerManager>(builder);
+        RegisterMock<ITimeControlInterface>(builder);
+        RegisterMock<ITroopRosterInterface>(builder);
+        RegisterMock<IMapTimeTrackerInterface>(builder);
+        RegisterMock<ILoadingInterface>(builder);
+        RegisterMock<ICoopSessionProvider>(builder);
+        RegisterMock<ITroopRosterInterface>(builder);
+        RegisterMock<IMobilePartyInterface>(builder);
 
         return builder;
     }
 
-    private ContainerBuilder RegisterMocks(ContainerBuilder builder)
+    private void RegisterMock<T>(ContainerBuilder builder) where T : class
     {
-        builder.RegisterInstance(ModuleInfoProviderMock.Object).SingleInstance();
-        builder.RegisterInstance(HeroInterfaceMock.Object).SingleInstance();
-
-        return builder;
+        var mock = new Mock<T>();
+        builder.RegisterInstance(mock).AsSelf().SingleInstance();
+        builder.RegisterInstance(mock.Object).As<T>().SingleInstance();
     }
 
     private IContainer SetupContainerProvider(ContainerBuilder builder)

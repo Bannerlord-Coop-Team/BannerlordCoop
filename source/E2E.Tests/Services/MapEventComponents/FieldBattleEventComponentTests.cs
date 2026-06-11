@@ -14,7 +14,7 @@ public class FieldBattleEventComponentTests : SyncTestBase
     }
 
     [Fact]
-    public void Server_MapEventParty_Properties()
+    public void Server_FieldBattleEventComponent_Properties()
     {
         string? componentId = null;
         TestEnvironment.Server.Call(() =>

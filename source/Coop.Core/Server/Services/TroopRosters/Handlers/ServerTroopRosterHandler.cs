@@ -2,9 +2,9 @@
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.TroopRosters.Messages;
-using Coop.Core.Server.Services.TroopRosters.Messages;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.TroopRosters.Messages;
+using GameInterface.Services.TroopRosters.Interfaces;
+using GameInterface.Services.UI.Notifications.Messages;
 using LiteNetLib;
 using Serilog;
 
@@ -15,39 +15,27 @@ internal class ServerTroopRosterHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
+    private readonly ITroopRosterInterface troopRosterInterface;
 
-    public ServerTroopRosterHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
+    public ServerTroopRosterHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager, ITroopRosterInterface troopRosterInterface)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
-        messageBroker.Subscribe<TroopRosterAddToCountsChanged>(HandleAddToCounts);
+        this.troopRosterInterface = troopRosterInterface;
+
         messageBroker.Subscribe<ClientRequestRecruitment>(HandleOnRecruitmentDone);
+    }
+
+    public void Dispose()
+    {
+        messageBroker.Unsubscribe<ClientRequestRecruitment>(HandleOnRecruitmentDone);
     }
 
     private void HandleOnRecruitmentDone(MessagePayload<ClientRequestRecruitment> payload)
     {
-        var obj = payload.What;
-        var message = new RecruitTroops(obj.MobilePartyId, obj.TroopsInCart);
-        messageBroker.Publish(this, message);
-    }
+        troopRosterInterface.HandleOnRecruitmentDone(payload.What.MobilePartyId, payload.What.TroopsInCart, out var changedGold);
 
-    private void HandleAddToCounts(MessagePayload<TroopRosterAddToCountsChanged> payload)
-    {
-        var obj = payload.What;
-
-        if (!objectManager.TryGetIdWithLogging(obj.MobileParty, out var mobilePartyId)) return;
-        if (!objectManager.TryGetIdWithLogging(obj.CharacterObject, out var characterObjectId)) return;
-
-        Logger.Debug("[Server] Sending troop roster add to counts change for MobileParty {MobilePartyId}, CharacterObject {CharacterObjectId}, Count {Count}, InsertAtFront {InsertAtFront}, WoundedCount {WoundedCount}, XpChanged {XpChanged}, RemoveDepleted {RemoveDepleted}, Index {Index}",
-            mobilePartyId, characterObjectId, obj.Count, obj.InsertAtFront, obj.WoundedCount, obj.XpChanged, obj.RemoveDepleted, obj.Index);
-
-        var message = new NetworkChangeTroopRosterAddtoCounts(mobilePartyId, characterObjectId, obj.Count, obj.InsertAtFront, obj.WoundedCount, obj.XpChanged, obj.RemoveDepleted, obj.Index);
-        network.SendAll(message);
-    }
-    public void Dispose()
-    {
-        messageBroker.Unsubscribe<TroopRosterAddToCountsChanged>(HandleAddToCounts);
-        messageBroker.Unsubscribe<ClientRequestRecruitment>(HandleOnRecruitmentDone);
+        network.Send(payload.Who as NetPeer, new NotifyGoldChange(changedGold));
     }
 }

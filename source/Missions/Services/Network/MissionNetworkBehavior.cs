@@ -1,66 +1,82 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
+using Common.Network;
+using Common.PacketHandlers;
+using Missions.Services.Agents.Handlers;
 using Missions.Services.Agents.Messages;
+using Serilog;
 using System;
-using System.Threading.Tasks;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Network
 {
-    public class MissionNetworkBehavior : MissionBehavior
+    public class CoopMissionNetworkBehavior : MissionBehavior, IDisposable
     {
+        private static readonly ILogger Logger = LogManager.GetLogger<CoopMissionNetworkBehavior>();
+
         public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
+        private readonly LiteNetP2PClient client;
 
-        private LiteNetP2PClient m_Client;
-        private MissionClient missionClient;
+        private readonly IMessageBroker messageBroker;
+        private readonly INetworkAgentRegistry agentRegistry;
 
-        private readonly TimeSpan WaitForConnectionsTime = TimeSpan.FromSeconds(1);
+        private readonly IDisposable[] disposables;
 
-        private readonly IMessageBroker _messageBroker;
-
-        public MissionNetworkBehavior(LiteNetP2PClient client, IMessageBroker messageBroker)
+        public CoopMissionNetworkBehavior(
+            LiteNetP2PClient client,
+            IMessageBroker messageBroker,
+            INetworkAgentRegistry agentRegistry,
+            IAgentMovementHandler movementHandler,
+            IMessagePacketHandler messagePacketHandler)
         {
-            m_Client = client;
-            _messageBroker = messageBroker;
+            this.client = client;
+            this.messageBroker = messageBroker;
+            this.agentRegistry = agentRegistry;
 
-            // TODO find callback for loading mission
-            Task.Factory.StartNew(async () =>
+            disposables = new IDisposable[]
             {
-                while (Mission == null || Mission.IsLoadingFinished == false)
-                {
-                    await Task.Delay(100);
-                }
+                client,
+                movementHandler,
+                messagePacketHandler
+            };
+        }
 
-                string sceneName = Mission.SceneName;
-                m_Client.NatPunch(sceneName);
+        ~CoopMissionNetworkBehavior() => Dispose();
 
-                missionClient = new MissionClient(m_Client, _messageBroker);
-                await Task.Delay(WaitForConnectionsTime);
-            });
+        public void Dispose()
+        {
+            agentRegistry.Clear();
+
+            foreach (var disposable in disposables)
+            {
+                disposable.Dispose();
+            }
+        }
+
+        public override void OnEndMission()
+        {
+            base.OnEndMission();
+            MBGameManager.EndGame();
+            Dispose();
         }
 
         public override void OnRemoveBehavior()
         {
             base.OnRemoveBehavior();
+            Dispose();
+        }
 
-            missionClient.Dispose();
-            m_Client.Stop();
-            m_Client = null;
-            missionClient = null;
+        public override void OnRenderingStarted()
+        {
+            string sceneName = Mission.SceneName;
+            client.NatPunch(sceneName);
         }
 
         public override void OnAgentDeleted(Agent affectedAgent)
         {
-            _messageBroker.Publish(this, new AgentDeleted(affectedAgent));
-            
+            messageBroker.Publish(this, new AgentDeleted(affectedAgent));
 
             base.OnAgentDeleted(affectedAgent);
-        }
-
-        protected override void OnEndMission()
-        {
-            m_Client.Dispose();
-            MBGameManager.EndGame();
-            base.OnEndMission();
         }
     }
 }

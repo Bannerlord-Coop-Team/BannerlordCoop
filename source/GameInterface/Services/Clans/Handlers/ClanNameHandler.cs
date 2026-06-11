@@ -1,15 +1,16 @@
-﻿using Common;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Clans.Patches;
 using GameInterface.Services.ObjectManager;
+using SandBox.GauntletUI;
 using Serilog;
-using System;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.Library;
 using TaleWorlds.Localization;
+using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.Clans.Handlers
 {
@@ -41,7 +42,6 @@ namespace GameInterface.Services.Clans.Handlers
         private void Handle(MessagePayload<ClanNameChanged> obj)
         {
             var payload = obj.What;
-            bool isServer = ModInformation.IsServer;
             network.SendAll(new NetworkChangeClanName(payload.ClanId, payload.Name, payload.InformalName));
         }
 
@@ -56,6 +56,18 @@ namespace GameInterface.Services.Clans.Handlers
             }
 
             ClanNameChangePatch.RunOriginalChangeClanName(clan, new TextObject(payload.Name), new TextObject(payload.InformalName));
+
+            if (ModInformation.IsServer)
+            {
+                network.SendAll(new NetworkChangeClanName(payload.ClanId, payload.Name, payload.InformalName));
+            }
+
+            if (ScreenManager.TopScreen is GauntletClanScreen clanScreen)
+            {
+                clanScreen._dataSource?.RefreshValues();
+            }
+
+            InformationManager.DisplayMessage(new InformationMessage($"Clan {payload.ClanId} changed name to {payload.Name}"));
         }
     }
 }

@@ -14,6 +14,8 @@ internal class DynamicSyncModule : Module
 {
     protected override void Load(ContainerBuilder builder)
     {
+        builder.RegisterType<DynamicSyncPatchCollector>().As<IDynamicSyncPatchCollector>().InstancePerLifetimeScope();
+
         builder.RegisterType<DynamicSyncRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<DynamicSyncPatcher>().InstancePerLifetimeScope();
         builder.RegisterType<DynamicSyncBuilder>().InstancePerLifetimeScope();
@@ -30,6 +32,7 @@ internal class DynamicSyncModule : Module
         builder.RegisterType<DynamicSyncPropertyListBuilder>().InstancePerLifetimeScope();
         builder.RegisterType<DynamicSyncPropertyQueueBuilder>().InstancePerLifetimeScope();
         builder.RegisterType<DynamicSyncConstantsBuilder>().InstancePerLifetimeScope();
+        builder.RegisterType<DynamicSyncFieldPropertyOwnerBuilder>().InstancePerLifetimeScope();
         builder.RegisterType<DynamicHandler>().InstancePerLifetimeScope();
 
         foreach (var type in GetDynamicSyncClasses())

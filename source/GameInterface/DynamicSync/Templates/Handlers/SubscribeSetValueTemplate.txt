@@ -6,6 +6,10 @@
 	network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage(instanceId, RawSerializer.Serialize(data.Value)));
 });
 
+{{~ if ReadOnly ~}}
+var {{MemberName}}FieldInfo = AccessTools.Field(typeof({{MemberDeclaringType}}), "{{MemberName}}");
+{{~ end ~}}
+
 SubscribeNetwork<byte[], {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage>((instance, data) => 
 {
 {{~ if Debug ~}}
@@ -13,7 +17,8 @@ SubscribeNetwork<byte[], {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMes
 {{~ end ~}}
 
 {{~ if ReadOnly ~}}
-	DynamicSync.Constants.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, {{DeserializeMethod}}(data.Value, instance.{{MemberName}}));
+	var value = {{DeserializeMethod}}(data.Value);
+	{{MemberName}}FieldInfo.SetValue(instance, value);
 {{~ else ~}}
 	using (new AllowedThread())
 	{

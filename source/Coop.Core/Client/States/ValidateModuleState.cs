@@ -71,7 +71,7 @@ public class ValidateModuleState : ClientStateBase
     {
         if (obj.What.HeroExists)
         {
-            Logic.ControlledHeroId = obj.What.HeroId;
+            Logic.Player = obj.What.Player;
             Logic.LoadSavedData();
         }
         else

@@ -7,7 +7,7 @@ namespace Coop.Core.Server.Services.MobileParties.Messages;
 /// Message from the client requesting a settlement encounter to end
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-internal record NetworkRequestEndSettlementEncounter : ICommand
+internal readonly struct NetworkRequestEndSettlementEncounter : ICommand
 {
     [ProtoMember(1)]
     public string PartyId { get; }

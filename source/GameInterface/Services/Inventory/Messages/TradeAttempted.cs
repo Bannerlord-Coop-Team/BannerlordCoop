@@ -13,7 +13,7 @@ public readonly struct TradeAttempted : IEvent
     public readonly ItemRoster FromRoster;
     public readonly ItemRoster ToRoster;
     public readonly bool IsTrading;
-    public readonly bool IsDonating;
+    public readonly bool CanGainXpFromDiscarding;
     public readonly Hero Hero;
     public readonly int TotalAmount;
     public readonly int MerchantGold;
@@ -22,12 +22,13 @@ public readonly struct TradeAttempted : IEvent
     public readonly SettlementComponent CurrentSettlementComponent;
     public readonly List<(ItemRosterElement, int)> BoughtItems;
     public readonly List<(ItemRosterElement, int)> SoldItems;
+    public readonly TroopRoster TroopRoster;
 
     public TradeAttempted(
         ItemRoster fromRoster,
         ItemRoster toRoster,
         bool isTrading,
-        bool isDonating,
+        bool canGainXpFromDiscarding,
         Hero hero,
         int totalAmount,
         int merchantGold,
@@ -35,12 +36,13 @@ public readonly struct TradeAttempted : IEvent
         MobileParty currentMobileParty,
         SettlementComponent currentSettlementComponent,
         List<(ItemRosterElement, int)> boughtItems,
-        List<(ItemRosterElement, int)> soldItems)
+        List<(ItemRosterElement, int)> soldItems,
+        TroopRoster troopRoster)
     {
         FromRoster = fromRoster;
         ToRoster = toRoster;
         IsTrading = isTrading;
-        IsDonating = isDonating;
+        CanGainXpFromDiscarding = canGainXpFromDiscarding;
         Hero = hero;
         TotalAmount = totalAmount;
         MerchantGold = merchantGold;
@@ -49,5 +51,6 @@ public readonly struct TradeAttempted : IEvent
         CurrentSettlementComponent = currentSettlementComponent;
         BoughtItems = boughtItems;
         SoldItems = soldItems;
+        TroopRoster = troopRoster;
     }
 }

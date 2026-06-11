@@ -24,20 +24,21 @@ internal class PartyIsSpottedServerPatch
 internal class PartyVisibilityOnServerPatch
 {
     [HarmonyPatch(nameof(MobileParty.IsVisible), MethodType.Setter)]
-    private static void Prefix(ref bool value)
+    [HarmonyPrefix]
+    private static void PrefixIsVisible(MobileParty __instance, ref bool value)
+    {
+        if (!(ModInformation.IsServer || Debugger.IsAttached)) return;
+
+        value = __instance.IsActive;
+    }
+
+    [HarmonyPatch(nameof(MobileParty.IsInspected), MethodType.Setter)]
+    [HarmonyPrefix]
+    private static void PrefixIsInspected(ref bool value)
     {
         if (ModInformation.IsServer || Debugger.IsAttached)
         {
             value = true;
-        }
-    }
-
-    [HarmonyPatch(nameof(MobileParty.IsVisible), MethodType.Getter)]
-    private static void Postfix(ref bool __result)
-    {
-        if (ModInformation.IsServer || Debugger.IsAttached)
-        {
-            __result = true;
         }
     }
 }

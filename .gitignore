@@ -537,7 +537,6 @@ MigrationBackup/
 # Backup folder for Package Reference Convert tool in Visual Studio 2017
 
 # End of https://www.gitignore.io/api/csharp,powershell,dotnetcore,visualstudio,visualstudiocode
-deploy/**
 DockerAssembliesTemp/**
 mb2
 mb2/**
@@ -550,3 +549,5 @@ source/.idea
 !*MissionTestMod.csproj.user
 # CodeRush
 /source/.cr/personal
+# ServerHeadless dev scratch helper (machine-specific paths)
+source/ServerHeadless/run.ps1

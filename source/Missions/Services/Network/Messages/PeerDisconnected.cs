@@ -1,13 +1,9 @@
-﻿using LiteNetLib;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Common.Messaging;
+using LiteNetLib;
 
 namespace Missions.Services.Network.Messages
 {
-    public readonly struct PeerDisconnected
+    public readonly struct PeerDisconnected : IEvent
     {
         public NetPeer NetPeer { get; }
         public DisconnectInfo DisconnectInfo { get; }

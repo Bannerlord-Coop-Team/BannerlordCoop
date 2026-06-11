@@ -95,7 +95,4 @@
 	<Publicize Include="TaleWorlds.ObjectSystem" />
 	<Publicize Include="TaleWorlds.SaveSystem" />
 </ItemGroup>
-<ItemGroup>
-  <Folder Include="AutoSync\TestClasses\" />
-</ItemGroup>
 </Project>

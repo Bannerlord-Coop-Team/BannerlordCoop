@@ -33,7 +33,7 @@ namespace Coop.Core.Client.Services.PartyBases.Handlers
 
         public void Handle(MessagePayload<NetworkItemRosterClear> payload)
         {
-            messageBroker.Publish(this, new ClearItemRoster(payload.What.PartyBaseID));
+            messageBroker.Publish(this, new ClearItemRoster(payload.What.ItemRosterId));
         }
 
         public void Dispose()

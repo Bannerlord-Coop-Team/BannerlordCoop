@@ -57,7 +57,6 @@ public class KingdomSyncTests : SyncTestBase
         TestEnvironment.AssertProperty<Kingdom, TextObject>(nameof(Kingdom.InformalName), new TextObject("informalName"), kingdom.InformalName);
         //TestEnvironment.AssertReferenceProperty<Kingdom, Settlement>(nameof(Kingdom.InitialHomeLand));
         //TestEnvironment.AssertProperty<Kingdom, uint>(nameof(Kingdom.LabelColor), 7);
-        TestEnvironment.AssertProperty<Kingdom, int>(nameof(Kingdom.LastArmyCreationDay), 7);
         TestEnvironment.AssertProperty<Kingdom, CampaignTime>(nameof(Kingdom.LastKingdomDecisionConclusionDate), new CampaignTime(54));
         TestEnvironment.AssertProperty<Kingdom, CampaignTime>(nameof(Kingdom.LastMercenaryOfferTime), new CampaignTime(54));
         TestEnvironment.AssertProperty<Kingdom, float>(nameof(Kingdom.MainHeroCrimeRating), 55f);

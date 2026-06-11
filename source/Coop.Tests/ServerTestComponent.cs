@@ -1,5 +1,7 @@
 ﻿using Autofac;
 using Coop.Core.Server;
+using GameInterface.DynamicSync;
+using GameInterface.Registry;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.MobileParties.Interfaces;
@@ -15,8 +17,7 @@ internal class ServerTestComponent : TestComponentBase
     {
         var builder = new ContainerBuilder();
         builder.RegisterModule<ServerModule>();
-        builder.RegisterType<ControlledEntityRegistry>().As<IControlledEntityRegistry>().InstancePerLifetimeScope();
-        builder.RegisterInstance(new Mock<IMobilePartyInterface>().Object).As<IMobilePartyInterface>().SingleInstance();
+        builder.RegisterModule<RegistryModule>();
         Container = BuildContainer(builder);
     }
 }

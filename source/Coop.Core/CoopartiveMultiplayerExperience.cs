@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common;
 using Common.LogicStates;
 using Common.Messaging;
 using Common.Network;
@@ -10,17 +11,15 @@ using GameInterface;
 using GameInterface.DynamicSync;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.UI.Messages;
-using HarmonyLib;
 using System;
 
 namespace Coop.Core
 {
     public class CoopartiveMultiplayerExperience : IDisposable
     {
-        private readonly IMessageBroker messageBroker;
+        private IMessageBroker messageBroker;
         private INetworkConfiguration configuration;
         private IContainer container;
-        private INetwork network;
 
         public CoopartiveMultiplayerExperience()
         {
@@ -78,6 +77,8 @@ namespace Coop.Core
         {
             DestroyContainer();
 
+            ModInformation.IsServer = true;
+
             var containerProvider = new ContainerProvider();
 
             ContainerBuilder builder = new ContainerBuilder();
@@ -92,8 +93,6 @@ namespace Coop.Core
             // Create harmony patches
             container.Resolve<IGameInterface>().PatchAll();
 
-            network = container.Resolve<INetwork>();
-
             var logic = container.Resolve<ILogic>();
             logic.Start();
         }
@@ -101,6 +100,8 @@ namespace Coop.Core
         public void StartAsClient(INetworkConfiguration configuration = null)
         {
             DestroyContainer();
+
+            ModInformation.IsServer = false;
 
             var containerProvider = new ContainerProvider();
 
@@ -123,10 +124,10 @@ namespace Coop.Core
             // debug export files. This prevents DebugAutoConnect races on that directory.
             DynamicSyncConfiguration.ExportFiles = false;
 
-            // Create harmony patches
+#if DEBUG
+            // For debugging faster, normally this is done after connection
             container.Resolve<IGameInterface>().PatchAll();
-
-            network = container.Resolve<INetwork>();
+#endif
 
             var logic = container.Resolve<ILogic>();
             logic.Start();
@@ -134,7 +135,7 @@ namespace Coop.Core
 
         private void DestroyContainer()
         {
-            container?.Resolve<Harmony>().UnpatchAll();
+            container?.Resolve<IGameInterface>().UnpatchAll();
             container?.Dispose();
             container = null;
         }

@@ -22,24 +22,21 @@ public struct ModuleInfo
 
 public interface IModuleInfoProvider
 {
-    List<ModuleInfo> GetModuleInfos();
+    IEnumerable<ModuleInfo> GetModuleInfos();
 }
 
 // TODO move to module interface
 public class TaleWorldsModuleInfoProvider : IModuleInfoProvider
 {
-    public List<ModuleInfo> GetModuleInfos()
+    public IEnumerable<ModuleInfo> GetModuleInfos()
     {
         var modules = TaleWorlds.ModuleManager.ModuleHelper.GetModules();
-        var moduleInfos = new List<ModuleInfo>();
         foreach (TaleWorlds.ModuleManager.ModuleInfo moduleInfo in modules)
         {
             if (!moduleInfo.IsSelected)
                 continue;
-            moduleInfos.Add(new ModuleInfo(moduleInfo.Id, moduleInfo.IsOfficial, moduleInfo.Version));
+            yield return new ModuleInfo(moduleInfo.Id, moduleInfo.IsOfficial, moduleInfo.Version);
         }
-
-        return moduleInfos;
     }
 }
 public class CompatibilityInfo

@@ -27,7 +27,9 @@ internal struct EquipmentElementSurrogate
 
     public static implicit operator EquipmentElement(EquipmentElementSurrogate surrogate)
     {
-        var item = MBObjectManager.Instance.GetObject<ItemObject>(surrogate.ItemId);
+        var item = string.IsNullOrEmpty(surrogate.ItemId)
+            ? null
+            : MBObjectManager.Instance.GetObject<ItemObject>(surrogate.ItemId);
         var modifier = string.IsNullOrEmpty(surrogate.ItemModifierId)
             ? null
             : MBObjectManager.Instance.GetObject<ItemModifier>(surrogate.ItemModifierId);

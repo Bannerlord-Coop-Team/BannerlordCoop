@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using GameInterface.DynamicSync;
 using Common.Logging;
 using Common.Util;
+using HarmonyLib;
 {{~ for library in Libraries ~}}
 using {{ library }};
 {{~ end ~}}

@@ -9,3 +9,4 @@ internal class DisableVillageNeedsCraftingMaterialsIssueBehavior
     [HarmonyPatch(nameof(VillageNeedsCraftingMaterialsIssueBehavior.RegisterEvents))]
     static bool Prefix() => false;
 }
+

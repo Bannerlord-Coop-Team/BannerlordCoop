@@ -1,6 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Serialization;
-using Coop.Core.Server.Services.Save.Data;
+using GameInterface.CoopSessionData.Save.Data;
 using System;
 using System.Collections;
 using System.IO;
@@ -33,9 +33,15 @@ namespace Coop.Core.Server.Services.Save
 
             if (File.Exists(filePath))
             {
-                var fileIO = new JsonFileIO();
-
-                return fileIO.ReadFromFile<CoopSession>(filePath);
+                try
+                {
+                    var fileIO = new JsonFileIO();
+                    return fileIO.ReadFromFile<CoopSession>(filePath);
+                }
+                catch (Exception)
+                {
+                    return null;
+                }
             }
 
             return null;

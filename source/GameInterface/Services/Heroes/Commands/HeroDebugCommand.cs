@@ -1,22 +1,24 @@
 ﻿using Common;
+using Common.Logging;
 using GameInterface.Services.Heroes.Audit;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.ObjectManager.Extensions;
+using Serilog;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text;
-using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
-using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Heroes.Commands;
 
 public class HeroDebugCommand
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<HeroDebugCommand>();
+
     // coop.debug.hero.list
     /// <summary>
     /// Lists all the heroes
@@ -77,7 +79,11 @@ public class HeroDebugCommand
             stringBuilder.AppendLine($"{field.Name} = {field.GetValue(hero)}");
         }
 
-        return stringBuilder.ToString();
+        var results = stringBuilder.ToString();
+
+        Logger.Debug("{Hero}", results);
+
+        return results;
     }
 
     // coop.debug.hero.createHero lord_2_7
@@ -363,5 +369,39 @@ public class HeroDebugCommand
         }
 
         return $"Hero Issue: {hero.Issue?.StringId ?? "none"}";
+    }
+
+    /// <summary>
+    /// View available volunteers for a target hero
+    /// </summary>
+    [CommandLineArgumentFunction("volunteers", "coop.debug.hero")]
+    public static string ViewVolunteersCommand(List<string> strings)
+    {
+        if (strings.Count == 0) return "Hero id required";
+
+        StringBuilder stringBuilder = new StringBuilder();
+        foreach (var hero in Hero.AllAliveHeroes)
+        {
+            if (hero.StringId == strings[0])
+            {
+                stringBuilder.AppendLine(hero.Name.ToString());
+                foreach (var volunteer in hero.VolunteerTypes)
+                {
+                    if (volunteer == null)
+                    {
+                        stringBuilder.AppendLine("[EMPTY SLOT]");
+                        continue;
+                    }
+                    stringBuilder.AppendLine(volunteer.Name.ToString());
+                }
+            }
+        }
+
+        string result = stringBuilder.ToString();
+        if (result.Length > 0)
+        {
+            return result;
+        }
+        return "Hero not found.";
     }
 }

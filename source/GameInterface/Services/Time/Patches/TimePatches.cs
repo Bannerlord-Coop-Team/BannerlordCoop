@@ -1,6 +1,9 @@
 ﻿using Common.Messaging;
 using Common.Util;
+using GameInterface.Policies;
+using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Time;
 using HarmonyLib;
 using SandBox.View.Map;
@@ -17,7 +20,7 @@ internal class TimePatches
 {
     private static CampaignTimeControlMode CurrentMode = CampaignTimeControlMode.Stop;
 
-    private static readonly TimeControlModeConverter timeControlModeConverter = new();
+    internal static ITimeControlModeConverter ModeConverter { get; } = new TimeControlModeConverter();
 
     [HarmonyPatch("TimeControlMode")]
     [HarmonyPatch(MethodType.Setter)]
@@ -27,12 +30,12 @@ internal class TimePatches
         // to publish the TimeSpeedChanged message.
         // To do this we skip this method if this thread is not "allowed"
         // We set this thread to "allowed" in AllowTimeControlFromControlsPatches
-        if (AllowedThread.IsThisThreadAllowed() == false) return false;
+        if (CallOriginalPolicy.IsOriginalAllowed() == false) return false;
 
         if (value != __instance._timeControlMode)
         {
-            var controlMode = timeControlModeConverter.Convert(value);
-            MessageBroker.Instance.Publish(__instance, new AttemptedTimeSpeedChanged(controlMode));
+            var controlMode = ModeConverter.Convert(value);
+            MessageBroker.Instance.Publish(__instance, new TimeSpeedChangedAttempted(controlMode));
         }
 
         return false;
@@ -53,6 +56,21 @@ internal class TimePatches
         CurrentMode = value;
         campaign._timeControlMode = value;
     }
+
+    internal static bool CanApplyTimeControl(TimeControlEnum controlMode)
+    {
+        if (ContainerProvider.TryResolve<ITimeControlInterface>(out var timeControlInterface) == false)
+        {
+            return true;
+        }
+
+        return timeControlInterface.CanSetTimeControl(controlMode);
+    }
+
+    internal static void PublishBlockedTimeControlAttempt(object source, TimeControlEnum controlMode)
+    {
+        MessageBroker.Instance.Publish(source, new TimeSpeedChangedAttempted(controlMode));
+    }
 }
 
 [HarmonyPatch(typeof(MapTimeControlVM))]
@@ -64,6 +82,13 @@ internal class AllowTimeControlFromControlsPatches
     {
         using (new AllowedThread())
         {
+            var controlMode = TimePatches.ModeConverter.Convert((CampaignTimeControlMode)selectedTimeSpeed);
+            if (TimePatches.CanApplyTimeControl(controlMode) == false)
+            {
+                TimePatches.PublishBlockedTimeControlAttempt(__instance, controlMode);
+                return false;
+            }
+
             int num = selectedTimeSpeed;
             if (__instance._timeFlowState == 3 && num == 2)
             {
@@ -85,6 +110,24 @@ internal class AllowTimeControlFromControlsPatches
 
             return false;
         }
+    }
+}
+
+[HarmonyPatch(typeof(Campaign))]
+internal class CampaignSetTimeSpeedPatches
+{
+    [HarmonyPatch(nameof(Campaign.SetTimeSpeed))]
+    [HarmonyPrefix]
+    private static bool SetTimeSpeedPrefix(ref Campaign __instance, int speed)
+    {
+        var controlMode = TimePatches.ModeConverter.Convert((CampaignTimeControlMode)speed);
+        if (TimePatches.CanApplyTimeControl(controlMode))
+        {
+            return true;
+        }
+
+        TimePatches.PublishBlockedTimeControlAttempt(__instance, controlMode);
+        return false;
     }
 }
 

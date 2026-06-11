@@ -19,4 +19,18 @@ public static class PartyBaseExtensions
 
         return MobilePartyVisualManager.Current._partiesAndVisuals.TryGetValue(partyBase, out var partyVisual) ? partyVisual : null;
     }
+
+    public static string GetPartyName(this PartyBase party)
+    {
+        if (party == null)
+            return "<null>";
+
+        if (party.MobileParty != null)
+            return party.MobileParty.StringId ?? party.MobileParty.Name?.ToString() ?? "<mobile-party>";
+
+        if (party.Settlement != null)
+            return party.Settlement.StringId ?? party.Settlement.Name?.ToString() ?? "<settlement>";
+
+        return party.ToString();
+    }
 }
