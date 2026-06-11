@@ -177,9 +177,17 @@ internal class InteractionPatches
             return;
 
         if (__instance.MobileParty?.IsPlayerParty() == true && mobileParty?.IsPlayerParty() == true)
-        {  
+        {
             __result = false;
             return;
+        }
+
+        // A party held in a conversation with a player can only be interacted with by that player's party. This is
+        // the hard stop that keeps other AI parties from starting an encounter or battle with it, since
+        // OnPartyInteraction only runs when this check passes.
+        if (ConversationPartyHold.IsInteractionBlocked(__instance, mobileParty))
+        {
+            __result = false;
         }
     }
 
