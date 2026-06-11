@@ -59,7 +59,7 @@ internal class GameObjectCreator
         { typeof(GarrisonPartyComponent), new GarrisonPartyComponentBuilder() },
         { typeof(VillageType), new VillageTypeBuilder() },
         { typeof(VillagerPartyComponent), new VillagerPartyComponentBuilder() },
-        { typeof(SiegeEvent.SiegeEngineMissile), new SiegeEngineMissileBuilder() }
+        { typeof(SiegeEvent.SiegeEngineMissile), new SiegeEngineMissileBuilder() },
         { typeof(TraitObject), new TraitObjectBuilder() },
         { typeof(PropertyOwner<TraitObject>), new PropertyOwnerBuilder() }
     };
