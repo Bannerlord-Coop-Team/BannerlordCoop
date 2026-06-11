@@ -12,6 +12,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Extensions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -240,6 +241,37 @@ internal class MobilePartyDebugCommand
         party.RemoveParty();
 
         return $"Destroyed {nameof(MobileParty)} with string id: {partyId}";
+    }
+
+    // coop.debug.mobileparty.destroyAllBanditParties
+    [CommandLineArgumentFunction("destroyAllBanditParties", "coop.debug.mobileparty")]
+    public static string DestroyAllBanditParties(List<string> args)
+    {
+        if (ModInformation.IsClient)
+        {
+            return "Destroy all bandit parties is only to be called on the server";
+        }
+
+        var banditParties = MobileParty.All.Where(party => party.IsBandit).ToList();
+
+        int destroyed = 0;
+        int skipped = 0;
+        foreach (var banditParty in banditParties)
+        {
+            if (banditParty.MapEvent != null)
+            {
+                skipped++;
+                continue;
+            }
+
+            // DestroyPartyAction is the destruction path synced to clients; plain
+            // RemoveParty is not. The lifetime handler needs a non-null destroyer,
+            // so the party destroys itself rather than crediting another party.
+            DestroyPartyAction.Apply(banditParty.Party, banditParty);
+            destroyed++;
+        }
+
+        return $"Destroyed {destroyed} bandit parties, skipped {skipped} in active map events";
     }
 
     [CommandLineArgumentFunction("list", "coop.debug.mobileparty")]

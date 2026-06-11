@@ -23,7 +23,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_town_town_tavern_on_consequence")]
     static bool DisableTavern()
     {
-        return false;
+        return true;
     }
 
     /// <summary>
@@ -83,7 +83,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_town_go_to_keep_on_consequence")]
     static bool DisableTownKeep()
     {
-        return false;
+        return true;
     }
 
     /// <summary>
@@ -113,7 +113,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_leave_troops_garrison_on_consequece")]
     static bool DisableGarrison()
     {
-        return false;
+        return true;
     }
 
     /// <summary>
@@ -123,7 +123,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_ui_town_manage_town_on_consequence")]
     static bool DisableTownManagement()
     {
-        return false;
+        return true;
     }
 
     /// <summary>
@@ -133,7 +133,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_ui_town_castle_manage_town_on_consequence")]
     static bool DisableCastleManagement()
     {
-        return false;
+        return true;
     }
 
     /// <summary>

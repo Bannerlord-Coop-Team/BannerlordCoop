@@ -574,4 +574,37 @@ public class TownDebugCommand
         BuildingHelper.ChangeCurrentBuildingQueue(town.Buildings, town);
         return "success";
     }
+
+    /// <summary>
+    /// View town management data of a specified town
+    /// </summary>
+    [CommandLineArgumentFunction("managementdata", "coop.debug.towns")]
+    public static string ViewManagementData(List<string> strings)
+    {
+        if (strings.Count == 0) return "Town name argument required.";
+
+        StringBuilder stringBuilder = new StringBuilder();
+        foreach (var town in Town.AllTowns)
+        {
+            if (town.Name.ToString() == strings[0])
+            {
+                stringBuilder.AppendLine(town.Name.ToString() + ":");
+                stringBuilder.AppendLine("Reserves: " + town.BoostBuildingProcess.ToString());
+                stringBuilder.AppendLine("Governor Name: " + town.Governor?.Name?.ToString());
+                stringBuilder.AppendLine("Current default building: " + town.CurrentDefaultBuilding?.Name?.ToString());
+                stringBuilder.AppendLine("Current building queue:");
+                foreach (var building in town.BuildingsInProgress)
+                {
+                    stringBuilder.AppendLine(building.Name.ToString());
+                }
+            }
+        }
+
+        string result = stringBuilder.ToString();
+        if (result.Length > 0)
+        {
+            return result;
+        }
+        return "Town not found.";
+    }
 }

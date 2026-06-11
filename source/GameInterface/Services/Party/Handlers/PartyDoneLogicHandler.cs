@@ -59,6 +59,9 @@ internal class PartyDoneLogicHandler : IHandler
         string leftPartyId = null;
         if (obj.What.LeftParty != null && !objectManager.TryGetIdWithLogging(obj.What.LeftParty, out leftPartyId)) return;
 
+        string leftPrisonerRosterId = null;
+        if (obj.What.LeftPrisonerRoster != null && !objectManager.TryGetIdWithLogging(obj.What.LeftPrisonerRoster, out leftPrisonerRosterId)) return;
+
         var upgradedTroopHistory = new UpgradedTroopHistoryData(new());
         foreach (Tuple<CharacterObject, CharacterObject, int> tuple in obj.What.UpgradedTroopHistory)
         {
@@ -85,6 +88,7 @@ internal class PartyDoneLogicHandler : IHandler
             obj.What.RightOwnerPartyItemRoster._data,
             upgradedTroopHistory,
             leftPartyId,
+            leftPrisonerRosterId,
             obj.What.PartyGoldChangeAmount,
             obj.What.PartyInfluenceChangeAmount,
             obj.What.PartyMoraleChangeAmount,
@@ -100,6 +104,9 @@ internal class PartyDoneLogicHandler : IHandler
 
         PartyBase leftParty = null;
         if (obj.What.LeftPartyId != null && !objectManager.TryGetObjectWithLogging<PartyBase>(obj.What.LeftPartyId, out leftParty)) return;
+
+        TroopRoster leftPrisonerRoster = null;
+        if (obj.What.LeftPrisonerRosterId != null && !objectManager.TryGetObjectWithLogging<TroopRoster>(obj.What.LeftPrisonerRosterId, out leftPrisonerRoster)) return;
 
         List<Tuple<CharacterObject, CharacterObject, int>> upgradedTroopHistory = new();
         if (obj.What.UpgradedTroopHistoryIds.Data != null)
@@ -119,6 +126,10 @@ internal class PartyDoneLogicHandler : IHandler
         {
             troopRosterInterface.UpdateWithData(leftParty.MemberRoster, obj.What.LeftMemberRosterData, mainHero);
             troopRosterInterface.UpdateWithData(leftParty.PrisonRoster, obj.What.LeftPrisonerRosterData, mainHero);
+        }
+        else if (leftPrisonerRoster != null) // Prisoner management doesn't have a set party
+        {
+            troopRosterInterface.UpdateWithData(leftPrisonerRoster, obj.What.LeftPrisonerRosterData, mainHero);
         }
 
         troopRosterInterface.UpdateWithData(mainHero.PartyBelongedTo.MemberRoster, obj.What.RightMemberRosterData, mainHero);

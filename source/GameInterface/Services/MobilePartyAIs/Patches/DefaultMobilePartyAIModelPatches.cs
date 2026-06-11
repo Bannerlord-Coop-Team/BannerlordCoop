@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using GameInterface.Services.MapEvents;
+using HarmonyLib;
 using Helpers;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -28,6 +29,11 @@ internal class DefaultMobilePartyAIModelPatches
             __result = false;
 
         if (!CanAttackTargetParty(party, targetParty))
+            __result = false;
+
+        // Don't consider attacking a party that is held in a conversation with a player; the interaction guard
+        // would block the attack anyway, and this keeps the AI from chasing an unattackable target.
+        if (ConversationPartyHold.IsInPlayerConversation(targetParty))
             __result = false;
     }
 
