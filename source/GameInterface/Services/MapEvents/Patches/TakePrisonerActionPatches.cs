@@ -23,7 +23,7 @@ internal class TakePrisonerActionPatches
 
     [HarmonyPatch(nameof(TakePrisonerAction.ApplyInternal))]
     [HarmonyPrefix]
-    private static void Prefix_ApplyInternal(PartyBase capturerParty, Hero prisonerCharacter)
+    private static bool Prefix_ApplyInternal(PartyBase capturerParty, Hero prisonerCharacter)
     {
         // Re-entrant call below, or a server-approved original: run it.
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
@@ -31,7 +31,7 @@ internal class TakePrisonerActionPatches
         if (ModInformation.IsClient)
         {
             Logger.Error("Client called managed method {methodName}", $"{nameof(TakePrisonerAction)}.{nameof(TakePrisonerAction.ApplyInternal)}");
-            return;
+            return false;
         }
 
         var prisonerParty = prisonerCharacter.PartyBelongedTo;

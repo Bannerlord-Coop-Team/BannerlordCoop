@@ -340,8 +340,9 @@ public abstract class MapEventTestBase : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(captorPartyId, out var captorParty));
 
             // Make the player hero a member of (not leader of) the player party: the capture resolves the hero
-            // from the player registry, and PlayerCaptivityServerHandler.Handle_PrisonerTaken derives the party
-            // from hero.PartyBelongedTo. This is local server setup; wrap in AllowedThread so it does not re-broadcast.
+            // from the player registry, and TakePrisonerActionPatches reads hero.PartyBelongedTo to snapshot the
+            // captured party for the PrisonerTaken message. This is local server setup; wrap in AllowedThread so
+            // it does not re-broadcast.
             using (new AllowedThread())
             {
                 playerParty.MemberRoster.AddToCounts(playerHero.CharacterObject, 1);
@@ -355,6 +356,52 @@ public abstract class MapEventTestBase : IDisposable
 
             mapEvent.CaptureDefeatedPartyMembers(mapEvent.AttackerSide.Parties, mapEvent.DefenderSide.Parties);
         }, disabledMethods);
+    }
+
+    /// <summary>
+    /// Frees the player hero the way native does when its captor party is defeated in battle:
+    /// <see cref="MapEvent.LootDefeatedPartyPrisoners"/> calls
+    /// <see cref="EndCaptivityAction.ApplyByReleasedAfterBattle"/> for each freed prisoner. Invoking that
+    /// exact entry point on the server exercises the coop release path
+    /// (<c>EndCaptivityActionPatches</c> → <c>PlayerCaptivityEndedByServer</c> →
+    /// <c>PlayerCaptivityServerHandler</c>) deterministically, without the faction/RNG of a full battle
+    /// resolution.
+    /// </summary>
+    protected void ReleasePlayerAfterCaptorDefeated(string playerHeroId)
+    {
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+
+            // A captor defeated in battle is destroyed/deactivated; reflect that so the release follows the
+            // defeated-captor path (no attempt to disengage from a still-active captor).
+            var captor = playerHero.PartyBelongedToAsPrisoner?.MobileParty;
+            if (captor != null)
+            {
+                using (new AllowedThread())
+                {
+                    captor.IsActive = false;
+                }
+            }
+
+            EndCaptivityAction.ApplyByReleasedAfterBattle(playerHero);
+        }, MapEventDisabledMethods);
+    }
+
+    /// <summary>
+    /// Asserts the player party with <paramref name="partyId"/> is active again and once more contains its
+    /// hero <paramref name="heroId"/> — i.e. it was restored to the map after a captivity release.
+    /// </summary>
+    protected void AssertPlayerPartyRestored(EnvironmentInstance instance, string heroId, string partyId)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+
+            Assert.True(party.IsActive, $"Player party {partyId} should be active again after release on {instance.GetType().Name}");
+            Assert.True(party.MemberRoster.Contains(hero.CharacterObject), $"Released hero {heroId} should be back in party {partyId} on {instance.GetType().Name}");
+        });
     }
 
     // ------------------------------------------------------------------

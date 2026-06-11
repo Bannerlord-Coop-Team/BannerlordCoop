@@ -1,14 +1,23 @@
 using Common;
 using Common.Logging;
 using Common.Messaging;
+using GameInterface.Policies;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
+using GameInterface.Services.Players;
 using HarmonyLib;
 using Serilog;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
+using TaleWorlds.LinQuick;
 
 namespace GameInterface.Services.PlayerCaptivityService.Patches;
 
@@ -21,6 +30,8 @@ namespace GameInterface.Services.PlayerCaptivityService.Patches;
 [HarmonyPatch]
 internal class PlayerStartCaptivityPatches
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<PlayerStartCaptivityPatches>();
+
     // Capture the previous captor before the setter overwrites it. In the postfix the auto-property already
     // holds the new value, so the "did not change" check must compare against this snapshot, not the getter.
     [HarmonyPatch(typeof(Hero), nameof(Hero.PartyBelongedToAsPrisoner), MethodType.Setter)]

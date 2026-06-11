@@ -136,6 +136,22 @@ internal class PlayerCaptivityClientHandler : IHandler
         PartyBase.MainParty.SetAsCameraFollowParty();
 
         Campaign.Current.PlayerCaptivity._captorParty = null;
+
+        // Leave the captivity menus/encounter now that we're free. This drives the client UI for
+        // server-initiated releases (e.g. our captor was defeated), where — unlike a client-requested
+        // release — there is no NetworkPlayerCaptivityEnded ack; we react to the synced captor clearing.
+        if (PlayerEncounter.Current != null)
+        {
+            PlayerEncounter.LeaveSettlement();
+        }
+        if (PlayerEncounter.Current != null)
+        {
+            PlayerEncounter.Finish(true);
+        }
+        else if (Campaign.Current.CurrentMenuContext != null)
+        {
+            GameMenu.ExitToLast();
+        }
     }
 
     /// <summary>

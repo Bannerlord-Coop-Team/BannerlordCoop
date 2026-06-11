@@ -108,6 +108,32 @@ public class MapEventEnvironmentTests : MapEventTestBase
     }
 
     [Fact]
+    public void CaptorDefeated_ReleasesPlayer_AndRestoresParty()
+    {
+        // Arrange — the player loses a battle and is taken prisoner by the captor party. Capture parks the
+        // player party (emptied + deactivated) and makes the hero the captor's prisoner.
+        var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
+        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        DefeatPlayerPartyInBattle(heroId, partyId, captorPartyId);
+
+        AssertCaptivity(Server, heroId, captorPartyId);
+
+        // Act — the captor party is later defeated by another party, which frees its prisoners after the
+        // battle (the scenario that previously left the player captive with a vanished party).
+        ReleasePlayerAfterCaptorDefeated(heroId);
+
+        // Assert — the player is freed on every instance...
+        AssertCaptivity(Server, heroId, null);
+        foreach (var client in Clients)
+        {
+            AssertCaptivity(client, heroId, null);
+        }
+
+        // ...and its party is restored to the map on the authoritative server.
+        AssertPlayerPartyRestored(Server, heroId, partyId);
+    }
+
+    [Fact]
     public void ServerEndCaptivity_OfPlayerHero_SyncAllClients()
     {
         // Arrange

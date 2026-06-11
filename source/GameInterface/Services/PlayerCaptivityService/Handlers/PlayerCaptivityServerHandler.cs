@@ -61,6 +61,7 @@ internal class PlayerCaptivityServerHandler : IHandler
         messageBroker.Subscribe<PrisonerTaken>(Handle_PrisonerTaken);
         messageBroker.Subscribe<NetworkPlayerSurrendered>(Handle_NetworkPlayerSurrendered);
         messageBroker.Subscribe<NetworkEndPlayerCaptivityAttempted>(Handle_NetworkEndPlayerCaptivityAttempted);
+        messageBroker.Subscribe<PlayerCaptivityEndedByServer>(Handle_PlayerCaptivityEndedByServer);
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
     }
 
@@ -69,6 +70,7 @@ internal class PlayerCaptivityServerHandler : IHandler
         messageBroker.Unsubscribe<PrisonerTaken>(Handle_PrisonerTaken);
         messageBroker.Unsubscribe<NetworkPlayerSurrendered>(Handle_NetworkPlayerSurrendered);
         messageBroker.Unsubscribe<NetworkEndPlayerCaptivityAttempted>(Handle_NetworkEndPlayerCaptivityAttempted);
+        messageBroker.Unsubscribe<PlayerCaptivityEndedByServer>(Handle_PlayerCaptivityEndedByServer);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
     }
 
@@ -85,7 +87,10 @@ internal class PlayerCaptivityServerHandler : IHandler
         if (ModInformation.IsClient) return;
 
         var hero = payload.What.PrisonerHero;
-        var playerParty = hero?.PartyBelongedTo;
+        // TakePrisonerActionPatches runs native TakePrisonerAction.Apply before publishing this, which
+        // already cleared hero.PartyBelongedTo and set PartyBelongedToAsPrisoner. The party the hero was
+        // captured from therefore has to come from the message, not from the (now-null) hero.PartyBelongedTo.
+        var playerParty = payload.What.PrisonerParty;
 
         PlayerCaptivityLogger.Debug("Handle_PrisonerTaken: hero={HeroId} party={PartyId} captor={CaptorId}",
             hero?.StringId, playerParty?.StringId, payload.What.CapturerParty?.MobileParty?.StringId);
@@ -93,23 +98,23 @@ internal class PlayerCaptivityServerHandler : IHandler
         // Only player heroes need coop-specific handling; native TakePrisonerAction covers AI heroes.
         if (playerParty?.IsPlayerParty() != true)
         {
-            PlayerCaptivityLogger.Debug("Handle_PrisonerTaken: skipping, {HeroId} is not in a player party", hero?.StringId);
+            PlayerCaptivityLogger.Debug("Handle_PrisonerTaken: skipping, captured party is not a player party");
             return;
         }
 
-        if (hero.PartyBelongedToAsPrisoner != null)
+        // Guard against re-processing an already-parked party (a repeated capture, or one already freed).
+        if (!playerParty.IsActive)
         {
-            PlayerCaptivityLogger.Debug("Handle_PrisonerTaken: skipping, {HeroId} is already a prisoner of {CaptorId}",
-                hero.StringId, hero.PartyBelongedToAsPrisoner?.MobileParty?.StringId);
+            PlayerCaptivityLogger.Debug("Handle_PrisonerTaken: skipping, player party {PartyId} is already parked", playerParty.StringId);
             return;
         }
 
-        playerParty.ChangePartyLeader(null);
-        // Clearing the member roster also clears hero.PartyBelongedTo (OnHeroRemoved), so the native
-        // ApplyInternal body that runs after this skips its own party-removal block.
+        // Park the now-leaderless player party so native post-battle processing cannot scatter or destroy
+        // it; the captivity-end flow reactivates it.
         playerParty.MemberRoster.Clear();
         playerParty.PrisonRoster.Clear();
         playerParty.IsActive = false;
+        playerParty.ChangePartyLeader(null);
     }
 
     /// <summary>
@@ -162,44 +167,56 @@ internal class PlayerCaptivityServerHandler : IHandler
         PlayerCaptivityLogger.Debug("Handle_NetworkEndPlayerCaptivityAttempted (server): hero={HeroId} party={PartyId} detail={Detail} facilitator={FacilitatorId}",
             playerHero.StringId, playerParty.StringId, payload.What.Detail, facilitator?.StringId);
 
-        // Snapshot the captor before the release: removing the hero from the captor's prison roster
-        // clears Hero.PartyBelongedToAsPrisoner, so reading it afterwards would always yield null.
-        PartyBase captorParty = playerHero.PartyBelongedToAsPrisoner;
-        IFaction capturerFaction = captorParty?.MapFaction;
-
-        EndPlayerCaptivityInternal(playerHero, playerParty, captorParty);
-
-        if (captorParty != null && captorParty.IsSettlement)
-        {
-            playerParty.DisembarkToPosition(captorParty.Settlement.GatePosition);
-        }
-        else if (captorParty != null && captorParty.IsMobile)
-        {
-            playerParty.IsCurrentlyAtSea = captorParty.MobileParty.IsCurrentlyAtSea;
-        }
-        if (facilitator != null && payload.What.Detail != EndCaptivityDetail.Death)
-        {
-            StringHelpers.SetCharacterProperties("FACILITATOR", facilitator.CharacterObject, null, false);
-            StringHelpers.SetCharacterProperties("PRISONER", playerHero.CharacterObject, null, false);
-            MBInformationManager.AddQuickInformation(new TextObject("{=xPuSASof}{FACILITATOR.NAME} paid a ransom and freed {PRISONER.NAME} from captivity."));
-        }
-        CampaignEventDispatcher.Instance.OnHeroPrisonerReleased(playerHero, captorParty, capturerFaction, payload.What.Detail, true);
-
-        playerParty.IsActive = true;
-        playerParty.Position = payload.What.PlayerPartyPosition;
-        playerParty.IgnoreForHours(4);
+        ReleasePlayerFromCaptivity(playerHero, playerParty, payload.What.Detail, facilitator, payload.What.PlayerPartyPosition);
 
         var message = new NetworkPlayerCaptivityEnded();
         network.Send(payload.Who as NetPeer, message);
     }
 
     /// <summary>
-    /// Re-implements native <see cref="PlayerCaptivity"/>.EndCaptivityInternal for a hero that is not
-    /// this instance's main hero. The menu/encounter cleanup the native version does happens on the
-    /// owning client instead (<see cref="PlayerCaptivityClientHandler"/>).
+    /// The server itself freed a player (client) hero — typically because the captor party was defeated in
+    /// battle (native <see cref="MapEvent.LootDefeatedPartyPrisoners"/> →
+    /// <see cref="EndCaptivityAction.ApplyByReleasedAfterBattle"/>), but also AI ransoms and peace releases.
+    /// Unlike the client-requested path there is no request to answer; the owning client leaves the
+    /// captivity menus on its own when the cleared <see cref="Hero.PartyBelongedToAsPrisoner"/> syncs to it
+    /// (<see cref="PlayerCaptivityClientHandler"/>).
     /// </summary>
-    private void EndPlayerCaptivityInternal(Hero playerHero, MobileParty playerParty, PartyBase captorParty)
+    private void Handle_PlayerCaptivityEndedByServer(MessagePayload<PlayerCaptivityEndedByServer> payload)
     {
+        if (ModInformation.IsClient) return;
+
+        var playerHero = payload.What.PrisonerHero;
+        if (playerHero == null) return;
+
+        if (!TryGetPlayerParty(playerHero, out var playerParty))
+        {
+            Logger.Error("Could not resolve a player party for released hero {HeroId}; cannot restore it", playerHero.StringId);
+            return;
+        }
+
+        PlayerCaptivityLogger.Debug("Handle_PlayerCaptivityEndedByServer: hero={HeroId} party={PartyId} detail={Detail}",
+            playerHero.StringId, playerParty.StringId, payload.What.Detail);
+
+        // The party was pinned to the captor while captive (Handle_CampaignTick), so its current position is
+        // where the release happens.
+        ReleasePlayerFromCaptivity(playerHero, playerParty, payload.What.Detail, payload.What.Facilitator, playerParty.Position);
+    }
+
+    /// <summary>
+    /// Server-authoritative release of a player (client) hero from captivity, shared by the client-requested
+    /// and server-initiated paths. Restores the deactivated player party to the map and clears the captivity
+    /// state — which auto-syncs to the clients through <see cref="Hero.PartyBelongedToAsPrisoner"/>.
+    /// Re-implements native <see cref="PlayerCaptivity"/>.EndCaptivityInternal for a hero that is not this
+    /// instance's main hero; the menu/encounter cleanup the native version does happens on the owning client
+    /// instead (<see cref="PlayerCaptivityClientHandler"/>).
+    /// </summary>
+    private void ReleasePlayerFromCaptivity(Hero playerHero, MobileParty playerParty, EndCaptivityDetail detail, Hero facilitator, CampaignVec2 releasePosition)
+    {
+        // Snapshot the captor before the release: clearing the captivity below nulls
+        // PartyBelongedToAsPrisoner, and a captor defeated in battle may already be inactive.
+        PartyBase captorParty = playerHero.PartyBelongedToAsPrisoner;
+        IFaction capturerFaction = captorParty?.MapFaction;
+
         if (playerHero.IsAlive)
         {
             playerHero.ChangeState(Hero.CharacterStates.Active);
@@ -217,17 +234,49 @@ internal class PlayerCaptivityServerHandler : IHandler
                 LeaveSettlementAction.ApplyForCharacterOnly(playerHero);
             }
         }
-        if (captorParty?.IsActive == true)
+
+        // Clear the captivity. Removing the hero from the captor's prison roster clears
+        // PartyBelongedToAsPrisoner via the engine hook; do this regardless of whether the captor is still
+        // active, since a captor defeated in battle may already be inactive. If the roster no longer holds
+        // the hero, null it directly so the cleared state still auto-syncs to the owning client.
+        if (captorParty != null && captorParty.PrisonRoster.Contains(playerHero.CharacterObject))
         {
             captorParty.PrisonRoster.RemoveTroop(playerHero.CharacterObject);
-            if (captorParty.IsMobile && !captorParty.MobileParty.IsCurrentlyAtSea)
-            {
-                playerParty.TeleportPartyToOutSideOfEncounterRadius();
-            }
         }
+        if (playerHero.PartyBelongedToAsPrisoner != null)
+        {
+            playerHero.PartyBelongedToAsPrisoner = null;
+        }
+
+        // Separate the freed party from a still-active mobile captor (mirrors native). A defeated/inactive
+        // captor is skipped — there's nothing to disengage from, and navigating around a destroyed party
+        // would be meaningless.
+        if (captorParty?.IsActive == true && captorParty.IsMobile && !captorParty.MobileParty.IsCurrentlyAtSea)
+        {
+            playerParty.TeleportPartyToOutSideOfEncounterRadius();
+        }
+
+        if (captorParty != null && captorParty.IsSettlement)
+        {
+            playerParty.DisembarkToPosition(captorParty.Settlement.GatePosition);
+        }
+        else if (captorParty != null && captorParty.IsMobile)
+        {
+            playerParty.IsCurrentlyAtSea = captorParty.MobileParty.IsCurrentlyAtSea;
+        }
+        if (facilitator != null && detail != EndCaptivityDetail.Death)
+        {
+            StringHelpers.SetCharacterProperties("FACILITATOR", facilitator.CharacterObject, null, false);
+            StringHelpers.SetCharacterProperties("PRISONER", playerHero.CharacterObject, null, false);
+            MBInformationManager.AddQuickInformation(new TextObject("{=xPuSASof}{FACILITATOR.NAME} paid a ransom and freed {PRISONER.NAME} from captivity."));
+        }
+        CampaignEventDispatcher.Instance.OnHeroPrisonerReleased(playerHero, captorParty, capturerFaction, detail, true);
+
         if (playerHero.IsAlive)
         {
             playerParty.IsActive = true;
+            playerParty.Position = releasePosition;
+            playerParty.IgnoreForHours(4);
             playerParty.Party.SetAsCameraFollowParty();
             playerParty.SetMoveModeHold();
 
@@ -243,7 +292,30 @@ internal class PlayerCaptivityServerHandler : IHandler
             {
                 playerParty.Party.UpdateVisibilityAndInspected(playerParty.Position);
             }
+
+            // Rebuild the map mesh after the roster/leader/position are restored, so the freed party's map
+            // figure reflects its (re-mounted) state rather than the stale on-foot captive mesh.
+            playerParty.Party.SetVisualAsDirty();
         }
+    }
+
+    /// <summary>
+    /// Resolves the <see cref="MobileParty"/> registered to the player that owns <paramref name="hero"/>.
+    /// </summary>
+    private bool TryGetPlayerParty(Hero hero, out MobileParty playerParty)
+    {
+        playerParty = null;
+
+        if (!objectManager.TryGetId(hero, out var heroId))
+            return false;
+
+        foreach (var player in playerManager.Players)
+        {
+            if (player.HeroId == heroId)
+                return objectManager.TryGetObject(player.MobilePartyId, out playerParty);
+        }
+
+        return false;
     }
 
     /// <summary>
