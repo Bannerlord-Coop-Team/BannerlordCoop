@@ -79,23 +79,24 @@ internal class PlayerCaptivityHandler : IHandler
     {
         var obj = payload.What;
 
-        var hero = obj.PrisonerHero;
-        var mobileParty = hero.PartyBelongedTo;
+        // The capture already cleared hero.PartyBelongedTo, so read the party from the message.
+        var mobileParty = obj.PrisonerParty;
 
-        if (mobileParty?.IsPlayerParty() == false)
+        if (mobileParty?.IsPlayerParty() != true)
             return;
 
-        if (hero.PartyBelongedToAsPrisoner != null)
+        // TakePrisonerAction has already run (see TakePrisonerActionPatches): the hero is in the captor's
+        // prison roster and PartyBelongedTo/PartyBelongedToAsPrisoner are set. All that remains is the
+        // coop-specific teardown vanilla only performs for the host's MainParty - empty and deactivate the
+        // now-leaderless player party so it leaves the map. Without this the captive party stays active at
+        // the captor's position (pinned there by Handle_CampaignTick) and the captor keeps re-encountering
+        // it, spawning a fresh map event against the player every tick. Guard on IsActive so a repeated
+        // capture for the same party is a no-op (and so we don't re-clear an already-freed party).
+        if (!mobileParty.IsActive)
             return;
 
-        hero.PartyBelongedToAsPrisoner = payload.What.CapturerParty;
-        hero.PartyBelongedTo = null;
-
-        mobileParty.MemberRoster.RemoveTroop(hero.CharacterObject);
         mobileParty.MemberRoster.Clear();
         mobileParty.PrisonRoster.Clear();
-        
-        payload.What.CapturerParty.PrisonRoster.AddToCounts(hero.CharacterObject, 1);
 
         mobileParty.IsActive = false;
         mobileParty.ChangePartyLeader(null);
@@ -230,6 +231,18 @@ internal class PlayerCaptivityHandler : IHandler
         playerParty.Position = payload.What.PlayerPartyPosition;
         playerParty.IgnoreForHours(4);
 
+        // Separate the freed party from a still-hostile mobile captor. The position set above places the
+        // party back where it was captured (next to the captor), and IgnoreForHours only stops the captor
+        // from attacking - it does not stop the freed party's own client-side encounter detection
+        // (HandleEncounterForMobileParty), which would otherwise re-initiate the battle instantly.
+        if (partyBelongedToAsPrisoner != null && partyBelongedToAsPrisoner.IsMobile && !playerParty.IsCurrentlyAtSea)
+            playerParty.TeleportPartyToOutSideOfEncounterRadius();
+
+        // Rebuild the map mesh after the roster/leader/position are all restored. The mounted-count recalc
+        // settles after the party visual was last built during captivity, so without this the map figure
+        // stays on the stale (on-foot) mesh even though the party is mounted again.
+        playerParty.Party.SetVisualAsDirty();
+
         var message = new NetworkPlayerCaptivityEnded();
         network.Send(payload.Who as NetPeer, message);
     }
@@ -308,7 +321,7 @@ internal class PlayerCaptivityHandler : IHandler
 
             if (captorParty == null) continue;
 
-            mobileParty.Position = hero.PartyBelongedToAsPrisoner.Position;
+            mobileParty.Position = captorParty.Position;
         }
     }
 

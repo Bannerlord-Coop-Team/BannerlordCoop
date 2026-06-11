@@ -1,0 +1,39 @@
+﻿[HarmonyTranspiler]
+public static IEnumerable<CodeInstruction> Transpiler_{{ MemberName }}_QueueClear(IEnumerable<CodeInstruction> instructions)
+{
+    var clearMethod = typeof(Queue<{{ MemberType }}>).GetMethod(nameof({{ MemberType }}.Clear));
+    var clearIntercept = typeof({{ MemberDeclaringType }}_DynamicPatches).GetMethod(nameof(QueueClearIntercept));
+
+    foreach ( var instruction in instructions )
+    {
+        if (instruction.Calls(clearMethod))
+        {
+            yield return new CodeInstruction(OpCodes.Call, clearIntercept);
+        }
+
+        yield return instruction;
+    }
+}
+
+public static void Intercept_QueueClear_{{ MemberName }}({{ MemberType }} queue)
+{
+    // Allows original method call if this thread is allowed
+    if (CallOriginalPolicy.IsOriginalAllowed())
+    {
+        queue.Clear();
+        return;
+    }
+
+    // Skip method if called from client and allow origin
+    if (ModInformation.IsClient)
+    {
+        Logger.Error("Client updated unmanaged {type}", typeof({{ MemberType }}));
+        queue.Clear();
+        return;
+    }
+
+    var message = new Local_{{ MemberDeclaringType}}_{{ MemberName }}_QueueClear(queue);
+    MessageBroker.Instance.Publish(queue, message);
+
+    queue.Clear();
+}

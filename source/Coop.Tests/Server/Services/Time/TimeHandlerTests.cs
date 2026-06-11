@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Common.Network.Messages;
 using Common.Tests.Utils;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;

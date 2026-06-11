@@ -92,7 +92,6 @@ public class TestEnvironment
 
         builder.RegisterModule<ServerModule>();
         builder.RegisterType<MockServer>().AsSelf().As<INetwork>().As<ICoopServer>().InstancePerLifetimeScope();
-        builder.RegisterType<ControlledEntityRegistry>().As<IControlledEntityRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<ServerInstance>().AsSelf();
         builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance();
 
