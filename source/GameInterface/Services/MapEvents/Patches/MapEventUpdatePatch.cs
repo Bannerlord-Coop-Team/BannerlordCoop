@@ -44,14 +44,3 @@ public class MapEventUpdatePatch
         return ModInformation.IsServer;
     }
 }
-
-[HarmonyPatch(typeof(BattleSimulation))]
-public class BattleSimulationUpdatePatch
-{
-    [HarmonyPrefix]
-    [HarmonyPatch(nameof(BattleSimulation.SimulateBattle))]
-    static bool PrefixUpdate(BattleSimulation __instance)
-    {
-        return false;
-    }
-}
