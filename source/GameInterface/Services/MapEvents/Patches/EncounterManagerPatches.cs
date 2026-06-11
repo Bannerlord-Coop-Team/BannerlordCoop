@@ -63,26 +63,14 @@ internal class EncounterManagerPatches
         // Our own server-approved re-run (AllowedThread) runs the real method.
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        // The server runs it locally (authoritative), unless the targeted party is held in a conversation by
-        // another player.
-        if (ModInformation.IsServer) return ConversationPartyHold.CanHostRestartEncounter(attackerParty, defenderParty);
+        // The server runs it locally (authoritative).
+        if (ModInformation.IsServer) return true;
 
         // Client: gate the encounter restart behind server approval (rate-limited + validated in
         // ConversationRequestHandler). On approval the handler re-runs this exact method under an AllowedThread.
         MessageBroker.Instance.Publish(null, new ConversationRequested(defenderParty, attackerParty, forcePlayerOutFromSettlement: false, ConversationRestartSource.EncounterManager));
 
         return false;
-    }
-
-    // After the host's encounter (re)starts via EncounterManager, hold the encountered AI party (see
-    // PlayerEncounterPatches.RestartPlayerEncounterPostfix for why this is a postfix).
-    [HarmonyPatch("RestartPlayerEncounter")]
-    [HarmonyPostfix]
-    private static void RestartPlayerEncounterPostfix()
-    {
-        if (!ModInformation.IsServer) return;
-
-        ConversationPartyHold.EngageHostEncounteredParty();
     }
 }
 

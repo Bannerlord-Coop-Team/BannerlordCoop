@@ -183,14 +183,10 @@ internal class InteractionPatches
         }
 
         // A party held in a conversation with a player can only be interacted with by that player's party. This is
-        // the hard stop that keeps AI parties (and the host) from starting an encounter or battle with it, since
+        // the hard stop that keeps other AI parties from starting an encounter or battle with it, since
         // OnPartyInteraction only runs when this check passes.
         if (ConversationPartyHold.IsInteractionBlocked(__instance, mobileParty))
         {
-            // The host's own bump is blocked here (clients are told via NetworkConversationDenied instead).
-            if (mobileParty?.IsMainParty == true)
-                ConversationPartyHold.ShowInteractionBlockedMessage();
-
             __result = false;
         }
     }

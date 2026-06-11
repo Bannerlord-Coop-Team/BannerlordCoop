@@ -1,7 +1,5 @@
-using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using System;
-using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
 
@@ -73,58 +71,6 @@ internal static class ConversationPartyHold
     }
 
     /// <summary>
-    /// [Server] Guard for the host's encounter restart: false when the targeted AI party is already in a
-    /// conversation with another player, so the restart must not run.
-    /// </summary>
-    public static bool CanHostRestartEncounter(PartyBase attackerParty, PartyBase defenderParty)
-    {
-        var tracker = ConversationPartyTracker.Instance;
-        if (tracker == null || tracker.IsEmpty) return true;
-
-        var aiParty = GetAiMobileSide(attackerParty, defenderParty);
-        if (aiParty == null) return true;
-
-        // Battle flow: an engagement outlives a conversation that escalated into a battle (it is released at the
-        // engager's encounter finish), and battle-related restarts must keep running for such parties.
-        if (aiParty.MapEvent != null) return true;
-
-        var objectManager = tracker.ObjectManager;
-        if (objectManager == null) return true;
-        if (!objectManager.TryGetId(aiParty.Party, out var partyId)) return true;
-
-        return !tracker.IsEngagedByOther(partyId, ConversationPartyTracker.HostEngagerKey);
-    }
-
-    /// <summary>
-    /// [Server] Marks and holds the AI party of the host's freshly (re)started encounter. Runs after the restart so
-    /// the restart's internal <c>PlayerEncounter.Finish</c> (which releases the previous engagement) cannot undo it.
-    /// </summary>
-    public static void EngageHostEncounteredParty()
-    {
-        var tracker = ConversationPartyTracker.Instance;
-        if (tracker == null) return;
-
-        var party = PlayerEncounter.EncounteredMobileParty;
-        if (party == null || party.IsPlayerParty()) return;
-
-        // Battle flow: the map-event rules take over once the party is in a battle.
-        if (party.MapEvent != null) return;
-
-        var objectManager = tracker.ObjectManager;
-        if (objectManager == null) return;
-        if (!objectManager.TryGetId(party.Party, out var partyId)) return;
-        if (!objectManager.TryGetId(PartyBase.MainParty, out var hostPartyId)) return;
-
-        TryEngage(tracker, ConversationPartyTracker.HostEngagerKey, hostPartyId, party, partyId);
-    }
-
-    /// <summary>[Server] Releases the AI party held for the host's conversation, if any.</summary>
-    public static void EndHostEngagement()
-    {
-        EndEngagement(ConversationPartyTracker.Instance, ConversationPartyTracker.HostEngagerKey);
-    }
-
-    /// <summary>
     /// [Server] True when the target party is held in a player's conversation and the interacting party is not the
     /// engaging player's own party, so the map interaction must be blocked.
     /// </summary>
@@ -181,17 +127,5 @@ internal static class ConversationPartyHold
 
         ai.EnableAi();
         ai.RethinkAtNextHourlyTick = true;
-    }
-
-    /// <summary>The non-player mobile side of an encounter, or null when there is none (e.g. a settlement side).</summary>
-    private static MobileParty GetAiMobileSide(PartyBase attackerParty, PartyBase defenderParty)
-    {
-        var attackerMobile = attackerParty?.MobileParty;
-        if (attackerMobile != null && !attackerMobile.IsPlayerParty()) return attackerMobile;
-
-        var defenderMobile = defenderParty?.MobileParty;
-        if (defenderMobile != null && !defenderMobile.IsPlayerParty()) return defenderMobile;
-
-        return null;
     }
 }

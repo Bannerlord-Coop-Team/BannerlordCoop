@@ -12,9 +12,8 @@ namespace GameInterface.Services.MapEvents;
 /// unattackable. Co-op keeps campaign time running, so while a player's encounter with an AI party is open the
 /// server records an engagement here. The conversation approval flow and the interaction/AI-attack guards consult
 /// the registry so no other player or AI party can interact with the engaged party, and
-/// <see cref="ConversationPartyHold"/> reverts the hold when the engagement ends. Engagements are keyed per player -
-/// the requesting client's <see cref="LiteNetLib.NetPeer"/>, or <see cref="HostEngagerKey"/> for the host - so each
-/// player holds at most one engagement at a time.
+/// <see cref="ConversationPartyHold"/> reverts the hold when the engagement ends. Engagements are keyed per player by
+/// the requesting client's <see cref="LiteNetLib.NetPeer"/>, so each player holds at most one engagement at a time.
 /// Aside from <see cref="Dispose"/> - which releases any leftover holds so a campaign that outlives the co-op
 /// session is not left with permanently frozen parties - this class is pure bookkeeping, so it is unit-testable
 /// without the game.
@@ -26,9 +25,6 @@ internal sealed class ConversationPartyTracker : IHandler
     /// the auto-activated handler registration.
     /// </summary>
     internal static ConversationPartyTracker Instance { get; private set; }
-
-    /// <summary>Engager key representing the host player; clients are keyed by their <see cref="LiteNetLib.NetPeer"/>.</summary>
-    internal static readonly object HostEngagerKey = new object();
 
     private readonly object stateLock = new object();
     private readonly Dictionary<string, Engagement> engagementsByPartyId = new Dictionary<string, Engagement>();
@@ -74,7 +70,7 @@ internal sealed class ConversationPartyTracker : IHandler
     /// <summary>A single player's engagement of an AI party.</summary>
     public readonly struct Engagement
     {
-        /// <summary>Key of the engaging player (<see cref="LiteNetLib.NetPeer"/> or <see cref="HostEngagerKey"/>).</summary>
+        /// <summary>Key of the engaging player (the requesting client's <see cref="LiteNetLib.NetPeer"/>).</summary>
         public readonly object EngagerKey;
 
         /// <summary>Id of the engaging player's party; interactions from that party stay allowed.</summary>
