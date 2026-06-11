@@ -16,7 +16,8 @@ namespace GameInterface.Services.Companions.Patches.Disable
         // Disable these methods on the client
         private static IEnumerable<MethodBase> TargetMethods() => new MethodBase[]
         {
-            AccessTools.Method(typeof(CompanionRolesCampaignBehavior), nameof(CompanionRolesCampaignBehavior.OnHeroRelationChanged))
+            AccessTools.Method(typeof(CompanionRolesCampaignBehavior), nameof(CompanionRolesCampaignBehavior.OnHeroRelationChanged)),
+            AccessTools.Method(typeof(CompanionRolesCampaignBehavior), nameof(CompanionRolesCampaignBehavior.OnCompanionRemoved))
         };
 
         static bool Prefix()
