@@ -8,7 +8,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
 using System.Xml.Linq;
 using TaleWorlds.ObjectSystem;
-using GameInterface.Services.Equipments.Messages.Events;
+using GameInterface.Services.Equipments.Messages;
 
 namespace E2E.Tests.Services.Equipments;
 

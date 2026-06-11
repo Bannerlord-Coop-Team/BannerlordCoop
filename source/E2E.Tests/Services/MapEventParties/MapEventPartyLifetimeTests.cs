@@ -1,6 +1,7 @@
 ﻿using E2E.Tests.Environment;
 using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.MapEventParties;
@@ -47,14 +48,19 @@ public class MapEventPartyLifetimeTests : IDisposable
     {
         // Arrange
         var server = TestEnvironment.Server;
+        var firstClient = TestEnvironment.Clients.First();
+
+        // MapEventParty's constructor dereferences the PartyBase, so build a valid party on the
+        // server (synced to clients) and construct from it on the client - mirrors MapEventPartyBuilder.
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
 
         // Act
         string? mapEventId = null;
-
-        var firstClient = TestEnvironment.Clients.First();
         firstClient.Call(() =>
         {
-            var mapEvent = new MapEventParty(default);
+            Assert.True(firstClient.ObjectManager.TryGetObject<MobileParty>(partyId, out var mobileParty));
+
+            var mapEvent = new MapEventParty(mobileParty.Party);
 
             Assert.False(firstClient.ObjectManager.TryGetId(mapEvent, out mapEventId));
         });

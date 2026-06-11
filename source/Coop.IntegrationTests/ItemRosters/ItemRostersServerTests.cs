@@ -1,7 +1,9 @@
-﻿using Coop.IntegrationTests.Environment.Instance;
+using Coop.IntegrationTests.Environment.Instance;
 using Coop.IntegrationTests.Environment;
 using GameInterface.Services.ItemRosters.Messages;
 
+using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Core;
 namespace Coop.IntegrationTests.ItemRosters
 {
     public class ItemRostersServerTests
@@ -14,7 +16,19 @@ namespace Coop.IntegrationTests.ItemRosters
         [Fact]
         public void ServerReceivesItemRosterUpdated_PublishesUpdateItemRoster_AllClients()
         {
-            var triggerMessage = new ItemRosterUpdated(null, null, null, 1);
+            var itemRoster = TestEnvironment.Server.CreateRegisteredObject<ItemRoster>("itemRoster1");
+            foreach (var client in TestEnvironment.Clients)
+            {
+                client.CreateRegisteredObject<ItemRoster>("itemRoster1");
+            }
+
+            var item = TestEnvironment.Server.CreateRegisteredObject<ItemObject>("item1");
+            foreach (var client in TestEnvironment.Clients)
+            {
+                client.CreateRegisteredObject<ItemObject>("item1");
+            }
+
+            var triggerMessage = new ItemRosterUpdated(itemRoster, item, null, 1);
 
             var server = TestEnvironment.Server;
 
@@ -34,7 +48,13 @@ namespace Coop.IntegrationTests.ItemRosters
         [Fact]
         public void ServerReceivesItemRosterCleared_PublishesClearItemRoster_AllClients()
         {
-            var triggerMessage = new ItemRosterCleared(null);
+            var itemRoster = TestEnvironment.Server.CreateRegisteredObject<ItemRoster>("itemRoster1");
+            foreach (var client in TestEnvironment.Clients)
+            {
+                client.CreateRegisteredObject<ItemRoster>("itemRoster1");
+            }
+
+            var triggerMessage = new ItemRosterCleared(itemRoster);
 
             var server = TestEnvironment.Server;
 

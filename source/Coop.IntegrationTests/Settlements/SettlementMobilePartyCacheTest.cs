@@ -1,8 +1,10 @@
-﻿using Coop.Core.Server.Services.Settlements.Messages;
+using Coop.Core.Server.Services.Settlements.Messages;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Settlements.Messages;
 
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 namespace Coop.IntegrationTests.Settlements;
 
 /// <summary>
@@ -18,7 +20,19 @@ public class SettlementMobilePartyCacheTest
     [Fact]
     public void ServerSettlementMobilePartyCacheChanged_Publishes_AllClients()
     {
-        var triggerMessage = new SettlementChangedMobileParty();
+        var settlement = TestEnvironment.Server.CreateRegisteredObject<Settlement>("settlement1");
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.CreateRegisteredObject<Settlement>("settlement1");
+        }
+
+        var mobileParty = TestEnvironment.Server.CreateRegisteredObject<MobileParty>("mobileParty1");
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.CreateRegisteredObject<MobileParty>("mobileParty1");
+        }
+
+        var triggerMessage = new SettlementChangedMobileParty(settlement, mobileParty, true);
 
         var server = TestEnvironment.Server;
 

@@ -2,35 +2,90 @@ name: Build and Test
 
 on:
   pull_request:
-    types:
-      [opened, synchronize]
-    drafts: false
-    
+
+# Cancel superseded runs when a PR is updated
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+
 jobs:
-  build-and-test:
+  build:
     runs-on: ubuntu-latest
-    
+    timeout-minutes: 30
+    if: ${{ !github.event.pull_request.draft }}
+
     container:
       image: garrettluskey/bannerlordcoop:latest
-      
+
     steps:
-      - name: Checkout Repo
-        run: |
-          git clone https://github.com/${{ github.repository }}
-          cd BannerlordCoop
-          git fetch origin "pull/${{ github.event.number }}/head:${{ github.event.pull_request.base.ref }}-PR-${{ github.event.number }}"
-          git checkout "${{ github.event.pull_request.base.ref }}-PR-${{ github.event.number }}"
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Link Game Assemblies Folder
-        run: |
-          ln -s /home/mb2 BannerlordCoop
-          
+        run: ln -s /home/mb2 mb2
+
+      - name: Cache NuGet Packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('source/**/*.csproj') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      # CoopTests.slnf contains the test projects that can build and run on Linux (plus their
+      # production dependencies such as Coop.Core and GameInterface). The full solution includes
+      # legacy net472 projects (Coop, Missions, ClientDebug, MissionTestMod and the
+      # Missions-dependent MissionTests) that require Windows.
       - name: Build Solution
-        run: |
-          cd BannerlordCoop/source
-          dotnet build Coop.Core -c Release
-      
+        working-directory: source
+        run: dotnet build CoopTests.slnf -c Release
+
+      - name: Upload Build Output
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: source/*/bin/**
+          retention-days: 1
+          if-no-files-found: error
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: build
+
+    container:
+      image: garrettluskey/bannerlordcoop:latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Link Game Assemblies Folder
+        run: ln -s /home/mb2 mb2
+
+      - name: Cache NuGet Packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('source/**/*.csproj') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Download Build Output
+        uses: actions/download-artifact@v4
+        with:
+          name: build-output
+          path: source
+
+      # Restore recreates the NuGet assets (obj/) that --no-build project evaluation needs;
+      # the binaries under bin/ come from the build job's artifact, so nothing is recompiled.
+      - name: Restore
+        working-directory: source
+        run: dotnet restore CoopTests.slnf
+
       - name: Run Unit Tests
-        run: |
-          cd BannerlordCoop/source
-          dotnet test -c Release --consoleLoggerParameters:ErrorsOnly
+        working-directory: source
+        run: dotnet test CoopTests.slnf -c Release --no-build --consoleLoggerParameters:ErrorsOnly

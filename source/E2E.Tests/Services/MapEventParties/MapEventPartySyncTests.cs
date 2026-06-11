@@ -1,6 +1,7 @@
 ﻿using E2E.Tests.Util;
 using HarmonyLib;
 using Newtonsoft.Json.Bson;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using Xunit.Abstractions;
@@ -21,8 +22,8 @@ namespace E2E.Tests.Services.MapEventParties
         {
             Server.ObjectManager.TryGetObject(MepId, out MapEventParty eventParty);
             eventParty.Party = null;
-            TestEnvironment.AssertProperty<MapEventParty, float>(nameof(MapEventParty.GainedInfluence), 5f);
-            TestEnvironment.AssertProperty<MapEventParty, float>(nameof(MapEventParty.GainedRenown), 2f);
+            TestEnvironment.AssertProperty<MapEventParty, ExplainedNumber>(nameof(MapEventParty.GainedInfluenceExplained), new ExplainedNumber(5f), defaultValue: eventParty.GainedInfluenceExplained);
+            TestEnvironment.AssertProperty<MapEventParty, ExplainedNumber>(nameof(MapEventParty.GainedRenownExplained), new ExplainedNumber(2f), defaultValue: eventParty.GainedRenownExplained);
             TestEnvironment.AssertProperty<MapEventParty, int>(nameof(MapEventParty.GoldLost), 3);
             TestEnvironment.AssertReferenceProperty<MapEventParty, PartyBase>(nameof(MapEventParty.Party));
             TestEnvironment.AssertProperty<MapEventParty, int>(nameof(MapEventParty.PlunderedGold), 3);
@@ -32,8 +33,9 @@ namespace E2E.Tests.Services.MapEventParties
         [Fact]
         public void Server_MapEventParty_Fields()
         {
-            TestEnvironment.AssertField<MapEventParty, int>(nameof(MapEventParty._contributionToBattle), 3, defaultValue: 1);
-            TestEnvironment.AssertField<MapEventParty, int>(nameof(MapEventParty._healthyManCountAtStart), 3, defaultValue: 1);
+            Server.ObjectManager.TryGetObject(MepId, out MapEventParty eventParty);
+            TestEnvironment.AssertField<MapEventParty, int>(nameof(MapEventParty._contributionToBattle), 3, defaultValue: eventParty._contributionToBattle);
+            TestEnvironment.AssertField<MapEventParty, int>(nameof(MapEventParty._healthyManCountAtStart), 3, defaultValue: eventParty._healthyManCountAtStart);
         }
     }
 }

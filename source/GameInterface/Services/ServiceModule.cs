@@ -52,7 +52,22 @@ internal class ServiceModule : Module
     }
 
     // Namespace is needed to separate client and server handlers being registered with DI
-    private IEnumerable<Type> GetHandlers() => InterfaceCollector.GetInterfaces<IHandler>(NAMESPACE).Concat(InterfaceCollector.GetInterfaces<IHandler>("DynamicSync"));
+    private IEnumerable<Type> GetHandlers()
+    {
+        var handlers = InterfaceCollector.GetInterfaces<IHandler>(NAMESPACE);
+
+        // When dynamic sync generates its code at runtime, the generated handlers are created by
+        // DynamicSyncPatcher.BindHandlers and must NOT also be activated by the container: the
+        // "DynamicSync" namespace scan covers every loaded assembly, so any container built after
+        // the runtime assembly exists (a second test environment, or rejoining coop in the same
+        // process) would construct a second handler per type and every synced message would be
+        // applied twice. Only when running from the compiled export (generation disabled) is the
+        // container the sole owner of the generated handlers.
+        if (DynamicSync.DynamicSyncConfiguration.Enabled)
+            return handlers;
+
+        return handlers.Concat(InterfaceCollector.GetInterfaces<IHandler>("DynamicSync"));
+    }
 
     // Namespace is needed to separate client and server handlers being registered with DI
     private IEnumerable<Type> GetGameAbstractions() => InterfaceCollector.GetInterfaces<IGameAbstraction>(NAMESPACE);
