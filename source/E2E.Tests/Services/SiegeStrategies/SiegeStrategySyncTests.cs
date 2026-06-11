@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem.Siege;
+using TaleWorlds.Localization;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.SiegeStrategies
@@ -23,8 +24,8 @@ namespace E2E.Tests.Services.SiegeStrategies
             Assert.True(Server.ObjectManager.TryGetObject(siegeStrategyId, out SiegeStrategy siegeStrategy));
 
             // Assert
-            TestEnvironment.AssertProperty<SiegeStrategy, string>(nameof(SiegeStrategy.Name), "testStrategy");
-            TestEnvironment.AssertProperty<SiegeStrategy, string>(nameof(SiegeStrategy.Description), "testStrategy_description");
+            TestEnvironment.AssertProperty<SiegeStrategy, TextObject>(nameof(SiegeStrategy.Name), new TextObject("testStrategy"));
+            TestEnvironment.AssertProperty<SiegeStrategy, TextObject>(nameof(SiegeStrategy.Description), new TextObject("testStrategy_description"));
         }
     }
 }
