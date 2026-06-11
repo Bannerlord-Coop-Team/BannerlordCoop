@@ -12,7 +12,7 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.MobileParties.Handlers;
 
 /// <summary>
-/// Replicates party leader changes server -&gt; client.
+/// Replicates party leader changes server -> client.
 /// </summary>
 internal class PartyLeaderHandler : IHandler
 {

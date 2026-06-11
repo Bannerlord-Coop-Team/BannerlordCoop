@@ -4,7 +4,7 @@ using ProtoBuf;
 namespace GameInterface.Services.MapEvents.Messages.Start;
 
 /// <summary>
-/// [Client -&gt; Server] Asks the server to run the authoritative auto-resolve simulation for the
+/// [Client -> Server] Asks the server to run the authoritative auto-resolve simulation for the
 /// given map event. Casualties and the resulting <c>BattleState</c> are replicated back through the
 /// existing TroopRoster / MapEvent sync; completion is signalled by <see cref="NetworkBattleSimulationFinished"/>.
 /// </summary>

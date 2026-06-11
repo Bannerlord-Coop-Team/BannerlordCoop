@@ -4,7 +4,7 @@ using ProtoBuf;
 namespace GameInterface.Services.MobileParties.Messages.Lifetime;
 
 /// <summary>
-/// [Server -&gt; Client] Replicates a party destruction. <see cref="VictoriousPartyId"/> is null when
+/// [Server -> Client] Replicates a party destruction. <see cref="VictoriousPartyId"/> is null when
 /// the party was destroyed with no destroyer (e.g. despawn cleanup such as patrol culling).
 /// </summary>
 [ProtoContract]

@@ -4,7 +4,7 @@ using ProtoBuf;
 namespace GameInterface.Services.MapEvents.Messages.Start;
 
 /// <summary>
-/// Client -&gt; Server request for the server to authoritatively create the <see cref="TaleWorlds.CampaignSystem.MapEvents.MapEvent"/>
+/// Client -> Server request for the server to authoritatively create the <see cref="TaleWorlds.CampaignSystem.MapEvents.MapEvent"/>
 /// for a player's battle. The client blocks until it receives a matching <see cref="NetworkMapEventCreated"/> (correlated
 /// by <see cref="RequestId"/>) or times out.
 /// </summary>

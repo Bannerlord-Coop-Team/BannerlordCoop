@@ -49,7 +49,7 @@ internal readonly struct BattleSimTroopChange
 }
 
 /// <summary>
-/// [Server -&gt; Client] One round's worth of scoreboard updates from the authoritative simulation.
+/// [Server -> Client] One round's worth of scoreboard updates from the authoritative simulation.
 /// The client replays them onto its open simulation screen, paced by its own frame tick, so the
 /// auto-resolve plays out instead of snapping to the result.
 /// </summary>
