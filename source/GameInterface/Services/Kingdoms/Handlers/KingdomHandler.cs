@@ -40,7 +40,14 @@ public class KingdomHandler : IHandler
             return;
         }
 
+        // Kingdoms created on clients skip the constructor, so the list can be null.
         var decisions = kingdom._unresolvedDecisions;
+        if (decisions == null)
+        {
+            Logger.Verbose("Kingdom {id} has no unresolved decision list.", payload.KingdomId);
+            return;
+        }
+
         if (payload.Index >= 0 && decisions.Count > payload.Index)
         {
             KingdomPatches.RunOriginalRemoveDecision(kingdom, decisions[payload.Index]);

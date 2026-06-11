@@ -15,13 +15,13 @@ internal class VillageSync : IDynamicSync
         // Fields
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Village), nameof(Village.VillageType)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Village), nameof(Village._marketData)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Village), nameof(Village._villageState)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Village), nameof(Village.VillagerPartyComponent)));
         //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Village), nameof(Village._owner))); // Uses abstract method PartyBase which can't be prepared. Not sure what to do about this
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Village), nameof(Village._bound)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Village), nameof(Village._tradeBound)));
 
         // Properties
-        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Village), nameof(Village.VillageState)));
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Village), nameof(Village.Hearth)));
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Village), nameof(Village.LastDemandSatisfiedTime)));
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Village), nameof(Village.TradeTaxAccumulated)));

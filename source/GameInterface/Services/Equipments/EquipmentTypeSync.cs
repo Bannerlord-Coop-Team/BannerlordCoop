@@ -9,6 +9,6 @@ class EquipmentSync : IDynamicSync
 {
     public EquipmentSync(DynamicSyncRegistry autoSyncBuilder)
     {
-        //autoSyncBuilder.AddField(AccessTools.Field(typeof(Equipment), nameof(Equipment._equipmentType)));
+        autoSyncBuilder.AddField(AccessTools.Field(typeof(Equipment), nameof(Equipment._equipmentType)));
     }
 }

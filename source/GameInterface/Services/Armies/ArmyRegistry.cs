@@ -50,6 +50,12 @@ internal class ArmyRegistry : AutoRegistryBase<Army>
     public override void OnClientCreated(Army obj, string id)
     {
         AccessTools.Field(typeof(Army), nameof(Army._parties)).SetValue(obj, new MBList<MobileParty>());
+
+        // The client Army is created via SkipConstructor, so the periodic tick events
+        // (_hourlyTickEvent / _tickEvent) are never initialized. Native methods such as
+        // DisperseInternal dereference them, so initialize them the same way the
+        // constructor does by invoking the private AddEventHandlers.
+        obj.AddEventHandlers();
     }
     // DisperseInternal doesnt work since  it accesses LeaderParty.Position, tick events, and
     // CampaignEventDispatcher which arent initialized on client objects (SkipConstructor).

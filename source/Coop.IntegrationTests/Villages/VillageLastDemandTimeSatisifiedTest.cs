@@ -1,8 +1,9 @@
-﻿using Coop.Core.Server.Services.Villages.Messages;
+using Coop.Core.Server.Services.Villages.Messages;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Villages.Messages;
 
+using TaleWorlds.CampaignSystem.Settlements;
 namespace Coop.IntegrationTests.Villages;
 
 public class VillageLastDemandTimeSatisifiedTest
@@ -18,7 +19,13 @@ public class VillageLastDemandTimeSatisifiedTest
     public void ServerLastDemandTimeChanged_Publishes_AllClients()
     {
         // Arrange
-        var triggerMessage = new VillageDemandTimeChanged();
+        var village = TestEnvironment.Server.CreateRegisteredObject<Village>("village1");
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.CreateRegisteredObject<Village>("village1");
+        }
+
+        var triggerMessage = new VillageDemandTimeChanged(village, 30f);
 
         var server = TestEnvironment.Server;
 

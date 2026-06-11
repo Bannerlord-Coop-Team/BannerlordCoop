@@ -70,15 +70,13 @@ public class TownQueueSyncTests : SyncTestBase
         foreach (var client in Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject(townId, out Town clientTown));
-            Assert.True(Server.ObjectManager.TryGetObject(townId, out Town serverTown));
-            Assert.True(2 == clientTown.BuildingsInProgress.Count,
-                $"client count={clientTown.BuildingsInProgress.Count}, server count={serverTown.BuildingsInProgress.Count}, " +
-                $"sameInstance={ReferenceEquals(serverTown, clientTown)}, sameQueue={ReferenceEquals(serverTown.BuildingsInProgress, clientTown.BuildingsInProgress)}");
+            Assert.Equal(2, clientTown.BuildingsInProgress.Count);
         }
 
+        var dynamicSyncAsm = DynamicSyncConfiguration.Enabled ? DynamicSyncPatcher.Assembly : typeof(DynamicSyncConfiguration).Assembly;
         // Act — clear the queue on the server through the generated queue clear intercept,
         // the same intercept the dynamic sync transpiler routes Queue<T>.Clear() calls into.
-        var patchesType = DynamicSyncPatcher.Assembly.GetType($"DynamicSync.{nameof(Town)}_DynamicPatches");
+        var patchesType = dynamicSyncAsm.GetType($"DynamicSync.{nameof(Town)}_DynamicPatches");
         Assert.True(patchesType != null, "Generated Town_DynamicPatches type not found in dynamic sync assembly");
 
         var clearIntercept = patchesType.GetMethod($"Intercept_QueueClear_{nameof(Town.BuildingsInProgress)}");

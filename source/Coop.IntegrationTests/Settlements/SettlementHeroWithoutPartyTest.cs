@@ -1,8 +1,10 @@
-﻿using Coop.Core.Server.Services.Settlements.Messages;
+using Coop.Core.Server.Services.Settlements.Messages;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Settlements.Messages;
 
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Settlements;
 namespace Coop.IntegrationTests.Settlements;
 
 /// <summary>
@@ -17,7 +19,19 @@ public class SettlementHeroWithoutPartyTest
     [Fact]
     public void ServerSettlementAddHeroWithoutPartyChanged_Publishes_AllClients()
     {
-        var triggerMessage = new SettlementChangedRemoveHeroWithoutParty(null, null);
+        var settlement = TestEnvironment.Server.CreateRegisteredObject<Settlement>("settlement1");
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.CreateRegisteredObject<Settlement>("settlement1");
+        }
+
+        var hero = TestEnvironment.Server.CreateRegisteredObject<Hero>("hero1");
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.CreateRegisteredObject<Hero>("hero1");
+        }
+
+        var triggerMessage = new SettlementChangedRemoveHeroWithoutParty(settlement, hero);
 
         var server = TestEnvironment.Server;
         server.SimulateMessage(this, triggerMessage);
@@ -38,7 +52,19 @@ public class SettlementHeroWithoutPartyTest
     [Fact]
     public void ServerSettlementAddRemoveWithoutPartyChanged_Publishes_AllClients()
     {
-        var triggerMessage = new SettlementChangedAddHeroWithoutParty(null, null);
+        var settlement = TestEnvironment.Server.CreateRegisteredObject<Settlement>("settlement1");
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.CreateRegisteredObject<Settlement>("settlement1");
+        }
+
+        var hero = TestEnvironment.Server.CreateRegisteredObject<Hero>("hero1");
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.CreateRegisteredObject<Hero>("hero1");
+        }
+
+        var triggerMessage = new SettlementChangedAddHeroWithoutParty(settlement, hero);
 
         var server = TestEnvironment.Server;
         server.SimulateMessage(this, triggerMessage);
