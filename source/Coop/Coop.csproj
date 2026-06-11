@@ -236,8 +236,8 @@
   <PropertyGroup>
     <ModName>Coop</ModName>
     <MainClass>CoopMod</MainClass>
-    <ModVersion>v0.0.1</ModVersion>
-    <GameVersion>v1.3.12</GameVersion>
+    <ModVersion>v0.0.2</ModVersion>
+    <GameVersion>v1.4.6</GameVersion>
   </PropertyGroup>
   <Import Project="$(MSBuildProjectDirectory)\..\..\Deploy.targets" />
 </Project>
