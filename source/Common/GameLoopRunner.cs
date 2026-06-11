@@ -64,12 +64,22 @@ public class GameLoopRunner : IUpdateable
     public int Priority { get; } = UpdatePriority.MainLoop.GameLoopRunner;
 
     /// <summary>
+    /// Maximum time a blocking <see cref="RunOnMainThread(Action, bool)"/> call waits for the game
+    /// loop to process the queued action before failing. Turns a silent deadlock into a loud error
+    /// when the game loop is not pumping (or was never initialized, as in test environments).
+    /// </summary>
+    public static readonly TimeSpan BlockingTimeout = TimeSpan.FromSeconds(30);
+
+    /// <summary>
     /// Runs a given action on the game thread
     /// </summary>
     /// <param name="action">Action to run on game thread</param>
     /// <param name="blocking">Flag to pause code execution,
     /// True blocks execution until task is complete,
     /// False queues and returns</param>
+    /// <exception cref="TimeoutException">
+    /// Thrown for blocking calls when the action was not processed within <see cref="BlockingTimeout"/>.
+    /// </exception>
     public static void RunOnMainThread(Action action, bool blocking = false)
     {
         if (Thread.CurrentThread.ManagedThreadId == Instance.m_GameLoopThreadId)
@@ -86,7 +96,13 @@ public class GameLoopRunner : IUpdateable
                 Instance.m_Queue.Enqueue((action, ewh));
             }
 
-            ewh?.WaitOne();
+            if (ewh != null && ewh.WaitOne(BlockingTimeout) == false)
+            {
+                throw new TimeoutException(
+                    $"A blocking {nameof(RunOnMainThread)} action was not processed by the game loop " +
+                    $"within {BlockingTimeout.TotalSeconds:0} seconds. The game loop thread is not pumping " +
+                    $"{nameof(GameLoopRunner)}.{nameof(Update)} (initialized: {Instance.IsInitialized}).");
+            }
         }
     }
 

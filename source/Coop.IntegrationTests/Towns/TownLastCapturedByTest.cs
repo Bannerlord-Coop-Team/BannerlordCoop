@@ -1,8 +1,10 @@
-﻿using Coop.Core.Server.Services.Towns.Messages;
+using Coop.Core.Server.Services.Towns.Messages;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Towns.Messages;
 
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Settlements;
 namespace Coop.IntegrationTests.Towns
 {
     public class TownLastCapturedByTest
@@ -17,7 +19,19 @@ namespace Coop.IntegrationTests.Towns
         public void ServerTownLastCapturedByChanged_Publishes_AllClients()
         {
             // Arrange
-            var triggerMessage = new TownLastCapturedByChanged();
+            var town = TestEnvironment.Server.CreateRegisteredObject<Town>("town1");
+            foreach (var client in TestEnvironment.Clients)
+            {
+                client.CreateRegisteredObject<Town>("town1");
+            }
+
+            var clan = TestEnvironment.Server.CreateRegisteredObject<Clan>("clan1");
+            foreach (var client in TestEnvironment.Clients)
+            {
+                client.CreateRegisteredObject<Clan>("clan1");
+            }
+
+            var triggerMessage = new TownLastCapturedByChanged(town, clan);
 
             var server = TestEnvironment.Server;
 

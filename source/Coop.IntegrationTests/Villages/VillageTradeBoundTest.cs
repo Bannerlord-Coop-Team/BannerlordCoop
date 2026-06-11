@@ -1,4 +1,4 @@
-﻿using Coop.Core.Server.Services.Villages.Messages;
+using Coop.Core.Server.Services.Villages.Messages;
 using Coop.IntegrationTests.Environment.Instance;
 using Coop.IntegrationTests.Environment;
 using GameInterface.Services.Villages.Messages;
@@ -8,6 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
+using TaleWorlds.CampaignSystem.Settlements;
 namespace Coop.IntegrationTests.Villages
 {
     public class VillageTradeBoundTest
@@ -22,7 +23,19 @@ namespace Coop.IntegrationTests.Villages
         public void ServerVillageTradeBoundChanged_Publishes_AllClients()
         {
             // Arrange
-            var triggerMessage = new VillageTradeBoundChanged();
+            var village = TestEnvironment.Server.CreateRegisteredObject<Village>("village1");
+            foreach (var client in TestEnvironment.Clients)
+            {
+                client.CreateRegisteredObject<Village>("village1");
+            }
+
+            var tradeBound = TestEnvironment.Server.CreateRegisteredObject<Settlement>("tradeBound1");
+            foreach (var client in TestEnvironment.Clients)
+            {
+                client.CreateRegisteredObject<Settlement>("tradeBound1");
+            }
+
+            var triggerMessage = new VillageTradeBoundChanged(village, tradeBound);
 
             var server = TestEnvironment.Server;
 

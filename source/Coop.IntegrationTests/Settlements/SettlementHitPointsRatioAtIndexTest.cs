@@ -1,4 +1,4 @@
-﻿using Coop.Core.Server.Services.Settlements.Messages;
+using Coop.Core.Server.Services.Settlements.Messages;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Settlements.Messages;
@@ -8,6 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
+using TaleWorlds.CampaignSystem.Settlements;
 namespace Coop.IntegrationTests.Settlements;
 public class SettlementHitPointsRatioAtIndexTest
 {
@@ -19,7 +20,13 @@ public class SettlementHitPointsRatioAtIndexTest
     [Fact]
     public void ServerSettlementHitPointsRatioAtIndexChanged_Publishes_AllClients()
     {
-        var triggerMessage = new SettlementWallHitPointsRatioChanged();
+        var settlement = TestEnvironment.Server.CreateRegisteredObject<Settlement>("settlement1");
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.CreateRegisteredObject<Settlement>("settlement1");
+        }
+
+        var triggerMessage = new SettlementWallHitPointsRatioChanged(settlement, 1, 0.5f);
 
         var server = TestEnvironment.Server;
 
