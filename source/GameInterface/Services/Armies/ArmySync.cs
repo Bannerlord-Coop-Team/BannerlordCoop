@@ -11,6 +11,11 @@ internal class ArmySync : IDynamicSync
 {
     public ArmySync(DynamicSyncRegistry autoSyncBuilder)
     {
+        //fields
+
+        //properties
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Army), nameof(Army.LeaderParty)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Army), nameof(Army.ArmyOwner)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Army), nameof(Army.Morale)));
     }
 }

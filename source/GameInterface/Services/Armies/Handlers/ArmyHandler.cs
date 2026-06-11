@@ -6,7 +6,9 @@ using GameInterface.Services.Armies.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Armies.Handlers;
 
@@ -31,6 +33,8 @@ public class ArmyHandler : IHandler
         messageBroker.Subscribe<NetworkAddMobilePartyInArmy>(HandleChangeAddMobilePartyInArmy);
         messageBroker.Subscribe<MobilePartyInArmyRemoved>(HandleRemoveMobilePartyInArmy);
         messageBroker.Subscribe<NetworkRemovePartyInArmy>(HandleChangeRemoveMobilePartyInArmy);
+        messageBroker.Subscribe<ArmyAiBehaviorObjectChanged>(HandleArmyAiBehaviorObjectChanged);
+        messageBroker.Subscribe<NetworkSetArmyAiBehaviorObject>(HandleNetworkSetArmyAiBehaviorObject);
     }
 
     public void Dispose()
@@ -39,6 +43,8 @@ public class ArmyHandler : IHandler
         messageBroker.Unsubscribe<NetworkAddMobilePartyInArmy>(HandleChangeAddMobilePartyInArmy);
         messageBroker.Unsubscribe<MobilePartyInArmyRemoved>(HandleRemoveMobilePartyInArmy);
         messageBroker.Unsubscribe<NetworkRemovePartyInArmy>(HandleChangeRemoveMobilePartyInArmy);
+        messageBroker.Unsubscribe<ArmyAiBehaviorObjectChanged>(HandleArmyAiBehaviorObjectChanged);
+        messageBroker.Unsubscribe<NetworkSetArmyAiBehaviorObject>(HandleNetworkSetArmyAiBehaviorObject);
     }
 
     private void HandleAddMobilePartyInArmy(MessagePayload<MobilePartyInArmyAdded> obj)
@@ -81,5 +87,39 @@ public class ArmyHandler : IHandler
         if (objectManager.TryGetObjectWithLogging<Army>(data.ArmyId, out var army) == false) return;
 
         ArmyPatches.RemoveMobilePartyInArmy(mobileParty, army);
+    }
+
+    private void HandleArmyAiBehaviorObjectChanged(MessagePayload<ArmyAiBehaviorObjectChanged> payload)
+    {
+        var obj = payload.What;
+        if (!objectManager.TryGetIdWithLogging(obj.Army, out var armyId)) return;
+
+        bool isSettlement = obj.AiBehaviorObject is Settlement;
+        if (!objectManager.TryGetIdWithLogging(obj.AiBehaviorObject, out var objectId)) return;
+
+        var message = new NetworkSetArmyAiBehaviorObject(armyId, objectId, isSettlement);
+
+        // Broadcast to all the clients that the state was changed   
+        network.SendAll(message);
+    }
+
+    private void HandleNetworkSetArmyAiBehaviorObject(MessagePayload<NetworkSetArmyAiBehaviorObject> payload)
+    {
+        var obj = payload.What;
+        if (objectManager.TryGetObjectWithLogging<Army>(obj.ArmyId, out var army) == false) return;
+
+        IMapPoint mapPoint;
+        if (obj.IsSettlement)
+        {
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.AiBehaviorObjectId, out var settlement)) return;
+            mapPoint = settlement;
+        }
+        else
+        {
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.AiBehaviorObjectId, out var party)) return;
+            mapPoint = party;
+        }
+
+        ArmyPatches.SetAiBehaviorObject(army, mapPoint);
     }
 }
