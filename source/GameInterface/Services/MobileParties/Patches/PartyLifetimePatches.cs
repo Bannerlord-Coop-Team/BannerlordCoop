@@ -46,25 +46,11 @@ internal class DestroyPartyActionPatch
     [HarmonyPrefix]
     internal static bool PrefixApply(PartyBase destroyerParty, MobileParty destroyedParty)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed())
-        {
-            // A destroy that runs while patches are skipped can be a vanilla side effect nested
-            // inside another replicated action (e.g. a settlement ownership change culling its
-            // patrol). On the server that destroy is still authoritative and must replicate, or
-            // clients keep a zombie party. The server never applies a received destroy, so this
-            // cannot double-publish.
-            if (CallOriginalPolicy.IsServerNestedCall())
-            {
-                // Nested destroys must not bypass the player-party protection either.
-                if (IsProtectedPlayerParty(destroyedParty)) return false;
-
-                PublishDestroyIfActive(destroyerParty, destroyedParty);
-            }
-
-            return true;
-        }
-
+        // Checked before the skip-patches guard so player parties stay protected even when a
+        // destroy runs nested inside another action's AllowedThread scope.
         if (IsProtectedPlayerParty(destroyedParty)) return false;
+
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient)
         {
@@ -72,7 +58,7 @@ internal class DestroyPartyActionPatch
             return true;
         }
 
-        PublishDestroyIfActive(destroyerParty, destroyedParty);
+        MessageBroker.Instance.Publish(null, new DestroyPartyApplied(destroyerParty, destroyedParty));
         return true;
     }
 
@@ -93,46 +79,17 @@ internal class DestroyPartyActionPatch
         return true;
     }
 
-    private static void PublishDestroyIfActive(PartyBase destroyerParty, MobileParty destroyedParty)
-    {
-        // Only replicate the destruction of a live party. Vanilla can re-run a destroy the
-        // replication layer already applied (the party is inactive by then), and replicating it
-        // again would make clients double-apply it.
-        if (destroyedParty == null || !destroyedParty.IsActive) return;
-
-        MessageBroker.Instance.Publish(null, new DestroyPartyApplied(destroyerParty, destroyedParty));
-    }
-
     [HarmonyPatch(nameof(DestroyPartyAction.ApplyForDisbanding))]
     [HarmonyPrefix]
-    internal static void PrefixApplyForDisbanding(MobileParty disbandedParty, Settlement relatedSettlement)
+    private static void PrefixApplyForDisbanding(MobileParty disbandedParty, Settlement relatedSettlement)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed())
-        {
-            // Same as Apply above: a disband nested inside another replicated action on the
-            // server is still authoritative and must replicate.
-            if (CallOriginalPolicy.IsServerNestedCall())
-                PublishDisbandIfActive(disbandedParty, relatedSettlement);
-
-            return;
-        }
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
         if (ModInformation.IsClient)
         {
             Logger.Error("Client attempted to apply DestroyPartyAction for disbanding party {partyName}, {StringId}", disbandedParty.Name, disbandedParty.StringId);
             return;
         }
-
-        PublishDisbandIfActive(disbandedParty, relatedSettlement);
-    }
-
-    private static void PublishDisbandIfActive(MobileParty disbandedParty, Settlement relatedSettlement)
-    {
-        // Only replicate the disband of a live party. The enter-settlement prefix lets the
-        // original action run after the handler chain already applied it, so vanilla reaches
-        // this disband a second time with the party already removed; publishing again would
-        // only produce duplicate-disband noise.
-        if (disbandedParty == null || !disbandedParty.IsActive) return;
 
         MessageBroker.Instance.Publish(null, new PartyDisbanded(disbandedParty, relatedSettlement));
     }

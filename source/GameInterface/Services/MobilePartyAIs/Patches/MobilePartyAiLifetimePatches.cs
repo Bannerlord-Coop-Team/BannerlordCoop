@@ -37,37 +37,16 @@ class MobilePartyAiLifetimePatches
     //}
 
     [HarmonyPatch(typeof(MobileParty), nameof(MobileParty.RemoveParty))]
-    [HarmonyPrefix]
-    private static void RemoveParty_Prefix(MobileParty __instance, ref bool __state)
-    {
-        // Capture liveness before removal: RemoveParty deactivates the party, and a second
-        // removal of an already-inactive party (vanilla re-running an action the replication
-        // layer already applied) must not replicate the Ai destruction again.
-        __state = __instance.IsActive;
-    }
-
-    [HarmonyPatch(typeof(MobileParty), nameof(MobileParty.RemoveParty))]
     [HarmonyPostfix]
-    internal static void RemoveParty_Postfix(ref MobileParty __instance, bool __state)
+    private static void RemoveParty_Postfix(ref MobileParty __instance)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed())
-        {
-            // A removal nested inside another replicated action on the server (running under
-            // AllowedThread) still has to deregister and replicate the party's Ai, matching the
-            // normal path below; otherwise server and clients keep a dead Ai registered.
-            if (CallOriginalPolicy.IsServerNestedCall() && __state)
-                MessageBroker.Instance.Publish(__instance.Ai, new InstanceDestroyed<MobilePartyAi>(__instance.Ai));
-
-            return;
-        }
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
         if (ModInformation.IsClient)
         {
             Logger.Error("Client destroyed unmanaged {name}", typeof(MobileParty));
             return;
         }
-
-        if (!__state) return;
 
         var ai = __instance.Ai;
 

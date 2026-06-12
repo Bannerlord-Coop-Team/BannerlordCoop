@@ -1,7 +1,6 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
-using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Settlements.Messages;
 using HarmonyLib;
@@ -32,27 +31,18 @@ namespace GameInterface.Services.Settlements.Patches
                 return false;
             }
 
-            MessageBroker.Instance.Publish(settlement, 
+            MessageBroker.Instance.Publish(settlement,
                 new SettlementOwnershipChanged(
-                    settlement.StringId, 
-                    newOwner?.StringId, 
-                    capturerHero?.StringId, 
+                    settlement.StringId,
+                    newOwner?.StringId,
+                    capturerHero?.StringId,
                     Convert.ToInt32(detail)));
 
-            RunOriginalApplyInternal(settlement, newOwner, capturerHero,detail);
-            return false;
+            // Run the original with patches live: each side effect (patrol culling, garrison
+            // destruction and creation, governor removal) replicates through its own patch and
+            // newly created objects get registered. Clients apply the owner change directly from
+            // the message above instead of replaying the whole action.
+            return true;
         }
-    
-        public static void RunOriginalApplyInternal(Settlement settlement, Hero newOwner, Hero capturerHero, ChangeOwnerOfSettlementDetail detail)
-        {
-            GameLoopRunner.RunOnMainThread(() =>
-            {
-                using (new AllowedThread())
-                {
-                    ChangeOwnerOfSettlementAction.ApplyInternal(settlement, newOwner, capturerHero, detail);
-                }
-            });
-        }
-    
     }
 }

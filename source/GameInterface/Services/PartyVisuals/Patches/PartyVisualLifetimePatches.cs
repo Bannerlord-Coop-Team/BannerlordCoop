@@ -36,19 +36,9 @@ public class PartyVisualLifetimePatches
 
     [HarmonyPatch(typeof(MobilePartyVisual), nameof(MobilePartyVisual.OnPartyRemoved))]
     [HarmonyPostfix]
-    internal static void OnMobilePartyDestroyedPostfix(ref MobilePartyVisual __instance)
+    private static void OnMobilePartyDestroyedPostfix(ref MobilePartyVisual __instance)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed())
-        {
-            // Same as the party lifetime patches: a visual removed by a destroy nested inside
-            // another replicated action (running under AllowedThread, e.g. a settlement ownership
-            // change culling its patrol) is still authoritative on the server and must replicate,
-            // or clients keep the party's map banner behind as a zombie visual.
-            if (CallOriginalPolicy.IsServerNestedCall())
-                MessageBroker.Instance.Publish(__instance, new PartyVisualDestroyed(__instance));
-
-            return;
-        }
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
         if (ModInformation.IsClient)
         {
