@@ -238,7 +238,9 @@ internal class MobilePartyDebugCommand
             return $"Unable to get {typeof(MobileParty)} with id: {partyId}";
         }
 
-        party.RemoveParty();
+        // DestroyPartyAction is the destruction path synced to clients; plain
+        // RemoveParty is not. A null destroyer replicates like any other.
+        DestroyPartyAction.Apply(null, party);
 
         return $"Destroyed {nameof(MobileParty)} with string id: {partyId}";
     }
