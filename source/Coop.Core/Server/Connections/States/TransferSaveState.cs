@@ -53,6 +53,9 @@ public class TransferSaveState : ConnectionStateBase
             null, // TODO manage controlled objects
             coopSessionProvider.CoopSession?.CraftingPlayerData);
 
+        // SaveHandler responds synchronously, so this runs in the same main-thread block as
+        // the snapshot: the save is enqueued before any world change taken after it, which is
+        // what lets the joining client safely discard everything received before the save.
         network.Send(peer, networkEvent);
 
         ConnectionLogic.Load();

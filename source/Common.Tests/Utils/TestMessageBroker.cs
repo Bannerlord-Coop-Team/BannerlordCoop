@@ -81,6 +81,9 @@ public class TestMessageBroker : MessageBroker
         }
     }
 
+    // Respond already runs synchronously here, so RespondSync shares its behavior.
+    public override void RespondSync<T>(object target, T message) => Respond(target, message);
+
     public override void Subscribe<T>(Action<MessagePayload<T>> subscription)
     {
         var delegates = _subscribers.ContainsKey(typeof(T)) ?

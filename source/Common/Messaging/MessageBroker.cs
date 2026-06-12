@@ -13,6 +13,13 @@ namespace Common.Messaging
 
         void Respond<T>(object target, T message) where T : IResponse;
 
+        /// <summary>
+        /// Like <see cref="Respond{T}"/> but invokes the responder synchronously on the
+        /// caller's thread instead of on a worker thread. Use when the caller must observe
+        /// the response's side effects before it continues.
+        /// </summary>
+        void RespondSync<T>(object target, T message) where T : IResponse;
+
         void Subscribe<T>(Action<MessagePayload<T>> subscription) where T : IMessage;
 
         void Unsubscribe<T>(Action<MessagePayload<T>> subscription) where T : IMessage;
@@ -106,6 +113,40 @@ namespace Common.Messaging
                 if (ReferenceEquals(weakDelegate.Instance, target))
                 {
                     Task.Factory.StartNew(() => weakDelegate.Invoke(new object[] { payload }));
+                    // Can only respond to one source, no longer need to loop if found
+                    return;
+                }
+            }
+        }
+
+        public virtual void RespondSync<T>(object target, T message) where T : IResponse
+        {
+            if (message == null)
+                return;
+
+            Logger.Verbose($"Responding {message.GetType().Name} to {target?.GetType().Name} synchronously");
+
+            if (!subscribers.ContainsKey(typeof(T)))
+            {
+                return;
+            }
+
+            var delegates = subscribers[typeof(T)];
+            if (delegates == null || delegates.Count == 0) return;
+            var payload = new MessagePayload<T>(target, message);
+            for (int i = 0; i < delegates.Count; i++)
+            {
+                var weakDelegate = delegates[i];
+                if (weakDelegate.IsAlive == false)
+                {
+                    // Remove dead delegates
+                    delegates.RemoveAt(i--);
+                    continue;
+                }
+
+                if (ReferenceEquals(weakDelegate.Instance, target))
+                {
+                    weakDelegate.Invoke(new object[] { payload });
                     // Can only respond to one source, no longer need to loop if found
                     return;
                 }

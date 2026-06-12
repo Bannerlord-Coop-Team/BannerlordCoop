@@ -21,10 +21,15 @@ namespace Coop.Core.Client.Services.Connection;
 /// The server broadcasts sync messages to every connected peer, including peers that
 /// have not loaded the campaign yet. Applying those messages early mutates a
 /// half-loaded campaign, and any missed object creations leave the client permanently
-/// desynced. The transferred save is a snapshot of the host world, so ordered messages
-/// received before <see cref="NetworkGameSaveDataReceived"/> are already part of the
-/// save and are discarded, while packets received after it are held and replayed in
-/// order once the campaign is loaded and all game objects are registered.
+/// desynced.
+///
+/// The transferred save is a snapshot of the host world, and the server sends it
+/// synchronously immediately after taking the snapshot — so no world change made after
+/// the snapshot can precede the save on the ordered channel. An ordered message received
+/// before <see cref="NetworkGameSaveDataReceived"/> was therefore sent before the
+/// snapshot and is already in the save, so it is discarded; messages received after it
+/// are held and replayed in order once the campaign is loaded and all game objects are
+/// registered.
 /// </remarks>
 public interface IClientPacketGate : IDisposable
 {
@@ -42,7 +47,11 @@ public class ClientPacketGate : IClientPacketGate
 
     private enum GateState
     {
-        /// <summary>Joining, save snapshot not yet received: ordered sync messages are already in the snapshot</summary>
+        /// <summary>
+        /// Joining, save snapshot not yet received. The server sends the save synchronously
+        /// right after snapshotting, so an ordered message received before it was sent before
+        /// the snapshot and is already in the save — these are discarded.
+        /// </summary>
         Discarding,
 
         /// <summary>Save snapshot received: sync packets happened after it and are held for replay</summary>
@@ -132,8 +141,9 @@ public class ClientPacketGate : IClientPacketGate
 
                 if (state == GateState.Discarding)
                 {
-                    // An ordered message sent before the host packaged its save is already part
-                    // of the transferred snapshot; applying it again would duplicate the change
+                    // The server sends the save synchronously right after snapshotting, so an
+                    // ordered message received before it was sent before the snapshot and is
+                    // already in the save; replaying it would duplicate the change.
                     CountDiscarded(messageType);
                     return true;
                 }

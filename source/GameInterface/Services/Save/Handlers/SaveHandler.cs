@@ -36,7 +36,11 @@ internal class SaveHandler : IHandler
                 gameData,
                 Campaign.Current?.UniqueGameId);
 
-            messageBroker.Respond(obj.Who, packagedMessage);
+            // Respond synchronously so the save is sent inside this same main-thread block,
+            // before the game loop resumes and broadcasts world changes. A joining client
+            // treats everything it receives before the save as already part of the snapshot;
+            // letting a post-snapshot change reach it ahead of the save would drop that change.
+            messageBroker.RespondSync(obj.Who, packagedMessage);
         });
     }
 }
