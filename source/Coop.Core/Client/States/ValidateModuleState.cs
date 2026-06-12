@@ -5,6 +5,7 @@ using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Modules;
 
@@ -19,6 +20,7 @@ public class ValidateModuleState : ClientStateBase
     private readonly INetwork network;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly ICoopFinalizer coopFinalizer;
+    private readonly IGameStateInterface gameStateInterface;
 
     public ValidateModuleState(
         IClientLogic logic,
@@ -26,12 +28,14 @@ public class ValidateModuleState : ClientStateBase
         INetwork network,
         IControllerIdProvider controllerIdProvider,
         ICoopFinalizer coopFinalizer,
+        IGameStateInterface gameStateInterface,
         IModuleInfoProvider moduleInfoProvider) : base(logic)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.controllerIdProvider = controllerIdProvider;
         this.coopFinalizer = coopFinalizer;
+        this.gameStateInterface = gameStateInterface;
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Subscribe<NetworkModuleVersionsValidated>(Handle_NetworkModuleVersionsValidated);
         messageBroker.Subscribe<NetworkClientValidated>(Handle_NetworkClientValidated);
@@ -94,7 +98,7 @@ public class ValidateModuleState : ClientStateBase
 
     public override void EnterMainMenu()
     {
-        messageBroker.Publish(this, new EnterMainMenu());
+        gameStateInterface.GoToMainMenu();
     }
 
     public override void LoadSavedData()
@@ -108,7 +112,7 @@ public class ValidateModuleState : ClientStateBase
 
     public override void Disconnect()
     {
-        messageBroker.Publish(this, new EnterMainMenu());
+        gameStateInterface.GoToMainMenu();
     }
 
     public override void EnterCampaignState()

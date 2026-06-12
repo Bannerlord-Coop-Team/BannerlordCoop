@@ -3,6 +3,7 @@ using Coop.Core.Client.Services.Heroes.Data;
 using GameInterface;
 using GameInterface.Registry;
 using GameInterface.Services.Entity;
+using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
@@ -21,6 +22,7 @@ public class LoadingState : ClientStateBase
     private readonly IHeroInterface heroInterface;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IPlayerManager playerRegistry;
+    private readonly IGameStateInterface gameStateInterface;
     private readonly ILoadingInterface loadingInterface;
 
     public LoadingState(
@@ -30,6 +32,7 @@ public class LoadingState : ClientStateBase
         IHeroInterface heroInterface,
         IControllerIdProvider controllerIdProvider,
         IPlayerManager playerRegistry,
+        IGameStateInterface gameStateInterface,
         ILoadingInterface loadingInterface) : base(logic)
     {
         this.messageBroker = messageBroker;
@@ -37,6 +40,7 @@ public class LoadingState : ClientStateBase
         this.heroInterface = heroInterface;
         this.controllerIdProvider = controllerIdProvider;
         this.playerRegistry = playerRegistry;
+        this.gameStateInterface = gameStateInterface;
         this.loadingInterface = loadingInterface;
 
         messageBroker.Subscribe<CampaignReady>(Handle_CampaignLoaded);
@@ -49,7 +53,7 @@ public class LoadingState : ClientStateBase
 
     public override void EnterMainMenu()
     {
-        messageBroker.Publish(this, new EnterMainMenu());
+        gameStateInterface.GoToMainMenu();
     }
 
     internal void Handle_CampaignLoaded(MessagePayload<CampaignReady> obj)
@@ -86,7 +90,7 @@ public class LoadingState : ClientStateBase
 
     public override void Disconnect()
     {
-        messageBroker.Publish(this, new EnterMainMenu());
+        gameStateInterface.GoToMainMenu();
     }
 
     public override void ExitGame()

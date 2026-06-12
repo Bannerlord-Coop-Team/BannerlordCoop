@@ -2,6 +2,7 @@
 using Common.Tests.Utils;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Services.Connection.Handlers;
+using Coop.Core.Server.Services.Connection.Messages;
 using Coop.Tests.Mocks;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Messages;
@@ -16,7 +17,7 @@ namespace Coop.Tests.Server.Services.Connection;
 public class PlayerConnectionServerMessageHandlerTests
 {
     [Fact]
-    public void PackageGameSaveData_WhenPlayerIsLoading_SendsTimeControlsDisabledMessage()
+    public void PlayerLoading_WhenPlayerIsLoading_SendsTimeControlsDisabledMessage()
     {
         // Arrange
         var broker = new TestMessageBroker();
@@ -25,13 +26,13 @@ public class PlayerConnectionServerMessageHandlerTests
         var loadingPeer = network.CreatePeer();
         var clientRegistry = new Mock<IClientRegistry>();
         var handler = new PlayerConnectionServerMessageHandler(broker, clientRegistry.Object, network);
-        var payload = new MessagePayload<PackageGameSaveData>(this, new PackageGameSaveData());
+        var payload = new MessagePayload<PlayerLoading>(this, new PlayerLoading());
 
         clientRegistry.SetupGet(m => m.PlayersLoading).Returns(true);
         clientRegistry.SetupGet(m => m.LoadingPeers).Returns(new List<NetPeer> { loadingPeer });
 
         // Act
-        handler.Handle_NetworkConnected(payload);
+        handler.Handle_PlayerLoading(payload);
 
         // Assert
         var localMessage = Assert.Single(broker.GetMessagesFromType<SendInformationMessage>());
@@ -45,7 +46,7 @@ public class PlayerConnectionServerMessageHandlerTests
     }
 
     [Fact]
-    public void PackageGameSaveData_WhenNoPlayerIsLoading_DoesNotSendTimeControlsDisabledMessage()
+    public void PlayerLoading_WhenNoPlayerIsLoading_DoesNotSendTimeControlsDisabledMessage()
     {
         // Arrange
         var broker = new TestMessageBroker();
@@ -53,12 +54,12 @@ public class PlayerConnectionServerMessageHandlerTests
         var connectedPeer = network.CreatePeer();
         var clientRegistry = new Mock<IClientRegistry>();
         var handler = new PlayerConnectionServerMessageHandler(broker, clientRegistry.Object, network);
-        var payload = new MessagePayload<PackageGameSaveData>(this, new PackageGameSaveData());
+        var payload = new MessagePayload<PlayerLoading>(this, new PlayerLoading());
 
         clientRegistry.SetupGet(m => m.PlayersLoading).Returns(false);
 
         // Act
-        handler.Handle_NetworkConnected(payload);
+        handler.Handle_PlayerLoading(payload);
 
         // Assert
         Assert.Empty(broker.GetMessagesFromType<SendInformationMessage>());

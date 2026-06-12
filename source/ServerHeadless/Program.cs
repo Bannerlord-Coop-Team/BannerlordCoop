@@ -248,6 +248,7 @@ namespace ServerHeadless
             // This (main) thread is the Coop game-loop thread, then start the server + load the save
             // through the Coop mod (StartAsServer + HostSaveGame), driven by reflection.
             CoopServerLauncher.Initialize();
+            CoopServerLauncher.AttachConsoleLog();
             CoopServerLauncher.HostSaveGameAsServer(save.Name);
 
             // HostSaveGame -> StartAsServer + LoadGame has pushed a GameLoadingState; advance it.

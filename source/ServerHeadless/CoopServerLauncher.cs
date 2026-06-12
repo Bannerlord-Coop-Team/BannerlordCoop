@@ -41,6 +41,20 @@ namespace ServerHeadless
         }
 
         /// <summary>
+        /// Routes the Coop mod's Serilog output to the console. The mod's only on-disk/UI sinks are
+        /// the in-game console (an <c>OutputSinkManager</c> callback the graphical mod registers) and
+        /// a Seq server — neither exists headless, so Poller-caught exceptions are otherwise invisible.
+        /// Registering an <c>OutputSinkManager</c> callback surfaces them on stderr.
+        /// </summary>
+        public static void AttachConsoleLog()
+        {
+            Type sinkType = Load("Common", "Common.Logging.OutputSinkManager");
+            MethodInfo add = sinkType.GetMethod("AddLogCallback", BindingFlags.Public | BindingFlags.Static);
+            Action<string> cb = line => Console.Error.WriteLine("[Coop] " + line);
+            add.Invoke(null, new object[] { cb });
+        }
+
+        /// <summary>
         /// Starts the Coop server and loads the named save into it (mirrors the in-game host flow).
         /// </summary>
         public static void HostSaveGameAsServer(string saveName)

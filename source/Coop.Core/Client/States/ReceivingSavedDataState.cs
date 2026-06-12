@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Coop.Core.Client.Messages;
+using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.UI.Interfaces;
 
@@ -10,20 +11,21 @@ namespace Coop.Core.Client.States;
 /// </summary>
 public class ReceivingSavedDataState : ClientStateBase
 {
-    private NetworkGameSaveDataReceived saveDataMessage = default;
     private readonly IMessageBroker messageBroker;
     private readonly ILoadingInterface loadingInterface;
+    private readonly IGameStateInterface gameStateInterface;
 
     public ReceivingSavedDataState(
         IClientLogic logic,
         IMessageBroker messageBroker,
-        ILoadingInterface loadingInterface) : base(logic)
+        ILoadingInterface loadingInterface,
+        IGameStateInterface gameStateInterface) : base(logic)
     {
         this.messageBroker = messageBroker;
         this.loadingInterface = loadingInterface;
-
+        this.gameStateInterface = gameStateInterface;
         messageBroker.Subscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
-        messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
+
         // NetworkNewPlayerHeroCreated is handled by the persistent RemotePlayerHeroHandler for the whole client
         // lifetime, so it is captured here AND during LoadingState without a per-state subscription gap.
 
@@ -38,21 +40,17 @@ public class ReceivingSavedDataState : ClientStateBase
     public override void Dispose()
     {
         messageBroker.Unsubscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
-        messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
     }
 
     internal void Handle_NetworkGameSaveDataReceived(MessagePayload<NetworkGameSaveDataReceived> obj)
     {
-        saveDataMessage = obj.What;
         loadingInterface.SetLoadingMessage(
             "Joining Coop Campaign",
             "Preparing host save data...");
-        Logic.EnterMainMenu();
-    }
 
-    internal void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> obj)
-    {
-        var saveData = saveDataMessage?.GameSaveData;
+        gameStateInterface.GoToMainMenu();
+
+        var saveData = obj.What.GameSaveData;
 
         if (saveData == null) return;
         if (saveData.Length == 0) return;
@@ -61,15 +59,14 @@ public class ReceivingSavedDataState : ClientStateBase
             "Loading Host Campaign",
             "Loading host save data...");
 
-        var commandLoad = new LoadGameSave(saveData);
-        messageBroker.Publish(this, commandLoad);
+        gameStateInterface.LoadSaveGame(saveData);
 
         Logic.LoadSavedData();
     }
 
     public override void EnterMainMenu()
     {
-        messageBroker.Publish(this, new EnterMainMenu());
+        gameStateInterface.GoToMainMenu();
     }
 
     public override void Connect()
@@ -78,7 +75,7 @@ public class ReceivingSavedDataState : ClientStateBase
 
     public override void Disconnect()
     {
-        messageBroker.Publish(this, new EnterMainMenu());
+        gameStateInterface.GoToMainMenu();
 
         Logic.SetState<MainMenuState>();
     }
