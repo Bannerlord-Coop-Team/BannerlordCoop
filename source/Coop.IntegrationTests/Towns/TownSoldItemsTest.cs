@@ -1,4 +1,4 @@
-﻿using Coop.Core.Server.Services.Towns.Messages;
+using Coop.Core.Server.Services.Towns.Messages;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Towns.Messages;
@@ -18,7 +18,13 @@ namespace Coop.IntegrationTests.Towns
         public void ServerTownSoldItemsChanged_Publishes_AllClients()
         {
             // Arrange
-            var triggerMessage = new TownSoldItemsChanged();
+            var town = TestEnvironment.Server.CreateRegisteredObject<Town>("town1");
+            foreach (var client in TestEnvironment.Clients)
+            {
+                client.CreateRegisteredObject<Town>("town1");
+            }
+
+            var triggerMessage = new TownSoldItemsChanged(town, Array.Empty<Town.SellLog>());
 
             var server = TestEnvironment.Server;
 

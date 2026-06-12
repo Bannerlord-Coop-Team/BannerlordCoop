@@ -15,13 +15,13 @@ public class SyncFiefTests : SyncTestBase
         TestEnvironment.CreateRegisteredObject<GarrisonPartyComponent>();
     }
 
-    [Fact(Skip="FoodStocks property sync not reaching clients (DynamicSync property inheritance issue)")]
+    [Fact]
     public void Server_Fief_Properties()
     {
         TestEnvironment.AssertProperty<Town, float>(nameof(Town.FoodStocks), 5);
     }
 
-    [Fact(Skip="DynamicSync ID lookup fails when Fief instance is a Town (inheritance ID mismatch in generated handler)")]
+    [Fact]
     public void Server_Fief_Fields()
     {
         // GarrisonPartyComponent may be initialized; clear it first so the pre-check passes

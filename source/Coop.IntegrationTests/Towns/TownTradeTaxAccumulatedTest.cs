@@ -1,8 +1,9 @@
-﻿using Coop.Core.Server.Services.Towns.Messages;
+using Coop.Core.Server.Services.Towns.Messages;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Towns.Messages;
 
+using TaleWorlds.CampaignSystem.Settlements;
 namespace Coop.IntegrationTests.Towns
 {
     public class TownTradeTaxAccumulatedTest
@@ -17,7 +18,13 @@ namespace Coop.IntegrationTests.Towns
         public void ServerTownTradeTaxAccumulatedChanged_Publishes_AllClients()
         {
             // Arrange
-            var triggerMessage = new TownTradeTaxAccumulatedChanged();
+            var town = TestEnvironment.Server.CreateRegisteredObject<Town>("town1");
+            foreach (var client in TestEnvironment.Clients)
+            {
+                client.CreateRegisteredObject<Town>("town1");
+            }
+
+            var triggerMessage = new TownTradeTaxAccumulatedChanged(town, 450);
 
             var server = TestEnvironment.Server;
 

@@ -40,11 +40,10 @@ internal class MobilePartyRegistry : AutoRegistryBase<MobileParty>
 
     public override IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(MobileParty));
 
-    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
-    //    new MethodBase[]
-    //{
-    //    AccessTools.Method(typeof(MobileParty), nameof(MobileParty.RemoveParty))
-    //};
+    public override IEnumerable<MethodBase> DestroyMethods => new MethodBase[]
+    {
+        AccessTools.Method(typeof(MobileParty), nameof(MobileParty.RemoveParty))
+    };
 
 
     public override void RegisterAllObjects()

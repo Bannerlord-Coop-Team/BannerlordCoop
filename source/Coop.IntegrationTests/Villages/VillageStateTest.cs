@@ -1,9 +1,10 @@
-﻿using Coop.Core.Server.Services.Villages.Messages;
+using Coop.Core.Server.Services.Villages.Messages;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Template.Messages;
 using GameInterface.Services.Villages.Messages;
 
+using TaleWorlds.CampaignSystem.Settlements;
 namespace Coop.IntegrationTests.Villages;
 
 public class VillageStateTest
@@ -18,7 +19,13 @@ public class VillageStateTest
     public void ServerVillageStateChanged_Publishes_AllClients()
     {
         // Arrange
-        var triggerMessage = new VillageStateChanged();
+        var village = TestEnvironment.Server.CreateRegisteredObject<Village>("village1");
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.CreateRegisteredObject<Village>("village1");
+        }
+
+        var triggerMessage = new VillageStateChanged(village, 1);
 
         var server = TestEnvironment.Server;
 
