@@ -3,7 +3,6 @@ using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Locations.Messages;
 using TaleWorlds.CampaignSystem.Settlements.Locations;
 
-
 namespace Coop.IntegrationTests.Locations
 {
     public class RemoveAllLocationCharactersTest

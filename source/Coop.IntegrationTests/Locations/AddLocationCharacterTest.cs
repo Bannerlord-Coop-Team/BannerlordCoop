@@ -4,7 +4,6 @@ using GameInterface.Services.Locations.Messages;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements.Locations;
 
-
 namespace Coop.IntegrationTests.Locations
 {
     public class AddLocationCharacterTest
