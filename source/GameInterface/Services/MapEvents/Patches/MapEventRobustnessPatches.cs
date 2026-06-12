@@ -38,12 +38,14 @@ internal class MapEventRobustnessPatches
         return null;
     }
 
-    // Under fast-forward churn a map event can tick against a party that was destroyed/desynced
-    // mid-tick, NRE-ing inside MapEvent.Update and crashing the server (MapEventManager.Tick runs
-    // outside the Campaign.RealTick finalizer). Swallow per-event so one bad event can't take down
-    // the rest of the manager tick; the event re-runs on the next tick, so a transient incomplete
-    // state resolves itself once the party state settles. Logged at Verbose because this can fire
-    // every tick for the duration of the churn and the swallow itself is the recovery.
+    // Fast-forwarding the campaign resolves many battles in one burst, so a party can be
+    // destroyed (its battle finished, the party wiped out or disbanded) while a later map event
+    // in the same tick still references it. MapEvent.Update then dereferences the missing party
+    // and crashes the server, because MapEventManager.Tick runs outside the Campaign.RealTick
+    // finalizer. Swallow per-event so one bad event can't take down the rest of the manager
+    // tick; the event re-runs on the next tick and proceeds normally once its parties are in a
+    // consistent state again. Logged at Verbose because it can fire every tick until then and
+    // the swallow itself is the recovery.
     [HarmonyPatch(typeof(MapEvent), "Update")]
     [HarmonyFinalizer]
     private static Exception Finalizer_Update(Exception __exception, MapEvent __instance)
@@ -56,10 +58,12 @@ internal class MapEventRobustnessPatches
         return null;
     }
 
-    // A map event side in a save snapshotted mid-churn can reference a leader party whose
-    // hero chain no longer resolves; vanilla derefs it unguarded and the throw unwinds through
-    // MapEventManager.OnAfterLoad, killing a joining client at the end of the loading screen.
-    // Fall back to vanilla's own no-leader default so the load continues.
+    // The save sent to a joining client is a snapshot of the live world, and while the campaign
+    // is fast-forwarded that snapshot can be taken in the middle of such a burst: a battle side
+    // can be captured with its leader party's hero already removed. Vanilla dereferences that
+    // leader unguarded while the client loads the save, and the throw unwinds through
+    // MapEventManager.OnAfterLoad, killing the client at the end of the loading screen. Fall
+    // back to vanilla's own no-leader default so the load continues.
     [HarmonyPatch(typeof(MapEventSide), nameof(MapEventSide.CacheLeaderSimulationModifier))]
     [HarmonyFinalizer]
     private static Exception Finalizer_CacheLeaderSimulationModifier(Exception __exception, MapEventSide __instance)
