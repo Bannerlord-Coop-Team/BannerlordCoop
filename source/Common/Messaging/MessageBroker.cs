@@ -86,25 +86,38 @@ namespace Common.Messaging
 
         public virtual void Respond<T>(object target, T message) where T : IResponse
         {
-            // Dispatch on a worker thread so a slow responder doesn't block the caller.
-            Task.Factory.StartNew(() => RespondSync(target, message));
+            // Resolve on the calling thread, then dispatch the responder on a worker thread
+            // so a slow responder doesn't block the caller.
+            if (TryGetResponder(target, message, out var responder, out var payload))
+                Task.Factory.StartNew(() => responder.Invoke(new object[] { payload }));
         }
 
         public virtual void RespondSync<T>(object target, T message) where T : IResponse
         {
+            // Run the responder on the calling thread, so its side effects are in place
+            // before the caller continues.
+            if (TryGetResponder(target, message, out var responder, out var payload))
+                responder.Invoke(new object[] { payload });
+        }
+
+        private bool TryGetResponder<T>(object target, T message, out WeakDelegate responder, out MessagePayload<T> payload) where T : IResponse
+        {
+            responder = null;
+            payload = default;
+
             if (message == null)
-                return;
+                return false;
 
             Logger.Verbose($"Responding {message.GetType().Name} to {target?.GetType().Name}");
 
             if (!subscribers.ContainsKey(typeof(T)))
             {
-                return;
+                return false;
             }
 
             var delegates = subscribers[typeof(T)];
-            if (delegates == null || delegates.Count == 0) return;
-            var payload = new MessagePayload<T>(target, message);
+            if (delegates == null || delegates.Count == 0) return false;
+
             for (int i = 0; i < delegates.Count; i++)
             {
                 // TODO this might be slow
@@ -118,11 +131,14 @@ namespace Common.Messaging
 
                 if (ReferenceEquals(weakDelegate.Instance, target))
                 {
-                    weakDelegate.Invoke(new object[] { payload });
+                    responder = weakDelegate;
+                    payload = new MessagePayload<T>(target, message);
                     // Can only respond to one source, no longer need to loop if found
-                    return;
+                    return true;
                 }
             }
+
+            return false;
         }
 
         public virtual void Subscribe<T>(Action<MessagePayload<T>> subscription) where T : IMessage
