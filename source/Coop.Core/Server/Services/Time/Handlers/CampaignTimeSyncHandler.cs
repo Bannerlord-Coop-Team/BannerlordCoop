@@ -1,4 +1,3 @@
-using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -33,7 +32,10 @@ public class CampaignTimeSyncHandler : IHandler
         this.network = network;
         this.mapTimeTrackerInterface = mapTimeTrackerInterface;
 
-        publishTimer = new Timer(PublishIntervalMs) { AutoReset = true };
+        // Each broadcast re-arms the timer when it finishes instead of auto-resetting, so at most
+        // one callback is ever in flight: a send stalled on a slow consumer delays the next tick
+        // rather than stacking blocked thread pool callbacks behind it.
+        publishTimer = new Timer(PublishIntervalMs) { AutoReset = false };
         publishTimer.Elapsed += PublishCampaignTime;
         publishTimer.Start();
     }
@@ -47,21 +49,27 @@ public class CampaignTimeSyncHandler : IHandler
 
     private void PublishCampaignTime(object sender, ElapsedEventArgs e)
     {
-        // The timer fires on a thread pool thread; reading campaign time and broadcasting must run
-        // on the game loop thread like every other game operation, so marshal the work onto it.
-        GameLoopRunner.RunOnMainThread(() =>
+        try
+        {
+            // No campaign loaded yet, nothing authoritative to broadcast.
+            if (mapTimeTrackerInterface.TryGetCurrentTicks(out long currentTicks) == false) return;
+
+            network.SendAll(new CampaignTimeUpdated(currentTicks));
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to broadcast {message}", nameof(CampaignTimeUpdated));
+        }
+        finally
         {
             try
             {
-                // No campaign loaded yet, nothing authoritative to broadcast.
-                if (mapTimeTrackerInterface.TryGetCurrentTicks(out long currentTicks) == false) return;
-
-                network.SendAll(new CampaignTimeUpdated(currentTicks));
+                publishTimer.Start();
             }
-            catch (Exception ex)
+            catch (ObjectDisposedException)
             {
-                Logger.Error(ex, "Failed to broadcast {message}", nameof(CampaignTimeUpdated));
+                // Disposed while this broadcast was in flight; no further ticks.
             }
-        });
+        }
     }
 }
