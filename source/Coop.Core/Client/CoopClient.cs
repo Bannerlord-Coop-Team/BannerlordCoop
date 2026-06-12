@@ -72,13 +72,20 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 
     public override void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
     {
-        IPacket packet = (IPacket)serializer.Deserialize(reader.GetRemainingBytes());
+        try
+        {
+            IPacket packet = (IPacket)serializer.Deserialize(reader.GetRemainingBytes());
 
-        // While loading a transfer save, world-change packets are buffered and replayed once the
-        // campaign is ready (see ILoadingPacketBuffer); otherwise handle immediately.
-        if (loadingPacketBuffer.Intercept(peer, packet)) return;
+            // While loading a transfer save, world-change packets are buffered and replayed once the
+            // campaign is ready (see ILoadingPacketBuffer); otherwise handle immediately.
+            if (loadingPacketBuffer.Intercept(peer, packet)) return;
 
-        packetManager.HandleReceive(peer, packet);
+            packetManager.HandleReceive(peer, packet);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to process packet");
+        }
     }
 
     public override void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)

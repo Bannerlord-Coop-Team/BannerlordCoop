@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Coop.Core.Client;
 using Coop.Core.Client.States;
+using Coop.Core.Common.Services.Connection.Messages;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Tests.Mocks;
 using GameInterface.Services.CharacterCreation.Messages;
@@ -96,33 +97,16 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
-        public void EnterMainMenu_GoesToMainMenu()
+        public void EnterMainMenu_DoesNothing()
         {
             // Arrange
             var validateState = clientLogic.SetState<ValidateModuleState>();
-            var gameStateMock = clientComponent.Container.Resolve<Mock<IGameStateInterface>>();
 
             // Act
             clientLogic.EnterMainMenu();
 
-            // Assert
-            gameStateMock.Verify(x => x.GoToMainMenu(), Times.Once);
-        }
-
-        [Fact]
-        public void MainMenuEntered_Transitions_MainMenuState()
-        {
-            // Arrange
-            var validateState = clientLogic.SetState<ValidateModuleState>();
-
-            var payload = new MessagePayload<MainMenuEntered>(
-                this, new MainMenuEntered());
-
-            // Act
-            validateState.Handle_MainMenuEntered(payload);
-
-            // Assert
-            Assert.IsType<MainMenuState>(clientLogic.State);
+            // Assert — EnterMainMenu is a no-op in this state; teardown happens via Disconnect.
+            Assert.IsType<ValidateModuleState>(clientLogic.State);
         }
 
         [Fact]
@@ -139,17 +123,17 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
-        public void Disconnect_GoesToMainMenu()
+        public void Disconnect_FinalizesCoop()
         {
             // Arrange
             var validateState = clientLogic.SetState<ValidateModuleState>();
-            var gameStateMock = clientComponent.Container.Resolve<Mock<IGameStateInterface>>();
 
             // Act
             clientLogic.Disconnect();
 
-            // Assert
-            gameStateMock.Verify(x => x.GoToMainMenu(), Times.Once);
+            // Assert — validation-failure disconnect tears coop down (EndCoopMode) even pre-campaign,
+            // rather than relying on GoToMainMenu -> MainMenuEntered (which no-ops with no campaign).
+            Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<EndCoopMode>());
         }
 
         [Fact]
