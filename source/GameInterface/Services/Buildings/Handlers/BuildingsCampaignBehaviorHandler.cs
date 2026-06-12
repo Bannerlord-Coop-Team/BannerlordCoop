@@ -1,7 +1,7 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Buildings.Messages;
-using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.Clans.Extensions;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -35,7 +35,7 @@ internal class BuildingsCampaignBehaviorHandler : IHandler
 
     private void Handle_OnSettlementOwnerChanged(MessagePayload<OnSettlementOwnerChanged> obj)
     {
-        if (obj.What.Settlement.Town != null && obj.What.NewOwner.PartyBelongedTo?.IsPlayerParty() != true)
+        if (obj.What.Settlement.Town != null && !obj.What.NewOwner.Clan.IsPlayerClan())
         {
             obj.What.Settlement.Town.BuildingsInProgress.Clear();
         }
@@ -53,7 +53,7 @@ internal class BuildingsCampaignBehaviorHandler : IHandler
                     building.HitPointChanged(10f);
                 }
             }
-            if (town.Owner.Settlement.Owner.PartyBelongedTo?.IsPlayerParty() != true) // Replacement for checking if not Clan.PlayerClan
+            if (!town.Owner.Settlement.OwnerClan.IsPlayerClan()) // Replacement for checking if not Clan.PlayerClan
             {
                 if (MBRandom.RandomFloat < 0.1f)
                 {

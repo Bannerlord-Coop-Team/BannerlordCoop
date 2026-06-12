@@ -21,6 +21,7 @@ internal class ClanSync : IDynamicSync
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._tributeWallet)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._home)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._clanDebtToKingdom)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._supporterNotablesCache)));
 
         // Properties
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.Name)));
