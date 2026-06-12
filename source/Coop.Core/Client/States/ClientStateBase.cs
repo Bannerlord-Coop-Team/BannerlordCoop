@@ -13,8 +13,9 @@ public abstract class ClientStateBase : IClientState
     }
 
     /// <summary>
-    /// Runs entry side effects (message publishes, network sends). Called by SetState after this state
-    /// becomes the current state, unlike the constructor, which runs while the previous state is still current.
+    /// Hook for entry side effects (message publishes, network sends). SetState calls it on every new state
+    /// after it becomes the current state; a constructor would run too early, while the previous state is
+    /// still current. No-op by default: only states with entry side effects override it.
     /// </summary>
     public virtual void Enter()
     {
