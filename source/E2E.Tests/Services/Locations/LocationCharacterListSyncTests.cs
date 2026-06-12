@@ -232,6 +232,10 @@ public class LocationCharacterListSyncTests : IDisposable
             {
                 heroCharacter = GameObjectCreator.CreateInitializedObject<CharacterObject>();
 
+                // Building the roster entry derives a face seed from the character's StringId;
+                // a locally built (unregistered) character has none, so assign one.
+                heroCharacter.StringId = "client_hero";
+
                 heroCharacter.Culture.DefaultBattleEquipmentRoster = GameObjectCreator.CreateInitializedObject<MBEquipmentRoster>();
                 heroCharacter.Culture.DefaultStealthEquipmentRoster = GameObjectCreator.CreateInitializedObject<MBEquipmentRoster>();
                 heroCharacter.Culture.DefaultStealthEquipmentRoster.AllEquipments[0]._itemSlots[0].Item = GameObjectCreator.CreateInitializedObject<ItemObject>();
