@@ -74,17 +74,22 @@ public class LoadingPacketBufferTests
     }
 
     [Fact]
-    public void MainMenuEntered_ClearsBacklog_AndDisarms()
+    public void MainMenuEntered_DuringLoad_DoesNotDisarmOrClear()
     {
+        // ReceivingSavedDataState fires MainMenuEntered as an intermediate step of the join (it clears
+        // the character-creation game before loading the host save). The buffer must ignore it —
+        // otherwise it would disarm and drop post-save deltas mid-load.
         buffer.Intercept(null, new FakePacket(PacketType.SaveData)); // arm
-        Assert.True(buffer.Intercept(null, new FakePacket(PacketType.Message))); // buffered
+        var buffered = new FakePacket(PacketType.Message);
+        Assert.True(buffer.Intercept(null, buffered)); // buffered
 
-        // Disconnect/abort: drop the backlog and disarm.
         messageBroker.Publish(this, new MainMenuEntered());
 
-        // A later campaign-entered must not replay the dropped backlog, and the gate is off.
+        // Still armed (a subsequent gameplay packet is still buffered)...
+        Assert.True(buffer.Intercept(null, new FakePacket(PacketType.Message)));
+
+        // ...and the backlog survives to be replayed when the campaign is ready.
         messageBroker.Publish(this, new ClientCampaignEntered());
-        Assert.Empty(buffer.DrainIfRequested());
-        Assert.False(buffer.Intercept(null, new FakePacket(PacketType.Message)));
+        Assert.Equal(2, buffer.DrainIfRequested().Count);
     }
 }

@@ -1,7 +1,6 @@
 using Common.Messaging;
 using Common.PacketHandlers;
 using Coop.Core.Client.Messages;
-using GameInterface.Services.GameState.Messages;
 using LiteNetLib;
 using System;
 using System.Collections.Concurrent;
@@ -27,11 +26,17 @@ namespace Coop.Core.Client.Network;
 /// queued. This is deadlock-safe: the client's load is driven by local game-state events and needs
 /// no further incoming packet to finish.</item>
 /// <item>On <see cref="ClientCampaignEntered"/> the queue is drained in FIFO order and buffering
-/// stops. <see cref="MainMenuEntered"/> (disconnect/abort) clears the queue and resets.</item>
+/// stops.</item>
 /// </list>
+/// Leaving coop (disconnect/abort) is not handled here: this buffer is scoped to the coop container,
+/// so it is disposed when the container is torn down and a reconnect builds a fresh one. It must NOT
+/// react to <c>MainMenuEntered</c> — that also fires as an intermediate step of a normal join (the
+/// client clears the character-creation game before loading the host save), which would wrongly
+/// disarm and clear the buffer mid-load.
+///
 /// Threading: <see cref="Intercept"/> and <see cref="DrainIfRequested"/> are both called on the
 /// network poller thread (CoopClient receive + update), so the queue is effectively single-threaded;
-/// only the drain/reset requests are raised from the broker thread and are therefore volatile flags.
+/// only the drain request is raised from the broker thread and is therefore a volatile flag.
 /// </remarks>
 public interface ILoadingPacketBuffer
 {
@@ -60,13 +65,11 @@ internal sealed class LoadingPacketBuffer : ILoadingPacketBuffer, IDisposable
     {
         this.messageBroker = messageBroker;
         messageBroker.Subscribe<ClientCampaignEntered>(Handle_ClientCampaignEntered);
-        messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<ClientCampaignEntered>(Handle_ClientCampaignEntered);
-        messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
     }
 
     public bool Intercept(NetPeer peer, IPacket packet)
@@ -107,13 +110,5 @@ internal sealed class LoadingPacketBuffer : ILoadingPacketBuffer, IDisposable
         // Defer the drain to the poller thread (DrainIfRequested) so replayed packets stay ordered
         // relative to live ones and the queue stays single-threaded.
         drainRequested = true;
-    }
-
-    private void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> payload)
-    {
-        // Left the campaign (disconnect/abort): drop the backlog and disarm so a reconnect starts clean.
-        buffering = false;
-        drainRequested = false;
-        while (queue.TryDequeue(out _)) { }
     }
 }

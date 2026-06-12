@@ -26,12 +26,6 @@ public class ReceivingSavedDataState : ClientStateBase
         this.gameStateInterface = gameStateInterface;
         messageBroker.Subscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
 
-        // NetworkNewPlayerHeroCreated is handled by the persistent RemotePlayerHeroHandler for the whole client
-        // lifetime, so it is captured here AND during LoadingState without a per-state subscription gap.
-
-        // Keep a loading screen up while we receive and load the server world. This is the
-        // common state for both new (post character-creation) and returning clients, so the
-        // client's local/main-menu view isn't shown during the transition.
         loadingInterface.ShowLoadingScreen(
             "Joining Coop Campaign",
             "Waiting for host save data...");
