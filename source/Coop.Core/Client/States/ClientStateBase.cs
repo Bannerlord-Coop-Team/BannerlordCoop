@@ -12,6 +12,16 @@ public abstract class ClientStateBase : IClientState
         Logic = logic;
     }
 
+    /// <summary>
+    /// Runs this state's entry side effects. Called by the owning logic's SetState after this state has been
+    /// assigned as the current state, so anything observable from here (message publishes, network sends) sees
+    /// the state machine already in this state. Side effects in the constructor would instead run while the
+    /// previous state is still current.
+    /// </summary>
+    public virtual void Enter()
+    {
+    }
+
     /// <inheritdoc/>
     public abstract void Dispose();
 

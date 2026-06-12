@@ -29,17 +29,20 @@ public class ClientLogic : IClientLogic
     private readonly ILogger Logger = LogManager.GetLogger<ClientLogic>();
     public IStateFactory StateFactory { get; }
     public Player Player { get; set; }
-    private IClientState InitialState => StateFactory.CreateClientState<MainMenuState>(this);
     private readonly HashSet<Type> RunningStates = new HashSet<Type>
     {
         typeof(MissionState),
         typeof(CampaignState),
     };
-    public IClientState State 
+    public IClientState State
     {
-        get 
-        { 
-            _state ??= InitialState;
+        get
+        {
+            if (_state == null)
+            {
+                // The initial state goes through SetState like any other, so its entry side effects run.
+                SetState<MainMenuState>();
+            }
             return _state;
         }
         set 
@@ -74,6 +77,14 @@ public class ClientLogic : IClientLogic
     {
         TState newState = StateFactory.CreateClientState<TState>(this);
         State = newState;
+
+        // Entry side effects run only after the new state is current, so subscribers they trigger never
+        // observe the state machine still in the previous state.
+        if (newState is ClientStateBase stateBase)
+        {
+            stateBase.Enter();
+        }
+
         return newState;
     }
 

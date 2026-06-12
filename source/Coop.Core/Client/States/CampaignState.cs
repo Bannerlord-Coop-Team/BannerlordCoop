@@ -17,6 +17,8 @@ namespace Coop.Core.Client.States;
 public class CampaignState : ClientStateBase
 {
     private readonly IMessageBroker messageBroker;
+    private readonly INetwork network;
+    private readonly ILoadingInterface loadingInterface;
     private readonly IGameStateInterface gameStateInterface;
     private readonly ICoopFinalizer coopFinalizer;
 
@@ -29,12 +31,17 @@ public class CampaignState : ClientStateBase
         ICoopFinalizer coopFinalizer) : base(logic)
     {
         this.messageBroker = messageBroker;
+        this.network = network;
+        this.loadingInterface = loadingInterface;
         this.gameStateInterface = gameStateInterface;
         this.coopFinalizer = coopFinalizer;
 
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Subscribe<MissionStateEntered>(Handle_MissionStateEntered);
+    }
 
+    public override void Enter()
+    {
         loadingInterface.SetLoadingMessage(
             "Loading Host Campaign",
             "Creating remote player heroes...");
