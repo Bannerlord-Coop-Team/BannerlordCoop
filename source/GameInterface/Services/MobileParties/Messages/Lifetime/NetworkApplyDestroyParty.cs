@@ -3,6 +3,10 @@ using ProtoBuf;
 
 namespace GameInterface.Services.MobileParties.Messages.Lifetime;
 
+/// <summary>
+/// [Server -> Client] Replicates a party destruction. <see cref="VictoriousPartyId"/> is null when
+/// the party was destroyed with no destroyer (e.g. despawn cleanup such as patrol culling).
+/// </summary>
 [ProtoContract]
 internal readonly struct NetworkApplyDestroyParty : ICommand
 {

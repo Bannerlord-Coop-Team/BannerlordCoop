@@ -24,6 +24,8 @@ internal class PartyComponentHandler : IHandler
         AccessTools.Field(typeof(PatrolPartyComponent), "_homeSettlement");
     private static readonly MethodInfo PatrolInitializeProperties =
         AccessTools.Method(typeof(PatrolPartyComponent), "InitializePartyComponentProperties");
+    private static readonly PropertyInfo GarrisonSettlementProperty =
+        AccessTools.Property(typeof(GarrisonPartyComponent), nameof(GarrisonPartyComponent.Settlement));
 
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
@@ -91,6 +93,35 @@ internal class PartyComponentHandler : IHandler
                 break;
             case 3:
                 objectManager.AddExisting(data.Id, obj);
+
+                var garrisonComponent = (GarrisonPartyComponent)obj;
+
+                if (data.HomeSettlementId is null) break;
+
+                // Reconstitute the Settlement link that is normally set in the constructor.
+                // It is bundled in the creation message to avoid any dependency on DynamicSync
+                // field-update ordering — without it GarrisonPartyComponent.PartyOwner
+                // (Settlement.OwnerClan.Leader) throws and crashes the nameplate VM.
+                if (!objectManager.TryGetObject(data.HomeSettlementId, out Settlement garrisonSettlement))
+                {
+                    Logger.Warning(
+                        "GarrisonPartyComponent {Id}: could not find Settlement '{SettlementId}' in ObjectManager; " +
+                        "Settlement will not be set on client",
+                        data.Id, data.HomeSettlementId);
+                    break;
+                }
+
+                using (new AllowedThread())
+                {
+                    GarrisonSettlementProperty.SetValue(garrisonComponent, garrisonSettlement);
+
+                    // Vanilla OnInitialize sets this back-link so the town resolves its garrison.
+                    if (garrisonSettlement.Town != null)
+                    {
+                        garrisonSettlement.Town.GarrisonPartyComponent = garrisonComponent;
+                    }
+                }
+
                 break;
             case 4:
                 objectManager.AddExisting(data.Id, obj);

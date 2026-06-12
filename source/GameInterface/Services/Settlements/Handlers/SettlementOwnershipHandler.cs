@@ -1,18 +1,13 @@
-﻿using Autofac.Features.OwnedInstances;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using GameInterface.Services.MobileParties.Handlers;
+using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Messages;
-using GameInterface.Services.Settlements.Patches;
 using Serilog;
-using System;
-using System.Runtime.Serialization;
-using System.Text.RegularExpressions;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Settlements.Handlers
@@ -77,8 +72,47 @@ namespace GameInterface.Services.Settlements.Handlers
                 return;
             }
 
-            ChangeOwnerOfSettlementPatch.RunOriginalApplyInternal(settlement, owner, capturer,
-                (ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail)payload.Detail);
+            var detail = (ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail)payload.Detail;
+
+            // Apply only the direct owner change. The action's other side effects (patrol
+            // culling, garrison destruction and creation, governor removal) run on the server
+            // with patches live and arrive here as their own replicated messages; replaying the
+            // whole action would apply them a second time.
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                using (new AllowedThread())
+                {
+                    var oldOwner = settlement.OwnerClan?.Leader;
+
+                    if (settlement.Town != null)
+                    {
+                        settlement.Town.IsOwnerUnassigned = false;
+                    }
+
+                    if (settlement.IsFortification)
+                    {
+                        settlement.Town.OwnerClan = owner.Clan;
+                    }
+
+                    settlement.Party.SetVisualAsDirty();
+                    foreach (var boundVillage in settlement.BoundVillages)
+                    {
+                        boundVillage.Settlement.Party.SetVisualAsDirty();
+                    }
+
+                    // Fire the owner-changed event so client-side listeners (map notifications,
+                    // UI refreshes, the claimant behavior's bookkeeping) still react — the same
+                    // listeners the old full replay reached. Server-side behaviors with game
+                    // consequences (patrol culling etc.) are disabled on clients and stay silent.
+                    var openToClaim = (detail == ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail.BySiege
+                        || detail == ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail.ByClanDestruction
+                        || detail == ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail.ByLeaveFaction)
+                        && settlement.IsFortification;
+
+                    CampaignEventDispatcher.Instance.OnSettlementOwnerChanged(
+                        settlement, openToClaim, owner, oldOwner, capturer, detail);
+                }
+            });
         }
     }
 }

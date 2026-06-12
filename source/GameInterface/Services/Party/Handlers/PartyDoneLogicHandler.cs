@@ -59,8 +59,9 @@ internal class PartyDoneLogicHandler : IHandler
         string leftPartyId = null;
         if (obj.What.LeftParty != null && !objectManager.TryGetIdWithLogging(obj.What.LeftParty, out leftPartyId)) return;
 
-        string leftPrisonerRosterId = null;
-        if (obj.What.LeftPrisonerRoster != null && !objectManager.TryGetIdWithLogging(obj.What.LeftPrisonerRoster, out leftPrisonerRosterId)) return;
+        // Don't need to check if it resolved or not, not all left prisoner rosters are managed
+        // Examples being discarding prisoners or taking prisoners after a battle
+        objectManager.TryGetIdWithLogging(obj.What.LeftPrisonerRoster, out var leftPrisonerRosterId);
 
         var upgradedTroopHistory = new UpgradedTroopHistoryData(new());
         foreach (Tuple<CharacterObject, CharacterObject, int> tuple in obj.What.UpgradedTroopHistory)

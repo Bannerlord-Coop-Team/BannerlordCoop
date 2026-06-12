@@ -19,7 +19,9 @@ internal class ResetLogicPatch
         AllowedThread.AllowThisThread();
     }
 
-    static void Postfix()
+    // Finalizer (not postfix) so the revoke runs even when the original throws;
+    // a skipped revoke would leave the thread permanently allowed.
+    static void Finalizer()
     {
         AllowedThread.RevokeThisThread();
     }
