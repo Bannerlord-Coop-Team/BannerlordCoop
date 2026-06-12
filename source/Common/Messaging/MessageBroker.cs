@@ -86,6 +86,12 @@ namespace Common.Messaging
 
         public virtual void Respond<T>(object target, T message) where T : IResponse
         {
+            // Dispatch on a worker thread so a slow responder doesn't block the caller.
+            Task.Factory.StartNew(() => RespondSync(target, message));
+        }
+
+        public virtual void RespondSync<T>(object target, T message) where T : IResponse
+        {
             if (message == null)
                 return;
 
@@ -102,40 +108,6 @@ namespace Common.Messaging
             for (int i = 0; i < delegates.Count; i++)
             {
                 // TODO this might be slow
-                var weakDelegate = delegates[i];
-                if (weakDelegate.IsAlive == false)
-                {
-                    // Remove dead delegates
-                    delegates.RemoveAt(i--);
-                    continue;
-                }
-
-                if (ReferenceEquals(weakDelegate.Instance, target))
-                {
-                    Task.Factory.StartNew(() => weakDelegate.Invoke(new object[] { payload }));
-                    // Can only respond to one source, no longer need to loop if found
-                    return;
-                }
-            }
-        }
-
-        public virtual void RespondSync<T>(object target, T message) where T : IResponse
-        {
-            if (message == null)
-                return;
-
-            Logger.Verbose($"Responding {message.GetType().Name} to {target?.GetType().Name} synchronously");
-
-            if (!subscribers.ContainsKey(typeof(T)))
-            {
-                return;
-            }
-
-            var delegates = subscribers[typeof(T)];
-            if (delegates == null || delegates.Count == 0) return;
-            var payload = new MessagePayload<T>(target, message);
-            for (int i = 0; i < delegates.Count; i++)
-            {
                 var weakDelegate = delegates[i];
                 if (weakDelegate.IsAlive == false)
                 {
