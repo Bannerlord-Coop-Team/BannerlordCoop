@@ -35,6 +35,6 @@ internal class LocationCharacterGuardPatches
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        return ModInformation.IsClient == false;
+        return ModInformation.IsServer;
     }
 }
