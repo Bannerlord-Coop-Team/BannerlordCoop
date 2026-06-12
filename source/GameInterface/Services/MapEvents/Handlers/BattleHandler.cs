@@ -16,6 +16,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -26,6 +27,7 @@ using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.MapEvents.Handlers;
 
@@ -58,7 +60,6 @@ internal class BattleHandler : IHandler
         this.mapEventLogger = mapEventLogger;
         this.playerRegistry = playerRegistry;
         this.timeControlInterface = timeControlInterface;
-        this.mapEventLogger = mapEventLogger;
         messageBroker.Subscribe<PlayerJoinedBattle>(Handle_PlayerJoinedBattle);
 
         messageBroker.Subscribe<MapEventFinalizeAttempted>(Handle_MapEventFinalizeAttempted);
@@ -115,7 +116,7 @@ internal class BattleHandler : IHandler
         if (!objectManager.TryGetObject(payload.What.MapEventId, out MapEvent mapEvent))
             return;
 
-        mapEventLogger.DebugMapEvent(mapEvent, "Handling network attack mission attempted for map event. Setting attack mission attempted to true");
+        mapEventLogger.DebugMapEvent(mapEvent, "Handling network attack mission attempted for map event. Making sides mission-ready and replying with mission start");
 
         foreach(var side in mapEvent._sides)
         {
@@ -128,35 +129,86 @@ internal class BattleHandler : IHandler
 
     private void Handle_NetworkStartAttackMission(MessagePayload<NetworkStartAttackMission> payload)
     {
-        var battle = PlayerEncounter.Battle;
-        bool isNavalEncounter = PlayerEncounter.IsNavalEncounter();
-        CampaignVec2 position = MobileParty.MainParty.Position;
+        // Opening a mission pushes a screen, and ScreenManager only tolerates screen
+        // changes from the main thread; doing it from the network thread races its
+        // layer lists and crashes the game.
+        GameLoopRunner.RunOnMainThread(OpenAttackMission);
+    }
 
-        IMapScene mapSceneWrapper = Campaign.Current.MapSceneWrapper;
-        MapPatchData mapPatchAtPosition = mapSceneWrapper.GetMapPatchAtPosition(position);
+    private static void OpenAttackMission()
+    {
+        try
+        {
+            // The encounter can end (or another mission can open) between the server
+            // round-trip and this running, so everything the mission depends on is
+            // re-validated here rather than at message arrival.
+            if (Campaign.Current == null)
+            {
+                Logger.Warning("Received {Message} but the campaign was not loaded, not opening battle mission", nameof(NetworkStartAttackMission));
+                return;
+            }
+
+            var battle = PlayerEncounter.Battle;
+            if (battle == null)
+            {
+                Logger.Warning("Received {Message} but PlayerEncounter.Battle was null, not opening battle mission", nameof(NetworkStartAttackMission));
+                return;
+            }
+
+            // A finalized battle keeps PlayerEncounter.Battle set but releases the
+            // main party from the map event, which the mission setup dereferences.
+            if (MobileParty.MainParty?.MapEvent == null)
+            {
+                Logger.Warning("Received {Message} but the main party is no longer in a map event, not opening battle mission", nameof(NetworkStartAttackMission));
+                return;
+            }
+
+            // Pressing attack again while the request is in flight produces a second
+            // mission start; opening on top of the running mission corrupts the game
+            // state stack. MissionState.Current is set synchronously by the state
+            // push, unlike Mission.Current which is only set on the mission's first
+            // tick, so it also covers two mission starts queued in the same frame.
+            if (MissionState.Current != null)
+            {
+                Logger.Warning("Received {Message} but a mission is already open, not opening battle mission", nameof(NetworkStartAttackMission));
+                return;
+            }
+
+            bool isNavalEncounter = PlayerEncounter.IsNavalEncounter();
+            CampaignVec2 position = MobileParty.MainParty.Position;
+
+            IMapScene mapSceneWrapper = Campaign.Current.MapSceneWrapper;
+            MapPatchData mapPatchAtPosition = mapSceneWrapper.GetMapPatchAtPosition(position);
 
 
-        string battleScene = Campaign.Current.Models.SceneModel.GetBattleSceneForMapPatch(mapPatchAtPosition, isNavalEncounter);
-        MissionInitializerRecord rec2 = new MissionInitializerRecord(battleScene);
-        TerrainType faceTerrainType2 = Campaign.Current.MapSceneWrapper.GetFaceTerrainType(MobileParty.MainParty.CurrentNavigationFace);
-        rec2.TerrainType = (int)faceTerrainType2;
-        rec2.DamageToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier();
-        rec2.DamageFromPlayerToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier();
-        rec2.NeedsRandomTerrain = false;
-        rec2.PlayingInCampaignMode = true;
+            string battleScene = Campaign.Current.Models.SceneModel.GetBattleSceneForMapPatch(mapPatchAtPosition, isNavalEncounter);
+            MissionInitializerRecord rec2 = new MissionInitializerRecord(battleScene);
+            TerrainType faceTerrainType2 = Campaign.Current.MapSceneWrapper.GetFaceTerrainType(MobileParty.MainParty.CurrentNavigationFace);
+            rec2.TerrainType = (int)faceTerrainType2;
+            rec2.DamageToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier();
+            rec2.DamageFromPlayerToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier();
+            rec2.NeedsRandomTerrain = false;
+            rec2.PlayingInCampaignMode = true;
 
-        // TODO make this server side
-        rec2.RandomTerrainSeed = MBRandom.RandomInt(10000);
-        rec2.AtmosphereOnCampaign = Campaign.Current.Models.MapWeatherModel.GetAtmosphereModel(MobileParty.MainParty.Position);
-        rec2.SceneHasMapPatch = true;
-        rec2.DecalAtlasGroup = 2;
-        rec2.PatchCoordinates = mapPatchAtPosition.normalizedCoordinates;
-        position = battle.AttackerSide.LeaderParty.Position;
-        Vec2 v2 = position.ToVec2();
-        position = battle.DefenderSide.LeaderParty.Position;
-        rec2.PatchEncounterDir = (v2 - position.ToVec2()).Normalized();
+            // TODO make this server side
+            rec2.RandomTerrainSeed = MBRandom.RandomInt(10000);
+            rec2.AtmosphereOnCampaign = Campaign.Current.Models.MapWeatherModel.GetAtmosphereModel(MobileParty.MainParty.Position);
+            rec2.SceneHasMapPatch = true;
+            rec2.DecalAtlasGroup = 2;
+            rec2.PatchCoordinates = mapPatchAtPosition.normalizedCoordinates;
+            position = battle.AttackerSide.LeaderParty.Position;
+            Vec2 v2 = position.ToVec2();
+            position = battle.DefenderSide.LeaderParty.Position;
+            rec2.PatchEncounterDir = (v2 - position.ToVec2()).Normalized();
 
-        CampaignMission.OpenBattleMission(rec2);
+            CampaignMission.OpenBattleMission(rec2);
+        }
+        catch (Exception e)
+        {
+            // GameLoopRunner runs queued actions unguarded, so a throw from here
+            // would escape into the game's main tick and crash it.
+            Logger.Error(e, "Failed to open the battle mission for {Message}", nameof(NetworkStartAttackMission));
+        }
     }
 
     private void Handle_MapEventFinalizeAttempted(MessagePayload<MapEventFinalizeAttempted> payload)
