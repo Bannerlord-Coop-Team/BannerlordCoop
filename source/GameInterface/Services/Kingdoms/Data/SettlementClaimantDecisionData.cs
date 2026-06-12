@@ -20,7 +20,6 @@ namespace GameInterface.Services.Kingdoms.Data
         private static readonly FieldInfo ClanToExcludeField = typeof(SettlementClaimantDecision).GetField(nameof(SettlementClaimantDecision.ClanToExclude), BindingFlags.Instance | BindingFlags.Public);
         private static readonly FieldInfo CapturerHeroField = typeof(SettlementClaimantDecision).GetField("_capturerHero", BindingFlags.Instance | BindingFlags.NonPublic);
 
-
         [ProtoMember(1)]
         public string SettlementId { get; }
         [ProtoMember(2)]
