@@ -1,8 +1,9 @@
-﻿using Coop.Core.Server.Services.Settlements.Messages;
+using Coop.Core.Server.Services.Settlements.Messages;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Settlements.Messages;
 
+using TaleWorlds.CampaignSystem.Settlements;
 namespace Coop.IntegrationTests.Settlements;
 public class SettlementHitPointsTest
 {
@@ -15,7 +16,13 @@ public class SettlementHitPointsTest
     public void ServerSettlementHitPointsChanged_Publishes_AllClients()
     {
         // Arrange
-        var triggerMessage = new SettlementChangedSettlementHitPoints();
+        var settlement = TestEnvironment.Server.CreateRegisteredObject<Settlement>("settlement1");
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.CreateRegisteredObject<Settlement>("settlement1");
+        }
+
+        var triggerMessage = new SettlementChangedSettlementHitPoints(settlement, 100f);
 
         var server = TestEnvironment.Server;
 

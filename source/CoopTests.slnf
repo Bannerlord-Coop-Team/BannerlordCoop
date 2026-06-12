@@ -1,0 +1,12 @@
+{
+  "solution": {
+    "path": "Coop.sln",
+    "projects": [
+      "Common.Tests\\Common.Tests.csproj",
+      "Coop.Tests\\Coop.Tests.csproj",
+      "Coop.IntegrationTests\\Coop.IntegrationTests.csproj",
+      "GameInterface.Tests\\GameInterface.Tests.csproj",
+      "E2E.Tests\\E2E.Tests.csproj"
+    ]
+  }
+}

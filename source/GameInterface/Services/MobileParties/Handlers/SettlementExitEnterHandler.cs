@@ -95,7 +95,8 @@ internal class SettlementExitEnterHandler : IHandler
         var settlementParty = settlement.Party;
         if (settlementParty == null)
         {
-            Logger.Error("Settlement {settlementName} did not have a party value", settlement.Name);
+            // Settlement.Name dereferences Party, which is exactly what is null here - log the id instead.
+            Logger.Error("Settlement {settlementId} did not have a party value", settlement.StringId);
             return;
         }
 

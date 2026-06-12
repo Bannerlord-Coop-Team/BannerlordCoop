@@ -130,21 +130,25 @@ internal class TradeHandler : IHandler
         var totalAmount = message.TotalAmount;
 
         // Undo any purchases that are no longer present in the roster
-        foreach (var boughtItem in boughtItems)
+        // When looting, taken items are treated as bought items. Don't need to manage changed rosters in these cases
+        if (fromRoster != null)
         {
-            int difference = fromRoster.GetItemNumber(boughtItem.Item1.EquipmentElement.Item) - boughtItem.Item1.Amount;
-
-            if (difference < 0)
+            foreach (var boughtItem in boughtItems)
             {
-                int fromRosterDataIndex = fromItemRosterData.FindIndex(rosterElement => rosterElement.EquipmentElement.Equals(boughtItem.Item1));
-                if (fromRosterDataIndex >= 0) fromItemRosterData[fromRosterDataIndex].Amount -= difference;
-                else fromItemRosterData.AddItem(new ItemRosterElement(boughtItem.Item1.EquipmentElement, -difference));
+                int difference = fromRoster.GetItemNumber(boughtItem.Item1.EquipmentElement.Item) - boughtItem.Item1.Amount;
 
-                int toRosterDataIndex = toItemRosterData.FindIndex(rosterElement => rosterElement.EquipmentElement.Equals(boughtItem.Item1));
-                if (toRosterDataIndex >= 0) toItemRosterData[toRosterDataIndex].Amount += difference;
-                else toItemRosterData.AddItem(new ItemRosterElement(boughtItem.Item1.EquipmentElement, difference));
+                if (difference < 0)
+                {
+                    int fromRosterDataIndex = fromItemRosterData.FindIndex(rosterElement => rosterElement.EquipmentElement.Equals(boughtItem.Item1));
+                    if (fromRosterDataIndex >= 0) fromItemRosterData[fromRosterDataIndex].Amount -= difference;
+                    else fromItemRosterData.AddItem(new ItemRosterElement(boughtItem.Item1.EquipmentElement, -difference));
 
-                totalAmount -= boughtItem.Item2;
+                    int toRosterDataIndex = toItemRosterData.FindIndex(rosterElement => rosterElement.EquipmentElement.Equals(boughtItem.Item1));
+                    if (toRosterDataIndex >= 0) toItemRosterData[toRosterDataIndex].Amount += difference;
+                    else toItemRosterData.AddItem(new ItemRosterElement(boughtItem.Item1.EquipmentElement, difference));
+
+                    totalAmount -= boughtItem.Item2;
+                }
             }
         }
 

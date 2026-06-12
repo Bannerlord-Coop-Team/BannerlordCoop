@@ -43,6 +43,9 @@ public class GameInterface : IGameInterface
 
     public void UnpatchAll()
     {
+        // Unpatching is disabled due to double ctor patch bug
+        return;
+
         patchCollector.UnpatchAll();
         harmony.UnpatchAll();
     }

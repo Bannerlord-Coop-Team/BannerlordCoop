@@ -59,9 +59,14 @@ internal class MapEventHandler : IHandler
             "Applying network battle state change. BattleState={BattleState}",
             payload.What.BattleState);
 
-        using (new AllowedThread())
-        {
-            mapEvent.BattleState = payload.What.BattleState;
-        }
+        // Do NOT wrap in AllowedThread. Setting BattleState to a victory state runs the native setter ->
+        // OnBattleWon -> CalculateAndCommitMapEventResults -> CaptureDefeatedPartyMembers, which is the
+        // server-authoritative capture path. Under AllowedThread CallOriginalPolicy.IsOriginalAllowed() is
+        // true, so the coop capture interceptors (PlayerStartCaptivityPatches, TakePrisonerActionPatches and
+        // the PartyBelongedToAsPrisoner sync) all run the original and the capture is never replicated -
+        // the client gets no capture UI and the player party is never parked. The server's BattleState
+        // setter does not re-broadcast (MapEventPatches.Prefix_BattleState returns without publishing on the
+        // server), so no AllowedThread is needed to prevent an echo.
+        mapEvent.BattleState = payload.What.BattleState;
     }
 }
