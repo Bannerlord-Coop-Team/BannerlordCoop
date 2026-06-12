@@ -1,11 +1,12 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using Common.Network;
-using Coop.Core.Client.Messages;
-using Coop.Core.Server.Services.Time.Messages;
+using Coop.Core.Common.Network.Packets;
+using Coop.Core.Server.Services.Connection.Messages;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
-using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Heroes.Interfaces;
 
 namespace Coop.Core.Server.Connections.States;
 
@@ -15,47 +16,41 @@ namespace Coop.Core.Server.Connections.States;
 /// </summary>
 public class TransferSaveState : ConnectionStateBase
 {
-    private readonly IMessageBroker messageBroker;
-    private readonly INetwork network;
-    private readonly ICoopSessionProvider coopSessionProvider;
-    private readonly ITimeControlInterface timeControlInterface;
-
     public TransferSaveState(
         IConnectionLogic connectionLogic,
         IMessageBroker messageBroker,
         INetwork network,
         ICoopSessionProvider coopSessionProvider,
+        ISaveInterface saveInterface,
         ITimeControlInterface timeControlInterface)
         : base(connectionLogic)
     {
-        this.network = network;
-        this.messageBroker = messageBroker;
-        this.coopSessionProvider = coopSessionProvider;
-        this.timeControlInterface = timeControlInterface;
-        messageBroker.Subscribe<GameSaveDataPackaged>(Handle_GameSaveDataPackaged);
+        messageBroker.Publish(this, new PlayerLoading());
 
-        timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
 
-        messageBroker.Publish(this, new PackageGameSaveData());
+            var saveResults = saveInterface.SaveCurrentGame();
+
+            var savePacket = new GameSaveDataPacket(
+                saveResults.Data,
+                saveResults.CampaignId,
+                coopSessionProvider.CoopSession?.CraftingPlayerData);
+
+            // Disconnect peer on failure
+            if (!saveResults.Success)
+            {
+                connectionLogic.Peer.Disconnect();
+                return;
+            }
+                
+            network.Send(ConnectionLogic.Peer, savePacket);
+        }, blocking: true);
     }
 
     public override void Dispose()
     {
-        messageBroker.Unsubscribe<GameSaveDataPackaged>(Handle_GameSaveDataPackaged);
-    }
-    internal void Handle_GameSaveDataPackaged(MessagePayload<GameSaveDataPackaged> obj)
-    {
-        var payload = obj.What;
-        var peer = ConnectionLogic.Peer;
-        var networkEvent = new NetworkGameSaveDataReceived(
-            payload.GameSaveData,
-            payload.CampaignID,
-            null, // TODO manage controlled objects
-            coopSessionProvider.CoopSession?.CraftingPlayerData);
-
-        network.Send(peer, networkEvent);
-
-        ConnectionLogic.Load();
     }
 
     public override void CreateCharacter()
