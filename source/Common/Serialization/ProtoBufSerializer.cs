@@ -9,6 +9,13 @@ public interface ICommonSerializer
     T Deserialize<T>(byte[] data);
     object Deserialize(byte[] data);
     byte[] Serialize(object obj);
+
+    /// <summary>
+    /// Resolves the runtime type of serialized data without materializing the payload
+    /// object graph, so no surrogate conversions run.
+    /// </summary>
+    /// <returns>False when the data cannot be read or its type id is unknown</returns>
+    bool TryPeekType(byte[] data, out Type type);
 }
 
 public class ProtoBufSerializer : ICommonSerializer
@@ -39,6 +46,26 @@ public class ProtoBufSerializer : ICommonSerializer
         }
     }
 
+    public bool TryPeekType(byte[] data, out Type type)
+    {
+        type = null;
+
+        try
+        {
+            using (var ms = new MemoryStream(data))
+            {
+                // Reading a contract that only declares the type id field skips the payload
+                // field without materializing it
+                var peek = Serializer.Deserialize<ProtoTypeIdPeek>(ms);
+                return typeMapper.TryGetType(peek.TypeId, out type);
+            }
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
     public byte[] Serialize(object obj)
     {
         if (typeMapper.TryGetId(obj.GetType(), out int typeId) == false)
@@ -55,6 +82,18 @@ public class ProtoBufSerializer : ICommonSerializer
                 Serializer.Serialize(internalStream, wrapper);
                 return internalStream.ToArray();
             }
+        }
+    }
+
+    [ProtoContract(SkipConstructor = true)]
+    private readonly struct ProtoTypeIdPeek
+    {
+        [ProtoMember(1)]
+        public readonly int TypeId;
+
+        public ProtoTypeIdPeek(int typeId)
+        {
+            TypeId = typeId;
         }
     }
 

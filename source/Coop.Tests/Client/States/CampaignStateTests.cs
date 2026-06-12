@@ -2,9 +2,11 @@
 using Common.Messaging;
 using Common.Tests.Utils;
 using Coop.Core.Client;
+using Coop.Core.Client.Messages;
 using Coop.Core.Client.States;
 using Coop.Tests.Mocks;
 using GameInterface.Services.GameState.Messages;
+using System.Linq;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -21,6 +23,21 @@ public class CampaignStateTests
         clientComponent = new ClientTestComponent(output);
         var container = clientComponent.Container;
         clientLogic = container.Resolve<IClientLogic>()!;
+    }
+
+    [Fact]
+    public void EnteringCampaign_ReleasesNetworkBacklog_AfterCampaignEntered()
+    {
+        clientLogic.SetState<CampaignState>();
+
+        // The backlog replay must run after the ClientCampaignEntered subscribers
+        // (deferred remote heroes) so replayed packets can resolve the objects they create
+        var messages = TestMessageBroker.Messages.ToList();
+        var enteredIndex = messages.FindIndex(message => message is ClientCampaignEntered);
+        var releaseIndex = messages.FindIndex(message => message is ReleaseNetworkBacklog);
+
+        Assert.True(enteredIndex >= 0);
+        Assert.True(releaseIndex > enteredIndex);
     }
 
     [Fact]

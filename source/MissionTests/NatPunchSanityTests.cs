@@ -159,6 +159,7 @@ namespace MissionTests
             public T Deserialize<T>(byte[] data) => default;
             public object Deserialize(byte[] data) => null;
             public byte[] Serialize(object obj) => Array.Empty<byte>();
+            public bool TryPeekType(byte[] data, out Type type) { type = null; return false; }
         }
 
         private sealed class XunitSink : ILogEventSink

@@ -5,6 +5,7 @@ using Common.Network;
 using Common.PacketHandlers;
 using Common.Serialization;
 using Coop.Core.Client.Messages;
+using Coop.Core.Client.Services.Connection;
 using Coop.Core.Common.Network;
 using GameInterface;
 using GameInterface.Services.GameDebug.Messages;
@@ -33,6 +34,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 
     private readonly IMessageBroker messageBroker;
     private readonly IPacketManager packetManager;
+    private readonly IClientPacketGate packetGate;
     private bool isConnected = false;
     private bool reconnectPending = false;
     private DateTime reconnectAfter = DateTime.MinValue;
@@ -43,10 +45,12 @@ public class CoopClient : CoopNetworkBase, ICoopClient
         INetworkConfiguration config,
         IMessageBroker messageBroker,
         IPacketManager packetManager,
+        IClientPacketGate packetGate,
         ICommonSerializer serializer) : base(config, serializer)
     {
         this.messageBroker = messageBroker;
         this.packetManager = packetManager;
+        this.packetGate = packetGate;
     }
 
     public override void OnConnectionRequest(ConnectionRequest request)
@@ -69,6 +73,9 @@ public class CoopClient : CoopNetworkBase, ICoopClient
     public override void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
     {
         IPacket packet = (IPacket)serializer.Deserialize(reader.GetRemainingBytes());
+
+        if (packetGate.TryHold(peer, packet)) return;
+
         packetManager.HandleReceive(peer, packet);
     }
 

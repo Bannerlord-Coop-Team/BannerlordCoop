@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
 using Coop.Core.Client.Policies;
+using Coop.Core.Client.Services.Connection;
 using Coop.Core.Client.States;
 using Coop.Core.Common;
 using GameInterface.Policies;
@@ -22,6 +23,7 @@ public class ClientModule : CommonModule
 
         builder.RegisterType<ClientLogic>().As<ILogic>().As<IClientLogic>().InstancePerLifetimeScope();
         builder.RegisterType<CoopClient>().As<ICoopClient>().As<INetwork>().As<INetEventListener>().InstancePerLifetimeScope();
+        builder.RegisterType<ClientPacketGate>().As<IClientPacketGate>().InstancePerLifetimeScope();
 
         // Policies
         builder.RegisterType<ClientSyncPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();

@@ -41,6 +41,10 @@ public class CampaignState : ClientStateBase
         // in the gap between the loading states.)
         messageBroker.Publish(this, new ClientCampaignEntered());
 
+        // Only now release the network backlog held while joining: the deferred remote heroes
+        // above must exist before held packets that reference them are replayed
+        messageBroker.Publish(this, new ReleaseNetworkBacklog());
+
         network.SendAll(new NetworkPlayerCampaignEntered());
 
         loadingInterface.HideLoadingScreen();
