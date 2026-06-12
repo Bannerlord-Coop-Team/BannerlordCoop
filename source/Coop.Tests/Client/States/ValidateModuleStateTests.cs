@@ -6,9 +6,11 @@ using Coop.Core.Server.Connections.Messages;
 using Coop.Tests.Mocks;
 using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Players.Data;
 using LiteNetLib;
+using Moq;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -94,17 +96,17 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
-        public void EnterMainMenu_Publishes_EnterMainMenuEvent()
+        public void EnterMainMenu_GoesToMainMenu()
         {
             // Arrange
             var validateState = clientLogic.SetState<ValidateModuleState>();
+            var gameStateMock = clientComponent.Container.Resolve<Mock<IGameStateInterface>>();
 
             // Act
             clientLogic.EnterMainMenu();
 
             // Assert
-            var message = Assert.Single(clientComponent.TestMessageBroker.Messages);
-            Assert.IsType<EnterMainMenu>(message);
+            gameStateMock.Verify(x => x.GoToMainMenu(), Times.Once);
         }
 
         [Fact]
@@ -137,17 +139,17 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
-        public void Disconnect_Publishes_EnterMainMenu()
+        public void Disconnect_GoesToMainMenu()
         {
             // Arrange
             var validateState = clientLogic.SetState<ValidateModuleState>();
+            var gameStateMock = clientComponent.Container.Resolve<Mock<IGameStateInterface>>();
 
             // Act
             clientLogic.Disconnect();
 
             // Assert
-            var message = Assert.Single(clientComponent.TestMessageBroker.Messages);
-            Assert.IsType<EnterMainMenu>(message);
+            gameStateMock.Verify(x => x.GoToMainMenu(), Times.Once);
         }
 
         [Fact]

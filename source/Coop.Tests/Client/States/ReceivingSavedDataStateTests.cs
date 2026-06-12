@@ -1,15 +1,14 @@
-﻿using Autofac;
+using Autofac;
 using Common.Messaging;
 using Coop.Core.Client;
 using Coop.Core.Client.Messages;
 using Coop.Core.Client.States;
 using Coop.Tests.Mocks;
-using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.UI.Interfaces;
 using Moq;
 using System;
-using System.Linq;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -20,6 +19,7 @@ namespace Coop.Tests.Client.States
         private readonly IClientLogic clientLogic;
         private readonly ClientTestComponent clientComponent;
         private readonly Mock<ILoadingInterface> loadingInterfaceMock;
+        private readonly Mock<IGameStateInterface> gameStateMock;
 
         public ReceivingSavedDataStateTests(ITestOutputHelper output)
         {
@@ -28,7 +28,11 @@ namespace Coop.Tests.Client.States
 
             clientLogic = container.Resolve<IClientLogic>()!;
             loadingInterfaceMock = container.Resolve<Mock<ILoadingInterface>>();
+            gameStateMock = container.Resolve<Mock<IGameStateInterface>>();
         }
+
+        private static NetworkGameSaveDataReceived SaveData(byte[] data, string campaignId) =>
+            new NetworkGameSaveDataReceived(data, campaignId, new CraftingPlayerData(new(), new(), new()));
 
         [Fact]
         public void StateEntered_Shows_LoadingProgressMessage()
@@ -43,164 +47,92 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
-        public void NetworkGameSaveDataReceived_Publishes_EnterMainMenuEvent()
+        public void NetworkGameSaveDataReceived_LoadsSaveGame_AndTransitionsToLoading()
         {
             // Arrange
             var currentState = clientLogic.SetState<ReceivingSavedDataState>();
-
             var gameSaveData = new byte[16];
-            var campaignId = "12345";
-
-            var payload = new MessagePayload<NetworkGameSaveDataReceived>(
-                this, new NetworkGameSaveDataReceived(gameSaveData, campaignId, null, new CraftingPlayerData(new(), new(), new())));
 
             // Act
-            currentState.Handle_NetworkGameSaveDataReceived(payload);
+            currentState.Handle_NetworkGameSaveDataReceived(
+                new MessagePayload<NetworkGameSaveDataReceived>(this, SaveData(gameSaveData, "12345")));
 
-            // Assert
-            var message = Assert.Single(clientComponent.TestMessageBroker.Messages);
-            Assert.IsType<EnterMainMenu>(message);
+            // Assert — the world is reset to the main menu, then the received save is loaded.
+            gameStateMock.Verify(x => x.GoToMainMenu(), Times.Once);
+            gameStateMock.Verify(x => x.LoadSaveGame(gameSaveData), Times.Once);
+            Assert.IsType<LoadingState>(clientLogic.State);
             loadingInterfaceMock.Verify(x => x.SetLoadingMessage(
                 "Joining Coop Campaign",
                 "Preparing host save data..."), Times.Once);
-        }
-
-        [Fact]
-        public void MainMenuEntered_Publishes_LoadGameSave()
-        {
-            // Arrange
-            var currentState = clientLogic.SetState<ReceivingSavedDataState>();
-
-            var gameSaveData = new byte[16];
-            var campaignId = "12345";
-
-            var gameDataMessage = new MessagePayload<NetworkGameSaveDataReceived>(
-                this, new NetworkGameSaveDataReceived(gameSaveData, campaignId, null, new CraftingPlayerData(new(), new(), new())));
-
-            currentState.Handle_NetworkGameSaveDataReceived(gameDataMessage);
-
-            var mainMenuPayload = new MessagePayload<MainMenuEntered>(
-                this, new MainMenuEntered());
-
-            // Act
-            currentState.Handle_MainMenuEntered(mainMenuPayload);
-
-            // Assert
-            Assert.Equal(2, clientComponent.TestMessageBroker.Messages.Count);
-            var message = clientComponent.TestMessageBroker.Messages.ElementAt(1);
-            var loadSaveMessage = Assert.IsType<LoadGameSave>(message);
-            Assert.Equal(gameSaveData, loadSaveMessage.SaveData);
-
-            Assert.IsType<LoadingState>(clientLogic.State);
             loadingInterfaceMock.Verify(x => x.SetLoadingMessage(
                 "Loading Host Campaign",
                 "Loading host save data..."), Times.Once);
         }
 
         [Fact]
-        public void MainMenuEntered_Handles_DefaultData()
+        public void NetworkGameSaveDataReceived_NullSaveData_StaysWaiting()
         {
             // Arrange
             var currentState = clientLogic.SetState<ReceivingSavedDataState>();
 
-            var campaignId = "12345";
-
-            var gameDataMessage = new MessagePayload<NetworkGameSaveDataReceived>(
-                this, new NetworkGameSaveDataReceived(default, campaignId, null, new CraftingPlayerData(new(), new(), new())));
-
-            currentState.Handle_NetworkGameSaveDataReceived(gameDataMessage);
-
-            var mainMenuPayload = new MessagePayload<MainMenuEntered>(
-                this, new MainMenuEntered());
-
             // Act
-            currentState.Handle_MainMenuEntered(mainMenuPayload);
+            currentState.Handle_NetworkGameSaveDataReceived(
+                new MessagePayload<NetworkGameSaveDataReceived>(this, SaveData(null, "12345")));
 
-            // Assert
-            Assert.Single(clientComponent.TestMessageBroker.Messages);
+            // Assert — no save to load, so we go to the main menu but remain waiting.
+            gameStateMock.Verify(x => x.GoToMainMenu(), Times.Once);
+            gameStateMock.Verify(x => x.LoadSaveGame(It.IsAny<byte[]>()), Times.Never);
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
         }
 
         [Fact]
-        public void MainMenuEntered_Handles_NullSaveData()
+        public void NetworkGameSaveDataReceived_ZeroLenArray_StaysWaiting()
         {
             // Arrange
             var currentState = clientLogic.SetState<ReceivingSavedDataState>();
 
-            var campaignId = "12345";
-
-            var gameDataMessage = new MessagePayload<NetworkGameSaveDataReceived>(
-                this, new NetworkGameSaveDataReceived(null, campaignId, null, new CraftingPlayerData(new(), new(), new())));
-
-            currentState.Handle_NetworkGameSaveDataReceived(gameDataMessage);
-
-            var mainMenuPayload = new MessagePayload<MainMenuEntered>(
-                this, new MainMenuEntered());
-
             // Act
-            currentState.Handle_MainMenuEntered(mainMenuPayload);
+            currentState.Handle_NetworkGameSaveDataReceived(
+                new MessagePayload<NetworkGameSaveDataReceived>(this, SaveData(Array.Empty<byte>(), "12345")));
 
             // Assert
-            Assert.Single(clientComponent.TestMessageBroker.Messages);
+            gameStateMock.Verify(x => x.GoToMainMenu(), Times.Once);
+            gameStateMock.Verify(x => x.LoadSaveGame(It.IsAny<byte[]>()), Times.Never);
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
         }
 
         [Fact]
-        public void MainMenuEntered_Handles_ZeroLenArray()
+        public void EnterMainMenu_GoesToMainMenu()
         {
             // Arrange
-            var currentState = clientLogic.SetState<ReceivingSavedDataState>();
-
-            var gameSaveData = Array.Empty<byte>();
-            var campaignId = "12345";
-
-            var gameDataMessage = new MessagePayload<NetworkGameSaveDataReceived>(
-                this, new NetworkGameSaveDataReceived(gameSaveData, campaignId, null, new CraftingPlayerData(new(), new(), new())));
-
-            currentState.Handle_NetworkGameSaveDataReceived(gameDataMessage);
-
-            var mainMenuPayload = new MessagePayload<MainMenuEntered>(
-                this, new MainMenuEntered());
-
-            // Act
-            currentState.Handle_MainMenuEntered(mainMenuPayload);
-
-            // Assert
-            Assert.Single(clientComponent.TestMessageBroker.Messages);
-            Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
-        }
-
-        [Fact]
-        public void EnterMainMenu_Publishes_EnterMainMenuEvent()
-        {
-            // Arrange
-            var currentState = clientLogic.SetState<ReceivingSavedDataState>();
+            clientLogic.SetState<ReceivingSavedDataState>();
 
             // Act
             clientLogic.EnterMainMenu();
 
             // Assert
-            var message = Assert.Single(clientComponent.TestMessageBroker.Messages);
-            Assert.IsType<EnterMainMenu>(message);
+            gameStateMock.Verify(x => x.GoToMainMenu(), Times.Once);
         }
 
         [Fact]
-        public void Disconnect_Publishes_EnterMainMenu()
+        public void Disconnect_GoesToMainMenu()
         {
             // Arrange
-            var currentState = clientLogic.SetState<ReceivingSavedDataState>();
+            clientLogic.SetState<ReceivingSavedDataState>();
 
             // Act
             clientLogic.Disconnect();
 
             // Assert
-            var message = Assert.Single(clientComponent.TestMessageBroker.Messages);
-            Assert.IsType<EnterMainMenu>(message);
+            gameStateMock.Verify(x => x.GoToMainMenu(), Times.Once);
         }
 
         [Fact]
-        public void Disconnect_Transitions_EnterMainMenu()
+        public void Disconnect_Transitions_MainMenuState()
         {
+            // Arrange
+            clientLogic.SetState<ReceivingSavedDataState>();
+
             // Act
             clientLogic.Disconnect();
 
@@ -212,7 +144,7 @@ namespace Coop.Tests.Client.States
         public void OtherStateMethods_DoNotAlterState()
         {
             // Arrange
-            var currentState = clientLogic.SetState<ReceivingSavedDataState>();
+            clientLogic.SetState<ReceivingSavedDataState>();
 
             // Act
             clientLogic.Connect();

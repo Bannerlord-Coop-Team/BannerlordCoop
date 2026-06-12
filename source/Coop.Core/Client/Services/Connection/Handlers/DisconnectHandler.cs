@@ -12,7 +12,14 @@ internal class DisconnectHandler : IHandler
     private readonly ICoopFinalizer coopFinalizer;
     private readonly IGameStateInterface gameStateInterface;
 
-    public DisconnectHandler(IMessageBroker messageBroker, ICoopFinalizer coopFinalizer, IGameStateInterface gameStateInterface) 
+    // MainMenuEntered fires both on a real disconnect AND as an intermediate step of normal flows —
+    // e.g. ReceivingSavedDataState calls GoToMainMenu() to clear the character-creation game before
+    // loading the host save. Finalizing on the latter would dispose the coop container mid-load, so
+    // the save's sync patches resolve ISyncPolicy from a disposed container (ObjectDisposedException).
+    // Only tear coop down when MainMenuEntered actually follows a disconnect.
+    private bool pendingDisconnect;
+
+    public DisconnectHandler(IMessageBroker messageBroker, ICoopFinalizer coopFinalizer, IGameStateInterface gameStateInterface)
     {
         this.messageBroker = messageBroker;
         this.coopFinalizer = coopFinalizer;
@@ -29,11 +36,15 @@ internal class DisconnectHandler : IHandler
 
     private void Handle(MessagePayload<NetworkDisconnected> obj)
     {
+        pendingDisconnect = true;
         gameStateInterface.GoToMainMenu();
     }
 
     private void Handle(MessagePayload<MainMenuEntered> obj)
     {
+        if (!pendingDisconnect) return;
+
+        pendingDisconnect = false;
         coopFinalizer.Finalize("You have been Disconnected");
     }
 }

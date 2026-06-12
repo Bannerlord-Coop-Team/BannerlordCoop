@@ -11,7 +11,6 @@ namespace Coop.Core.Client.States;
 /// </summary>
 public class ReceivingSavedDataState : ClientStateBase
 {
-    private NetworkGameSaveDataReceived saveDataMessage = default;
     private readonly IMessageBroker messageBroker;
     private readonly ILoadingInterface loadingInterface;
     private readonly IGameStateInterface gameStateInterface;
@@ -26,7 +25,7 @@ public class ReceivingSavedDataState : ClientStateBase
         this.loadingInterface = loadingInterface;
         this.gameStateInterface = gameStateInterface;
         messageBroker.Subscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
-        messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
+
         // NetworkNewPlayerHeroCreated is handled by the persistent RemotePlayerHeroHandler for the whole client
         // lifetime, so it is captured here AND during LoadingState without a per-state subscription gap.
 
@@ -41,21 +40,17 @@ public class ReceivingSavedDataState : ClientStateBase
     public override void Dispose()
     {
         messageBroker.Unsubscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
-        messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
     }
 
     internal void Handle_NetworkGameSaveDataReceived(MessagePayload<NetworkGameSaveDataReceived> obj)
     {
-        saveDataMessage = obj.What;
         loadingInterface.SetLoadingMessage(
             "Joining Coop Campaign",
             "Preparing host save data...");
-        Logic.EnterMainMenu();
-    }
 
-    internal void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> obj)
-    {
-        var saveData = saveDataMessage?.GameSaveData;
+        gameStateInterface.GoToMainMenu();
+
+        var saveData = obj.What.GameSaveData;
 
         if (saveData == null) return;
         if (saveData.Length == 0) return;

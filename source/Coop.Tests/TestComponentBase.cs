@@ -22,6 +22,7 @@ using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.UI.Interfaces;
 using Moq;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using Xunit.Abstractions;
 using IGameInterface = GameInterface.IGameInterface;
@@ -90,6 +91,15 @@ internal abstract class TestComponentBase
         RegisterMock<ITroopRosterInterface>(builder);
         RegisterMock<IMobilePartyInterface>(builder);
         RegisterMock<IGameStateInterface>(builder);
+
+        // ISaveInterface is consumed by TransferSaveState's constructor, which packages a save the
+        // moment the state is entered. Give it a non-null default so simply entering the state does
+        // not NRE; tests that assert on the transferred save re-stub the return value.
+        var saveInterfaceMock = new Mock<ISaveInterface>();
+        saveInterfaceMock.Setup(m => m.SaveCurrentGame())
+            .Returns(new SaveResults(true, Array.Empty<byte>(), "test-campaign"));
+        builder.RegisterInstance(saveInterfaceMock).AsSelf().SingleInstance();
+        builder.RegisterInstance(saveInterfaceMock.Object).As<ISaveInterface>().SingleInstance();
 
         return builder;
     }

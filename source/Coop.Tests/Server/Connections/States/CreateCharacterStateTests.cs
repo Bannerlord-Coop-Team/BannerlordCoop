@@ -44,13 +44,13 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
-        public void TransferCharacter_TransitionState_TransferCharacterState()
+        public void TransferSave_TransitionState_LoadingState()
         {
             connectionLogic.SetState<CreateCharacterState>();
 
             connectionLogic.TransferSave();
 
-            Assert.IsType<TransferSaveState>(connectionLogic.State);
+            Assert.IsType<LoadingState>(connectionLogic.State);
         }
 
         [Fact]
@@ -78,10 +78,11 @@ namespace Coop.Tests.Server.Connections.States
                 playerPeer, new NetworkTransferNewHero("MyId", Array.Empty<byte>()));
             currentState.Handle_NetworkTransferNewHero(payload);
 
-            // Assert — the joining peer is sent the server-assigned ids, then we move on to the save transfer
+            // Assert — the joining peer is sent the server-assigned ids, then we send the save and wait
+            // for the client to load (LoadingState).
             var message = Assert.Single(serverComponent.TestNetwork.GetPeerMessages(playerPeer));
             Assert.IsType<NetworkHeroRecieved>(message);
-            Assert.IsType<TransferSaveState>(connectionLogic.State);
+            Assert.IsType<LoadingState>(connectionLogic.State);
         }
 
         [Fact]
@@ -102,7 +103,7 @@ namespace Coop.Tests.Server.Connections.States
             var message = Assert.Single(serverComponent.TestNetwork.GetPeerMessages(differentPeer));
             var created = Assert.IsType<NetworkNewPlayerHeroCreated>(message);
             Assert.Equal(TestCharacterObjectId, created.Player.CharacterObjectId);
-            Assert.IsType<TransferSaveState>(connectionLogic.State);
+            Assert.IsType<LoadingState>(connectionLogic.State);
         }
 
         [Fact]

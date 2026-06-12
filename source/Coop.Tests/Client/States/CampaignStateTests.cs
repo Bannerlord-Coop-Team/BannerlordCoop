@@ -4,7 +4,9 @@ using Common.Tests.Utils;
 using Coop.Core.Client;
 using Coop.Core.Client.States;
 using Coop.Tests.Mocks;
+using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
+using Moq;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -53,29 +55,31 @@ public class CampaignStateTests
     }
 
     [Fact]
-    public void EnterMainMenu_Publishes_EnterMainMenuEvent()
+    public void EnterMainMenu_GoesToMainMenu()
     {
         // Arrange
         var campaignState = clientLogic.SetState<CampaignState>();
+        var gameStateMock = clientComponent.Container.Resolve<Mock<IGameStateInterface>>();
 
         // Act
         clientLogic.EnterMainMenu();
 
         // Assert
-        Assert.Single(TestMessageBroker.GetMessagesFromType<EnterMainMenu>());
+        gameStateMock.Verify(x => x.GoToMainMenu(), Times.Once);
     }
 
     [Fact]
-    public void Disconnect_Publishes_EnterMainMenu()
+    public void Disconnect_GoesToMainMenu()
     {
         // Arrange
         var campaignState = clientLogic.SetState<CampaignState>();
+        var gameStateMock = clientComponent.Container.Resolve<Mock<IGameStateInterface>>();
 
         // Act
         clientLogic.Disconnect();
 
         // Assert
-        Assert.Single(TestMessageBroker.GetMessagesFromType<EnterMainMenu>());
+        gameStateMock.Verify(x => x.GoToMainMenu(), Times.Once);
     }
 
     [Fact]

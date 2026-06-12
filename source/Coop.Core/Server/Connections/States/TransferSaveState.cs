@@ -1,14 +1,12 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Network;
-using Coop.Core.Client.Messages;
+using Coop.Core.Common.Network.Packets;
 using Coop.Core.Server.Services.Connection.Messages;
-using Coop.Core.Server.Services.Time.Messages;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
-using GameInterface.Services.Heroes.Messages;
 
 namespace Coop.Core.Server.Connections.States;
 
@@ -35,15 +33,20 @@ public class TransferSaveState : ConnectionStateBase
 
             var saveResults = saveInterface.SaveCurrentGame();
 
-            var networkEvent = new NetworkGameSaveDataReceived(
+            var savePacket = new GameSaveDataPacket(
                 saveResults.Data,
                 saveResults.CampaignId,
                 coopSessionProvider.CoopSession?.CraftingPlayerData);
 
-            network.Send(ConnectionLogic.Peer, networkEvent);
+            // Disconnect peer on failure
+            if (!saveResults.Success)
+            {
+                connectionLogic.Peer.Disconnect();
+                return;
+            }
+                
+            network.Send(ConnectionLogic.Peer, savePacket);
         }, blocking: true);
-
-        ConnectionLogic.Load();
     }
 
     public override void Dispose()

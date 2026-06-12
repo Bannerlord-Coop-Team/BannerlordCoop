@@ -5,6 +5,7 @@ using Common.Network;
 using Common.PacketHandlers;
 using Common.Serialization;
 using Coop.Core.Client.Messages;
+using Coop.Core.Client.Network;
 using Coop.Core.Common.Network;
 using GameInterface;
 using GameInterface.Services.GameDebug.Messages;
@@ -33,6 +34,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 
     private readonly IMessageBroker messageBroker;
     private readonly IPacketManager packetManager;
+    private readonly ILoadingPacketBuffer loadingPacketBuffer;
     private bool isConnected = false;
     private bool reconnectPending = false;
     private DateTime reconnectAfter = DateTime.MinValue;
@@ -43,10 +45,12 @@ public class CoopClient : CoopNetworkBase, ICoopClient
         INetworkConfiguration config,
         IMessageBroker messageBroker,
         IPacketManager packetManager,
+        ILoadingPacketBuffer loadingPacketBuffer,
         ICommonSerializer serializer) : base(config, serializer)
     {
         this.messageBroker = messageBroker;
         this.packetManager = packetManager;
+        this.loadingPacketBuffer = loadingPacketBuffer;
     }
 
     public override void OnConnectionRequest(ConnectionRequest request)
@@ -69,6 +73,11 @@ public class CoopClient : CoopNetworkBase, ICoopClient
     public override void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
     {
         IPacket packet = (IPacket)serializer.Deserialize(reader.GetRemainingBytes());
+
+        // While loading a transfer save, world-change packets are buffered and replayed once the
+        // campaign is ready (see ILoadingPacketBuffer); otherwise handle immediately.
+        if (loadingPacketBuffer.Intercept(peer, packet)) return;
+
         packetManager.HandleReceive(peer, packet);
     }
 
@@ -166,6 +175,12 @@ public class CoopClient : CoopNetworkBase, ICoopClient
     public override void Update(TimeSpan frameTime)
     {
         netManager.PollEvents();
+
+        // Replay any packets buffered during the transfer-save load, in order, on this poller thread.
+        foreach (var (peer, packet) in loadingPacketBuffer.DrainIfRequested())
+        {
+            packetManager.HandleReceive(peer, packet);
+        }
 
         if (reconnectPending && DateTime.UtcNow >= reconnectAfter)
         {
