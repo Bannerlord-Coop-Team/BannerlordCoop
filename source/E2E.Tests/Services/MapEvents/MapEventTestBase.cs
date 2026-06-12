@@ -322,10 +322,10 @@ public abstract class MapEventTestBase : IDisposable
     /// party's <c>LeaderHero</c> (on the server a player party's <c>PartyComponent.Leader</c> is not reliably
     /// set), so the coop capture must resolve the captured hero from the player registry — which is what
     /// <c>PlayerStartCaptivityPatches</c> does in a <em>prefix</em> (before native removes the leader and
-    /// scatters members). The native <c>TakePrisonerAction.ApplyInternal</c> mutation is suppressed so the
-    /// assertion deterministically exercises the coop capture/sync path (<c>PrisonerTaken</c> →
-    /// <c>PlayerCaptivityServerHandler</c> → AutoSynced <see cref="Hero.PartyBelongedToAsPrisoner"/>), not vanilla
-    /// prisoner RNG.
+    /// scatters members). Native <c>TakePrisonerAction.ApplyInternal</c> runs with patches live, so each of
+    /// its side effects replicates to the clients as it happens (roster deltas + the AutoSynced
+    /// <see cref="Hero.PartyBelongedToAsPrisoner"/>), and the postfix-published <c>PrisonerTaken</c> drives
+    /// the coop park (<c>PlayerCaptivityServerHandler</c>).
     /// </remarks>
     protected void DefeatPlayerPartyInBattle(string playerHeroId, string playerPartyId, string captorPartyId)
     {
@@ -344,8 +344,10 @@ public abstract class MapEventTestBase : IDisposable
 
             // Make the player hero a member of (not leader of) the player party: the capture resolves the hero
             // from the player registry, and TakePrisonerActionPatches reads hero.PartyBelongedTo to snapshot the
-            // captured party for the PrisonerTaken message. This is local server setup; wrap in AllowedThread so
-            // it does not re-broadcast.
+            // captured party for the PrisonerTaken message. AddToCounts runs under AllowedThread but STILL
+            // replicates (TroopRosterAddToCountsPatch publishes for AddToCounts even on an allowed thread), so
+            // every client's roster also gains the hero — the convergence the capture's index-based removal
+            // delta relies on. Only the PartyBelongedTo write stays local.
             using (new AllowedThread())
             {
                 playerParty.MemberRoster.AddToCounts(playerHero.CharacterObject, 1);
@@ -499,6 +501,24 @@ public abstract class MapEventTestBase : IDisposable
             Assert.True(
                 expected == party.MemberRoster.TotalManCount,
                 $"[{instance.GetType().Name}] party {partyId} should have {expected} men, has {party.MemberRoster.TotalManCount}");
+        });
+    }
+
+    /// <summary>
+    /// Asserts the prison roster of the party with <paramref name="partyId"/> holds exactly
+    /// <paramref name="expected"/> prisoners on the given <paramref name="instance"/>. Guards the
+    /// captor's side of a capture: the prisoner must be counted once everywhere — a replicated add
+    /// applied on top of a locally derived one shows up here as a doubled count.
+    /// </summary>
+    protected void AssertPartyPrisonerCount(EnvironmentInstance instance, string partyId, int expected)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+
+            Assert.True(
+                expected == party.PrisonRoster.TotalManCount,
+                $"[{instance.GetType().Name}] party {partyId} should have {expected} prisoners, has {party.PrisonRoster.TotalManCount}");
         });
     }
 

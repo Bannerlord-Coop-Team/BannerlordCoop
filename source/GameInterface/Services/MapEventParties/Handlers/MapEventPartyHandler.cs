@@ -1,16 +1,11 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Common.Util;
 using GameInterface.Services.MapEventParties.Messages;
-using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.MapEvents;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.MapEventParties.Handlers;
@@ -37,9 +32,6 @@ internal class MapEventPartyHandler : IHandler
 
         messageBroker.Subscribe<OnTroopRoutedAttempted>(Handle_OnTroopRoutedAttempted);
         messageBroker.Subscribe<NetworkTroopRouted>(Handle_NetworkTroopRouted);
-
-        messageBroker.Subscribe<PrisonerTaken>(Handle_PrisonerTaken);
-        messageBroker.Subscribe<NetworkTakePrisoner>(Handle_NetworkTakePrisoner);
 
         // Client
         messageBroker.Subscribe<RequestMapEventPartyUpdate>(Handle_RequestMapEventPartyUpdate);
@@ -194,66 +186,6 @@ internal class MapEventPartyHandler : IHandler
         catch (Exception ex)
         {
             Logger.Error(ex, "Error handling NetworkTroopRouted message for MapEventParty with ID {MapEventPartyId}", obj.MapEventPartyId);
-        }
-    }
-
-    private void Handle_PrisonerTaken(MessagePayload<PrisonerTaken> payload)
-    {
-        var obj = payload.What;
-
-        if (!objectManager.TryGetIdWithLogging(obj.CapturerParty, out var partyBaseId))
-            return;
-        if (!objectManager.TryGetIdWithLogging(obj.PrisonerHero, out var heroId))
-            return;
-        if (!objectManager.TryGetIdWithLogging(obj.PrisonerParty, out var prisonerPartyId))
-            return;
-
-        var message = new NetworkTakePrisoner(partyBaseId, heroId, prisonerPartyId);
-        network.SendAll(message);
-    }
-
-    private void Handle_NetworkTakePrisoner(MessagePayload<NetworkTakePrisoner> payload)
-    {
-        var obj = payload.What;
-
-        if (!objectManager.TryGetObjectWithLogging<PartyBase>(obj.PartyBaseId, out var partyBase))
-            return;
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.HeroId, out var hero))
-            return;
-
-        // Resolved separately so a missing party id only costs the park below, never the capture itself.
-        objectManager.TryGetObjectWithLogging<MobileParty>(obj.PrisonerPartyId, out var prisonerParty);
-
-        using (new AllowedThread())
-        {
-            try
-            {
-                TakePrisonerAction.ApplyInternal(partyBase, hero);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to apply prisoner capture. HeroId: {HeroId}", obj.HeroId);
-            }
-
-            // Park the local copy of the captured player party the same way the server does
-            // (PlayerCaptivityServerHandler.Handle_PrisonerTaken). The native ApplyInternal above only
-            // removes the hero from the member roster while hero.PartyBelongedTo is set, and the
-            // captor's replicated prison-roster add has already nulled it by this point — leaving a
-            // stale hero element that the release's re-add would double. The forfeit is absolute and
-            // idempotent, so the roster converges to the server's parked (empty) state regardless of
-            // what the replay did — including when it threw, which is why the park runs outside its
-            // try. It runs AFTER the replay: native RemoveTroop on an already-emptied roster would
-            // index out of bounds.
-            if (prisonerParty == null) return;
-
-            try
-            {
-                prisonerParty.ForfeitRosters();
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to park captured party. PrisonerPartyId: {PrisonerPartyId}", obj.PrisonerPartyId);
-            }
         }
     }
 }

@@ -2,7 +2,6 @@ using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Common.Util;
 using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
@@ -76,21 +75,22 @@ internal class PlayerCaptivityServerHandler : IHandler
     }
 
     /// <summary>
-    /// Runs from the <see cref="TakePrisonerAction.ApplyInternal"/> prefix, before the native body.
-    /// Native does the canonical capture right after this returns (hero state → Prisoner, add to the
-    /// captor's prison roster, which sets <see cref="Hero.PartyBelongedToAsPrisoner"/> and replicates
-    /// it to the clients). Only the coop-specific extras happen here: the player party's troops are
-    /// forfeited so native <see cref="MapEvent.CaptureDefeatedPartyMembers"/> cannot re-process or
-    /// scatter them, and the party is parked until captivity ends.
+    /// Runs from the <see cref="TakePrisonerAction.ApplyInternal"/> postfix, after the native capture
+    /// applied with patches live (hero state → Prisoner, member-roster removal, prison-roster add —
+    /// each replicating to the clients as its own message, with
+    /// <see cref="Hero.PartyBelongedToAsPrisoner"/> auto-synced). Only the coop-specific extras happen
+    /// here: the player party's remaining troops are forfeited so native
+    /// <see cref="MapEvent.CaptureDefeatedPartyMembers"/> cannot re-process or scatter them, and the
+    /// party is parked until captivity ends.
     /// </summary>
     private void Handle_PrisonerTaken(MessagePayload<PrisonerTaken> payload)
     {
         if (ModInformation.IsClient) return;
 
         var hero = payload.What.PrisonerHero;
-        // TakePrisonerActionPatches runs native TakePrisonerAction.Apply before publishing this, which
-        // already cleared hero.PartyBelongedTo and set PartyBelongedToAsPrisoner. The party the hero was
-        // captured from therefore has to come from the message, not from the (now-null) hero.PartyBelongedTo.
+        // PrisonerTaken is published from the TakePrisonerAction.ApplyInternal postfix, so native already
+        // cleared hero.PartyBelongedTo and set PartyBelongedToAsPrisoner. The party the hero was captured
+        // from therefore has to come from the message, not from the (now-null) hero.PartyBelongedTo.
         var playerParty = payload.What.PrisonerParty;
 
         PlayerCaptivityLogger.Debug("Handle_PrisonerTaken: hero={HeroId} party={PartyId} captor={CaptorId}",
@@ -111,16 +111,12 @@ internal class PlayerCaptivityServerHandler : IHandler
         }
 
         // Park the now-leaderless player party so native post-battle processing cannot scatter or destroy
-        // it; the captivity-end flow reactivates it. The roster forfeit runs under AllowedThread so its
-        // per-index removal deltas are NOT broadcast: every client parks its own copy when it applies
-        // NetworkTakePrisoner (MapEventPartyHandler.Handle_NetworkTakePrisoner), and the deltas — computed
-        // against a server roster that already lost its hero to the silenced native capture — would land on
-        // misaligned indices on the still-stale client rosters. Leader change and IsActive stay outside the
-        // scope (the leader change replicates; IsActive is server-only state).
-        using (new AllowedThread())
-        {
-            playerParty.ForfeitRosters();
-        }
+        // it; the captivity-end flow reactivates it. The clears run with patches live: each per-element
+        // removal replicates to the clients, whose rosters have tracked the same sequence of replicated
+        // deltas (the hero's own removal already replicated from the patches-live native capture), so
+        // the indices line up everywhere.
+        playerParty.MemberRoster.Clear();
+        playerParty.PrisonRoster.Clear();
         playerParty.IsActive = false;
         playerParty.ChangePartyLeader(null);
     }

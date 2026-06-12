@@ -1,15 +1,11 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
-using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
 using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
@@ -23,9 +19,9 @@ internal class TakePrisonerActionPatches
 
     [HarmonyPatch(nameof(TakePrisonerAction.ApplyInternal))]
     [HarmonyPrefix]
-    private static bool Prefix_ApplyInternal(PartyBase capturerParty, Hero prisonerCharacter)
+    private static bool Prefix_ApplyInternal(Hero prisonerCharacter, ref MobileParty __state)
     {
-        // Re-entrant call below, or a server-approved original: run it.
+        // A server-approved original (e.g. applying a received message): run it without the coop extras.
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient)
@@ -34,22 +30,28 @@ internal class TakePrisonerActionPatches
             return false;
         }
 
+        // The capture runs with patches live, so each side effect of the native body replicates as its
+        // own message: the member-roster removal and the captor's prison-roster add as roster deltas,
+        // hero state and PartyBelongedToAsPrisoner through their auto-synced setters. Clients apply the
+        // state the server computed instead of re-deriving it. A captured player party additionally
+        // needs the coop park; snapshot it here — native clears hero.PartyBelongedTo — and let the
+        // postfix publish PrisonerTaken once the capture has fully applied.
         var prisonerParty = prisonerCharacter.PartyBelongedTo;
-        if (prisonerParty?.IsPlayerParty() != true)
-            return true;
-
-        // The native capture runs silenced: none of its side effects (member-roster removal, prison-roster
-        // add, hero state) replicate from here. Every client derives them instead by replaying this same
-        // action when it applies NetworkTakePrisoner (MapEventPartyHandler.Handle_NetworkTakePrisoner),
-        // which also parks its copy of the captured party. A side effect added inside ApplyInternal that
-        // the client replay does NOT derive identically will silently diverge per machine.
-        using (new AllowedThread())
+        if (prisonerParty?.IsPlayerParty() == true)
         {
-            TakePrisonerAction.Apply(capturerParty, prisonerCharacter);
+            __state = prisonerParty;
         }
 
-        MessageBroker.Instance.Publish(null, new PrisonerTaken(capturerParty, prisonerCharacter, prisonerParty));
+        return true;
+    }
 
-        return false;
+    [HarmonyPatch(nameof(TakePrisonerAction.ApplyInternal))]
+    [HarmonyPostfix]
+    private static void Postfix_ApplyInternal(PartyBase capturerParty, Hero prisonerCharacter, MobileParty __state)
+    {
+        // Only set when the prefix intercepted a player-party capture on the server.
+        if (__state == null) return;
+
+        MessageBroker.Instance.Publish(null, new PrisonerTaken(capturerParty, prisonerCharacter, __state));
     }
 }

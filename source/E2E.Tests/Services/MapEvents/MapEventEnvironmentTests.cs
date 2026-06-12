@@ -290,17 +290,28 @@ public class MapEventEnvironmentTests : MapEventTestBase
             AssertPartyManCount(client, partyId, 0);
         }
 
+        // ...and the captor holds the prisoner exactly once everywhere (a replicated prison-roster
+        // add applied on top of a locally derived one used to double the count on clients).
+        AssertPartyPrisonerCount(Server, captorPartyId, 1);
+        foreach (var client in Clients)
+        {
+            AssertPartyPrisonerCount(client, captorPartyId, 1);
+        }
+
         // Act — the player escapes ("you were able to get away"): the owning client requests the
         // release and the server applies it authoritatively.
         ReleasePlayerByEscapeRequest(Clients.First(), heroId, partyId);
 
-        // Assert — the player is free and the restored party counts exactly one man everywhere.
+        // Assert — the player is free and the restored party counts exactly one man everywhere,
+        // and no phantom prisoner is left behind in the captor's roster.
         AssertCaptivity(Server, heroId, null);
         AssertPlayerPartyRestored(Server, heroId, partyId);
+        AssertPartyPrisonerCount(Server, captorPartyId, 0);
         foreach (var client in Clients)
         {
             AssertCaptivity(client, heroId, null);
             AssertHeroInPartyRoster(client, heroId, partyId);
+            AssertPartyPrisonerCount(client, captorPartyId, 0);
         }
     }
 
