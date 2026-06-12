@@ -73,11 +73,16 @@ internal class PeerQueueOverloadedHandler : IHandler
             if (overloadedPeers.Contains(payload.What.NetPeer))
                 return;
 
+            // Capture the mode to restore only when the overload pause begins. A second peer
+            // overloading while the game is already paused for the first would otherwise
+            // capture this handler's own pause, making the eventual resume restore Pause.
+            if (overloadedPeers.Count == 0)
+            {
+                originalSpeed = timeControlInterface.GetTimeControl();
+            }
+
             overloadedPeers.Add(payload.What.NetPeer);
         }
-
-        // Store previoes time control mode for resuming
-        originalSpeed = timeControlInterface.GetTimeControl();
 
         // pause time
         timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);

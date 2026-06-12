@@ -77,4 +77,44 @@ public class PeerQueueOverloadedTests
         timeControlMock.Verify(t => t.ServerSetTimeControl(TimeControlEnum.Pause), Times.Once());
         timeControlMock.Verify(t => t.ServerSetTimeControl(TimeControlEnum.Play_1x), Times.Once());
     }
+
+    [Fact]
+    public void SecondOverloadedPeer_DoesNotStomp_RestoredSpeed()
+    {
+        // Arrange
+        var timeControlMock = serverComponent.Container.Resolve<Mock<ITimeControlInterface>>();
+
+        /// Mirror the real interface: GetTimeControl reads back whatever was last set, so the
+        /// handler's own pause is visible to a later capture.
+        var currentMode = TimeControlEnum.Play_2x;
+        timeControlMock.Setup(t => t.GetTimeControl()).Returns(() => currentMode);
+        timeControlMock.Setup(t => t.ServerSetTimeControl(It.IsAny<TimeControlEnum>()))
+            .Callback<TimeControlEnum>(mode => currentMode = mode);
+
+        var peerOverloadedHandler = serverComponent.Container.Resolve<PeerQueueOverloadedHandler>();
+
+        var firstPeer = TestNetwork.CreatePeer();
+        var secondPeer = TestNetwork.CreatePeer();
+        firstPeer.SetQueueLength(1);
+        secondPeer.SetQueueLength(1);
+
+        // Act
+        /// Both peers overload in the same pause window; the second arrives while the game
+        /// is already paused for the first
+        TestMessageBroker.Publish(this, new PeerQueueOverloaded(firstPeer));
+        TestMessageBroker.Publish(this, new PeerQueueOverloaded(secondPeer));
+
+        peerOverloadedHandler.Poller.Stop();
+        firstPeer.SetQueueLength(0);
+        secondPeer.SetQueueLength(0);
+
+        /// Trigger polling manually to always ensure polling happens instead of waiting
+        peerOverloadedHandler.Poll(TimeSpan.Zero);
+
+        // Assert
+        /// The resume restores the speed from before the pause began, not the pause captured
+        /// when the second peer overloaded
+        timeControlMock.Verify(t => t.ServerSetTimeControl(TimeControlEnum.Play_2x), Times.Once());
+        Assert.Equal(TimeControlEnum.Play_2x, currentMode);
+    }
 }
