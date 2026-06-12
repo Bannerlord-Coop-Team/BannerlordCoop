@@ -238,7 +238,9 @@ internal class MobilePartyDebugCommand
             return $"Unable to get {typeof(MobileParty)} with id: {partyId}";
         }
 
-        party.RemoveParty();
+        // DestroyPartyAction is the destruction path synced to clients; plain
+        // RemoveParty is not. A null destroyer replicates like any other.
+        DestroyPartyAction.Apply(null, party);
 
         return $"Destroyed {nameof(MobileParty)} with string id: {partyId}";
     }
@@ -265,9 +267,9 @@ internal class MobilePartyDebugCommand
             }
 
             // DestroyPartyAction is the destruction path synced to clients; plain
-            // RemoveParty is not. The lifetime handler needs a non-null destroyer,
-            // so the party destroys itself rather than crediting another party.
-            DestroyPartyAction.Apply(banditParty.Party, banditParty);
+            // RemoveParty is not. A null destroyer replicates like any other, so
+            // no party needs to be credited with the kill.
+            DestroyPartyAction.Apply(null, banditParty);
             destroyed++;
         }
 
