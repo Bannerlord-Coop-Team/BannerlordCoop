@@ -1,15 +1,9 @@
-﻿using Autofac;
-using Common.Messaging;
-using Common.Network;
-using Coop.Core.Client.Messages;
-using Coop.Core.Server;
+using Autofac;
+using Coop.Core.Common.Network.Packets;
 using Coop.Core.Server.Connections;
-using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using Coop.Tests.Mocks;
-using GameInterface.CoopSessionData;
-using GameInterface.CoopSessionData.Save.Data;
-using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Heroes.Interfaces;
 using LiteNetLib;
 using Moq;
 using System.Linq;
@@ -68,33 +62,27 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
-        public void GameSaveDataPackaged_ValidTransactionId()
+        public void EnteringState_SendsSaveDataPacket_ToJoiningPeerOnly()
         {
-            // Arrange
-            var currentState = connectionLogic.SetState<TransferSaveState>();
-
-            byte[] data = new byte[1];
+            // Arrange — the save interface returns a known payload.
+            byte[] data = new byte[] { 1, 2, 3 };
             string campaignId = "12345";
+            var saveMock = serverComponent.Container.Resolve<Mock<ISaveInterface>>();
+            saveMock.Setup(m => m.SaveCurrentGame()).Returns(new SaveResults(true, data, campaignId));
 
-            // No CoopSession mock needed: Handle_GameSaveDataPackaged reads CoopSession?.CraftingPlayerData,
-            // which is null-safe.
+            // Act — entering the state packages the save and sends it to the joining peer.
+            connectionLogic.SetState<TransferSaveState>();
 
-            // Act
-            var payload = new MessagePayload<GameSaveDataPackaged>(
-                null, new GameSaveDataPackaged(data, campaignId));
-            currentState.Handle_GameSaveDataPackaged(payload);
+            // Assert — exactly one save packet, carrying the save data, to the joining peer.
+            var packet = Assert.Single(serverComponent.TestNetwork.GetPeerPacketsFromType<GameSaveDataPacket>(playerPeer));
+            Assert.Equal(data, packet.GameSaveData);
+            Assert.Equal(campaignId, packet.CampaignID);
 
-            // Assert — the save data is sent only to the joining peer. Time-control pausing now goes through the
-            // mocked ITimeControlInterface (TransferSaveState ctor), so it no longer produces a counted broadcast
-            // here; only the directed NetworkGameSaveDataReceived reaches the wire.
-            var message = Assert.Single(serverComponent.TestNetwork.GetPeerMessages(playerPeer));
-            var castedMessage = Assert.IsType<NetworkGameSaveDataReceived>(message);
-            Assert.Equal(data, castedMessage.GameSaveData);
-            Assert.Equal(campaignId, castedMessage.CampaignID);
-
-            // GetPeerMessages indexes the backing dictionary directly and would throw for a peer that never
-            // received anything, so assert the absence of the key instead.
-            Assert.False(serverComponent.TestNetwork.SentNetworkMessages.ContainsKey(differentPeer.Id));
+            // The directed save is not sent to any other peer.
+            var otherPeerGotSave =
+                serverComponent.TestNetwork.SentPackets.TryGetValue(differentPeer.Id, out var packets) &&
+                packets.OfType<GameSaveDataPacket>().Any();
+            Assert.False(otherPeerGotSave);
         }
     }
 }

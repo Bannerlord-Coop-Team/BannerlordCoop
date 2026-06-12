@@ -6,7 +6,9 @@ using Coop.Core.Server;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.States;
 using Coop.Tests.Mocks;
+using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
+using Moq;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -27,17 +29,17 @@ namespace Coop.Tests.Server.States
         }
 
         [Fact]
-        public void Stop_Publishes_EnterMainMenu()
+        public void Stop_GoesToMainMenu()
         {
             // Arrange
             var currentState = serverLogic.SetState<ServerRunningState>();
+            var gameStateMock = serverComponent.Container.Resolve<Mock<IGameStateInterface>>();
 
             // Act
             currentState.Stop();
 
             // Assert
-            var message = Assert.Single(serverComponent.TestMessageBroker.Messages);
-            Assert.IsType<EnterMainMenu>(message);
+            gameStateMock.Verify(x => x.GoToMainMenu(), Times.Once);
         }
 
         [Fact]

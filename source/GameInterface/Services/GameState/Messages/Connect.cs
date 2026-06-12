@@ -24,6 +24,4 @@ public readonly struct Connected : IResponse
     }
 
     public bool ClientPartyExists { get; }
-
-
 }
