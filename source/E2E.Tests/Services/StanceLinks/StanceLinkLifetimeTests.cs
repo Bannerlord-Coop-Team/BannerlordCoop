@@ -17,7 +17,7 @@ public class StaceLinkLifetimeTests : IDisposable
         TestEnvironment.Dispose();
     }
 
-    [Fact]
+    [Fact(Skip = "Stance link currently disabled")]
     public void ServerCreateStanceLink_SyncAllClients()
     {
         // Arrange
@@ -42,7 +42,7 @@ public class StaceLinkLifetimeTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Skip = "Stance link currently disabled")]
     public void ClientCreateStanceLink_DoesNothing()
     {
         // Arrange

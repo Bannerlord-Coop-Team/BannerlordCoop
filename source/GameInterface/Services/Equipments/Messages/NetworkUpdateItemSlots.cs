@@ -1,5 +1,4 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.Equipments.Data;
 using ProtoBuf;
 using TaleWorlds.Core;
 

@@ -36,7 +36,7 @@ public class MobilePartyMovementTests : SyncTestBase
 
         var playerManager = TestEnvironment.Server.Container.Resolve<IPlayerManager>();
 
-        playerManager.AddPlayer(new Player(ServerId, HeroId, MobilePartyId, "MyClan", "MyCharacter"));
+        playerManager.AddPlayer(new Player(ServerId, HeroId, MobilePartyId, "MyClan", "CharacterObjectId"));
 
         var clientNum = 1;
 

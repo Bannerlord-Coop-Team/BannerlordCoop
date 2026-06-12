@@ -1,4 +1,4 @@
-﻿using Coop.Core.Server.Services.Settlements.Messages;
+using Coop.Core.Server.Services.Settlements.Messages;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Settlements.Messages;
@@ -8,6 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
+using TaleWorlds.CampaignSystem.Settlements;
 namespace Coop.IntegrationTests.Settlements;
 public class SettlementBribePaidTest
 {
@@ -21,7 +22,13 @@ public class SettlementBribePaidTest
     public void ServerSettlementBribePaidChanged_Publishes_AllClients()
     {
         // Arrange
-        var triggerMessage = new SettlementChangedBribePaid();
+        var settlement = TestEnvironment.Server.CreateRegisteredObject<Settlement>("settlement1");
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.CreateRegisteredObject<Settlement>("settlement1");
+        }
+
+        var triggerMessage = new SettlementChangedBribePaid(settlement, 100);
 
         var server = TestEnvironment.Server;
 

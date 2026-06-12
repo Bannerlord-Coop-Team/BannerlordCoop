@@ -58,9 +58,22 @@ public class PartyVisualLifetimeHandler : IHandler
 
         using(new AllowedThread())
         {
-            var mobileParty = partyBase.MobileParty;
-            MobilePartyVisualManager.Current.AddNewPartyVisualForParty(mobileParty);
-            var newVisual = partyBase.GetPartyVisual();
+            MobilePartyVisual newVisual;
+
+            var visualManager = MobilePartyVisualManager.Current;
+            if (visualManager != null)
+            {
+                // Normal client: let the map visuals manager create the visual so the party renders.
+                visualManager.AddNewPartyVisualForParty(partyBase.MobileParty);
+                newVisual = partyBase.GetPartyVisual();
+            }
+            else
+            {
+                // No visuals manager (headless server / tests): construct directly so the object is
+                // still tracked for sync without participating in map rendering.
+                newVisual = new MobilePartyVisual(partyBase);
+            }
+
             objectManager.AddExisting(payload.What.PartyVisualId, newVisual);
         }
     }
