@@ -39,9 +39,9 @@ namespace GameInterface.Services.Kingdoms.Data
         public override bool TryGetKingdomDecision(IObjectManager objectManager, out KingdomDecision kingdomDecision)
         {
             if (!TryGetProposerClanAndKingdom(objectManager, out Clan proposerClan, out Kingdom kingdom) || 
-                !objectManager.TryGetObject(ClanToExcludeId, out Clan clanToExclude) ||
+                !TryGetOptionalObject(objectManager, ClanToExcludeId, out Clan clanToExclude) ||
                 !objectManager.TryGetObject(SettlementId, out Settlement settlement) ||
-                !objectManager.TryGetObject(CapturerHeroId, out Hero capturerHero))
+                !TryGetOptionalObject(objectManager, CapturerHeroId, out Hero capturerHero))
             {
                 kingdomDecision = null;
                 return false;
