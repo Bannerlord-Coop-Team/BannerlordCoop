@@ -8,6 +8,7 @@ using Coop.Core.Server.Connections.Messages;
 using GameInterface.Registry;
 using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.Entity;
+using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Players;
@@ -28,6 +29,7 @@ public class CharacterCreationState : ClientStateBase
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly ILoadingInterface loadingInterface;
     private readonly IPlayerManager playerManager;
+    private readonly IGameStateInterface gameStateInterface;
     private readonly ICoopFinalizer coopFinalizer;
 
     public CharacterCreationState(
@@ -39,6 +41,7 @@ public class CharacterCreationState : ClientStateBase
         IControllerIdProvider controllerIdProvider,
         ILoadingInterface loadingInterface,
         IPlayerManager playerManager,
+        IGameStateInterface gameStateInterface,
         ICoopFinalizer coopFinalizer) : base(logic)
     {
         this.messageBroker = messageBroker;
@@ -48,6 +51,7 @@ public class CharacterCreationState : ClientStateBase
         this.controllerIdProvider = controllerIdProvider;
         this.loadingInterface = loadingInterface;
         this.playerManager = playerManager;
+        this.gameStateInterface = gameStateInterface;
         this.coopFinalizer = coopFinalizer;
 
         loadingInterface.HideLoadingScreen();
@@ -99,7 +103,7 @@ public class CharacterCreationState : ClientStateBase
 
     public override void EnterMainMenu()
     {
-        messageBroker.Publish(this, new EnterMainMenu());
+        gameStateInterface.GoToMainMenu();
     }
 
     public override void Connect()
@@ -108,7 +112,7 @@ public class CharacterCreationState : ClientStateBase
 
     public override void Disconnect()
     {
-        messageBroker.Publish(this, new EnterMainMenu());
+        gameStateInterface.GoToMainMenu();
     }
 
     public override void ExitGame()

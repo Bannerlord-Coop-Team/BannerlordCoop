@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Coop.Core.Client.Messages;
+using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.UI.Interfaces;
 
@@ -13,15 +14,17 @@ public class ReceivingSavedDataState : ClientStateBase
     private NetworkGameSaveDataReceived saveDataMessage = default;
     private readonly IMessageBroker messageBroker;
     private readonly ILoadingInterface loadingInterface;
+    private readonly IGameStateInterface gameStateInterface;
 
     public ReceivingSavedDataState(
         IClientLogic logic,
         IMessageBroker messageBroker,
-        ILoadingInterface loadingInterface) : base(logic)
+        ILoadingInterface loadingInterface,
+        IGameStateInterface gameStateInterface) : base(logic)
     {
         this.messageBroker = messageBroker;
         this.loadingInterface = loadingInterface;
-
+        this.gameStateInterface = gameStateInterface;
         messageBroker.Subscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
         // NetworkNewPlayerHeroCreated is handled by the persistent RemotePlayerHeroHandler for the whole client
@@ -61,15 +64,14 @@ public class ReceivingSavedDataState : ClientStateBase
             "Loading Host Campaign",
             "Loading host save data...");
 
-        var commandLoad = new LoadGameSave(saveData);
-        messageBroker.Publish(this, commandLoad);
+        gameStateInterface.LoadSaveGame(saveData);
 
         Logic.LoadSavedData();
     }
 
     public override void EnterMainMenu()
     {
-        messageBroker.Publish(this, new EnterMainMenu());
+        gameStateInterface.GoToMainMenu();
     }
 
     public override void Connect()
@@ -78,7 +80,7 @@ public class ReceivingSavedDataState : ClientStateBase
 
     public override void Disconnect()
     {
-        messageBroker.Publish(this, new EnterMainMenu());
+        gameStateInterface.GoToMainMenu();
 
         Logic.SetState<MainMenuState>();
     }

@@ -9,6 +9,7 @@ using GameInterface.CoopSessionData;
 using GameInterface.DynamicSync;
 using GameInterface.Registry;
 using GameInterface.Services.Entity;
+using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.MobileParties.Interfaces;
@@ -88,6 +89,7 @@ internal abstract class TestComponentBase
         RegisterMock<ICoopSessionProvider>(builder);
         RegisterMock<ITroopRosterInterface>(builder);
         RegisterMock<IMobilePartyInterface>(builder);
+        RegisterMock<IGameStateInterface>(builder);
 
         return builder;
     }

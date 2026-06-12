@@ -11,8 +11,6 @@ namespace Common.Messaging
     {
         void Publish<T>(object source, T message) where T : IMessage;
 
-        void Respond<T>(object target, T message) where T : IResponse;
-
         void Subscribe<T>(Action<MessagePayload<T>> subscription) where T : IMessage;
 
         void Unsubscribe<T>(Action<MessagePayload<T>> subscription) where T : IMessage;
@@ -73,41 +71,6 @@ namespace Common.Messaging
                 catch (Exception ex)
                 {
                     Logger.Error(ex, "Failed to run {Method}", (weakDelegate.Instance as WeakDelegate)?.Method.Name ?? "<null>");
-                }
-            }
-        }
-
-        public virtual void Respond<T>(object target, T message) where T : IResponse
-        {
-            if (message == null)
-                return;
-
-            Logger.Verbose($"Responding {message.GetType().Name} to {target?.GetType().Name}");
-
-            if (!subscribers.ContainsKey(typeof(T)))
-            {
-                return;
-            }
-
-            var delegates = subscribers[typeof(T)];
-            if (delegates == null || delegates.Count == 0) return;
-            var payload = new MessagePayload<T>(target, message);
-            for (int i = 0; i < delegates.Count; i++)
-            {
-                // TODO this might be slow
-                var weakDelegate = delegates[i];
-                if (weakDelegate.IsAlive == false)
-                {
-                    // Remove dead delegates
-                    delegates.RemoveAt(i--);
-                    continue;
-                }
-
-                if (ReferenceEquals(weakDelegate.Instance, target))
-                {
-                    Task.Factory.StartNew(() => weakDelegate.Invoke(new object[] { payload }));
-                    // Can only respond to one source, no longer need to loop if found
-                    return;
                 }
             }
         }

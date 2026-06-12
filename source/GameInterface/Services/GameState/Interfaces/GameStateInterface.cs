@@ -1,4 +1,6 @@
 ﻿using Common;
+using Common.Messaging;
+using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes;
 using SandBox;
 using System;
@@ -10,9 +12,9 @@ using TaleWorlds.SaveSystem.Load;
 
 namespace GameInterface.Services.GameState.Interfaces;
 
-internal interface IGameStateInterface : IGameAbstraction
+public interface IGameStateInterface : IGameAbstraction
 {
-    void EnterMainMenu();
+    void GoToMainMenu();
     void StartNewGame();
     void LoadSaveGame(byte[] saveData);
     void EndGame();
@@ -20,7 +22,14 @@ internal interface IGameStateInterface : IGameAbstraction
 
 internal class GameStateInterface : IGameStateInterface
 {
-    public void EnterMainMenu()
+    private readonly IMessageBroker messageBroker;
+
+    public GameStateInterface(IMessageBroker messageBroker)
+    {
+        this.messageBroker = messageBroker;
+    }
+
+    public void GoToMainMenu()
     {
         if (Campaign.Current == null) return;
         if (Game.Current == null) return;
@@ -57,6 +66,8 @@ internal class GameStateInterface : IGameStateInterface
 
     public void EndGame()
     {
-        GameLoopRunner.RunOnMainThread(MBGameManager.EndGame);
+        GameLoopRunner.RunOnMainThread(MBGameManager.EndGame, blocking: true);
+
+        messageBroker.Publish(this, new MainMenuEntered());
     }
 }
