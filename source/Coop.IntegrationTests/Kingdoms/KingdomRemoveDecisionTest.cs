@@ -1,9 +1,10 @@
-﻿using Coop.Core.Server.Services.Kingdoms.Messages;
+using Coop.Core.Server.Services.Kingdoms.Messages;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Kingdoms.Data;
 using GameInterface.Services.Kingdoms.Messages;
 
+using TaleWorlds.CampaignSystem;
 namespace Coop.IntegrationTests.Kingdoms
 {
     /// <summary>
@@ -21,7 +22,13 @@ namespace Coop.IntegrationTests.Kingdoms
         public void ServerKingdom_RemoveDecision_Publishes_AllClients()
         {
             // Arrange
-            var triggerMessage = new DecisionRemoved();
+            var kingdom = TestEnvironment.Server.CreateRegisteredObject<Kingdom>("kingdom1");
+            foreach (var client in TestEnvironment.Clients)
+            {
+                client.CreateRegisteredObject<Kingdom>("kingdom1");
+            }
+
+            var triggerMessage = new DecisionRemoved(kingdom, 1);
 
             var server = TestEnvironment.Server;
 

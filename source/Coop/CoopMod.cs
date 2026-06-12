@@ -91,7 +91,10 @@ namespace Coop
                 // Clear old filepath
                 File.Delete(filePath);
             }
-            catch (IOException) { }
+            catch (Exception)
+            {
+                // Best effort delete
+            }
 
             LogManager.Configuration
                 .Enrich.WithProcessId()

@@ -1,8 +1,10 @@
-﻿using Coop.Core.Client.Services.Heroes.Messages;
+using Coop.Core.Client.Services.Heroes.Messages;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Heroes.Messages;
 
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Settlements;
 namespace Coop.IntegrationTests.Heroes
 {
     public class HeroFieldTests
@@ -13,7 +15,13 @@ namespace Coop.IntegrationTests.Heroes
         [Fact]
         public void ServerRecievesLastTimeStampChanged()
         {
-            var triggerMessage = new LastTimeStampChanged();
+            var hero = TestEnvironment.Server.CreateRegisteredObject<Hero>("hero1");
+            foreach (var client in TestEnvironment.Clients)
+            {
+                client.CreateRegisteredObject<Hero>("hero1");
+            }
+
+            var triggerMessage = new LastTimeStampChanged(5, hero);
 
             var server = TestEnvironment.Server;
 
@@ -29,7 +37,19 @@ namespace Coop.IntegrationTests.Heroes
         [Fact]
         public void ServerRecievesCharacterObjectChanged()
         {
-            var triggerMessage = new CharacterObjectChanged();
+            var characterObject = TestEnvironment.Server.CreateRegisteredObject<CharacterObject>("characterObject1");
+            foreach (var client in TestEnvironment.Clients)
+            {
+                client.CreateRegisteredObject<CharacterObject>("characterObject1");
+            }
+
+            var hero = TestEnvironment.Server.CreateRegisteredObject<Hero>("hero1");
+            foreach (var client in TestEnvironment.Clients)
+            {
+                client.CreateRegisteredObject<Hero>("hero1");
+            }
+
+            var triggerMessage = new CharacterObjectChanged(characterObject, hero);
 
             var server = TestEnvironment.Server;
 
@@ -45,7 +65,13 @@ namespace Coop.IntegrationTests.Heroes
         [Fact]
         public void ServerRecievesFirstNameChanged()
         {
-            var triggerMessage = new FirstNameChanged();
+            var hero = TestEnvironment.Server.CreateRegisteredObject<Hero>("hero1");
+            foreach (var client in TestEnvironment.Clients)
+            {
+                client.CreateRegisteredObject<Hero>("hero1");
+            }
+
+            var triggerMessage = new FirstNameChanged("TestName", hero);
 
             var server = TestEnvironment.Server;
 
@@ -61,7 +87,13 @@ namespace Coop.IntegrationTests.Heroes
         [Fact]
         public void ServerRecievesNameChanged()
         {
-            var triggerMessage = new NameChanged();
+            var hero = TestEnvironment.Server.CreateRegisteredObject<Hero>("hero1");
+            foreach (var client in TestEnvironment.Clients)
+            {
+                client.CreateRegisteredObject<Hero>("hero1");
+            }
+
+            var triggerMessage = new NameChanged("TestName", hero);
 
             var server = TestEnvironment.Server;
 
@@ -77,7 +109,13 @@ namespace Coop.IntegrationTests.Heroes
         [Fact]
         public void ServerRecievesHairTagsChanged()
         {
-            var triggerMessage = new HairTagsChanged();
+            var hero = TestEnvironment.Server.CreateRegisteredObject<Hero>("hero1");
+            foreach (var client in TestEnvironment.Clients)
+            {
+                client.CreateRegisteredObject<Hero>("hero1");
+            }
+
+            var triggerMessage = new HairTagsChanged("TestTags", hero);
 
             var server = TestEnvironment.Server;
 
@@ -93,7 +131,13 @@ namespace Coop.IntegrationTests.Heroes
         [Fact]
         public void ServerRecievesBeardTagsChanged()
         {
-            var triggerMessage = new BeardTagsChanged();
+            var hero = TestEnvironment.Server.CreateRegisteredObject<Hero>("hero1");
+            foreach (var client in TestEnvironment.Clients)
+            {
+                client.CreateRegisteredObject<Hero>("hero1");
+            }
+
+            var triggerMessage = new BeardTagsChanged("TestTags", hero);
 
             var server = TestEnvironment.Server;
 
@@ -109,7 +153,13 @@ namespace Coop.IntegrationTests.Heroes
         [Fact]
         public void ServerRecievesTattooTagsChanged()
         {
-            var triggerMessage = new TattooTagsChanged();
+            var hero = TestEnvironment.Server.CreateRegisteredObject<Hero>("hero1");
+            foreach (var client in TestEnvironment.Clients)
+            {
+                client.CreateRegisteredObject<Hero>("hero1");
+            }
+
+            var triggerMessage = new TattooTagsChanged("TestTags", hero);
 
             var server = TestEnvironment.Server;
 
@@ -125,7 +175,13 @@ namespace Coop.IntegrationTests.Heroes
         [Fact]
         public void ServerRecievesHeroStateChanged()
         {
-            var triggerMessage = new HeroStateChanged();
+            var hero = TestEnvironment.Server.CreateRegisteredObject<Hero>("hero1");
+            foreach (var client in TestEnvironment.Clients)
+            {
+                client.CreateRegisteredObject<Hero>("hero1");
+            }
+
+            var triggerMessage = new HeroStateChanged(1, hero);
 
             var server = TestEnvironment.Server;
 
@@ -141,7 +197,13 @@ namespace Coop.IntegrationTests.Heroes
         [Fact]
         public void ServerRecievesHeroLevelChanged()
         {
-            var triggerMessage = new HeroLevelChanged();
+            var hero = TestEnvironment.Server.CreateRegisteredObject<Hero>("hero1");
+            foreach (var client in TestEnvironment.Clients)
+            {
+                client.CreateRegisteredObject<Hero>("hero1");
+            }
+
+            var triggerMessage = new HeroLevelChanged(5, hero);
 
             var server = TestEnvironment.Server;
 
@@ -157,7 +219,13 @@ namespace Coop.IntegrationTests.Heroes
         [Fact]
         public void ServerRecievesSpcDaysInLocationChanged()
         {
-            var triggerMessage = new SpcDaysInLocationChanged();
+            var hero = TestEnvironment.Server.CreateRegisteredObject<Hero>("hero1");
+            foreach (var client in TestEnvironment.Clients)
+            {
+                client.CreateRegisteredObject<Hero>("hero1");
+            }
+
+            var triggerMessage = new SpcDaysInLocationChanged(5, hero);
 
             var server = TestEnvironment.Server;
 
@@ -173,7 +241,13 @@ namespace Coop.IntegrationTests.Heroes
         [Fact]
         public void ServerRecievesDefaultAgeChanged()
         {
-            var triggerMessage = new DefaultAgeChanged();
+            var hero = TestEnvironment.Server.CreateRegisteredObject<Hero>("hero1");
+            foreach (var client in TestEnvironment.Clients)
+            {
+                client.CreateRegisteredObject<Hero>("hero1");
+            }
+
+            var triggerMessage = new DefaultAgeChanged(25f, hero);
 
             var server = TestEnvironment.Server;
 
@@ -189,7 +263,13 @@ namespace Coop.IntegrationTests.Heroes
         [Fact]
         public void ServerRecievesBirthDayChanged()
         {
-            var triggerMessage = new BirthDayChanged();
+            var hero = TestEnvironment.Server.CreateRegisteredObject<Hero>("hero1");
+            foreach (var client in TestEnvironment.Clients)
+            {
+                client.CreateRegisteredObject<Hero>("hero1");
+            }
+
+            var triggerMessage = new BirthDayChanged(100L, hero);
 
             var server = TestEnvironment.Server;
 
@@ -205,7 +285,13 @@ namespace Coop.IntegrationTests.Heroes
         [Fact]
         public void ServerRecievesPowerChanged()
         {
-            var triggerMessage = new PowerChanged();
+            var hero = TestEnvironment.Server.CreateRegisteredObject<Hero>("hero1");
+            foreach (var client in TestEnvironment.Clients)
+            {
+                client.CreateRegisteredObject<Hero>("hero1");
+            }
+
+            var triggerMessage = new PowerChanged(10f, hero);
 
             var server = TestEnvironment.Server;
 
@@ -221,7 +307,19 @@ namespace Coop.IntegrationTests.Heroes
         [Fact]
         public void ServerRecievesCultureChanged()
         {
-            var triggerMessage = new CultureChanged();
+            var culture = TestEnvironment.Server.CreateRegisteredObject<CultureObject>("culture1");
+            foreach (var client in TestEnvironment.Clients)
+            {
+                client.CreateRegisteredObject<CultureObject>("culture1");
+            }
+
+            var hero = TestEnvironment.Server.CreateRegisteredObject<Hero>("hero1");
+            foreach (var client in TestEnvironment.Clients)
+            {
+                client.CreateRegisteredObject<Hero>("hero1");
+            }
+
+            var triggerMessage = new CultureChanged(culture, hero);
 
             var server = TestEnvironment.Server;
 
@@ -237,7 +335,19 @@ namespace Coop.IntegrationTests.Heroes
         [Fact]
         public void ServerRecievesHomeSettlementChanged()
         {
-            var triggerMessage = new HomeSettlementChanged();
+            var settlement = TestEnvironment.Server.CreateRegisteredObject<Settlement>("settlement1");
+            foreach (var client in TestEnvironment.Clients)
+            {
+                client.CreateRegisteredObject<Settlement>("settlement1");
+            }
+
+            var hero = TestEnvironment.Server.CreateRegisteredObject<Hero>("hero1");
+            foreach (var client in TestEnvironment.Clients)
+            {
+                client.CreateRegisteredObject<Hero>("hero1");
+            }
+
+            var triggerMessage = new HomeSettlementChanged(settlement, hero);
 
             var server = TestEnvironment.Server;
 
@@ -253,7 +363,13 @@ namespace Coop.IntegrationTests.Heroes
         [Fact]
         public void ServerRecievesPregnantChanged()
         {
-            var triggerMessage = new PregnantChanged();
+            var hero = TestEnvironment.Server.CreateRegisteredObject<Hero>("hero1");
+            foreach (var client in TestEnvironment.Clients)
+            {
+                client.CreateRegisteredObject<Hero>("hero1");
+            }
+
+            var triggerMessage = new PregnantChanged(hero, true);
 
             var server = TestEnvironment.Server;
 
