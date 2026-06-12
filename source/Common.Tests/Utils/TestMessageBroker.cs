@@ -60,7 +60,6 @@ public class TestMessageBroker : MessageBroker
         var delegates = _subscribers[messageType];
         if (delegates == null || delegates.Count == 0) return;
 
-
         for (int i = 0; i < delegates.Count; i++)
         {
             // TODO this might be slow
@@ -128,7 +127,6 @@ public class TestMessageBroker : MessageBroker
 
         return totalSubscribers;
     }
-
 
     public IEnumerable<T> GetMessagesFromType<T>() where T : IMessage => Messages.Where(m => m is T).Cast<T>();
 

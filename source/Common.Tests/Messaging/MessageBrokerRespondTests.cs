@@ -1,5 +1,4 @@
 ﻿using Common.Messaging;
-using System.Threading;
 using Xunit;
 
 namespace Common.Tests.Messaging;
@@ -16,7 +15,7 @@ public class MessageBrokerRespondTests
         public void Handle(MessagePayload<TestResponse> payload)
         {
             Handled = true;
-            HandledOnThread = Thread.CurrentThread.ManagedThreadId;
+            HandledOnThread = Environment.CurrentManagedThreadId;
         }
     }
 
@@ -32,7 +31,7 @@ public class MessageBrokerRespondTests
         // Synchronous: the handler has already run by the time RespondSync returns,
         // on the calling thread — nothing can interleave between caller and response.
         Assert.True(target.Handled);
-        Assert.Equal(Thread.CurrentThread.ManagedThreadId, target.HandledOnThread);
+        Assert.Equal(Environment.CurrentManagedThreadId, target.HandledOnThread);
     }
 
     [Fact]
