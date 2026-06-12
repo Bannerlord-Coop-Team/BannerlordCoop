@@ -1,3 +1,4 @@
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -46,16 +47,21 @@ public class CampaignTimeSyncHandler : IHandler
 
     private void PublishCampaignTime(object sender, ElapsedEventArgs e)
     {
-        try
+        // The timer fires on a thread pool thread; reading campaign time and broadcasting must run
+        // on the game loop thread like every other game operation, so marshal the work onto it.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            // No campaign loaded yet, nothing authoritative to broadcast.
-            if (mapTimeTrackerInterface.TryGetCurrentTicks(out long currentTicks) == false) return;
+            try
+            {
+                // No campaign loaded yet, nothing authoritative to broadcast.
+                if (mapTimeTrackerInterface.TryGetCurrentTicks(out long currentTicks) == false) return;
 
-            network.SendAll(new CampaignTimeUpdated(currentTicks));
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "Failed to broadcast {message}", nameof(CampaignTimeUpdated));
-        }
+                network.SendAll(new CampaignTimeUpdated(currentTicks));
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Failed to broadcast {message}", nameof(CampaignTimeUpdated));
+            }
+        });
     }
 }
