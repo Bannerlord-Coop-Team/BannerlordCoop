@@ -186,8 +186,14 @@ public class CoopClient : CoopNetworkBase, ICoopClient
         // Replay any packets buffered during the transfer-save load, in order, on this poller thread.
         foreach (var (peer, packet) in loadingPacketBuffer.DrainIfRequested())
         {
-            packetManager.HandleReceive(peer, packet);
-        }
+            try
+            {
+                packetManager.HandleReceive(peer, packet);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Failed to process packet {PacketType}", packet.GetType());
+            }
 
         if (reconnectPending && DateTime.UtcNow >= reconnectAfter)
         {
@@ -197,7 +203,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
             Logger.Information("Retrying connection to {Endpoint}...", connectEndPoint);
             netManager.Connect(connectEndPoint, Configuration.Token);
         }
-    }
+    }}
 
     public override void SendAll(IPacket packet)
     {
