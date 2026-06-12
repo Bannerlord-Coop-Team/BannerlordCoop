@@ -38,6 +38,11 @@ internal class TakePrisonerActionPatches
         if (prisonerParty?.IsPlayerParty() != true)
             return true;
 
+        // The native capture runs silenced: none of its side effects (member-roster removal, prison-roster
+        // add, hero state) replicate from here. Every client derives them instead by replaying this same
+        // action when it applies NetworkTakePrisoner (MapEventPartyHandler.Handle_NetworkTakePrisoner),
+        // which also parks its copy of the captured party. A side effect added inside ApplyInternal that
+        // the client replay does NOT derive identically will silently diverge per machine.
         using (new AllowedThread())
         {
             TakePrisonerAction.Apply(capturerParty, prisonerCharacter);

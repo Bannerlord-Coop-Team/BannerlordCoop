@@ -50,4 +50,20 @@ public static class MobilePartyExtensions
 
         return PlayerManager.TryGetControlledObjectInfo(party, out var _);
     }
+
+    /// <summary>
+    /// Empties the party's member and prison rosters — the forfeit applied when a player party is
+    /// parked for captivity. The server parks the authoritative party
+    /// (<c>PlayerCaptivityServerHandler.Handle_PrisonerTaken</c>) and every client parks its own copy
+    /// when it applies the replicated capture
+    /// (<c>MapEventPartyHandler.Handle_NetworkTakePrisoner</c>); both must forfeit the same rosters or
+    /// the release's re-add lands on diverged state, so the shape of the park lives here, once.
+    /// Callers run it inside <see cref="Common.Util.AllowedThread"/> — the clear must never broadcast
+    /// roster deltas (each side empties its own copy absolutely).
+    /// </summary>
+    public static void ForfeitRosters(this MobileParty party)
+    {
+        party.MemberRoster.Clear();
+        party.PrisonRoster.Clear();
+    }
 }

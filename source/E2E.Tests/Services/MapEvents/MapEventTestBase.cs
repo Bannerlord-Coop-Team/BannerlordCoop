@@ -1,7 +1,9 @@
+using Common.Network;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
@@ -14,6 +16,7 @@ using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using Xunit.Abstractions;
@@ -420,6 +423,86 @@ public abstract class MapEventTestBase : IDisposable
     }
 
     /// <summary>
+    /// Frees the captive player hero the way the live escape pop-up ("you were able to get away")
+    /// does: the owning client's <see cref="EndCaptivityAction"/> is intercepted locally and forwarded
+    /// as a <c>NetworkEndPlayerCaptivityAttempted</c> request, which the server applies
+    /// authoritatively (<c>PlayerCaptivityServerHandler</c>) and replicates back. The wire message is
+    /// sent directly from <paramref name="client"/> because the client-side intercept path resolves
+    /// the test hero against <see cref="Hero.MainHero"/> and reads <see cref="MobileParty.MainParty"/>
+    /// — the harness's main hero (E2ETestEnvironment.SetupMainHero) is a separate bootstrap hero, and
+    /// no main party exists headlessly — so the local handler chain cannot fire for a test hero.
+    /// </summary>
+    protected void ReleasePlayerByEscapeRequest(EnvironmentInstance client, string heroId, string partyId)
+    {
+        var disabledMethods = MapEventDisabledMethods
+            // An escape releases from a still-active captor, so the server disengages the freed party
+            // (TeleportPartyToOutSideOfEncounterRadius), which pathfinds for a reachable point and
+            // needs a live map scene. The captor-defeated release path skips it (inactive captor).
+            .Append(AccessTools.Method(typeof(MobileParty), nameof(MobileParty.TeleportPartyToOutSideOfEncounterRadius)))
+            .ToList();
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+
+            client.Resolve<INetwork>().SendAll(new NetworkEndPlayerCaptivityAttempted(
+                heroId, partyId, party.Position, EndCaptivityDetail.ReleasedAfterEscape, null));
+        }, disabledMethods);
+    }
+
+    /// <summary>
+    /// Seeds <paramref name="count"/> of <paramref name="characterId"/> into the member roster of the
+    /// party with <paramref name="partyId"/> on the server and every client without triggering sync,
+    /// so each instance starts from the same known state.
+    /// </summary>
+    protected void SeedPartyTroopOnAll(string partyId, string characterId, int count)
+    {
+        void Seed(EnvironmentInstance instance)
+        {
+            instance.Call(() =>
+            {
+                using (new AllowedThread())
+                {
+                    Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                    Assert.True(instance.ObjectManager.TryGetObject<CharacterObject>(characterId, out var character));
+
+                    // Seed via AddNewElement + AddToCountsAtIndex, which AllowedThread suppresses.
+                    // AddToCounts must not be used here: TroopRosterAddToCountsPatch intentionally
+                    // publishes sync for AddToCounts even on an allowed thread, so seeding through it
+                    // would sync the seed too.
+                    party.MemberRoster.AddNewElement(character, -1);
+                    var index = party.MemberRoster.FindIndexOfTroop(character);
+                    party.MemberRoster.AddToCountsAtIndex(index, count, woundedCountChange: 0, xpChange: 0, removeDepleted: false);
+                }
+            });
+        }
+
+        Seed(Server);
+        foreach (var client in Clients)
+        {
+            Seed(client);
+        }
+    }
+
+    /// <summary>
+    /// Asserts the member roster of the party with <paramref name="partyId"/> holds exactly
+    /// <paramref name="expected"/> men on the given <paramref name="instance"/>.
+    /// <see cref="TroopRoster.TotalManCount"/> is what every nameplate/speed/wage computation reads,
+    /// so a stale or duplicated element shows up here even when the roster still "contains" the hero.
+    /// </summary>
+    protected void AssertPartyManCount(EnvironmentInstance instance, string partyId, int expected)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+
+            Assert.True(
+                expected == party.MemberRoster.TotalManCount,
+                $"[{instance.GetType().Name}] party {partyId} should have {expected} men, has {party.MemberRoster.TotalManCount}");
+        });
+    }
+
+    /// <summary>
     /// Frees the player hero the way native does when its captor party is defeated in battle:
     /// <see cref="MapEvent.LootDefeatedPartyPrisoners"/> calls
     /// <see cref="EndCaptivityAction.ApplyByReleasedAfterBattle"/> for each freed prisoner. Invoking that
@@ -450,26 +533,30 @@ public abstract class MapEventTestBase : IDisposable
     }
 
     /// <summary>
-    /// Asserts the player party with <paramref name="partyId"/> is active again and once more contains its
+    /// Asserts the player party with <paramref name="partyId"/> is active again and holds exactly its
     /// hero <paramref name="heroId"/> — i.e. it was restored to the map after a captivity release.
+    /// Captivity forfeits the party's troops, so the restored roster is exactly one man; a stale
+    /// element surviving the capture would double-count here.
     /// </summary>
     protected void AssertPlayerPartyRestored(EnvironmentInstance instance, string heroId, string partyId)
     {
         instance.Call(() =>
         {
-            Assert.True(instance.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
             Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
 
             Assert.True(party.IsActive, $"Player party {partyId} should be active again after release on {instance.GetType().Name}");
-            Assert.True(party.MemberRoster.Contains(hero.CharacterObject), $"Released hero {heroId} should be back in party {partyId} on {instance.GetType().Name}");
         });
+
+        AssertHeroInPartyRoster(instance, heroId, partyId);
     }
 
     /// <summary>
     /// Asserts the released hero <paramref name="heroId"/> is back in its party <paramref name="partyId"/>'s
-    /// member roster on the given <paramref name="instance"/> (party activation is not asserted, so this is
-    /// safe to use on clients where <see cref="MobileParty.IsActive"/> is not synced). This is the symptom of
-    /// the "released party has 0 troops" bug — the server re-adds the hero and that add must replicate.
+    /// member roster on the given <paramref name="instance"/>, and that the roster holds exactly that one
+    /// man (party activation is not asserted, so this is safe to use on clients where
+    /// <see cref="MobileParty.IsActive"/> is not synced). Contains guards the "released party has 0 troops"
+    /// bug — the server's re-add must replicate; the exact count guards the inverse "phantom troop" bug —
+    /// a stale hero element surviving the capture on a client doubles the count when the re-add lands.
     /// </summary>
     protected void AssertHeroInPartyRoster(EnvironmentInstance instance, string heroId, string partyId)
     {
@@ -481,6 +568,9 @@ public abstract class MapEventTestBase : IDisposable
             Assert.True(
                 party.MemberRoster.Contains(hero.CharacterObject),
                 $"Released hero {heroId} should be back in party {partyId} on {instance.GetType().Name} (count={party.MemberRoster.TotalManCount})");
+            Assert.True(
+                party.MemberRoster.TotalManCount == 1,
+                $"Released party {partyId} should hold exactly its hero on {instance.GetType().Name}, has {party.MemberRoster.TotalManCount} men");
         });
     }
 

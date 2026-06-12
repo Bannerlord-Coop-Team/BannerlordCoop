@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.MapEventParties.Messages;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
@@ -204,8 +205,10 @@ internal class MapEventPartyHandler : IHandler
             return;
         if (!objectManager.TryGetIdWithLogging(obj.PrisonerHero, out var heroId))
             return;
+        if (!objectManager.TryGetIdWithLogging(obj.PrisonerParty, out var prisonerPartyId))
+            return;
 
-        var message = new NetworkTakePrisoner(partyBaseId, heroId);
+        var message = new NetworkTakePrisoner(partyBaseId, heroId, prisonerPartyId);
         network.SendAll(message);
     }
 
@@ -218,9 +221,39 @@ internal class MapEventPartyHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Hero>(obj.HeroId, out var hero))
             return;
 
+        // Resolved separately so a missing party id only costs the park below, never the capture itself.
+        objectManager.TryGetObjectWithLogging<MobileParty>(obj.PrisonerPartyId, out var prisonerParty);
+
         using (new AllowedThread())
         {
-            TakePrisonerAction.ApplyInternal(partyBase, hero);
+            try
+            {
+                TakePrisonerAction.ApplyInternal(partyBase, hero);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Failed to apply prisoner capture. HeroId: {HeroId}", obj.HeroId);
+            }
+
+            // Park the local copy of the captured player party the same way the server does
+            // (PlayerCaptivityServerHandler.Handle_PrisonerTaken). The native ApplyInternal above only
+            // removes the hero from the member roster while hero.PartyBelongedTo is set, and the
+            // captor's replicated prison-roster add has already nulled it by this point — leaving a
+            // stale hero element that the release's re-add would double. The forfeit is absolute and
+            // idempotent, so the roster converges to the server's parked (empty) state regardless of
+            // what the replay did — including when it threw, which is why the park runs outside its
+            // try. It runs AFTER the replay: native RemoveTroop on an already-emptied roster would
+            // index out of bounds.
+            if (prisonerParty == null) return;
+
+            try
+            {
+                prisonerParty.ForfeitRosters();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Failed to park captured party. PrisonerPartyId: {PrisonerPartyId}", obj.PrisonerPartyId);
+            }
         }
     }
 }

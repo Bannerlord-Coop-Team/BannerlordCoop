@@ -10,10 +10,13 @@ public readonly struct NetworkTakePrisoner : ICommand
     public readonly string PartyBaseId;
     [ProtoMember(2)]
     public readonly string HeroId;
+    [ProtoMember(3)]
+    public readonly string PrisonerPartyId;
 
-    public NetworkTakePrisoner(string partyBaseId, string heroId)
+    public NetworkTakePrisoner(string partyBaseId, string heroId, string prisonerPartyId)
     {
         PartyBaseId = partyBaseId;
         HeroId = heroId;
+        PrisonerPartyId = prisonerPartyId;
     }
 }

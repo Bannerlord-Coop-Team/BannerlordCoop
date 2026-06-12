@@ -2,6 +2,7 @@ using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
@@ -110,9 +111,16 @@ internal class PlayerCaptivityServerHandler : IHandler
         }
 
         // Park the now-leaderless player party so native post-battle processing cannot scatter or destroy
-        // it; the captivity-end flow reactivates it.
-        playerParty.MemberRoster.Clear();
-        playerParty.PrisonRoster.Clear();
+        // it; the captivity-end flow reactivates it. The roster forfeit runs under AllowedThread so its
+        // per-index removal deltas are NOT broadcast: every client parks its own copy when it applies
+        // NetworkTakePrisoner (MapEventPartyHandler.Handle_NetworkTakePrisoner), and the deltas — computed
+        // against a server roster that already lost its hero to the silenced native capture — would land on
+        // misaligned indices on the still-stale client rosters. Leader change and IsActive stay outside the
+        // scope (the leader change replicates; IsActive is server-only state).
+        using (new AllowedThread())
+        {
+            playerParty.ForfeitRosters();
+        }
         playerParty.IsActive = false;
         playerParty.ChangePartyLeader(null);
     }
@@ -212,6 +220,17 @@ internal class PlayerCaptivityServerHandler : IHandler
     /// </summary>
     private void ReleasePlayerFromCaptivity(Hero playerHero, MobileParty playerParty, EndCaptivityDetail detail, Hero facilitator, CampaignVec2 releasePosition)
     {
+        // Guard against re-processing an already-ended captivity: a client release request can race a
+        // server-initiated release, and a second pass would re-add the hero to the member roster,
+        // doubling the troop count. The captor reference is the captivity's source of truth — it is
+        // still set on every legitimate entry (the EndCaptivityAction prefix intercepts before native
+        // clears anything, including a death in captivity) and cleared below on the first pass.
+        if (playerHero.PartyBelongedToAsPrisoner == null)
+        {
+            PlayerCaptivityLogger.Debug("ReleasePlayerFromCaptivity: skipping, hero {HeroId} is no longer captive", playerHero.StringId);
+            return;
+        }
+
         // Snapshot the captor before the release: clearing the captivity below nulls
         // PartyBelongedToAsPrisoner, and a captor defeated in battle may already be inactive.
         PartyBase captorParty = playerHero.PartyBelongedToAsPrisoner;
