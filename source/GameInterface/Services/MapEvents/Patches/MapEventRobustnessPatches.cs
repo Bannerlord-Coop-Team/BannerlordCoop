@@ -51,12 +51,7 @@ internal class MapEventRobustnessPatches
         return null;
     }
 
-    // The save sent to a joining client is a snapshot of the live world, and while the campaign
-    // is fast-forwarded that snapshot can be taken in the middle of such a burst: a battle side
-    // can be captured with its leader party's hero already removed. Vanilla dereferences that
-    // leader unguarded while the client loads the save, and the throw unwinds through
-    // MapEventManager.OnAfterLoad, killing the client at the end of the loading screen. Fall
-    // back to vanilla's own no-leader default so the load continues.
+    // See https://github.com/Bannerlord-Coop-Team/BannerlordCoop/issues/1353
     [HarmonyPatch(typeof(MapEventSide), nameof(MapEventSide.CacheLeaderSimulationModifier))]
     [HarmonyFinalizer]
     private static Exception Finalizer_CacheLeaderSimulationModifier(Exception __exception, MapEventSide __instance)
