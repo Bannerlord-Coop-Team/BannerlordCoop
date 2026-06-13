@@ -205,23 +205,16 @@ internal class HeroInterface : IHeroInterface
 
     private string NewServerStringId<T>(T obj) where T : MBObjectBase
     {
-        // FindNextUniqueStringId only avoids ids of objects currently registered in the campaign. A
-        // player restored from a saved co-op session keeps its hero/party/clan ids reserved even when
-        // those objects are not loaded on the server (clients re-send their hero on connect rather than
-        // being persisted here), so without this guard a freshly created client can be handed an id an
-        // absent player already owns — both then resolve to the same party and inflate counts such as
-        // the map-event player count. Skip ids any known player already holds; a rejoining client keeps
-        // its ids by resolving (matched on its controller/platform id) and never reaches this allocation.
+        // FindNextUniqueStringId only avoids ids of objects loaded in the campaign, so also skip ids held
+        // by registered players — otherwise a new client can reuse a saved-but-unloaded player's id.
         return NextUnreservedStringId(
             seed => Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<T>(seed),
             ReservedServerStringIds<T>());
     }
 
     /// <summary>
-    /// Returns the first "Player{N}" id that is free both in the campaign and among the players' reserved
-    /// ids. <paramref name="findCampaignUniqueId"/> yields the next id unused by registered objects for a
-    /// given seed (i.e. <c>FindNextUniqueStringId</c>); <paramref name="reservedIds"/> are ids already
-    /// claimed by known players, whose objects may not be loaded and so are invisible to the campaign lookup.
+    /// Returns the first "Player{N}" id free both in the campaign (via <paramref name="findCampaignUniqueId"/>)
+    /// and among <paramref name="reservedIds"/> (ids already claimed by registered players).
     /// </summary>
     internal static string NextUnreservedStringId(Func<string, string> findCampaignUniqueId, ISet<string> reservedIds)
     {
