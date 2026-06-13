@@ -38,14 +38,7 @@ internal class MapEventRobustnessPatches
         return null;
     }
 
-    // Fast-forwarding the campaign resolves many battles in one burst, so a party can be
-    // destroyed (its battle finished, the party wiped out or disbanded) while a later map event
-    // in the same tick still references it. MapEvent.Update then dereferences the missing party
-    // and crashes the server, because MapEventManager.Tick runs outside the Campaign.RealTick
-    // finalizer. Swallow per-event so one bad event can't take down the rest of the manager
-    // tick; the event re-runs on the next tick and proceeds normally once its parties are in a
-    // consistent state again. Logged at Verbose because it can fire every tick until then and
-    // the swallow itself is the recovery.
+    // See https://github.com/Bannerlord-Coop-Team/BannerlordCoop/issues/1353
     [HarmonyPatch(typeof(MapEvent), "Update")]
     [HarmonyFinalizer]
     private static Exception Finalizer_Update(Exception __exception, MapEvent __instance)
