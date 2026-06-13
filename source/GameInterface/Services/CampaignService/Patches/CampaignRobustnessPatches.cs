@@ -18,7 +18,7 @@ internal class CampaignRobustnessPatches
 
     [HarmonyPatch(nameof(Campaign.RealTick))]
     [HarmonyFinalizer]
-    private static Exception Finalizer_UpdateMapEventsAux(Exception __exception, MethodBase __originalMethod)
+    private static Exception Finalizer_RealTick(Exception __exception)
     {
         if (__exception != null)
         {
