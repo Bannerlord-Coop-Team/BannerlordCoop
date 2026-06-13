@@ -43,12 +43,6 @@ public class AllowedThread : IDisposable
     /// </summary>
     public static void AllowThisThread()
     {
-        // Log warning if server is using allowed thread
-        // Server calling allowed thread will not broadcast side effects to all clients
-        if (ModInformation.IsServer)
-        {
-            Logger.Warning("Server is using allowed thread. This likely should not be happening. {CallStack}", Environment.StackTrace);
-        }
         _allowedCount++;
     }
 
