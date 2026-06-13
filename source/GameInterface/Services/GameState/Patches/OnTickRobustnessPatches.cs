@@ -17,7 +17,7 @@ internal class OnTickRobustnessPatches
     {
         if (__exception != null)
         {
-            Logger.Error(__exception, "Failed to run {Method}", $"Campaign.RealTick");
+            Logger.Error(__exception, "Failed to run {Method}", $"Game.OnTick");
         }
 
         return null;

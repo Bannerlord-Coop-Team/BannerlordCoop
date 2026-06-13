@@ -1,13 +1,8 @@
 ﻿using Common.Logging;
 using HarmonyLib;
 using Serilog;
-using Serilog.Core;
 using System;
-using System.Collections.Generic;
-using System.Reflection;
-using System.Text;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.CampaignService.Patches;
 
