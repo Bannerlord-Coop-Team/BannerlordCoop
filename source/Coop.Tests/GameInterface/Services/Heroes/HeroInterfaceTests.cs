@@ -37,8 +37,8 @@ public class HeroInterfaceTests
     [Fact]
     public void NextUnreservedStringId_BaseIdReservedByAbsentPlayer_SkipsToNextFreeId()
     {
-        // The reported bug: a saved-but-absent player still owns "Player", so a freshly created client must
-        // not be handed "Player" — both records would otherwise resolve to one party and double-count it.
+        // A saved-but-absent player still owns "Player", so a freshly created client must not be handed
+        // "Player" — both records would otherwise resolve to one party and be counted as two.
         var reserved = new HashSet<string> { "Player" };
 
         var id = HeroInterface.NextUnreservedStringId(CampaignSeedFree, reserved);
