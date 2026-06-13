@@ -55,9 +55,10 @@ public class TransferSaveState : ConnectionStateBase
 
             // The save carries every player's hero but not the player registry, and the
             // per-player broadcast fires only once, at character creation — a peer that was
-            // not yet receiving broadcasts at that moment would treat those players' parties
-            // as AI forever. Send the registry with the save; the client applies it once the
-            // campaign and its object registry are ready.
+            // not yet receiving broadcasts at that moment never registers those players, so
+            // their parties/heroes/clans are not marked player-controlled on that client.
+            // Send the registry with the save; the client applies it once the campaign and
+            // its object registry are ready.
             var players = playerManager.Players?.ToArray() ?? System.Array.Empty<Player>();
             network.Send(ConnectionLogic.Peer, new NetworkExistingPlayers(players));
 
