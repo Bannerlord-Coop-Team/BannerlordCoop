@@ -115,6 +115,7 @@ public class ResolveCharacterState : ConnectionStateBase
         {
             Id = networkModuleInfo.Id,
             IsOfficial = networkModuleInfo.IsOfficial,
+            IsDlc = networkModuleInfo.IsDlc,
             Version = new ApplicationVersion((ApplicationVersionType)networkModuleInfo.Version.ApplicationVersionType, networkModuleInfo.Version.Major, networkModuleInfo.Version.Minor, networkModuleInfo.Version.Revision, networkModuleInfo.Version.ChangeSet)
         };
     }
