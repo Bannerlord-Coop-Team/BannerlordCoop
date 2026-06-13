@@ -1,10 +1,14 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
 using Common.Network;
 using GameInterface.Registry;
 using GameInterface.Registry.Messages;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.MobileParties.Messages;
+using GameInterface.Services.Modules;
+using GameInterface.Services.Modules.Validators;
+using Serilog;
 
 namespace Coop.Core.Server.States;
 
@@ -13,17 +17,25 @@ namespace Coop.Core.Server.States;
 /// </summary>
 public class InitialServerState : ServerStateBase
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<InitialServerState>();
+
     private readonly IMessageBroker messageBroker;
     private readonly IRegistryManager registryManager;
+    private readonly IModuleValidator moduleValidator;
+    private readonly IModuleInfoProvider moduleInfoProvider;
 
     public InitialServerState(
         IServerLogic context,
         IMessageBroker messageBroker,
-        IRegistryManager registryManager) : 
+        IRegistryManager registryManager,
+        IModuleValidator moduleValidator,
+        IModuleInfoProvider moduleInfoProvider) :
         base(context)
     {
         this.messageBroker = messageBroker;
         this.registryManager = registryManager;
+        this.moduleValidator = moduleValidator;
+        this.moduleInfoProvider = moduleInfoProvider;
         messageBroker.Subscribe<CampaignReady>(Handle_CampaignReady);
     }
 
@@ -34,6 +46,13 @@ public class InitialServerState : ServerStateBase
 
     internal void Handle_CampaignReady(MessagePayload<CampaignReady> payload)
     {
+        // Coop does not support DLC. Warn the host if any is enabled before the server becomes
+        // joinable; clients with DLC enabled are rejected separately during module validation.
+        if (!moduleValidator.ValidateNoDlc(moduleInfoProvider.GetModuleInfos(), out var dlcError))
+        {
+            Logger.Error("Hosting with unsupported modules enabled. {error}", dlcError);
+        }
+
         // Remove server party
         messageBroker.Publish(this, new RemoveMainParty());
 
