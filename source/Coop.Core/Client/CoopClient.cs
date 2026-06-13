@@ -194,6 +194,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
             {
                 Logger.Error(ex, "Failed to process packet {PacketType}", packet.GetType());
             }
+        }
 
         if (reconnectPending && DateTime.UtcNow >= reconnectAfter)
         {
@@ -203,7 +204,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
             Logger.Information("Retrying connection to {Endpoint}...", connectEndPoint);
             netManager.Connect(connectEndPoint, Configuration.Token);
         }
-    }}
+    }
 
     public override void SendAll(IPacket packet)
     {
