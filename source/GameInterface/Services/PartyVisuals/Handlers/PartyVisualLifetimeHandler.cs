@@ -5,7 +5,6 @@ using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.PartyVisuals.Messages;
-using SandBox.View;
 using SandBox.View.Map.Managers;
 using SandBox.View.Map.Visuals;
 using TaleWorlds.CampaignSystem.Party;
@@ -61,11 +60,7 @@ public class PartyVisualLifetimeHandler : IHandler
         {
             MobilePartyVisual newVisual;
 
-            // MobilePartyVisualManager.Current throws (rather than returning null) while the
-            // map view is not initialized — e.g. on a client that is still on the loading
-            // screen when the server announces a new party. Resolve it null-safely so the
-            // no-manager fallback below stays reachable.
-            var visualManager = SandBoxViewSubModule.SandBoxViewVisualManager?.GetEntityComponent<MobilePartyVisualManager>();
+            var visualManager = MobilePartyVisualManager.Current;
             if (visualManager != null)
             {
                 // Normal client: let the map visuals manager create the visual so the party renders.
@@ -102,14 +97,7 @@ public class PartyVisualLifetimeHandler : IHandler
         {
             using (new AllowedThread())
             {
-                var visualManager = SandBoxViewSubModule.SandBoxViewVisualManager?.GetEntityComponent<MobilePartyVisualManager>();
-                var mobileParty = partyVisual.MapEntity?.MobileParty;
-
-                // Without a map view there is nothing rendering the visual; unregistering it
-                // (below) is all that is needed.
-                if (visualManager == null || mobileParty == null) return;
-
-                visualManager.RemovePartyVisualForParty(mobileParty);
+                MobilePartyVisualManager.Current.RemovePartyVisualForParty(partyVisual.MapEntity.MobileParty);
             }
         });
 
