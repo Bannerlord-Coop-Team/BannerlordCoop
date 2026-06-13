@@ -21,7 +21,6 @@ public class HeroInterfaceTests
     [InlineData("Player9", "Player10")]
     [InlineData("Player430", "Player431")]
     [InlineData("Player2863", "Player2864")]
-    [InlineData("Player99999999999999999999", "Player1")] // suffix too large for uint is treated as 0
     public void IncrementPostfix_AdvancesTrailingNumber(string input, string expected)
     {
         Assert.Equal(expected, HeroInterface.IncrementPostfix(input));

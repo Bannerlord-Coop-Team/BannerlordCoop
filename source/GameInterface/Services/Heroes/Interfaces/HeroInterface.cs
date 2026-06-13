@@ -268,11 +268,7 @@ internal class HeroInterface : IHeroInterface
             splitIndex--;
 
         var prefix = stringId.Substring(0, splitIndex);
-        // Ids are minted as bounded uint postfixes (matching FindNextUniqueStringId), so a suffix that
-        // doesn't fit a uint is treated as 0 (yielding "{prefix}1") rather than throwing.
-        uint number = 0;
-        if (splitIndex < stringId.Length)
-            uint.TryParse(stringId.Substring(splitIndex), out number);
+        var number = splitIndex < stringId.Length ? uint.Parse(stringId.Substring(splitIndex)) : 0u;
         return prefix + (number + 1);
     }
 
