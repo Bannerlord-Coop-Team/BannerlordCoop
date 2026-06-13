@@ -11,6 +11,7 @@ using GameInterface.Services.MobilePartyAIs;
 using GameInterface.Services.MobilePartyAIs.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Handlers;
@@ -100,32 +101,44 @@ internal class MobilePartyBehaviorHandler : IHandler
             return;
 
 
-        using (new AllowedThread())
+        try
         {
-            PartyBehaviorPatch.SetAiBehavior(party.Ai, data.NewAiBehavior, partyBase, data.BestTargetPoint);
-
-            if (MobilePartyAiConfig.DEBUG)
+            using (new AllowedThread())
             {
-                Logger.Debug(
-                    "Setting AI behavior. PartyId: {PartyId}, Behavior: {Behavior}, TargetParty: {TargetParty}, BestTargetPoint: {BestTargetPoint}",
-                    data.MobilePartyId,
-                    data.NewAiBehavior,
-                    partyBase,
-                    data.BestTargetPoint
-                );
-            }
+                PartyBehaviorPatch.SetAiBehavior(party.Ai, data.NewAiBehavior, partyBase, data.BestTargetPoint);
 
-            party.Ai.SetAiBehavior(data.NewAiBehavior, partyBase, data.BestTargetPoint);
+                if (MobilePartyAiConfig.DEBUG)
+                {
+                    Logger.Debug(
+                        "Setting AI behavior. PartyId: {PartyId}, Behavior: {Behavior}, TargetParty: {TargetParty}, BestTargetPoint: {BestTargetPoint}",
+                        data.MobilePartyId,
+                        data.NewAiBehavior,
+                        partyBase,
+                        data.BestTargetPoint
+                    );
+                }
 
-            if (ModInformation.IsClient)
-            {
-                party.Ai._mobileParty.Position = data.PartyPosition;
+                party.Ai.SetAiBehavior(data.NewAiBehavior, partyBase, data.BestTargetPoint);
+
+                if (ModInformation.IsClient)
+                {
+                    party.Ai._mobileParty.Position = data.PartyPosition;
+                }
+                else
+                {
+                    data.PartyPosition = party.Position;
+                    messageBroker.Publish(this, new PartyBehaviorUpdated(ref data));
+                }
             }
-            else
-            {
-                data.PartyPosition = party.Position;
-                messageBroker.Publish(this, new PartyBehaviorUpdated(ref data));
-            }
+        }
+        catch (Exception e)
+        {
+            // A behavior update can arrive while this machine is still loading the world (or
+            // while the involved parties are mid-rebuild); applying it then dereferences map,
+            // path or target state that does not exist yet — e.g. vanilla UpdateBehavior reads
+            // AiBehaviorPartyBase.MobileParty unchecked on the EngageParty branch. Behavior is
+            // streamed continuously, so dropping this update self-heals on the next one.
+            Logger.Verbose(e, "Suppressed behavior update for {PartyId} while its world state was not ready", data.MobilePartyId);
         }
     }
 }
