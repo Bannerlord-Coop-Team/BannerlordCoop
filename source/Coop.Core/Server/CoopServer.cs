@@ -6,6 +6,7 @@ using Common.Network.Messages;
 using Common.PacketHandlers;
 using Common.Serialization;
 using Coop.Core.Common.Network;
+using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Time.Messages;
 using GameInterface.Registry.Messages;
@@ -41,17 +42,20 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     private readonly IMessageBroker messageBroker;
     private readonly IPacketManager packetManager;
+    private readonly IPeerBroadcastGate broadcastGate;
 
     public CoopServer(
-        INetworkConfiguration configuration, 
+        INetworkConfiguration configuration,
         IMessageBroker messageBroker,
         IPacketManager packetManager,
         IControllerIdProvider controllerIdProvider,
-        ICommonSerializer serializer) : base(configuration, serializer)
+        ICommonSerializer serializer,
+        IPeerBroadcastGate broadcastGate) : base(configuration, serializer)
     {
         // Dependancy assignment
         this.messageBroker = messageBroker;
         this.packetManager = packetManager;
+        this.broadcastGate = broadcastGate;
 
         // Netmanager initialization
         netManager.NatPunchEnabled = true;
@@ -130,6 +134,34 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     public override void SendAllBut(NetPeer ignoredPeer, IPacket packet)
     {
         SendAllBut(netManager, ignoredPeer, packet);
+    }
+
+    // World broadcasts are withheld from peers that do not have the transfer save yet:
+    // everything broadcast before the snapshot is already inside it, and the flood would
+    // otherwise overload their send queue and be applied against a campaign they have not
+    // loaded. Peer-targeted Send calls (the join handshake, the save itself) are unaffected.
+    protected override void SendAll(NetManager netManager, IPacket packet)
+    {
+        var peers = new List<NetPeer>();
+        netManager.GetPeersNonAlloc(peers, ConnectionState.Connected);
+        foreach (var peer in peers)
+        {
+            if (broadcastGate.CanBroadcastTo(peer) == false) continue;
+
+            Send(peer, packet);
+        }
+    }
+
+    public override void SendAllBut(NetManager netManager, NetPeer netPeer, IPacket packet)
+    {
+        var peers = new List<NetPeer>();
+        netManager.GetPeersNonAlloc(peers, ConnectionState.Connected);
+        foreach (var peer in peers.Where(peer => peer != netPeer))
+        {
+            if (broadcastGate.CanBroadcastTo(peer) == false) continue;
+
+            Send(peer, packet);
+        }
     }
 
     private void CheckNetworkQueueOverloaded(NetPeer ignoredPeer = null)

@@ -22,7 +22,8 @@ public class TransferSaveState : ConnectionStateBase
         INetwork network,
         ICoopSessionProvider coopSessionProvider,
         ISaveInterface saveInterface,
-        ITimeControlInterface timeControlInterface)
+        ITimeControlInterface timeControlInterface,
+        IPeerBroadcastGate broadcastGate)
         : base(connectionLogic)
     {
         messageBroker.Publish(this, new PlayerLoading());
@@ -44,8 +45,15 @@ public class TransferSaveState : ConnectionStateBase
                 connectionLogic.Peer.Disconnect();
                 return;
             }
-                
+
             network.Send(ConnectionLogic.Peer, savePacket);
+
+            // Open world broadcasts to this peer only now: everything broadcast before this
+            // point is inside the snapshot just sent. Ordered broadcasts enqueued after it
+            // follow the save on the same reliable-ordered channel, where the client buffers
+            // them until the campaign is ready; unordered packets (party behavior) may arrive
+            // ahead of the save and rely on their lookup-guarded handlers instead.
+            broadcastGate.Open(ConnectionLogic.Peer);
         }, blocking: true);
     }
 

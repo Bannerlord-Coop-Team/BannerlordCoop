@@ -18,6 +18,8 @@ internal class ConnectionModule : Module
 
         builder.RegisterType<ClientRegistry>().As<IClientRegistry>().AsSelf().InstancePerLifetimeScope().AutoActivate();
 
+        builder.RegisterType<PeerBroadcastGate>().As<IPeerBroadcastGate>().InstancePerLifetimeScope();
+
         base.Load(builder);
     }
 }
