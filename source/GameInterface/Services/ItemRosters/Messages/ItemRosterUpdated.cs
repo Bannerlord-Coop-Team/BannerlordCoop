@@ -1,5 +1,4 @@
-﻿using Common.Logging.Attributes;
-using Common.Messaging;
+﻿using Common.Messaging;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 
@@ -8,7 +7,6 @@ namespace GameInterface.Services.ItemRosters.Messages;
 /// <summary> 
 /// Called when an ItemRoster is updated.
 /// </summary>
-[BatchLogMessage]
 public readonly struct ItemRosterUpdated : IEvent
 {
     public readonly ItemRoster Instance;

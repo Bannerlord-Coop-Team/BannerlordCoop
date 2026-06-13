@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
 using Common.Serialization;
@@ -24,6 +25,9 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
 
     private readonly Poller poller;
 
+    // Profiles which messages are sent over the network; dumps per-type counts every 10 seconds (server only).
+    private readonly MessageProfiler messageProfiler = new MessageProfiler(TimeSpan.FromSeconds(10));
+
     private CancellationTokenSource CancellationTokenSource;
     // Guard against double-dispose: finalizer calls Dispose() after explicit Dispose() on reconnect
     private bool _disposed = false;
@@ -37,10 +41,7 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
 
         netManager = new NetManager(this)
         {
-            // DisconnectTimeout = configuration.ConnectionTimeout.Milliseconds
-
-            // Increase disconnect timeout to prevent disconnect during debugging
-            DisconnectTimeout = 300 * 1000
+            DisconnectTimeout = (int)configuration.ConnectionTimeout.TotalMilliseconds
         };
 
         CancellationTokenSource = new CancellationTokenSource();
@@ -60,6 +61,8 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
         _disposed = true;
 
         netManager.Stop();
+
+        messageProfiler.Dispose();
 
         CancellationTokenSource.Cancel();
         CancellationTokenSource.Dispose();
@@ -124,6 +127,9 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
         {
             throw new ArgumentException($"Type {message.GetType().Name} is not serializable.");
         }
+
+        // Single chokepoint for all message sends (Send/SendAll/SendAllBut).
+        messageProfiler.Record(message.GetType());
 
         return serializer.Serialize(message);
     }

@@ -1,5 +1,4 @@
-﻿using Common.Logging.Attributes;
-using Common.Messaging;
+﻿using Common.Messaging;
 using GameInterface.Services.MobileParties.Handlers;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Map;
@@ -11,7 +10,6 @@ namespace GameInterface.Services.MobileParties.Messages.Behavior;
 /// The game has attempted to change party behavior.
 /// </summary>
 /// <seealso cref="MobilePartyBehaviorHandler"/>
-[BatchLogMessage]
 internal readonly struct PartyBehaviorChangeAttempted : IEvent
 {
     public readonly MobilePartyAi PartyAi;

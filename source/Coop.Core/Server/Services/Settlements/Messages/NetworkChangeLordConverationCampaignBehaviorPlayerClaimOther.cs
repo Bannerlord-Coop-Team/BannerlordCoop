@@ -1,5 +1,4 @@
-﻿using Common.Logging.Attributes;
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
 using System;
 using System.Collections.Generic;
@@ -10,7 +9,6 @@ namespace Coop.Core.Server.Services.Settlements.Messages;
 /// <summary>
 /// Server notifies other clients of request.
 /// </summary>
-[BatchLogMessage]
 [ProtoContract(SkipConstructor = true)]
 public record NetworkChangeLordConverationCampaignBehaviorPlayerClaimOther : IEvent
 {

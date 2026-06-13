@@ -135,7 +135,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     private void CheckNetworkQueueOverloaded(NetPeer ignoredPeer = null)
     {
         // TODO see if Parallel.ForEach works here
-        foreach (var netPeer in ConnectedPeers.Where(peer => peer != ignoredPeer))
+        foreach (var netPeer in ConnectedPeers.Where(peer => peer != ignoredPeer).Where(peer => peer.ConnectionState == ConnectionState.Connected))
         {
             // Sending defaults to channel 0
             int outgoingPacketCount = 

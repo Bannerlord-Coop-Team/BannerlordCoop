@@ -1,4 +1,3 @@
-using Common.Logging.Attributes;
 using Common.Messaging;
 using ProtoBuf;
 
@@ -12,7 +11,6 @@ namespace Coop.Core.Server.Services.Time.Messages;
 /// local <c>MapTimeTracker</c> tick value toward <see cref="ServerTicks"/>.
 /// </remarks>
 [ProtoContract(SkipConstructor = true)]
-[BatchLogMessage]
 public sealed class CampaignTimeUpdated : IEvent
 {
     [ProtoMember(1)]

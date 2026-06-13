@@ -1,5 +1,4 @@
-﻿using Common.Logging.Attributes;
-using Common.Messaging;
+﻿using Common.Messaging;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Settlements.Messages;
@@ -7,7 +6,6 @@ namespace GameInterface.Services.Settlements.Messages;
 /// <summary>
 /// Notify server to send Settlement.LastVistTimeOfOwner change.
 /// </summary>
-[BatchLogMessage]
 public readonly struct SettlementChangedLastVisitTimeOfOwner : IEvent
 {
     public readonly Settlement Settlement;
