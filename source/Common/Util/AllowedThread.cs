@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Common.Logging;
+using Serilog;
+using System;
 
 namespace Common.Util;
 
@@ -20,6 +22,8 @@ namespace Common.Util;
 /// </remarks>
 public class AllowedThread : IDisposable
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<AllowedThread>();
+
     [ThreadStatic]
     private static int _allowedCount;
 
