@@ -34,6 +34,7 @@ namespace E2E.Tests.Services.MapEventParties
         public void Server_MapEventParty_Fields()
         {
             Server.ObjectManager.TryGetObject(MepId, out MapEventParty eventParty);
+            // Not needed on client as it only is used in server calculations
             //TestEnvironment.AssertField<MapEventParty, int>(nameof(MapEventParty._contributionToBattle), 3, defaultValue: eventParty._contributionToBattle);
             TestEnvironment.AssertField<MapEventParty, int>(nameof(MapEventParty._healthyManCountAtStart), 3, defaultValue: eventParty._healthyManCountAtStart);
         }
