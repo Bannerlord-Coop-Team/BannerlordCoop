@@ -218,7 +218,7 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Lib.Harmony" Version="2.3.5" />
+    <PackageReference Include="Lib.Harmony" Version="2.4.2" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.3" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.13.0" />
     <PackageReference Include="Microsoft.Extensions.Primitives" Version="9.0.2" />
@@ -293,6 +293,5 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Services\Kingdoms\Commands\" />
-    <Folder Include="Services\MapEvents\Messages\Join\" />
   </ItemGroup>
 </Project>

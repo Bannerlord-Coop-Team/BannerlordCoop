@@ -9,6 +9,7 @@ using Coop.Tests.Mocks;
 using GameInterface;
 using GameInterface.Registry.Messages;
 using GameInterface.Services.CharacterCreation.Messages;
+using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Players.Data;
@@ -46,7 +47,7 @@ namespace Coop.Tests.Client.States
             // Arrange
             var characterCreationState = clientLogic.SetState<CharacterCreationState>();
 
-            var player = new Player("MyControllerId", "MyHeroId", "MyPartyId", "MyClanId");
+            var player = new Player("MyControllerId", "MyHeroId", "MyPartyId", "MyClanId", "MyCharacterObjectId");
 
             var payload = new MessagePayload<NetworkHeroRecieved>(
                 this, new NetworkHeroRecieved(player));
@@ -78,16 +79,17 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
-        public void EnterMainMenu_Publishes_EnterMainMenuEvent()
+        public void EnterMainMenu_GoesToMainMenu()
         {
             // Arrange
             var characterCreationState = clientLogic.SetState<CharacterCreationState>();
+            var gameStateMock = clientComponent.Container.Resolve<Mock<IGameStateInterface>>();
 
             // Act
             clientLogic.EnterMainMenu();
 
             // Assert
-            Assert.Single(TestMessageBroker.GetMessagesFromType<EnterMainMenu>());
+            gameStateMock.Verify(x => x.GoToMainMenu(), Times.Once);
         }
 
         [Fact]

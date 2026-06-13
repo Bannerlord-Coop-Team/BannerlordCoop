@@ -1,8 +1,10 @@
-﻿using Coop.Core.Server.Services.Settlements.Messages;
+using Coop.Core.Server.Services.Settlements.Messages;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Settlements.Messages;
 
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Settlements;
 namespace Coop.IntegrationTests.Settlements;
 /// <summary>
 /// Test NotableCaches function call test
@@ -18,7 +20,13 @@ public class SettlementCollectNotablesToCacheTest
     public void ServerSettlementNotableCache_Publishes_AllClients()
     {
         // Arrange
-        var triggerMessage = new SettlementChangedNotablesCache();
+        var settlement = TestEnvironment.Server.CreateRegisteredObject<Settlement>("settlement1");
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.CreateRegisteredObject<Settlement>("settlement1");
+        }
+
+        var triggerMessage = new SettlementChangedNotablesCache(settlement, new List<Hero>());
 
         var server = TestEnvironment.Server;
 

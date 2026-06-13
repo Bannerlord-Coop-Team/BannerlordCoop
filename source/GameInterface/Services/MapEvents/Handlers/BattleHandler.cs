@@ -3,8 +3,11 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using Coop.Core.Server.Services.Time.Messages;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
+using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
@@ -13,6 +16,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -23,6 +27,7 @@ using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.MapEvents.Handlers;
 
@@ -36,6 +41,10 @@ internal class BattleHandler : IHandler
     private readonly IMapEventLogger mapEventLogger;
     private readonly IPlayerManager playerRegistry;
     private readonly ITimeControlInterface timeControlInterface;
+
+    // Server-side: number of players in a map event at the last broadcast, used to
+    // detect when fast-forward becomes (un)available and to keep clients informed.
+    private int lastBroadcastPlayersInMapEvent;
 
     public BattleHandler(
         IMessageBroker messageBroker,
@@ -51,7 +60,6 @@ internal class BattleHandler : IHandler
         this.mapEventLogger = mapEventLogger;
         this.playerRegistry = playerRegistry;
         this.timeControlInterface = timeControlInterface;
-        this.mapEventLogger = mapEventLogger;
         messageBroker.Subscribe<PlayerJoinedBattle>(Handle_PlayerJoinedBattle);
 
         messageBroker.Subscribe<MapEventFinalizeAttempted>(Handle_MapEventFinalizeAttempted);
@@ -65,8 +73,13 @@ internal class BattleHandler : IHandler
         messageBroker.Subscribe<NetworkAttackMissionAttempted>(Handle_NetworkAttackMissionAttempted);
         messageBroker.Subscribe<NetworkStartAttackMission>(Handle_NetworkStartAttackMission);
 
+        messageBroker.Subscribe<MapEventFinalized>(Handle_MapEventFinalized);
+        messageBroker.Subscribe<TimeSpeedChangedAttempted>(Handle_TimeSpeedChangedAttempted);
+
         messageBroker.Subscribe<PlayerJoinBattleAttempted>(Handle_PlayerJoinBattleAttempted);
         messageBroker.Subscribe<NetworkRequestJoinBattle>(Handle_NetworkRequestJoinBattle);
+
+        timeControlInterface.AddFastForwardPolicy(FastForwardWhilePlayerInMapEventPolicy);
     }
 
     public void Dispose()
@@ -84,46 +97,13 @@ internal class BattleHandler : IHandler
         messageBroker.Unsubscribe<NetworkAttackMissionAttempted>(Handle_NetworkAttackMissionAttempted);
         messageBroker.Unsubscribe<NetworkStartAttackMission>(Handle_NetworkStartAttackMission);
 
+        messageBroker.Unsubscribe<MapEventFinalized>(Handle_MapEventFinalized);
+        messageBroker.Unsubscribe<TimeSpeedChangedAttempted>(Handle_TimeSpeedChangedAttempted);
+
         messageBroker.Unsubscribe<PlayerJoinBattleAttempted>(Handle_PlayerJoinBattleAttempted);
         messageBroker.Unsubscribe<NetworkRequestJoinBattle>(Handle_NetworkRequestJoinBattle);
-    }
 
-    /// <summary>[Client] Bridge the local player's battle join to a server request.</summary>
-    private void Handle_PlayerJoinBattleAttempted(MessagePayload<PlayerJoinBattleAttempted> payload)
-    {
-        var data = payload.What;
-
-        if (!objectManager.TryGetIdWithLogging(data.MapEvent, out var mapEventId)) return;
-        if (!objectManager.TryGetIdWithLogging(data.JoiningParty, out var partyId)) return;
-
-        mapEventLogger.DebugMapEvent(data.MapEvent, "Requesting server to join battle. PartyId={PartyId}, Side={Side}", partyId, data.Side);
-
-        // On a client, SendAll targets the server (its only connected peer).
-        network.SendAll(new NetworkRequestJoinBattle(mapEventId, partyId, data.Side));
-    }
-
-    /// <summary>[Server] Perform the authoritative join; the native add replicates to all clients.</summary>
-    private void Handle_NetworkRequestJoinBattle(MessagePayload<NetworkRequestJoinBattle> payload)
-    {
-        if (!ModInformation.IsServer) return;
-
-        var data = payload.What;
-
-        if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.MapEventId, out var mapEvent)) return;
-        if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.PartyId, out var party)) return;
-
-        GameLoopRunner.RunOnMainThread(() =>
-        {
-            if (party.MapEventSide != null)
-            {
-                Logger.Warning("Ignoring join request: party {PartyId} is already in a map event", data.PartyId);
-                return;
-            }
-
-            // The setter runs the native MapEventSide.AddPartyInternal on the server (NOT under AllowedThread), so the
-            // AddIntercept publishes the battle-party add and it replicates to every client through the map-event sync.
-            party.MapEventSide = mapEvent.GetMapEventSide(data.Side);
-        });
+        timeControlInterface.RemoveFastForwardPolicy(FastForwardWhilePlayerInMapEventPolicy);
     }
 
     private void Handle_AttackMissionAttempted(MessagePayload<AttackMissionAttempted> payload)
@@ -142,7 +122,7 @@ internal class BattleHandler : IHandler
         if (!objectManager.TryGetObject(payload.What.MapEventId, out MapEvent mapEvent))
             return;
 
-        mapEventLogger.DebugMapEvent(mapEvent, "Handling network attack mission attempted for map event. Setting attack mission attempted to true");
+        mapEventLogger.DebugMapEvent(mapEvent, "Handling network attack mission attempted for map event. Making sides mission-ready and replying with mission start");
 
         foreach(var side in mapEvent._sides)
         {
@@ -155,35 +135,86 @@ internal class BattleHandler : IHandler
 
     private void Handle_NetworkStartAttackMission(MessagePayload<NetworkStartAttackMission> payload)
     {
-        var battle = PlayerEncounter.Battle;
-        bool isNavalEncounter = PlayerEncounter.IsNavalEncounter();
-        CampaignVec2 position = MobileParty.MainParty.Position;
+        // Opening a mission pushes a screen, and ScreenManager only tolerates screen
+        // changes from the main thread; doing it from the network thread races its
+        // layer lists and crashes the game.
+        GameLoopRunner.RunOnMainThread(OpenAttackMission);
+    }
 
-        IMapScene mapSceneWrapper = Campaign.Current.MapSceneWrapper;
-        MapPatchData mapPatchAtPosition = mapSceneWrapper.GetMapPatchAtPosition(position);
+    private static void OpenAttackMission()
+    {
+        try
+        {
+            // The encounter can end (or another mission can open) between the server
+            // round-trip and this running, so everything the mission depends on is
+            // re-validated here rather than at message arrival.
+            if (Campaign.Current == null)
+            {
+                Logger.Warning("Received {Message} but the campaign was not loaded, not opening battle mission", nameof(NetworkStartAttackMission));
+                return;
+            }
+
+            var battle = PlayerEncounter.Battle;
+            if (battle == null)
+            {
+                Logger.Warning("Received {Message} but PlayerEncounter.Battle was null, not opening battle mission", nameof(NetworkStartAttackMission));
+                return;
+            }
+
+            // A finalized battle keeps PlayerEncounter.Battle set but releases the
+            // main party from the map event, which the mission setup dereferences.
+            if (MobileParty.MainParty?.MapEvent == null)
+            {
+                Logger.Warning("Received {Message} but the main party is no longer in a map event, not opening battle mission", nameof(NetworkStartAttackMission));
+                return;
+            }
+
+            // Pressing attack again while the request is in flight produces a second
+            // mission start; opening on top of the running mission corrupts the game
+            // state stack. MissionState.Current is set synchronously by the state
+            // push, unlike Mission.Current which is only set on the mission's first
+            // tick, so it also covers two mission starts queued in the same frame.
+            if (MissionState.Current != null)
+            {
+                Logger.Warning("Received {Message} but a mission is already open, not opening battle mission", nameof(NetworkStartAttackMission));
+                return;
+            }
+
+            bool isNavalEncounter = PlayerEncounter.IsNavalEncounter();
+            CampaignVec2 position = MobileParty.MainParty.Position;
+
+            IMapScene mapSceneWrapper = Campaign.Current.MapSceneWrapper;
+            MapPatchData mapPatchAtPosition = mapSceneWrapper.GetMapPatchAtPosition(position);
 
 
-        string battleScene = Campaign.Current.Models.SceneModel.GetBattleSceneForMapPatch(mapPatchAtPosition, isNavalEncounter);
-        MissionInitializerRecord rec2 = new MissionInitializerRecord(battleScene);
-        TerrainType faceTerrainType2 = Campaign.Current.MapSceneWrapper.GetFaceTerrainType(MobileParty.MainParty.CurrentNavigationFace);
-        rec2.TerrainType = (int)faceTerrainType2;
-        rec2.DamageToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier();
-        rec2.DamageFromPlayerToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier();
-        rec2.NeedsRandomTerrain = false;
-        rec2.PlayingInCampaignMode = true;
+            string battleScene = Campaign.Current.Models.SceneModel.GetBattleSceneForMapPatch(mapPatchAtPosition, isNavalEncounter);
+            MissionInitializerRecord rec2 = new MissionInitializerRecord(battleScene);
+            TerrainType faceTerrainType2 = Campaign.Current.MapSceneWrapper.GetFaceTerrainType(MobileParty.MainParty.CurrentNavigationFace);
+            rec2.TerrainType = (int)faceTerrainType2;
+            rec2.DamageToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier();
+            rec2.DamageFromPlayerToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier();
+            rec2.NeedsRandomTerrain = false;
+            rec2.PlayingInCampaignMode = true;
 
-        // TODO make this server side
-        rec2.RandomTerrainSeed = MBRandom.RandomInt(10000);
-        rec2.AtmosphereOnCampaign = Campaign.Current.Models.MapWeatherModel.GetAtmosphereModel(MobileParty.MainParty.Position);
-        rec2.SceneHasMapPatch = true;
-        rec2.DecalAtlasGroup = 2;
-        rec2.PatchCoordinates = mapPatchAtPosition.normalizedCoordinates;
-        position = battle.AttackerSide.LeaderParty.Position;
-        Vec2 v2 = position.ToVec2();
-        position = battle.DefenderSide.LeaderParty.Position;
-        rec2.PatchEncounterDir = (v2 - position.ToVec2()).Normalized();
+            // TODO make this server side
+            rec2.RandomTerrainSeed = MBRandom.RandomInt(10000);
+            rec2.AtmosphereOnCampaign = Campaign.Current.Models.MapWeatherModel.GetAtmosphereModel(MobileParty.MainParty.Position);
+            rec2.SceneHasMapPatch = true;
+            rec2.DecalAtlasGroup = 2;
+            rec2.PatchCoordinates = mapPatchAtPosition.normalizedCoordinates;
+            position = battle.AttackerSide.LeaderParty.Position;
+            Vec2 v2 = position.ToVec2();
+            position = battle.DefenderSide.LeaderParty.Position;
+            rec2.PatchEncounterDir = (v2 - position.ToVec2()).Normalized();
 
-        CampaignMission.OpenBattleMission(rec2);
+            CampaignMission.OpenBattleMission(rec2);
+        }
+        catch (Exception e)
+        {
+            // GameLoopRunner runs queued actions unguarded, so a throw from here
+            // would escape into the game's main tick and crash it.
+            Logger.Error(e, "Failed to open the battle mission for {Message}", nameof(NetworkStartAttackMission));
+        }
     }
 
     private void Handle_MapEventFinalizeAttempted(MessagePayload<MapEventFinalizeAttempted> payload)
@@ -218,17 +249,34 @@ internal class BattleHandler : IHandler
 
     private void Handle_NetworkMapEventFinalized(MessagePayload<NetworkMapEventFinalized> payload)
     {
-        if (PlayerEncounter.Current != null)
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            // TODO determine force out of settlement
-            PlayerEncounter.Finish(true);
-        }
-        
-        GameMenu.ExitToLast();
+            if (Campaign.Current == null) return;
+
+            // When this battle ended with the local player captured, the captivity flow owns the UI:
+            // PlayerCaptivityClientHandler has switched to the prisoner menu and leaves the encounter
+            // itself. Exiting menus here would close the capture screen.
+            if (PlayerCaptivity.IsCaptive) return;
+
+            if (PlayerEncounter.Current != null)
+            {
+                // TODO determine force out of settlement
+                PlayerEncounter.Finish(true);
+            }
+
+            GameMenu.ExitToLast();
+        });
     }
 
     private void Handle_MapEventInvolvedPartiesAdded(MessagePayload<MapEventInvolvedPartiesAdded> payload)
     {
+        // This message is published when a player party joins a battle (a fresh one
+        // during MapEvent.Initialize, or an already-running one as a reinforcement);
+        // the joining party's MapEventSide is already set by this point, so the live
+        // count is accurate.
+        CapFastForwardForMapEvent();
+        RefreshFastForwardState();
+
         var message = payload.What;
         if (!objectManager.TryGetIdWithLogging(message.MapEvent, out var mapEventSideId))
             return;
@@ -273,12 +321,133 @@ internal class BattleHandler : IHandler
         }
     }
 
+    /// <summary>[Client] Bridge the local player's battle join to a server request.</summary>
+    private void Handle_PlayerJoinBattleAttempted(MessagePayload<PlayerJoinBattleAttempted> payload)
+    {
+        var data = payload.What;
+
+        if (!objectManager.TryGetIdWithLogging(data.MapEvent, out var mapEventId)) return;
+        if (!objectManager.TryGetIdWithLogging(data.JoiningParty, out var partyId)) return;
+
+        mapEventLogger.DebugMapEvent(data.MapEvent, "Requesting server to join battle. PartyId={PartyId}, Side={Side}", partyId, data.Side);
+
+        // On a client, SendAll targets the server (its only connected peer).
+        network.SendAll(new NetworkRequestJoinBattle(mapEventId, partyId, data.Side));
+    }
+
+    /// <summary>[Server] Perform the authoritative join; the native add replicates to all clients.</summary>
+    private void Handle_NetworkRequestJoinBattle(MessagePayload<NetworkRequestJoinBattle> payload)
+    {
+        if (!ModInformation.IsServer) return;
+
+        var data = payload.What;
+
+        if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.MapEventId, out var mapEvent)) return;
+        if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.PartyId, out var party)) return;
+
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            if (party.MapEventSide != null)
+            {
+                Logger.Warning("Ignoring join request: party {PartyId} is already in a map event", data.PartyId);
+                return;
+            }
+
+            // The setter runs the native MapEventSide.AddPartyInternal on the server (NOT under AllowedThread), so the
+            // AddIntercept publishes the battle-party add and it replicates to every client through the map-event sync.
+            party.MapEventSide = mapEvent.GetMapEventSide(data.Side);
+        });
+    }
+
     private void Handle_PlayerJoinedBattle(MessagePayload<PlayerJoinedBattle> payload)
     {
         if (AllPlayersInMapEvents())
         {
             timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
         }
+        else
+        {
+            // A player started a battle while others remain on the map.
+            CapFastForwardForMapEvent();
+        }
+
+        RefreshFastForwardState();
+    }
+
+    private void Handle_MapEventFinalized(MessagePayload<MapEventFinalized> payload)
+    {
+        // A map event ended; its parties have left it, so re-evaluate whether
+        // fast-forward should become available again.
+        RefreshFastForwardState(finalizedMapEvent: payload.What.MapEvent);
+    }
+
+    private void Handle_TimeSpeedChangedAttempted(MessagePayload<TimeSpeedChangedAttempted> payload)
+    {
+        // Notify the host (clients are notified by their own time handler) when they
+        // try to fast-forward while it is blocked by a map event.
+        if (ModInformation.IsClient)
+            return;
+
+        if (payload.What.NewControlMode != TimeControlEnum.Play_2x)
+            return;
+
+        var playersInMapEvent = CountPlayersInMapEvents();
+        if (playersInMapEvent == 0)
+            return;
+
+        messageBroker.Publish(this, new SendInformationMessage(
+            MapEventTimeControlMessages.FastForwardBlocked(playersInMapEvent)));
+    }
+
+    /// <summary>
+    /// Recomputes how many players are in a map event and, when that crosses the
+    /// 0 / non-0 boundary, announces it locally and informs clients. Server only.
+    /// </summary>
+    /// <param name="finalizedMapEvent">A map event being finalized, excluded from the count.</param>
+    private void RefreshFastForwardState(MapEvent finalizedMapEvent = null)
+    {
+        if (ModInformation.IsClient)
+            return;
+
+        var count = CountPlayersInMapEvents(finalizedMapEvent);
+        if (count == lastBroadcastPlayersInMapEvent)
+            return;
+
+        var wasBlocked = lastBroadcastPlayersInMapEvent > 0;
+        var isBlocked = count > 0;
+        lastBroadcastPlayersInMapEvent = count;
+
+        network.SendAll(new NetworkMapEventLockChanged(count));
+
+        if (isBlocked && !wasBlocked)
+            messageBroker.Publish(this, new SendInformationMessage(MapEventTimeControlMessages.FastForwardDisabled));
+        else if (!isBlocked && wasBlocked)
+            messageBroker.Publish(this, new SendInformationMessage(MapEventTimeControlMessages.FastForwardEnabled));
+    }
+
+    /// <summary>
+    /// Drops the campaign out of fast-forward when a player is in a map event. The
+    /// fast-forward policy then keeps it capped at normal speed until every player
+    /// has left their map event. Runs on the server only.
+    /// </summary>
+    private void CapFastForwardForMapEvent()
+    {
+        if (ModInformation.IsClient)
+            return;
+
+        if (timeControlInterface.GetTimeControl() == TimeControlEnum.Play_2x)
+        {
+            timeControlInterface.ServerSetTimeControl(TimeControlEnum.Play_1x);
+        }
+    }
+
+    /// <summary>
+    /// Fast-forwarding the campaign map is not allowed while any player is in a map event.
+    /// </summary>
+    /// <returns>True if fast-forwarding is allowed, otherwise false</returns>
+    private bool FastForwardWhilePlayerInMapEventPolicy()
+    {
+        return AnyPlayerInMapEvent() == false;
     }
 
     private bool AllPlayersInMapEvents()
@@ -289,6 +458,22 @@ internal class BattleHandler : IHandler
                 return false;
 
             return playerParty.MapEvent != null;
+        });
+    }
+
+    private bool AnyPlayerInMapEvent() => CountPlayersInMapEvents() > 0;
+
+    private int CountPlayersInMapEvents(MapEvent excluding = null)
+    {
+        // Backs the fast-forward policy and messaging, which are evaluated on every
+        // time-control change, so this uses the non-logging lookup to avoid spamming
+        // the log when a party is momentarily unresolved.
+        return playerRegistry.Players.Count(player =>
+        {
+            if (!objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty))
+                return false;
+
+            return playerParty.MapEvent != null && playerParty.MapEvent != excluding;
         });
     }
 }

@@ -20,9 +20,11 @@ namespace GameInterface.Services.Heroes.Interaces;
 public interface ITimeControlInterface : IGameAbstraction
 {
     void AddUnpausePolicy(Func<bool> policy);
+    void RemoveUnpausePolicy(Func<bool> policy);
+    void AddFastForwardPolicy(Func<bool> policy);
+    void RemoveFastForwardPolicy(Func<bool> policy);
     bool CanSetTimeControl(TimeControlEnum timeMode);
     TimeControlEnum GetTimeControl();
-    void RemoveUnpausePolicy(Func<bool> policy);
     void ClientSetTimeControl(TimeControlEnum newMode);
     void ServerSetTimeControl(TimeControlEnum timeMode);
 }
@@ -33,6 +35,7 @@ internal class TimeControlInterface : ITimeControlInterface
 
     private readonly ITimeControlModeConverter modeConverter;
     private readonly List<WeakDelegate> unpausePolicies = new List<WeakDelegate>();
+    private readonly List<WeakDelegate> fastForwardPolicies = new List<WeakDelegate>();
     private readonly INetwork network;
 
     public TimeControlInterface(ITimeControlModeConverter modeConverter, INetwork network)
@@ -48,7 +51,7 @@ internal class TimeControlInterface : ITimeControlInterface
 
     public void ClientSetTimeControl(TimeControlEnum newMode)
     {
-        TimePatches.OverrideTimeControlMode(Campaign.Current, modeConverter.Convert(newMode));
+        TimePatches.OverrideTimeControlMode(modeConverter.Convert(newMode));
     }
 
     /// <summary>
@@ -69,36 +72,73 @@ internal class TimeControlInterface : ITimeControlInterface
         unpausePolicies.Remove(policy);
     }
 
-    public bool CanSetTimeControl(TimeControlEnum timeMode)
+    /// <summary>
+    /// Adds a policy to consider whether fast-forwarding is allowed
+    /// </summary>
+    /// <param name="policy">Function to check if fast-forwarding is allowed. True is allowed and false is NOT allowed</param>
+    public void AddFastForwardPolicy(Func<bool> policy)
     {
-        return timeMode == TimeControlEnum.Pause || UnpauseDisallowed() == false;
+        fastForwardPolicies.Add(policy);
     }
 
     /// <summary>
-    /// If any unpause policy fails, unpausing is not allowed
+    /// Removes a policy to consider whether fast-forwarding is allowed
     /// </summary>
-    /// <returns>True if unpausing is not allowed, otherwise False</returns>
-    private bool UnpauseDisallowed()
+    /// <param name="policy">Policy to remove</param>
+    public void RemoveFastForwardPolicy(Func<bool> policy)
     {
-        foreach (var policy in unpausePolicies)
+        fastForwardPolicies.Remove(policy);
+    }
+
+    public bool CanSetTimeControl(TimeControlEnum timeMode)
+    {
+        return LimitTimeControl(timeMode) == timeMode;
+    }
+
+    /// <summary>
+    /// Reduces a requested time control mode to what the active policies allow.
+    /// Unpausing being blocked forces <see cref="TimeControlEnum.Pause"/>, while
+    /// fast-forwarding being blocked caps the speed at <see cref="TimeControlEnum.Play_1x"/>.
+    /// </summary>
+    /// <param name="requestedMode">The time control mode being requested</param>
+    /// <returns>The highest mode the policies permit for the request</returns>
+    internal TimeControlEnum LimitTimeControl(TimeControlEnum requestedMode)
+    {
+        if (requestedMode != TimeControlEnum.Pause && AnyPolicyDisallows(unpausePolicies))
+        {
+            return TimeControlEnum.Pause;
+        }
+
+        if (requestedMode == TimeControlEnum.Play_2x && AnyPolicyDisallows(fastForwardPolicies))
+        {
+            return TimeControlEnum.Play_1x;
+        }
+
+        return requestedMode;
+    }
+
+    /// <summary>
+    /// Evaluates a set of time control policies. Each policy returns true when its
+    /// action is allowed; if any live policy returns false, the action is disallowed.
+    /// </summary>
+    /// <param name="policies">The policies to evaluate</param>
+    /// <returns>True if any policy disallows the action, otherwise false</returns>
+    private static bool AnyPolicyDisallows(List<WeakDelegate> policies)
+    {
+        foreach (var policy in policies)
         {
             if (policy.IsAlive == false)
             {
                 continue;
             }
 
-            if (UnpauseAllowedBy(policy) == false)
+            if (policy.Invoke<bool>(Array.Empty<object>()) == false)
             {
                 return true;
             }
         }
 
         return false;
-    }
-
-    private static bool UnpauseAllowedBy(WeakDelegate policy)
-    {
-        return policy.Invoke<bool>(Array.Empty<object>());
     }
 
 
@@ -114,10 +154,7 @@ internal class TimeControlInterface : ITimeControlInterface
             return;
         }
 
-        if (CanSetTimeControl(timeMode) == false)
-        {
-            timeMode = TimeControlEnum.Pause;
-        }
+        timeMode = LimitTimeControl(timeMode);
 
         Logger.Verbose("Server changing time to {mode}", timeMode);
 

@@ -1,8 +1,9 @@
-﻿using Coop.Core.Server.Services.Settlements.Messages;
+using Coop.Core.Server.Services.Settlements.Messages;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Settlements.Messages;
 
+using TaleWorlds.CampaignSystem.Settlements;
 namespace Coop.IntegrationTests.Settlements;
 
 
@@ -19,7 +20,13 @@ public class SettlementMiltiaTest
     [Fact]
     public void ServerSettlementMilitiaChanged_Publishes_AllClients()
     {
-        var triggerMessage = new SettlementChangedMilitia();
+        var settlement = TestEnvironment.Server.CreateRegisteredObject<Settlement>("settlement1");
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.CreateRegisteredObject<Settlement>("settlement1");
+        }
+
+        var triggerMessage = new SettlementChangedMilitia(settlement, 50f);
 
 
         var server = TestEnvironment.Server;

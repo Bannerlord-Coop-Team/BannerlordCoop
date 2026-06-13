@@ -44,23 +44,13 @@ internal class DestroyPartyActionPatch
     private static readonly ILogger Logger = LogManager.GetLogger<DestroyPartyActionPatch>();
     [HarmonyPatch(nameof(DestroyPartyAction.Apply))]
     [HarmonyPrefix]
-    private static bool PrefixApply(PartyBase destroyerParty, MobileParty destroyedParty)
+    internal static bool PrefixApply(PartyBase destroyerParty, MobileParty destroyedParty)
     {
+        // Checked before the skip-patches guard so player parties stay protected even when a
+        // destroy runs nested inside another action's AllowedThread scope.
+        if (IsProtectedPlayerParty(destroyedParty)) return false;
 
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-        // Never destroy a party owned by a connected player. On the server a remote player's party
-        // is NOT MobileParty.MainParty, so vanilla's main-party guard does not protect it; a lost/
-        // finalized MapEvent (MapEventSide.HandleMapEventEndForPartyInternal) would call
-        // DestroyPartyAction.Apply on MobileParty_Player and remove it from the object manager.
-        // The party then no longer resolves and a subsequent settlement encounter activates an
-        // empty/unregistered menu -> null GameMenu NRE in MenuContext.HandleStates.
-        // Blocking here also prevents publishing DestroyPartyApplied, so clients keep the party too.
-        if (destroyedParty != null && destroyedParty.IsPlayerParty())
-        {
-            Logger.Warning("Blocked DestroyPartyAction for player party {partyName}, {StringId}", destroyedParty.Name, destroyedParty.StringId);
-            return false;
-        }
 
         if (ModInformation.IsClient)
         {
@@ -68,8 +58,24 @@ internal class DestroyPartyActionPatch
             return true;
         }
 
-        var message = new DestroyPartyApplied(destroyerParty, destroyedParty);
-        MessageBroker.Instance.Publish(null, message);
+        MessageBroker.Instance.Publish(null, new DestroyPartyApplied(destroyerParty, destroyedParty));
+        return true;
+    }
+
+    /// <summary>
+    /// Never destroy a party owned by a connected player. On the server a remote player's party
+    /// is NOT MobileParty.MainParty, so vanilla's main-party guard does not protect it; a lost/
+    /// finalized MapEvent (MapEventSide.HandleMapEventEndForPartyInternal) would call
+    /// DestroyPartyAction.Apply on MobileParty_Player and remove it from the object manager.
+    /// The party then no longer resolves and a subsequent settlement encounter activates an
+    /// empty/unregistered menu -> null GameMenu NRE in MenuContext.HandleStates.
+    /// Blocking here also prevents publishing DestroyPartyApplied, so clients keep the party too.
+    /// </summary>
+    private static bool IsProtectedPlayerParty(MobileParty destroyedParty)
+    {
+        if (destroyedParty == null || !destroyedParty.IsPlayerParty()) return false;
+
+        Logger.Warning("Blocked DestroyPartyAction for player party {partyName}, {StringId}", destroyedParty.Name, destroyedParty.StringId);
         return true;
     }
 
@@ -85,7 +91,6 @@ internal class DestroyPartyActionPatch
             return;
         }
 
-        var message = new PartyDisbanded(disbandedParty, relatedSettlement);
-        MessageBroker.Instance.Publish(null, message);
+        MessageBroker.Instance.Publish(null, new PartyDisbanded(disbandedParty, relatedSettlement));
     }
 }

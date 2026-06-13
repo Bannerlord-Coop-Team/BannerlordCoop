@@ -1,14 +1,12 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Registry.Auto;
 using HarmonyLib;
 using Serilog;
-using System;
-using TaleWorlds.Core;
-using GameInterface.Services.Equipments.Messages.Events;
-using GameInterface.Services.Heroes.Messages;
 using TaleWorlds.CampaignSystem;
-using Common;
+using TaleWorlds.Core;
 
 
 namespace GameInterface.Services.Equipments.Patches;
@@ -23,41 +21,9 @@ internal class EquipmentLifetimePatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<EquipmentLifetimePatches>();
 
-    [HarmonyPatch(typeof(Equipment), MethodType.Constructor)]
-    [HarmonyPrefix]
-    private static bool CreateEquipmentPrefix(Equipment __instance)
-    {
-
-        // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-        // Equiptment is cloned on the client for party icon
-        if (ModInformation.IsClient) return true;
-
-        MessageBroker.Instance.Publish(__instance, new EquipmentCreated(__instance));
-            
-        return true;
-    }
-    
-    [HarmonyPatch(typeof(Equipment), MethodType.Constructor, typeof(Equipment))]
-    [HarmonyPrefix]
-    private static bool CreateEquipmentParamPrefix(Equipment __instance, Equipment equipment)
-    {
-        // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client created managed {name}", typeof(Equipment));
-
-
-            return true;
-        }
-
-            MessageBroker.Instance.Publish(__instance, new EquipmentCreated(__instance));
-
-        return true;
-    }
+    // Equipment creation is handled by the auto-registry (see EquipmentRegistry.Constructors).
+    // Only the Hero-driven removal lives here, because it removes both the battle and
+    // civilian equipment together and so does not fit the per-instance DestroyMethods model.
 
     [HarmonyPatch(typeof(Hero), nameof(Hero.OnDeath))]
     [HarmonyPrefix]
@@ -71,9 +37,7 @@ internal class EquipmentLifetimePatches
             return;
         }
 
-        var message = new EquipmentRemoved(__instance.BattleEquipment, __instance.CivilianEquipment);
-
-        MessageBroker.Instance.Publish(__instance, message);
+        PublishEquipmentDestroyed(__instance);
     }
 
 
@@ -89,9 +53,13 @@ internal class EquipmentLifetimePatches
             return;
         }
 
-        var message = new EquipmentRemoved(__instance.BattleEquipment, __instance.CivilianEquipment);
+        PublishEquipmentDestroyed(__instance);
+    }
 
-        MessageBroker.Instance.Publish(__instance, message);
-
+    private static void PublishEquipmentDestroyed(Hero hero)
+    {
+        MessageBroker.Instance.Publish(hero, new InstanceDestroyed<Equipment>(hero.BattleEquipment));
+        MessageBroker.Instance.Publish(hero, new InstanceDestroyed<Equipment>(hero.CivilianEquipment));
+        MessageBroker.Instance.Publish(hero, new InstanceDestroyed<Equipment>(hero.StealthEquipment));
     }
 }

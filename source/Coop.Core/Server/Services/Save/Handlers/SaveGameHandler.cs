@@ -48,7 +48,6 @@ internal class SaveGameHandler : IHandler
     private void Handle_GameSaved(MessagePayload<GameSaved> obj)
     {
         var saveName = obj.What.SaveName;
-        messageBroker.Publish(this, new PackageObjectGuids());
 
         CraftingPlayerData craftingPlayerData = coopSessionProvider.CoopSession.CraftingPlayerData;
         craftingPlayerData ??= new(new(), new(), new());

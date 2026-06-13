@@ -92,8 +92,10 @@ public class CreateCharacterState : ConnectionStateBase
             return false;
         if (!objectManager.TryGetIdWithLogging(hero.Clan, out var clanId))
             return false;
+        if (!objectManager.TryGetIdWithLogging(hero.CharacterObject, out var characterObjectId))
+            return false;
 
-        player = new Player(controllerId, heroId, mobilePartyId, clanId);
+        player = new Player(controllerId, heroId, mobilePartyId, clanId, characterObjectId);
         return true;
     }
 
@@ -115,6 +117,10 @@ public class CreateCharacterState : ConnectionStateBase
 
     public override void TransferSave()
     {
+        // SetState packages and sends the save synchronously; then move to LoadingState to await the
+        // client reporting it has entered the campaign. Load() must run here (not inside the
+        // TransferSaveState ctor) so it resolves against TransferSaveState, not this state.
         ConnectionLogic.SetState<TransferSaveState>();
+        ConnectionLogic.Load();
     }
 }

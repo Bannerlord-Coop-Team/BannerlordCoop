@@ -4,6 +4,7 @@ using Common.Tests.Utils;
 using Coop.Core.Client;
 using Coop.Core.Client.States;
 using GameInterface.Registry.Messages;
+using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.UI.Interfaces;
 using Moq;
@@ -62,16 +63,17 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
-        public void Disconnect_Publishes_EnterMainMenu()
+        public void Disconnect_GoesToMainMenu()
         {
             // Arrange
             clientLogic.SetState<LoadingState>();
+            var gameStateMock = clientComponent.Container.Resolve<Mock<IGameStateInterface>>();
 
             // Act
             clientLogic.Disconnect();
 
             // Assert
-            Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<EnterMainMenu>());
+            gameStateMock.Verify(x => x.GoToMainMenu(), Times.Once);
         }
 
         [Fact]

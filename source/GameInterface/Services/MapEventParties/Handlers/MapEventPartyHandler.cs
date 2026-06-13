@@ -1,15 +1,11 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Common.Util;
 using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.MapEvents;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.MapEventParties.Handlers;
@@ -36,9 +32,6 @@ internal class MapEventPartyHandler : IHandler
 
         messageBroker.Subscribe<OnTroopRoutedAttempted>(Handle_OnTroopRoutedAttempted);
         messageBroker.Subscribe<NetworkTroopRouted>(Handle_NetworkTroopRouted);
-
-        messageBroker.Subscribe<PrisonerTaken>(Handle_PrisonerTaken);
-        messageBroker.Subscribe<NetworkTakePrisoner>(Handle_NetworkTakePrisoner);
 
         // Client
         messageBroker.Subscribe<RequestMapEventPartyUpdate>(Handle_RequestMapEventPartyUpdate);
@@ -193,34 +186,6 @@ internal class MapEventPartyHandler : IHandler
         catch (Exception ex)
         {
             Logger.Error(ex, "Error handling NetworkTroopRouted message for MapEventParty with ID {MapEventPartyId}", obj.MapEventPartyId);
-        }
-    }
-
-    private void Handle_PrisonerTaken(MessagePayload<PrisonerTaken> payload)
-    {
-        var obj = payload.What;
-
-        if (!objectManager.TryGetIdWithLogging(obj.CapturerParty, out var partyBaseId))
-            return;
-        if (!objectManager.TryGetIdWithLogging(obj.PrisonerHero, out var heroId))
-            return;
-
-        var message = new NetworkTakePrisoner(partyBaseId, heroId);
-        network.SendAll(message);
-    }
-
-    private void Handle_NetworkTakePrisoner(MessagePayload<NetworkTakePrisoner> payload)
-    {
-        var obj = payload.What;
-
-        if (!objectManager.TryGetObjectWithLogging<PartyBase>(obj.PartyBaseId, out var partyBase))
-            return;
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.HeroId, out var hero))
-            return;
-
-        using (new AllowedThread())
-        {
-            TakePrisonerAction.ApplyInternal(partyBase, hero);
         }
     }
 }

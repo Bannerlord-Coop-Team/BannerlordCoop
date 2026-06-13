@@ -68,6 +68,18 @@ internal class MapEventPatches
         return false;
     }
 
+    [HarmonyPatch(nameof(MapEvent.FinalizeEventAux))]
+    [HarmonyPostfix]
+    private static void Postfix_FinalizeEventAux(MapEvent __instance)
+    {
+        // By this point the event's parties have left it, so the server can
+        // re-evaluate whether any player is still in a map event.
+        if (ModInformation.IsClient)
+            return;
+
+        MessageBroker.Instance.Publish(__instance, new MapEventFinalized(__instance));
+    }
+
     [HarmonyPatch(nameof(MapEvent.BattleState), MethodType.Setter)]
     [HarmonyPrefix]
     private static bool Prefix_BattleState(MapEvent __instance, BattleState value)
@@ -162,6 +174,31 @@ internal class InteractionPatches
 
 
     private static readonly ConditionalWeakTable<MobileParty, PlayerBattleAiJoinWindow> interactionDebounce = new();
+
+    [HarmonyPatch(typeof(PartyBase), "TaleWorlds.CampaignSystem.Map.IInteractablePoint.CanPartyInteract")]
+    [HarmonyPostfix]
+    private static void Postfix_CanPartyInteract(
+        PartyBase __instance,
+        MobileParty mobileParty,
+        ref bool __result)
+    {
+        if (!__result)
+            return;
+
+        if (ModInformation.IsClient)
+            return;
+
+        // NOTE: the "both parties are players" block was intentionally removed to re-enable PvP — two player
+        // parties must be able to interact to start/join a battle with each other.
+
+        // A party held in a conversation with a player can only be interacted with by that player's party. This is
+        // the hard stop that keeps other AI parties from starting an encounter or battle with it, since
+        // OnPartyInteraction only runs when this check passes.
+        if (ConversationPartyHold.IsInteractionBlocked(__instance, mobileParty))
+        {
+            __result = false;
+        }
+    }
 
     private static readonly ConditionalWeakTable<MapEvent, PlayerBattleAiJoinWindow> playerBattleAiJoinWindows = new();
 

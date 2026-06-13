@@ -1,8 +1,9 @@
-﻿using Coop.Core.Server.Services.Settlements.Messages;
+using Coop.Core.Server.Services.Settlements.Messages;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Settlements.Messages;
 
+using TaleWorlds.CampaignSystem.Settlements;
 namespace Coop.IntegrationTests.Settlements;
 
 /// <summary>
@@ -15,7 +16,13 @@ public class SettlementEnterActionLastVisitTimeOfOwnerTest
     [Fact]
     public void ServerSettlementEnterActionLastVisitTimeOfOwner_Publishes_AllClients()
     {
-        var triggerMessage = new SettlementChangedLastVisitTimeOfOwner();
+        var settlement = TestEnvironment.Server.CreateRegisteredObject<Settlement>("settlement1");
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.CreateRegisteredObject<Settlement>("settlement1");
+        }
+
+        var triggerMessage = new SettlementChangedLastVisitTimeOfOwner(settlement, 5f);
 
         var server = TestEnvironment.Server;
         server.SimulateMessage(this, triggerMessage);

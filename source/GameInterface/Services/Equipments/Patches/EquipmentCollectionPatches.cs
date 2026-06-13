@@ -2,8 +2,8 @@
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.Core;
-using GameInterface.Services.Equipments.Messages.Events;
 using GameInterface.Utils;
+using GameInterface.Services.Equipments.Messages;
 
 namespace GameInterface.Services.Equipments.Patches;
 

@@ -6,9 +6,9 @@ using {{ library }};
     
 public readonly struct Local_{{ MemberDeclaringType}}_{{ MemberName }}_QueueClear : IEvent
 {
-    public readonly {{ MemberType }} Instance;
+    public readonly {{ MemberDeclaringType }} Instance;
 
-    public Local_{{ MemberDeclaringType}}_{{ MemberName }}_QueueClear({{ MemberType }} instance)
+    public Local_{{ MemberDeclaringType}}_{{ MemberName }}_QueueClear({{ MemberDeclaringType }} instance)
     {
         Instance = instance;
     }
