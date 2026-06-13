@@ -3,7 +3,6 @@ using Common.LogicStates;
 using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
-using Coop.Core.Client.Network;
 using Coop.Core.Client.Policies;
 using Coop.Core.Client.States;
 using Coop.Core.Common;
@@ -22,7 +21,6 @@ public class ClientModule : CommonModule
         base.Load(builder);
 
         builder.RegisterType<ClientLogic>().As<ILogic>().As<IClientLogic>().InstancePerLifetimeScope();
-        builder.RegisterType<LoadingPacketBuffer>().As<ILoadingPacketBuffer>().InstancePerLifetimeScope();
         builder.RegisterType<CoopClient>().As<ICoopClient>().As<INetwork>().As<INetEventListener>().InstancePerLifetimeScope();
 
         // Policies

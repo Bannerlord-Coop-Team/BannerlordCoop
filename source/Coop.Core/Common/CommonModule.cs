@@ -4,7 +4,6 @@ using Common.Network;
 using Common.PacketHandlers;
 using Common.Serialization;
 using Common.Util;
-using Coop.Core.Client.Services.Heroes.Data;
 using Coop.Core.Common.Configuration;
 using Coop.Core.Server;
 using GameInterface;
@@ -41,7 +40,6 @@ public abstract class CommonModule : Module
         #endregion
 
         builder.RegisterType<ControllerIdProvider>().As<IControllerIdProvider>().InstancePerLifetimeScope();
-        builder.RegisterType<DeferredHeroRepository>().As<IDeferredHeroRepository>().InstancePerLifetimeScope();
         builder.RegisterType<ModuleValidator>().As<IModuleValidator>().SingleInstance();
 
         builder.RegisterType<CoopFinalizer>().As<ICoopFinalizer>().InstancePerLifetimeScope();
