@@ -104,15 +104,19 @@ namespace GameInterface.Services.Smithing.Handlers
             CraftingTemplate randomElement = CraftingTemplate.All.GetRandomElement<CraftingTemplate>();
             string nextTownOrderId = obj.CraftingCampaignBehavior.GetNextTownOrderId();
 
-            WeaponDesign weaponDesignTemplate = new WeaponDesign(randomElement, TextObject.GetEmpty(), obj.CraftingCampaignBehavior.GetWeaponPieces(randomElement, pieceTier), nextTownOrderId);
-            objectManager.AddNewObject(weaponDesignTemplate, out var weaponDesignId);
+            var weaponDesignTemplate = new WeaponDesign(
+                randomElement,
+                TextObject.GetEmpty(),
+                obj.CraftingCampaignBehavior.GetWeaponPieces(randomElement, pieceTier),
+                nextTownOrderId);
 
-            CraftingOrder order;
-            order = new CraftingOrder(obj.OrderOwner, townOrderDifficulty, weaponDesignTemplate, randomElement, obj.OrderSlot, nextTownOrderId);
-            using (new AllowedThread())
-            {
-                order.PreCraftedWeaponDesignItem.StringId = nextTownOrderId;
-            }
+            var order  = new CraftingOrder(
+                obj.OrderOwner,
+                townOrderDifficulty,
+                weaponDesignTemplate,
+                randomElement,
+                obj.OrderSlot,
+                nextTownOrderId);
 
             obj.CraftingCampaignBehavior._craftingOrders[obj.OrderOwner.CurrentSettlement.Town].AddTownOrder(order);
 
@@ -124,9 +128,7 @@ namespace GameInterface.Services.Smithing.Handlers
             if (!objectManager.TryGetIdWithLogging(obj.CraftingCampaignBehavior, out var craftingCampaignBehaviorId)) return;
             if (!objectManager.TryGetIdWithLogging(obj.OrderOwner, out var orderOwnerId)) return;
             if (!objectManager.TryGetIdWithLogging(randomElement, out var randomElementId)) return;
-
-            if (!objectManager.AddNewObject(craftingOrder, out var craftingOrderId) &&
-                !objectManager.TryGetIdWithLogging(craftingOrder, out craftingOrderId)) return;
+            if (!objectManager.TryGetIdWithLogging(craftingOrder, out var craftingOrderId)) return;
 
             // Send to clients from server
             NetworkCreateTownOrder message = new(
@@ -147,12 +149,39 @@ namespace GameInterface.Services.Smithing.Handlers
             if (!objectManager.TryGetObjectWithLogging(obj.OrderOwnerId, out Hero orderOwner)) return;
             if (!objectManager.TryGetObjectWithLogging(obj.CraftingOrderId, out CraftingOrder craftingOrder)) return;
 
+            // [DIAG] Temporary diagnostics for the client CreateTownOrder NRE — remove after triage.
+            // Confirms (a) DynamicSync populated craftingOrder.OrderOwner from the ctor, and
+            // (b) whether the resolved owner's CurrentSettlement/StayingInSettlement is null on the client.
+            Logger.Information(
+                "[CreateTownOrder-DIAG] orderOwnerId={OrderOwnerId} orderOwner={OrderOwner} " +
+                "currentSettlement={CurrentSettlement} stayingInSettlement={StayingInSettlement} partyBelongedTo={PartyBelongedTo} " +
+                "craftingOrderId={CraftingOrderId} craftingOrder.OrderOwner={CraftingOrderOwner}",
+                obj.OrderOwnerId,
+                orderOwner?.Name?.ToString() ?? "<null>",
+                orderOwner?.CurrentSettlement?.StringId ?? "<null>",
+                orderOwner?.StayingInSettlement?.StringId ?? "<null>",
+                orderOwner?.PartyBelongedTo?.StringId ?? "<null>",
+                obj.CraftingOrderId,
+                craftingOrder?.OrderOwner?.Name?.ToString() ?? "<null>");
+
+            if (orderOwner.CurrentSettlement == null)
+            {
+                Logger.Error(
+                    "[CreateTownOrder-DIAG] orderOwner {OrderOwner} ({OrderOwnerId}) has null CurrentSettlement on client — " +
+                    "the orderOwner.CurrentSettlement.Town deref below will NRE. StayingInSettlement present={StayingInSettlementPresent}, " +
+                    "craftingOrder.OrderOwner present={CraftingOrderOwnerPresent}",
+                    orderOwner.Name?.ToString() ?? "<null>",
+                    obj.OrderOwnerId,
+                    orderOwner.StayingInSettlement != null,
+                    craftingOrder.OrderOwner != null);
+            }
+
             using (new AllowedThread())
             {
                 WeaponDesign weaponDesignTemplate = new WeaponDesign(randomElement, TextObject.GetEmpty(), craftingCampaignBehavior.GetWeaponPieces(randomElement, obj.PieceTier), obj.NextTownOrderId);
                 craftingOrder._weaponDesignTemplate = weaponDesignTemplate;
                 Crafting.GenerateItem(weaponDesignTemplate, TextObject.GetEmpty(), orderOwner.Culture, randomElement.ItemModifierGroup, ref craftingOrder.PreCraftedWeaponDesignItem, obj.NextTownOrderId);
-                craftingOrder._preCraftedWeaponDesignItemData = new CraftingCampaignBehavior.CraftedItemInitializationData(craftingOrder.WeaponDesignTemplate, craftingOrder.PreCraftedWeaponDesignItem.Name, orderOwner.Culture);
+                craftingOrder._preCraftedWeaponDesignItemData = new CraftingCampaignBehavior.CraftedItemInitializationData(craftingOrder.WeaponDesignTemplate, craftingOrder.PreCraftedWeaponDesignItem.Name, craftingOrder.OrderOwner.Culture);
 
                 // Replace TaleWorlds implementation
                 craftingCampaignBehavior._craftingOrders[orderOwner.CurrentSettlement.Town].AddTownOrder(craftingOrder);
