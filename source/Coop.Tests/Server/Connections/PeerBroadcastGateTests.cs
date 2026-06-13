@@ -73,7 +73,7 @@ public class PeerBroadcastGateTests
         // A failed save disconnects the peer without sending the snapshot, so the gate must
         // stay closed.
         var saveMock = serverComponent.Container.Resolve<Mock<ISaveInterface>>();
-        saveMock.Setup(m => m.SaveCurrentGame()).Returns(new SaveResults(false, new byte[0], ""));
+        saveMock.Setup(m => m.SaveCurrentGame()).Returns(new SaveResults(false, System.Array.Empty<byte>(), ""));
 
         connectionLogic.SetState<TransferSaveState>();
 
