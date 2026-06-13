@@ -8,10 +8,12 @@ using GameInterface.Serialization.External;
 using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
+using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using SandBox.View.Map.Managers;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -36,16 +38,18 @@ internal class HeroInterface : IHeroInterface
     private readonly IObjectManager objectManager;
     private readonly IMessageBroker messageBroker;
     private readonly IBinaryPackageFactory binaryPackageFactory;
+    private readonly IPlayerManager playerManager;
 
     public HeroInterface(
         IMessageBroker messageBroker,
         IBinaryPackageFactory binaryPackageFactory,
-        IObjectManager objectManager)
+        IObjectManager objectManager,
+        IPlayerManager playerManager)
     {
         this.objectManager = objectManager;
         this.messageBroker = messageBroker;
         this.binaryPackageFactory = binaryPackageFactory;
-        this.objectManager = objectManager;
+        this.playerManager = playerManager;
     }
 
     public byte[] PackageMainHero()
@@ -200,7 +204,77 @@ internal class HeroInterface : IHeroInterface
     }
 
     private string NewServerStringId<T>(T obj) where T : MBObjectBase
-        => Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<T>("Player");
+    {
+        // FindNextUniqueStringId only avoids ids of objects currently registered in the campaign. A
+        // player restored from a saved co-op session keeps its hero/party/clan ids reserved even when
+        // those objects are not loaded on the server (clients re-send their hero on connect rather than
+        // being persisted here), so without this guard a freshly created client can be handed an id an
+        // absent player already owns — both then resolve to the same party and inflate counts such as
+        // the map-event player count. Skip ids any known player already holds; a rejoining client keeps
+        // its ids by resolving (matched on its controller/platform id) and never reaches this allocation.
+        return NextUnreservedStringId(
+            seed => Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<T>(seed),
+            ReservedServerStringIds<T>());
+    }
+
+    /// <summary>
+    /// Returns the first "Player{N}" id that is free both in the campaign and among the players' reserved
+    /// ids. <paramref name="findCampaignUniqueId"/> yields the next id unused by registered objects for a
+    /// given seed (i.e. <c>FindNextUniqueStringId</c>); <paramref name="reservedIds"/> are ids already
+    /// claimed by known players, whose objects may not be loaded and so are invisible to the campaign lookup.
+    /// </summary>
+    internal static string NextUnreservedStringId(Func<string, string> findCampaignUniqueId, ISet<string> reservedIds)
+    {
+        var stringId = findCampaignUniqueId("Player");
+        while (reservedIds.Contains(stringId))
+            stringId = findCampaignUniqueId(IncrementPostfix(stringId));
+        return stringId;
+    }
+
+    /// <summary>
+    /// The raw StringIds of type <typeparamref name="T"/> already claimed by registered players, used to
+    /// keep a new client off ids that belong to a saved (possibly not-yet-connected) player.
+    /// </summary>
+    private HashSet<string> ReservedServerStringIds<T>() where T : MBObjectBase
+    {
+        var reserved = new HashSet<string>();
+        foreach (var player in playerManager.Players)
+        {
+            // Player records store the registered key ("MobileParty_Player430"); strip the "{Type}_"
+            // prefix to compare against the raw ids FindNextUniqueStringId produces ("Player430").
+            var registeredId = ReservedPlayerId<T>(player);
+            if (!string.IsNullOrEmpty(registeredId))
+                reserved.Add(StripTypePrefix<T>(registeredId));
+        }
+        return reserved;
+    }
+
+    private static string ReservedPlayerId<T>(Player player) where T : MBObjectBase
+    {
+        if (typeof(T) == typeof(Hero)) return player.HeroId;
+        if (typeof(T) == typeof(MobileParty)) return player.MobilePartyId;
+        if (typeof(T) == typeof(Clan)) return player.ClanId;
+        return null;
+    }
+
+    /// <summary>
+    /// Returns the next "Player{N}" id by incrementing the trailing number (or appending 1), matching the
+    /// postfix scheme FindNextUniqueStringId uses so a reserved id can be stepped over.
+    /// </summary>
+    internal static string IncrementPostfix(string stringId)
+    {
+        var splitIndex = stringId.Length;
+        while (splitIndex > 0 && char.IsDigit(stringId[splitIndex - 1]))
+            splitIndex--;
+
+        var prefix = stringId.Substring(0, splitIndex);
+        // Ids are minted as bounded uint postfixes (matching FindNextUniqueStringId), so a suffix that
+        // doesn't fit a uint is treated as 0 (yielding "{prefix}1") rather than throwing.
+        uint number = 0;
+        if (splitIndex < stringId.Length)
+            uint.TryParse(stringId.Substring(splitIndex), out number);
+        return prefix + (number + 1);
+    }
 
     private void RegisterPrimary<T>(T obj, string stringId) where T : MBObjectBase
     {
@@ -227,7 +301,11 @@ internal class HeroInterface : IHeroInterface
     /// Recovers the StringId from a registered id (e.g. "MobileParty_Player1" -> "Player1") by stripping the
     /// leading "{TypeName}_" prefix the registration scheme adds.
     /// </summary>
+    // Overload for call sites that infer T from an instance rather than naming it explicitly.
     private static string StripTypePrefix<T>(string registeredId, T obj) where T : MBObjectBase
+        => StripTypePrefix<T>(registeredId);
+
+    private static string StripTypePrefix<T>(string registeredId) where T : MBObjectBase
     {
         var prefix = $"{typeof(T).Name}_";
         return registeredId != null && registeredId.StartsWith(prefix)
