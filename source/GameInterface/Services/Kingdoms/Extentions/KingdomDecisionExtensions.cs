@@ -85,7 +85,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
             if (kingSelectionKingdomDecision != null)
             {
                 return new KingSelectionKingdomDecisionData(kingSelectionKingdomDecision.ProposerClan.StringId, kingSelectionKingdomDecision.Kingdom.StringId,
-                    kingSelectionKingdomDecision.TriggerTime._numTicks, kingSelectionKingdomDecision.IsEnforced, kingSelectionKingdomDecision.NotifyPlayer, kingSelectionKingdomDecision.PlayerExamined, kingSelectionKingdomDecision._clanToExclude.StringId);
+                    kingSelectionKingdomDecision.TriggerTime._numTicks, kingSelectionKingdomDecision.IsEnforced, kingSelectionKingdomDecision.NotifyPlayer, kingSelectionKingdomDecision.PlayerExamined, kingSelectionKingdomDecision._clanToExclude?.StringId);
             }
             else
             {
@@ -113,7 +113,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
             if (settlementClaimantDecision != null)
             {
                 return new SettlementClaimantDecisionData(settlementClaimantDecision.ProposerClan.StringId, settlementClaimantDecision.Kingdom.StringId,
-                    settlementClaimantDecision.TriggerTime._numTicks, settlementClaimantDecision.IsEnforced, settlementClaimantDecision.NotifyPlayer, settlementClaimantDecision.PlayerExamined, settlementClaimantDecision.Settlement.StringId, settlementClaimantDecision._capturerHero.StringId, settlementClaimantDecision.ClanToExclude.StringId);
+                    settlementClaimantDecision.TriggerTime._numTicks, settlementClaimantDecision.IsEnforced, settlementClaimantDecision.NotifyPlayer, settlementClaimantDecision.PlayerExamined, settlementClaimantDecision.Settlement.StringId, settlementClaimantDecision._capturerHero?.StringId, settlementClaimantDecision.ClanToExclude?.StringId);
             }
             else
             {

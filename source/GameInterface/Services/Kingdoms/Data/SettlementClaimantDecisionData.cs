@@ -20,7 +20,6 @@ namespace GameInterface.Services.Kingdoms.Data
         private static readonly FieldInfo ClanToExcludeField = typeof(SettlementClaimantDecision).GetField(nameof(SettlementClaimantDecision.ClanToExclude), BindingFlags.Instance | BindingFlags.Public);
         private static readonly FieldInfo CapturerHeroField = typeof(SettlementClaimantDecision).GetField("_capturerHero", BindingFlags.Instance | BindingFlags.NonPublic);
 
-
         [ProtoMember(1)]
         public string SettlementId { get; }
         [ProtoMember(2)]
@@ -39,9 +38,9 @@ namespace GameInterface.Services.Kingdoms.Data
         public override bool TryGetKingdomDecision(IObjectManager objectManager, out KingdomDecision kingdomDecision)
         {
             if (!TryGetProposerClanAndKingdom(objectManager, out Clan proposerClan, out Kingdom kingdom) || 
-                !objectManager.TryGetObject(ClanToExcludeId, out Clan clanToExclude) ||
+                !TryGetOptionalObject(objectManager, ClanToExcludeId, out Clan clanToExclude) ||
                 !objectManager.TryGetObject(SettlementId, out Settlement settlement) ||
-                !objectManager.TryGetObject(CapturerHeroId, out Hero capturerHero))
+                !TryGetOptionalObject(objectManager, CapturerHeroId, out Hero capturerHero))
             {
                 kingdomDecision = null;
                 return false;
