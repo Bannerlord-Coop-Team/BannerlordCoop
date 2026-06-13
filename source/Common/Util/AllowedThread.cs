@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Common.Logging;
+using Serilog;
+using System;
 
 namespace Common.Util;
 
@@ -20,11 +22,20 @@ namespace Common.Util;
 /// </remarks>
 public class AllowedThread : IDisposable
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<AllowedThread>();
+
     [ThreadStatic]
     private static int _allowedCount;
 
-    public AllowedThread()
+    public AllowedThread(bool stringId = false)
     {
+        // Log warning if server is using allowed thread (and not explicitly setting a string id)
+        // Server calling allowed thread will not broadcast side effects to all clients
+        if (ModInformation.IsServer && !stringId)
+        {
+            Logger.Warning("Server is using allowed thread. This likely should not be happening. {CallStack}", Environment.StackTrace);
+        }
+
         AllowThisThread();
     }
 
@@ -39,6 +50,8 @@ public class AllowedThread : IDisposable
     /// </summary>
     public static void AllowThisThread()
     {
+        if (ModInformation.IsServer)
+
         _allowedCount++;
     }
 
