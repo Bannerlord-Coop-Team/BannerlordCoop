@@ -9,7 +9,7 @@ namespace Coop.Core.Server.Connections.Messages;
 /// Response to <see cref="NetworkModuleVersionsValidate"/>.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-public record NetworkModuleVersionsValidated : IResponse
+public record NetworkModuleVersionsValidated : IEvent
 {
     [ProtoMember(1)]
     public bool Matches { get; }

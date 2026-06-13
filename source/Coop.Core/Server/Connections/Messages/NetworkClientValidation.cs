@@ -34,7 +34,7 @@ public record NetworkClientValidate : ICommand
 /// Response to <see cref="NetworkClientValidate"/> when successful
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-public record NetworkClientValidated : IResponse
+public record NetworkClientValidated : IEvent
 {
     [ProtoMember(1)]
     public bool HeroExists { get; }
