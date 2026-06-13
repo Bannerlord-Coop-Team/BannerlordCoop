@@ -1,9 +1,12 @@
 using Autofac;
+using Coop.Core.Client.Services.Heroes.Messages;
 using Coop.Core.Common.Network.Packets;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.States;
 using Coop.Tests.Mocks;
 using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Moq;
 using System.Linq;
@@ -83,6 +86,27 @@ namespace Coop.Tests.Server.Connections.States
                 serverComponent.TestNetwork.SentPackets.TryGetValue(differentPeer.Id, out var packets) &&
                 packets.OfType<GameSaveDataPacket>().Any();
             Assert.False(otherPeerGotSave);
+        }
+
+        [Fact]
+        public void EnteringState_SendsThePlayerRegistry_WithTheSave()
+        {
+            // Arrange — a player is already registered on the server.
+            var existingPlayer = new Player("other", "hero1", "party1", "clan1", "char1");
+            var playerManagerMock = serverComponent.Container.Resolve<Mock<IPlayerManager>>();
+            playerManagerMock.Setup(m => m.Players).Returns(new[] { existingPlayer });
+
+            var saveMock = serverComponent.Container.Resolve<Mock<ISaveInterface>>();
+            saveMock.Setup(m => m.SaveCurrentGame()).Returns(new SaveResults(true, new byte[] { 1 }, "12345"));
+
+            // Act
+            connectionLogic.SetState<TransferSaveState>();
+
+            // Assert — the joining peer receives the registry snapshot; its heroes are inside
+            // the save, so only the records travel.
+            var message = Assert.Single(
+                serverComponent.TestNetwork.GetPeerMessagesFromType<NetworkExistingPlayers>(playerPeer));
+            Assert.Equal(existingPlayer, Assert.Single(message.Players));
         }
     }
 }

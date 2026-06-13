@@ -78,10 +78,9 @@ namespace Coop.Tests.Server.Connections.States
                 playerPeer, new NetworkTransferNewHero("MyId", Array.Empty<byte>()));
             currentState.Handle_NetworkTransferNewHero(payload);
 
-            // Assert — the joining peer is sent the server-assigned ids, then we send the save and wait
-            // for the client to load (LoadingState).
-            var message = Assert.Single(serverComponent.TestNetwork.GetPeerMessages(playerPeer));
-            Assert.IsType<NetworkHeroRecieved>(message);
+            // Assert — the joining peer is sent the server-assigned ids, then we send the save
+            // (with the player-registry snapshot) and wait for the client to load (LoadingState).
+            Assert.Single(serverComponent.TestNetwork.GetPeerMessagesFromType<NetworkHeroRecieved>(playerPeer));
             Assert.IsType<LoadingState>(connectionLogic.State);
         }
 

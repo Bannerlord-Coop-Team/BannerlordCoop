@@ -9,6 +9,7 @@ using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using Serilog;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 
@@ -33,6 +34,7 @@ internal class RemotePlayerHeroHandler : IHandler
     private readonly IHeroInterface heroInterface;
     private readonly IPlayerManager playerRegistry;
     private readonly IDeferredHeroRepository deferredHeroRepo;
+    private readonly List<Player> pendingExistingPlayers = new List<Player>();
     private bool campaignReady;
 
     public RemotePlayerHeroHandler(
@@ -47,6 +49,7 @@ internal class RemotePlayerHeroHandler : IHandler
         this.deferredHeroRepo = deferredHeroRepo;
 
         messageBroker.Subscribe<NetworkNewPlayerHeroCreated>(Handle_NetworkNewPlayerHeroCreated);
+        messageBroker.Subscribe<NetworkExistingPlayers>(Handle_NetworkExistingPlayers);
         messageBroker.Subscribe<ClientCampaignEntered>(Handle_ClientCampaignEntered);
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
     }
@@ -54,6 +57,7 @@ internal class RemotePlayerHeroHandler : IHandler
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkNewPlayerHeroCreated>(Handle_NetworkNewPlayerHeroCreated);
+        messageBroker.Unsubscribe<NetworkExistingPlayers>(Handle_NetworkExistingPlayers);
         messageBroker.Unsubscribe<ClientCampaignEntered>(Handle_ClientCampaignEntered);
         messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
     }
@@ -71,9 +75,29 @@ internal class RemotePlayerHeroHandler : IHandler
         }
     }
 
+    private void Handle_NetworkExistingPlayers(MessagePayload<NetworkExistingPlayers> payload)
+    {
+        // Protobuf collapses an empty array to null (fresh server, no other players yet).
+        var players = payload.What.Players ?? System.Array.Empty<Player>();
+
+        if (campaignReady)
+        {
+            RegisterExistingPlayers(players);
+        }
+        else
+        {
+            pendingExistingPlayers.AddRange(players);
+        }
+    }
+
     private void Handle_ClientCampaignEntered(MessagePayload<ClientCampaignEntered> payload)
     {
         campaignReady = true;
+
+        // Players whose heroes came inside the transfer save register first; their objects
+        // exist as soon as the campaign does.
+        RegisterExistingPlayers(pendingExistingPlayers);
+        pendingExistingPlayers.Clear();
 
         foreach (var message in deferredHeroRepo.GetAllDeferredHeroes())
         {
@@ -89,6 +113,18 @@ internal class RemotePlayerHeroHandler : IHandler
         // instantiating again, so a reconnect doesn't create heroes against an unloaded campaign.
         campaignReady = false;
         deferredHeroRepo.Clear();
+        pendingExistingPlayers.Clear();
+    }
+
+    private void RegisterExistingPlayers(IEnumerable<Player> players)
+    {
+        foreach (var player in players)
+        {
+            // Unlike a newly created hero, the player's objects are already inside the
+            // transfer save — only the registry record is missing. Re-adding a known player
+            // (this client's own, or a duplicate delivery) is expected and harmless.
+            playerRegistry.AddPlayer(player);
+        }
     }
 
     private void CreatePlayerHero(NetworkNewPlayerHeroCreated message)

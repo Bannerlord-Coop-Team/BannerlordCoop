@@ -1,12 +1,16 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Network;
+using Coop.Core.Client.Services.Heroes.Messages;
 using Coop.Core.Common.Network.Packets;
 using Coop.Core.Server.Services.Connection.Messages;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
+using System.Linq;
 
 namespace Coop.Core.Server.Connections.States;
 
@@ -23,7 +27,8 @@ public class TransferSaveState : ConnectionStateBase
         ICoopSessionProvider coopSessionProvider,
         ISaveInterface saveInterface,
         ITimeControlInterface timeControlInterface,
-        IPeerBroadcastGate broadcastGate)
+        IPeerBroadcastGate broadcastGate,
+        IPlayerManager playerManager)
         : base(connectionLogic)
     {
         messageBroker.Publish(this, new PlayerLoading());
@@ -47,6 +52,14 @@ public class TransferSaveState : ConnectionStateBase
             }
 
             network.Send(ConnectionLogic.Peer, savePacket);
+
+            // The save carries every player's hero but not the player registry, and the
+            // per-player broadcast fires only once, at character creation — a peer that was
+            // not yet receiving broadcasts at that moment would treat those players' parties
+            // as AI forever. Send the registry with the save; the client applies it once the
+            // campaign and its object registry are ready.
+            var players = playerManager.Players?.ToArray() ?? System.Array.Empty<Player>();
+            network.Send(ConnectionLogic.Peer, new NetworkExistingPlayers(players));
 
             // Open world broadcasts to this peer only now: everything broadcast before this
             // point is inside the snapshot just sent. Ordered broadcasts enqueued after it
