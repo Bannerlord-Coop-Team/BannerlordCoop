@@ -4,6 +4,8 @@ using Common.Network;
 using GameInterface.Services.MapEventParties;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Messages;
+using GameInterface.Services.TroopRosters.Interfaces;
+using Helpers;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -21,16 +23,21 @@ internal class PartyScreenHelperHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly ITroopRosterInterface troopRosterInterface;
 
     public PartyScreenHelperHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        ITroopRosterInterface troopRosterInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.troopRosterInterface = troopRosterInterface;
 
+        messageBroker.Subscribe<NewClanPartyScreenClosed>(Handle_NewClanPartyScreenClosed);
+        messageBroker.Subscribe<CreateClanPartyAfterScreenClose>(Handle_CreateClanPartyAfterScreenClose);
         messageBroker.Subscribe<GarrisonDonated>(Handle_GarrisonDonated);
         messageBroker.Subscribe<DonateToGarrison>(Handle_DonateToGarrison);
         messageBroker.Subscribe<PrisonersDonated>(Handle_PrisonersDonated);
@@ -43,6 +50,8 @@ internal class PartyScreenHelperHandler : IHandler
 
     public void Dispose()
     {
+        messageBroker.Unsubscribe<NewClanPartyScreenClosed>(Handle_NewClanPartyScreenClosed);
+        messageBroker.Unsubscribe<CreateClanPartyAfterScreenClose>(Handle_CreateClanPartyAfterScreenClose);
         messageBroker.Unsubscribe<GarrisonDonated>(Handle_GarrisonDonated);
         messageBroker.Unsubscribe<DonateToGarrison>(Handle_DonateToGarrison);
         messageBroker.Unsubscribe<PrisonersDonated>(Handle_PrisonersDonated);
@@ -51,6 +60,49 @@ internal class PartyScreenHelperHandler : IHandler
         messageBroker.Unsubscribe<DoManageGarrison>(Handle_DoManageGarrison);
         messageBroker.Unsubscribe<PrisonersReleasedAndTaken>(Handle_PrisonersReleasedAndTaken);
         messageBroker.Unsubscribe<ReleaseAndTakePrisoners>(Handle_ReleaseAndTakePrisoners);
+    }
+
+    private void Handle_NewClanPartyScreenClosed(MessagePayload<NewClanPartyScreenClosed> obj)
+    {
+        if (!objectManager.TryGetIdWithLogging(obj.What.MainHero, out var mainHeroId)) return;
+        if (!objectManager.TryGetIdWithLogging(obj.What.NewLeaderHero, out var newLeaderHeroId)) return;
+
+        var leftMemberRosterData = troopRosterInterface.PackTroopRosterData(obj.What.LeftMemberRoster);
+        var leftPrisonRosterData = troopRosterInterface.PackTroopRosterData(obj.What.LeftPrisonRoster);
+
+        var message = new CreateClanPartyAfterScreenClose(
+            mainHeroId,
+            newLeaderHeroId,
+            leftMemberRosterData,
+            leftPrisonRosterData
+        );
+        network.SendAll(message);
+    }
+
+    private void Handle_CreateClanPartyAfterScreenClose(MessagePayload<CreateClanPartyAfterScreenClose> obj)
+    {
+        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
+        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.NewLeaderHeroId, out var newLeaderHero)) return;
+
+        int partyGoldLowerThreshold = Campaign.Current.Models.ClanFinanceModel.PartyGoldLowerThreshold;
+        if (newLeaderHero.Gold < partyGoldLowerThreshold)
+        {
+            GiveGoldAction.ApplyBetweenCharacters(mainHero, newLeaderHero, partyGoldLowerThreshold - newLeaderHero.Gold, false);
+        }
+        MobileParty mobileParty = MobilePartyHelper.CreateNewClanMobileParty(newLeaderHero, newLeaderHero.Clan);
+        foreach (var troopRosterElement in troopRosterInterface.UnpackTroopRosterData(obj.What.LeftMemberRosterData))
+        {
+            if (troopRosterElement.Character != newLeaderHero.CharacterObject)
+            {
+                mobileParty.MemberRoster.Add(troopRosterElement);
+                //rightOwnerParty.MemberRoster.AddToCounts(troopRosterElement.Character, -troopRosterElement.Number, false, -troopRosterElement.WoundedNumber, -troopRosterElement.Xp, true, -1);
+            }
+        }
+        foreach (var troopRosterElement in troopRosterInterface.UnpackTroopRosterData(obj.What.LeftPrisonRosterData))
+        {
+            mobileParty.PrisonRoster.Add(troopRosterElement);
+            //rightOwnerParty.PrisonRoster.AddToCounts(troopRosterElement2.Character, -troopRosterElement2.Number, false, -troopRosterElement2.WoundedNumber, -troopRosterElement2.Xp, true, -1);
+        }
     }
 
     private void Handle_GarrisonDonated(MessagePayload<GarrisonDonated> obj)

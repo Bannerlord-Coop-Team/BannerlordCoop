@@ -21,6 +21,12 @@ public interface ITroopRosterInterface : IGameAbstraction
     TroopRosterData PackTroopRosterData(TroopRoster troopRoster);
 
     /// <summary>
+    /// Unpack troop roster data into usable TroopRosterElements.
+    /// Optional mainHero parameter for avoiding retrieving a duplicate of a player hero already in a roster.
+    /// </summary>
+    List<TroopRosterElement> UnpackTroopRosterData(TroopRosterData troopRosterData, Hero mainHero = null);
+
+    /// <summary>
     /// Updates target roster with incoming data from the client.
     /// </summary>
     void UpdateWithData(TroopRoster targetTroopRoster, TroopRosterData packedTroopRosterElements, Hero mainHero);
@@ -56,6 +62,35 @@ internal class TroopRosterInterface : ITroopRosterInterface
         return packedData;
     }
 
+    public List<TroopRosterElement> UnpackTroopRosterData(TroopRosterData troopRosterData, Hero mainHero = null)
+    {
+        var unpackedData = new List<TroopRosterElement>();
+        foreach (var elementData in troopRosterData.Data)
+        {
+            TroopRosterElement troopRosterElement;
+            if (objectManager.TryGetObjectWithLogging<Hero>(elementData.CharacterId, out var hero))
+            {
+                if (hero == mainHero) continue;
+                troopRosterElement = new TroopRosterElement(hero.CharacterObject);
+            }
+            else if (objectManager.TryGetObjectWithLogging<CharacterObject>(elementData.CharacterId, out var character))
+            {
+                troopRosterElement = new TroopRosterElement(character);
+            }
+            else
+            {
+                continue;
+            }
+
+            troopRosterElement._number = elementData.Number;
+            troopRosterElement._woundedNumber = elementData.WoundedNumber;
+            troopRosterElement._xp = elementData.Xp;
+            unpackedData.Add(troopRosterElement);
+        }
+
+        return unpackedData;
+    }
+
     public void UpdateWithData(TroopRoster targetTroopRoster, TroopRosterData packedTroopRosterElements, Hero mainHero)
     {
         // Clear without removing MainHero (causes issues if MainHero is removed)
@@ -68,27 +103,9 @@ internal class TroopRosterInterface : ITroopRosterInterface
         if (packedTroopRosterElements.Data == null) return;
 
         // Rebuild roster with new data
-        foreach (var troopRosterElementData in packedTroopRosterElements.Data)
+        foreach (var element in UnpackTroopRosterData(packedTroopRosterElements, mainHero))
         {
-            TroopRosterElement troopRosterElement;
-            if (objectManager.TryGetObjectWithLogging<Hero>(troopRosterElementData.CharacterId, out var hero))
-            {
-                if (hero == mainHero) continue;
-                troopRosterElement = new TroopRosterElement(hero.CharacterObject);
-            }
-            else if (objectManager.TryGetObjectWithLogging<CharacterObject>(troopRosterElementData.CharacterId, out var character))
-            {
-                troopRosterElement = new TroopRosterElement(character);
-            }
-            else
-            {
-                continue;
-            }
-
-            troopRosterElement._number = troopRosterElementData.Number;
-            troopRosterElement._woundedNumber = troopRosterElementData.WoundedNumber;
-            troopRosterElement._xp = troopRosterElementData.Xp;
-            targetTroopRoster.Add(troopRosterElement);
+            targetTroopRoster.Add(element);
         }
     }
 

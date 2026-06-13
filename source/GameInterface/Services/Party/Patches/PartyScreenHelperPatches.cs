@@ -17,6 +17,34 @@ internal class PartyScreenHelperPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<PartyScreenHelperPatches>();
 
+    [HarmonyPatch(nameof(PartyScreenHelper.OpenScreenAsCreateClanPartyForHeroPartyScreenClosed))]
+    [HarmonyPrefix]
+    public static bool OpenScreenAsCreateClanPartyForHeroPartyScreenClosedPrefix(PartyBase leftOwnerParty, TroopRoster leftMemberRoster, TroopRoster leftPrisonRoster, PartyBase rightOwnerParty, TroopRoster rightMemberRoster, TroopRoster rightPrisonRoster, bool fromCancel)
+    {
+        if (!fromCancel)
+        {
+            Hero newLeaderHero = null;
+            for (int i = 0; i < leftMemberRoster.data.Length; i++)
+            {
+                CharacterObject character = leftMemberRoster.data[i].Character;
+                if (character != null && character.IsHero)
+                {
+                    newLeaderHero = leftMemberRoster.data[i].Character.HeroObject;
+                }
+            }
+            var message = new NewClanPartyScreenClosed(
+                Hero.MainHero,
+                newLeaderHero,
+                leftMemberRoster,
+                leftPrisonRoster
+            );
+            
+            MessageBroker.Instance.Publish(null, message);
+        }
+
+        return false;
+    }
+
     [HarmonyPatch(nameof(PartyScreenHelper.SellPrisonersDoneHandler))]
     [HarmonyPrefix]
     public static bool SellPrisonersDoneHandlerPrefix(ref bool __result, TroopRoster leftPrisonRoster)
