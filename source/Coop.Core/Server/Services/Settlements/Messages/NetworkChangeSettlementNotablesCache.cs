@@ -4,7 +4,6 @@ using System.Collections.Generic;
 
 namespace Coop.Core.Server.Services.Settlements.Messages;
 
-
 /// <summary>
 /// Message used to inform client of notable cache change
 /// </summary>
