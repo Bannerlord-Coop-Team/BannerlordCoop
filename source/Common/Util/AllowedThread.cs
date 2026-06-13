@@ -27,9 +27,9 @@ public class AllowedThread : IDisposable
     [ThreadStatic]
     private static int _allowedCount;
 
-    public AllowedThread(bool stringId = false)
+    public AllowedThread()
     {
-        AllowThisThread(stringId);
+        AllowThisThread();
     }
 
     public void Dispose()
@@ -41,15 +41,14 @@ public class AllowedThread : IDisposable
     /// Increments this thread's allowance count. Every call must be balanced by exactly one
     /// <see cref="RevokeThisThread"/>; the count is what lets scopes nest on one thread.
     /// </summary>
-    public static void AllowThisThread(bool stringId = false)
+    public static void AllowThisThread()
     {
-        // Log warning if server is using allowed thread (and not explicitly setting a string id)
+        // Log warning if server is using allowed thread
         // Server calling allowed thread will not broadcast side effects to all clients
-        if (ModInformation.IsServer && !stringId)
+        if (ModInformation.IsServer)
         {
             Logger.Warning("Server is using allowed thread. This likely should not be happening. {CallStack}", Environment.StackTrace);
         }
-
         _allowedCount++;
     }
 
