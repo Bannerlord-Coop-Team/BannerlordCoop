@@ -6,6 +6,7 @@ using Common.Network.Messages;
 using Common.PacketHandlers;
 using Common.Serialization;
 using Coop.Core.Common.Network;
+using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Time.Messages;
 using GameInterface.Registry.Messages;
@@ -41,17 +42,20 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     private readonly IMessageBroker messageBroker;
     private readonly IPacketManager packetManager;
+    private readonly IConnectionMessageQueue connectionMessageQueue;
 
     public CoopServer(
-        INetworkConfiguration configuration, 
+        INetworkConfiguration configuration,
         IMessageBroker messageBroker,
         IPacketManager packetManager,
+        IConnectionMessageQueue connectionMessageQueue,
         IControllerIdProvider controllerIdProvider,
         ICommonSerializer serializer) : base(configuration, serializer)
     {
         // Dependancy assignment
         this.messageBroker = messageBroker;
         this.packetManager = packetManager;
+        this.connectionMessageQueue = connectionMessageQueue;
 
         // Netmanager initialization
         netManager.NatPunchEnabled = true;
@@ -124,12 +128,28 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     public override void SendAll(IPacket packet)
     {
         CheckNetworkQueueOverloaded();
-        SendAll(netManager, packet);
+
+        var peers = new List<NetPeer>();
+        netManager.GetPeersNonAlloc(peers, ConnectionState.Connected);
+        foreach (var peer in peers)
+        {
+            // A still-loading peer has its broadcasts dropped (pre-save) or held (loading) instead of
+            // sent live; the queue replays the held ones once the peer enters the campaign.
+            if (connectionMessageQueue.TryHandleBroadcast(peer, packet)) continue;
+            Send(peer, packet);
+        }
     }
 
     public override void SendAllBut(NetPeer ignoredPeer, IPacket packet)
     {
-        SendAllBut(netManager, ignoredPeer, packet);
+        var peers = new List<NetPeer>();
+        netManager.GetPeersNonAlloc(peers, ConnectionState.Connected);
+        foreach (var peer in peers)
+        {
+            if (peer == ignoredPeer) continue;
+            if (connectionMessageQueue.TryHandleBroadcast(peer, packet)) continue;
+            Send(peer, packet);
+        }
     }
 
     private void CheckNetworkQueueOverloaded(NetPeer ignoredPeer = null)

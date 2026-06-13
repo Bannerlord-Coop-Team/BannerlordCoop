@@ -22,7 +22,8 @@ public class TransferSaveState : ConnectionStateBase
         INetwork network,
         ICoopSessionProvider coopSessionProvider,
         ISaveInterface saveInterface,
-        ITimeControlInterface timeControlInterface)
+        ITimeControlInterface timeControlInterface,
+        IConnectionMessageQueue connectionMessageQueue)
         : base(connectionLogic)
     {
         messageBroker.Publish(this, new PlayerLoading());
@@ -30,6 +31,12 @@ public class TransferSaveState : ConnectionStateBase
         GameLoopRunner.RunOnMainThread(() =>
         {
             timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
+
+            // Start holding this peer's broadcasts at the save boundary, on the main thread. This is the
+            // approximate cut between "in the save" (dropped while Dropping) and "after the save" (queued
+            // for replay) — approximate because the save below is not atomic w.r.t. the network poller;
+            // see ConnectionMessageQueue for the residual duplicate/loss windows.
+            connectionMessageQueue.BeginQueueing(ConnectionLogic.Peer);
 
             var saveResults = saveInterface.SaveCurrentGame();
 
