@@ -14,9 +14,9 @@
     <GameVersion>  v1.3.12       Depended-module game version
 
   Behavior vs. the old deploy.ps1:
-    - Incremental: skips entirely when nothing changed (Inputs/Outputs), and
-      Copy uses SkipUnchangedFiles. No more wipe-and-recreate of the module
-      folder, so an empty build output can no longer delete the live module.
+    - Runs on every build (no Inputs/Outputs skip). Copy uses SkipUnchangedFiles
+      so unchanged files still aren't re-copied. No more wipe-and-recreate of the
+      module folder, so an empty build output can no longer delete the live module.
     - No-ops cleanly when the mb2 junction is absent (CI / fresh checkout)
       instead of throwing.
 -->
@@ -33,8 +33,6 @@
     <ModDir>$(ModsRoot)\$(ModName)</ModDir>
     <ModBinDir>$(ModDir)\bin\Win64_Shipping_Client</ModBinDir>
     <ModPrefabDir>$(ModDir)\GUI\Prefabs</ModPrefabDir>
-
-    <DeployStamp>$(IntermediateOutputPath)deploy.stamp</DeployStamp>
   </PropertyGroup>
 
   <ItemGroup>
@@ -51,13 +49,11 @@
 
   <Target Name="DeployToGame"
           AfterTargets="Build"
-          Condition="'$(ModName)' != '' and Exists('$(ModsRoot)')"
-          Inputs="@(DeployDllFiles);@(DeployStaticFiles);@(UIMovieFiles);$(SubModuleTemplate)"
-          Outputs="$(DeployStamp)">
+          Condition="'$(ModName)' != '' and Exists('$(ModsRoot)')">
 
     <Message Importance="high" Text="Deploying $(ModName) -> $(ModDir)" />
 
-    <MakeDir Directories="$(ModBinDir);$(ModPrefabDir);$(IntermediateOutputPath)" />
+    <MakeDir Directories="$(ModBinDir);$(ModPrefabDir)" />
 
     <!-- DLLs -->
     <Copy SourceFiles="@(DeployDllFiles)"
@@ -79,8 +75,6 @@
         File="$(ModDir)\SubModule.xml"
         Lines="$([System.IO.File]::ReadAllText('$(SubModuleTemplate)').Replace('${name}','$(ModName)').Replace('${main_class}','$(MainClass)').Replace('${version}','$(ModVersion)').Replace('${game_version}','$(GameVersion)'))"
         Overwrite="true" />
-
-    <Touch Files="$(DeployStamp)" AlwaysCreate="true" />
   </Target>
 
 </Project>
