@@ -176,9 +176,9 @@ internal class HeroInterface : IHeroInterface
     {
         var party = hero.PartyBelongedTo;
 
-        RegisterPrimary(hero, NewServerStringId(hero));
-        RegisterPrimary(party, NewServerStringId(party));
-        RegisterPrimary(hero.Clan, NewServerStringId(hero.Clan));
+        RegisterPrimary(hero, NewServerStringId<Hero>(p => p.HeroId));
+        RegisterPrimary(party, NewServerStringId<MobileParty>(p => p.MobilePartyId));
+        RegisterPrimary(hero.Clan, NewServerStringId<Clan>(p => p.ClanId));
         // CharacterObject is 1:1 with its hero and isn't tracked by the CampaignObjectManager, so we can't mint a
         // "PlayerN" id for it via FindNextUniqueStringId (that only knows campaign object types). Reuse the hero's
         // freshly-assigned unique StringId; the type-prefixed coop key ("CharacterObject_PlayerN") keeps it distinct.
@@ -203,13 +203,13 @@ internal class HeroInterface : IHeroInterface
         RegisterPartyChildren(party);
     }
 
-    private string NewServerStringId<T>(T obj) where T : MBObjectBase
+    private string NewServerStringId<T>(Func<Player, string> reservedId) where T : MBObjectBase
     {
         // FindNextUniqueStringId only avoids ids of objects loaded in the campaign, so also skip ids held
         // by registered players — otherwise a new client can reuse a saved-but-unloaded player's id.
         return NextUnreservedStringId(
             seed => Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<T>(seed),
-            ReservedServerStringIds<T>());
+            ReservedServerStringIds<T>(reservedId));
     }
 
     /// <summary>
@@ -225,29 +225,21 @@ internal class HeroInterface : IHeroInterface
     }
 
     /// <summary>
-    /// The raw StringIds of type <typeparamref name="T"/> already claimed by registered players, used to
-    /// keep a new client off ids that belong to a saved (possibly not-yet-connected) player.
+    /// The raw StringIds of type <typeparamref name="T"/> already claimed by registered players (selected
+    /// per player by <paramref name="reservedId"/>), used to keep a new client off a saved player's id.
     /// </summary>
-    private HashSet<string> ReservedServerStringIds<T>() where T : MBObjectBase
+    private HashSet<string> ReservedServerStringIds<T>(Func<Player, string> reservedId) where T : MBObjectBase
     {
         var reserved = new HashSet<string>();
         foreach (var player in playerManager.Players)
         {
             // Player records store the registered key ("MobileParty_Player430"); strip the "{Type}_"
             // prefix to compare against the raw ids FindNextUniqueStringId produces ("Player430").
-            var registeredId = ReservedPlayerId<T>(player);
+            var registeredId = reservedId(player);
             if (!string.IsNullOrEmpty(registeredId))
                 reserved.Add(StripTypePrefix<T>(registeredId));
         }
         return reserved;
-    }
-
-    private static string ReservedPlayerId<T>(Player player) where T : MBObjectBase
-    {
-        if (typeof(T) == typeof(Hero)) return player.HeroId;
-        if (typeof(T) == typeof(MobileParty)) return player.MobilePartyId;
-        if (typeof(T) == typeof(Clan)) return player.ClanId;
-        return null;
     }
 
     /// <summary>
