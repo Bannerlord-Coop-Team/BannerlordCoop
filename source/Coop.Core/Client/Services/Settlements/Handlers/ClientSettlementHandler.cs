@@ -25,9 +25,6 @@ internal class ClientSettlementHandler : IHandler
         messageBroker.Subscribe<NetworkChangeSettlementCurrentSiegeState>(HandleCurrentSiegeState);
         messageBroker.Subscribe<NetworkChangeSettlementMilitia>(HandleMiltia);
         messageBroker.Subscribe<NetworkChangeSettlementGarrisonWagePaymentLimit>(HandleGarrisonWageLimit);
-        messageBroker.Subscribe<NetworkChangeSettlementNotablesCache>(HandleCollectNotablesToCache);
-        messageBroker.Subscribe<NetworkChangeSettlementAddHeroWithoutParty>(HandleAddHeroWithoutParty);
-        messageBroker.Subscribe<NetworkChangeSettlementRemoveHeroWithoutParty>(HandleRemoveHeroWithoutParty);
         messageBroker.Subscribe<NetworkChangeSettlementMobileParty>(HandleMobileParty);
 
         messageBroker.Subscribe<NetworkChangeWallHitPointsRatio>(HandleHitPointsRatio);
@@ -114,31 +111,6 @@ internal class ClientSettlementHandler : IHandler
 
     }
 
-    private void HandleRemoveHeroWithoutParty(MessagePayload<NetworkChangeSettlementRemoveHeroWithoutParty> payload)
-    {
-        var obj = payload.What;
-
-        var message = new ChangeSettlementHeroWithoutPartyRemove(obj.SettlementId, obj.HeroId);
-
-        messageBroker.Publish(this, message);
-    }
-
-    private void HandleAddHeroWithoutParty(MessagePayload<NetworkChangeSettlementAddHeroWithoutParty> payload)
-    {
-        var obj = payload.What;
-
-        var message = new ChangeSettlementHeroWithoutParty(obj.SettlementId, obj.HeroId);
-
-        messageBroker.Publish(this, message);
-    }
-
-    private void HandleCollectNotablesToCache(MessagePayload<NetworkChangeSettlementNotablesCache> payload)
-    {
-        var obj = payload.What;
-        var message = new ChangeSettlementNotablesCache(obj.SettlementId, obj.NotablesCache);
-        messageBroker.Publish(this, message);
-    }
-
     private void HandleGarrisonWageLimit(MessagePayload<NetworkChangeSettlementGarrisonWagePaymentLimit> payload)
     {
         var obj = payload.What;
@@ -204,7 +176,6 @@ internal class ClientSettlementHandler : IHandler
         messageBroker.Unsubscribe<NetworkChangeSettlementCurrentSiegeState>(HandleCurrentSiegeState);
         messageBroker.Unsubscribe<NetworkChangeSettlementMilitia>(HandleMiltia);
         messageBroker.Unsubscribe<NetworkChangeSettlementGarrisonWagePaymentLimit>(HandleGarrisonWageLimit);
-        messageBroker.Unsubscribe<NetworkChangeSettlementNotablesCache>(HandleCollectNotablesToCache);
         messageBroker.Unsubscribe<NetworkChangeSettlementMobileParty>(HandleMobileParty);
         messageBroker.Unsubscribe<NetworkChangeLastVisitTimeOfOwner>(HandleLastVisitTimeOfOwner);
         messageBroker.Unsubscribe<LordConversationCampaignBehaviourPlayerChangedClaim>(HandleClientCampaignBehaviorClaim);
