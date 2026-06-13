@@ -32,10 +32,7 @@ public class CampaignTimeSyncHandler : IHandler
         this.network = network;
         this.mapTimeTrackerInterface = mapTimeTrackerInterface;
 
-        // Each broadcast re-arms the timer when it finishes instead of auto-resetting, so at most
-        // one callback is ever in flight: a send stalled on a slow consumer delays the next tick
-        // rather than stacking blocked thread pool callbacks behind it.
-        publishTimer = new Timer(PublishIntervalMs) { AutoReset = false };
+        publishTimer = new Timer(PublishIntervalMs) { AutoReset = true };
         publishTimer.Elapsed += PublishCampaignTime;
         publishTimer.Start();
     }
@@ -59,17 +56,6 @@ public class CampaignTimeSyncHandler : IHandler
         catch (Exception ex)
         {
             Logger.Error(ex, "Failed to broadcast {message}", nameof(CampaignTimeUpdated));
-        }
-        finally
-        {
-            try
-            {
-                publishTimer.Start();
-            }
-            catch (ObjectDisposedException)
-            {
-                // Disposed while this broadcast was in flight; no further ticks.
-            }
         }
     }
 }

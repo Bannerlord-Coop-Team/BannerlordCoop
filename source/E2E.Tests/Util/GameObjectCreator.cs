@@ -7,7 +7,6 @@ using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
-using TaleWorlds.CampaignSystem.Settlements.Locations;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
@@ -50,7 +49,6 @@ internal class GameObjectCreator
         { typeof(EquipmentElement), new EquipmentElementBuilder() },
         { typeof(ItemObject), new ItemObjectBuilder() },
         { typeof(Alley), new AlleyBuilder() },
-        { typeof(Location), new LocationBuilder() },
         { typeof(Equipment), new EquipmentBuilder() },
         { typeof(MBCharacterSkills), new DefaultBuilder<MBCharacterSkills>() },
         { typeof(MBEquipmentRoster), new DefaultBuilder<MBEquipmentRoster>() },
