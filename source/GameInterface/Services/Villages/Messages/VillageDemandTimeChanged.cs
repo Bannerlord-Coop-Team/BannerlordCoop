@@ -1,5 +1,4 @@
-﻿using Common.Logging.Attributes;
-using Common.Messaging;
+﻿using Common.Messaging;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Villages.Messages;
@@ -7,7 +6,6 @@ namespace GameInterface.Services.Villages.Messages;
 /// <summary>
 /// Message used when LastDemandTimeSatisfied changes.
 /// </summary>
-[BatchLogMessage]
 public readonly struct VillageDemandTimeChanged : ICommand
 {
     public readonly Village Village;

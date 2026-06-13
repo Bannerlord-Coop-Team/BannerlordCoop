@@ -75,6 +75,26 @@ namespace GameInterface.Services.Kingdoms.Data
         }
 
         /// <summary>
+        /// Resolves an optional object id. A null or empty id represents an intentionally
+        /// absent reference and yields a null object with a successful result; a non-empty
+        /// id must resolve through the object manager.
+        /// </summary>
+        /// <typeparam name="T">type of object to resolve.</typeparam>
+        /// <param name="objectManager">object manager.</param>
+        /// <param name="id">optional StringId, may be null or empty.</param>
+        /// <param name="obj">resolved object, or null when the id is null/empty.</param>
+        /// <returns>True if the id was null/empty or resolved successfully, else false.</returns>
+        protected static bool TryGetOptionalObject<T>(IObjectManager objectManager, string id, out T obj)
+        {
+            if (string.IsNullOrEmpty(id))
+            {
+                obj = default;
+                return true;
+            }
+            return objectManager.TryGetObject(id, out obj);
+        }
+
+        /// <summary>
         /// Tries to get/create the kingdom decision object from the current KingdomDecisionData object.
         /// Implemented in derived class.
         /// </summary>
