@@ -1,5 +1,7 @@
 ﻿using Common.Messaging;
 using Coop.Core.Common;
+using GameInterface;
+using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
 
 namespace Coop.Core.Client.States;
@@ -10,14 +12,17 @@ namespace Coop.Core.Client.States;
 public class MissionState : ClientStateBase
 {
     private readonly IMessageBroker messageBroker;
+    private readonly IGameStateInterface gameStateInterface;
     private readonly ICoopFinalizer coopFinalizer;
 
     public MissionState(
         IClientLogic logic,
         IMessageBroker messageBroker,
+        IGameStateInterface gameStateInterface,
         ICoopFinalizer coopFinalizer) : base(logic)
     {
         this.messageBroker = messageBroker;
+        this.gameStateInterface = gameStateInterface;
         this.coopFinalizer = coopFinalizer;
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Subscribe<CampaignStateEntered>(Handle_CampaignStateEntered);
@@ -48,7 +53,7 @@ public class MissionState : ClientStateBase
 
     public override void EnterMainMenu()
     {
-        messageBroker.Publish(this, new EnterMainMenu());
+        gameStateInterface.GoToMainMenu();
     }
 
     public override void Connect()
@@ -57,7 +62,7 @@ public class MissionState : ClientStateBase
 
     public override void Disconnect()
     {
-        messageBroker.Publish(this, new EnterMainMenu());
+        gameStateInterface.GoToMainMenu();
     }
 
     public override void EnterMissionState()

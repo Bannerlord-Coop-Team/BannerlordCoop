@@ -5,6 +5,7 @@ using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Modules;
 
@@ -19,6 +20,7 @@ public class ValidateModuleState : ClientStateBase
     private readonly INetwork network;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly ICoopFinalizer coopFinalizer;
+    private readonly IGameStateInterface gameStateInterface;
 
     public ValidateModuleState(
         IClientLogic logic,
@@ -26,13 +28,14 @@ public class ValidateModuleState : ClientStateBase
         INetwork network,
         IControllerIdProvider controllerIdProvider,
         ICoopFinalizer coopFinalizer,
+        IGameStateInterface gameStateInterface,
         IModuleInfoProvider moduleInfoProvider) : base(logic)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.controllerIdProvider = controllerIdProvider;
         this.coopFinalizer = coopFinalizer;
-        messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
+        this.gameStateInterface = gameStateInterface;
         messageBroker.Subscribe<NetworkModuleVersionsValidated>(Handle_NetworkModuleVersionsValidated);
         messageBroker.Subscribe<NetworkClientValidated>(Handle_NetworkClientValidated);
         messageBroker.Subscribe<CharacterCreationStarted>(Handle_CharacterCreationStarted);
@@ -48,7 +51,6 @@ public class ValidateModuleState : ClientStateBase
 
     public override void Dispose()
     {
-        messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Unsubscribe<NetworkModuleVersionsValidated>(Handle_NetworkModuleVersionsValidated);
         messageBroker.Unsubscribe<NetworkClientValidated>(Handle_NetworkClientValidated);
         messageBroker.Unsubscribe<CharacterCreationStarted>(Handle_CharacterCreationStarted);
@@ -85,16 +87,8 @@ public class ValidateModuleState : ClientStateBase
         Logic.SetState<CharacterCreationState>();
     }
 
-    internal void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> obj)
-    {
-        coopFinalizer.Finalize("Client has been stopped");
-
-        Logic.SetState<MainMenuState>();
-    }
-
     public override void EnterMainMenu()
     {
-        messageBroker.Publish(this, new EnterMainMenu());
     }
 
     public override void LoadSavedData()
@@ -108,7 +102,10 @@ public class ValidateModuleState : ClientStateBase
 
     public override void Disconnect()
     {
-        messageBroker.Publish(this, new EnterMainMenu());
+        // Finalize tears down coop (EndCoopMode -> DestroyContainer), which disposes the container the
+        // state machine resolves from — so do NOT SetState afterwards (it would resolve from a disposed
+        // container and throw). This matches the teardown in the other states (e.g. CampaignState).
+        coopFinalizer.Finalize("Client has been stopped");
     }
 
     public override void EnterCampaignState()

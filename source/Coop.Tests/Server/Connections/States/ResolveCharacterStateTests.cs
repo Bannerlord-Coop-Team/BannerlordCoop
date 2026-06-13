@@ -56,7 +56,7 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
-        public void TransferSaveMethod_TransitionState_TransferSaveState()
+        public void TransferSaveMethod_TransitionState_LoadingState()
         {
             // Arrange
             connectionLogic.SetState<ResolveCharacterState>();
@@ -64,8 +64,9 @@ namespace Coop.Tests.Server.Connections.States
             // Act
             connectionLogic.TransferSave();
 
-            // Assert
-            Assert.IsType<TransferSaveState>(connectionLogic.State);
+            // Assert — TransferSave sends the save (TransferSaveState) then immediately advances to
+            // LoadingState to await the client entering the campaign.
+            Assert.IsType<LoadingState>(connectionLogic.State);
         }
 
         [Fact]

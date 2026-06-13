@@ -51,7 +51,7 @@ internal class TimeControlInterface : ITimeControlInterface
 
     public void ClientSetTimeControl(TimeControlEnum newMode)
     {
-        TimePatches.OverrideTimeControlMode(Campaign.Current, modeConverter.Convert(newMode));
+        TimePatches.OverrideTimeControlMode(modeConverter.Convert(newMode));
     }
 
     /// <summary>

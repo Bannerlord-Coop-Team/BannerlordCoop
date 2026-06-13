@@ -1,3 +1,4 @@
+using SandBox;
 using ServerHeadless.Bootstrap;
 using ServerHeadless.Bootstrap.Patches;
 using System;
@@ -6,9 +7,9 @@ using System.Linq;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.SaveSystem;
-using SandBox;
 
 namespace ServerHeadless
 {
@@ -248,6 +249,7 @@ namespace ServerHeadless
             // This (main) thread is the Coop game-loop thread, then start the server + load the save
             // through the Coop mod (StartAsServer + HostSaveGame), driven by reflection.
             CoopServerLauncher.Initialize();
+            CoopServerLauncher.AttachConsoleLog();
             CoopServerLauncher.HostSaveGameAsServer(save.Name);
 
             // HostSaveGame -> StartAsServer + LoadGame has pushed a GameLoadingState; advance it.

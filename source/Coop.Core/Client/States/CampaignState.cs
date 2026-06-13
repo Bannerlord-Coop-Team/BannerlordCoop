@@ -5,6 +5,7 @@ using Common.Network;
 using Coop.Core.Client.Messages;
 using Coop.Core.Common;
 using Coop.Core.Server.Connections.Messages;
+using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.UI.Interfaces;
 
@@ -16,6 +17,7 @@ namespace Coop.Core.Client.States;
 public class CampaignState : ClientStateBase
 {
     private readonly IMessageBroker messageBroker;
+    private readonly IGameStateInterface gameStateInterface;
     private readonly ICoopFinalizer coopFinalizer;
 
     public CampaignState(
@@ -23,9 +25,11 @@ public class CampaignState : ClientStateBase
         IMessageBroker messageBroker,
         INetwork network,
         ILoadingInterface loadingInterface,
+        IGameStateInterface gameStateInterface,
         ICoopFinalizer coopFinalizer) : base(logic)
     {
         this.messageBroker = messageBroker;
+        this.gameStateInterface = gameStateInterface;
         this.coopFinalizer = coopFinalizer;
 
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
@@ -64,12 +68,12 @@ public class CampaignState : ClientStateBase
 
     public override void EnterMissionState()
     {
-        messageBroker.Publish(this, new EnterMissionState());
+        // Mission state may be removed in the future
     }
 
     public override void EnterMainMenu()
     {
-        messageBroker.Publish(this, new EnterMainMenu());
+        gameStateInterface.GoToMainMenu();
     }
 
     public override void Connect()
@@ -78,7 +82,7 @@ public class CampaignState : ClientStateBase
 
     public override void Disconnect()
     {
-        messageBroker.Publish(this, new EnterMainMenu());
+        gameStateInterface.GoToMainMenu();
     }
 
     public override void ExitGame()
