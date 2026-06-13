@@ -1,5 +1,4 @@
-﻿using Common.Logging.Attributes;
-using Common.Messaging;
+﻿using Common.Messaging;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Settlements.Messages;
@@ -7,7 +6,6 @@ namespace GameInterface.Services.Settlements.Messages;
 /// <summary>
 /// Used to let server send message when siege state changes.
 /// </summary>
-[BatchLogMessage]
 public readonly struct SettlementChangedCurrentSiegeState : IEvent
 {
     public readonly Settlement Settlement;

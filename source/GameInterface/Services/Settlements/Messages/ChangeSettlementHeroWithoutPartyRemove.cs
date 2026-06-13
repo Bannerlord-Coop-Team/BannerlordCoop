@@ -1,16 +1,10 @@
-﻿using Common.Logging.Attributes;
-using Common.Messaging;
-using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using Common.Messaging;
 
 namespace GameInterface.Services.Settlements.Messages;
-
 
 /// <summary>
 /// Remove A Hero in Settlement HeroWithoutParty cache
 /// </summary>
-[BatchLogMessage]
 public record ChangeSettlementHeroWithoutPartyRemove : ICommand
 {
     public string SettlementId { get; }

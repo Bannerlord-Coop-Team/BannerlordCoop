@@ -1,4 +1,3 @@
-using Common.Logging.Attributes;
 using Common.Messaging;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -7,7 +6,6 @@ namespace GameInterface.Services.Villages.Messages;
 /// <summary>
 /// When village tax has changed.
 /// </summary>
-[BatchLogMessage]
 public readonly struct VillageTaxAccumulateChanged : ICommand
 {
     public readonly Village Village;

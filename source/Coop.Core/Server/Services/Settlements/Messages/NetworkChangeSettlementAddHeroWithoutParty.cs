@@ -1,5 +1,4 @@
-﻿using Common.Logging.Attributes;
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
 
 namespace Coop.Core.Server.Services.Settlements.Messages;
@@ -9,7 +8,6 @@ namespace Coop.Core.Server.Services.Settlements.Messages;
 /// Notifies clients of settlement addherowithout party change
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-[BatchLogMessage]
 public readonly struct NetworkChangeSettlementAddHeroWithoutParty : IEvent
 {
     [ProtoMember(1)]
