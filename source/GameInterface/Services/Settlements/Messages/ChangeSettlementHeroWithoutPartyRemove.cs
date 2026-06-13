@@ -1,10 +1,6 @@
 ﻿using Common.Messaging;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace GameInterface.Services.Settlements.Messages;
-
 
 /// <summary>
 /// Remove A Hero in Settlement HeroWithoutParty cache
