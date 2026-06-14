@@ -39,3 +39,21 @@ internal readonly struct ChangeAutoRecruitForSettlement : ICommand
         Value = value;
     }
 }
+
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct ChangeAutoRecruitForSettlementClients : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string HomeSettlementId;
+
+    [ProtoMember(2)]
+    public readonly bool Value;
+
+    public ChangeAutoRecruitForSettlementClients(
+        string homeSettlementId,
+        bool value)
+    {
+        HomeSettlementId = homeSettlementId;
+        Value = value;
+    }
+}

@@ -58,13 +58,3 @@ public readonly struct ClanPartyDisbanded : IEvent
         SelectedParty = selectedParty;
     }
 }
-
-public readonly struct ClanPartiesVMFinalized : IEvent
-{
-    public readonly Dictionary<PartyComponent, int> PartyComponentNewWageLimits;
-
-    public ClanPartiesVMFinalized(Dictionary<PartyComponent, int> partyComponentWageNewLimits)
-    {
-        PartyComponentNewWageLimits = partyComponentWageNewLimits;
-    }
-}

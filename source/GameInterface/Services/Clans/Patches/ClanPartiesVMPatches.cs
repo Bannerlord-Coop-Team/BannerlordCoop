@@ -56,31 +56,4 @@ internal class ClanPartiesVMPatches
 
         return false;
     }
-
-    [HarmonyPatch(nameof(ClanPartiesVM.OnFinalize))]
-    [HarmonyPostfix]
-    public static void OnFinalizePostfix(ref ClanPartiesVM __instance)
-    {
-        var partyComponentNewLimits = new Dictionary<PartyComponent, int>();
-        foreach (var partyItem in __instance.Parties)
-        {
-            var partyComponent = partyItem.ExpenseItem._mobileParty._partyComponent;
-            int newLimit = 0;
-            if (partyComponent is LordPartyComponent)
-            {
-                newLimit = partyComponent.WagePaymentLimit;
-            }
-            else if (partyComponent is GarrisonPartyComponent component)
-            {
-                newLimit = component.Settlement.GarrisonWagePaymentLimit;
-            }
-
-            partyComponentNewLimits[partyComponent] = newLimit;
-        }
-
-        // Send new party wage limit settings to server to sync
-        // Do this as part of the finalization to avoid syncing sliders every time they change
-        var message = new ClanPartiesVMFinalized(partyComponentNewLimits);
-        MessageBroker.Instance.Publish(__instance, message);
-    }
 }

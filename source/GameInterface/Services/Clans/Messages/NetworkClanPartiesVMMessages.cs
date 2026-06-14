@@ -76,15 +76,3 @@ internal readonly struct DisbandClanParty : ICommand
         SelectedPartyId = selectedPartyId;
     }
 }
-
-[ProtoContract(SkipConstructor = true)]
-internal readonly struct FinalizeClanPartiesVM : ICommand
-{
-    [ProtoMember(1)]
-    public readonly Dictionary<string, int> PartyComponentIdNewWageLimits;
-
-    public FinalizeClanPartiesVM(Dictionary<string, int> partyComponentIdNewWageLimits)
-    {
-        PartyComponentIdNewWageLimits = partyComponentIdNewWageLimits;
-    }
-}

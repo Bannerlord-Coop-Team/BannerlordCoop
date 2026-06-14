@@ -36,8 +36,6 @@ internal class ClanPartiesVMHandler : IHandler
         messageBroker.Subscribe<ChangeClanPartyLeader>(Handle_ChangeClanPartyLeader);
         messageBroker.Subscribe<ClanPartyDisbanded>(Handle_ClanPartyDisbanded);
         messageBroker.Subscribe<DisbandClanParty>(Handle_DisbandClanParty);
-        messageBroker.Subscribe<ClanPartiesVMFinalized>(Handle_ClanPartiesVMFinalized);
-        messageBroker.Subscribe<FinalizeClanPartiesVM>(Handle_FinalizeClanPartiesVM);
     }
 
     public void Dispose()
@@ -48,8 +46,6 @@ internal class ClanPartiesVMHandler : IHandler
         messageBroker.Unsubscribe<ChangeClanPartyLeader>(Handle_ChangeClanPartyLeader);
         messageBroker.Unsubscribe<ClanPartyDisbanded>(Handle_ClanPartyDisbanded);
         messageBroker.Unsubscribe<DisbandClanParty>(Handle_DisbandClanParty);
-        messageBroker.Unsubscribe<ClanPartiesVMFinalized>(Handle_ClanPartiesVMFinalized);
-        messageBroker.Unsubscribe<FinalizeClanPartiesVM>(Handle_FinalizeClanPartiesVM);
     }
 
     private void Handle_NewClanPartyCreated(MessagePayload<NewClanPartyCreated> obj)
@@ -140,29 +136,5 @@ internal class ClanPartiesVMHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.SelectedPartyId, out var selectedParty)) return;
 
         DisbandPartyAction.StartDisband(selectedParty);
-    }
-
-    private void Handle_ClanPartiesVMFinalized(MessagePayload<ClanPartiesVMFinalized> obj)
-    {
-        var partyComponentIdNewWageLimits = new Dictionary<string, int>();
-        foreach (var partyComponentNewWageLimit in obj.What.PartyComponentNewWageLimits)
-        {
-            if (!objectManager.TryGetIdWithLogging(partyComponentNewWageLimit.Key, out var currentPartyComponentId)) continue;
-
-            partyComponentIdNewWageLimits[currentPartyComponentId] = partyComponentNewWageLimit.Value;
-        }
-
-        network.SendAll(new FinalizeClanPartiesVM(partyComponentIdNewWageLimits));
-    }
-
-    private void Handle_FinalizeClanPartiesVM(MessagePayload<FinalizeClanPartiesVM> obj)
-    {
-        // Set wage limits for every component. Since its setting a value, shouldn't have any problem for the changing client
-        foreach (var partyComponentIdNewWageLimit in obj.What.PartyComponentIdNewWageLimits)
-        {
-            if (!objectManager.TryGetObjectWithLogging<PartyComponent>(partyComponentIdNewWageLimit.Key, out var currentPartyComponent)) continue;
-
-            currentPartyComponent.SetWagePaymentLimit(partyComponentIdNewWageLimit.Value);
-        }
     }
 }

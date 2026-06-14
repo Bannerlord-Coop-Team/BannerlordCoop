@@ -64,6 +64,8 @@ internal class TroopRosterInterface : ITroopRosterInterface
 
     public List<TroopRosterElement> UnpackTroopRosterData(TroopRosterData troopRosterData, Hero mainHero = null)
     {
+        if (troopRosterData.Data == null) return new();
+
         var unpackedData = new List<TroopRosterElement>();
         foreach (var elementData in troopRosterData.Data)
         {

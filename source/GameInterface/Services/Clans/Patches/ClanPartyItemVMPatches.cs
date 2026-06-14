@@ -25,8 +25,7 @@ internal class ClanPartyItemVMPatches
 
         return false;
     }
-
-    /*
+    
     [HarmonyPatch(nameof(ClanPartyItemVM.OnAutoRecruitChanged))]
     [HarmonyPrefix]
     public static bool OnAutoRecruitChangedPrefix(ref ClanPartyItemVM __instance, bool value)
@@ -44,28 +43,5 @@ internal class ClanPartyItemVMPatches
 
         return false;
     }
-    */
 
-    /*
-    [HarmonyPatch(nameof(ClanPartyItemVM.OnFinalize))]
-    [HarmonyPostfix]
-    public static void OnFinalizePostfix(ref ClanPartyItemVM __instance)
-    {
-        var partyComponent = __instance.ExpenseItem._mobileParty._partyComponent;
-        int newLimit = 0;
-        if (partyComponent is LordPartyComponent)
-        {
-            newLimit = partyComponent.WagePaymentLimit;
-        }
-        else if (partyComponent is GarrisonPartyComponent component)
-        {
-            newLimit = component.Settlement.GarrisonWagePaymentLimit;
-        }
-
-        // Send new party wage limit settings to server to sync
-        // Do this as part of the finalization to avoid syncing the slider every time it changes
-        var message = new ClanPartyItemVMFinalized(partyComponent, newLimit);
-        MessageBroker.Instance.Publish(__instance, message);
-    }
-    */
 }
