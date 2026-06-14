@@ -3,6 +3,7 @@ using Common.Logging;
 using GameInterface.Policies;
 using HarmonyLib;
 using Serilog;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Stances.Patches
@@ -19,13 +20,6 @@ namespace GameInterface.Services.Stances.Patches
     {
         private static readonly ILogger Logger = LogManager.GetLogger<FactionManagerPatches>();
 
-        [HarmonyPatch("AddStance")]
-        [HarmonyPrefix]
-        private static bool AddStancePrefix()
-        {
-            return true;
-        }
-
         // Faction-elimination stance cleanup (RemoveFactionsFromCampaignWars) is not yet synced.
         [HarmonyPatch("RemoveStance")]
         [HarmonyPrefix]
@@ -36,33 +30,32 @@ namespace GameInterface.Services.Stances.Patches
 
         [HarmonyPatch("SetStance")]
         [HarmonyPrefix]
-        private static bool SetStancePrefix()
+        private static bool SetStancePrefix(MethodBase __originalMethod)
         {
-            // SetStance is private, so it cannot be referenced via nameof from here.
-            return AllowStanceMutation("SetStance");
+            return AllowStanceMutation(__originalMethod);
         }
 
         [HarmonyPatch("DeclareWar")]
         [HarmonyPrefix]
-        private static bool DeclareWarPrefix()
+        private static bool DeclareWarPrefix(MethodBase __originalMethod)
         {
-            return AllowStanceMutation(nameof(FactionManager.DeclareWar));
+            return AllowStanceMutation(__originalMethod);
         }
 
         [HarmonyPatch("SetNeutral")]
         [HarmonyPrefix]
-        private static bool SetNeutralPrefix()
+        private static bool SetNeutralPrefix(MethodBase __originalMethod)
         {
-            return AllowStanceMutation(nameof(FactionManager.SetNeutral));
+            return AllowStanceMutation(__originalMethod);
         }
 
-        private static bool AllowStanceMutation(string method)
+        private static bool AllowStanceMutation(MethodBase originalMethod)
         {
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client called unmanaged FactionManager.{method}", method);
+                Logger.Error("Client called unmanaged FactionManager.{method}", originalMethod.Name);
                 return false;
             }
 
