@@ -94,7 +94,7 @@ public class ObjectManager : IObjectManager
 {
     private readonly ILogger logger;
 
-    protected readonly Dictionary<string, object> idObjs = new Dictionary<string, object>();
+    protected readonly ConcurrentDictionary<string, object> idObjs = new ConcurrentDictionary<string, object>();
     protected ConditionalWeakTable<object, string> objsIds = new ConditionalWeakTable<object, string>();
 
     private readonly ConcurrentDictionary<Type, int> objectCounters = new ConcurrentDictionary<Type, int>();
@@ -117,19 +117,18 @@ public class ObjectManager : IObjectManager
             // Skip to next id
             GetUniqueTypeId(obj);
 
-            if (idObjs.ContainsKey(id))
-            {
-                logger.Error("Duplicate id: {id}", id);
-                return false;
-            }
-
             if (objsIds.TryGetValue(obj, out var _))
             {
                 logger.Error("Object already registered: {ObjectType}", obj.GetType());
                 return false;
             }
 
-            idObjs.Add(id, obj);
+            if (!idObjs.TryAdd(id, obj))
+            {
+                logger.Error("Duplicate id: {id}", id);
+                return false;
+            }
+
             objsIds.Add(obj, id);
 
             return true;
@@ -151,7 +150,7 @@ public class ObjectManager : IObjectManager
 
             newId = $"{obj.GetType().Name}_{GetUniqueTypeId(obj)}";
 
-            if (idObjs.ContainsKey(newId))
+            if (!idObjs.TryAdd(newId, obj))
             {
                 logger.Error(
                     "Generated duplicate id {Id} for object type {ObjectType}",
@@ -161,7 +160,6 @@ public class ObjectManager : IObjectManager
                 return false;
             }
 
-            idObjs.Add(newId, obj);
             objsIds.Add(obj, newId);
 
             return true;
@@ -207,17 +205,17 @@ public class ObjectManager : IObjectManager
     {
         if (obj == null) return false;
 
-        return objsIds.TryGetValue(obj, out var _);
+        lock (_gate)
+        {
+            return objsIds.TryGetValue(obj, out var _);
+        }
     }
 
     public bool Contains(string id)
     {
         if (string.IsNullOrEmpty(id)) return false;
 
-        lock (_gate)
-        {
-            return idObjs.ContainsKey(id);
-        }
+        return idObjs.ContainsKey(id);
     }
 
     public bool TryGetId(object obj, out string id)
@@ -236,8 +234,9 @@ public class ObjectManager : IObjectManager
 
         if (string.IsNullOrEmpty(id)) return false;
 
-        if (!idObjs.TryGetValue(id, out var storedObj) 
-            && !idObjs.TryGetValue($"{typeof(T).Name}_{id}", out storedObj)) { // If object not found also attempt with prefixed type name
+        if (!idObjs.TryGetValue(id, out var storedObj)
+            && !idObjs.TryGetValue($"{typeof(T).Name}_{id}", out storedObj)) // If object not found also attempt with prefixed type name
+        {
             return false;
         }
 
@@ -256,11 +255,11 @@ public class ObjectManager : IObjectManager
     {
         if (obj == null) return false;
 
-        if (objsIds.TryGetValue(obj, out var id) == false) return false;
-
         lock (_gate)
         {
-            return idObjs.Remove(id) && objsIds.Remove(obj);
+            if (objsIds.TryGetValue(obj, out var id) == false) return false;
+
+            return idObjs.TryRemove(id, out _) && objsIds.Remove(obj);
         }
     }
 
