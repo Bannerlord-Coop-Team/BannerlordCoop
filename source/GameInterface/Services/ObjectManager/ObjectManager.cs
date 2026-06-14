@@ -94,10 +94,6 @@ public class ObjectManager : IObjectManager
 {
     private readonly ILogger logger;
 
-    // idObjs (ConcurrentDictionary) and objsIds (ConditionalWeakTable) are both safe for lock-free
-    // reads, so the lookup methods take no lock. They are inverse indexes that must stay consistent,
-    // and writes run concurrently on the game thread (object construction) and the network poller
-    // thread, so the write methods serialize on _gate to keep the pair updated atomically.
     protected readonly ConcurrentDictionary<string, object> idObjs = new ConcurrentDictionary<string, object>();
     protected ConditionalWeakTable<object, string> objsIds = new ConditionalWeakTable<object, string>();
 
@@ -121,19 +117,18 @@ public class ObjectManager : IObjectManager
             // Skip to next id
             GetUniqueTypeId(obj);
 
-            if (idObjs.ContainsKey(id))
-            {
-                logger.Error("Duplicate id: {id}", id);
-                return false;
-            }
-
             if (objsIds.TryGetValue(obj, out var _))
             {
                 logger.Error("Object already registered: {ObjectType}", obj.GetType());
                 return false;
             }
 
-            idObjs[id] = obj;
+            if (!idObjs.TryAdd(id, obj))
+            {
+                logger.Error("Duplicate id: {id}", id);
+                return false;
+            }
+
             objsIds.Add(obj, id);
 
             return true;
@@ -155,7 +150,7 @@ public class ObjectManager : IObjectManager
 
             newId = $"{obj.GetType().Name}_{GetUniqueTypeId(obj)}";
 
-            if (idObjs.ContainsKey(newId))
+            if (!idObjs.TryAdd(newId, obj))
             {
                 logger.Error(
                     "Generated duplicate id {Id} for object type {ObjectType}",
@@ -165,7 +160,6 @@ public class ObjectManager : IObjectManager
                 return false;
             }
 
-            idObjs[newId] = obj;
             objsIds.Add(obj, newId);
 
             return true;
