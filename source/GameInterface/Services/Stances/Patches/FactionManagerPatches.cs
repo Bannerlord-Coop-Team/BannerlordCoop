@@ -8,7 +8,7 @@ using TaleWorlds.CampaignSystem;
 namespace GameInterface.Services.Stances.Patches
 {
     /// <summary>
-    /// Routes <see cref="FactionManager"/> stance mutations through coop sync. The war/peace
+    /// Gates <see cref="FactionManager"/> stance mutations for replication. The war/peace
     /// announcements happen at the action funnels (<see cref="DeclareWarActionPatch"/> /
     /// <see cref="MakePeaceActionPatch"/>); these prefixes only let the stance mutation run on the
     /// server (live) and on the receive path (under AllowedThread), while blocking a client from

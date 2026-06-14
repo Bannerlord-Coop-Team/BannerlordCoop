@@ -14,8 +14,8 @@ using TaleWorlds.Library;
 namespace GameInterface.Services.Kingdoms.Patches
 {
     /// <summary>
-    /// Re-enables <see cref="KingdomDecisionProposalBehavior"/> on the server with coop-safe
-    /// behaviour. The vanilla behaviour both proposes AI kingdom decisions (in DailyTickClan)
+    /// Re-enables <see cref="KingdomDecisionProposalBehavior"/> on the server. The vanilla
+    /// behaviour both proposes AI kingdom decisions (in DailyTickClan)
     /// and drains the unresolved queue (in HourlyTick / the diplomacy listeners). Both are
     /// keyed off the player clan / main hero, which do not meaningfully exist on the dedicated
     /// host, so this patch:
@@ -43,7 +43,7 @@ namespace GameInterface.Services.Kingdoms.Patches
         public static bool RegisterEventsPrefix() => ModInformation.IsServer;
 
         /// <summary>
-        /// Coop-safe replacement for the per-clan daily proposer. Mirrors the vanilla logic but
+        /// Replacement for the per-clan daily proposer. Mirrors the vanilla logic but
         /// drops the Clan.PlayerClan / Hero.MainHero dependencies and proposes only war/peace/policy.
         /// Proposed decisions flow through the live Kingdom.AddDecision funnel, which resolves
         /// player-free kingdoms immediately and queues the rest for the hourly sweep.
@@ -54,7 +54,7 @@ namespace GameInterface.Services.Kingdoms.Patches
         {
             if (ModInformation.IsClient) return false;
 
-            // Co-op equivalent of vanilla's `clan == Clan.PlayerClan` skip: never auto-propose for
+            // Mirrors vanilla's `clan == Clan.PlayerClan` skip: never auto-propose for
             // a connected player's own clan. Clan.PlayerClan is the vestigial launcher clan on the
             // dedicated host, so the player set is the replicated GetPlayerMobileParties registry.
             // Proposing here would spend the player's influence and author a decision in their name.

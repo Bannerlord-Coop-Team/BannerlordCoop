@@ -14,8 +14,8 @@ using TaleWorlds.CampaignSystem.Election;
 namespace GameInterface.Services.Kingdoms.Patches
 {
     /// <summary>
-    /// Routes <see cref="Kingdom"/> decision and policy mutations through coop sync so the
-    /// authoritative server replicates them to every client.
+    /// Routes <see cref="Kingdom"/> decision and policy mutations so the authoritative
+    /// server replicates them to every client.
     /// </summary>
     /// <seealso cref="PolicyObject"/>
     [HarmonyPatch(typeof(Kingdom))]

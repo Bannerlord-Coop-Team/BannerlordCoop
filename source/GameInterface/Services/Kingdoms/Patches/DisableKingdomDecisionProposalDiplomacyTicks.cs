@@ -8,7 +8,7 @@ namespace GameInterface.Services.Kingdoms.Patches
     /// <summary>
     /// Disables the diplomacy / lifecycle listeners of <see cref="KingdomDecisionProposalBehavior"/>
     /// that drain the unresolved queue via the vanilla, player-keyed UpdateKingdomDecisions
-    /// (which uses a non-coop election path). The coop sweep in
+    /// (which uses the player-driven election path). The sweep in
     /// <see cref="CoopKingdomDecisionProposalBehaviorPatch"/> is the sole authority for draining.
     /// DailyTick (queue pruning) and OnKingdomDecisionAdded (dedup tracking) are intentionally
     /// left enabled.
