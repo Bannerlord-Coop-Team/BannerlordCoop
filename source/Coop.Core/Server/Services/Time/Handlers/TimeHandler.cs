@@ -86,7 +86,6 @@ public class TimeHandler : IHandler
         var loadingPeers = connections.LoadingPeers;
         if (loadingPeers.Count() > 0)
         {
-
             Logger.Information($"{string.Join(",", loadingPeers.Select(p => p.Peer.Address))} are currently loading, unable to change time");
             return false;
         }

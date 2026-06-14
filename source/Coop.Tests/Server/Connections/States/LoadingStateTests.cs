@@ -73,7 +73,6 @@ namespace Coop.Tests.Server.Connections.States
                 playerPeer, new NetworkPlayerCampaignEntered());
             currentState.PlayerCampaignEnteredHandler(payload);
 
-
             // Assert
             Assert.Single(serverComponent.TestMessageBroker.GetMessagesFromType<PlayerCampaignEntered>());
 
@@ -90,7 +89,6 @@ namespace Coop.Tests.Server.Connections.States
             var payload = new MessagePayload<NetworkPlayerCampaignEntered>(
                 differentPeer, new NetworkPlayerCampaignEntered());
             currentState.PlayerCampaignEnteredHandler(payload);
-
 
             // Assert
             Assert.Empty(serverComponent.TestMessageBroker.GetMessagesFromType<PlayerCampaignEntered>());
