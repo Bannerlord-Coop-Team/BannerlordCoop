@@ -173,6 +173,10 @@ internal class PlayerCaptivityServerHandler : IHandler
 
         ReleasePlayerFromCaptivity(playerHero, playerParty, payload.What.Detail, facilitator, payload.What.PlayerPartyPosition);
 
+        if (payload.What.Detail == EndCaptivityDetail.Ransom && payload.What.RansomAmount!=0)
+        {
+            GiveGoldAction.ApplyBetweenCharacters(playerHero, null, payload.What.RansomAmount, false);
+        }
         var message = new NetworkPlayerCaptivityEnded();
         network.Send(payload.Who as NetPeer, message);
     }

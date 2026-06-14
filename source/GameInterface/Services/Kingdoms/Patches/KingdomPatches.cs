@@ -14,7 +14,8 @@ using TaleWorlds.CampaignSystem.Election;
 namespace GameInterface.Services.Kingdoms.Patches
 {
     /// <summary>
-    /// Disables functionality of policies in game.
+    /// Routes <see cref="Kingdom"/> decision and policy mutations so the authoritative
+    /// server replicates them to every client.
     /// </summary>
     /// <seealso cref="PolicyObject"/>
     [HarmonyPatch(typeof(Kingdom))]
@@ -103,16 +104,54 @@ namespace GameInterface.Services.Kingdoms.Patches
 
         [HarmonyPatch("AddPolicy")]
         [HarmonyPrefix]
-        public static bool AddPolicyPrefix()
+        public static bool AddPolicyPrefix(Kingdom __instance, PolicyObject policy)
         {
-            return false;
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+            if (ModInformation.IsClient) return false;
+
+            // Vanilla AddPolicy is an idempotent no-op when the policy is already active; only
+            // announce a change that will actually take effect.
+            if (!__instance.ActivePolicies.Contains(policy))
+            {
+                MessageBroker.Instance.Publish(__instance, new KingdomPolicyChanged(__instance, policy, isAdd: true));
+            }
+            return true;
         }
 
         [HarmonyPatch("RemovePolicy")]
         [HarmonyPrefix]
-        public static bool RemovePolicyPrefix()
+        public static bool RemovePolicyPrefix(Kingdom __instance, PolicyObject policy)
         {
-            return false;
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+            if (ModInformation.IsClient) return false;
+
+            // Vanilla RemovePolicy is an idempotent no-op when the policy is not active; only
+            // announce a change that will actually take effect.
+            if (__instance.ActivePolicies.Contains(policy))
+            {
+                MessageBroker.Instance.Publish(__instance, new KingdomPolicyChanged(__instance, policy, isAdd: false));
+            }
+            return true;
+        }
+
+        public static void RunChangeKingdomPolicy(Kingdom kingdom, PolicyObject policy, bool isAdd)
+        {
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                using (new AllowedThread())
+                {
+                    if (isAdd)
+                    {
+                        kingdom.AddPolicy(policy);
+                    }
+                    else
+                    {
+                        kingdom.RemovePolicy(policy);
+                    }
+                }
+            }, true);
         }
     }
 }

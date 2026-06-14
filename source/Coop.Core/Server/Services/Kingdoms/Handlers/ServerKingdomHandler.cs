@@ -22,6 +22,18 @@ public class ServerKingdomHandler : IHandler
         this.objectManager = objectManager;
         messageBroker.Subscribe<DecisionAdded>(HandleLocalDecisionAdded);
         messageBroker.Subscribe<DecisionRemoved>(HandleLocalDecisionRemoved);
+        messageBroker.Subscribe<KingdomPolicyChanged>(HandleLocalKingdomPolicyChanged);
+    }
+
+    private void HandleLocalKingdomPolicyChanged(MessagePayload<KingdomPolicyChanged> obj)
+    {
+        var payload = obj.What;
+
+        if (!objectManager.TryGetIdWithLogging(payload.Kingdom, out var kingdomId)) return;
+        if (!objectManager.TryGetIdWithLogging(payload.Policy, out var policyId)) return;
+
+        var message = new NetworkChangeKingdomPolicy(kingdomId, policyId, payload.IsAdd);
+        network.SendAll(message);
     }
 
     private void HandleLocalDecisionRemoved(MessagePayload<DecisionRemoved> obj)
@@ -49,5 +61,6 @@ public class ServerKingdomHandler : IHandler
     {
         messageBroker.Unsubscribe<DecisionAdded>(HandleLocalDecisionAdded);
         messageBroker.Unsubscribe<DecisionRemoved>(HandleLocalDecisionRemoved);
+        messageBroker.Unsubscribe<KingdomPolicyChanged>(HandleLocalKingdomPolicyChanged);
     }
 }
