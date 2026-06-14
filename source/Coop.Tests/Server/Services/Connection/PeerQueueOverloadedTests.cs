@@ -89,6 +89,7 @@ public class PeerQueueOverloadedTests
         var netPeer = TestNetwork.CreatePeer();
         /// Queue length greater than 0 so <see cref="PeerQueueOverloadedHandler.Poll"/> does not resume the game
         netPeer.SetQueueLength(1);
+        netPeer.SetConnected();
 
         // Act
         /// This is handled by <see cref="PeerQueueOverloadedHandler.Handle_PeerQueueCongested"/>
@@ -110,6 +111,7 @@ public class PeerQueueOverloadedTests
 
         var netPeer = TestNetwork.CreatePeer();
         netPeer.SetQueueLength(1);
+        netPeer.SetConnected();
 
         // Act
         TestMessageBroker.Publish(this, new PeerQueueCongested(netPeer));
@@ -130,6 +132,7 @@ public class PeerQueueOverloadedTests
 
         var netPeer = TestNetwork.CreatePeer();
         netPeer.SetQueueLength(1);
+        netPeer.SetConnected();
 
         // Act
         /// The same client crosses the slow-down threshold, then the pause threshold.
@@ -164,8 +167,10 @@ public class PeerQueueOverloadedTests
 
         var overloadedPeer = TestNetwork.CreatePeer();
         overloadedPeer.SetQueueLength(1);
-        var congestedPeer = TestNetwork.CreatePeer();
+        overloadedPeer.SetConnected();
+        var congestedPeer = TestNetwork.CreatePeer("127.0.0.2");
         congestedPeer.SetQueueLength(1);
+        congestedPeer.SetConnected();
 
         // Act
         TestMessageBroker.Publish(this, new PeerQueueOverloaded(overloadedPeer));
@@ -200,6 +205,7 @@ public class PeerQueueOverloadedTests
         // Act
         var congestedPeer = TestNetwork.CreatePeer();
         congestedPeer.SetQueueLength(1);
+        congestedPeer.SetConnected();
         TestMessageBroker.Publish(this, new PeerQueueCongested(congestedPeer));
         handler.Poller.Stop();
 
@@ -209,8 +215,9 @@ public class PeerQueueOverloadedTests
         Assert.False(handler.SlowDownPolicy());
 
         // Act
-        var overloadedPeer = TestNetwork.CreatePeer();
+        var overloadedPeer = TestNetwork.CreatePeer("127.0.0.2");
         overloadedPeer.SetQueueLength(1);
+        overloadedPeer.SetConnected();
         TestMessageBroker.Publish(this, new PeerQueueOverloaded(overloadedPeer));
         handler.Poller.Stop();
 

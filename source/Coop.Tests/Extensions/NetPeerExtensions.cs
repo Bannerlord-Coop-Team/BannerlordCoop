@@ -16,6 +16,7 @@ namespace Coop.Tests.Extensions
     {
         private static readonly FieldInfo Id = typeof(NetPeer).GetField(nameof(NetPeer.Id))!;
         private static readonly FieldInfo _channels = typeof(NetPeer).GetField("_channels", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static readonly FieldInfo _connectionState = typeof(NetPeer).GetField("_connectionState", BindingFlags.NonPublic | BindingFlags.Instance)!;
 
         private static readonly ConstructorInfo ctor = typeof(NetPeer).GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance, new Type[]
         {
@@ -26,6 +27,15 @@ namespace Coop.Tests.Extensions
         public static void SetId(this NetPeer peer, int id)
         {
             Id.SetValue(peer, id);
+        }
+
+        /// <summary>
+        /// Marks the peer as connected. Queue-length catch-up checks only apply to connected peers, so a test
+        /// peer must be flagged connected for its <see cref="SetQueueLength"/> backlog to be observed.
+        /// </summary>
+        public static void SetConnected(this NetPeer peer)
+        {
+            _connectionState.SetValue(peer, ConnectionState.Connected);
         }
 
         public static void Setup(this NetPeer peer, int id, string iPAddress = "127.0.0.1")
