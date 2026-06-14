@@ -207,7 +207,10 @@ public class ObjectManager : IObjectManager
     {
         if (obj == null) return false;
 
-        return objsIds.TryGetValue(obj, out var _);
+        lock (_gate)
+        {
+            return objsIds.TryGetValue(obj, out var _);
+        }
     }
 
     public bool Contains(string id)
@@ -236,9 +239,14 @@ public class ObjectManager : IObjectManager
 
         if (string.IsNullOrEmpty(id)) return false;
 
-        if (!idObjs.TryGetValue(id, out var storedObj) 
-            && !idObjs.TryGetValue($"{typeof(T).Name}_{id}", out storedObj)) { // If object not found also attempt with prefixed type name
-            return false;
+        object storedObj;
+        lock (_gate)
+        {
+            if (!idObjs.TryGetValue(id, out storedObj)
+                && !idObjs.TryGetValue($"{typeof(T).Name}_{id}", out storedObj)) // If object not found also attempt with prefixed type name
+            {
+                return false;
+            }
         }
 
         if (storedObj is not T castedObject)
@@ -256,10 +264,10 @@ public class ObjectManager : IObjectManager
     {
         if (obj == null) return false;
 
-        if (objsIds.TryGetValue(obj, out var id) == false) return false;
-
         lock (_gate)
         {
+            if (objsIds.TryGetValue(obj, out var id) == false) return false;
+
             return idObjs.Remove(id) && objsIds.Remove(obj);
         }
     }
