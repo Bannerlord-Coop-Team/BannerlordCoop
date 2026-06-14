@@ -1,14 +1,12 @@
 ﻿using Common.Logging;
 using Common.Messaging;
-using Common.Network;
 using GameInterface.Registry;
-using GameInterface.Registry.Messages;
-using GameInterface.Services.GameDebug.Interfaces;
-using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
+using GameInterface.Services.UI.Interfaces;
 using Serilog;
 
 namespace Coop.Core.Server.States;
@@ -23,22 +21,25 @@ public class InitialServerState : ServerStateBase
     private readonly IMessageBroker messageBroker;
     private readonly IRegistryManager registryManager;
     private readonly IModuleValidator moduleValidator;
-    private readonly IDebugGameInterface debugGameInterface;
+    private readonly IGameStateInterface gameStateInterface;
+    private readonly ILoadingInterface loadingInterface;
     private readonly IModuleInfoProvider moduleInfoProvider;
 
     public InitialServerState(
         IServerLogic context,
         IMessageBroker messageBroker,
         IRegistryManager registryManager,
+        IModuleInfoProvider moduleInfoProvider,
         IModuleValidator moduleValidator,
-        IDebugGameInterface debugGameInterface,
-        IModuleInfoProvider moduleInfoProvider) :
+        IGameStateInterface gameStateInterface,
+        ILoadingInterface loadingInterface) :
         base(context)
     {
         this.messageBroker = messageBroker;
         this.registryManager = registryManager;
         this.moduleValidator = moduleValidator;
-        this.debugGameInterface = debugGameInterface;
+        this.gameStateInterface = gameStateInterface;
+        this.loadingInterface = loadingInterface;
         this.moduleInfoProvider = moduleInfoProvider;
         messageBroker.Subscribe<CampaignReady>(Handle_CampaignReady);
     }
@@ -70,7 +71,8 @@ public class InitialServerState : ServerStateBase
     public override void Start()
     {
 #if DEBUG
-        debugGameInterface.LoadDebugGame();
+        loadingInterface.ShowLoadingScreen();
+        gameStateInterface.LoadGame("MP");
 #endif
     }
 

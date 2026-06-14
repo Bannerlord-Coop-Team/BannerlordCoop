@@ -1,11 +1,16 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes;
+using GameInterface.Services.UI.Interfaces;
 using SandBox;
+using Serilog;
 using System;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
+using TaleWorlds.Engine;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.SaveSystem;
 using TaleWorlds.SaveSystem.Load;
@@ -16,17 +21,22 @@ public interface IGameStateInterface : IGameAbstraction
 {
     void GoToMainMenu();
     void StartNewGame();
-    void LoadSaveGame(byte[] saveData);
+    void LoadSaveData(byte[] saveData);
+    void LoadGame(string saveName);
     void EndGame();
 }
 
 internal class GameStateInterface : IGameStateInterface
 {
-    private readonly IMessageBroker messageBroker;
+    private static readonly ILogger Logger = LogManager.GetLogger<GameStateInterface>();
 
-    public GameStateInterface(IMessageBroker messageBroker)
+    private readonly IMessageBroker messageBroker;
+    private readonly ILoadingInterface loadingInterface;
+
+    public GameStateInterface(IMessageBroker messageBroker, ILoadingInterface loadingInterface)
     {
         this.messageBroker = messageBroker;
+        this.loadingInterface = loadingInterface;
     }
 
     public void GoToMainMenu()
@@ -37,7 +47,7 @@ internal class GameStateInterface : IGameStateInterface
         EndGame();
     }
 
-    public void LoadSaveGame(byte[] saveData)
+    public void LoadSaveData(byte[] saveData)
     {
         GameLoopRunner.RunOnMainThread(() => InteralLoadSaveGame(saveData), blocking: true);
     }
@@ -62,6 +72,28 @@ internal class GameStateInterface : IGameStateInterface
         {
             MBGameManager.StartNewGame(new SandBoxGameManager(() => new Campaign(CampaignGameMode.Campaign)));
         });
+    }
+
+    public void LoadGame(string saveName)
+    {
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            var save = MBSaveLoad.GetSaveFiles(null).SingleOrDefault(x => x.Name == saveName);
+
+            if (save == null)
+            {
+                Logger.Error("Failed to load save with name {SaveName}", saveName);
+                return;
+            }
+
+            SandBoxSaveHelper.TryLoadSave(save, StartGame, null);
+        }, blocking: true);
+    }
+
+    private void StartGame(LoadResult loadResult)
+    {
+        MBGameManager.StartNewGame(new SandBoxGameManager(loadResult));
+        MouseManager.ShowCursor(false);
     }
 
     public void EndGame()

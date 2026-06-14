@@ -11,6 +11,8 @@ using GameInterface;
 using GameInterface.DynamicSync;
 using GameInterface.Services.GameDebug.Interfaces;
 using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.GameState.Interfaces;
+using GameInterface.Services.UI.Interfaces;
 using GameInterface.Services.UI.Messages;
 using System;
 
@@ -62,9 +64,9 @@ namespace Coop.Core
         {
             StartAsServer();
 
-            var gameDebugInterface = container.Resolve<IDebugGameInterface>();
-
-            gameDebugInterface.LoadGame(obj.What.SaveName);
+            container
+                .Resolve<IGameStateInterface>()
+                .LoadGame(obj.What.SaveName);
         }
 
         private void Handle(MessagePayload<EndCoopMode> payload)
