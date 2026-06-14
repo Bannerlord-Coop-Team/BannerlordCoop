@@ -28,6 +28,26 @@ public class KingdomHandler : IHandler
         this.objectManager = objectManager;
         messageBroker.Subscribe<AddDecision>(HandleAddDecision);
         messageBroker.Subscribe<RemoveDecision>(HandleRemoveDecision);
+        messageBroker.Subscribe<ChangeKingdomPolicy>(HandleChangeKingdomPolicy);
+    }
+
+    private void HandleChangeKingdomPolicy(MessagePayload<ChangeKingdomPolicy> obj)
+    {
+        var payload = obj.What;
+
+        if (!objectManager.TryGetObject(payload.KingdomId, out Kingdom kingdom))
+        {
+            Logger.Verbose("Kingdom not found in KingdomHandler with KingdomId: {id}", payload.KingdomId);
+            return;
+        }
+
+        if (!objectManager.TryGetObject(payload.PolicyId, out PolicyObject policy))
+        {
+            Logger.Verbose("PolicyObject not found in KingdomHandler with PolicyId: {id}", payload.PolicyId);
+            return;
+        }
+
+        KingdomPatches.RunChangeKingdomPolicy(kingdom, policy, payload.IsAdd);
     }
 
     private void HandleRemoveDecision(MessagePayload<RemoveDecision> obj)
@@ -82,5 +102,6 @@ public class KingdomHandler : IHandler
     {
         messageBroker.Unsubscribe<AddDecision>(HandleAddDecision);
         messageBroker.Unsubscribe<RemoveDecision>(HandleRemoveDecision);
+        messageBroker.Unsubscribe<ChangeKingdomPolicy>(HandleChangeKingdomPolicy);
     }
 }
