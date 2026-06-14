@@ -47,6 +47,10 @@ public abstract class MockNetworkBase : INetwork
         networkOrchestrator.Send(NetPeer, netPeer, message);
     }
 
+    public void SendImmediate(NetPeer netPeer, IPacket packet) => Send(netPeer, packet);
+
+    public void SendImmediate(NetPeer netPeer, IMessage message) => Send(netPeer, message);
+
     public void SendAll(IPacket packet)
     {
         NetworkSentPackets.Add(packet);

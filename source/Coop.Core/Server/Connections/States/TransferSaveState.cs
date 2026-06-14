@@ -53,7 +53,7 @@ public class TransferSaveState : ConnectionStateBase
             // Dropping) from "after the save" (queued for replay).
             connectionMessageQueue.BeginQueueing(ConnectionLogic.Peer);
 
-            network.Send(ConnectionLogic.Peer, savePacket);
+            network.SendImmediate(ConnectionLogic.Peer, savePacket);
         }, blocking: true);
     }
 

@@ -128,28 +128,22 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     public override void SendAll(IPacket packet)
     {
         CheckNetworkQueueOverloaded();
-
-        var peers = new List<NetPeer>();
-        netManager.GetPeersNonAlloc(peers, ConnectionState.Connected);
-        foreach (var peer in peers)
-        {
-            // A still-loading peer has its broadcasts dropped (pre-save) or held (loading) instead of
-            // sent live; the queue replays the held ones once the peer enters the campaign.
-            if (connectionMessageQueue.TryHandleBroadcast(peer, packet)) continue;
-            Send(peer, packet);
-        }
+        SendAll(netManager, packet);
     }
 
     public override void SendAllBut(NetPeer ignoredPeer, IPacket packet)
     {
-        var peers = new List<NetPeer>();
-        netManager.GetPeersNonAlloc(peers, ConnectionState.Connected);
-        foreach (var peer in peers)
-        {
-            if (peer == ignoredPeer) continue;
-            if (connectionMessageQueue.TryHandleBroadcast(peer, packet)) continue;
-            Send(peer, packet);
-        }
+        SendAllBut(netManager, ignoredPeer, packet);
+    }
+
+    // Every per-peer send funnels through here, so a still-loading peer's world deltas are dropped
+    // (pre-save) or held (loading) instead of sent live — broadcasts and direct sends alike. The queue
+    // replays the held ones on campaign entry. Connection-level traffic that must always reach a
+    // mid-join peer (the save, the join handshake) uses SendImmediate to bypass this.
+    public override void Send(NetPeer netPeer, IPacket packet)
+    {
+        if (connectionMessageQueue.TryHandleBroadcast(netPeer, packet)) return;
+        base.Send(netPeer, packet);
     }
 
     private void CheckNetworkQueueOverloaded(NetPeer ignoredPeer = null)

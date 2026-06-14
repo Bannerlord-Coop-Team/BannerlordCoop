@@ -82,7 +82,7 @@ public class CreateCharacterState : ConnectionStateBase
         network.SendAllBut(netPeer, message);
 
         // Respond with ids for the creating client
-        network.Send(netPeer, new NetworkHeroRecieved(player));
+        network.SendImmediate(netPeer, new NetworkHeroRecieved(player));
 
         ConnectionLogic.TransferSave();
     }

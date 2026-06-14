@@ -156,11 +156,11 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
 
             // Replay under the gate so a broadcast racing the campaign-entered signal either lands in
             // Pending before this drain (and is replayed in order) or sees Open afterwards and goes
-            // live strictly after the replay. Send only serializes + hands off to a non-blocking
-            // LiteNetLib queue and never re-enters this gate.
+            // live strictly after the replay. SendImmediate bypasses the queue (Send now routes back
+            // through it), so the replay cannot re-enter this gate and re-queue itself.
             while (channel.Pending.Count > 0)
             {
-                network.Value.Send(peer, channel.Pending.Dequeue());
+                network.Value.SendImmediate(peer, channel.Pending.Dequeue());
             }
 
             channel.Phase = Phase.Open;

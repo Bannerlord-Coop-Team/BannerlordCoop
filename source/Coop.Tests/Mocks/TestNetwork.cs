@@ -83,6 +83,10 @@ public class TestNetwork : INetwork
         SentNetworkMessages[netPeer.Id] = messages;
     }
 
+    public void SendImmediate(NetPeer netPeer, IPacket packet) => Send(netPeer, packet);
+
+    public void SendImmediate(NetPeer netPeer, IMessage message) => Send(netPeer, message);
+
     public void SendAll(IMessage message)
     {
         foreach(var peer in Peers)
