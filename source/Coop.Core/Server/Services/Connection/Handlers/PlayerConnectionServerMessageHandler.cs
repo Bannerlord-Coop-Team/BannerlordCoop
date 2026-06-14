@@ -3,6 +3,7 @@ using Common.Network;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Messages;
+using System.Threading;
 
 namespace Coop.Core.Server.Services.Connection.Handlers;
 
@@ -37,7 +38,7 @@ public class PlayerConnectionServerMessageHandler : IHandler
 
     internal void Handle_LoadingPlayersChanged(MessagePayload<LoadingPlayersChanged> obj)
     {
-        loadingPlayerCount = obj.What.LoadingPlayerCount;
+        Volatile.Write(ref loadingPlayerCount, obj.What.LoadingPlayerCount);
 
         BroadcastNotification(loadingPlayerCount > 0 ? LoadingMessage(loadingPlayerCount) : UnpauseReadyMessage);
     }
@@ -45,7 +46,7 @@ public class PlayerConnectionServerMessageHandler : IHandler
     internal void Handle_TimeSpeedChangeAttempted(MessagePayload<TimeSpeedChangedAttempted> obj)
     {
         // Remind whoever just tried to change the speed why it is locked.
-        if (loadingPlayerCount <= 0) return;
+        if (Volatile.Read(ref loadingPlayerCount) <= 0) return;
 
         BroadcastNotification(LoadingMessage(loadingPlayerCount));
     }

@@ -38,7 +38,5 @@ public class ServerModule : CommonModule
 
         RegisterAllTypesWithInterface<ServerModule, IHandler>(builder, autoInstantiate: true);
         RegisterAllTypesWithInterface<ServerModule, IPacketHandler>(builder, autoInstantiate: true);
-
-        RegisterAllTypesWithInterface<ServerModule, IServerState>(builder);
     }
 }

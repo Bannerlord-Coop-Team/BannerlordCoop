@@ -27,7 +27,7 @@ public class TransferSaveState : ConnectionStateBase
         {
             // Pause so the save snapshot is taken from a stationary world. This is local to the
             // save and runs before the connection has been assigned this state, so it precedes
-            // the registry's loading lock; ClientRegistry drives the broadcast loading pause once
+            // the registry's loading lock; ConnectionCollection drives the broadcast loading pause once
             // the transition completes (see IsLoading below).
             timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
 

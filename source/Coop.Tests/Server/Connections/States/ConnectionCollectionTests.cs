@@ -14,13 +14,13 @@ using Xunit.Abstractions;
 
 namespace Coop.Tests.Server.Connections.States
 {
-    public class ClientRegistryTests
+    public class ConnectionCollectionTests
     {
         private readonly ConnectionCollection connectionCollection;
         private readonly NetPeer playerPeer;
         private readonly ServerTestComponent serverComponent;
 
-        public ClientRegistryTests(ITestOutputHelper output)
+        public ConnectionCollectionTests(ITestOutputHelper output)
         {
             serverComponent = new ServerTestComponent(output);
 

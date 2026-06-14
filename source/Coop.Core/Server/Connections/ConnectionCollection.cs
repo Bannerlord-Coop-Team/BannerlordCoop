@@ -56,7 +56,6 @@ public class ConnectionCollection : IConnectionCollection
     {
         var playerPeer = obj.What.PlayerPeer;
         ConnectionStates.TryAdd(playerPeer, new ConnectionLogic(playerPeer, connectionContext));
-        BroadcastLoadingStateIfChanged();
     }
 
     internal void PlayerDisconnectedHandler(MessagePayload<PlayerDisconnected> obj)

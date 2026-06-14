@@ -57,9 +57,6 @@ public class ConnectionLogic : IConnectionLogic
     {
         TState newState = (TState)stateFactories[typeof(TState)]();
         State = newState;
-
-        context.MessageBroker.Publish(this, new ConnectionStateChanged());
-
         return newState;
     }
 
