@@ -109,8 +109,9 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
                     // Already in the save the peer is about to load; discard.
                     return true;
                 default:
-                    // Open: reachable only in the brief race window between the flush flipping the
-                    // channel and removing it from the dictionary (concurrency-only). Send live.
+                    // Open: this peer has already caught up and is a normal live player now, so just
+                    // send the packet. (We only land here for a split second, right after the catch-up
+                    // finishes and before its channel is tidied away.)
                     return false;
             }
         }
