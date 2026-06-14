@@ -57,23 +57,23 @@ internal class DisablePlayerTownVisitCampaignBehavior
     //}
 
     /// <summary>
-    /// Disables entering the town center from the town menu
+    /// Allows entering the town center from the town menu (location-sync handles it as a P2P instance).
     /// </summary>
     [HarmonyPrefix]
     [HarmonyPatch("game_menu_town_town_streets_on_consequence")]
     static bool DisableTownCenter()
     {
-        return false;
+        return true;
     }
 
     /// <summary>
-    /// Disables entering the town hall from the town menu
+    /// Allows entering the town hall from the town menu (location-sync handles it as a P2P instance).
     /// </summary>
     [HarmonyPrefix]
     [HarmonyPatch("game_menu_town_lordshall_on_consequence")]
     static bool DisableTownHall()
     {
-        return false;
+        return true;
     }
 
     /// <summary>
@@ -87,23 +87,23 @@ internal class DisablePlayerTownVisitCampaignBehavior
     }
 
     /// <summary>
-    /// Disables entering the town center from the village menu
+    /// Allows entering the village center from the village menu (location-sync handles it as a P2P instance).
     /// </summary>
     [HarmonyPrefix]
     [HarmonyPatch("game_menu_village_village_center_on_consequence")]
     static bool DisableVillageCenter()
     {
-        return false;
+        return true;
     }
 
     /// <summary>
-    /// Disables entering the castle hall from the castle menu
+    /// Allows entering the castle hall from the castle menu (location-sync handles it as a P2P instance).
     /// </summary>
     [HarmonyPrefix]
     [HarmonyPatch("game_menu_castle_lordshall_on_consequence")]
     static bool DisableCastleHall()
     {
-        return false;
+        return true;
     }
 
     /// <summary>
@@ -137,13 +137,13 @@ internal class DisablePlayerTownVisitCampaignBehavior
     }
 
     /// <summary>
-    /// Disables entering the castle walk around from the castle menu
+    /// Allows the castle walk-around from the castle menu (location-sync handles it as a P2P instance).
     /// </summary>
     [HarmonyPrefix]
     [HarmonyPatch("game_menu_castle_take_a_walk_around_the_castle_on_consequence")]
     static bool DisableCastleWalkAround()
     {
-        return false;
+        return true;
     }
 
     /// <summary>
