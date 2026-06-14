@@ -32,12 +32,6 @@ public class TransferSaveState : ConnectionStateBase
         {
             timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
 
-            // Start holding this peer's broadcasts at the save boundary, on the main thread. This is the
-            // approximate cut between "in the save" (dropped while Dropping) and "after the save" (queued
-            // for replay) — approximate because the save below is not atomic w.r.t. the network poller;
-            // see ConnectionMessageQueue for the residual duplicate/loss windows.
-            connectionMessageQueue.BeginQueueing(ConnectionLogic.Peer);
-
             var saveResults = saveInterface.SaveCurrentGame();
 
             var savePacket = new GameSaveDataPacket(
@@ -51,7 +45,14 @@ public class TransferSaveState : ConnectionStateBase
                 connectionLogic.Peer.Disconnect();
                 return;
             }
-                
+
+            // Start holding this peer's broadcasts now that the snapshot has been taken. The whole save
+            // runs in a blocking RunOnMainThread call issued from the network thread, so the poller is
+            // parked for its duration and cannot broadcast a received delta that races the snapshot;
+            // taking the cut right after the snapshot cleanly separates "in the save" (dropped while
+            // Dropping) from "after the save" (queued for replay).
+            connectionMessageQueue.BeginQueueing(ConnectionLogic.Peer);
+
             network.Send(ConnectionLogic.Peer, savePacket);
         }, blocking: true);
     }

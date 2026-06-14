@@ -23,12 +23,12 @@ namespace Coop.Core.Server.Connections;
 /// Each peer moves through three phases:
 /// <list type="bullet">
 /// <item><b>Dropping</b> (default, created on <see cref="PlayerConnected"/>): the peer has connected
-/// but its transfer save has not been taken yet. Broadcasts are discarded, on the assumption they are
-/// captured by the save the peer is about to receive (replaying them would be redundant, and for
-/// additive messages divergent).</item>
-/// <item><b>Queueing</b> (entered via <see cref="BeginQueueing"/>, called on the main thread at the
-/// save boundary): broadcasts are held in FIFO order, on the assumption they carry world changes the
-/// save does not contain, so the peer must receive them once it is live.</item>
+/// but its transfer save has not been taken yet. Broadcasts are discarded — their world change is
+/// already captured by the save the peer is about to receive, so replaying them would be redundant
+/// (and for additive messages divergent).</item>
+/// <item><b>Queueing</b> (entered via <see cref="BeginQueueing"/>, called on the main thread just
+/// after the save snapshot): broadcasts are held in FIFO order — they carry world changes the save
+/// does not contain, so the peer must receive them once it is live.</item>
 /// <item><b>Open</b> (reached when the peer reports <see cref="PlayerCampaignEntered"/>): the held
 /// packets are replayed in FIFO order and the channel is dropped, after which the peer receives
 /// broadcasts live like any fully-joined peer.</item>
@@ -39,14 +39,12 @@ namespace Coop.Core.Server.Connections;
 /// reply) use <see cref="INetwork.Send(NetPeer, IPacket)"/> and bypass the queue by construction, so
 /// no packet-type whitelist is needed.
 ///
-/// The Dropping/Queueing cut sits at the save boundary but is only APPROXIMATE: the transfer save is
-/// not atomic with respect to the still-running network poller, nor to main-thread mutations made
-/// while the save is being written. Two narrow residual windows follow. A broadcast whose world
-/// mutation is applied off the main thread after the save is taken can be dropped here yet not be in
-/// the save (a lost delta). A main-thread mutate-and-broadcast while the save is being written can be
-/// both saved and queued (a duplicated delta — harmless for the idempotent set/replace messages seen
-/// on these paths, divergent only for an additive delta). Neither has been observed in practice; do
-/// not rely on an exact no-loss / no-duplicate guarantee.
+/// The Dropping/Queueing cut is taken at the save boundary and is effectively atomic. The transfer
+/// save runs inside a blocking <c>GameLoopRunner.RunOnMainThread</c> call issued from the network
+/// thread, so the poller is parked for the save's duration and cannot broadcast a received delta that
+/// races the snapshot, while the main thread takes the snapshot with no other game logic interleaved.
+/// <see cref="BeginQueueing"/> is called immediately after the snapshot, so a broadcast is dropped iff
+/// its world change is already in the save and queued iff it is not.
 ///
 /// Ordering and memory visibility rest solely on the per-peer gate lock — never on thread identity
 /// (the network poller is a rotating thread-pool set) nor on broker delivery order (the message broker
@@ -64,11 +62,10 @@ public interface IConnectionMessageQueue
     bool TryHandleBroadcast(NetPeer peer, IPacket packet);
 
     /// <summary>
-    /// Moves a peer from <c>Dropping</c> to <c>Queueing</c>. Call on the main thread at the save
-    /// boundary (immediately before the transfer save is taken) so broadcasts from roughly the save
-    /// instant onward are captured for replay. The cut is approximate — the save is not atomic with
-    /// respect to the network poller or to save-time mutations, so a narrow duplicate/loss window
-    /// exists at the boundary (see the residual windows noted on the type).
+    /// Moves a peer from <c>Dropping</c> to <c>Queueing</c>. Call on the main thread immediately after
+    /// the transfer-save snapshot is taken. Because that save runs under a blocking RunOnMainThread
+    /// call issued from the network thread the poller is parked, so the snapshot is not raced and this
+    /// cut cleanly separates "in the save" (dropped) from "after the save" (queued for replay).
     /// </summary>
     void BeginQueueing(NetPeer peer);
 }
