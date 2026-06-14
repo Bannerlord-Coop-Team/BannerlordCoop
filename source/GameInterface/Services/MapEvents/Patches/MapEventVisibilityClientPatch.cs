@@ -9,20 +9,6 @@ namespace GameInterface.Services.MapEvents.Patches;
 /// <summary>
 /// Keeps a map event's battle icon visibility correct on the client.
 /// </summary>
-/// <remarks>
-/// Map-event icon visibility is a per-machine concern: vanilla derives it from whether any involved
-/// party is visible to the local main party's see range, so it must be computed locally rather than
-/// synced. The dedicated server has no main party and force-marks every party visible, so it would only
-/// ever report a battle as visible; that value is therefore not synced (see <see cref="MapEventSync"/>),
-/// and each client reconciles its own icons here instead.
-///
-/// The vanilla party-visibility chain (PartyBase.OnVisibilityChanged -> MapEvent.PartyVisibilityChanged)
-/// only fires on visibility transitions, which never happen for battles that stay outside the client's
-/// view-update range or that begin with already-visible parties. Reconciling every real tick covers both
-/// cases, runs right after the vanilla visibility pass (so it reads fresh party state), and is gated to
-/// only touch the icon when it actually changes. Runs on the client only; the server's authoritative
-/// behaviour is unchanged.
-/// </remarks>
 [HarmonyPatch(typeof(Campaign))]
 internal class MapEventVisibilityClientPatch
 {
