@@ -12,11 +12,14 @@ public class NetworkModuleInfo
     public bool IsOfficial { get; }
     [ProtoMember(3)]
     public NetworkApplicationVersion Version { get; }
+    [ProtoMember(4)]
+    public bool IsDlc { get; }
 
-    public NetworkModuleInfo(string id, bool isOfficial, ApplicationVersion version)
+    public NetworkModuleInfo(string id, bool isOfficial, bool isDlc, ApplicationVersion version)
     {
         Id = id;
         IsOfficial = isOfficial;
+        IsDlc = isDlc;
         Version = new NetworkApplicationVersion((int) version.ApplicationVersionType, version.Major, version.Minor, version.Revision, version.ChangeSet);
     }
 }

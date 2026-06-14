@@ -93,6 +93,26 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
 
     public virtual void Send(NetPeer netPeer, IPacket packet)
     {
+        SendCore(netPeer, packet);
+    }
+
+    /// <summary>
+    /// Sends straight to the peer, bypassing any per-peer send gating (the server's connection queue).
+    /// For connection-level traffic that must reach a peer regardless of its load state — the transfer
+    /// save and the join handshake — and for the queue's own replay.
+    /// </summary>
+    public void SendImmediate(NetPeer netPeer, IPacket packet)
+    {
+        SendCore(netPeer, packet);
+    }
+
+    public void SendImmediate(NetPeer netPeer, IMessage message)
+    {
+        SendCore(netPeer, new MessagePacket(SerializeMessage(message)));
+    }
+
+    private void SendCore(NetPeer netPeer, IPacket packet)
+    {
         // Serialize data
         byte[] data = serializer.Serialize(packet);
 

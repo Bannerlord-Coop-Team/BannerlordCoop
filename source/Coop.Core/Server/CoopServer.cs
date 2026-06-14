@@ -6,6 +6,7 @@ using Common.Network.Messages;
 using Common.PacketHandlers;
 using Common.Serialization;
 using Coop.Core.Common.Network;
+using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Time.Messages;
 using GameInterface.Registry.Messages;
@@ -41,17 +42,20 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     private readonly IMessageBroker messageBroker;
     private readonly IPacketManager packetManager;
+    private readonly IConnectionMessageQueue connectionMessageQueue;
 
     public CoopServer(
-        INetworkConfiguration configuration, 
+        INetworkConfiguration configuration,
         IMessageBroker messageBroker,
         IPacketManager packetManager,
+        IConnectionMessageQueue connectionMessageQueue,
         IControllerIdProvider controllerIdProvider,
         ICommonSerializer serializer) : base(configuration, serializer)
     {
         // Dependancy assignment
         this.messageBroker = messageBroker;
         this.packetManager = packetManager;
+        this.connectionMessageQueue = connectionMessageQueue;
 
         // Netmanager initialization
         netManager.NatPunchEnabled = true;
@@ -130,6 +134,16 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     public override void SendAllBut(NetPeer ignoredPeer, IPacket packet)
     {
         SendAllBut(netManager, ignoredPeer, packet);
+    }
+
+    // Every per-peer send funnels through here, so a still-loading peer's world deltas are dropped
+    // (pre-save) or held (loading) instead of sent live — broadcasts and direct sends alike. The queue
+    // replays the held ones on campaign entry. Connection-level traffic that must always reach a
+    // mid-join peer (the save, the join handshake) uses SendImmediate to bypass this.
+    public override void Send(NetPeer netPeer, IPacket packet)
+    {
+        if (connectionMessageQueue.TryHandleBroadcast(netPeer, packet)) return;
+        base.Send(netPeer, packet);
     }
 
     private void CheckNetworkQueueOverloaded(NetPeer ignoredPeer = null)

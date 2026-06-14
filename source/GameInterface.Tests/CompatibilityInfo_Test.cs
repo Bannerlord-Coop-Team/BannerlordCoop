@@ -20,8 +20,8 @@ namespace GameInterface.Tests
             var gameVersion = new ApplicationVersion(ApplicationVersionType.EarlyAccess, 1, 2, 3, 4);
             var modVersion = new ApplicationVersion(ApplicationVersionType.EarlyAccess, 1, 0, 1, 23);
 
-            GameModule = new ModuleInfo("TestModule1", true, gameVersion);
-            ModModule = new ModuleInfo("TestModule2", false, modVersion);
+            GameModule = new ModuleInfo("TestModule1", true, false, gameVersion);
+            ModModule = new ModuleInfo("TestModule2", false, false, modVersion);
         }
 
         public IEnumerable<ModuleInfo> GetModuleInfos()
@@ -44,8 +44,8 @@ namespace GameInterface.Tests
             var gameVersion = new ApplicationVersion(ApplicationVersionType.EarlyAccess, 1, 2, 4, 4);
             var modVersion = new ApplicationVersion(ApplicationVersionType.EarlyAccess, 1, 0, 2, 23);
 
-            GameModule = new ModuleInfo("TestModule1", true, gameVersion);
-            ModModule = new ModuleInfo("TestModule2", false, modVersion);
+            GameModule = new ModuleInfo("TestModule1", true, false, gameVersion);
+            ModModule = new ModuleInfo("TestModule2", false, false, modVersion);
         }
 
         public IEnumerable<ModuleInfo> GetModuleInfos()

@@ -81,7 +81,7 @@ namespace IntroServer.Config
 
         public TimeSpan ConnectionTimeout => DisconnectTimeout;
 
-        public int MaxPacketsInQueue => 1000;
+        public int MaxPacketsInQueue => 10000;
 
         public TimeSpan AuditTimeout => DisconnectTimeout;
 
