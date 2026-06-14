@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Registry;
 using GameInterface.Registry.Messages;
+using GameInterface.Services.GameDebug.Interfaces;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.MobileParties.Messages;
@@ -22,6 +23,7 @@ public class InitialServerState : ServerStateBase
     private readonly IMessageBroker messageBroker;
     private readonly IRegistryManager registryManager;
     private readonly IModuleValidator moduleValidator;
+    private readonly IDebugGameInterface debugGameInterface;
     private readonly IModuleInfoProvider moduleInfoProvider;
 
     public InitialServerState(
@@ -29,12 +31,14 @@ public class InitialServerState : ServerStateBase
         IMessageBroker messageBroker,
         IRegistryManager registryManager,
         IModuleValidator moduleValidator,
+        IDebugGameInterface debugGameInterface,
         IModuleInfoProvider moduleInfoProvider) :
         base(context)
     {
         this.messageBroker = messageBroker;
         this.registryManager = registryManager;
         this.moduleValidator = moduleValidator;
+        this.debugGameInterface = debugGameInterface;
         this.moduleInfoProvider = moduleInfoProvider;
         messageBroker.Subscribe<CampaignReady>(Handle_CampaignReady);
     }
@@ -66,7 +70,7 @@ public class InitialServerState : ServerStateBase
     public override void Start()
     {
 #if DEBUG
-       messageBroker.Publish(this, new LoadDebugGame());
+        debugGameInterface.LoadDebugGame();
 #endif
     }
 

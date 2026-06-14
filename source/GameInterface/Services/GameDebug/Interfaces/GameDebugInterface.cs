@@ -1,68 +1,56 @@
-﻿using SandBox;
+﻿using Common;
+using Common.Logging;
+using GameInterface.Services.UI.Interfaces;
+using SandBox;
+using Serilog;
 using System.Linq;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.MountAndBlade;
-using TaleWorlds.SaveSystem.Load;
 using TaleWorlds.SaveSystem;
-using Common;
-using Common.Util;
-using System.Reflection;
-using TaleWorlds.Library;
-using Serilog;
-using Common.Logging;
-using GameInterface.Services.GameDebug.Patches;
-using TaleWorlds.CampaignSystem;
-using SandBox.View.Map;
-using TaleWorlds.CampaignSystem.ViewModelCollection.Party;
-using GameInterface.Services.PartyBases.Extensions;
+using TaleWorlds.SaveSystem.Load;
 
-namespace GameInterface.Services.GameDebug.Interfaces
+namespace GameInterface.Services.GameDebug.Interfaces;
+
+public interface IDebugGameInterface : IGameAbstraction
 {
-    internal interface IDebugGameInterface : IGameAbstraction
+    void LoadDebugGame();
+    void LoadGame(string saveName);
+}
+
+internal class DebugGameInterface : IDebugGameInterface
+{
+    private static readonly ILogger Logger = LogManager.GetLogger<DebugGameInterface>();
+
+    public static readonly string LOAD_GAME = "MP";
+    private readonly ILoadingInterface loadingInterface;
+
+    public DebugGameInterface(ILoadingInterface loadingInterface)
     {
-        void LoadDebugGame();
-        void LoadGame(string saveName);
+        this.loadingInterface = loadingInterface;
     }
 
-    internal class DebugGameInterface : IDebugGameInterface
+    public void LoadDebugGame()
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<DebugGameInterface>();
+        loadingInterface.ShowLoadingScreen();
+        GameLoopRunner.RunOnMainThread(InternalLoadDebugGame, false);
+    }
 
-        public static readonly string LOAD_GAME = "MP";
+    private void InternalLoadDebugGame()
+    {
+        SaveGameFileInfo mp_save = MBSaveLoad.GetSaveFiles(null).Single(x => x.Name == LOAD_GAME);
+        SandBoxSaveHelper.TryLoadSave(mp_save, StartGame, null);
+    }
 
-        public void LoadDebugGame()
-        {
-            GameLoopRunner.RunOnMainThread(InternalLoadDebugGame, false);
-        }
+    private void StartGame(LoadResult loadResult)
+    {
+        MBGameManager.StartNewGame(new SandBoxGameManager(loadResult));
+        MouseManager.ShowCursor(false);
+    }
 
-        private static PlatformDirectoryPath SaveDir => FileDriver.SavePath;
-        private static PlatformFilePath SavePath => new PlatformFilePath(SaveDir, $"{LOAD_GAME}.sav");
-        private static string FullSavePath => TaleWorlds.Library.Common.PlatformFileHelper?.GetFileFullPath(SavePath);
-        private void InternalLoadDebugGame()
-        {
-            //Logger.Information("Downloading save file to: {savePath}", FullSavePath);
-
-            //WebDownloader webDownloader = new WebDownloader();
-            //// TODO maybe uncomment for debugging
-            //webDownloader.DownloadFile("https://coop.theodor.dev/MP.sav", FullSavePath);
-
-            //Logger.Information("Downloaded save file.");
-
-            SaveGameFileInfo mp_save = MBSaveLoad.GetSaveFiles(null).Single(x => x.Name == LOAD_GAME);
-            SandBoxSaveHelper.TryLoadSave(mp_save, StartGame, null);
-        }
-
-        private void StartGame(LoadResult loadResult)
-        {
-            MBGameManager.StartNewGame(new SandBoxGameManager(loadResult));
-            MouseManager.ShowCursor(false);
-        }
-
-        public void LoadGame(string saveName)
-        {
-            SaveGameFileInfo mp_save = MBSaveLoad.GetSaveFiles(null).Single(x => x.Name == saveName);
-            SandBoxSaveHelper.TryLoadSave(mp_save, StartGame, null);
-        }
+    public void LoadGame(string saveName)
+    {
+        SaveGameFileInfo mp_save = MBSaveLoad.GetSaveFiles(null).Single(x => x.Name == saveName);
+        SandBoxSaveHelper.TryLoadSave(mp_save, StartGame, null);
     }
 }
