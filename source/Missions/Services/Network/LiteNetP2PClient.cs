@@ -310,15 +310,5 @@ namespace Missions.Services.Network
 
             PacketManager.HandleReceive(peer, packet);
         }
-
-        public void SendImmediate(NetPeer netPeer, IPacket packet)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void SendImmediate(NetPeer netPeer, IMessage message)
-        {
-            throw new NotImplementedException();
-        }
     }
 }

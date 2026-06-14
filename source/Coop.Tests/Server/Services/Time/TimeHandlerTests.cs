@@ -1,5 +1,4 @@
-﻿using Common.Messaging;
-using Common.Network.Messages;
+using Common.Messaging;
 using Common.Tests.Utils;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
@@ -8,11 +7,9 @@ using Coop.Core.Server.Services.Time.Messages;
 using Coop.Tests.Mocks;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
-using LiteNetLib;
 using Moq;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Xunit;
 
 namespace Coop.Tests.Server.Services.Time;
@@ -25,9 +22,9 @@ public class TimeHandlerTests
         // Arrange
         var broker = new TestMessageBroker();
         var network = new TestNetwork();
-        var clientRegistry = new Mock<IClientRegistry>();
         var timeControlInterface = new Mock<ITimeControlInterface>();
-        var handler = new TimeHandler(broker, network, clientRegistry.Object, timeControlInterface.Object);
+        var connections = new Mock<IConnectionCollection>();
+        var handler = new TimeHandler(broker, network, timeControlInterface.Object, connections.Object);
 
         Assert.True(broker.GetTotalSubscribers() > 0);
 
@@ -40,132 +37,47 @@ public class TimeHandlerTests
     }
 
     [Fact]
-    public void PlayerConnected_ForcesPauseAndLocksClients()
+    public void LoadingPlayersChanged_WhenPlayersLoading_PausesAndLocksClients()
     {
         // Arrange
         var broker = new TestMessageBroker();
         var network = new TestNetwork();
-        var clientRegistry = new Mock<IClientRegistry>();
         var timeControlInterface = new Mock<ITimeControlInterface>();
-        var handler = new TimeHandler(broker, network, clientRegistry.Object, timeControlInterface.Object);
+        var connections = new Mock<IConnectionCollection>();
+        var handler = new TimeHandler(broker, network, timeControlInterface.Object, connections.Object);
         var peer = network.CreatePeer();
-        var payload = new MessagePayload<PlayerConnected>(this, new PlayerConnected(peer));
+        var payload = new MessagePayload<LoadingPlayersChanged>(this, new LoadingPlayersChanged(2));
 
         // Act
-        handler.Handle_PlayerConnected(payload);
+        handler.Handle_LoadingPlayersChanged(payload);
 
         // Assert
         timeControlInterface.Verify(m => m.ServerSetTimeControl(TimeControlEnum.Pause), Times.Once);
         var lockMessage = Assert.Single(network.GetPeerMessagesFromType<NetworkTimeControlLockChanged>(peer));
         Assert.True(lockMessage.IsLocked);
-        Assert.Equal(1, lockMessage.LoadingPlayers);
+        Assert.Equal(2, lockMessage.LoadingPlayers);
     }
 
     [Fact]
-    public void PlayerCampaignEntered_WhenNoPlayersLoading_UnlocksClients()
+    public void LoadingPlayersChanged_WhenNoPlayersLoading_UnlocksClients()
     {
         // Arrange
         var broker = new TestMessageBroker();
         var network = new TestNetwork();
-        var clientRegistry = new Mock<IClientRegistry>();
         var timeControlInterface = new Mock<ITimeControlInterface>();
-        var handler = new TimeHandler(broker, network, clientRegistry.Object, timeControlInterface.Object);
+        var connections = new Mock<IConnectionCollection>();
+        var handler = new TimeHandler(broker, network, timeControlInterface.Object, connections.Object);
         var peer = network.CreatePeer();
-        var payload = new MessagePayload<PlayerCampaignEntered>(this, new PlayerCampaignEntered(peer));
-
-        clientRegistry.SetupGet(m => m.PlayersLoading).Returns(false);
+        var payload = new MessagePayload<LoadingPlayersChanged>(this, new LoadingPlayersChanged(0));
 
         // Act
-        handler.Handle_PlayerCampaignEntered(payload);
+        handler.Handle_LoadingPlayersChanged(payload);
 
         // Assert
+        timeControlInterface.Verify(m => m.ServerSetTimeControl(It.IsAny<TimeControlEnum>()), Times.Never);
         var lockMessage = Assert.Single(network.GetPeerMessagesFromType<NetworkTimeControlLockChanged>(peer));
         Assert.False(lockMessage.IsLocked);
         Assert.Equal(0, lockMessage.LoadingPlayers);
-    }
-
-    [Fact]
-    public void PlayerCampaignEntered_WhenPlayersStillLoading_RefreshesClientLock()
-    {
-        // Arrange
-        var broker = new TestMessageBroker();
-        var network = new TestNetwork();
-        var clientRegistry = new Mock<IClientRegistry>();
-        var timeControlInterface = new Mock<ITimeControlInterface>();
-        var handler = new TimeHandler(broker, network, clientRegistry.Object, timeControlInterface.Object);
-        var peer = network.CreatePeer();
-        var loadingPeer = network.CreatePeer();
-        var payload = new MessagePayload<PlayerCampaignEntered>(this, new PlayerCampaignEntered(peer));
-
-        clientRegistry.SetupGet(m => m.PlayersLoading).Returns(true);
-        clientRegistry.SetupGet(m => m.LoadingPeers).Returns(new List<NetPeer> { loadingPeer });
-
-        // Act
-        handler.Handle_PlayerCampaignEntered(payload);
-
-        // Assert
-        var lockMessage = Assert.Single(network.GetPeerMessagesFromType<NetworkTimeControlLockChanged>(peer));
-        Assert.True(lockMessage.IsLocked);
-        Assert.Equal(1, lockMessage.LoadingPlayers);
-
-        var loadingPeerLockMessage = Assert.Single(network.GetPeerMessagesFromType<NetworkTimeControlLockChanged>(loadingPeer));
-        Assert.True(loadingPeerLockMessage.IsLocked);
-        Assert.Equal(1, loadingPeerLockMessage.LoadingPlayers);
-    }
-
-    [Fact]
-    public void PlayerDisconnected_WhenLastLoadingPeerDisconnected_UnlocksClients()
-    {
-        // Arrange
-        var broker = new TestMessageBroker();
-        var network = new TestNetwork();
-        var clientRegistry = new Mock<IClientRegistry>();
-        var timeControlInterface = new Mock<ITimeControlInterface>();
-        var handler = new TimeHandler(broker, network, clientRegistry.Object, timeControlInterface.Object);
-        var disconnectedPeer = network.CreatePeer();
-        var payload = new MessagePayload<PlayerDisconnected>(
-            this,
-            new PlayerDisconnected(disconnectedPeer, default));
-
-        clientRegistry.SetupGet(m => m.LoadingPeers).Returns(new List<NetPeer> { disconnectedPeer });
-
-        // Act
-        handler.Handle_PlayerDisconnected(payload);
-
-        // Assert
-        var lockMessage = Assert.Single(network.GetPeerMessagesFromType<NetworkTimeControlLockChanged>(disconnectedPeer));
-        Assert.False(lockMessage.IsLocked);
-        Assert.Equal(0, lockMessage.LoadingPlayers);
-    }
-
-    [Fact]
-    public void PlayerDisconnected_WhenOtherPeersStillLoading_RefreshesClientLock()
-    {
-        // Arrange
-        var broker = new TestMessageBroker();
-        var network = new TestNetwork();
-        var clientRegistry = new Mock<IClientRegistry>();
-        var timeControlInterface = new Mock<ITimeControlInterface>();
-        var handler = new TimeHandler(broker, network, clientRegistry.Object, timeControlInterface.Object);
-        var disconnectedPeer = network.CreatePeer();
-        var loadingPeer = network.CreatePeer();
-        var payload = new MessagePayload<PlayerDisconnected>(
-            this,
-            new PlayerDisconnected(disconnectedPeer, default));
-
-        clientRegistry.SetupGet(m => m.LoadingPeers).Returns(new List<NetPeer> { disconnectedPeer, loadingPeer });
-
-        // Act
-        handler.Handle_PlayerDisconnected(payload);
-
-        // Assert
-        var disconnectedPeerLockMessage = Assert.Single(network.GetPeerMessagesFromType<NetworkTimeControlLockChanged>(disconnectedPeer));
-        Assert.True(disconnectedPeerLockMessage.IsLocked);
-        Assert.Equal(1, disconnectedPeerLockMessage.LoadingPlayers);
-
-        var loadingPeerLockMessage = Assert.Single(network.GetPeerMessagesFromType<NetworkTimeControlLockChanged>(loadingPeer));
-        Assert.True(loadingPeerLockMessage.IsLocked);
-        Assert.Equal(1, loadingPeerLockMessage.LoadingPlayers);
     }
 
     [Fact]
@@ -176,16 +88,17 @@ public class TimeHandlerTests
         var broker = new TestMessageBroker();
         var network = new TestNetwork();
         var peer = network.CreatePeer();
-        var clientRegistry = new Mock<IClientRegistry>();
         var timeControlInterface = new Mock<ITimeControlInterface>();
+        var connections = new Mock<IConnectionCollection>();
 
-        clientRegistry.SetupGet(m => m.PlayersLoading).Returns(true);
-        clientRegistry.SetupGet(m => m.LoadingPeers).Returns(new List<NetPeer> { peer });
+        var loadingLogic = new Mock<IConnectionLogic>();
+        loadingLogic.SetupGet(m => m.Peer).Returns(peer);
+        connections.SetupGet(m => m.LoadingPeers).Returns(new List<IConnectionLogic> { loadingLogic.Object });
         timeControlInterface
             .Setup(m => m.AddUnpausePolicy(It.IsAny<Func<bool>>()))
             .Callback<Func<bool>>(p => policy = p);
 
-        _ = new TimeHandler(broker, network, clientRegistry.Object, timeControlInterface.Object);
+        _ = new TimeHandler(broker, network, timeControlInterface.Object, connections.Object);
 
         // Act
         Assert.NotNull(policy);
@@ -202,15 +115,15 @@ public class TimeHandlerTests
         Func<bool>? policy = null;
         var broker = new TestMessageBroker();
         var network = new TestNetwork();
-        var clientRegistry = new Mock<IClientRegistry>();
         var timeControlInterface = new Mock<ITimeControlInterface>();
+        var connections = new Mock<IConnectionCollection>();
 
-        clientRegistry.SetupGet(m => m.PlayersLoading).Returns(false);
+        connections.SetupGet(m => m.LoadingPeers).Returns(new List<IConnectionLogic>());
         timeControlInterface
             .Setup(m => m.AddUnpausePolicy(It.IsAny<Func<bool>>()))
             .Callback<Func<bool>>(p => policy = p);
 
-        _ = new TimeHandler(broker, network, clientRegistry.Object, timeControlInterface.Object);
+        _ = new TimeHandler(broker, network, timeControlInterface.Object, connections.Object);
 
         // Act
         Assert.NotNull(policy);
