@@ -24,6 +24,7 @@ public class ServerModule : CommonModule
 
         builder.RegisterModule<ConnectionModule>();
 
+        builder.RegisterType<ServerContext>().AsSelf().InstancePerLifetimeScope();
         builder.RegisterType<ServerLogic>().As<IServerLogic>().As<ILogic>().InstancePerLifetimeScope();
         builder.RegisterType<CoopServer>().As<ICoopServer>().As<INetwork>().As<INetEventListener>().InstancePerLifetimeScope();
         builder.RegisterType<CoopSaveManager>().As<ICoopSaveManager>().InstancePerLifetimeScope();
@@ -37,7 +38,5 @@ public class ServerModule : CommonModule
 
         RegisterAllTypesWithInterface<ServerModule, IHandler>(builder, autoInstantiate: true);
         RegisterAllTypesWithInterface<ServerModule, IPacketHandler>(builder, autoInstantiate: true);
-
-        RegisterAllTypesWithInterface<ServerModule, IServerState>(builder);
     }
 }

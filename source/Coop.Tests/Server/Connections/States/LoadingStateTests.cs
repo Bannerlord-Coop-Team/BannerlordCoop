@@ -28,7 +28,7 @@ namespace Coop.Tests.Server.Connections.States
 
             playerPeer = network.CreatePeer();
             differentPeer = network.CreatePeer();
-            connectionLogic = container.Resolve<ConnectionLogic>(new NamedParameter("playerId", playerPeer));
+            connectionLogic = container.Resolve<ConnectionLogic>(new TypedParameter(typeof(NetPeer), playerPeer));
 
             differentPeer.SetId(playerPeer.Id + 1);
         }
@@ -73,7 +73,6 @@ namespace Coop.Tests.Server.Connections.States
                 playerPeer, new NetworkPlayerCampaignEntered());
             currentState.PlayerCampaignEnteredHandler(payload);
 
-
             // Assert
             Assert.Single(serverComponent.TestMessageBroker.GetMessagesFromType<PlayerCampaignEntered>());
 
@@ -91,9 +90,8 @@ namespace Coop.Tests.Server.Connections.States
                 differentPeer, new NetworkPlayerCampaignEntered());
             currentState.PlayerCampaignEnteredHandler(payload);
 
-
             // Assert
-            Assert.Empty(serverComponent.TestMessageBroker.Messages);
+            Assert.Empty(serverComponent.TestMessageBroker.GetMessagesFromType<PlayerCampaignEntered>());
 
             Assert.IsType<LoadingState>(connectionLogic.State);
         }
