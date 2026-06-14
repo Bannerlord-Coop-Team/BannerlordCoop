@@ -205,7 +205,10 @@ public class ObjectManager : IObjectManager
     {
         if (obj == null) return false;
 
-        return objsIds.TryGetValue(obj, out var _);
+        lock (_gate)
+        {
+            return objsIds.TryGetValue(obj, out var _);
+        }
     }
 
     public bool Contains(string id)
@@ -220,7 +223,10 @@ public class ObjectManager : IObjectManager
         id = null;
         if (obj == null) return false;
 
-        return objsIds.TryGetValue(obj, out id);
+        lock (_gate)
+        {
+            return objsIds.TryGetValue(obj, out id);
+        }
     }
     public bool TryGetObject<T>(string id, out T obj)
     {
