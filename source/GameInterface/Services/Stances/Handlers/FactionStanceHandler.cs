@@ -75,7 +75,7 @@ namespace GameInterface.Services.Stances.Handlers
                 faction = clan;
                 return true;
             }
-            Logger.Verbose("Faction not found in FactionStanceHandler with id: {id}", id);
+            Logger.Debug("Faction not found in FactionStanceHandler with id: {id}", id);
             faction = null;
             return false;
         }

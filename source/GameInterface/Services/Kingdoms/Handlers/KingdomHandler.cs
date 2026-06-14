@@ -37,13 +37,13 @@ public class KingdomHandler : IHandler
 
         if (!objectManager.TryGetObject(payload.KingdomId, out Kingdom kingdom))
         {
-            Logger.Verbose("Kingdom not found in KingdomHandler with KingdomId: {id}", payload.KingdomId);
+            Logger.Debug("Kingdom not found in KingdomHandler with KingdomId: {id}", payload.KingdomId);
             return;
         }
 
         if (!objectManager.TryGetObject(payload.PolicyId, out PolicyObject policy))
         {
-            Logger.Verbose("PolicyObject not found in KingdomHandler with PolicyId: {id}", payload.PolicyId);
+            Logger.Debug("PolicyObject not found in KingdomHandler with PolicyId: {id}", payload.PolicyId);
             return;
         }
 
@@ -56,7 +56,7 @@ public class KingdomHandler : IHandler
 
         if (!objectManager.TryGetObject(payload.KingdomId, out Kingdom kingdom))
         {
-            Logger.Verbose("Kingdom not found in KingdomDecisionHandler with KingdomId: {id}", payload.KingdomId);
+            Logger.Debug("Kingdom not found in KingdomDecisionHandler with KingdomId: {id}", payload.KingdomId);
             return;
         }
 
@@ -64,7 +64,7 @@ public class KingdomHandler : IHandler
         var decisions = kingdom._unresolvedDecisions;
         if (decisions == null)
         {
-            Logger.Verbose("Kingdom {id} has no unresolved decision list.", payload.KingdomId);
+            Logger.Debug("Kingdom {id} has no unresolved decision list.", payload.KingdomId);
             return;
         }
 
@@ -74,7 +74,7 @@ public class KingdomHandler : IHandler
         }
         else
         {
-            Logger.Verbose("Index is out of bounds of the list.");
+            Logger.Warning("Index is out of bounds of the list.");
             return;
         }
     }
@@ -85,13 +85,13 @@ public class KingdomHandler : IHandler
 
         if (!objectManager.TryGetObject(payload.KingdomId, out Kingdom kingdom))
         {
-            Logger.Verbose("Kingdom not found in KingdomDecisionHandler with KingdomId: {id}", payload.KingdomId);
+            Logger.Debug("Kingdom not found in KingdomDecisionHandler with KingdomId: {id}", payload.KingdomId);
             return;
         }
 
         if (!payload.Data.TryGetKingdomDecision(objectManager, out KingdomDecision kingdomDecision))
         {
-            Logger.Verbose("KingdomDecision could not be deserialized in KingdomDecisionHandler.");
+            Logger.Warning("KingdomDecision could not be deserialized in KingdomDecisionHandler.");
             return;
         }
 
