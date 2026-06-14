@@ -24,7 +24,15 @@ public class ServerModule : CommonModule
 
         builder.RegisterModule<ConnectionModule>();
 
+        builder.RegisterType<ServerContext>().AsSelf().InstancePerLifetimeScope();
         builder.RegisterType<ServerLogic>().As<IServerLogic>().As<ILogic>().InstancePerLifetimeScope();
+
+        // Owns the "no un-pausing while a client is loading" policy; AutoActivate so the policy is
+        // registered with the time control interface as soon as the server starts.
+        builder.RegisterType<Coop.Core.Server.Services.Time.ServerTimeInterface>()
+            .As<Coop.Core.Server.Services.Time.IServerTimeInterface>()
+            .InstancePerLifetimeScope()
+            .AutoActivate();
         builder.RegisterType<CoopServer>().As<ICoopServer>().As<INetwork>().As<INetEventListener>().InstancePerLifetimeScope();
         builder.RegisterType<CoopSaveManager>().As<ICoopSaveManager>().InstancePerLifetimeScope();
 

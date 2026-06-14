@@ -112,5 +112,30 @@ namespace Coop.Tests.Server.Connections.States
             Assert.False(clientRegistry.PlayersLoading);
             Assert.Empty(clientRegistry.LoadingPeers);
         }
+
+        [Fact]
+        public void LoadingTransitions_BroadcastLoadingPlayersChangedOnChangeOnly()
+        {
+            // Arrange
+            var connectPayload = new MessagePayload<PlayerConnected>(this, new PlayerConnected(playerPeer));
+            clientRegistry.PlayerJoiningHandler(connectPayload);
+            var connectionLogic = clientRegistry.ConnectionStates[playerPeer];
+            serverComponent.TestMessageBroker.Messages.Clear();
+
+            // Act & Assert: entering a loading state broadcasts a count of 1.
+            connectionLogic.SetState<TransferSaveState>();
+            var loadingMessage = Assert.Single(serverComponent.TestMessageBroker.GetMessagesFromType<LoadingPlayersChanged>());
+            Assert.Equal(1, loadingMessage.LoadingPlayerCount);
+
+            // Staying loading (TransferSave -> Loading) does not re-broadcast an unchanged count.
+            serverComponent.TestMessageBroker.Messages.Clear();
+            connectionLogic.SetState<LoadingState>();
+            Assert.Empty(serverComponent.TestMessageBroker.GetMessagesFromType<LoadingPlayersChanged>());
+
+            // Leaving the loading states broadcasts a count of 0.
+            connectionLogic.SetState<CampaignState>();
+            var clearedMessage = Assert.Single(serverComponent.TestMessageBroker.GetMessagesFromType<LoadingPlayersChanged>());
+            Assert.Equal(0, clearedMessage.LoadingPlayerCount);
+        }
     }
 }

@@ -93,7 +93,7 @@ namespace Coop.Tests.Server.Connections.States
 
 
             // Assert
-            Assert.Empty(serverComponent.TestMessageBroker.Messages);
+            Assert.Empty(serverComponent.TestMessageBroker.GetMessagesFromType<PlayerCampaignEntered>());
 
             Assert.IsType<LoadingState>(connectionLogic.State);
         }

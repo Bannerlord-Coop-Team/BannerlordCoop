@@ -1,77 +1,96 @@
-﻿using Common.Messaging;
-using Common.Network;
+using Common.Messaging;
 using Common.Network.Messages;
 using Coop.Core.Server.Connections.Messages;
-using Coop.Core.Server.Connections.States;
 using LiteNetLib;
 using System;
+using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+
 namespace Coop.Core.Server.Connections;
 
 /// <summary>
 /// Manages client connections while one or more connections is receiving the game state
-/// through a save transfer
+/// through a save transfer. Exposes the live connection states for consumers that need to
+/// reason about who is loading.
 /// </summary>
-public interface IClientRegistry : IDisposable
+public interface IConnectionCollection : IEnumerable<IConnectionState>, IDisposable
 {
-    bool PlayersLoading { get; }
-
-    List<NetPeer> LoadingPeers { get; }
+    IEnumerable<IConnectionLogic> LoadingPeers { get; }
 }
 
-/// <inheritdoc cref="IClientRegistry"/>
-public class ClientRegistry : IClientRegistry
+/// <inheritdoc cref="IConnectionCollection"/>
+public class ClientRegistry : IConnectionCollection
 {
-    public IDictionary<NetPeer, IConnectionLogic> ConnectionStates { get; private set; } = new Dictionary<NetPeer, IConnectionLogic>();
+    public ConcurrentDictionary<NetPeer, IConnectionLogic> ConnectionStates { get; private set; } = new();
 
-    private static HashSet<Type> loadingStates = new HashSet<Type>
-    {
-        typeof(TransferSaveState),
-        typeof(LoadingState),
-    };
-
-    public bool PlayersLoading => ConnectionStates.Any(state => loadingStates.Contains(state.Value.State.GetType()));
-
-    public List<NetPeer> LoadingPeers => ConnectionStates.Where(state => loadingStates.Contains(state.Value.State.GetType())).Select(state => state.Key).ToList();
+    public IEnumerable<IConnectionLogic> LoadingPeers => ConnectionStates
+        .Select(conn => conn.Value)
+        .Where(conn => conn.IsLoading);
 
     private readonly IMessageBroker messageBroker;
-    private readonly INetwork network;
-    private readonly IConnectionLogicFactory connectionLogicFactory;
+    private readonly ConnectionContext connectionContext;
+
+    private int lastBroadcastLoadingCount;
 
     public ClientRegistry(
         IMessageBroker messageBroker,
-        INetwork network,
-        IConnectionLogicFactory connectionLogicFactory)
+        ConnectionContext connectionContext)
     {
         this.messageBroker = messageBroker;
-        this.network = network;
-        this.connectionLogicFactory = connectionLogicFactory;
+        this.connectionContext = connectionContext;
         this.messageBroker.Subscribe<PlayerConnected>(PlayerJoiningHandler);
         this.messageBroker.Subscribe<PlayerDisconnected>(PlayerDisconnectedHandler);
+        this.messageBroker.Subscribe<ConnectionStateChanged>(ConnectionStateChangedHandler);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<PlayerConnected>(PlayerJoiningHandler);
         messageBroker.Unsubscribe<PlayerDisconnected>(PlayerDisconnectedHandler);
+        messageBroker.Unsubscribe<ConnectionStateChanged>(ConnectionStateChangedHandler);
     }
 
     internal void PlayerJoiningHandler(MessagePayload<PlayerConnected> obj)
     {
         var playerPeer = obj.What.PlayerPeer;
-        var connectionLogic = connectionLogicFactory.CreateLogic(playerPeer);
-        ConnectionStates.Add(playerPeer, connectionLogic);
+        ConnectionStates.TryAdd(playerPeer, new ConnectionLogic(playerPeer, connectionContext));
+        BroadcastLoadingStateIfChanged();
     }
 
     internal void PlayerDisconnectedHandler(MessagePayload<PlayerDisconnected> obj)
     {
         var playerId = obj.What.PlayerId;
-        
-        if(ConnectionStates.TryGetValue(playerId, out IConnectionLogic logic))
+
+        if (ConnectionStates.TryRemove(playerId, out IConnectionLogic logic))
         {
-            ConnectionStates.Remove(playerId);
             logic.Dispose();
         }
+
+        BroadcastLoadingStateIfChanged();
     }
+
+    internal void ConnectionStateChangedHandler(MessagePayload<ConnectionStateChanged> obj)
+    {
+        BroadcastLoadingStateIfChanged();
+    }
+
+    /// <summary>
+    /// Publishes a <see cref="LoadingPlayersChanged"/> whenever the number of loading connections
+    /// differs from what was last broadcast. Concentrating this here makes the registry the single
+    /// source of truth for "who is loading" and gives downstream handlers one event to react to.
+    /// </summary>
+    private void BroadcastLoadingStateIfChanged()
+    {
+        var loadingCount = LoadingPeers.Count();
+        if (loadingCount == lastBroadcastLoadingCount) return;
+
+        lastBroadcastLoadingCount = loadingCount;
+        messageBroker.Publish(this, new LoadingPlayersChanged(loadingCount));
+    }
+
+    public IEnumerator<IConnectionState> GetEnumerator() => ConnectionStates.Values.GetEnumerator();
+
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }

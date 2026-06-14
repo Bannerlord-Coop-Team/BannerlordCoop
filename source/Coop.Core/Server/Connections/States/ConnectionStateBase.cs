@@ -1,4 +1,4 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using Common.Network;
 
 namespace Coop.Core.Server.Connections.States;
@@ -14,6 +14,11 @@ public abstract class ConnectionStateBase : IConnectionState
     {
         ConnectionLogic = connectionLogic;
     }
+
+    /// <summary>
+    /// Connections do not block time by default; loading states override this.
+    /// </summary>
+    public virtual bool IsLoading => false;
 
     public abstract void CreateCharacter();
     public abstract void TransferSave();
