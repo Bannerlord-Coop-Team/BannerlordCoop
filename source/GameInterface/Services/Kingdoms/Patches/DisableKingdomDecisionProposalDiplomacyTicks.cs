@@ -7,11 +7,13 @@ namespace GameInterface.Services.Kingdoms.Patches
 {
     /// <summary>
     /// Disables the diplomacy / lifecycle listeners of <see cref="KingdomDecisionProposalBehavior"/>
-    /// that drain the unresolved queue via the vanilla, player-keyed UpdateKingdomDecisions
-    /// (which uses the player-driven election path). The sweep in
-    /// <see cref="CoopKingdomDecisionProposalBehaviorPatch"/> is the sole authority for draining.
-    /// DailyTick (queue pruning) and OnKingdomDecisionAdded (dedup tracking) are intentionally
-    /// left enabled.
+    /// that drain the unresolved queue via UpdateKingdomDecisions, which cancels invalid decisions
+    /// and resolves due ones (StartElectionWithoutPlayer) exactly as the sweep in
+    /// <see cref="CoopKingdomDecisionProposalBehaviorPatch"/> does. Leaving them enabled would give
+    /// two resolvers for the same queue running re-entrantly: resolving a decision fires a war/peace
+    /// event whose listener re-enters UpdateKingdomDecisions and resolves/removes further decisions
+    /// mid-resolution. Disabling them makes the sweep the sole resolver. DailyTick (queue pruning)
+    /// and OnKingdomDecisionAdded (dedup tracking) are intentionally left enabled.
     /// </summary>
     [HarmonyPatch]
     internal class DisableKingdomDecisionProposalDiplomacyTicks
