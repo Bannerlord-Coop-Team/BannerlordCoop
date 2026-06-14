@@ -61,43 +61,36 @@ public class PartyVisualLifetimeHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<PartyBase>(payload.What.PartyBaseId, out var partyBase))
             return;
 
+        // No visuals manager (headless server / tests): nothing to render, and the object manager
+        // does not need to track the visual there. Real clients register it on the main thread below.
+        if (MobilePartyVisualManager.Current == null)
+            return;
+
         var partyVisualId = payload.What.PartyVisualId;
 
-        if (MobilePartyVisualManager.Current != null)
+        // Normal client: the map visuals manager mutates its party list and builds native visual
+        // entities here, while its OnTick walks that same list in parallel on the main thread.
+        // Doing this on the network thread races that tick and corrupts memory, so marshal it onto
+        // the main thread. Re-read Current there: it can be torn down or replaced (campaign exit,
+        // save reload, mission entry) between this enqueue and the queued action running.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            // Normal client: the map visuals manager mutates its party list and builds native visual
-            // entities here, while its OnTick walks that same list in parallel on the main thread.
-            // Doing this on the network thread races that tick and corrupts memory, so marshal it onto
-            // the main thread. Re-read Current there: it can be torn down or replaced (campaign exit,
-            // save reload, mission entry) between this enqueue and the queued action running.
-            GameLoopRunner.RunOnMainThread(() =>
-            {
-                using (new AllowedThread())
-                {
-                    try
-                    {
-                        var visualManager = MobilePartyVisualManager.Current;
-                        if (visualManager == null) return;
-
-                        visualManager.AddNewPartyVisualForParty(partyBase.MobileParty);
-                        objectManager.AddExisting(partyVisualId, partyBase.GetPartyVisual());
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Error(ex, "Failed to create party visual {VisualId}", partyVisualId);
-                    }
-                }
-            });
-        }
-        else
-        {
-            // No visuals manager (headless server / tests): construct directly so the object is
-            // still tracked for sync without participating in map rendering.
             using (new AllowedThread())
             {
-                objectManager.AddExisting(partyVisualId, new MobilePartyVisual(partyBase));
+                try
+                {
+                    var visualManager = MobilePartyVisualManager.Current;
+                    if (visualManager == null) return;
+
+                    visualManager.AddNewPartyVisualForParty(partyBase.MobileParty);
+                    objectManager.AddExisting(partyVisualId, partyBase.GetPartyVisual());
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to create party visual {VisualId}", partyVisualId);
+                }
             }
-        }
+        });
     }
 
     private void Handle(MessagePayload<PartyVisualDestroyed> payload)
