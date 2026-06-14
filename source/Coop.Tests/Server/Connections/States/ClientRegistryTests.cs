@@ -16,7 +16,7 @@ namespace Coop.Tests.Server.Connections.States
 {
     public class ClientRegistryTests
     {
-        private readonly ClientRegistry clientRegistry;
+        private readonly ConnectionCollection connectionCollection;
         private readonly NetPeer playerPeer;
         private readonly ServerTestComponent serverComponent;
 
@@ -29,7 +29,7 @@ namespace Coop.Tests.Server.Connections.States
 
             playerPeer = network.CreatePeer();
 
-            clientRegistry = container.Resolve<ClientRegistry>();
+            connectionCollection = container.Resolve<ConnectionCollection>();
         }
 
         [Fact]
@@ -40,12 +40,12 @@ namespace Coop.Tests.Server.Connections.States
             var disconnectPayload = new MessagePayload<PlayerDisconnected>(this, new PlayerDisconnected(playerPeer, default));
 
             // Act
-            clientRegistry.PlayerJoiningHandler(connectPayload);
-            Assert.Single(clientRegistry.ConnectionStates);
-            clientRegistry.PlayerDisconnectedHandler(disconnectPayload);
+            connectionCollection.PlayerJoiningHandler(connectPayload);
+            Assert.Single(connectionCollection.ConnectionStates);
+            connectionCollection.PlayerDisconnectedHandler(disconnectPayload);
 
             // Assert
-            Assert.Empty(clientRegistry.ConnectionStates);
+            Assert.Empty(connectionCollection.ConnectionStates);
         }
 
         [Fact]
@@ -56,14 +56,14 @@ namespace Coop.Tests.Server.Connections.States
             var disconnectPayload = new MessagePayload<PlayerDisconnected>(this, new PlayerDisconnected(playerPeer, default));
 
             // Act
-            clientRegistry.PlayerJoiningHandler(connectPayload);
-            clientRegistry.ConnectionStates[playerPeer].SetState<TransferSaveState>();
-            Assert.True(clientRegistry.PlayersLoading);
-            clientRegistry.PlayerDisconnectedHandler(disconnectPayload);
+            connectionCollection.PlayerJoiningHandler(connectPayload);
+            connectionCollection.ConnectionStates[playerPeer].SetState<TransferSaveState>();
+            Assert.NotEmpty(connectionCollection.LoadingPeers);
+            connectionCollection.PlayerDisconnectedHandler(disconnectPayload);
 
             // Assert
-            Assert.False(clientRegistry.PlayersLoading);
-            Assert.Empty(clientRegistry.LoadingPeers);
+            Assert.Empty(connectionCollection.LoadingPeers);
+            Assert.Empty(connectionCollection.LoadingPeers);
         }
 
         [Fact]
@@ -73,10 +73,10 @@ namespace Coop.Tests.Server.Connections.States
             var connectPayload = new MessagePayload<PlayerConnected>(this, new PlayerConnected(playerPeer));
             
             // Act
-            clientRegistry.PlayerJoiningHandler(connectPayload);
+            connectionCollection.PlayerJoiningHandler(connectPayload);
 
             // Assert
-            var connectionState = Assert.Single(clientRegistry.ConnectionStates).Value;
+            var connectionState = Assert.Single(connectionCollection.ConnectionStates).Value;
             Assert.IsType<ResolveCharacterState>(connectionState.State);
         }
 
@@ -85,32 +85,27 @@ namespace Coop.Tests.Server.Connections.States
         {
             // Arrange
             var connectPayload = new MessagePayload<PlayerConnected>(this, new PlayerConnected(playerPeer));
-            clientRegistry.PlayerJoiningHandler(connectPayload);
-            var connectionLogic = clientRegistry.ConnectionStates[playerPeer];
+            connectionCollection.PlayerJoiningHandler(connectPayload);
+            var connectionLogic = connectionCollection.ConnectionStates[playerPeer];
 
             // Assert
             // Character resolution/creation happen before the save snapshot is taken,
             // so time is free to unpause during them.
-            Assert.False(clientRegistry.PlayersLoading);
-            Assert.Empty(clientRegistry.LoadingPeers);
+            Assert.Empty(connectionCollection.LoadingPeers);
 
             connectionLogic.SetState<CreateCharacterState>();
-            Assert.False(clientRegistry.PlayersLoading);
-            Assert.Empty(clientRegistry.LoadingPeers);
+            Assert.Empty(connectionCollection.LoadingPeers);
 
             // The save is packaged in TransferSaveState and consumed through LoadingState,
             // so time must stay locked across that window.
             connectionLogic.SetState<TransferSaveState>();
-            Assert.True(clientRegistry.PlayersLoading);
-            Assert.Contains(playerPeer, clientRegistry.LoadingPeers);
+            Assert.Contains(connectionCollection.LoadingPeers, logic => logic.Peer == playerPeer);
 
             connectionLogic.SetState<LoadingState>();
-            Assert.True(clientRegistry.PlayersLoading);
-            Assert.Contains(playerPeer, clientRegistry.LoadingPeers);
+            Assert.Contains(connectionCollection.LoadingPeers, logic => logic.Peer == playerPeer);
 
             connectionLogic.SetState<CampaignState>();
-            Assert.False(clientRegistry.PlayersLoading);
-            Assert.Empty(clientRegistry.LoadingPeers);
+            Assert.Empty(connectionCollection.LoadingPeers);
         }
 
         [Fact]
@@ -118,8 +113,8 @@ namespace Coop.Tests.Server.Connections.States
         {
             // Arrange
             var connectPayload = new MessagePayload<PlayerConnected>(this, new PlayerConnected(playerPeer));
-            clientRegistry.PlayerJoiningHandler(connectPayload);
-            var connectionLogic = clientRegistry.ConnectionStates[playerPeer];
+            connectionCollection.PlayerJoiningHandler(connectPayload);
+            var connectionLogic = connectionCollection.ConnectionStates[playerPeer];
             serverComponent.TestMessageBroker.Messages.Clear();
 
             // Act & Assert: entering a loading state broadcasts a count of 1.

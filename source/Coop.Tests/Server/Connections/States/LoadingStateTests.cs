@@ -28,7 +28,7 @@ namespace Coop.Tests.Server.Connections.States
 
             playerPeer = network.CreatePeer();
             differentPeer = network.CreatePeer();
-            connectionLogic = container.Resolve<ConnectionLogic>(new NamedParameter("playerId", playerPeer));
+            connectionLogic = container.Resolve<ConnectionLogic>(new TypedParameter(typeof(NetPeer), playerPeer));
 
             differentPeer.SetId(playerPeer.Id + 1);
         }

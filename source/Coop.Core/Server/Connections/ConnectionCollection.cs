@@ -21,7 +21,7 @@ public interface IConnectionCollection : IEnumerable<IConnectionState>, IDisposa
 }
 
 /// <inheritdoc cref="IConnectionCollection"/>
-public class ClientRegistry : IConnectionCollection
+public class ConnectionCollection : IConnectionCollection
 {
     public ConcurrentDictionary<NetPeer, IConnectionLogic> ConnectionStates { get; private set; } = new();
 
@@ -34,7 +34,7 @@ public class ClientRegistry : IConnectionCollection
 
     private int lastBroadcastLoadingCount;
 
-    public ClientRegistry(
+    public ConnectionCollection(
         IMessageBroker messageBroker,
         ConnectionContext connectionContext)
     {

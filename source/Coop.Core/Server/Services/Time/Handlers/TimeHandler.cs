@@ -1,12 +1,14 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Time.Messages;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Messages;
 using Serilog;
+using System.Linq;
 
 namespace Coop.Core.Server.Services.Time.Handlers;
 
@@ -22,15 +24,19 @@ public class TimeHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly ITimeControlInterface timeControlInterface;
+    private readonly IConnectionCollection connections;
 
-    public TimeHandler(IMessageBroker messageBroker, INetwork network, ITimeControlInterface timeControlInterface)
+    public TimeHandler(IMessageBroker messageBroker, INetwork network, ITimeControlInterface timeControlInterface, IConnectionCollection connections)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.timeControlInterface = timeControlInterface;
+        this.connections = connections;
         this.messageBroker.Subscribe<LoadingPlayersChanged>(Handle_LoadingPlayersChanged);
         this.messageBroker.Subscribe<TimeSpeedChangedAttempted>(Handle_TimeSpeedChanged);
         this.messageBroker.Subscribe<NetworkRequestTimeSpeedChange>(Handle_NetworkRequestTimeSpeedChange);
+
+        timeControlInterface.AddUnpausePolicy(PlayersLoadingPolicy);
     }
 
     public void Dispose()
@@ -38,6 +44,8 @@ public class TimeHandler : IHandler
         messageBroker.Unsubscribe<LoadingPlayersChanged>(Handle_LoadingPlayersChanged);
         messageBroker.Unsubscribe<TimeSpeedChangedAttempted>(Handle_TimeSpeedChanged);
         messageBroker.Unsubscribe<NetworkRequestTimeSpeedChange>(Handle_NetworkRequestTimeSpeedChange);
+
+        timeControlInterface.RemoveUnpausePolicy(PlayersLoadingPolicy);
     }
 
     /// <summary>
@@ -71,5 +79,18 @@ public class TimeHandler : IHandler
         var newMode = obj.What.NewControlMode;
 
         timeControlInterface.ServerSetTimeControl(newMode);
+    }
+
+    private bool PlayersLoadingPolicy()
+    {
+        var loadingPeers = connections.LoadingPeers;
+        if (loadingPeers.Count() > 0)
+        {
+
+            Logger.Information($"{string.Join(",", loadingPeers.Select(p => p.Peer.Address))} are currently loading, unable to change time");
+            return false;
+        }
+
+        return true;
     }
 }

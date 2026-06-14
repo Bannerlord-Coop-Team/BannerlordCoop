@@ -3,7 +3,7 @@ using Common.Messaging;
 namespace Coop.Core.Server.Connections.Messages;
 
 /// <summary>
-/// Published by the <see cref="ClientRegistry"/> whenever the number of connections in a
+/// Published by the <see cref="ConnectionCollection"/> whenever the number of connections in a
 /// loading state changes. It is the single signal other server handlers react to in order
 /// to pause time, lock client time controls, and message players while clients are joining.
 /// </summary>

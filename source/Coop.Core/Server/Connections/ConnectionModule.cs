@@ -14,7 +14,7 @@ internal class ConnectionModule : Module
         // so they can also be resolved standalone (e.g. in tests) with a playerId parameter.
         builder.RegisterType<ConnectionLogic>().As<IConnectionLogic>().AsSelf();
 
-        builder.RegisterType<ClientRegistry>().As<IConnectionCollection>().AsSelf().InstancePerLifetimeScope().AutoActivate();
+        builder.RegisterType<ConnectionCollection>().As<IConnectionCollection>().AsSelf().InstancePerLifetimeScope().AutoActivate();
 
         base.Load(builder);
     }
