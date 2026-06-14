@@ -13,44 +13,24 @@ using System.Collections.Generic;
 namespace Coop.Core.Server.Connections;
 
 /// <summary>
-/// Server-side, per-peer broadcast queue that stops a still-loading client from receiving the live
-/// world stream before it can apply it. A peer is transport-connected the instant it joins — long
-/// before it has the host save — yet every <c>SendAll</c>/<c>SendAllBut</c> fans out to every
-/// connected peer, so without this gate a joining client is flooded with deltas it has no campaign to
-/// apply them against.
+/// Server-side, per-peer gate that withholds world broadcasts from a client while it is still loading,
+/// so it is not flooded with deltas it has no campaign to apply. Every <c>SendAll</c>/<c>SendAllBut</c>
+/// runs through here per peer; single-peer handshake and save sends bypass it.
 /// </summary>
 /// <remarks>
-/// Each peer moves through three phases:
+/// Each peer's channel moves through three phases:
 /// <list type="bullet">
-/// <item><b>Dropping</b> (default, created on <see cref="PlayerConnected"/>): the peer has connected
-/// but its transfer save has not been taken yet. Broadcasts are discarded — their world change is
-/// already captured by the save the peer is about to receive, so replaying them would be redundant
-/// (and for additive messages divergent).</item>
-/// <item><b>Queueing</b> (entered via <see cref="BeginQueueing"/>, called on the main thread just
-/// after the save snapshot): broadcasts are held in FIFO order — they carry world changes the save
-/// does not contain, so the peer must receive them once it is live.</item>
-/// <item><b>Open</b> (reached when the peer reports <see cref="PlayerCampaignEntered"/>): the held
-/// packets are replayed in FIFO order and the channel is dropped, after which the peer receives
-/// broadcasts live like any fully-joined peer.</item>
+/// <item><b>Dropping</b> (on <see cref="PlayerConnected"/>): pre-save broadcasts are discarded — they
+/// are already in the save the peer is about to load.</item>
+/// <item><b>Queueing</b> (on <see cref="BeginQueueing"/>, just after the save snapshot): broadcasts are
+/// held FIFO — they are not in the save.</item>
+/// <item><b>Open</b> (on <see cref="PlayerCampaignEntered"/>): held packets are replayed FIFO, the
+/// channel is dropped, and the peer goes live (a peer with no channel is live).</item>
 /// </list>
-/// A peer with no channel — never connected, or already flushed — is treated as live: broadcasts are
-/// sent immediately. Only fan-out broadcasts pass through here; single-peer handshake and save sends
-/// (<see cref="GameInterface.Services.Heroes.Interfaces.ISaveInterface"/> transfer, the new-hero
-/// reply) use <see cref="INetwork.Send(NetPeer, IPacket)"/> and bypass the queue by construction, so
-/// no packet-type whitelist is needed.
-///
-/// The Dropping/Queueing cut is taken at the save boundary and is effectively atomic. The transfer
-/// save runs inside a blocking <c>GameLoopRunner.RunOnMainThread</c> call issued from the network
-/// thread, so the poller is parked for the save's duration and cannot broadcast a received delta that
-/// races the snapshot, while the main thread takes the snapshot with no other game logic interleaved.
-/// <see cref="BeginQueueing"/> is called immediately after the snapshot, so a broadcast is dropped iff
-/// its world change is already in the save and queued iff it is not.
-///
-/// Ordering and memory visibility rest solely on the per-peer gate lock — never on thread identity
-/// (the network poller is a rotating thread-pool set) nor on broker delivery order (the message broker
-/// is not thread-safe and broadcasts fire from both the main and poller threads). The gate is held
-/// across the entire flush, flipping the channel out of reach as its last action, so replayed packets
-/// always precede any live broadcast that races the campaign-entered signal.
+/// The drop/queue cut is clean: the save runs in a blocking <c>RunOnMainThread</c> on the network
+/// thread, so the poller is parked and nothing races the snapshot. Replay-before-live is held by the
+/// per-peer gate lock (across the whole flush, Open flipped last), not by thread identity or the
+/// non-thread-safe broker.
 /// </remarks>
 public interface IConnectionMessageQueue
 {
