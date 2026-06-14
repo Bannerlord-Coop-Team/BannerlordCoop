@@ -160,10 +160,6 @@ public class CoopServer : CoopNetworkBase, ICoopServer
             {
                 messageBroker.Publish(this, new PeerQueueOverloaded(netPeer));
             }
-            else if (outgoingPacketCount > Configuration.SlowDownPacketThreshold)
-            {
-                messageBroker.Publish(this, new PeerQueueCongested(netPeer));
-            }
         }
     }
 }

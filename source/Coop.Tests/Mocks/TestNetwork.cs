@@ -25,12 +25,10 @@ public class TestNetwork : INetwork
     private static int NewPeerId => Interlocked.Increment(ref _peerId);
     private static int _peerId = 0;
 
-    // NetPeer derives from IPEndPoint, so peers are equal when their address:port match. Callers that need
-    // distinct peers (e.g. for per-peer dedup) must pass distinct addresses.
-    public NetPeer CreatePeer(string ipAddress = "127.0.0.1")
+    public NetPeer CreatePeer()
     {
         var newPeer = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
-        newPeer.Setup(NewPeerId, ipAddress);
+        newPeer.Setup(NewPeerId);
 
         Peers.Add(newPeer);
 
