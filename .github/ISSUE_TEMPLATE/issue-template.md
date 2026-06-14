@@ -4,6 +4,7 @@ about: Default issue template
 title: "[ISSUE]"
 labels: ''
 assignees: ''
+projects: ["Bannerlord-Coop-Team/37"]
 
 ---
 

@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
 using Common.Serialization;
@@ -24,6 +25,9 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
 
     private readonly Poller poller;
 
+    // Profiles which messages are sent over the network; dumps per-type counts every 10 seconds (server only).
+    private readonly MessageProfiler messageProfiler = new MessageProfiler(TimeSpan.FromSeconds(10));
+
     private CancellationTokenSource CancellationTokenSource;
     // Guard against double-dispose: finalizer calls Dispose() after explicit Dispose() on reconnect
     private bool _disposed = false;
@@ -37,10 +41,7 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
 
         netManager = new NetManager(this)
         {
-            // DisconnectTimeout = configuration.ConnectionTimeout.Milliseconds
-
-            // Increase disconnect timeout to prevent disconnect during debugging
-            DisconnectTimeout = 300 * 1000
+            DisconnectTimeout = (int)configuration.ConnectionTimeout.TotalMilliseconds
         };
 
         CancellationTokenSource = new CancellationTokenSource();
@@ -60,6 +61,8 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
         _disposed = true;
 
         netManager.Stop();
+
+        messageProfiler.Dispose();
 
         CancellationTokenSource.Cancel();
         CancellationTokenSource.Dispose();
@@ -89,6 +92,26 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
     }
 
     public virtual void Send(NetPeer netPeer, IPacket packet)
+    {
+        SendCore(netPeer, packet);
+    }
+
+    /// <summary>
+    /// Sends straight to the peer, bypassing any per-peer send gating (the server's connection queue).
+    /// For connection-level traffic that must reach a peer regardless of its load state — the transfer
+    /// save and the join handshake — and for the queue's own replay.
+    /// </summary>
+    public void SendImmediate(NetPeer netPeer, IPacket packet)
+    {
+        SendCore(netPeer, packet);
+    }
+
+    public void SendImmediate(NetPeer netPeer, IMessage message)
+    {
+        SendCore(netPeer, new MessagePacket(SerializeMessage(message)));
+    }
+
+    private void SendCore(NetPeer netPeer, IPacket packet)
     {
         // Serialize data
         byte[] data = serializer.Serialize(packet);
@@ -124,6 +147,9 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
         {
             throw new ArgumentException($"Type {message.GetType().Name} is not serializable.");
         }
+
+        // Single chokepoint for all message sends (Send/SendAll/SendAllBut).
+        messageProfiler.Record(message.GetType());
 
         return serializer.Serialize(message);
     }

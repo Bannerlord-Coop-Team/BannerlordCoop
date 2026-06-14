@@ -6,6 +6,7 @@ using Common.Util;
 using Coop.Core.Client.Messages;
 using Coop.Core.Client.Services.Heroes.Messages;
 using Coop.Core.Server.Connections.Messages;
+using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -27,6 +28,7 @@ public class CreateCharacterState : ConnectionStateBase
     private readonly INetwork network;
     private readonly IHeroInterface heroInterface;
     private readonly IPlayerManager playerRegistry;
+    private readonly IGameStateInterface gameStateInterface;
 
     public CreateCharacterState(
         IConnectionLogic connectionLogic,
@@ -34,7 +36,8 @@ public class CreateCharacterState : ConnectionStateBase
         IMessageBroker messageBroker,
         INetwork network,
         IHeroInterface heroInterface,
-        IPlayerManager playerRegistry)
+        IPlayerManager playerRegistry,
+        IGameStateInterface gameStateInterface)
         : base(connectionLogic)
     {
         this.objectManager = objectManager;
@@ -42,6 +45,7 @@ public class CreateCharacterState : ConnectionStateBase
         this.network = network;
         this.heroInterface = heroInterface;
         this.playerRegistry = playerRegistry;
+        this.gameStateInterface = gameStateInterface;
         messageBroker.Subscribe<NetworkTransferNewHero>(Handle_NetworkTransferNewHero);
     }
 
@@ -66,6 +70,7 @@ public class CreateCharacterState : ConnectionStateBase
         if (!TryCreatePlayer(controllerId, hero, out var player))
         {
             Logger.Error("Failed to create player");
+            gameStateInterface.GoToMainMenu();
             return;
         }
 
@@ -77,7 +82,7 @@ public class CreateCharacterState : ConnectionStateBase
         network.SendAllBut(netPeer, message);
 
         // Respond with ids for the creating client
-        network.Send(netPeer, new NetworkHeroRecieved(player));
+        network.SendImmediate(netPeer, new NetworkHeroRecieved(player));
 
         ConnectionLogic.TransferSave();
     }

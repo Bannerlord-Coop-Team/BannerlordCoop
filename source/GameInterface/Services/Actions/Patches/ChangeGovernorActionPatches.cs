@@ -32,6 +32,11 @@ internal class ChangeGovernorActionPatches
     [HarmonyPrefix]
     public static bool ApplyGiveUpInternalPrefix(Hero governor)
     {
+        // Governor state syncs over several channels, so a removal can arrive after the
+        // governorship is already cleared. Vanilla dereferences GovernorOf unguarded;
+        // treat removing a non-governor as a no-op instead of re-announcing or crashing.
+        if (governor?.GovernorOf == null) return false;
+
         if (ModInformation.IsServer) return true;
 
         // Send message to server to manage removed governor

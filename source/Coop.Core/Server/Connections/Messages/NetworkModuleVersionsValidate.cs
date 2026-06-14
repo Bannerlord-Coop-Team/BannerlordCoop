@@ -28,6 +28,6 @@ public record NetworkModuleVersionsValidate : ICommand
             return;
         }
 
-        Modules = modules.Select(m => new NetworkModuleInfo(m.Id, m.IsOfficial, m.Version)).ToArray();
+        Modules = modules.Select(m => new NetworkModuleInfo(m.Id, m.IsOfficial, m.IsDlc, m.Version)).ToArray();
     }
 }

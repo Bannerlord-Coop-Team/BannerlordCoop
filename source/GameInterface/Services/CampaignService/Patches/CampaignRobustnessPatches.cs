@@ -1,13 +1,8 @@
 ﻿using Common.Logging;
 using HarmonyLib;
 using Serilog;
-using Serilog.Core;
 using System;
-using System.Collections.Generic;
-using System.Reflection;
-using System.Text;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.CampaignService.Patches;
 
@@ -18,7 +13,7 @@ internal class CampaignRobustnessPatches
 
     [HarmonyPatch(nameof(Campaign.RealTick))]
     [HarmonyFinalizer]
-    private static Exception Finalizer_UpdateMapEventsAux(Exception __exception, MethodBase __originalMethod)
+    private static Exception Finalizer_RealTick(Exception __exception)
     {
         if (__exception != null)
         {
