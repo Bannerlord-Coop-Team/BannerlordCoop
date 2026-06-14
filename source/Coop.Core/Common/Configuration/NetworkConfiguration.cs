@@ -26,8 +26,6 @@ public class NetworkConfiguration : INetworkConfiguration
 
     public int MaxPacketsInQueue => 10000;
 
-    public int SlowDownPacketThreshold => 5000;
-
     public TimeSpan AuditTimeout => TimeSpan.FromSeconds(15);
 
     public TimeSpan ObjectCreationTimeout => TimeSpan.FromSeconds(5);
