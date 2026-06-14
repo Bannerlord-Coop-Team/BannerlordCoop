@@ -7,6 +7,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
@@ -150,6 +151,135 @@ public class KingdomDebugCommand
         }
 
         return stringBuilder.ToString();
+    }
+
+    // coop.debug.kingdom.list_policies
+    /// <summary>
+    /// Lists the active policies of a specific kingdom. Useful for verifying that a policy change
+    /// resolved on the server has replicated to clients.
+    /// </summary>
+    /// <param name="args">first arg : kingdomId</param>
+    /// <returns>strings of all the active policies of a specific kingdom</returns>
+    [CommandLineArgumentFunction("list_policies", "coop.debug.kingdom")]
+    public static string ListKingdomPolicies(List<string> args)
+    {
+        if (args.Count < 1)
+        {
+            return "Usage: coop.debug.kingdom.list_policies <kingdomId>";
+        }
+
+        if (TryGetObjectManager(out var objectManager) == false)
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        if (objectManager.TryGetObject(args[0], out Kingdom kingdom) == false)
+        {
+            return $"ID: '{args[0]}' not found";
+        }
+
+        StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.Append($"Active policies of Kingdom: {kingdom.Name}\n");
+
+        int i = 1;
+        foreach (PolicyObject policy in kingdom.ActivePolicies)
+        {
+            stringBuilder.Append($"{i}. {policy.Name} ({policy.StringId})\n");
+            i++;
+        }
+
+        if (kingdom.ActivePolicies.Count == 0)
+        {
+            stringBuilder.Append("(none)\n");
+        }
+
+        return stringBuilder.ToString();
+    }
+
+    // coop.debug.kingdom.declare_war
+    /// <summary>
+    /// Directly declares war between two factions (run on the server). Deterministic alternative
+    /// to a DeclareWarDecision, which the kingdom AI may vote against.
+    /// </summary>
+    /// <param name="args">first arg : faction1Id ; second arg : faction2Id</param>
+    /// <returns>result message</returns>
+    [CommandLineArgumentFunction("declare_war", "coop.debug.kingdom")]
+    public static string DeclareWar(List<string> args)
+    {
+        if (args.Count < 2)
+        {
+            return "Usage: coop.debug.kingdom.declare_war <faction1Id> <faction2Id> (run on the server)";
+        }
+
+        if (TryGetObjectManager(out var objectManager) == false)
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        if (TryGetFaction(objectManager, args[0], out IFaction faction1) == false)
+        {
+            return $"Faction not found with id: {args[0]}";
+        }
+
+        if (TryGetFaction(objectManager, args[1], out IFaction faction2) == false)
+        {
+            return $"Faction not found with id: {args[1]}";
+        }
+
+        DeclareWarAction.ApplyByDefault(faction1, faction2);
+        return $"Declared war between '{faction1.Name}' and '{faction2.Name}'.";
+    }
+
+    // coop.debug.kingdom.make_peace
+    /// <summary>
+    /// Directly makes peace between two factions (run on the server).
+    /// </summary>
+    /// <param name="args">first arg : faction1Id ; second arg : faction2Id</param>
+    /// <returns>result message</returns>
+    [CommandLineArgumentFunction("make_peace", "coop.debug.kingdom")]
+    public static string MakePeace(List<string> args)
+    {
+        if (args.Count < 2)
+        {
+            return "Usage: coop.debug.kingdom.make_peace <faction1Id> <faction2Id> (run on the server)";
+        }
+
+        if (TryGetObjectManager(out var objectManager) == false)
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        if (TryGetFaction(objectManager, args[0], out IFaction faction1) == false)
+        {
+            return $"Faction not found with id: {args[0]}";
+        }
+
+        if (TryGetFaction(objectManager, args[1], out IFaction faction2) == false)
+        {
+            return $"Faction not found with id: {args[1]}";
+        }
+
+        MakePeaceAction.Apply(faction1, faction2);
+        return $"Made peace between '{faction1.Name}' and '{faction2.Name}'.";
+    }
+
+    /// <summary>
+    /// Resolves a faction id to either a Kingdom or a Clan.
+    /// </summary>
+    private static bool TryGetFaction(IObjectManager objectManager, string id, out IFaction faction)
+    {
+        if (objectManager.TryGetObject(id, out Kingdom kingdom))
+        {
+            faction = kingdom;
+            return true;
+        }
+        if (objectManager.TryGetObject(id, out Clan clan))
+        {
+            faction = clan;
+            return true;
+        }
+        faction = null;
+        return false;
     }
 
     // coop.debug..kingdom.add_decision

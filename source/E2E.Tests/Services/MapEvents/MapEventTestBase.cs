@@ -448,7 +448,7 @@ public abstract class MapEventTestBase : IDisposable
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
 
             client.Resolve<INetwork>().SendAll(new NetworkEndPlayerCaptivityAttempted(
-                heroId, partyId, party.Position, EndCaptivityDetail.ReleasedAfterEscape, null));
+                heroId, partyId, party.Position, EndCaptivityDetail.ReleasedAfterEscape, null, 0));
         }, disabledMethods);
     }
 

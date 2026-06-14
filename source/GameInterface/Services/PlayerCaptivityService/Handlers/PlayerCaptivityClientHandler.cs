@@ -192,8 +192,9 @@ internal class PlayerCaptivityClientHandler : IHandler
 
         string facilitatorId = null;
         if (data.Facilitator != null && !objectManager.TryGetIdWithLogging(data.Facilitator, out facilitatorId)) return;
+        int ransomAmount = Campaign.Current.PlayerCaptivity.CurrentRansomAmount;
 
-        var message = new NetworkEndPlayerCaptivityAttempted(heroId, partyId, playerParty.Position, data.Detail, facilitatorId);
+        var message = new NetworkEndPlayerCaptivityAttempted(heroId, partyId, playerParty.Position, data.Detail, facilitatorId, ransomAmount);
         network.SendAll(message);
 
         var playerCaptivity = Campaign.Current.PlayerCaptivity;

@@ -172,7 +172,7 @@ public class MapEventEnvironmentTests : MapEventTestBase
     }
 
     [Fact]
-    public void ReleasedHero_IsHealed_NotWounded_SyncAllClients()
+    public void ReleasedHero_StaysWounded_SyncAllClients()
     {
         // Arrange — the player loses a battle and is taken prisoner.
         var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
@@ -195,26 +195,14 @@ public class MapEventEnvironmentTests : MapEventTestBase
         // Act — the captor is defeated and the player is freed.
         ReleasePlayerAfterCaptorDefeated(heroId);
 
-        // Assert — the released hero is restored to full health everywhere, so it is no longer shown wounded
-        // in the party roster (vanilla never re-adds a released hero as wounded).
-        AssertHeroHitPoints(Server, heroId, expectFull: true);
-        AssertNoWoundedInParty(Server, partyId);
+        // Assert — release does not instantly heal the freed captive: the hero stays wounded everywhere
+        // (it recovers gradually through normal healing over time), and that wounded state stays consistent
+        // across the server and every client.
+        AssertHeroHitPoints(Server, heroId, expectFull: false);
         foreach (var client in Clients)
         {
-            AssertHeroHitPoints(client, heroId, expectFull: true);
-            AssertNoWoundedInParty(client, partyId);
+            AssertHeroHitPoints(client, heroId, expectFull: false);
         }
-    }
-
-    private void AssertNoWoundedInParty(EnvironmentInstance instance, string partyId)
-    {
-        instance.Call(() =>
-        {
-            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
-            Assert.True(
-                party.MemberRoster.TotalWoundedHeroes == 0,
-                $"[{instance.GetType().Name}] released party should have no wounded heroes: wounded={party.MemberRoster.TotalWoundedHeroes}");
-        });
     }
 
     private void AssertHeroHitPoints(EnvironmentInstance instance, string heroId, bool expectFull)

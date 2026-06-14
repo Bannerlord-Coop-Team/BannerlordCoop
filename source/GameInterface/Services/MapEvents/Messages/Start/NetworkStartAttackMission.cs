@@ -1,12 +1,16 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace GameInterface.Services.MapEvents.Messages.Start;
 
-[ProtoContract]
+[ProtoContract(SkipConstructor = true)]
 internal readonly struct NetworkStartAttackMission : ICommand
 {
+    [ProtoMember(1)]
+    public readonly int RandomTerrainSeed;
+
+    public NetworkStartAttackMission(int randomTerrainSeed)
+    {
+        RandomTerrainSeed = randomTerrainSeed;
+    }
 }
