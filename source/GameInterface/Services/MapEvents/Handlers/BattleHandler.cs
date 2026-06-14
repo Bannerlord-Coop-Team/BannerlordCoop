@@ -17,6 +17,7 @@ using GameInterface.Services.Players;
 using LiteNetLib;
 using Serilog;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -45,6 +46,16 @@ internal class BattleHandler : IHandler
     // Server-side: number of players in a map event at the last broadcast, used to
     // detect when fast-forward becomes (un)available and to keep clients informed.
     private int lastBroadcastPlayersInMapEvent;
+
+    // Exclusive upper bound for the terrain seed, preserving the range of the original
+    // client-side MBRandom.RandomInt(10000) roll this replaces.
+    private const int MaxTerrainSeed = 10000;
+
+    // Server-side: terrain seed chosen once per map event and reused for every client
+    // that opens the same battle, so they all use the same terrain seed. Keyed by
+    // map event id; the entry is evicted when the event finalizes.
+    private readonly ConcurrentDictionary<string, int> mapEventTerrainSeeds = new ConcurrentDictionary<string, int>();
+    private readonly Random terrainSeedRandom = new Random();
 
     public BattleHandler(
         IMessageBroker messageBroker,
@@ -123,8 +134,24 @@ internal class BattleHandler : IHandler
             side.MakeReadyForMission(null);
         }
 
-        var message = new NetworkStartAttackMission();
+        // Roll the terrain seed once for this map event and reuse it for every client
+        // that opens the battle, so they all use the same terrain seed. The seed is
+        // chosen server-side and carried in the message instead of rolled per machine.
+        var randomTerrainSeed = mapEventTerrainSeeds.GetOrAdd(payload.What.MapEventId, _ => RollTerrainSeed());
+
+        var message = new NetworkStartAttackMission(randomTerrainSeed);
         network.Send(payload.Who as NetPeer, message);
+    }
+
+    private int RollTerrainSeed()
+    {
+        // This runs on the network thread, so it avoids MBRandom, which mutates the
+        // game's shared main-thread RNG state. System.Random is not thread-safe, so
+        // the shared instance is guarded.
+        lock (terrainSeedRandom)
+        {
+            return terrainSeedRandom.Next(MaxTerrainSeed);
+        }
     }
 
     private void Handle_NetworkStartAttackMission(MessagePayload<NetworkStartAttackMission> payload)
@@ -132,10 +159,11 @@ internal class BattleHandler : IHandler
         // Opening a mission pushes a screen, and ScreenManager only tolerates screen
         // changes from the main thread; doing it from the network thread races its
         // layer lists and crashes the game.
-        GameLoopRunner.RunOnMainThread(OpenAttackMission);
+        var randomTerrainSeed = payload.What.RandomTerrainSeed;
+        GameLoopRunner.RunOnMainThread(() => OpenAttackMission(randomTerrainSeed));
     }
 
-    private static void OpenAttackMission()
+    private static void OpenAttackMission(int randomTerrainSeed)
     {
         try
         {
@@ -190,8 +218,9 @@ internal class BattleHandler : IHandler
             rec2.NeedsRandomTerrain = false;
             rec2.PlayingInCampaignMode = true;
 
-            // TODO make this server side
-            rec2.RandomTerrainSeed = MBRandom.RandomInt(10000);
+            // Seed chosen server-side and carried in NetworkStartAttackMission so every
+            // client uses the same terrain seed for this battle.
+            rec2.RandomTerrainSeed = randomTerrainSeed;
             rec2.AtmosphereOnCampaign = Campaign.Current.Models.MapWeatherModel.GetAtmosphereModel(MobileParty.MainParty.Position);
             rec2.SceneHasMapPatch = true;
             rec2.DecalAtlasGroup = 2;
@@ -335,6 +364,10 @@ internal class BattleHandler : IHandler
         // A map event ended; its parties have left it, so re-evaluate whether
         // fast-forward should become available again.
         RefreshFastForwardState(finalizedMapEvent: payload.What.MapEvent);
+
+        // The battle is over, so drop its cached terrain seed.
+        if (objectManager.TryGetId(payload.What.MapEvent, out var mapEventId))
+            mapEventTerrainSeeds.TryRemove(mapEventId, out _);
     }
 
     private void Handle_TimeSpeedChangedAttempted(MessagePayload<TimeSpeedChangedAttempted> payload)
