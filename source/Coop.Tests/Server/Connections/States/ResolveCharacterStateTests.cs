@@ -90,7 +90,7 @@ namespace Coop.Tests.Server.Connections.States
             // Arrange
             var currentState = connectionLogic.SetState<ResolveCharacterState>();
 
-            var modules = new List<ModuleInfo> { new ModuleInfo("1", true, new ApplicationVersion()) };
+            var modules = new List<ModuleInfo> { new ModuleInfo("1", true, false, new ApplicationVersion()) };
 
             serverComponent.Container
                 .Resolve<Mock<IModuleInfoProvider>>()
@@ -120,12 +120,12 @@ namespace Coop.Tests.Server.Connections.States
                 .Resolve<Mock<IModuleInfoProvider>>()
                 .Setup(mip => mip.GetModuleInfos())
                 .Returns(
-                    new List<ModuleInfo> { new ModuleInfo("1", true, new ApplicationVersion()) }
+                    new List<ModuleInfo> { new ModuleInfo("1", true, false, new ApplicationVersion()) }
                 );
 
             // Act
             var payload = new MessagePayload<NetworkModuleVersionsValidate>(
-                playerPeer, new NetworkModuleVersionsValidate(new List<ModuleInfo> { new ModuleInfo("MismatchedModule", true, new ApplicationVersion())}));
+                playerPeer, new NetworkModuleVersionsValidate(new List<ModuleInfo> { new ModuleInfo("MismatchedModule", true, false, new ApplicationVersion())}));
             currentState.Handle_ModuleVersionsValidate(payload);
 
             // Assert
