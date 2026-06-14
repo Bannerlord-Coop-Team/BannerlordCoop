@@ -22,7 +22,8 @@ public class TransferSaveState : ConnectionStateBase
         INetwork network,
         ICoopSessionProvider coopSessionProvider,
         ISaveInterface saveInterface,
-        ITimeControlInterface timeControlInterface)
+        ITimeControlInterface timeControlInterface,
+        IConnectionMessageQueue connectionMessageQueue)
         : base(connectionLogic)
     {
         messageBroker.Publish(this, new PlayerLoading());
@@ -44,8 +45,15 @@ public class TransferSaveState : ConnectionStateBase
                 connectionLogic.Peer.Disconnect();
                 return;
             }
-                
-            network.Send(ConnectionLogic.Peer, savePacket);
+
+            // Start holding this peer's broadcasts now that the snapshot has been taken. The whole save
+            // runs in a blocking RunOnMainThread call issued from the network thread, so the poller is
+            // parked for its duration and cannot broadcast a received delta that races the snapshot;
+            // taking the cut right after the snapshot cleanly separates "in the save" (dropped while
+            // Dropping) from "after the save" (queued for replay).
+            connectionMessageQueue.BeginQueueing(ConnectionLogic.Peer);
+
+            network.SendImmediate(ConnectionLogic.Peer, savePacket);
         }, blocking: true);
     }
 

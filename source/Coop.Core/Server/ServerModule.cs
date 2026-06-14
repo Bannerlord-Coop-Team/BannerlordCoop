@@ -27,6 +27,10 @@ public class ServerModule : CommonModule
         builder.RegisterType<ServerLogic>().As<IServerLogic>().As<ILogic>().InstancePerLifetimeScope();
         builder.RegisterType<CoopServer>().As<ICoopServer>().As<INetwork>().As<INetEventListener>().InstancePerLifetimeScope();
         builder.RegisterType<CoopSaveManager>().As<ICoopSaveManager>().InstancePerLifetimeScope();
+
+        // Withholds world broadcasts from a peer until it has the transfer save and has entered the
+        // campaign. AutoActivate so it subscribes to connection lifecycle events before any peer joins.
+        builder.RegisterType<ConnectionMessageQueue>().As<IConnectionMessageQueue>().InstancePerLifetimeScope().AutoActivate();
         
         // Policies
         builder.RegisterType<ServerSyncPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();

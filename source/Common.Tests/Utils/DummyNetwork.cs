@@ -24,6 +24,16 @@ internal class DummyNetwork : INetwork
         throw new NotImplementedException();
     }
 
+    public void SendImmediate(NetPeer netPeer, IPacket packet)
+    {
+        throw new NotImplementedException();
+    }
+
+    public void SendImmediate(NetPeer netPeer, IMessage message)
+    {
+        throw new NotImplementedException();
+    }
+
     public void SendAll(IPacket packet)
     {
         throw new NotImplementedException();
