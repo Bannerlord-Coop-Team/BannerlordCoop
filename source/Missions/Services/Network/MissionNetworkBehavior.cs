@@ -16,6 +16,16 @@ namespace Missions.Services.Network
         private static readonly ILogger Logger = LogManager.GetLogger<CoopMissionNetworkBehavior>();
 
         public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
+
+        /// <summary>
+        /// True when this behavior runs inside a live campaign (the location-sync tavern bridge) rather
+        /// than the standalone Missions test harness. In the test harness the mission IS the whole game
+        /// session, so ending it ends the game; in a live campaign the mission is just an interior, so
+        /// ending it must return to the settlement — never tear the campaign down to the main menu.
+        /// Set by <see cref="LiveInstanceLauncher"/> when it attaches the behavior.
+        /// </summary>
+        public bool IsLiveInstance { get; set; }
+
         private readonly LiteNetP2PClient client;
 
         private readonly IMessageBroker messageBroker;
@@ -57,7 +67,15 @@ namespace Missions.Services.Network
         public override void OnEndMission()
         {
             base.OnEndMission();
-            MBGameManager.EndGame();
+
+            // Only the standalone test harness should drop to the main menu on mission end. In a live
+            // campaign, leaving the tavern must keep the campaign running (the game returns the player
+            // to the settlement on its own).
+            if (IsLiveInstance == false)
+            {
+                MBGameManager.EndGame();
+            }
+
             Dispose();
         }
 

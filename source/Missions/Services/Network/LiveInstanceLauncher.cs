@@ -281,6 +281,10 @@ namespace Missions.Services.Network
                 var netBehavior = missionContainer.Resolve<CoopMissionNetworkBehavior>();
                 var tavernController = missionContainer.Resolve<CoopTavernsController>();
 
+                // Live campaign: leaving the tavern must return to the settlement, not EndGame() to the
+                // main menu (that behaviour is only for the standalone Missions test harness).
+                netBehavior.IsLiveInstance = true;
+
                 Common.GameLoopRunner.RunOnMainThread(() =>
                 {
                     mission.AddMissionBehavior(netBehavior);

@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Instances;
 using Common.Network.Instances.Messages;
 using LiteNetLib;
 using Missions.Services.BoardGames;
@@ -56,6 +57,7 @@ namespace Missions.Services.Taverns
         }
 
         private bool _localAgentRegistered;
+        private bool _instanceReadyPublished;
 
         public override void AfterStart()
         {
@@ -82,8 +84,8 @@ namespace Missions.Services.Taverns
                 _localAgentRegistered = true;
                 Logger.Information("[LocationSync] Registered local controlled agent {PlayerID}; broadcasting join info", playerId);
 
-                // Cover peers that connected before this controller was attached/subscribed
-                // (their PeerConnected was missed). Remote side dedupes by player id.
+                // Announce to peers that connected before this controller was attached/subscribed
+                // (their PeerConnected was missed). Remote side dedupes by the stable player id.
                 network.SendAll(BuildJoinInfo());
             }
         }
@@ -176,6 +178,14 @@ namespace Missions.Services.Taverns
             _agentRegistry.RegisterNetworkControlledAgent(netPeer, newAgentId, newAgent);
             Logger.Information("[LocationSync] Spawned + registered remote agent {AgentID} at {Pos} (mission '{Scene}')",
                 newAgentId, newAgent.Position, Mission.Current?.SceneName);
+
+            // The instance is now populated with at least one remote player. Tell the campaign side so a
+            // joining client can drop its "connecting to players" loading screen. Publish once.
+            if (_instanceReadyPublished == false)
+            {
+                _instanceReadyPublished = true;
+                _messageBroker.Publish(this, new InstanceReady(InstanceContext.Instance.CurrentInstanceId));
+            }
         }
 
         public Agent SpawnAgent(Vec3 startingPos, CharacterObject character)
