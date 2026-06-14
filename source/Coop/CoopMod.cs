@@ -166,6 +166,9 @@ namespace Coop
         {
             Coop = new CoopartiveMultiplayerExperience();
 
+            // EXPERIMENTAL: wire the campaign instance assignment to the Missions P2P stack (LocationSync).
+            Missions.Services.Network.LiveInstanceLauncher.Activate();
+
             Updateables.Add(GameLoopRunner.Instance);
 
 

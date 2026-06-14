@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Locations.Messages;
 using GameInterface.Services.Locations.Patches;
 using GameInterface.Services.ObjectManager;
@@ -276,6 +277,15 @@ public class LocationHandler : IHandler
 
         if (objectManager.TryGetObjectWithLogging(data.LocationId, out location) == false) return false;
         if (objectManager.TryGetObjectWithLogging(data.CharacterId, out CharacterObject character) == false) return false;
+
+        // Players are represented inside interiors by the P2P mission layer (their controllable agent),
+        // not by the server-authoritative location roster. Spawning a roster copy of a player hero
+        // produces a second, frozen duplicate alongside the P2P agent — so never roster-spawn one.
+        if (character.IsHero && character.HeroObject != null && character.HeroObject.IsPlayerHero())
+        {
+            Logger.Debug("Skipping location roster spawn for player hero {Hero} — represented via P2P", character.StringId);
+            return false;
+        }
 
         // A failed lookup is logged but still degrades gracefully: the entry is created with a
         // SimpleAgentOrigin / without the item rather than being dropped.

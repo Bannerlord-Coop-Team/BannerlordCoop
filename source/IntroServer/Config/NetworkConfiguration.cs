@@ -1,6 +1,8 @@
 ﻿using LiteNetLib;
 using System;
+using System.Linq;
 using System.Net;
+using System.Net.Sockets;
 using IntroServer.Server;
 using Common.Network;
 
@@ -11,14 +13,15 @@ namespace IntroServer.Config
     /// </summary>
     public class NetworkConfiguration : INetworkConfiguration
     {
+        private string LanAddressText { get; set; } = "127.0.0.1";
         /// <summary>
         ///     ip address of the server in LAN.
         /// </summary>
-        public IPAddress LanAddress { get; } = IPAddress.Parse("127.0.0.1");
+        public IPAddress LanAddress => IPAddress.Parse(LanAddressText);
         /// <summary>
         ///     port of the server in LAN.
         /// </summary>
-        public int LanPort { get; } = 4201;
+        public int LanPort { get; private set; } = 4201;
 
         private string WanAddressText { get; set; } = "144.202.53.18";
         /// <summary>
@@ -28,7 +31,46 @@ namespace IntroServer.Config
         /// <summary>
         ///     port of the server in WAN.
         /// </summary>
-        public int WanPort { get; } = 4200;
+        public int WanPort { get; private set; } = 4200;
+
+        /// <summary>
+        ///     Point the NAT-punch rendezvous at a specific endpoint (e.g. the co-hosting Coop
+        ///     server) instead of the compiled-in defaults. Sets both LAN and WAN so the punch
+        ///     reaches the target regardless of <see cref="NATType"/>.
+        /// </summary>
+        public void SetRendezvous(string address, int port)
+        {
+            // LanAddress/WanAddress parse the stored text with IPAddress.Parse, which rejects
+            // hostnames like "localhost". Resolve to a numeric IP up front (preferring IPv4) so the
+            // getters never throw and LiteNetLib gets a usable address.
+            string resolved = ResolveToIp(address);
+            LanAddressText = resolved;
+            WanAddressText = resolved;
+            LanPort = port;
+            WanPort = port;
+        }
+
+        private static string ResolveToIp(string address)
+        {
+            if (string.IsNullOrWhiteSpace(address)) return address;
+            if (IPAddress.TryParse(address, out _)) return address;
+
+            try
+            {
+                var addresses = Dns.GetHostAddresses(address);
+                var ipv4 = addresses.FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork);
+                if (ipv4 != null) return ipv4.ToString();
+
+                var any = addresses.FirstOrDefault();
+                if (any != null) return any.ToString();
+            }
+            catch
+            {
+                // Fall through: keep the original text (will surface as a parse error if unusable).
+            }
+
+            return address;
+        }
         /// <summary>
         ///     Interval in which the server will send out LAN discovery messages.
         /// </summary>

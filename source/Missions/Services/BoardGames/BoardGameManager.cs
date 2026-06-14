@@ -45,7 +45,7 @@ namespace Missions.Services.BoardGames
         {
             _messageBroker.Unsubscribe<AgentInteraction>(Handle_OnAgentInteraction);
             _messageBroker.Unsubscribe<BoardGameChallengeRequest>(Handle_ChallengeRequest);
-            _messageBroker.Unsubscribe<BoardGameChallengeResponse>(Handle_ChallengeResponse);
+            //_messageBroker.Unsubscribe<BoardGameChallengeResponse>(Handle_ChallengeResponse);
         }
 
         private void Handle_OnAgentInteraction(MessagePayload<AgentInteraction> payload)
@@ -64,7 +64,7 @@ namespace Missions.Services.BoardGames
                 _agentRegistry.TryGetExternalController(other, out NetPeer otherPeer);
                 BoardGameChallengeRequest request = new BoardGameChallengeRequest(senderGuid, otherGuid);
                 // TODO associate a client id so we don't have to subscribe here
-                _messageBroker.Subscribe<BoardGameChallengeResponse>(Handle_ChallengeResponse);
+                //_messageBroker.Subscribe<BoardGameChallengeResponse>(Handle_ChallengeResponse);
                 network.Send(otherPeer, request);
             }
             else
@@ -98,8 +98,8 @@ namespace Missions.Services.BoardGames
         {
             Guid gameId = Guid.NewGuid();
 
-            BoardGameChallengeResponse response = new BoardGameChallengeResponse(sender, other, true, gameId);
-            network.Send(netPeer, response);
+            //BoardGameChallengeResponse response = new BoardGameChallengeResponse(sender, other, true, gameId);
+            //network.Send(netPeer, response);
 
             //Has to do same thing as if (accepted) in Handle_ChallengeResponse
             if (_agentRegistry.TryGetAgent(other, out Agent opponent))
@@ -110,25 +110,25 @@ namespace Missions.Services.BoardGames
 
         private void DenyGameRequest(Guid sender, Guid other, NetPeer netPeer)
         {
-            BoardGameChallengeResponse response = new BoardGameChallengeResponse(sender, other, false, Guid.Empty);
-            network.Send(netPeer, response);
+            //BoardGameChallengeResponse response = new BoardGameChallengeResponse(sender, other, false, Guid.Empty);
+            //network.Send(netPeer, response);
         }
 
-        private void Handle_ChallengeResponse(MessagePayload<BoardGameChallengeResponse> payload)
-        {
-            bool accepted = payload.What.Accepted;
-            Guid gameId = payload.What.GameId;
-            Guid opponentId = payload.What.RequestingPlayer;
+        //private void Handle_ChallengeResponse(MessagePayload<BoardGameChallengeResponse> payload)
+        //{
+        //    bool accepted = payload.What.Accepted;
+        //    Guid gameId = payload.What.GameId;
+        //    Guid opponentId = payload.What.RequestingPlayer;
 
-            if (accepted)
-            {
-                NetPeer netPeer = payload.Who as NetPeer;
-                if (_agentRegistry.TryGetAgent(opponentId, out Agent opponent))
-                {
-                    StartGame(true, gameId, opponent);
-                }
-            }
-        }
+        //    if (accepted)
+        //    {
+        //        NetPeer netPeer = payload.Who as NetPeer;
+        //        if (_agentRegistry.TryGetAgent(opponentId, out Agent opponent))
+        //        {
+        //            StartGame(true, gameId, opponent);
+        //        }
+        //    }
+        //}
 
         private void StartGame(bool startFirst, Guid gameId, Agent opposingAgent)
         {

@@ -1,4 +1,5 @@
 ﻿using ProtoBuf;
+using System.Reflection;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Packets
@@ -6,6 +7,27 @@ namespace Missions.Services.Agents.Packets
     [ProtoContract(SkipConstructor = true)]
     public class AgentActionData
     {
+        // MBAPI.IMBAnimation is a non-public static field. The publicizer makes it compile, but the
+        // emitted IgnoresAccessChecksTo isn't honored in every runtime load context (it throws
+        // FieldAccessException in live play). Reflecting a non-public static field always works, so
+        // resolve action names through here instead of touching MBAPI.IMBAnimation directly.
+        private static readonly FieldInfo AnimationField =
+            typeof(MBAPI).GetField("IMBAnimation", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+        private static MethodInfo getActionNameWithCode;
+
+        internal static string GetActionNameWithCode(int actionCode)
+        {
+            var animation = AnimationField?.GetValue(null);
+            if (animation == null) return null;
+
+            if (getActionNameWithCode == null)
+            {
+                getActionNameWithCode = animation.GetType().GetMethod("GetActionNameWithCode", new[] { typeof(int) });
+            }
+
+            return getActionNameWithCode?.Invoke(animation, new object[] { actionCode }) as string;
+        }
+
         public AgentActionData(Agent agent)
         {
             ActionIndexCache cache0 = agent.GetCurrentAction(0);
@@ -64,8 +86,9 @@ namespace Missions.Services.Agents.Packets
             // apply the animation on channel 0 if none exists
             if (agent.GetCurrentAction(0) == ActionIndexCache.act_none || agent.GetCurrentAction(0).Index != Action0Index)
             {
-                string actionName1 = MBAPI.IMBAnimation.GetActionNameWithCode(Action0Index);
-                agent.SetActionChannel(0, ActionIndexCache.Create(actionName1), additionalFlags: (AnimFlags)Action0Flag, startProgress: Action0Progress);
+                string actionName1 = GetActionNameWithCode(Action0Index);
+                if (actionName1 != null)
+                    agent.SetActionChannel(0, ActionIndexCache.Create(actionName1), additionalFlags: (AnimFlags)Action0Flag, startProgress: Action0Progress);
 
             }
             // otherwise continue the existing animation
@@ -92,8 +115,9 @@ namespace Missions.Services.Agents.Packets
                 // if the animation is none, start it
                 if (agent.GetCurrentAction(1) == ActionIndexCache.act_none || agent.GetCurrentAction(1).Index != Action1Index)
                 {
-                    string actionName2 = MBAPI.IMBAnimation.GetActionNameWithCode(Action1Index);
-                    agent.SetActionChannel(1, ActionIndexCache.Create(actionName2), additionalFlags: (AnimFlags)Action1Flag, startProgress: Action1Progress);
+                    string actionName2 = GetActionNameWithCode(Action1Index);
+                    if (actionName2 != null)
+                        agent.SetActionChannel(1, ActionIndexCache.Create(actionName2), additionalFlags: (AnimFlags)Action1Flag, startProgress: Action1Progress);
 
                 }
                 // otherwise continue it

@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Instances;
 using Common.PacketHandlers;
 using Missions.Services.Agents.Handlers;
 using Missions.Services.Agents.Messages;
@@ -68,8 +69,13 @@ namespace Missions.Services.Network
 
         public override void OnRenderingStarted()
         {
-            string sceneName = Mission.SceneName;
-            client.NatPunch(sceneName);
+            // In a live campaign the server assigns a unique instance id per settlement interior;
+            // fall back to the scene name for the standalone mission test harness (no campaign server).
+            string instance = InstanceContext.Instance.InInstance
+                ? InstanceContext.Instance.CurrentInstanceId
+                : Mission.SceneName;
+
+            client.NatPunch(instance);
         }
 
         public override void OnAgentDeleted(Agent affectedAgent)

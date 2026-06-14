@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Locations.Messages;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
@@ -315,6 +316,12 @@ internal class SettlementPopulationTracker : IHandler
 
             foreach (var locationCharacter in location.GetCharacterList() ?? Enumerable.Empty<LocationCharacter>())
             {
+                // Players are represented inside interiors by the P2P mission layer, never by the
+                // location roster. Excluding them here (server is authoritative on who is a player)
+                // keeps clients from spawning a frozen roster duplicate next to the P2P agent.
+                var hero = locationCharacter?.Character?.HeroObject;
+                if (hero != null && hero.IsPlayerHero()) continue;
+
                 if (LocationCharacterFactory.TryCreateData(objectManager, locationId, locationCharacter, out var data))
                 {
                     entries.Add(data);

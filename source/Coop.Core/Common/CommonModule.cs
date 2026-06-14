@@ -37,6 +37,8 @@ public abstract class CommonModule : Module
         builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
         builder.RegisterType<MessagePacketHandler>().AsSelf().InstancePerLifetimeScope().AutoActivate();
         builder.RegisterInstance(MessageBroker.Instance).As<IMessageBroker>().SingleInstance().ExternallyOwned();
+        // Touch the singleton at load so it subscribes before any instance assignment is published.
+        builder.RegisterInstance(global::Common.Network.Instances.InstanceContext.Instance).As<global::Common.Network.Instances.IInstanceContext>().SingleInstance().ExternallyOwned();
         #endregion
 
         builder.RegisterType<ControllerIdProvider>().As<IControllerIdProvider>().InstancePerLifetimeScope();

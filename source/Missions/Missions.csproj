@@ -245,6 +245,7 @@
     <Compile Include="Services\Network\MissionNetworkBehavior.cs" />
     <Compile Include="Services\Network\Enums\EDisconnectReason.cs" />
     <Compile Include="Services\Network\LiteNetP2PClient.cs" />
+    <Compile Include="Services\Network\LiveInstanceLauncher.cs" />
     <Compile Include="Services\Network\NetworkAgentRegistry.cs" />
     <Compile Include="Services\Agents\Packets\AgentActionData.cs" />
     <Compile Include="Services\Agents\Packets\AgentData.cs" />

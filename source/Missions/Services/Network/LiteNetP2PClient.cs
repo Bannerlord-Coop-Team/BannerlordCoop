@@ -145,6 +145,15 @@ namespace Missions.Services.Network
 
         public void NatPunch(string instance)
         {
+            // Idempotent: the live bridge and CoopMissionNetworkBehavior.OnRenderingStarted can both
+            // request a punch for the same instance. Re-introducing duplicates the P2P connection (and
+            // thus the spawned agent), so punch each instance only once.
+            if (instance == this.instance)
+            {
+                Logger.Debug("Already punched for instance {instance}; skipping duplicate", instance);
+                return;
+            }
+
             this.instance = instance;
             TryPunch(instance);
         }
@@ -169,6 +178,12 @@ namespace Missions.Services.Network
             byte[] data = serializer.Serialize(packet);
             netPeer.Send(data, packet.DeliveryMethod);
         }
+
+        // The P2P client has no per-peer send gating (that's a server-side concern), so an immediate
+        // send is just a normal send.
+        public void SendImmediate(NetPeer netPeer, IPacket packet) => Send(netPeer, packet);
+
+        public void SendImmediate(NetPeer netPeer, IMessage message) => Send(netPeer, message);
 
         public void SendAllBut(NetPeer netPeer, IPacket packet)
         {
@@ -210,13 +225,21 @@ namespace Missions.Services.Network
 
         public void OnPeerConnected(NetPeer peer)
         {
-            if (PeerServer != null && peer != PeerServer)
+            // peer != PeerServer covers both modes: when connected to a rendezvous server PeerServer is
+            // that connection (excluded here); when co-hosting via pure NAT punch PeerServer is null, so
+            // every connected peer is a genuine punched-through P2P peer.
+            if (peer != PeerServer)
             {
                 var peerConnectedEvent = new PeerConnected(peer);
                 messageBroker.Publish(this, peerConnectedEvent);
             }
 
-            Logger.Verbose("{LocalPort} received connection from {peer}", netManager.LocalPort, peer);
+            // Proof-of-P2P diagnostic: the remote endpoint here is the OTHER CLIENT's socket, reached
+            // directly. Compare its port against the rendezvous (server) port — if they differ, this is
+            // a direct client-to-client link, not server-relayed.
+            Logger.Information("[LocationSync] P2P link established: remote(other client)={Remote} | myP2PPort={LocalPort} | rendezvous(server)={Server}:{ServerPort}. " +
+                "remote != rendezvous => DIRECT P2P (not server-relayed).",
+                peer, netManager.LocalPort, networkConfig.LanAddress, networkConfig.LanPort);
         }
 
         public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
