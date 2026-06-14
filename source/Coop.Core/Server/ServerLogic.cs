@@ -1,11 +1,9 @@
 ﻿using Common.Logging;
 using Common.LogicStates;
-using Common.Messaging;
-using Common.Network;
-using Coop.Core.Client.States;
-using Coop.Core.Server.Connections;
 using Coop.Core.Server.States;
 using Serilog;
+using System;
+using System.Collections.Generic;
 
 namespace Coop.Core.Server;
 
@@ -25,7 +23,9 @@ public interface IServerLogic : ILogic, IServerState
 public class ServerLogic : IServerLogic
 {
     private static readonly ILogger Logger = LogManager.GetLogger<ServerLogic>();
-    private readonly IStateFactory stateFactory;
+
+    private readonly ServerContext context;
+    private readonly IReadOnlyDictionary<Type, Func<IServerState>> stateFactories;
 
     public IServerState State
     {
@@ -43,9 +43,10 @@ public class ServerLogic : IServerLogic
 
     private IServerState _state;
 
-    public ServerLogic(IStateFactory stateFactory)
+    public ServerLogic(ServerContext context)
     {
-        this.stateFactory = stateFactory;
+        this.context = context;
+        stateFactories = CreateStateFactories();
         SetState<InitialServerState>();
     }
 
@@ -66,8 +67,16 @@ public class ServerLogic : IServerLogic
 
     public TState SetState<TState>() where TState : IServerState
     {
-        TState newState = stateFactory.CreateServerState<TState>(this);
+        TState newState = (TState)stateFactories[typeof(TState)]();
         State = newState;
         return newState;
     }
+
+    // Explicit, container-free construction of each server state from the shared context.
+    private IReadOnlyDictionary<Type, Func<IServerState>> CreateStateFactories() =>
+        new Dictionary<Type, Func<IServerState>>
+        {
+            [typeof(InitialServerState)] = () => new InitialServerState(this, context.MessageBroker, context.RegistryManager, context.ModuleValidator, context.ModuleInfoProvider),
+            [typeof(ServerRunningState)] = () => new ServerRunningState(this, context.MessageBroker, context.Network, context.GameStateInterface, context.LoadingInterface),
+        };
 }

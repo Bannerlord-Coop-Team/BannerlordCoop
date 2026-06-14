@@ -1,18 +1,13 @@
-﻿using Common.Logging;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Server.Connections.Messages;
-using GameInterface.Services.Heroes.Interfaces;
-using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.Players;
-using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Serilog;
 using System.Linq;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
 
 namespace Coop.Core.Server.Connections.States;
@@ -30,12 +25,13 @@ public class ResolveCharacterState : ConnectionStateBase
     private readonly IModuleValidator moduleValidator;
     private readonly IPlayerManager playerManager;
     private readonly IModuleInfoProvider moduleInfoProvider;
+
     public ResolveCharacterState(IConnectionLogic connectionLogic,
         IMessageBroker messageBroker,
         INetwork network,
         IModuleValidator moduleValidator,
         IPlayerManager playerManager,
-        IModuleInfoProvider moduleInfoProvider) 
+        IModuleInfoProvider moduleInfoProvider)
         : base(connectionLogic)
     {
         this.messageBroker = messageBroker;
