@@ -94,7 +94,11 @@ public class ObjectManager : IObjectManager
 {
     private readonly ILogger logger;
 
-    protected readonly Dictionary<string, object> idObjs = new Dictionary<string, object>();
+    // idObjs (ConcurrentDictionary) and objsIds (ConditionalWeakTable) are both safe for lock-free
+    // reads, so the lookup methods take no lock. They are inverse indexes that must stay consistent,
+    // and writes run concurrently on the game thread (object construction) and the network poller
+    // thread, so the write methods serialize on _gate to keep the pair updated atomically.
+    protected readonly ConcurrentDictionary<string, object> idObjs = new ConcurrentDictionary<string, object>();
     protected ConditionalWeakTable<object, string> objsIds = new ConditionalWeakTable<object, string>();
 
     private readonly ConcurrentDictionary<Type, int> objectCounters = new ConcurrentDictionary<Type, int>();
@@ -129,7 +133,7 @@ public class ObjectManager : IObjectManager
                 return false;
             }
 
-            idObjs.Add(id, obj);
+            idObjs[id] = obj;
             objsIds.Add(obj, id);
 
             return true;
@@ -161,7 +165,7 @@ public class ObjectManager : IObjectManager
                 return false;
             }
 
-            idObjs.Add(newId, obj);
+            idObjs[newId] = obj;
             objsIds.Add(obj, newId);
 
             return true;
@@ -207,20 +211,14 @@ public class ObjectManager : IObjectManager
     {
         if (obj == null) return false;
 
-        lock (_gate)
-        {
-            return objsIds.TryGetValue(obj, out var _);
-        }
+        return objsIds.TryGetValue(obj, out var _);
     }
 
     public bool Contains(string id)
     {
         if (string.IsNullOrEmpty(id)) return false;
 
-        lock (_gate)
-        {
-            return idObjs.ContainsKey(id);
-        }
+        return idObjs.ContainsKey(id);
     }
 
     public bool TryGetId(object obj, out string id)
@@ -228,10 +226,7 @@ public class ObjectManager : IObjectManager
         id = null;
         if (obj == null) return false;
 
-        lock (_gate)
-        {
-            return objsIds.TryGetValue(obj, out id);
-        }
+        return objsIds.TryGetValue(obj, out id);
     }
     public bool TryGetObject<T>(string id, out T obj)
     {
@@ -239,14 +234,10 @@ public class ObjectManager : IObjectManager
 
         if (string.IsNullOrEmpty(id)) return false;
 
-        object storedObj;
-        lock (_gate)
+        if (!idObjs.TryGetValue(id, out var storedObj)
+            && !idObjs.TryGetValue($"{typeof(T).Name}_{id}", out storedObj)) // If object not found also attempt with prefixed type name
         {
-            if (!idObjs.TryGetValue(id, out storedObj)
-                && !idObjs.TryGetValue($"{typeof(T).Name}_{id}", out storedObj)) // If object not found also attempt with prefixed type name
-            {
-                return false;
-            }
+            return false;
         }
 
         if (storedObj is not T castedObject)
@@ -268,7 +259,7 @@ public class ObjectManager : IObjectManager
         {
             if (objsIds.TryGetValue(obj, out var id) == false) return false;
 
-            return idObjs.Remove(id) && objsIds.Remove(obj);
+            return idObjs.TryRemove(id, out _) && objsIds.Remove(obj);
         }
     }
 
