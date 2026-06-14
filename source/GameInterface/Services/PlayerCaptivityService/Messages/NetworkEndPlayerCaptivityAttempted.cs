@@ -21,18 +21,22 @@ internal readonly struct NetworkEndPlayerCaptivityAttempted : IEvent
     public readonly EndCaptivityDetail Detail;
     [ProtoMember(5)]
     public readonly string FacilitatorId;
+    [ProtoMember(6)]
+    public readonly int RansomAmount;
 
     public NetworkEndPlayerCaptivityAttempted(
         string playerHeroId,
         string playerPartyId,
         CampaignVec2 playerPartyPosition,
         EndCaptivityDetail detail,
-        string facilitatorId)
+        string facilitatorId,
+        int ransomAmount)
     {
         PlayerHeroId = playerHeroId;
         PlayerPartyId = playerPartyId;
         PlayerPartyPosition = playerPartyPosition;
         Detail = detail;
         FacilitatorId = facilitatorId;
+        RansomAmount = ransomAmount;
     }
 }
