@@ -24,7 +24,7 @@ public class ContainerTest
             containerBuilder.RegisterInstance(harmony).As<Harmony>().SingleInstance();
 
             RegisterMock<INetwork>(containerBuilder);
-            RegisterMock<INetworkConfiguration>(containerBuilder);
+            RegisterMock<INetworkConfig>(containerBuilder);
             RegisterMock<ISerializableTypeMapper>(containerBuilder);
 
             containerBuilder.RegisterModule<GameInterfaceModule>();

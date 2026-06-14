@@ -6,7 +6,7 @@ using LiteNetLib;
 namespace Common.Tests.Utils;
 internal class DummyNetwork : INetwork
 {
-    public INetworkConfiguration Configuration => throw new NotImplementedException();
+    public INetworkConfig Configuration => throw new NotImplementedException();
 
     public int Priority => throw new NotImplementedException();
 

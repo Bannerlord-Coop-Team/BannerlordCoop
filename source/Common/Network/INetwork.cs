@@ -10,7 +10,7 @@ namespace Common.Network;
 /// </summary>
 public interface INetwork : IDisposable
 {
-    INetworkConfiguration Configuration { get; }
+    INetworkConfig Configuration { get; }
 
     void Send(NetPeer netPeer, IPacket packet);
     void SendImmediate(NetPeer netPeer, IPacket packet);

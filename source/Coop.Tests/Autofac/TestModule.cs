@@ -15,7 +15,7 @@ namespace Coop.Tests.Autofac
         {
             builder.RegisterType<TestMessageBroker>().AsSelf().As<IMessageBroker>().InstancePerLifetimeScope();
             builder.RegisterType<ContainerProvider>().As<IContainerProvider>().InstancePerLifetimeScope();
-            builder.RegisterType<NetworkConfiguration>().As<INetworkConfiguration>().OwnedByLifetimeScope();
+            builder.RegisterType<NetworkConfig>().As<INetworkConfig>().OwnedByLifetimeScope();
             base.Load(builder);
         }
     }

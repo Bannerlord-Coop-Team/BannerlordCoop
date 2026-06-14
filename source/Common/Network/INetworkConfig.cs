@@ -2,7 +2,7 @@
 
 namespace Common.Network;
 
-public interface INetworkConfiguration
+public interface INetworkConfig
 {
     string Address { get; }
     int Port { get; }

@@ -51,14 +51,14 @@ internal class MapEventCreationCoordinator : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
-    private readonly INetworkConfiguration configuration;
+    private readonly INetworkConfig configuration;
     private readonly ConcurrentDictionary<string, PendingRequest> pendingRequests = new ConcurrentDictionary<string, PendingRequest>();
 
     public MapEventCreationCoordinator(
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
-        INetworkConfiguration configuration)
+        INetworkConfig configuration)
     {
         this.messageBroker = messageBroker;
         this.network = network;

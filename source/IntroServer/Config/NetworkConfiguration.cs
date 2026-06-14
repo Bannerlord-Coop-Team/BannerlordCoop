@@ -9,7 +9,7 @@ namespace IntroServer.Config
     /// <summary>
     ///     Network settings for both client & server.
     /// </summary>
-    public class NetworkConfiguration : INetworkConfiguration
+    public class NetworkConfiguration : INetworkConfig
     {
         /// <summary>
         ///     ip address of the server in LAN.

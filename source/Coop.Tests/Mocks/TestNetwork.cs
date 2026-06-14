@@ -14,7 +14,7 @@ namespace Coop.Tests.Mocks;
 
 public class TestNetwork : INetwork
 {
-    public INetworkConfiguration Configuration => throw new NotImplementedException();
+    public INetworkConfig Configuration => throw new NotImplementedException();
 
     public int Priority => throw new NotImplementedException();
 

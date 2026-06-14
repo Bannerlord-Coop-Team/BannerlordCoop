@@ -17,7 +17,7 @@ namespace Coop.Core.Common.Network;
 /// <inheritdoc cref="INetwork"/>
 public abstract class CoopNetworkBase : INetwork, INetEventListener
 {
-    public INetworkConfiguration Configuration { get; }
+    public INetworkConfig Configuration { get; }
     public abstract int Priority { get; }
 
     protected readonly ICommonSerializer serializer;
@@ -33,7 +33,7 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
 
     protected readonly NetManager netManager;
 
-    protected CoopNetworkBase(INetworkConfiguration configuration, ICommonSerializer serializer)
+    protected CoopNetworkBase(INetworkConfig configuration, ICommonSerializer serializer)
     {
         Configuration = configuration;
         this.serializer = serializer;

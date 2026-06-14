@@ -8,6 +8,7 @@ using Common.Serialization;
 using Coop.Core.Common.Network;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
+using Coop.Core.Server.Services.Time;
 using Coop.Core.Server.Services.Time.Messages;
 using GameInterface.Registry.Messages;
 using GameInterface.Services.Entity;
@@ -26,7 +27,6 @@ namespace Coop.Core.Server;
 /// </summary>
 public interface ICoopServer : INetwork, INatPunchListener, IDisposable
 {
-    IEnumerable<NetPeer> ConnectedPeers { get; }
 }
 
 /// <inheritdoc cref="ICoopServer"/>
@@ -38,24 +38,25 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override int Priority => 0;
 
-    public IEnumerable<NetPeer> ConnectedPeers => netManager;
-
     private readonly IMessageBroker messageBroker;
     private readonly IPacketManager packetManager;
     private readonly IConnectionMessageQueue connectionMessageQueue;
+    private readonly IOverloadedPeerManager overloadedPeerManager;
 
     public CoopServer(
-        INetworkConfiguration configuration,
+        INetworkConfig configuration,
         IMessageBroker messageBroker,
         IPacketManager packetManager,
         IConnectionMessageQueue connectionMessageQueue,
         IControllerIdProvider controllerIdProvider,
+        IOverloadedPeerManager overloadedPeerManager,
         ICommonSerializer serializer) : base(configuration, serializer)
     {
         // Dependancy assignment
         this.messageBroker = messageBroker;
         this.packetManager = packetManager;
         this.connectionMessageQueue = connectionMessageQueue;
+        this.overloadedPeerManager = overloadedPeerManager;
 
         // Netmanager initialization
         netManager.NatPunchEnabled = true;
@@ -115,6 +116,8 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void Update(TimeSpan frameTime)
     {
+        overloadedPeerManager.CheckForOverloadedPeers();
+
         netManager.PollEvents();
         netManager.NatPunchModule.PollEvents();
     }
@@ -127,7 +130,6 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void SendAll(IPacket packet)
     {
-        CheckNetworkQueueOverloaded();
         SendAll(netManager, packet);
     }
 
@@ -144,22 +146,5 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     {
         if (connectionMessageQueue.TryHandleBroadcast(netPeer, packet)) return;
         base.Send(netPeer, packet);
-    }
-
-    private void CheckNetworkQueueOverloaded(NetPeer ignoredPeer = null)
-    {
-        // TODO see if Parallel.ForEach works here
-        foreach (var netPeer in ConnectedPeers.Where(peer => peer != ignoredPeer).Where(peer => peer.ConnectionState == ConnectionState.Connected))
-        {
-            // Sending defaults to channel 0
-            int outgoingPacketCount = 
-                  netPeer.GetPacketsCountInReliableQueue(0, true)
-                + netPeer.GetPacketsCountInReliableQueue(0, false);
-
-            if (outgoingPacketCount > Configuration.MaxPacketsInQueue)
-            {
-                messageBroker.Publish(this, new PeerQueueOverloaded(netPeer));
-            }
-        }
     }
 }

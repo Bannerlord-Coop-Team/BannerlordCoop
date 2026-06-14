@@ -15,7 +15,7 @@ namespace Coop.Core.Server.Connections;
 /// through a save transfer. Exposes the live connection states for consumers that need to
 /// reason about who is loading.
 /// </summary>
-public interface IConnectionCollection : IEnumerable<IConnectionState>, IDisposable
+public interface IConnectionCollection : IEnumerable<IConnectionLogic>, IDisposable
 {
     IEnumerable<IConnectionLogic> LoadingPeers { get; }
 }
@@ -90,7 +90,7 @@ public class ConnectionCollection : IConnectionCollection
         messageBroker.Publish(this, new LoadingPlayersChanged(loadingCount));
     }
 
-    public IEnumerator<IConnectionState> GetEnumerator() => ConnectionStates.Values.GetEnumerator();
+    public IEnumerator<IConnectionLogic> GetEnumerator() => ConnectionStates.Values.GetEnumerator();
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }

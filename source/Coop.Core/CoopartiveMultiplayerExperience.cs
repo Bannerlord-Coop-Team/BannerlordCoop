@@ -18,14 +18,14 @@ namespace Coop.Core
     public class CoopartiveMultiplayerExperience : IDisposable
     {
         private IMessageBroker messageBroker;
-        private INetworkConfiguration configuration;
+        private INetworkConfig configuration;
         private IContainer container;
 
         public CoopartiveMultiplayerExperience()
         {
             // TODO use DI maybe?
             messageBroker = MessageBroker.Instance;
-            configuration = new NetworkConfiguration();
+            configuration = new NetworkConfig();
 
             messageBroker.Subscribe<AttemptJoin>(Handle);
             messageBroker.Subscribe<HostSaveGame>(Handle);
@@ -48,7 +48,7 @@ namespace Coop.Core
         {
             var connectMessage = obj.What;
 
-            configuration = new NetworkConfiguration()
+            configuration = new NetworkConfig()
             {
                 Address = connectMessage.Address.ToString(),
                 Port = connectMessage.Port,
@@ -97,7 +97,7 @@ namespace Coop.Core
             logic.Start();
         }
 
-        public void StartAsClient(INetworkConfiguration configuration = null)
+        public void StartAsClient(INetworkConfig configuration = null)
         {
             DestroyContainer();
 
@@ -112,7 +112,7 @@ namespace Coop.Core
 
             if (configuration != null)
             {
-                builder.RegisterInstance(configuration).As<INetworkConfiguration>().SingleInstance();
+                builder.RegisterInstance(configuration).As<INetworkConfig>().SingleInstance();
             }
 
             container = builder.Build();

@@ -29,7 +29,7 @@ public abstract class CommonModule : Module
         #endregion
 
         #region Network
-        builder.RegisterType<NetworkConfiguration>().As<INetworkConfiguration>().InstancePerLifetimeScope();
+        builder.RegisterType<NetworkConfig>().As<INetworkConfig>().InstancePerLifetimeScope();
         #endregion
 
         #region Communication

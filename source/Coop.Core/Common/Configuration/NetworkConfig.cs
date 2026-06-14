@@ -7,7 +7,7 @@ namespace Coop.Core.Common.Configuration;
 /// <summary>
 /// Network configuration used by the client and server
 /// </summary>
-public class NetworkConfiguration : INetworkConfiguration
+public class NetworkConfig : INetworkConfig
 {
 #if DEBUG
     public string Address { get; set; } =  "localhost";
