@@ -32,7 +32,11 @@ public class ServerModule : CommonModule
         // Withholds world broadcasts from a peer until it has the transfer save and has entered the
         // campaign. AutoActivate so it subscribes to connection lifecycle events before any peer joins.
         builder.RegisterType<ConnectionMessageQueue>().As<IConnectionMessageQueue>().InstancePerLifetimeScope().AutoActivate();
-        
+
+        // Pauses time while a peer's packet queue is overloaded (slow client catching up). Constructed
+        // as a CoopServer dependency, so it registers its unpause policy when the server is built.
+        builder.RegisterType<Coop.Core.Server.Services.Time.OverloadedPeerManager>().As<Coop.Core.Server.Services.Time.IOverloadedPeerManager>().InstancePerLifetimeScope();
+
         // Policies
         builder.RegisterType<ServerSyncPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();
 

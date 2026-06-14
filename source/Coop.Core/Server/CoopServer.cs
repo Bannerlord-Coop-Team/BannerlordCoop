@@ -41,7 +41,9 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     private readonly IMessageBroker messageBroker;
     private readonly IPacketManager packetManager;
     private readonly IConnectionMessageQueue connectionMessageQueue;
-    private readonly IOverloadedPeerManager overloadedPeerManager;
+    // Lazy breaks the construction cycle: the manager depends on ITimeControlInterface, which depends
+    // on INetwork (this server). It is only needed each Update, so deferring construction is fine.
+    private readonly Lazy<IOverloadedPeerManager> overloadedPeerManager;
 
     public CoopServer(
         INetworkConfig configuration,
@@ -49,7 +51,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         IPacketManager packetManager,
         IConnectionMessageQueue connectionMessageQueue,
         IControllerIdProvider controllerIdProvider,
-        IOverloadedPeerManager overloadedPeerManager,
+        Lazy<IOverloadedPeerManager> overloadedPeerManager,
         ICommonSerializer serializer) : base(configuration, serializer)
     {
         // Dependancy assignment
@@ -116,7 +118,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void Update(TimeSpan frameTime)
     {
-        overloadedPeerManager.CheckForOverloadedPeers();
+        overloadedPeerManager.Value.CheckForOverloadedPeers();
 
         netManager.PollEvents();
         netManager.NatPunchModule.PollEvents();

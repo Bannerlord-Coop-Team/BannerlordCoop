@@ -23,7 +23,9 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
     private static readonly ILogger Logger = LogManager.GetLogger<OverloadedPeerManager>();
     private readonly INetworkConfig config;
     private readonly IMessageBroker messageBroker;
-    private readonly INetwork network;
+    // Lazy breaks the construction cycle: CoopServer (the INetwork) depends on this manager, and the
+    // manager only needs INetwork later, at notify time, to broadcast catch-up messages.
+    private readonly Lazy<INetwork> network;
     private readonly ITimeControlInterface timeControlInterface;
     private readonly IConnectionCollection connectionCollection;
 
@@ -33,7 +35,7 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
     public OverloadedPeerManager(
         INetworkConfig config,
         IMessageBroker messageBroker,
-        INetwork network,
+        Lazy<INetwork> network,
         ITimeControlInterface timeControlInterface,
         IConnectionCollection connectionCollection
     )
@@ -54,42 +56,44 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
         timeControlInterface.RemoveUnpausePolicy(PlayersOverloadedPolicy);
     }
 
-    private IEnumerable<NetPeer> GetOverloadedPeers()
+    private List<NetPeer> GetPeersAboveThreshold(int threshold)
     {
         return connectionCollection
             .Select(logic => logic.Peer)
             .Where(peer =>
             {
-                var numPacketsInQueue = 
+                var numPacketsInQueue =
                     peer.GetPacketsCountInReliableQueue(0, true) +
                     peer.GetPacketsCountInReliableQueue(0, false);
 
-                return config.MaxPacketsInQueue < numPacketsInQueue;
+                return numPacketsInQueue > threshold;
             })
             .ToList();
     }
 
     public void CheckForOverloadedPeers()
     {
-        var overloadedPeers = GetOverloadedPeers();
-
-        var overloadedPeerCount = overloadedPeers.Count();
-
-        if (overloadedPeerCount <= 0)
+        // While paused for overload, hold until every peer has drained below the (lower) resume
+        // threshold, not just back under the pause threshold. The gap between the two thresholds is
+        // hysteresis: it stops a chronically slow peer from flapping pause/resume around one limit.
+        if (originalSpeed.HasValue)
         {
+            if (GetPeersAboveThreshold(config.ResumePacketsInQueue).Any())
+                return;
+
             ResumeTime();
             return;
         }
 
-        // original speed will be cleared on resume
-        if (originalSpeed.HasValue)
+        var overloadedPeers = GetPeersAboveThreshold(config.MaxPacketsInQueue);
+        if (overloadedPeers.Count == 0)
             return;
 
         originalSpeed = timeControlInterface.GetTimeControl();
         cachedOverloadedPeers = overloadedPeers;
 
         timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
-        NotifyAll($"{overloadedPeerCount} clients are catching up. Pausing...");
+        NotifyAll($"{overloadedPeers.Count} clients are catching up. Pausing...");
     }
 
     private void ResumeTime()
@@ -124,6 +128,6 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
         // notify server and clients
         var msg = new SendInformationMessage(message);
         messageBroker.Publish(this, msg);
-        network.SendAll(msg);
+        network.Value.SendAll(msg);
     }
 }

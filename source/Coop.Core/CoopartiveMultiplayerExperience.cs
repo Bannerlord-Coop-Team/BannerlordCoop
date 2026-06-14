@@ -79,15 +79,11 @@ namespace Coop.Core
 
             ModInformation.IsServer = true;
 
-            var containerProvider = new ContainerProvider();
-
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<ServerModule>();
-            builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance().ExternallyOwned();
             builder.RegisterModule<GameInterfaceModule>();
             container = builder.Build();
 
-            containerProvider.SetProvider(container);
             GameInterface.ContainerProvider.SetContainer(container);
 
             // Create harmony patches
@@ -103,11 +99,8 @@ namespace Coop.Core
 
             ModInformation.IsServer = false;
 
-            var containerProvider = new ContainerProvider();
-
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<ClientModule>();
-            builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance().ExternallyOwned();
             builder.RegisterModule<GameInterfaceModule>();
 
             if (configuration != null)
@@ -117,7 +110,6 @@ namespace Coop.Core
 
             container = builder.Build();
 
-            containerProvider.SetProvider(container);
             GameInterface.ContainerProvider.SetContainer(container);
 
             // Client process does not own the export directory — only the server writes
