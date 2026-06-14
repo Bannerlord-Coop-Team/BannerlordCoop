@@ -12,7 +12,6 @@ using IntroServer.Server;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using Missions.Services.Network.Messages;
-using ProtoBuf.Meta;
 using Serilog;
 using Serilog.Events;
 using System;
@@ -170,6 +169,11 @@ namespace Missions.Services.Network
             netPeer.Send(data, packet.DeliveryMethod);
         }
 
+        // The P2P client has no per-peer send gating, so Send already reaches the peer immediately.
+        public void SendImmediate(NetPeer netPeer, IPacket packet) => Send(netPeer, packet);
+
+        public void SendImmediate(NetPeer netPeer, IMessage message) => Send(netPeer, message);
+
         public void SendAllBut(NetPeer netPeer, IPacket packet)
         {
             foreach (var peer in netManager.ConnectedPeerList.Where(peer => peer != netPeer))
@@ -270,33 +274,17 @@ namespace Missions.Services.Network
 
         public void Send(NetPeer netPeer, IMessage message)
         {
-            var data = SerializeMessage(message);
-            var eventPacket = new MessagePacket(data);
-            Send(netPeer, eventPacket);
+            Send(netPeer, MessagePacket.Create(message, serializer));
         }
 
         public void SendAll(IMessage message)
         {
-            var data = SerializeMessage(message);
-            var eventPacket = new MessagePacket(data);
-            SendAll(eventPacket);
+            SendAll(MessagePacket.Create(message, serializer));
         }
 
         public void SendAllBut(NetPeer excludedPeer, IMessage message)
         {
-            var data = SerializeMessage(message);
-            var eventPacket = new MessagePacket(data);
-            SendAllBut(excludedPeer, eventPacket);
-        }
-
-        private byte[] SerializeMessage(IMessage message)
-        {
-            if (RuntimeTypeModel.Default.IsDefined(message.GetType()) == false)
-            {
-                throw new ArgumentException($"Type {message.GetType().Name} is not serializable.");
-            }
-
-            return serializer.Serialize(message);
+            SendAllBut(excludedPeer, MessagePacket.Create(message, serializer));
         }
 
         public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
@@ -304,6 +292,16 @@ namespace Missions.Services.Network
             var packet = serializer.Deserialize<IPacket>(reader.GetRemainingBytes());
 
             PacketManager.HandleReceive(peer, packet);
+        }
+
+        public void SendImmediate(NetPeer netPeer, IPacket packet)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void SendImmediate(NetPeer netPeer, IMessage message)
+        {
+            throw new NotImplementedException();
         }
     }
 }
