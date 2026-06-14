@@ -1,4 +1,6 @@
-﻿using Common;
+﻿using System;
+using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
@@ -7,12 +9,15 @@ using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.PartyVisuals.Messages;
 using SandBox.View.Map.Managers;
 using SandBox.View.Map.Visuals;
+using Serilog;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.PartyVisuals.Handlers;
 
 public class PartyVisualLifetimeHandler : IHandler
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<PartyVisualLifetimeHandler>();
+
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
@@ -56,26 +61,36 @@ public class PartyVisualLifetimeHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<PartyBase>(payload.What.PartyBaseId, out var partyBase))
             return;
 
-        using(new AllowedThread())
+        // No visuals manager (headless server / tests): nothing to render, and the object manager
+        // does not need to track the visual there. Real clients register it on the main thread below.
+        if (MobilePartyVisualManager.Current == null)
+            return;
+
+        var partyVisualId = payload.What.PartyVisualId;
+
+        // Normal client: the map visuals manager mutates its party list and builds native visual
+        // entities here, while its OnTick walks that same list in parallel on the main thread.
+        // Doing this on the network thread races that tick and corrupts memory, so marshal it onto
+        // the main thread. Re-read Current there: it can be torn down or replaced (campaign exit,
+        // save reload, mission entry) between this enqueue and the queued action running.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            MobilePartyVisual newVisual;
-
-            var visualManager = MobilePartyVisualManager.Current;
-            if (visualManager != null)
+            using (new AllowedThread())
             {
-                // Normal client: let the map visuals manager create the visual so the party renders.
-                visualManager.AddNewPartyVisualForParty(partyBase.MobileParty);
-                newVisual = partyBase.GetPartyVisual();
-            }
-            else
-            {
-                // No visuals manager (headless server / tests): construct directly so the object is
-                // still tracked for sync without participating in map rendering.
-                newVisual = new MobilePartyVisual(partyBase);
-            }
+                try
+                {
+                    var visualManager = MobilePartyVisualManager.Current;
+                    if (visualManager == null) return;
 
-            objectManager.AddExisting(payload.What.PartyVisualId, newVisual);
-        }
+                    visualManager.AddNewPartyVisualForParty(partyBase.MobileParty);
+                    objectManager.AddExisting(partyVisualId, partyBase.GetPartyVisual());
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to create party visual {VisualId}", partyVisualId);
+                }
+            }
+        });
     }
 
     private void Handle(MessagePayload<PartyVisualDestroyed> payload)
@@ -90,17 +105,31 @@ public class PartyVisualLifetimeHandler : IHandler
 
     private void Handle(MessagePayload<NetworkDestroyPartyVisual> payload)
     {
-        if (!objectManager.TryGetObjectWithLogging(payload.What.PartyVisualId, out MobilePartyVisual partyVisual))
-            return;
+        var partyVisualId = payload.What.PartyVisualId;
 
+        // Defer the whole removal onto the main thread so it runs in network order relative to the
+        // create handler (which also defers). Resolving and removing the visual here, on the network
+        // thread, would race a create whose registration is still queued: the lookup would miss the
+        // not-yet-registered id, the destroy would be dropped, and the queued create would then leave
+        // a zombie visual on the map.
         GameLoopRunner.RunOnMainThread(() =>
         {
             using (new AllowedThread())
             {
-                MobilePartyVisualManager.Current.RemovePartyVisualForParty(partyVisual.MapEntity.MobileParty);
+                try
+                {
+                    if (!objectManager.TryGetObjectWithLogging(partyVisualId, out MobilePartyVisual partyVisual))
+                        return;
+
+                    // Deregister first so the id is freed even if the native removal below throws.
+                    objectManager.Remove(partyVisual);
+                    MobilePartyVisualManager.Current?.RemovePartyVisualForParty(partyVisual.MapEntity.MobileParty);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to destroy party visual {VisualId}", partyVisualId);
+                }
             }
         });
-
-        objectManager.Remove(partyVisual);
     }
 }
