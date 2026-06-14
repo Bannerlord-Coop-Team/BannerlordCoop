@@ -1,25 +1,21 @@
-﻿using Common.Logging;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Common.Network.Messages;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Time.Messages;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Messages;
-using LiteNetLib;
 using Serilog;
-using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Coop.Core.Server.Services.Time.Handlers;
 
 /// <summary>
-/// Handles time requests and commanding time controls
+/// Handles time requests and commanding time controls. Reacts to the registry's loading signal to
+/// pause and lock client time controls; the unpause policy itself lives in
+/// <see cref="ServerTimeInterface"/>.
 /// </summary>
 public class TimeHandler : IHandler
 {
@@ -27,18 +23,16 @@ public class TimeHandler : IHandler
 
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
-    private readonly IClientRegistry clientRegistry;
     private readonly ITimeControlInterface timeControlInterface;
+    private readonly IConnectionCollection connections;
 
-    public TimeHandler(IMessageBroker messageBroker, INetwork network, IClientRegistry clientRegistry, ITimeControlInterface timeControlInterface)
+    public TimeHandler(IMessageBroker messageBroker, INetwork network, ITimeControlInterface timeControlInterface, IConnectionCollection connections)
     {
         this.messageBroker = messageBroker;
         this.network = network;
-        this.clientRegistry = clientRegistry;
         this.timeControlInterface = timeControlInterface;
-        this.messageBroker.Subscribe<PlayerConnected>(Handle_PlayerConnected);
-        this.messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
-        this.messageBroker.Subscribe<PlayerCampaignEntered>(Handle_PlayerCampaignEntered);
+        this.connections = connections;
+        this.messageBroker.Subscribe<LoadingPlayersChanged>(Handle_LoadingPlayersChanged);
         this.messageBroker.Subscribe<TimeSpeedChangedAttempted>(Handle_TimeSpeedChanged);
         this.messageBroker.Subscribe<NetworkRequestTimeSpeedChange>(Handle_NetworkRequestTimeSpeedChange);
 
@@ -47,39 +41,25 @@ public class TimeHandler : IHandler
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<PlayerConnected>(Handle_PlayerConnected);
-        messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
-        messageBroker.Unsubscribe<PlayerCampaignEntered>(Handle_PlayerCampaignEntered);
+        messageBroker.Unsubscribe<LoadingPlayersChanged>(Handle_LoadingPlayersChanged);
         messageBroker.Unsubscribe<TimeSpeedChangedAttempted>(Handle_TimeSpeedChanged);
         messageBroker.Unsubscribe<NetworkRequestTimeSpeedChange>(Handle_NetworkRequestTimeSpeedChange);
 
         timeControlInterface.RemoveUnpausePolicy(PlayersLoadingPolicy);
     }
 
-    internal void Handle_PlayerConnected(MessagePayload<PlayerConnected> obj)
+    /// <summary>
+    /// Reacts to the registry's single loading signal: pause and lock client time controls while
+    /// any player is loading, and release the lock once none are. The count arrives already
+    /// reconciled with the connection states, so no peer bookkeeping is needed here.
+    /// </summary>
+    internal void Handle_LoadingPlayersChanged(MessagePayload<LoadingPlayersChanged> obj)
     {
-        timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
-        network.SendAll(new NetworkTimeControlLockChanged(true, LoadingPlayerCount(minimumWhenLoading: 1)));
-    }
+        var loadingPlayerCount = obj.What.LoadingPlayerCount;
 
-    internal void Handle_PlayerDisconnected(MessagePayload<PlayerDisconnected> obj)
-    {
-        var disconnectedPeer = obj.What.PlayerId;
-        var loadingPlayerCount = LoadingPlayerCount(excludedPeer: disconnectedPeer);
         if (loadingPlayerCount > 0)
         {
-            network.SendAll(new NetworkTimeControlLockChanged(true, loadingPlayerCount));
-            return;
-        }
-
-        network.SendAll(new NetworkTimeControlLockChanged(false));
-    }
-
-    internal void Handle_PlayerCampaignEntered(MessagePayload<PlayerCampaignEntered> obj)
-    {
-        var loadingPlayerCount = LoadingPlayerCount();
-        if (loadingPlayerCount > 0)
-        {
+            timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
             network.SendAll(new NetworkTimeControlLockChanged(true, loadingPlayerCount));
             return;
         }
@@ -103,26 +83,13 @@ public class TimeHandler : IHandler
 
     private bool PlayersLoadingPolicy()
     {
-        if (clientRegistry.PlayersLoading)
+        var loadingPeers = connections.LoadingPeers;
+        if (loadingPeers.Any())
         {
-            var loadingPeers = clientRegistry.LoadingPeers;
-            Logger.Information($"{string.Join(",", loadingPeers.Select(p => p.Address))} are currently loading, unable to change time");
+            Logger.Information($"{string.Join(",", loadingPeers.Select(p => p.Peer.Address))} are currently loading, unable to change time");
             return false;
         }
 
         return true;
-    }
-
-    private int LoadingPlayerCount(NetPeer excludedPeer = null, int minimumWhenLoading = 0)
-    {
-        var loadingPeers = clientRegistry.LoadingPeers ?? new List<NetPeer>();
-        var loadingPlayerCount = loadingPeers.Count(peer => peer != excludedPeer);
-
-        if (loadingPlayerCount == 0 && (clientRegistry.PlayersLoading || minimumWhenLoading > 0))
-        {
-            return minimumWhenLoading;
-        }
-
-        return loadingPlayerCount;
     }
 }
