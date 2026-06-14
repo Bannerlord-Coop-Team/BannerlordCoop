@@ -63,7 +63,6 @@ namespace Coop.Tests.Server.Connections.States
 
             // Assert
             Assert.Empty(connectionCollection.LoadingPeers);
-            Assert.Empty(connectionCollection.LoadingPeers);
         }
 
         [Fact]
