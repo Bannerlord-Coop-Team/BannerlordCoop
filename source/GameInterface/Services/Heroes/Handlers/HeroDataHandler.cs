@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Clans;
 using GameInterface.Services.Heroes.Messages;
@@ -7,7 +8,6 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Template.Handlers;
 using GameInterface.Services.Template.Messages;
 using GameInterface.Services.Template.Patches;
-using GameInterface.Utils;
 using SandBox.GauntletUI;
 using Serilog;
 using System;
@@ -50,21 +50,29 @@ internal class HeroDataHandler : IHandler
             return;
         }
 
-        // Applying the name runs vanilla game code and the refresh touches the clan
-        // screen UI; both must run on the main thread, not the network thread that
-        // delivered the message.
-        MainThreadDispatch.RunWhenCampaignReady("change hero name", () =>
+        // Applying the name runs vanilla game code and the refresh touches the clan screen
+        // UI; both must run on the main thread, not the network thread that delivered it.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            var fullName = new TextObject(data.FullName);
-            var firstName = new TextObject(data.FirstName);
+            if (Campaign.Current == null) return;
 
-            HeroDataPatches.SetNameOverride(hero, fullName, firstName);
-
-            InformationManager.DisplayMessage(new InformationMessage($"Changed hero name to {fullName}"));
-
-            if (ScreenManager.TopScreen is GauntletClanScreen clanScreen)
+            try
             {
-                clanScreen._dataSource?.RefreshValues();
+                var fullName = new TextObject(data.FullName);
+                var firstName = new TextObject(data.FirstName);
+
+                HeroDataPatches.SetNameOverride(hero, fullName, firstName);
+
+                InformationManager.DisplayMessage(new InformationMessage($"Changed hero name to {fullName}"));
+
+                if (ScreenManager.TopScreen is GauntletClanScreen clanScreen)
+                {
+                    clanScreen._dataSource?.RefreshValues();
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to apply hero name change for {stringId}", data.HeroStringId);
             }
         });
     }

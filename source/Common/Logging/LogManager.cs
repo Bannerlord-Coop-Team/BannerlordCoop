@@ -21,9 +21,4 @@ public static class LogManager
 	public static ILogger GetLogger<T>() => _logger.Value
 		.ForContext<T>();
 
-	// Type overload for callers that cannot use the generic form, such as static classes
-	// (a static type cannot be a generic type argument).
-	public static ILogger GetLogger(Type type) => _logger.Value
-		.ForContext(type);
-
 }

@@ -2,10 +2,10 @@ using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using System;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Clans.Patches;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Utils;
 using SandBox.GauntletUI;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -56,26 +56,34 @@ namespace GameInterface.Services.Clans.Handlers
                 return;
             }
 
-            // Applying the name runs vanilla game code and the refresh touches the clan
-            // screen UI; both must run on the main thread, not the network thread that
-            // delivered the message. The server relays to the other clients only after it
-            // has applied the change itself, so a skipped/failed apply does not leave the
-            // host diverged from its clients.
-            MainThreadDispatch.RunWhenCampaignReady("change clan name", () =>
+            // Applying the name runs vanilla game code and the refresh touches the clan screen
+            // UI; both must run on the main thread, not the network thread that delivered the
+            // message. The server relays to the other clients only after it has applied the
+            // change itself.
+            GameLoopRunner.RunOnMainThread(() =>
             {
-                ClanNameChangePatch.RunOriginalChangeClanName(clan, new TextObject(payload.Name), new TextObject(payload.InformalName));
+                if (Campaign.Current == null) return;
 
-                if (ModInformation.IsServer)
+                try
                 {
-                    network.SendAll(new NetworkChangeClanName(payload.ClanId, payload.Name, payload.InformalName));
-                }
+                    ClanNameChangePatch.RunOriginalChangeClanName(clan, new TextObject(payload.Name), new TextObject(payload.InformalName));
 
-                if (ScreenManager.TopScreen is GauntletClanScreen clanScreen)
+                    if (ModInformation.IsServer)
+                    {
+                        network.SendAll(new NetworkChangeClanName(payload.ClanId, payload.Name, payload.InformalName));
+                    }
+
+                    if (ScreenManager.TopScreen is GauntletClanScreen clanScreen)
+                    {
+                        clanScreen._dataSource?.RefreshValues();
+                    }
+
+                    InformationManager.DisplayMessage(new InformationMessage($"Clan {payload.ClanId} changed name to {payload.Name}"));
+                }
+                catch (Exception e)
                 {
-                    clanScreen._dataSource?.RefreshValues();
+                    Logger.Error(e, "Failed to apply clan name change for clan ({clanId})", payload.ClanId);
                 }
-
-                InformationManager.DisplayMessage(new InformationMessage($"Clan {payload.ClanId} changed name to {payload.Name}"));
             });
         }
     }

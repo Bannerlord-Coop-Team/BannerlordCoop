@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
@@ -48,21 +49,29 @@ internal class GauntletMapEventVisaulHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<GauntletMapEventVisual>(payload.What.InstanceId, out var visual))
             return;
 
-        using(new AllowedThread())
+        var position = payload.What.Position;
+        var instanceId = payload.What.InstanceId;
+
+        // Initializing the visual touches Gauntlet map UI, which is only safe on the main
+        // thread; this handler runs on the network thread that delivered the message.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            try
+            using (new AllowedThread())
             {
-                // Initialize from this client's own map-event visibility, not the server's. The server
-                // force-spots every party (no main party) so its value is always visible; map-event icon
-                // visibility is local (see MapEventVisibilityClientPatch), and the vanilla IsVisible setter
-                // keeps the visual in lock-step, so seeding the visual from the local value keeps the icon
-                // and battle sound consistent here instead of starting in the server-visible state.
-                visual.Initialize(payload.What.Position, visual.MapEvent?.IsVisible ?? false);
+                try
+                {
+                    // Initialize from this client's own map-event visibility, not the server's. The server
+                    // force-spots every party (no main party) so its value is always visible; map-event icon
+                    // visibility is local (see MapEventVisibilityClientPatch), and the vanilla IsVisible setter
+                    // keeps the visual in lock-step, so seeding the visual from the local value keeps the icon
+                    // and battle sound consistent here instead of starting in the server-visible state.
+                    visual.Initialize(position, visual.MapEvent?.IsVisible ?? false);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to initialize GauntletMapEventVisual with InstanceId {InstanceId}", instanceId);
+                }
             }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to initialize GauntletMapEventVisual with InstanceId {InstanceId}", payload.What.InstanceId);
-            }
-        }
+        });
     }
 }

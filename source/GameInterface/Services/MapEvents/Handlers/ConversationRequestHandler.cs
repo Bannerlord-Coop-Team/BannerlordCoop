@@ -7,7 +7,6 @@ using Common.Util;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Utils;
 using HarmonyLib;
 using LiteNetLib;
 using Serilog;
@@ -272,11 +271,13 @@ internal class ConversationRequestHandler : IHandler
             return;
         }
 
-        // Restarting the encounter reopens the encounter menu, and the PlayerEncounter
-        // state it reads is mutated by the main-thread tick; both must run on the main
-        // thread rather than the network thread that delivered the approval.
-        MainThreadDispatch.RunWhenCampaignReady("restart approved conversation encounter", () =>
+        // Restarting the encounter reopens the encounter menu and reads PlayerEncounter state
+        // the main-thread tick mutates; both must run on the main thread, not the network
+        // thread that delivered the approval.
+        GameLoopRunner.RunOnMainThread(() =>
         {
+            if (Campaign.Current == null) return;
+
             if (PlayerEncounter.Current != null)
             {
                 // A duplicate approval for the encounter that is already open (the rate-limited request was retried
@@ -293,17 +294,27 @@ internal class ConversationRequestHandler : IHandler
                 return;
             }
 
-            using (new AllowedThread())
+            try
             {
-                if (message.Source == ConversationRestartSource.EncounterManager)
+                using (new AllowedThread())
                 {
-                    EncounterManager.RestartPlayerEncounter(attacker, defender);
+                    if (message.Source == ConversationRestartSource.EncounterManager)
+                    {
+                        EncounterManager.RestartPlayerEncounter(attacker, defender);
+                    }
+                    else
+                    {
+                        // PlayerEncounter.RestartPlayerEncounter(defenderParty, attackerParty, forcePlayerOutFromSettlement)
+                        PlayerEncounter.RestartPlayerEncounter(defender, attacker, message.ForcePlayerOutFromSettlement);
+                    }
                 }
-                else
-                {
-                    // PlayerEncounter.RestartPlayerEncounter(defenderParty, attackerParty, forcePlayerOutFromSettlement)
-                    PlayerEncounter.RestartPlayerEncounter(defender, attacker, message.ForcePlayerOutFromSettlement);
-                }
+            }
+            catch (Exception e)
+            {
+                // The server engaged and held the AI party before approving; if the restart fails,
+                // release that hold so the party does not stay frozen for other players.
+                Logger.Error(e, "Failed to restart approved conversation encounter; releasing the server-side party hold");
+                SendConversationEndedToServer();
             }
         });
     }
