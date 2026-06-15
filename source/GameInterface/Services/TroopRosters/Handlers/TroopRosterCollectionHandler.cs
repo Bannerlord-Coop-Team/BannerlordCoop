@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -58,22 +59,35 @@ namespace GameInterface.Services.TroopRosters.Handlers
         {
             var data = payload.What;
 
-            if (!objectManager.TryGetObject(data.RosterId, out TroopRoster troopRoster)) return;
-
-            objectManager.TryGetObject(data.CharacterId, out CharacterObject character);
-
-            TroopRosterElement newElement = new TroopRosterElement()
+            // Mutating the roster touches game state and must run on the main thread, not the
+            // network thread that delivered the message. Ids are resolved inside the lambda so
+            // the apply stays queue-ordered behind the roster's create and ahead of its destroy.
+            GameLoopRunner.RunOnMainThread(() =>
             {
-                Character = character,
-                Number = data.Number,
-                WoundedNumber = data.WoundedNumber,
-                Xp = data.Xp,
-            };
+                try
+                {
+                    if (!objectManager.TryGetObject(data.RosterId, out TroopRoster troopRoster)) return;
 
-            troopRoster.data[data.Index] = newElement;
-            troopRoster.UpdateVersion();
-            troopRoster.ValidateTroopListCache();
-            troopRoster._count = troopRoster.data.Length;
+                    objectManager.TryGetObject(data.CharacterId, out CharacterObject character);
+
+                    TroopRosterElement newElement = new TroopRosterElement()
+                    {
+                        Character = character,
+                        Number = data.Number,
+                        WoundedNumber = data.WoundedNumber,
+                        Xp = data.Xp,
+                    };
+
+                    troopRoster.data[data.Index] = newElement;
+                    troopRoster.UpdateVersion();
+                    troopRoster.ValidateTroopListCache();
+                    troopRoster._count = troopRoster.data.Length;
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to apply NetworkUpdateTroopRosterData");
+                }
+            });
         }
     }
 }

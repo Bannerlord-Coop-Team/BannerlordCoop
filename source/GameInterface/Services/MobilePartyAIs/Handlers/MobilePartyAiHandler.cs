@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
@@ -72,11 +73,23 @@ internal class MobilePartyAiHandler : IHandler
 
         if (payload.What.IsNull)
         {
-            using (new AllowedThread())
+            // Setting AiBehaviorInteractable runs vanilla game code (Harmony-prefixed); defer it
+            // to the game-loop thread instead of the network thread that delivered the message.
+            GameLoopRunner.RunOnMainThread(() =>
             {
-                partyAi.AiBehaviorInteractable = null;
-                return;
-            }
+                try
+                {
+                    using (new AllowedThread())
+                    {
+                        partyAi.AiBehaviorInteractable = null;
+                    }
+                }
+                catch (Exception e)
+                {
+                    logger.Error(e, "Failed to apply UpdateAiBehaviorInteractablePoint");
+                }
+            });
+            return;
         }
 
         if (!objectManager.TryGetObject<PartyBase>(payload.What.InteractablePointId, out var interactablePoint))
@@ -84,9 +97,21 @@ internal class MobilePartyAiHandler : IHandler
             return;
         }
 
-        using (new AllowedThread())
+        // Setting AiBehaviorInteractable runs vanilla game code (Harmony-prefixed); defer it
+        // to the game-loop thread instead of the network thread that delivered the message.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            partyAi.AiBehaviorInteractable = interactablePoint;
-        }
+            try
+            {
+                using (new AllowedThread())
+                {
+                    partyAi.AiBehaviorInteractable = interactablePoint;
+                }
+            }
+            catch (Exception e)
+            {
+                logger.Error(e, "Failed to apply UpdateAiBehaviorInteractablePoint");
+            }
+        });
     }
 }

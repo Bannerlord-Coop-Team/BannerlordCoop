@@ -8,6 +8,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Smithing.Messages;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -65,6 +66,7 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void Handle(MessagePayload<NetworkHourlyTick> obj)
         {
+            // Client receive-path on the poller thread; HourlyTick defers the apply to the game-loop thread.
             HourlyTick(obj.What);
         }
 
@@ -75,20 +77,34 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void HourlyTick(NetworkHourlyTick obj)
         {
-            if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
+            var data = obj;
 
-            if (obj.HeroIdCraftingRecords == null) return;
-
-            var heroCraftingRecords = craftingCampaignBehavior._heroCraftingRecords;
-            foreach (KeyValuePair<string, int> keyValuePair in obj.HeroIdCraftingRecords)
+            // Mutating the campaign crafting-records dictionary touches state the main-thread
+            // crafting VM/tick reads, so defer the resolution and apply to the game-loop thread.
+            GameLoopRunner.RunOnMainThread(() =>
             {
-                if (!objectManager.TryGetObjectWithLogging<Hero>(keyValuePair.Key, out var currentHero)) return;
+                try
+                {
+                    if (!objectManager.TryGetObjectWithLogging(data.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
 
-                heroCraftingRecords[currentHero] = new HeroCraftingRecord(keyValuePair.Value);
-            }
+                    if (data.HeroIdCraftingRecords == null) return;
 
-            // Needed because crafting stamina recovers as time passes while a client is in the crafting menu (unlike vanilla)
-            messageBroker.Publish(this, new RefreshCraftingVM());
+                    var heroCraftingRecords = craftingCampaignBehavior._heroCraftingRecords;
+                    foreach (KeyValuePair<string, int> keyValuePair in data.HeroIdCraftingRecords)
+                    {
+                        if (!objectManager.TryGetObjectWithLogging<Hero>(keyValuePair.Key, out var currentHero)) return;
+
+                        heroCraftingRecords[currentHero] = new HeroCraftingRecord(keyValuePair.Value);
+                    }
+
+                    // Needed because crafting stamina recovers as time passes while a client is in the crafting menu (unlike vanilla)
+                    messageBroker.Publish(this, new RefreshCraftingVM());
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to apply NetworkHourlyTick");
+                }
+            });
         }
 
         private void DailyTickSettlementInternal(DailySettlementTick obj)

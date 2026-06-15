@@ -125,19 +125,23 @@ public class TroopRosterHandler : IHandler
     {
         var obj = payload.What;
 
-        if (!objectManager.TryGetObjectWithLogging(obj.TroopRosterId, out TroopRoster troopRoster)) return;
-
-        using (new AllowedThread())
+        // Applying the roster change runs vanilla game code; defer it to the game-loop thread instead of the network thread that delivered the message.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            try
+            using (new AllowedThread())
             {
-                troopRoster.AddToCountsAtIndex(obj.Index, obj.CountChange, obj.WoundedCountChange, obj.XpChange, obj.RemoveDepleted);
+                try
+                {
+                    if (!objectManager.TryGetObjectWithLogging(obj.TroopRosterId, out TroopRoster troopRoster)) return;
+
+                    troopRoster.AddToCountsAtIndex(obj.Index, obj.CountChange, obj.WoundedCountChange, obj.XpChange, obj.RemoveDepleted);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to AddToCountsAtIndex. TroopRosterId: {TroopRosterId}", obj.TroopRosterId);
+                }
             }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to AddToCountsAtIndex. TroopRosterId: {TroopRosterId}", obj.TroopRosterId);
-            }
-        }
+        });
     }
     #endregion
 
@@ -156,20 +160,24 @@ public class TroopRosterHandler : IHandler
     {
         var obj = payload.What;
 
-        if (!objectManager.TryGetObjectWithLogging(obj.TroopRosterId, out TroopRoster troopRoster)) return;
-        if (!TryResolveCharacterObject(obj.ObjectId, obj.IsHero, out var characterObject)) return;
-
-        using (new AllowedThread())
+        // Applying the roster change runs vanilla game code; defer it to the game-loop thread instead of the network thread that delivered the message.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            try
+            using (new AllowedThread())
             {
-                troopRoster.AddNewElement(characterObject, obj.InsertionIndex);
+                try
+                {
+                    if (!objectManager.TryGetObjectWithLogging(obj.TroopRosterId, out TroopRoster troopRoster)) return;
+                    if (!TryResolveCharacterObject(obj.ObjectId, obj.IsHero, out var characterObject)) return;
+
+                    troopRoster.AddNewElement(characterObject, obj.InsertionIndex);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to AddNewElement. TroopRosterId: {TroopRosterId}", obj.TroopRosterId);
+                }
             }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to AddNewElement. TroopRosterId: {TroopRosterId}", obj.TroopRosterId);
-            }
-        }
+        });
     }
     #endregion
 
@@ -183,19 +191,25 @@ public class TroopRosterHandler : IHandler
 
     private void Handle_NetworkRemoveZeroCounts(MessagePayload<NetworkRemoveZeroCounts> payload)
     {
-        if (!objectManager.TryGetObjectWithLogging<TroopRoster>(payload.What.TroopRosterId, out var troopRoster)) return;
+        var troopRosterId = payload.What.TroopRosterId;
 
-        using (new AllowedThread())
+        // Applying the roster change runs vanilla game code; defer it to the game-loop thread instead of the network thread that delivered the message.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            try
+            using (new AllowedThread())
             {
-                troopRoster.RemoveZeroCounts();
+                try
+                {
+                    if (!objectManager.TryGetObjectWithLogging<TroopRoster>(troopRosterId, out var troopRoster)) return;
+
+                    troopRoster.RemoveZeroCounts();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to RemoveZeroCounts. TroopRosterId: {TroopRosterId}", troopRosterId);
+                }
             }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to RemoveZeroCounts. TroopRosterId: {TroopRosterId}", payload.What.TroopRosterId);
-            }
-        }
+        });
     }
     #endregion
 
@@ -213,19 +227,23 @@ public class TroopRosterHandler : IHandler
     {
         var obj = payload.What;
 
-        if (!objectManager.TryGetObjectWithLogging<TroopRoster>(obj.TroopRosterId, out var troopRoster)) return;
-
-        using (new AllowedThread())
+        // Applying the roster change runs vanilla game code; defer it to the game-loop thread instead of the network thread that delivered the message.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            try
+            using (new AllowedThread())
             {
-                troopRoster.SetElementNumber(obj.Index, obj.Number);
+                try
+                {
+                    if (!objectManager.TryGetObjectWithLogging<TroopRoster>(obj.TroopRosterId, out var troopRoster)) return;
+
+                    troopRoster.SetElementNumber(obj.Index, obj.Number);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to SetElementNumber. TroopRosterId: {TroopRosterId}", obj.TroopRosterId);
+                }
             }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to SetElementNumber. TroopRosterId: {TroopRosterId}", obj.TroopRosterId);
-            }
-        }
+        });
     }
     #endregion
 
@@ -243,19 +261,23 @@ public class TroopRosterHandler : IHandler
     {
         var obj = payload.What;
 
-        if (!objectManager.TryGetObjectWithLogging<TroopRoster>(obj.TroopRosterId, out var troopRoster)) return;
-
-        using (new AllowedThread())
+        // Applying the roster change runs vanilla game code; defer it to the game-loop thread instead of the network thread that delivered the message.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            try
+            using (new AllowedThread())
             {
-                troopRoster.SetElementWoundedNumber(obj.Index, obj.Number);
+                try
+                {
+                    if (!objectManager.TryGetObjectWithLogging<TroopRoster>(obj.TroopRosterId, out var troopRoster)) return;
+
+                    troopRoster.SetElementWoundedNumber(obj.Index, obj.Number);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to SetElementWoundedNumber. TroopRosterId: {TroopRosterId}", obj.TroopRosterId);
+                }
             }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to SetElementWoundedNumber. TroopRosterId: {TroopRosterId}", obj.TroopRosterId);
-            }
-        }
+        });
     }
     #endregion
 
@@ -273,19 +295,23 @@ public class TroopRosterHandler : IHandler
     {
         var obj = payload.What;
 
-        if (!objectManager.TryGetObjectWithLogging<TroopRoster>(obj.TroopRosterId, out var troopRoster)) return;
-
-        using (new AllowedThread())
+        // Applying the roster change runs vanilla game code; defer it to the game-loop thread instead of the network thread that delivered the message.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            try
+            using (new AllowedThread())
             {
-                troopRoster.SetElementXp(obj.Index, obj.Number);
+                try
+                {
+                    if (!objectManager.TryGetObjectWithLogging<TroopRoster>(obj.TroopRosterId, out var troopRoster)) return;
+
+                    troopRoster.SetElementXp(obj.Index, obj.Number);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to SetElementXp. TroopRosterId: {TroopRosterId}", obj.TroopRosterId);
+                }
             }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to SetElementXp. TroopRosterId: {TroopRosterId}", obj.TroopRosterId);
-            }
-        }
+        });
     }
     #endregion
 
@@ -303,19 +329,23 @@ public class TroopRosterHandler : IHandler
     {
         var obj = payload.What;
 
-        if (!objectManager.TryGetObjectWithLogging<TroopRoster>(obj.TroopRosterId, out var troopRoster)) return;
-
-        using (new AllowedThread())
+        // Applying the roster change runs vanilla game code; defer it to the game-loop thread instead of the network thread that delivered the message.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            try
+            using (new AllowedThread())
             {
-                troopRoster.ShiftTroopToIndex(obj.TroopIndex, obj.TargetIndex);
+                try
+                {
+                    if (!objectManager.TryGetObjectWithLogging<TroopRoster>(obj.TroopRosterId, out var troopRoster)) return;
+
+                    troopRoster.ShiftTroopToIndex(obj.TroopIndex, obj.TargetIndex);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to ShiftTroopToIndex. TroopRosterId: {TroopRosterId}", obj.TroopRosterId);
+                }
             }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to ShiftTroopToIndex. TroopRosterId: {TroopRosterId}", obj.TroopRosterId);
-            }
-        }
+        });
     }
     #endregion
 
@@ -333,19 +363,23 @@ public class TroopRosterHandler : IHandler
     {
         var obj = payload.What;
 
-        if (!objectManager.TryGetObjectWithLogging<TroopRoster>(obj.TroopRosterId, out var troopRoster)) return;
-
-        using (new AllowedThread())
+        // Applying the roster change runs vanilla game code; defer it to the game-loop thread instead of the network thread that delivered the message.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            try
+            using (new AllowedThread())
             {
-                troopRoster.SwapTroopsAtIndices(obj.FirstIndex, obj.SecondIndex);
+                try
+                {
+                    if (!objectManager.TryGetObjectWithLogging<TroopRoster>(obj.TroopRosterId, out var troopRoster)) return;
+
+                    troopRoster.SwapTroopsAtIndices(obj.FirstIndex, obj.SecondIndex);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to SwapTroopsAtIndices. TroopRosterId: {TroopRosterId}", obj.TroopRosterId);
+                }
             }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to SwapTroopsAtIndices. TroopRosterId: {TroopRosterId}", obj.TroopRosterId);
-            }
-        }
+        });
     }
     #endregion
 }

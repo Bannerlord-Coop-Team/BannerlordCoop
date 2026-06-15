@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Companions.Messages;
@@ -6,6 +7,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.UI.Notifications.Messages;
 using LiteNetLib;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
@@ -59,16 +61,31 @@ internal class HireCompanionHandler : IHandler
 
     private void Handle_HireCompanion(MessagePayload<HireCompanion> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.OneToOneConversationHeroId, out var oneToOneConversationHero)) return;
-        if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.PlayerClanId, out var playerClan)) return;
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
+        var data = obj.What;
+        var peer = obj.Who as NetPeer;
 
-        GiveGoldAction.ApplyBetweenCharacters(mainHero, oneToOneConversationHero, obj.What.HiringPrice, false);
-        AddCompanionAction.Apply(playerClan, oneToOneConversationHero);
-        AddHeroToPartyAction.Apply(oneToOneConversationHero, mainParty, true);
+        // The hire applies vanilla game actions; defer them to the game-loop thread so they
+        // run there instead of on the network (poller) thread that delivered the message.
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
+                if (!objectManager.TryGetObjectWithLogging<Hero>(data.OneToOneConversationHeroId, out var oneToOneConversationHero)) return;
+                if (!objectManager.TryGetObjectWithLogging<Clan>(data.PlayerClanId, out var playerClan)) return;
+                if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty)) return;
 
-        // Give client notification of changed gold
-        network.Send(obj.Who as NetPeer, new NotifyGoldChange(-obj.What.HiringPrice));
+                GiveGoldAction.ApplyBetweenCharacters(mainHero, oneToOneConversationHero, data.HiringPrice, false);
+                AddCompanionAction.Apply(playerClan, oneToOneConversationHero);
+                AddHeroToPartyAction.Apply(oneToOneConversationHero, mainParty, true);
+
+                // Give client notification of changed gold, only after the gold change has applied
+                network.Send(peer, new NotifyGoldChange(-data.HiringPrice));
+            }
+            catch (Exception e)
+            {
+                logger.Error(e, "Failed to apply {Message}", nameof(HireCompanion));
+            }
+        });
     }
 }

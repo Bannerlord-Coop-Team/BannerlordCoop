@@ -159,26 +159,48 @@ internal class PlayerCaptivityServerHandler : IHandler
     {
         if (ModInformation.IsClient) return;
 
-        if (!objectManager.TryGetObjectWithLogging<Hero>(payload.What.PlayerHeroId, out var playerHero))
-            return;
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(payload.What.PlayerPartyId, out var playerParty))
-            return;
+        var heroId = payload.What.PlayerHeroId;
+        var partyId = payload.What.PlayerPartyId;
+        var facilitatorId = payload.What.FacilitatorId;
+        var detail = payload.What.Detail;
+        var ransomAmount = payload.What.RansomAmount;
+        var releasePosition = payload.What.PlayerPartyPosition;
+        var peer = payload.Who as NetPeer;
 
-        Hero facilitator = null;
-        if (payload.What.FacilitatorId != null && !objectManager.TryGetObjectWithLogging(payload.What.FacilitatorId, out facilitator))
-            return;
-
-        PlayerCaptivityLogger.Debug("Handle_NetworkEndPlayerCaptivityAttempted (server): hero={HeroId} party={PartyId} detail={Detail} facilitator={FacilitatorId}",
-            playerHero.StringId, playerParty.StringId, payload.What.Detail, facilitator?.StringId);
-
-        ReleasePlayerFromCaptivity(playerHero, playerParty, payload.What.Detail, facilitator, payload.What.PlayerPartyPosition);
-
-        if (payload.What.Detail == EndCaptivityDetail.Ransom && payload.What.RansomAmount!=0)
+        // The release touches party/roster game state the main-thread tick also touches, so defer the
+        // apply to the game loop; resolve the object ids inside the lambda so a deferred create that lands
+        // first is visible, and send the reply inside the lambda after the release runs so the client only
+        // leaves the captivity menus once the server has actually applied it.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            GiveGoldAction.ApplyBetweenCharacters(playerHero, null, payload.What.RansomAmount, false);
-        }
-        var message = new NetworkPlayerCaptivityEnded();
-        network.Send(payload.Who as NetPeer, message);
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging<Hero>(heroId, out var playerHero))
+                    return;
+                if (!objectManager.TryGetObjectWithLogging<MobileParty>(partyId, out var playerParty))
+                    return;
+
+                Hero facilitator = null;
+                if (facilitatorId != null && !objectManager.TryGetObjectWithLogging(facilitatorId, out facilitator))
+                    return;
+
+                PlayerCaptivityLogger.Debug("Handle_NetworkEndPlayerCaptivityAttempted (server): hero={HeroId} party={PartyId} detail={Detail} facilitator={FacilitatorId}",
+                    playerHero.StringId, playerParty.StringId, detail, facilitator?.StringId);
+
+                ReleasePlayerFromCaptivity(playerHero, playerParty, detail, facilitator, releasePosition);
+
+                if (detail == EndCaptivityDetail.Ransom && ransomAmount != 0)
+                {
+                    GiveGoldAction.ApplyBetweenCharacters(playerHero, null, ransomAmount, false);
+                }
+
+                network.Send(peer, new NetworkPlayerCaptivityEnded());
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to apply {Message}", nameof(NetworkEndPlayerCaptivityAttempted));
+            }
+        }, blocking: true);
     }
 
     /// <summary>

@@ -1,5 +1,7 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
+using Common.Util;
 using GameInterface.Services.UI.Notifications.Messages;
 using Serilog;
 using System;
@@ -29,9 +31,26 @@ internal class GoldNotificationHandler : IHandler
 
     private void Handle_NotifyGoldChange(MessagePayload<NotifyGoldChange> obj)
     {
-        CampaignEventDispatcher.Instance.OnHeroOrPartyTradedGold(
-            new ValueTuple<Hero, PartyBase>(null, null),
-            new ValueTuple<Hero, PartyBase>(Hero.MainHero, MobileParty.MainParty.Party),
-            new ValueTuple<int, string>(obj.What.GoldAmount, ""), true);
+        var goldAmount = obj.What.GoldAmount;
+
+        // OnHeroOrPartyTradedGold runs vanilla campaign/UI code (showNotification:true); it must run on the
+        // main thread, not the network thread that delivered the notification.
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            try
+            {
+                using (new AllowedThread())
+                {
+                    CampaignEventDispatcher.Instance.OnHeroOrPartyTradedGold(
+                        new ValueTuple<Hero, PartyBase>(null, null),
+                        new ValueTuple<Hero, PartyBase>(Hero.MainHero, MobileParty.MainParty.Party),
+                        new ValueTuple<int, string>(goldAmount, ""), true);
+                }
+            }
+            catch (Exception e)
+            {
+                logger.Error(e, "Failed to apply NotifyGoldChange");
+            }
+        });
     }
 }

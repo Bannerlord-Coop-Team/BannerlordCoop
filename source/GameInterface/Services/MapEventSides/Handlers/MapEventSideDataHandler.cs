@@ -129,47 +129,71 @@ internal class MapEventSideDataHandler : IHandler
     {
         var data = payload.What;
 
-        if (objectManager.TryGetObject<MapEventParty>(data.PartyId, out var party) == false)
+        // Removing from the vanilla _battleParties collection runs Harmony-patched game code;
+        // defer it to the game-loop thread instead of the network thread that delivered the message.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            Logger.Error("Unable to find {type} with id: {id}", typeof(MapEventParty), data.PartyId);
-            return;
-        }
-        if (objectManager.TryGetObject<MapEventSide>(data.SideId, out var side) == false)
-        {
-            Logger.Error("Unable to find {type} with id: {id}", typeof(MapEventSide), data.SideId);
-            return;
-        }
+            try
+            {
+                if (objectManager.TryGetObject<MapEventParty>(data.PartyId, out var party) == false)
+                {
+                    Logger.Error("Unable to find {type} with id: {id}", typeof(MapEventParty), data.PartyId);
+                    return;
+                }
+                if (objectManager.TryGetObject<MapEventSide>(data.SideId, out var side) == false)
+                {
+                    Logger.Error("Unable to find {type} with id: {id}", typeof(MapEventSide), data.SideId);
+                    return;
+                }
 
-        using (new AllowedThread())
-        {
-            side._battleParties.Remove(party);
-        }
+                using (new AllowedThread())
+                {
+                    side._battleParties.Remove(party);
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to apply NetworkRemoveMapEventParty");
+            }
+        });
     }
 
     private void Handle(MessagePayload<NetworkAddMapEventParty> payload)
     {
         var data = payload.What;
 
-        if (objectManager.TryGetObject<MapEventParty>(data.PartyId, out var party) == false)
+        // Adding to the vanilla _battleParties collection (and reading side.MapEvent) is game
+        // state; defer it to the game-loop thread instead of the network thread that delivered the message.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            Logger.Error("Unable to find {type} with id: {id}", typeof(MapEventParty), data.PartyId);
-            return;
-        }
-        if (objectManager.TryGetObject<MapEventSide>(data.SideId, out var side) == false)
-        {
-            Logger.Error("Unable to find {type} with id: {id}", typeof(MapEventSide), data.SideId);
-            return;
-        }
+            try
+            {
+                if (objectManager.TryGetObject<MapEventParty>(data.PartyId, out var party) == false)
+                {
+                    Logger.Error("Unable to find {type} with id: {id}", typeof(MapEventParty), data.PartyId);
+                    return;
+                }
+                if (objectManager.TryGetObject<MapEventSide>(data.SideId, out var side) == false)
+                {
+                    Logger.Error("Unable to find {type} with id: {id}", typeof(MapEventSide), data.SideId);
+                    return;
+                }
 
-        using (new AllowedThread())
-        {
-            Logger.Debug("Adding {PartyId} to side {SideId} in map event ({MapEvent})", 
-                data.PartyId,
-                data.SideId,
-                side.MapEvent.StringId ?? "<null>");
+                using (new AllowedThread())
+                {
+                    Logger.Debug("Adding {PartyId} to side {SideId} in map event ({MapEvent})",
+                        data.PartyId,
+                        data.SideId,
+                        side.MapEvent.StringId ?? "<null>");
 
-            side._battleParties.Add(party);
-        }
+                    side._battleParties.Add(party);
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to apply NetworkAddMapEventParty");
+            }
+        });
     }
 
     private void Handle_MapEventSideAssigned(MessagePayload<MapEventSideAssigned> payload)
@@ -183,13 +207,29 @@ internal class MapEventSideDataHandler : IHandler
 
     private void Handle_NetworkAssignMapEventSide(MessagePayload<NetworkAssignMapEventSide> payload)
     {
-        if (!objectManager.TryGetObjectWithLogging<MapEvent>(payload.What.MapEventId, out var mapEvent)) return;
-        if (!objectManager.TryGetObjectWithLogging<MapEventSide>(payload.What.MapEventSideId, out var mapEventSide)) return;
+        var data = payload.What;
 
-        using(new AllowedThread())
+        var side = (int)data.Side;
+
+        // Assigning into the vanilla _sides array races main-thread MapEventManager.Tick iterating
+        // sides; defer it to the game-loop thread instead of the network thread that delivered the message.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            mapEvent._sides[(int)payload.What.Side] = mapEventSide;
-        }
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.MapEventId, out var mapEvent)) return;
+                if (!objectManager.TryGetObjectWithLogging<MapEventSide>(data.MapEventSideId, out var mapEventSide)) return;
+
+                using (new AllowedThread())
+                {
+                    mapEvent._sides[side] = mapEventSide;
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to apply NetworkAssignMapEventSide");
+            }
+        });
     }
 
     private void Handle_MapEventPartyBattlePartyAdded(MessagePayload<MapEventPartyBattlePartyAdded> payload)
@@ -205,14 +245,28 @@ internal class MapEventSideDataHandler : IHandler
 
     private void Handle_NetworkAddBattleParty(MessagePayload<NetworkAddBattleParty> payload)
     {
-        if (!objectManager.TryGetObjectWithLogging<MapEventSide>(payload.What.MapEventSideId, out var mapEventSide))
-            return;
-        if (!objectManager.TryGetObjectWithLogging<MapEventParty>(payload.What.MapEventPartyId, out var mapEventParty))
-            return;
+        var data = payload.What;
 
-        using (new AllowedThread())
+        // Adding to the vanilla _battleParties collection runs Harmony-patched game code;
+        // defer it to the game-loop thread instead of the network thread that delivered the message.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            mapEventSide._battleParties.Add(mapEventParty);
-        }
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging<MapEventSide>(data.MapEventSideId, out var mapEventSide))
+                    return;
+                if (!objectManager.TryGetObjectWithLogging<MapEventParty>(data.MapEventPartyId, out var mapEventParty))
+                    return;
+
+                using (new AllowedThread())
+                {
+                    mapEventSide._battleParties.Add(mapEventParty);
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to apply NetworkAddBattleParty");
+            }
+        });
     }
 }

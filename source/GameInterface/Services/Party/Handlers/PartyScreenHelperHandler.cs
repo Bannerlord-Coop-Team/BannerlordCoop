@@ -1,10 +1,13 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using GameInterface.Services.MapEventParties;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Messages;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
@@ -64,24 +67,43 @@ internal class PartyScreenHelperHandler : IHandler
 
     private void Handle_DonateToGarrison(MessagePayload<DonateToGarrison> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.CurrentSettlementId, out var currentSettlement)) return;
-        if (!objectManager.TryGetObjectWithLogging<TroopRoster>(obj.What.LeftMemberRosterId, out var leftMemberRoster)) return;
+        var data = obj.What;
 
-        MobileParty garrisonParty = currentSettlement.Town.GarrisonParty;
-        if (garrisonParty == null)
+        // This mutates campaign state (creates/registers the garrison party, mutates its
+        // roster) and runs a vanilla campaign action, all of which must run on the game
+        // loop rather than the network thread that delivered the message. The objects are
+        // re-resolved at drain time so the apply stays queue-ordered behind their create.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            currentSettlement.AddGarrisonParty();
-            garrisonParty = currentSettlement.Town.GarrisonParty;
-        }
-        for (int i = 0; i < leftMemberRoster.Count; i++)
-        {
-            TroopRosterElement elementCopyAtIndex = leftMemberRoster.GetElementCopyAtIndex(i);
-            garrisonParty.AddElementToMemberRoster(elementCopyAtIndex.Character, elementCopyAtIndex.Number, false);
-            if (elementCopyAtIndex.Character.IsHero)
+            try
             {
-                EnterSettlementAction.ApplyForCharacterOnly(elementCopyAtIndex.Character.HeroObject, currentSettlement);
+                if (!objectManager.TryGetObjectWithLogging<Settlement>(data.CurrentSettlementId, out var currentSettlement)) return;
+                if (!objectManager.TryGetObjectWithLogging<TroopRoster>(data.LeftMemberRosterId, out var leftMemberRoster)) return;
+
+                using (new AllowedThread())
+                {
+                    MobileParty garrisonParty = currentSettlement.Town.GarrisonParty;
+                    if (garrisonParty == null)
+                    {
+                        currentSettlement.AddGarrisonParty();
+                        garrisonParty = currentSettlement.Town.GarrisonParty;
+                    }
+                    for (int i = 0; i < leftMemberRoster.Count; i++)
+                    {
+                        TroopRosterElement elementCopyAtIndex = leftMemberRoster.GetElementCopyAtIndex(i);
+                        garrisonParty.AddElementToMemberRoster(elementCopyAtIndex.Character, elementCopyAtIndex.Number, false);
+                        if (elementCopyAtIndex.Character.IsHero)
+                        {
+                            EnterSettlementAction.ApplyForCharacterOnly(elementCopyAtIndex.Character.HeroObject, currentSettlement);
+                        }
+                    }
+                }
             }
-        }
+            catch (Exception e)
+            {
+                logger.Error(e, "Failed to apply {Message}", nameof(DonateToGarrison));
+            }
+        });
     }
 
     private void Handle_PrisonersDonated(MessagePayload<PrisonersDonated> obj)
@@ -96,18 +118,37 @@ internal class PartyScreenHelperHandler : IHandler
 
     private void Handle_DonatePrisoners(MessagePayload<DonatePrisoners> obj)
     {
-        FlattenedTroopRoster rightSidePrisonerRoster = FlattenedTroopSerializer.Deserialize(obj.What.RightSidePrisonerRoster, objectManager);
-        if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.CurrentSettlementId, out var currentSettlement)) return;
-        if (!objectManager.TryGetObjectWithLogging<PartyBase>(obj.What.RightPartyId, out var rightParty)) return;
+        var data = obj.What;
 
-        foreach (CharacterObject characterObject in rightSidePrisonerRoster.Troops)
+        // The vanilla EnterSettlementAction and the campaign event dispatch mutate hero /
+        // settlement prisoner state and fire campaign behaviors, all main-thread-only; this
+        // handler runs on the network thread. The roster is deserialized and the objects are
+        // re-resolved at drain time so the apply stays queue-ordered behind their create.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            if (characterObject.IsHero)
+            try
             {
-                EnterSettlementAction.ApplyForPrisoner(characterObject.HeroObject, currentSettlement);
+                FlattenedTroopRoster rightSidePrisonerRoster = FlattenedTroopSerializer.Deserialize(data.RightSidePrisonerRoster, objectManager);
+                if (!objectManager.TryGetObjectWithLogging<Settlement>(data.CurrentSettlementId, out var currentSettlement)) return;
+                if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.RightPartyId, out var rightParty)) return;
+
+                using (new AllowedThread())
+                {
+                    foreach (CharacterObject characterObject in rightSidePrisonerRoster.Troops)
+                    {
+                        if (characterObject.IsHero)
+                        {
+                            EnterSettlementAction.ApplyForPrisoner(characterObject.HeroObject, currentSettlement);
+                        }
+                    }
+                    CampaignEventDispatcher.Instance.OnPrisonerDonatedToSettlement(rightParty.MobileParty, rightSidePrisonerRoster, currentSettlement);
+                }
             }
-        }
-        CampaignEventDispatcher.Instance.OnPrisonerDonatedToSettlement(rightParty.MobileParty, rightSidePrisonerRoster, currentSettlement);
+            catch (Exception e)
+            {
+                logger.Error(e, "Failed to apply {Message}", nameof(DonatePrisoners));
+            }
+        });
     }
 
     private void Handle_GarrisonManaged(MessagePayload<GarrisonManaged> obj)
@@ -122,26 +163,45 @@ internal class PartyScreenHelperHandler : IHandler
 
     private void Handle_DoManageGarrison(MessagePayload<DoManageGarrison> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.CurrentSettlementId, out var currentSettlement)) return;
-        if (!objectManager.TryGetObjectWithLogging<TroopRoster>(obj.What.LeftMemberRosterId, out var leftMemberRoster)) return;
-        if (!objectManager.TryGetObjectWithLogging<TroopRoster>(obj.What.LeftPrisonerRosterId, out var leftPrisonerRoster)) return;
+        var data = obj.What;
 
-        for (int i = 0; i < leftMemberRoster.Count; i++)
+        // Both loops invoke vanilla EnterSettlementAction which mutates settlement / hero
+        // state and fires events, all main-thread-only; this handler runs on the network
+        // thread. The objects are re-resolved at drain time so the apply stays queue-ordered
+        // behind their create.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            TroopRosterElement elementCopyAtIndex = leftMemberRoster.GetElementCopyAtIndex(i);
-            if (elementCopyAtIndex.Character.IsHero)
+            try
             {
-                EnterSettlementAction.ApplyForCharacterOnly(elementCopyAtIndex.Character.HeroObject, currentSettlement);
+                if (!objectManager.TryGetObjectWithLogging<Settlement>(data.CurrentSettlementId, out var currentSettlement)) return;
+                if (!objectManager.TryGetObjectWithLogging<TroopRoster>(data.LeftMemberRosterId, out var leftMemberRoster)) return;
+                if (!objectManager.TryGetObjectWithLogging<TroopRoster>(data.LeftPrisonerRosterId, out var leftPrisonerRoster)) return;
+
+                using (new AllowedThread())
+                {
+                    for (int i = 0; i < leftMemberRoster.Count; i++)
+                    {
+                        TroopRosterElement elementCopyAtIndex = leftMemberRoster.GetElementCopyAtIndex(i);
+                        if (elementCopyAtIndex.Character.IsHero)
+                        {
+                            EnterSettlementAction.ApplyForCharacterOnly(elementCopyAtIndex.Character.HeroObject, currentSettlement);
+                        }
+                    }
+                    for (int j = 0; j < leftPrisonerRoster.Count; j++)
+                    {
+                        TroopRosterElement elementCopyAtIndex2 = leftPrisonerRoster.GetElementCopyAtIndex(j);
+                        if (elementCopyAtIndex2.Character.IsHero)
+                        {
+                            EnterSettlementAction.ApplyForPrisoner(elementCopyAtIndex2.Character.HeroObject, currentSettlement);
+                        }
+                    }
+                }
             }
-        }
-        for (int j = 0; j < leftPrisonerRoster.Count; j++)
-        {
-            TroopRosterElement elementCopyAtIndex2 = leftPrisonerRoster.GetElementCopyAtIndex(j);
-            if (elementCopyAtIndex2.Character.IsHero)
+            catch (Exception e)
             {
-                EnterSettlementAction.ApplyForPrisoner(elementCopyAtIndex2.Character.HeroObject, currentSettlement);
+                logger.Error(e, "Failed to apply {Message}", nameof(DoManageGarrison));
             }
-        }
+        });
     }
 
     private void Handle_PrisonersReleasedAndTaken(MessagePayload<PrisonersReleasedAndTaken> obj)
@@ -155,16 +215,36 @@ internal class PartyScreenHelperHandler : IHandler
 
     private void Handle_ReleaseAndTakePrisoners(MessagePayload<ReleaseAndTakePrisoners> obj)
     {
-        FlattenedTroopRoster takenPrisonerRoster = FlattenedTroopSerializer.Deserialize(obj.What.TakenPrisonerRoster, objectManager);
-        FlattenedTroopRoster releasedPrisonerRoster = FlattenedTroopSerializer.Deserialize(obj.What.ReleasedPrisonerRoster, objectManager);
+        var data = obj.What;
 
-        if (!releasedPrisonerRoster.IsEmpty<FlattenedTroopRosterElement>())
+        // The vanilla EndCaptivityAction / TakePrisonerAction route through patched
+        // ApplyInternal whose prefixes block the client original (and log an error) unless
+        // the running thread is allowed; they also mutate hero / party state that is
+        // main-thread-only. Defer to the game loop and run inside AllowedThread so the
+        // patched actions run the original. The rosters are deserialized at drain time.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            EndCaptivityAction.ApplyByReleasedByChoice(releasedPrisonerRoster);
-        }
-        if (!takenPrisonerRoster.IsEmpty<FlattenedTroopRosterElement>())
-        {
-            TakePrisonerAction.ApplyByTakenFromPartyScreen(takenPrisonerRoster);
-        }
+            try
+            {
+                FlattenedTroopRoster takenPrisonerRoster = FlattenedTroopSerializer.Deserialize(data.TakenPrisonerRoster, objectManager);
+                FlattenedTroopRoster releasedPrisonerRoster = FlattenedTroopSerializer.Deserialize(data.ReleasedPrisonerRoster, objectManager);
+
+                using (new AllowedThread())
+                {
+                    if (!releasedPrisonerRoster.IsEmpty<FlattenedTroopRosterElement>())
+                    {
+                        EndCaptivityAction.ApplyByReleasedByChoice(releasedPrisonerRoster);
+                    }
+                    if (!takenPrisonerRoster.IsEmpty<FlattenedTroopRosterElement>())
+                    {
+                        TakePrisonerAction.ApplyByTakenFromPartyScreen(takenPrisonerRoster);
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                logger.Error(e, "Failed to apply {Message}", nameof(ReleaseAndTakePrisoners));
+            }
+        });
     }
 }

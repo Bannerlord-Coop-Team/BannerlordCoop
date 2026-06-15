@@ -7,6 +7,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Smithing.Interfaces;
 using GameInterface.Services.Smithing.Messages;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -70,7 +71,22 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void Handle(MessagePayload<NetworkInitializeServerCraftingDataKeys> obj)
         {
-            sessionCraftingPlayerDataInterface.AddPlayerKeys(obj.What.PlayerHeroId);
+            var data = obj.What;
+
+            // Seeding the per-player crafting keys reads CraftingTemplate.All and resolves
+            // template ids, which touches game state the main-thread tick also reads; apply
+            // it on the game loop rather than the network thread that delivered the message.
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                try
+                {
+                    sessionCraftingPlayerDataInterface.AddPlayerKeys(data.PlayerHeroId);
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to apply {Message}", nameof(NetworkInitializeServerCraftingDataKeys));
+                }
+            });
         }
 
         private Dictionary<CraftingTemplate, List<CraftingPiece>> GetOpenedPartsDictionary(string playerHeroId)

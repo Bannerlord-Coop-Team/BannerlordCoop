@@ -339,22 +339,37 @@ internal class BattleHandler : IHandler
     {
         var message = payload.What;
 
-        if (!objectManager.TryGetObjectWithLogging<MapEvent>(message.MapEventId, out var mapEvent))
-            return;
-
-        mapEventLogger.DebugMapEvent(mapEvent, "Handling network add involved parties. Party count: {MapEventPartyCount}", message.MapEventPartyIds.Length);
-
-        using (new AllowedThread())
+        // The map event's troop-upgrade tracker is game state the main-thread tick also
+        // touches, so defer the apply to the game loop. Ids are resolved at drain time so
+        // the apply stays queue-ordered behind the event's create and ahead of its evict.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            foreach (var mapEventPartyId in message.MapEventPartyIds)
+            try
             {
-                if (!objectManager.TryGetObjectWithLogging<MapEventParty>(mapEventPartyId, out var mapEventParty))
-                    continue;
+                if (!objectManager.TryGetObjectWithLogging<MapEvent>(message.MapEventId, out var mapEvent))
+                    return;
 
-                mapEventLogger.DebugMapEvent(mapEvent, "Adding involved map event party {MapEventPartyId} to troop upgrade tracker", mapEventPartyId);
-                mapEvent.TroopUpgradeTracker.AddParty(mapEventParty);
+                mapEventLogger.DebugMapEvent(mapEvent, "Handling network add involved parties. Party count: {MapEventPartyCount}", message.MapEventPartyIds.Length);
+
+                // Re-applying campaign-collection state replicated from the server; the
+                // DynamicSync TroopUpgradeTracker patches must stand down during the apply.
+                using (new AllowedThread())
+                {
+                    foreach (var mapEventPartyId in message.MapEventPartyIds)
+                    {
+                        if (!objectManager.TryGetObjectWithLogging<MapEventParty>(mapEventPartyId, out var mapEventParty))
+                            continue;
+
+                        mapEventLogger.DebugMapEvent(mapEvent, "Adding involved map event party {MapEventPartyId} to troop upgrade tracker", mapEventPartyId);
+                        mapEvent.TroopUpgradeTracker.AddParty(mapEventParty);
+                    }
+                }
             }
-        }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to apply {Message}", nameof(NetworkAddInvolvedParties));
+            }
+        });
     }
 
     private void Handle_PlayerJoinedBattle(MessagePayload<PlayerJoinedBattle> payload)
