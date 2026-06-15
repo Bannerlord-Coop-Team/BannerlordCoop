@@ -45,8 +45,8 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     private readonly IConnectionMessageQueue connectionMessageQueue;
 
     // Co-hosted NAT-punch rendezvous for P2P instances (taverns etc.). The server's NetManager
-    // already has NatPunchEnabled; this just answers the introduction requests.
-    private readonly Services.Instances.InstanceIntroducer instanceIntroducer = new Services.Instances.InstanceIntroducer();
+    // already has NatPunchEnabled; the MissionManager answers the introduction requests.
+    private readonly Services.Instances.IMissionManager missionManager;
 
     public CoopServer(
         INetworkConfiguration configuration,
@@ -54,12 +54,14 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         IPacketManager packetManager,
         IConnectionMessageQueue connectionMessageQueue,
         IControllerIdProvider controllerIdProvider,
+        Services.Instances.IMissionManager missionManager,
         ICommonSerializer serializer) : base(configuration, serializer)
     {
         // Dependancy assignment
         this.messageBroker = messageBroker;
         this.packetManager = packetManager;
         this.connectionMessageQueue = connectionMessageQueue;
+        this.missionManager = missionManager;
 
         // Netmanager initialization
         netManager.NatPunchEnabled = true;
@@ -76,7 +78,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public void OnNatIntroductionRequest(IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token)
     {
-        instanceIntroducer.HandleIntroductionRequest(netManager.NatPunchModule, localEndPoint, remoteEndPoint, token);
+        missionManager.HandleIntroductionRequest(netManager.NatPunchModule, localEndPoint, remoteEndPoint, token);
     }
 
     public void OnNatIntroductionSuccess(IPEndPoint targetEndPoint, NatAddressType type, string token)

@@ -28,13 +28,13 @@ namespace Missions.Services.Missiles.Handlers
     /// <inheritdoc/>
     public class MissileHandler : IMissileHandler
     {
-        readonly INetwork network;
+        readonly IMissionNetwork network;
         readonly IMessageBroker messageBroker;
         readonly INetworkAgentRegistry networkAgentRegistry;
         readonly static ILogger Logger = LogManager.GetLogger<AgentDamageHandler>();
 
         public MissileHandler(
-            INetwork network,
+            IMissionNetwork network,
             IMessageBroker messageBroker,
             INetworkAgentRegistry networkAgentRegistry)
         {

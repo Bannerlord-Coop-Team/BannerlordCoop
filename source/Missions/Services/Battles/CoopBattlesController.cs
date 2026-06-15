@@ -34,7 +34,7 @@ namespace Missions.Services
         public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
 
         private readonly IMessageBroker messageBroker;
-        private readonly INetwork network;
+        private readonly IMissionNetwork network;
         private readonly INetworkAgentRegistry agentRegistry;
         private readonly IRandomEquipmentGenerator equipmentGenerator;
         private readonly IBinaryPackageFactory packageFactory;
@@ -46,7 +46,7 @@ namespace Missions.Services
 
         public CoopBattlesController(
             IMessageBroker messageBroker,
-            INetwork network,
+            IMissionNetwork network,
             INetworkAgentRegistry agentRegistry, 
             IRandomEquipmentGenerator equipmentGenerator,
             IBinaryPackageFactory packageFactory,

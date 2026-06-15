@@ -26,12 +26,12 @@ namespace Missions.Services.Agents.Handlers
         private readonly CancellationTokenSource agentPollingCancelToken = new CancellationTokenSource();
         private readonly Task agentPollingTask;
         private readonly IPacketManager packetManager;
-        private readonly INetwork client;
+        private readonly IMissionNetwork client;
         private readonly IMessageBroker messageBroker;
         private readonly INetworkAgentRegistry agentRegistry;
 
         public AgentMovementHandler(
-            INetwork client,
+            IMissionNetwork client,
             IPacketManager packetManager,
             IMessageBroker messageBroker,
             INetworkAgentRegistry agentRegistry)

@@ -51,44 +51,14 @@ namespace Missions.Services.Agents.Packets
 
         public void Apply(Agent agent)
         {
-            // Set the agent's flags to 0 ie nothing
-            agent.EventControlFlags = 0U;
-
-            // if the agent is crouching, add that event
-            if (CrouchMode)
-            {
-
-                agent.EventControlFlags |= Agent.EventControlFlag.Crouch;
-            }
-            else
-            {
-                agent.EventControlFlags |= Agent.EventControlFlag.Stand;
-            }
-
-            // Now check the flags given to us from the server
-            uint eventFlag = EventFlag;
-            if (eventFlag == 1u)
-            {
-                // dismount
-                agent.EventControlFlags |= Agent.EventControlFlag.Dismount;
-            }
-            if (eventFlag == 2u)
-            {
-                // mount
-                agent.EventControlFlags |= Agent.EventControlFlag.Mount;
-            }
-            if (eventFlag == 0x400u)
-            {
-                // switch weapon
-                agent.EventControlFlags |= Agent.EventControlFlag.ToggleAlternativeWeapon;
-            }
+            agent.EventControlFlags |= (Agent.EventControlFlag)EventFlag;
+            agent.MovementFlags = (Agent.MovementControlFlag)MovementFlag;
 
             // apply the animation on channel 0 if none exists
             if (agent.GetCurrentAction(0) == ActionIndexCache.act_none || agent.GetCurrentAction(0).Index != Action0Index)
             {
-                string actionName1 = GetActionNameWithCode(Action0Index);
-                if (actionName1 != null)
-                    agent.SetActionChannel(0, ActionIndexCache.Create(actionName1), additionalFlags: (AnimFlags)Action0Flag, startProgress: Action0Progress);
+                string actionName1 = MBAPI.IMBAnimation.GetActionNameWithCode(Action0Index);
+                agent.SetActionChannel(0, ActionIndexCache.Create(actionName1), additionalFlags: (AnimFlags)Action0Flag, startProgress: Action0Progress);
 
             }
             // otherwise continue the existing animation
@@ -97,40 +67,52 @@ namespace Missions.Services.Agents.Packets
                 agent.SetCurrentActionProgress(0, Action0Progress);
             }
 
+            // apply the animation on channel 1 if none exists
+            if (agent.GetCurrentAction(1) == ActionIndexCache.act_none || agent.GetCurrentAction(1).Index != Action1Index)
+            {
+                string actionName2 = MBAPI.IMBAnimation.GetActionNameWithCode(Action1Index);
+                agent.SetActionChannel(1, ActionIndexCache.Create(actionName2), additionalFlags: (AnimFlags)Action1Flag, startProgress: Action1Progress);
+
+            }
+            // otherwise continue the existing animation
+            else
+            {
+                agent.SetCurrentActionProgress(1, Action1Progress);
+            }
+
             // Set the movement flags to none
             agent.MovementFlags = 0U;
 
             // Check the action of the agent; if they are defending, apply the defending movement flag
             if (Action1CodeType >= (int)Agent.ActionCodeType.DefendAllBegin && Action1CodeType <= (int)Agent.ActionCodeType.DefendAllEnd)
-
             {
                 agent.MovementFlags = (Agent.MovementControlFlag)MovementFlag;
                 return;
             }
 
 
-            // Check if there is a melee; this breaks the game if we don't do it.
-            if ((Agent.ActionCodeType)Action1CodeType != Agent.ActionCodeType.BlockedMelee)
-            {
-                // if the animation is none, start it
-                if (agent.GetCurrentAction(1) == ActionIndexCache.act_none || agent.GetCurrentAction(1).Index != Action1Index)
-                {
-                    string actionName2 = GetActionNameWithCode(Action1Index);
-                    if (actionName2 != null)
-                        agent.SetActionChannel(1, ActionIndexCache.Create(actionName2), additionalFlags: (AnimFlags)Action1Flag, startProgress: Action1Progress);
+            //// Check if there is a melee; this breaks the game if we don't do it.
+            //if ((Agent.ActionCodeType)Action1CodeType != Agent.ActionCodeType.BlockedMelee)
+            //{
+            //    // if the animation is none, start it
+            //    if (agent.GetCurrentAction(1) == ActionIndexCache.act_none || agent.GetCurrentAction(1).Index != Action1Index)
+            //    {
+            //        string actionName2 = GetActionNameWithCode(Action1Index);
+            //        if (actionName2 != null)
+            //            agent.SetActionChannel(1, ActionIndexCache.Create(actionName2), additionalFlags: (AnimFlags)Action1Flag, startProgress: Action1Progress);
 
-                }
-                // otherwise continue it
-                else
-                {
-                    agent.SetCurrentActionProgress(1, Action1Progress);
-                }
-            }
-            else
-            {
-                // otherwise just cancel it
-                agent.SetActionChannel(1, ActionIndexCache.act_none, ignorePriority: true, startProgress: 100);
-            }
+            //    }
+            //    // otherwise continue it
+            //    else
+            //    {
+            //        agent.SetCurrentActionProgress(1, Action1Progress);
+            //    }
+            //}
+            //else
+            //{
+            //    // otherwise just cancel it
+            //    agent.SetActionChannel(1, ActionIndexCache.act_none, ignorePriority: true, startProgress: 100);
+            //}
         }
 
         [ProtoMember(1)]

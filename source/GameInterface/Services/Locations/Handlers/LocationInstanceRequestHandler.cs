@@ -21,17 +21,25 @@ public class LocationInstanceRequestHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
 
+    // The location the client has already requested an instance for. PlayerEnteredLocation fires
+    // several times per entry (OpenIndoorMission runs more than once), so we collapse the duplicates
+    // and only request once per location. Reset on InstanceCleared so re-entering the same location
+    // after leaving requests again.
+    private string requestedLocationKey;
+
     public LocationInstanceRequestHandler(IMessageBroker messageBroker, IObjectManager objectManager)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
 
         messageBroker.Subscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation);
+        messageBroker.Subscribe<InstanceCleared>(Handle_InstanceCleared);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation);
+        messageBroker.Unsubscribe<InstanceCleared>(Handle_InstanceCleared);
     }
 
     private void Handle_PlayerEnteredLocation(MessagePayload<PlayerEnteredLocation> payload)
@@ -59,8 +67,22 @@ public class LocationInstanceRequestHandler : IHandler
             return;
         }
 
+        var locationKey = settlementId + "|" + locationId;
+        if (locationKey == requestedLocationKey)
+        {
+            Logger.Debug("[LocationSync] Already requested an instance for {SettlementId}/{LocationId} — skipping duplicate PlayerEnteredLocation", settlementId, locationId);
+            return;
+        }
+        requestedLocationKey = locationKey;
+
         Logger.Information("[LocationSync] Sending EnterLocationRequested settlement={SettlementId} location={LocationId}", settlementId, locationId);
 
         messageBroker.Publish(this, new EnterLocationRequested(settlementId, locationId));
+    }
+
+    private void Handle_InstanceCleared(MessagePayload<InstanceCleared> payload)
+    {
+        // Left the location; the next entry (even into the same location) must request a fresh instance.
+        requestedLocationKey = null;
     }
 }

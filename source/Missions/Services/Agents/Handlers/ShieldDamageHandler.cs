@@ -23,13 +23,13 @@ namespace Missions.Services.Agents.Handlers
     public class ShieldDamageHandler : IShieldDamageHandler
     {
         private readonly INetworkAgentRegistry networkAgentRegistry;
-        private readonly INetwork network;
+        private readonly IMissionNetwork network;
         private readonly IMessageBroker messageBroker;
         readonly static ILogger Logger = LogManager.GetLogger<ShieldDamageHandler>();
 
         public ShieldDamageHandler(
             INetworkAgentRegistry networkAgentRegistry,
-            INetwork network,
+            IMissionNetwork network,
             IMessageBroker messageBroker)
         {
             this.networkAgentRegistry = networkAgentRegistry;

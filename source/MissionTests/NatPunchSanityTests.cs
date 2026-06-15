@@ -1,6 +1,7 @@
 using Common.Messaging;
 using Common.PacketHandlers;
 using Common.Serialization;
+using GameInterface.Services.Entity;
 using IntroServer.Config;
 using IntroServer.Server;
 using LiteNetLib;
@@ -121,7 +122,11 @@ namespace MissionTests
             // NOTE: MessageBroker stores subscribers as weak references to the delegate target,
             // so the watcher instance MUST stay alive for the duration of the test.
             broker.Subscribe<PeerConnected>(watcher.OnPeerConnected);
-            return new LiteNetP2PClient(config, new NoopSerializer(), broker, new PacketManager());
+            // Each client needs a distinct, non-empty ControllerId (its P2P identity); otherwise the
+            // intro server's registry conflates the two peers as one.
+            var controllerIdProvider = new ControllerIdProvider();
+            controllerIdProvider.SetControllerId(Guid.NewGuid().ToString());
+            return new LiteNetP2PClient(config, new NoopSerializer(), broker, new PacketManager(), controllerIdProvider);
         }
 
         private Task PumpServer(MissionTestServer server) => Task.Run(async () =>

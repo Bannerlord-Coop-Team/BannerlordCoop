@@ -20,15 +20,16 @@ public class ServerInstanceHandler : IHandler
 
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
-    private readonly IInstanceCoordinator coordinator;
+    private readonly IMissionManager missionManager;
 
-    public ServerInstanceHandler(IMessageBroker messageBroker, INetwork network, IInstanceCoordinator coordinator)
+    public ServerInstanceHandler(IMessageBroker messageBroker, INetwork network, IMissionManager missionManager)
     {
         this.messageBroker = messageBroker;
         this.network = network;
-        this.coordinator = coordinator;
+        this.missionManager = missionManager;
 
         messageBroker.Subscribe<NetworkEnterLocation>(Handle_EnterLocation);
+        messageBroker.Subscribe<NetworkLeaveLocation>(Handle_LeaveLocation);
         messageBroker.Subscribe<NetworkPlayerCampaignEntered>(Handle_CampaignEntered);
         messageBroker.Subscribe<PlayerDisconnected>(Handle_Disconnected);
     }
@@ -36,6 +37,7 @@ public class ServerInstanceHandler : IHandler
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkEnterLocation>(Handle_EnterLocation);
+        messageBroker.Unsubscribe<NetworkLeaveLocation>(Handle_LeaveLocation);
         messageBroker.Unsubscribe<NetworkPlayerCampaignEntered>(Handle_CampaignEntered);
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_Disconnected);
     }
@@ -45,12 +47,17 @@ public class ServerInstanceHandler : IHandler
         var peer = (NetPeer)payload.Who;
         var data = payload.What;
 
-        var result = coordinator.Join(peer, data.SettlementId, data.LocationId);
+        var result = missionManager.Join(peer, data.SettlementId, data.LocationId);
 
         network.Send(peer, new NetworkAssignInstance(
             result.InstanceId.ToString(), data.SettlementId, data.LocationId, result.BecameHost));
 
         Logger.Debug("Assigned instance {InstanceId} to peer (host={IsHost})", result.InstanceId, result.BecameHost);
+    }
+
+    private void Handle_LeaveLocation(MessagePayload<NetworkLeaveLocation> payload)
+    {
+        ReleaseMembership((NetPeer)payload.Who);
     }
 
     private void Handle_CampaignEntered(MessagePayload<NetworkPlayerCampaignEntered> payload)
@@ -65,7 +72,7 @@ public class ServerInstanceHandler : IHandler
 
     private void ReleaseMembership(NetPeer peer)
     {
-        var result = coordinator.Leave(peer);
+        var result = missionManager.Leave(peer);
         if (result.WasMember == false) return;
 
         if (result.NewHost != null)

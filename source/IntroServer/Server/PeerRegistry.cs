@@ -8,9 +8,9 @@ namespace IntroServer.Server
     internal class PeerRegistry
     {
         private readonly Dictionary<string, List<P2PPeer>> m_instancePeers = new Dictionary<string, List<P2PPeer>>();
-        private readonly Dictionary<Guid, NetPeer> m_peers = new Dictionary<Guid, NetPeer>();
+        private readonly Dictionary<string, NetPeer> m_peers = new Dictionary<string, NetPeer>();
 
-        public NetPeer GetPeer(Guid id)
+        public NetPeer GetPeer(string id)
         {
             if (m_peers.TryGetValue(id, out NetPeer value))
             {
@@ -31,7 +31,7 @@ namespace IntroServer.Server
             }
         }
 
-        public void RegisterPeer(Guid id, NetPeer peer)
+        public void RegisterPeer(string id, NetPeer peer)
         {
             if (m_peers.ContainsKey(id) == false)
             {
@@ -40,7 +40,7 @@ namespace IntroServer.Server
         }
 
 
-        public void RemovePeer(Guid id)
+        public void RemovePeer(string id)
         {
             if (m_peers.TryGetValue(id, out NetPeer peer))
             {
@@ -60,12 +60,15 @@ namespace IntroServer.Server
                 }
             }
 
-            Guid id = m_peers.Where(e => e.Value == peer).Select(e => e.Key).SingleOrDefault();
+            string id = m_peers.Where(e => e.Value == peer).Select(e => e.Key).SingleOrDefault();
 
-            m_peers.Remove(id);
+            if (id != null)
+            {
+                m_peers.Remove(id);
+            }
         }
 
-        public bool ContainsP2PPeer(string instance, Guid id)
+        public bool ContainsP2PPeer(string instance, string id)
         {
             if (m_instancePeers.TryGetValue(instance, out var p2PPeers) &&
                m_peers.TryGetValue(id, out var NetPeer))

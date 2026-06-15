@@ -33,7 +33,7 @@ public class ServerModule : CommonModule
         // campaign. AutoActivate so it subscribes to connection lifecycle events before any peer joins.
         builder.RegisterType<ConnectionMessageQueue>().As<IConnectionMessageQueue>().InstancePerLifetimeScope().AutoActivate();
 
-        builder.RegisterType<Services.Instances.InstanceCoordinator>().As<Services.Instances.IInstanceCoordinator>().InstancePerLifetimeScope();
+        builder.RegisterType<Services.Instances.MissionManager>().As<Services.Instances.IMissionManager>().InstancePerLifetimeScope();
 
         // Policies
         builder.RegisterType<ServerSyncPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();

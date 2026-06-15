@@ -26,6 +26,7 @@ public class ClientInstanceHandler : IHandler
 
         // Local -> network
         messageBroker.Subscribe<EnterLocationRequested>(Handle_EnterLocationRequested);
+        messageBroker.Subscribe<InstanceCleared>(Handle_InstanceCleared);
 
         // Network -> local
         messageBroker.Subscribe<NetworkAssignInstance>(Handle_AssignInstance);
@@ -35,6 +36,7 @@ public class ClientInstanceHandler : IHandler
     public void Dispose()
     {
         messageBroker.Unsubscribe<EnterLocationRequested>(Handle_EnterLocationRequested);
+        messageBroker.Unsubscribe<InstanceCleared>(Handle_InstanceCleared);
         messageBroker.Unsubscribe<NetworkAssignInstance>(Handle_AssignInstance);
         messageBroker.Unsubscribe<NetworkInstanceHostChanged>(Handle_HostChanged);
     }
@@ -44,6 +46,14 @@ public class ClientInstanceHandler : IHandler
         var data = payload.What;
         network.SendAll(new NetworkEnterLocation(data.SettlementId, data.LocationId));
         Logger.Debug("Requested instance for {SettlementId}/{LocationId}", data.SettlementId, data.LocationId);
+    }
+
+    private void Handle_InstanceCleared(MessagePayload<InstanceCleared> payload)
+    {
+        // The local mission ended (left the interior). Tell the server to release our instance
+        // membership now, rather than waiting for campaign re-entry or a disconnect.
+        network.SendAll(new NetworkLeaveLocation());
+        Logger.Debug("Left location; requested server-side instance membership release");
     }
 
     private void Handle_AssignInstance(MessagePayload<NetworkAssignInstance> payload)

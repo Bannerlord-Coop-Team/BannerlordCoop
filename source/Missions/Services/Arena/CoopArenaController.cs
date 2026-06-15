@@ -34,7 +34,7 @@ namespace Missions.Services
 
         public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
 
-        private readonly INetwork network;
+        private readonly IMissionNetwork network;
         private readonly IMessageBroker messageBroker;
         private readonly INetworkAgentRegistry agentRegistry;
         private readonly IRandomEquipmentGenerator equipmentGenerator;
@@ -46,7 +46,7 @@ namespace Missions.Services
         private readonly Guid playerId;
 
         public CoopArenaController(
-            INetwork network,
+            IMissionNetwork network,
             IMessageBroker messageBroker,
             INetworkAgentRegistry agentRegistry, 
             IRandomEquipmentGenerator equipmentGenerator,

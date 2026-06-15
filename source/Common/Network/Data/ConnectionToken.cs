@@ -12,7 +12,7 @@ namespace Common.Network.Data
     {
         private static readonly ILogger Logger = LogManager.GetLogger<ConnectionToken>();
 
-        public Guid PeerId { get; }
+        public string PeerId { get; }
         public string InstanceName { get; }
         public NatAddressType NatType { get; }
 
@@ -22,12 +22,12 @@ namespace Common.Network.Data
         /// <param name="peerId">The unique identifier of the peer associated with the connection token.</param>
         /// <param name="instanceName">The name of the game instance associated with the connection token.</param>
         /// <param name="natType">The type of the NAT associated with the connection token.</param>
-        /// <exception cref="ArgumentException">Thrown when the peer identifier is an empty GUID or the instance name is null or empty.</exception>
-        public ConnectionToken(Guid peerId, string instanceName, NatAddressType natType)
+        /// <exception cref="ArgumentException">Thrown when the peer identifier is null or empty or the instance name is null or empty.</exception>
+        public ConnectionToken(string peerId, string instanceName, NatAddressType natType)
         {
-            if (peerId == Guid.Empty)
+            if (string.IsNullOrEmpty(peerId))
             {
-                throw new ArgumentException("PeerId cannot be an empty Guid", nameof(peerId));
+                throw new ArgumentException("PeerId cannot be null or empty", nameof(peerId));
             }
 
             if (string.IsNullOrEmpty(instanceName))
@@ -82,7 +82,8 @@ namespace Common.Network.Data
                 throw new ArgumentException("Invalid data length, expected 3 but got " + data.Length, nameof(tokenString));
             }
 
-            if (!Guid.TryParse(data[0], out Guid peerId))
+            string peerId = data[0];
+            if (string.IsNullOrEmpty(peerId))
             {
                 throw new ArgumentException("Invalid PeerId in token string", nameof(tokenString));
             }

@@ -6,6 +6,7 @@ using Common.Network.Data;
 using Common.PacketHandlers;
 using Common.Serialization;
 using Common.Util;
+using GameInterface.Services.Entity;
 using IntroServer.Config;
 using IntroServer.Data;
 using IntroServer.Server;
@@ -23,7 +24,7 @@ using Version = System.Version;
 
 namespace Missions.Services.Network
 {
-    public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateable, IDisposable, IP2PClient
+    public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateable, IDisposable, IMissionNetwork
     {
         private static readonly ILogger Logger = LogManager.GetLogger<LiteNetP2PClient>();
         public int ConnectedPeersCount => netManager.ConnectedPeersCount;
@@ -36,24 +37,44 @@ namespace Missions.Services.Network
 
         private string instance;
 
-        private readonly Guid id = Guid.NewGuid();
         private readonly NetManager netManager;
         private readonly NetworkConfiguration networkConfig;
         private readonly ICommonSerializer serializer;
         private readonly Version version = typeof(MissionTestServer).Assembly.GetName().Version;
         private readonly IMessageBroker messageBroker;
+        private readonly IControllerIdProvider controllerIdProvider;
         private readonly Poller poller;
-        
+
+        /// <summary>
+        /// This client's network identity. It is the campaign <see cref="IControllerIdProvider.ControllerId"/>
+        /// so a P2P peer maps directly to its campaign player. Standalone Missions flows do not set it up
+        /// front, so it is populated on first use the same way the campaign client does
+        /// (see Coop.Core ValidateModuleState), which always yields a non-empty value.
+        /// </summary>
+        private string ControllerId
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(controllerIdProvider.ControllerId))
+                {
+                    controllerIdProvider.SetControllerFromProgramArgs();
+                }
+                return controllerIdProvider.ControllerId;
+            }
+        }
+
         public LiteNetP2PClient(
             NetworkConfiguration config,
             ICommonSerializer serializer,
             IMessageBroker messageBroker,
-            IPacketManager packetManager)
+            IPacketManager packetManager,
+            IControllerIdProvider controllerIdProvider)
         {
             PacketManager = packetManager;
             networkConfig = config;
             this.serializer = serializer;
             this.messageBroker = messageBroker;
+            this.controllerIdProvider = controllerIdProvider;
 
             netManager = new NetManager(this)
             {
@@ -135,7 +156,7 @@ namespace Missions.Services.Network
             Logger.Information($"Connecting to {connectionAddress}:{port}");
 
             ClientInfo clientInfo = new ClientInfo(
-                id,
+                ControllerId,
                 version);
 
             PeerServer = netManager.Connect(connectionAddress,
@@ -174,7 +195,7 @@ namespace Missions.Services.Network
         {
             Logger.Verbose("Attempting NAT Punch");
 
-            ConnectionToken token = new ConnectionToken(id, instance, networkConfig.NATType);
+            ConnectionToken token = new ConnectionToken(ControllerId, instance, networkConfig.NATType);
             if (networkConfig.NATType == NatAddressType.Internal)
             {
                 netManager.NatPunchModule.SendNatIntroduceRequest(networkConfig.LanAddress.ToString(), networkConfig.LanPort, token);

@@ -23,7 +23,7 @@ namespace Missions.Services.Taverns
         private static readonly ILogger Logger = LogManager.GetLogger<CoopArenaController>();
         public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
 
-        private readonly INetwork network;
+        private readonly IMissionNetwork network;
         private readonly IMessageBroker _messageBroker;
         private readonly INetworkAgentRegistry _agentRegistry;
 
@@ -36,7 +36,7 @@ namespace Missions.Services.Taverns
         private readonly Guid playerId;
 
         public CoopTavernsController(
-            INetwork network,
+            IMissionNetwork network,
             IMessageBroker messageBroker,
             INetworkAgentRegistry agentRegistry,
             BoardGameManager boardGameManager)
