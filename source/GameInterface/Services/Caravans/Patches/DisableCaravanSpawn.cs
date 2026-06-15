@@ -47,7 +47,7 @@ protected override void OnSubModuleLoad()
 
             _harmony.Patch(original, postfix: new HarmonyMethod(postfix));
 
-            Logger.Error("CaravanBlock: patched InitializeCaravanOnCreation successfully");
+            Logger.Information("CaravanBlock: patched InitializeCaravanOnCreation successfully");
         }
     
     public static class CaravanBlockPatch
