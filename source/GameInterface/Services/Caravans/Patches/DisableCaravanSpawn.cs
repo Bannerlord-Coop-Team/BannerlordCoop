@@ -18,7 +18,7 @@ protected override void OnSubModuleLoad()
             }
             catch (Exception ex)
             {
-                InformationManager.DisplayMessage(new InformationMessage("CaravanBlock patch failed: " + ex.Message));
+                InformationManager.DisplayMessage(new InformationMessage("CaravanBlock: InitializationArgs type not found"));
             }
         }
 
