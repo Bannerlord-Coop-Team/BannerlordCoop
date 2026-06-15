@@ -2,7 +2,6 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Common.Util;
 using Coop.Core.Client.Services.TroopRosters.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Interfaces;
@@ -44,14 +43,9 @@ internal class ServerTroopRosterHandler : IHandler
         {
             try
             {
-                // This is an edge case where AllowedThread on the server is currently needed
-                // TroopRosterPatches.cs:TroopRosterAddToCountsPatch will early return otherwise
-                using (new AllowedThread())
-                {
-                    troopRosterInterface.HandleOnRecruitmentDone(data.MobilePartyId, data.TroopsInCart, out var changedGold);
+                troopRosterInterface.HandleOnRecruitmentDone(data.MobilePartyId, data.TroopsInCart, out var changedGold);
 
-                    network.Send(peer, new NotifyGoldChange(changedGold));
-                }
+                network.Send(peer, new NotifyGoldChange(changedGold));
             }
             catch (Exception e)
             {
