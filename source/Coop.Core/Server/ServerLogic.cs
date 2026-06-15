@@ -76,7 +76,7 @@ public class ServerLogic : IServerLogic
     private IReadOnlyDictionary<Type, Func<IServerState>> CreateStateFactories() =>
         new Dictionary<Type, Func<IServerState>>
         {
-            [typeof(InitialServerState)] = () => new InitialServerState(this, context.MessageBroker, context.RegistryManager, context.ModuleValidator, context.ModuleInfoProvider),
+            [typeof(InitialServerState)] = () => new InitialServerState(this, context.MessageBroker, context.RegistryManager, context.ModuleInfoProvider, context.ModuleValidator, context.GameStateInterface, context.LoadingInterface),
             [typeof(ServerRunningState)] = () => new ServerRunningState(this, context.MessageBroker, context.Network, context.GameStateInterface, context.LoadingInterface),
         };
 }
