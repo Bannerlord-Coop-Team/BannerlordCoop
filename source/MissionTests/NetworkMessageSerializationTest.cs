@@ -35,7 +35,8 @@ namespace IntroductionServerTests
             builder.RegisterType<GameInterface.Services.ObjectManager.ObjectManager>().As<IObjectManager>().InstancePerLifetimeScope();
             builder.RegisterType<BinaryPackageFactory>().As<IBinaryPackageFactory>().AutoActivate().SingleInstance();
 
-            ContainerProvider.SetContainer(builder.Build());
+            // The CharacterObject surrogate resolves ids against the campaign (main-map) registry.
+            GameInterface.ContainerProvider.SetContainer(builder.Build());
         }
 
         /// <summary>
@@ -62,7 +63,11 @@ namespace IntroductionServerTests
 
             character.StringId = "Test Character";
 
-            NetworkMissionJoinInfo missionJoinInfo = new NetworkMissionJoinInfo( 
+            // Surrogate now sends the registry id, so the character must be registered to round-trip.
+            GameInterface.ContainerProvider.TryResolve(out IObjectManager objectManager);
+            objectManager.AddExisting(character.StringId, character);
+
+            NetworkMissionJoinInfo missionJoinInfo = new NetworkMissionJoinInfo(
                 character, 
                 default,
                 default,

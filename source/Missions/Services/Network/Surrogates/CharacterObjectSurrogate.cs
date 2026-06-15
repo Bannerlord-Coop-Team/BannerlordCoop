@@ -1,40 +1,51 @@
-﻿using Common.Serialization;
-using GameInterface.Serialization;
-using GameInterface.Serialization.External;
+using Common.Logging;
+using GameInterface.Services.ObjectManager;
 using ProtoBuf;
+using Serilog;
 using TaleWorlds.CampaignSystem;
 
 namespace Missions.Services.Network.Surrogates
 {
+    /// <summary>
+    /// Sends only the object-manager registry id (the StringId) instead of the whole CharacterObject
+    /// graph, and resolves the real object from the main-map server's registry on the other side.
+    /// </summary>
     [ProtoContract(SkipConstructor = true)]
     public class CharacterObjectSurrogate
     {
+        private static readonly ILogger Logger = LogManager.GetLogger<CharacterObjectSurrogate>();
+
         [ProtoMember(1)]
-        public byte[] data { get; }
+        public string Id { get; }
 
         public CharacterObjectSurrogate(CharacterObject obj)
         {
-            // Required to not overwrite data
-            // For some reason protobuf sends 2 character objects
-            // and one is null
             if (obj == null) return;
 
-            if (ContainerProvider.TryResolve(out IBinaryPackageFactory packageFactory) == false) return;
+            // Resolve against the campaign (main-map) container's registry, not the mission snapshot.
+            if (GameInterface.ContainerProvider.TryResolve(out IObjectManager objectManager) == false) return;
 
-            IBinaryPackage package = packageFactory.GetBinaryPackage(obj);
+            if (objectManager.TryGetId(obj, out var id) == false)
+            {
+                Logger.Error("No registry id for CharacterObject {StringId}", obj.StringId);
+                return;
+            }
 
-            data = BinaryFormatterSerializer.Serialize(package);
+            Id = id;
         }
 
         private CharacterObject Deserialize()
         {
-            if (data == null) return default;
+            if (string.IsNullOrEmpty(Id)) return null;
+            if (GameInterface.ContainerProvider.TryResolve(out IObjectManager objectManager) == false) return null;
 
-            if (ContainerProvider.TryResolve(out IBinaryPackageFactory packageFactory) == false) return default;
+            if (objectManager.TryGetObject<CharacterObject>(Id, out var character) == false)
+            {
+                Logger.Error("Could not resolve CharacterObject from registry id {Id}", Id);
+                return null;
+            }
 
-            var package = BinaryFormatterSerializer.Deserialize<CharacterObjectBinaryPackage>(data);
-
-            return package.Unpack<CharacterObject>(packageFactory);
+            return character;
         }
 
         public static implicit operator CharacterObjectSurrogate(CharacterObject obj)
@@ -44,7 +55,7 @@ namespace Missions.Services.Network.Surrogates
 
         public static implicit operator CharacterObject(CharacterObjectSurrogate surrogate)
         {
-            return surrogate.Deserialize();
+            return surrogate?.Deserialize();
         }
     }
 }
