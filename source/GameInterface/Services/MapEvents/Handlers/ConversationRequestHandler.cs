@@ -11,6 +11,7 @@ using HarmonyLib;
 using LiteNetLib;
 using Serilog;
 using System;
+using System.Collections.Concurrent;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -44,6 +45,11 @@ internal class ConversationRequestHandler : IHandler
     private readonly ConversationPartyTracker conversationPartyTracker;
 
     private DateTime lastRequestSentUtc = DateTime.MinValue;
+
+    // [Server] Player-vs-player interactions in progress, keyed by the attacking player's peer -> the defending
+    // player's party id. Lets the defender be told when the interaction ends (the attacker has no AI party to hold,
+    // so this is the only record of a PvP engagement). The defender's "hold on" popup is driven from these broadcasts.
+    private readonly ConcurrentDictionary<NetPeer, string> pvpDefenderByAttacker = new ConcurrentDictionary<NetPeer, string>();
 
     public ConversationRequestHandler(
         IMessageBroker messageBroker,
@@ -112,13 +118,19 @@ internal class ConversationRequestHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<PartyBase>(request.AttackerId, out var attacker)) return;
         if (!objectManager.TryGetObjectWithLogging<PartyBase>(request.DefenderId, out var defender)) return;
 
-        if (!TryAcceptConversationRequest(requestingPeer, request, attacker, defender, out var aiParty, out var aiPartyId, out var playerPartyId))
+        if (!TryAcceptConversationRequest(requestingPeer, request, attacker, defender, out var aiParty, out var aiPartyId, out var playerPartyId, out var isPlayerVsPlayer))
             return;
 
         if (aiParty == null)
         {
-            // No AI mobile party involved (e.g. a settlement side); nothing to hold.
+            // No AI mobile party involved (a settlement side, or both sides are players); nothing to hold.
             SendAllowConversation(requestingPeer, request);
+
+            // PvP: tell the defending player's client to show a "hold on" popup while the attacker drives the
+            // interaction. request.DefenderId is the engaged (non-initiating) party.
+            if (isPlayerVsPlayer)
+                NotifyPvpInteractionStarted(requestingPeer, request, attacker);
+
             return;
         }
 
@@ -129,10 +141,11 @@ internal class ConversationRequestHandler : IHandler
     }
 
     /// <summary>
-    /// [Server] Network-thread filter that rejects when both parties are players or either is already in a battle,
-    /// and identifies the AI side. Returns false (rejection logged, and the requester told when the party is engaged
-    /// by another player) when the request must not proceed. On success <paramref name="aiParty"/> is the AI mobile
-    /// party to hold, or null when only a settlement side is involved (allow, but nothing to hold).
+    /// [Server] Network-thread filter that identifies the AI side and rejects when both parties are already in
+    /// (separate) battles. Returns false (rejection logged, and the requester told when the party is engaged by
+    /// another player) when the request must not proceed. On success <paramref name="aiParty"/> is the AI mobile
+    /// party to hold, or null when only a settlement side is involved or both sides are players — in which case
+    /// <paramref name="isPlayerVsPlayer"/> is set so the caller can drive the defender's "hold on" popup.
     /// </summary>
     private bool TryAcceptConversationRequest(
         NetPeer requestingPeer,
@@ -141,11 +154,13 @@ internal class ConversationRequestHandler : IHandler
         PartyBase defender,
         out MobileParty aiParty,
         out string aiPartyId,
-        out string playerPartyId)
+        out string playerPartyId,
+        out bool isPlayerVsPlayer)
     {
         aiParty = null;
         aiPartyId = null;
         playerPartyId = null;
+        isPlayerVsPlayer = false;
 
         var attackerIsPlayer = attacker.MobileParty?.IsPlayerParty() == true;
         var defenderIsPlayer = defender.MobileParty?.IsPlayerParty() == true;
@@ -163,9 +178,10 @@ internal class ConversationRequestHandler : IHandler
         }
 
         // PvP: two human players are allowed to open the encounter so they can fight each other. Neither side is AI,
-        // so there is nothing to hold.
+        // so there is nothing to hold; the defending player is shown a "hold on" popup instead.
         if (attackerIsPlayer && defenderIsPlayer)
         {
+            isPlayerVsPlayer = true;
             Logger.Debug(
                 "Allowing conversation: both parties are players (PvP). AttackerId={AttackerId}, DefenderId={DefenderId}",
                 request.AttackerId, request.DefenderId);
@@ -267,6 +283,31 @@ internal class ConversationRequestHandler : IHandler
         network.Send(requestingPeer, new NetworkAllowConversation(request.DefenderId, request.AttackerId, request.ForcePlayerOutFromSettlement, request.Source));
     }
 
+    /// <summary>
+    /// [Server] Records the PvP engagement (attacker peer -> defender party) and, the first time it is seen, broadcasts
+    /// <see cref="NetworkPlayerInteractionStarted"/> so the defending player's client shows the "hold on" popup.
+    /// Re-broadcasting is skipped on the rate-limited retries of the same request.
+    /// </summary>
+    private void NotifyPvpInteractionStarted(NetPeer requestingPeer, NetworkRequestConversation request, PartyBase attacker)
+    {
+        // TryAdd returns false when this attacker already has a recorded interaction; the popup is already up.
+        if (!pvpDefenderByAttacker.TryAdd(requestingPeer, request.DefenderId))
+            return;
+
+        var attackerName = attacker.LeaderHero?.Name?.ToString() ?? attacker.Name?.ToString() ?? "Another player";
+
+        network.SendAll(new NetworkPlayerInteractionStarted(request.DefenderId, attackerName));
+    }
+
+    /// <summary>[Server] Ends the given attacker's PvP interaction, telling the defending player's client to close the popup.</summary>
+    private void EndPvpInteraction(NetPeer attackerPeer)
+    {
+        if (attackerPeer == null) return;
+
+        if (pvpDefenderByAttacker.TryRemove(attackerPeer, out var defenderPartyId))
+            network.SendAll(new NetworkPlayerInteractionEnded(defenderPartyId));
+    }
+
     /// <summary>[Client] Server approved: re-run RestartPlayerEncounter with the same parameters.</summary>
     private void Handle_NetworkAllowConversation(MessagePayload<NetworkAllowConversation> payload)
     {
@@ -349,6 +390,7 @@ internal class ConversationRequestHandler : IHandler
         }
 
         ReleaseEngagementOnMainThread(peer);
+        EndPvpInteraction(peer);
     }
 
     /// <summary>[Client] The server denied the request because the party is engaged; tell the player why.</summary>
@@ -365,6 +407,7 @@ internal class ConversationRequestHandler : IHandler
         if (!ModInformation.IsServer) return;
 
         ReleaseEngagementOnMainThread(payload.What.PlayerId);
+        EndPvpInteraction(payload.What.PlayerId);
     }
 
     /// <summary>[Server] Releases the given player's engagement on the game thread.</summary>
