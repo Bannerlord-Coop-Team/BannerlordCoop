@@ -54,8 +54,6 @@ internal class HeroDataHandler : IHandler
         // UI; both must run on the main thread, not the network thread that delivered it.
         GameLoopRunner.RunOnMainThread(() =>
         {
-            if (Campaign.Current == null) return;
-
             try
             {
                 var fullName = new TextObject(data.FullName);

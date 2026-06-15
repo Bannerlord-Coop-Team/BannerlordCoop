@@ -140,8 +140,6 @@ internal class BattleHandler : IHandler
         // then reply so the start goes out only after they are ready.
         GameLoopRunner.RunOnMainThread(() =>
         {
-            if (Campaign.Current == null) return;
-
             try
             {
                 foreach (var side in mapEvent._sides)

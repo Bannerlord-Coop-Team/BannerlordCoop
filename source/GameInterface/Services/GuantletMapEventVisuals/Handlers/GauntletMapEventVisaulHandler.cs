@@ -8,7 +8,6 @@ using GameInterface.Services.ObjectManager;
 using SandBox.GauntletUI.Map;
 using Serilog;
 using System;
-using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.GuantletMapEventVisuals.Handlers;
 
@@ -57,8 +56,6 @@ internal class GauntletMapEventVisaulHandler : IHandler
         // stale init is skipped.
         GameLoopRunner.RunOnMainThread(() =>
         {
-            if (Campaign.Current == null) return;
-
             if (!objectManager.TryGetObjectWithLogging<GauntletMapEventVisual>(instanceId, out var visual))
                 return;
 

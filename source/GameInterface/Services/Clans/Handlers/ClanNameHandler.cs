@@ -62,8 +62,6 @@ namespace GameInterface.Services.Clans.Handlers
             // change itself.
             GameLoopRunner.RunOnMainThread(() =>
             {
-                if (Campaign.Current == null) return;
-
                 try
                 {
                     ClanNameChangePatch.RunOriginalChangeClanName(clan, new TextObject(payload.Name), new TextObject(payload.InformalName));

@@ -276,14 +276,6 @@ internal class ConversationRequestHandler : IHandler
         // thread that delivered the approval.
         GameLoopRunner.RunOnMainThread(() =>
         {
-            if (Campaign.Current == null)
-            {
-                // The client can no longer open the encounter; release the server-side hold the
-                // server took before approving, so the AI party is not left frozen.
-                SendConversationEndedToServer();
-                return;
-            }
-
             try
             {
                 if (PlayerEncounter.Current != null)
