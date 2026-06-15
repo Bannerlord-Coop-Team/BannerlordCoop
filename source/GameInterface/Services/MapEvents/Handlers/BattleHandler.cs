@@ -129,18 +129,31 @@ internal class BattleHandler : IHandler
 
         mapEventLogger.DebugMapEvent(mapEvent, "Handling network attack mission attempted for map event. Making sides mission-ready and replying with mission start");
 
-        foreach(var side in mapEvent._sides)
-        {
-            side.MakeReadyForMission(null);
-        }
-
         // Roll the terrain seed once for this map event and reuse it for every client
         // that opens the battle, so they all use the same terrain seed. The seed is
         // chosen server-side and carried in the message instead of rolled per machine.
         var randomTerrainSeed = mapEventTerrainSeeds.GetOrAdd(payload.What.MapEventId, _ => RollTerrainSeed());
+        var requester = payload.Who as NetPeer;
 
-        var message = new NetworkStartAttackMission(randomTerrainSeed);
-        network.Send(payload.Who as NetPeer, message);
+        // _sides is game state the main-thread tick also touches; mutating it from the
+        // network thread races the tick. Make the sides mission-ready on the main thread,
+        // then reply so the start goes out only after they are ready.
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            try
+            {
+                foreach (var side in mapEvent._sides)
+                {
+                    side.MakeReadyForMission(null);
+                }
+
+                network.Send(requester, new NetworkStartAttackMission(randomTerrainSeed));
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to make map event sides mission-ready for {Message}", nameof(NetworkAttackMissionAttempted));
+            }
+        });
     }
 
     private int RollTerrainSeed()

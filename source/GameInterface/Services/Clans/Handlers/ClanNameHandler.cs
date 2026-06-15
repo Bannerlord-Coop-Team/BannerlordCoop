@@ -2,6 +2,7 @@ using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using System;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Clans.Patches;
 using GameInterface.Services.ObjectManager;
@@ -55,19 +56,33 @@ namespace GameInterface.Services.Clans.Handlers
                 return;
             }
 
-            ClanNameChangePatch.RunOriginalChangeClanName(clan, new TextObject(payload.Name), new TextObject(payload.InformalName));
-
-            if (ModInformation.IsServer)
+            // Applying the name runs vanilla game code and the refresh touches the clan screen
+            // UI; both must run on the main thread, not the network thread that delivered the
+            // message. The server relays to the other clients only after it has applied the
+            // change itself.
+            GameLoopRunner.RunOnMainThread(() =>
             {
-                network.SendAll(new NetworkChangeClanName(payload.ClanId, payload.Name, payload.InformalName));
-            }
+                try
+                {
+                    ClanNameChangePatch.RunOriginalChangeClanName(clan, new TextObject(payload.Name), new TextObject(payload.InformalName));
 
-            if (ScreenManager.TopScreen is GauntletClanScreen clanScreen)
-            {
-                clanScreen._dataSource?.RefreshValues();
-            }
+                    if (ModInformation.IsServer)
+                    {
+                        network.SendAll(new NetworkChangeClanName(payload.ClanId, payload.Name, payload.InformalName));
+                    }
 
-            InformationManager.DisplayMessage(new InformationMessage($"Clan {payload.ClanId} changed name to {payload.Name}"));
+                    if (ScreenManager.TopScreen is GauntletClanScreen clanScreen)
+                    {
+                        clanScreen._dataSource?.RefreshValues();
+                    }
+
+                    InformationManager.DisplayMessage(new InformationMessage($"Clan {payload.ClanId} changed name to {payload.Name}"));
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to apply clan name change for clan ({clanId})", payload.ClanId);
+                }
+            });
         }
     }
 }

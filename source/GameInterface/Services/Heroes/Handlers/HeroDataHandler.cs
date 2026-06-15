@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Clans;
 using GameInterface.Services.Heroes.Messages;
@@ -49,16 +50,28 @@ internal class HeroDataHandler : IHandler
             return;
         }
 
-        var fullName = new TextObject(data.FullName);
-        var firstName = new TextObject(data.FirstName);
-
-        HeroDataPatches.SetNameOverride(hero, fullName, firstName);
-
-        InformationManager.DisplayMessage(new InformationMessage($"Changed hero name to {fullName}"));
-
-        if (ScreenManager.TopScreen is GauntletClanScreen clanScreen)
+        // Applying the name runs vanilla game code and the refresh touches the clan screen
+        // UI; both must run on the main thread, not the network thread that delivered it.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            clanScreen._dataSource?.RefreshValues();
-        }
+            try
+            {
+                var fullName = new TextObject(data.FullName);
+                var firstName = new TextObject(data.FirstName);
+
+                HeroDataPatches.SetNameOverride(hero, fullName, firstName);
+
+                InformationManager.DisplayMessage(new InformationMessage($"Changed hero name to {fullName}"));
+
+                if (ScreenManager.TopScreen is GauntletClanScreen clanScreen)
+                {
+                    clanScreen._dataSource?.RefreshValues();
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to apply hero name change for {stringId}", data.HeroStringId);
+            }
+        });
     }
 }
