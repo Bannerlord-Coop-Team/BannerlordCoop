@@ -25,7 +25,7 @@ namespace Coop.Tests.Server.States
 
             var container = serverComponent.Container;
 
-            serverLogic = container.Resolve<ServerLogic>();
+            serverLogic = container.Resolve<IServerLogic>();
         }
 
         [Fact]

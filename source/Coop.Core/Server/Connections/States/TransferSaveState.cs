@@ -1,8 +1,6 @@
 ﻿using Common;
-using Common.Messaging;
 using Common.Network;
 using Coop.Core.Common.Network.Packets;
-using Coop.Core.Server.Services.Connection.Messages;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
@@ -18,7 +16,6 @@ public class TransferSaveState : ConnectionStateBase
 {
     public TransferSaveState(
         IConnectionLogic connectionLogic,
-        IMessageBroker messageBroker,
         INetwork network,
         ICoopSessionProvider coopSessionProvider,
         ISaveInterface saveInterface,
@@ -26,10 +23,12 @@ public class TransferSaveState : ConnectionStateBase
         IConnectionMessageQueue connectionMessageQueue)
         : base(connectionLogic)
     {
-        messageBroker.Publish(this, new PlayerLoading());
-
         GameLoopRunner.RunOnMainThread(() =>
         {
+            // Pause so the save snapshot is taken from a stationary world. This is local to the
+            // save and runs before the connection has been assigned this state, so it precedes
+            // the registry's loading lock; ConnectionCollection drives the broadcast loading pause once
+            // the transition completes (see IsLoading below).
             timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
 
             var saveResults = saveInterface.SaveCurrentGame();
@@ -56,6 +55,8 @@ public class TransferSaveState : ConnectionStateBase
             network.SendImmediate(ConnectionLogic.Peer, savePacket);
         }, blocking: true);
     }
+
+    public override bool IsLoading => true;
 
     public override void Dispose()
     {

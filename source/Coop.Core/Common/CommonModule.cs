@@ -22,7 +22,6 @@ public abstract class CommonModule : Module
     protected override void Load(ContainerBuilder builder)
     {
         builder.RegisterType<TaleWorldsModuleInfoProvider>().As<IModuleInfoProvider>().SingleInstance();
-        builder.RegisterType<StateFactory>().As<IStateFactory>().InstancePerLifetimeScope();
 
         #region Serialization
         builder.RegisterType<SerializableTypeMapper>().As<ISerializableTypeMapper>().InstancePerLifetimeScope();

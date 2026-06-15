@@ -117,9 +117,31 @@ namespace Common.PacketHandlers
         [ProtoMember(1)]
         public readonly byte[] Data;
 
-        public MessagePacket(byte[] data)
+        /// <summary>
+        /// The wrapped message's type, kept for send-side profiling. Not serialized, so it is null
+        /// after the packet is deserialized on the receiving side — only set when sending.
+        /// </summary>
+        public readonly Type MessageType;
+
+        private MessagePacket(byte[] data, Type messageType)
         {
             Data = data;
+            MessageType = messageType;
+        }
+
+        /// <summary>
+        /// Serializes <paramref name="message"/> and wraps it in a <see cref="MessagePacket"/>, capturing
+        /// the message type alongside its bytes. This is the only way to build a message packet, so the
+        /// serialized data and the type it was produced from can never diverge.
+        /// </summary>
+        public static MessagePacket Create(IMessage message, ICommonSerializer serializer)
+        {
+            if (RuntimeTypeModel.Default.IsDefined(message.GetType()) == false)
+            {
+                throw new ArgumentException($"Type {message.GetType().Name} is not serializable.");
+            }
+
+            return new MessagePacket(serializer.Serialize(message), message.GetType());
         }
     }
 }

@@ -97,6 +97,7 @@
   <ItemGroup>
     <Compile Include="Server\Services\Kingdoms\Messages\NetworkAddDecision.cs" />
     <Compile Include="Server\Services\Kingdoms\Messages\NetworkRemoveDecision.cs" />
+    <Compile Include="Server\Services\Kingdoms\Messages\NetworkChangeKingdomPolicy.cs" />
   </ItemGroup>
   <ItemGroup>
 	  <Reference Include="TaleWorlds.CampaignSystem">

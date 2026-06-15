@@ -117,7 +117,10 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void Handle(MessagePayload<RefreshCraftingVM> obj)
         {
-            RefreshCraftingVM();
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                RefreshCraftingVM();
+            });
         }
 
         private void RefreshCraftingVM()

@@ -52,7 +52,12 @@ internal class GauntletMapEventVisaulHandler : IHandler
         {
             try
             {
-                visual.Initialize(payload.What.Position, payload.What.IsVisible);
+                // Initialize from this client's own map-event visibility, not the server's. The server
+                // force-spots every party (no main party) so its value is always visible; map-event icon
+                // visibility is local (see MapEventVisibilityClientPatch), and the vanilla IsVisible setter
+                // keeps the visual in lock-step, so seeding the visual from the local value keeps the icon
+                // and battle sound consistent here instead of starting in the server-visible state.
+                visual.Initialize(payload.What.Position, visual.MapEvent?.IsVisible ?? false);
             }
             catch (Exception ex)
             {

@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Serialization;
@@ -268,8 +269,8 @@ namespace GameInterface.Services.Smithing.Handlers
 
             byte[] craftedItemObjectData = itemObjectInterface.PackageItemObject(obj.CraftedItemObject);
 
-            CraftingBinaryPackage package = binaryPackageFactory.GetBinaryPackage<CraftingBinaryPackage>(obj.CraftingLogic);
-            byte[] craftingLogicData = BinaryFormatterSerializer.Serialize(package);
+            string itemModifierGroupId = null;
+            if (obj.CraftingLogic.CurrentItemModifierGroup != null && !objectManager.TryGetIdWithLogging(obj.CraftingLogic.CurrentItemModifierGroup, out itemModifierGroupId)) return;
 
             var weaponDesignElementCraftingPieceIds = new List<string>();
             var weaponDesignElementScalePercentages = new List<int>();
@@ -303,7 +304,7 @@ namespace GameInterface.Services.Smithing.Handlers
                 weaponModifierId,
                 obj.NextCraftedItemId,
                 playerHeroId,
-                craftingLogicData
+                itemModifierGroupId
             );
             network.SendAll(message);
         }
@@ -316,8 +317,8 @@ namespace GameInterface.Services.Smithing.Handlers
 
             ItemObject craftedItemObject = itemObjectInterface.UnpackItemObject(obj.CraftedItemObjectData);
 
-            CraftingBinaryPackage package = BinaryFormatterSerializer.Deserialize<CraftingBinaryPackage>(obj.CraftingLogicData);
-            Crafting craftingLogic = package.Unpack<Crafting>(binaryPackageFactory);
+            ItemModifierGroup itemModifierGroup = null;
+            if (obj.ItemModifierGroupId != null && !objectManager.TryGetObjectWithLogging(obj.ItemModifierGroupId, out itemModifierGroup)) return;
 
             if (!GetUsedPieces(obj.WeaponDesignElementCraftingPieceIds, obj.WeaponDesignElementScalePercentages, out WeaponDesignElement[] usedPieces)) return;
 
@@ -352,7 +353,7 @@ namespace GameInterface.Services.Smithing.Handlers
                 weaponDesign,
                 craftedItemObject.Name,
                 craftedItemObject.Culture,
-                craftingLogic.CurrentItemModifierGroup,
+                itemModifierGroup,
                 ref craftedItemObject,
                 nextCraftedItemId);
             }
@@ -388,8 +389,8 @@ namespace GameInterface.Services.Smithing.Handlers
 
             ItemObject craftedItemObject = itemObjectInterface.UnpackItemObject(obj.CraftedItemObjectData);
 
-            CraftingBinaryPackage package = BinaryFormatterSerializer.Deserialize<CraftingBinaryPackage>(obj.CraftingLogicData);
-            Crafting craftingLogic = package.Unpack<Crafting>(binaryPackageFactory);
+            ItemModifierGroup itemModifierGroup = null;
+            if (obj.ItemModifierGroupId != null && !objectManager.TryGetObjectWithLogging(obj.ItemModifierGroupId, out itemModifierGroup)) return;
 
             if (!GetUsedPieces(obj.WeaponDesignElementCraftingPieceIds, obj.WeaponDesignElementScalePercentages, out WeaponDesignElement[] usedPieces)) return;
 
@@ -412,7 +413,7 @@ namespace GameInterface.Services.Smithing.Handlers
                 weaponDesign,
                 craftedItemObject.Name,
                 craftedItemObject.Culture,
-                craftingLogic.CurrentItemModifierGroup,
+                itemModifierGroup,
                 ref craftedItemObject,
                 nextCraftedItemId);
             }
