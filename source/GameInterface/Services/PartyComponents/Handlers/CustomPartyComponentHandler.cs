@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
@@ -57,46 +58,59 @@ internal class CustomPartyComponentHandler : IHandler
     {
         var obj = payload.What;
 
-        if (objectManager.TryGetObject<CustomPartyComponent>(obj.ComponentId, out var component) == false)
+        // These are direct backing-field writes on a live CustomPartyComponent the game loop
+        // reads concurrently; defer the resolve + apply to the game-loop thread so it does not
+        // race the network thread that delivered the message.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            Logger.Error("Could not find {component} in registry", obj.ComponentId);
-            return;
-        }
-
-        using (new AllowedThread())
-        {
-            switch ((CustomPartyComponentType)obj.CustomPartyComponentType)
+            try
             {
-                case CustomPartyComponentType.Name:
-                    component._name = new TextObject(obj.Value);
-                    break;
+                if (objectManager.TryGetObject<CustomPartyComponent>(obj.ComponentId, out var component) == false)
+                {
+                    Logger.Error("Could not find {component} in registry", obj.ComponentId);
+                    return;
+                }
 
-                case CustomPartyComponentType.HomeSettlement:
-                    objectManager.TryGetObject(obj.Value, out Settlement settlement);
-                    component._homeSettlement = settlement;
-                    break;
+                using (new AllowedThread())
+                {
+                    switch ((CustomPartyComponentType)obj.CustomPartyComponentType)
+                    {
+                        case CustomPartyComponentType.Name:
+                            component._name = new TextObject(obj.Value);
+                            break;
 
-                case CustomPartyComponentType.Owner:
-                    objectManager.TryGetObject(obj.Value, out Hero hero);
-                    component._owner = hero;
-                    break;
+                        case CustomPartyComponentType.HomeSettlement:
+                            objectManager.TryGetObject(obj.Value, out Settlement settlement);
+                            component._homeSettlement = settlement;
+                            break;
 
-                case CustomPartyComponentType.BaseSpeed:
-                    component._customPartyBaseSpeed = float.Parse(obj.Value);
-                    break;
+                        case CustomPartyComponentType.Owner:
+                            objectManager.TryGetObject(obj.Value, out Hero hero);
+                            component._owner = hero;
+                            break;
 
-                case CustomPartyComponentType.MountId:
-                    component._partyMountStringId = obj.Value;
-                    break;
+                        case CustomPartyComponentType.BaseSpeed:
+                            component._customPartyBaseSpeed = float.Parse(obj.Value);
+                            break;
 
-                case CustomPartyComponentType.HarnessId:
-                    component._partyHarnessStringId = obj.Value;
-                    break;
+                        case CustomPartyComponentType.MountId:
+                            component._partyMountStringId = obj.Value;
+                            break;
 
-                case CustomPartyComponentType.AvoidHostileActions:
-                    component._avoidHostileActions = bool.Parse(obj.Value);
-                    break;
+                        case CustomPartyComponentType.HarnessId:
+                            component._partyHarnessStringId = obj.Value;
+                            break;
+
+                        case CustomPartyComponentType.AvoidHostileActions:
+                            component._avoidHostileActions = bool.Parse(obj.Value);
+                            break;
+                    }
+                }
             }
-        }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to apply NetworkUpdateCustomPartyComponent");
+            }
+        });
     }
 }

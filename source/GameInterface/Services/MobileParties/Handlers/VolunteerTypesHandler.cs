@@ -1,10 +1,13 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 
@@ -51,9 +54,28 @@ internal class VolunteerTypesHandler : IHandler
 
     private void Handle_RemoveVolunteer(MessagePayload<RemoveVolunteer> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.IndividualId, out var individual)) return;
+        var individualId = obj.What.IndividualId;
+        var bitCode = obj.What.BitCode;
 
-        individual.VolunteerTypes[obj.What.BitCode] = null;
+        // The volunteer array write touches game state and must run on the main thread, not the
+        // network thread that delivered the message. Resolving the hero inside the lambda keeps
+        // the apply queue-ordered behind the hero's create and ahead of its destroy.
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging<Hero>(individualId, out var individual)) return;
+
+                using (new AllowedThread())
+                {
+                    individual.VolunteerTypes[bitCode] = null;
+                }
+            }
+            catch (Exception e)
+            {
+                logger.Error(e, "Failed to apply RemoveVolunteer for hero ({individualId})", individualId);
+            }
+        });
     }
 
     private void Handle_VolunteersUpdated(MessagePayload<VolunteersUpdated> obj)
@@ -80,17 +102,35 @@ internal class VolunteerTypesHandler : IHandler
 
     private void Handle_UpdateVolunteers(MessagePayload<UpdateVolunteers> obj)
     {
-        Dictionary<Hero, CharacterObject[]> updatedVolunteerTypes = new();
-        foreach (KeyValuePair<string, string[]> keyValuePair in obj.What.UpdatedVolunteerTypeIds)
+        var updatedVolunteerTypeIds = obj.What.UpdatedVolunteerTypeIds;
+
+        // The volunteer array writes touch game state and must run on the main thread, not the
+        // network thread that delivered the message. Resolving the heroes/characters inside the
+        // lambda keeps the apply queue-ordered behind their create and ahead of their destroy.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging<Hero>(keyValuePair.Key, out var currentHero)) continue;
-
-            for (int i = 0; i < keyValuePair.Value.Length; i++)
+            try
             {
-                if (!objectManager.TryGetObjectWithLogging<CharacterObject>(keyValuePair.Value[i], out var currentCharacter)) continue;
+                Dictionary<Hero, CharacterObject[]> updatedVolunteerTypes = new();
+                foreach (KeyValuePair<string, string[]> keyValuePair in updatedVolunteerTypeIds)
+                {
+                    if (!objectManager.TryGetObjectWithLogging<Hero>(keyValuePair.Key, out var currentHero)) continue;
 
-                currentHero.VolunteerTypes[i] = currentCharacter;
+                    for (int i = 0; i < keyValuePair.Value.Length; i++)
+                    {
+                        if (!objectManager.TryGetObjectWithLogging<CharacterObject>(keyValuePair.Value[i], out var currentCharacter)) continue;
+
+                        using (new AllowedThread())
+                        {
+                            currentHero.VolunteerTypes[i] = currentCharacter;
+                        }
+                    }
+                }
             }
-        }
+            catch (Exception e)
+            {
+                logger.Error(e, "Failed to apply UpdateVolunteers");
+            }
+        });
     }
 }

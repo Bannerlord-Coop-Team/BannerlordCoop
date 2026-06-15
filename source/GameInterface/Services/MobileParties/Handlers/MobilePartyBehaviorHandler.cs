@@ -11,6 +11,7 @@ using GameInterface.Services.MobilePartyAIs;
 using GameInterface.Services.MobilePartyAIs.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Handlers;
@@ -92,38 +93,53 @@ internal class MobilePartyBehaviorHandler : IHandler
     {
         var data = obj.What.BehaviorUpdateData;
 
-        PartyBase partyBase = null;
-        if (data.HasTarget && !objectManager.TryGetObject(data.InteractablePointId, out partyBase))
-            return;
-
-        if (!objectManager.TryGetObject(data.MobilePartyId, out MobileParty party))
-            return;
-
-
-        using (new AllowedThread())
+        // Applying the behavior runs vanilla campaign-map AI/movement code; it must run
+        // on the main thread, not the network thread that delivered the message. Ids are
+        // resolved at drain time so the apply stays queue-ordered with the party's other
+        // game-loop work.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            PartyBehaviorPatch.SetAiBehavior(party.Ai, data.NewAiBehavior, partyBase, data.BestTargetPoint);
+            try
+            {
+                PartyBase partyBase = null;
+                if (data.HasTarget && !objectManager.TryGetObject(data.InteractablePointId, out partyBase))
+                    return;
 
-            if (MobilePartyAiConfig.DEBUG)
-            {
-                Logger.Debug(
-                    "Setting AI behavior. PartyId: {PartyId}, Behavior: {Behavior}, TargetParty: {TargetParty}, BestTargetPoint: {BestTargetPoint}",
-                    data.MobilePartyId,
-                    data.NewAiBehavior,
-                    partyBase,
-                    data.BestTargetPoint
-                );
-            }
+                if (!objectManager.TryGetObject(data.MobilePartyId, out MobileParty party))
+                    return;
 
-            if (ModInformation.IsClient)
-            {
-                party.Ai._mobileParty.Position = data.PartyPosition;
+                // The apply drives the Harmony-patched SetAiBehavior path; the DynamicSync
+                // patch must stand down while the replicated behavior is applied.
+                using (new AllowedThread())
+                {
+                    PartyBehaviorPatch.SetAiBehavior(party.Ai, data.NewAiBehavior, partyBase, data.BestTargetPoint);
+
+                    if (MobilePartyAiConfig.DEBUG)
+                    {
+                        Logger.Debug(
+                            "Setting AI behavior. PartyId: {PartyId}, Behavior: {Behavior}, TargetParty: {TargetParty}, BestTargetPoint: {BestTargetPoint}",
+                            data.MobilePartyId,
+                            data.NewAiBehavior,
+                            partyBase,
+                            data.BestTargetPoint
+                        );
+                    }
+
+                    if (ModInformation.IsClient)
+                    {
+                        party.Ai._mobileParty.Position = data.PartyPosition;
+                    }
+                    else
+                    {
+                        data.PartyPosition = party.Position;
+                        messageBroker.Publish(this, new PartyBehaviorUpdated(ref data));
+                    }
+                }
             }
-            else
+            catch (Exception e)
             {
-                data.PartyPosition = party.Position;
-                messageBroker.Publish(this, new PartyBehaviorUpdated(ref data));
+                Logger.Error(e, "Failed to apply {Message}", nameof(UpdatePartyBehavior));
             }
-        }
+        });
     }
 }

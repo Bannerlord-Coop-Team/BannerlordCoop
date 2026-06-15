@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Buildings.Messages;
@@ -7,6 +8,7 @@ using GameInterface.Services.UI.Notifications.Messages;
 using Helpers;
 using LiteNetLib;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -61,10 +63,25 @@ internal class BuildingHelperHandler : IHandler
 
     private void Handle_ChangeDefaultBuilding(MessagePayload<ChangeDefaultBuilding> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Building>(obj.What.NewDefaultId, out var newDefault)) return;
-        if (!objectManager.TryGetObjectWithLogging<Town>(obj.What.TownId, out var town)) return;
+        var data = obj.What;
 
-        BuildingHelper.ChangeDefaultBuilding(newDefault, town);
+        // Applying the default building runs vanilla game code, so defer it to the game
+        // loop. The objects are resolved at drain time because they may unregister between
+        // enqueue and execution.
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging<Building>(data.NewDefaultId, out var newDefault)) return;
+                if (!objectManager.TryGetObjectWithLogging<Town>(data.TownId, out var town)) return;
+
+                BuildingHelper.ChangeDefaultBuilding(newDefault, town);
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to apply {Message}", nameof(ChangeDefaultBuilding));
+            }
+        });
     }
 
     private void Handle_CurrentBuildingQueueChanged(MessagePayload<CurrentBuildingQueueChanged> obj)
@@ -85,20 +102,35 @@ internal class BuildingHelperHandler : IHandler
 
     private void Handle_ChangeCurrentBuildingQueue(MessagePayload<ChangeCurrentBuildingQueue> obj)
     {
-        var buildings = new List<Building>();
-        if (obj.What.BuildingIds != null)
+        var data = obj.What;
+
+        // Applying the building queue runs vanilla game code, so defer it to the game
+        // loop. The objects are resolved at drain time because they may unregister between
+        // enqueue and execution.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            foreach (var buildingId in obj.What.BuildingIds)
+            try
             {
-                if (!objectManager.TryGetObjectWithLogging<Building>(buildingId, out var currentBuilding)) continue;
+                var buildings = new List<Building>();
+                if (data.BuildingIds != null)
+                {
+                    foreach (var buildingId in data.BuildingIds)
+                    {
+                        if (!objectManager.TryGetObjectWithLogging<Building>(buildingId, out var currentBuilding)) continue;
 
-                buildings.Add(currentBuilding);
+                        buildings.Add(currentBuilding);
+                    }
+                }
+
+                if (!objectManager.TryGetObjectWithLogging<Town>(data.TownId, out var town)) return;
+
+                BuildingHelper.ChangeCurrentBuildingQueue(buildings, town);
             }
-        }
-
-        if (!objectManager.TryGetObjectWithLogging<Town>(obj.What.TownId, out var town)) return;
-
-        BuildingHelper.ChangeCurrentBuildingQueue(buildings, town);
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to apply {Message}", nameof(ChangeCurrentBuildingQueue));
+            }
+        });
     }
 
     private void Handle_BuildingProcessBoostedWithGold(MessagePayload<BuildingProcessBoostedWithGold> obj)
@@ -112,22 +144,39 @@ internal class BuildingHelperHandler : IHandler
 
     private void Handle_BoostBuildingProcessWithGold(MessagePayload<BoostBuildingProcessWithGold> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Town>(obj.What.TownId, out var town)) return;
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
+        var data = obj.What;
+        var peer = obj.Who as NetPeer;
 
-        int difference = 0;
-        if (obj.What.Gold < town.BoostBuildingProcess)
+        // The gold transfer and building boost run vanilla game code, so defer the whole
+        // apply to the game loop. The objects are resolved at drain time because they may
+        // unregister between enqueue and execution, and the gold-change reply goes out only
+        // after the work runs so 'difference' is computed on the main thread.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            difference = town.BoostBuildingProcess - obj.What.Gold;
-            GiveGoldAction.ApplyBetweenCharacters(null, hero, difference, false);
-        }
-        else if (obj.What.Gold > town.BoostBuildingProcess)
-        {
-            difference = obj.What.Gold - town.BoostBuildingProcess;
-            GiveGoldAction.ApplyBetweenCharacters(hero, null, difference, false);
-        }
-        town.BoostBuildingProcess = obj.What.Gold;
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging<Town>(data.TownId, out var town)) return;
+                if (!objectManager.TryGetObjectWithLogging<Hero>(data.HeroId, out var hero)) return;
 
-        network.Send(obj.Who as NetPeer, new NotifyGoldChange(-difference));
+                int difference = 0;
+                if (data.Gold < town.BoostBuildingProcess)
+                {
+                    difference = town.BoostBuildingProcess - data.Gold;
+                    GiveGoldAction.ApplyBetweenCharacters(null, hero, difference, false);
+                }
+                else if (data.Gold > town.BoostBuildingProcess)
+                {
+                    difference = data.Gold - town.BoostBuildingProcess;
+                    GiveGoldAction.ApplyBetweenCharacters(hero, null, difference, false);
+                }
+                town.BoostBuildingProcess = data.Gold;
+
+                network.Send(peer, new NotifyGoldChange(-difference));
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to apply {Message}", nameof(BoostBuildingProcessWithGold));
+            }
+        });
     }
 }

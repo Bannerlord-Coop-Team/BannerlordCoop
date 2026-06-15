@@ -5,6 +5,7 @@ using Common.Network;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Heroes.Handlers;
@@ -55,8 +56,22 @@ public class HeroHitPointsHandler : IHandler
     {
         if (ModInformation.IsClient) return;
 
-        if (!objectManager.TryGetObjectWithLogging<Hero>(payload.What.HeroId, out var hero)) return;
+        var data = payload.What;
 
-        hero.HitPoints = payload.What.HitPoints;
+        // Setting Hero.HitPoints runs the server-side property-sync intercept; defer it to the
+        // game-loop thread so the value change (and its replication) fire on the main thread.
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging<Hero>(data.HeroId, out var hero)) return;
+
+                hero.HitPoints = data.HitPoints;
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to apply NetworkHeroHitPointsChangeRequest");
+            }
+        });
     }
 }

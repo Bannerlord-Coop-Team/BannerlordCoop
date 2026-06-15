@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
@@ -6,6 +7,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyComponents.BanditPartyComponents.Messages;
 using GameInterface.Services.PartyComponents.BanditPartyComponents.Patches;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
@@ -61,26 +63,39 @@ internal class BanditPartyComponentHandler : IHandler
     {
         var obj = payload.What;
 
-        if (objectManager.TryGetObject<BanditPartyComponent>(obj.ComponentId, out var component) == false)
+        // Applying the component change runs vanilla setter code that must run on the
+        // main thread, not the network thread that delivered the message. Resolve the ids
+        // at drain time so the apply stays ordered behind the object's create.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            Logger.Error("Could not find {component} in registry", obj.ComponentId);
-            return;
-        }
-
-        using (new AllowedThread())
-        {
-            switch ((BanditPartyComponentType)obj.BanditPartyComponentType)
+            try
             {
-                case BanditPartyComponentType.Hideout:
-                    objectManager.TryGetObject(obj.Value, out Hideout hideout);
-                    component.Hideout = hideout;
-                    break;
+                if (objectManager.TryGetObject<BanditPartyComponent>(obj.ComponentId, out var component) == false)
+                {
+                    Logger.Error("Could not find {component} in registry", obj.ComponentId);
+                    return;
+                }
 
-                case BanditPartyComponentType.IsBossParty:
-                    component.IsBossParty = bool.Parse(obj.Value);
-                    break;
+                using (new AllowedThread())
+                {
+                    switch ((BanditPartyComponentType)obj.BanditPartyComponentType)
+                    {
+                        case BanditPartyComponentType.Hideout:
+                            objectManager.TryGetObject(obj.Value, out Hideout hideout);
+                            component.Hideout = hideout;
+                            break;
+
+                        case BanditPartyComponentType.IsBossParty:
+                            component.IsBossParty = bool.Parse(obj.Value);
+                            break;
+                    }
+                }
             }
-        }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to apply NetworkUpdateBanditPartyComponent");
+            }
+        });
     }
 
     private void Handle_BanditPartyComponentInitArgsUpdated(MessagePayload<BanditPartyComponentInitArgsUpdated> payload)
@@ -104,15 +119,28 @@ internal class BanditPartyComponentHandler : IHandler
     {
         var message = payload.What;
 
-        if (!objectManager.TryGetObjectWithLogging<BanditPartyComponent>(message.BanditPartyComponentId, out var instance)) return;
-        if (!objectManager.TryGetObjectWithLogging<Clan>(message.ClanId, out var clan)) return;
-        if (!objectManager.TryGetObjectWithLogging<PartyTemplateObject>(message.PartyTemplateId, out var partyTemplate)) return;
-
-        using (new AllowedThread())
+        // Storing the init args is a cross-thread campaign-state mutation; defer it to the
+        // main thread and resolve the ids at drain time so it stays ordered behind the
+        // object's create on the game loop.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            var initArgs = new BanditPartyComponent.InitializationArgs(clan, partyTemplate, message.InitialPosition);
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging<BanditPartyComponent>(message.BanditPartyComponentId, out var instance)) return;
+                if (!objectManager.TryGetObjectWithLogging<Clan>(message.ClanId, out var clan)) return;
+                if (!objectManager.TryGetObjectWithLogging<PartyTemplateObject>(message.PartyTemplateId, out var partyTemplate)) return;
 
-            instance._initializationArgs = initArgs;
-        }
+                using (new AllowedThread())
+                {
+                    var initArgs = new BanditPartyComponent.InitializationArgs(clan, partyTemplate, message.InitialPosition);
+
+                    instance._initializationArgs = initArgs;
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to apply NetworkUpdateBanditPartyComponentInitArgs");
+            }
+        });
     }
 }

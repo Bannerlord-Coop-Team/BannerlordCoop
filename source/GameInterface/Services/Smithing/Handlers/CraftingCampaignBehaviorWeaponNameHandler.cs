@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using System;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Smithing.Messages;
 using Serilog;
@@ -54,10 +55,25 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void Handle(MessagePayload<NetworkBehaviorSetCraftedWeaponNameServer> obj)
         {
-            // Send from server to all clients
             NetworkBehaviorSetCraftedWeaponNameClients nameChange = new(obj.What);
-            network.SendAll(nameChange);
-            SetCraftedWeaponName(nameChange);
+
+            // Applying the rename runs vanilla game code, so it must run on the main thread,
+            // not the network thread that delivered the message. The server relays to all
+            // clients only after it has applied the change itself.
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                try
+                {
+                    SetCraftedWeaponName(nameChange);
+
+                    // Send from server to all clients
+                    network.SendAll(nameChange);
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to apply NetworkBehaviorSetCraftedWeaponNameServer");
+                }
+            });
         }
 
         private void Handle(MessagePayload<NetworkBehaviorSetCraftedWeaponNameClients> obj)
@@ -67,17 +83,30 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void SetCraftedWeaponName(NetworkBehaviorSetCraftedWeaponNameClients obj)
         {
-            if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
-            ItemObject mbCraftedWeapon = MBObjectManager.Instance.GetObject<ItemObject>(obj.CraftedWeaponId);
-            if (mbCraftedWeapon == null) return;
-
-            if (craftingCampaignBehavior._craftedItemDictionary.TryGetValue(mbCraftedWeapon, out CraftingCampaignBehavior.CraftedItemInitializationData craftedItemInitializationData))
+            // Resolving the ids and writing the crafted-item dictionary must run on the main
+            // thread, not the network thread that delivered the message. Resolving inside the
+            // lambda keeps the write queue-ordered behind the object's create at drain time.
+            GameLoopRunner.RunOnMainThread(() =>
             {
-                craftingCampaignBehavior._craftedItemDictionary[mbCraftedWeapon] = new CraftingCampaignBehavior.CraftedItemInitializationData(
-                    craftedItemInitializationData.CraftedData,
-                    new TextObject(obj.StringName),
-                    craftedItemInitializationData.Culture);
-            }
+                try
+                {
+                    if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
+                    ItemObject mbCraftedWeapon = MBObjectManager.Instance.GetObject<ItemObject>(obj.CraftedWeaponId);
+                    if (mbCraftedWeapon == null) return;
+
+                    if (craftingCampaignBehavior._craftedItemDictionary.TryGetValue(mbCraftedWeapon, out CraftingCampaignBehavior.CraftedItemInitializationData craftedItemInitializationData))
+                    {
+                        craftingCampaignBehavior._craftedItemDictionary[mbCraftedWeapon] = new CraftingCampaignBehavior.CraftedItemInitializationData(
+                            craftedItemInitializationData.CraftedData,
+                            new TextObject(obj.StringName),
+                            craftedItemInitializationData.Culture);
+                    }
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to apply NetworkBehaviorSetCraftedWeaponNameClients");
+                }
+            });
         }
     }
 }

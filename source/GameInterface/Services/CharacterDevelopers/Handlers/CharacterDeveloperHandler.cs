@@ -48,10 +48,16 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
 
         private void Handle(MessagePayload<NetworkApplyChangesServer> obj)
         {
-            // Send to all clients and apply on server
+            // Server-authoritative: apply on the game-loop thread, then relay to all
+            // clients after the apply so the change goes out only once it has run here.
             NetworkApplyChangesClients changes = new(obj.What);
-            network.SendAll(changes);
-            ApplyChanges(changes);
+            ApplyChanges(changes, () =>
+            {
+                if (ModInformation.IsServer)
+                {
+                    network.SendAll(changes);
+                }
+            });
         }
 
         private void Handle(MessagePayload<NetworkApplyChangesClients> obj)
@@ -126,18 +132,34 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
             network.SendAll(message);
         }
 
-        private void ApplyChanges(NetworkApplyChangesClients obj)
+        private void ApplyChanges(NetworkApplyChangesClients obj, Action afterApply = null)
         {
-            string heroId = obj.HeroId;
-            if (!objectManager.TryGetObject(obj.HeroId, out Hero hero))
+            // Applying perks/attributes/focuses runs vanilla game code, so it must run on
+            // the main thread, not the network thread that delivered the message. Ids are
+            // resolved at drain time so the apply stays queue-ordered behind the hero's
+            // create and ahead of its destroy.
+            GameLoopRunner.RunOnMainThread(() =>
             {
-                Logger.Error("Unable to get object for id {id}", heroId);
-                return;
-            }
+                try
+                {
+                    string heroId = obj.HeroId;
+                    if (!objectManager.TryGetObject(obj.HeroId, out Hero hero))
+                    {
+                        Logger.Error("Unable to get object for id {id}", heroId);
+                        return;
+                    }
 
-            AddPerks(obj.PerkIds, hero.HeroDeveloper);
-            AddAttributes(obj.AttributeIds, obj.AttributeIncreases, hero.HeroDeveloper);
-            AddFocuses(obj.SkillIds, obj.SkillFocusLevels, obj.SkillOrgFocusAmounts, hero.HeroDeveloper);
+                    AddPerks(obj.PerkIds, hero.HeroDeveloper);
+                    AddAttributes(obj.AttributeIds, obj.AttributeIncreases, hero.HeroDeveloper);
+                    AddFocuses(obj.SkillIds, obj.SkillFocusLevels, obj.SkillOrgFocusAmounts, hero.HeroDeveloper);
+
+                    afterApply?.Invoke();
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to apply {Message}", nameof(NetworkApplyChangesClients));
+                }
+            });
         }
 
         private void AddPerks(List<string> perkIds, HeroDeveloper heroDeveloper)
