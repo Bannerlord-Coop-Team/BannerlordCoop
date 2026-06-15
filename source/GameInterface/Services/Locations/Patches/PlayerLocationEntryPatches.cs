@@ -13,12 +13,12 @@ using TaleWorlds.MountAndBlade;
 namespace GameInterface.Services.Locations.Patches;
 
 /// <summary>
-/// Detects the local player entering a settlement interior (the indoor mission opening) and raises
-/// <see cref="PlayerEnteredLocation"/>. This is the front of the location-sync handoff: it is what
-/// kicks off the request to the server for a P2P instance.
-///
-/// Both <see cref="SandBoxMissions.OpenIndoorMission"/> overloads carry the entered
-/// <see cref="Location"/> and return the opened <see cref="Mission"/>, so both are patched.
+/// Raises <see cref="PlayerEnteredLocation"/> when the local player enters a location, kicking off the
+/// P2P instance request. The game opens each location type through a different <see cref="SandBoxMissions"/>
+/// method (per <c>LocationEncounter.CreateAndOpenMissionController</c>) — indoor (tavern/hall), town centre,
+/// castle courtyard, village — and all route both menu entry and in-mission door transitions, so each is
+/// patched. The non-indoor entries patch only the <c>string sceneLevels</c> leaf (the <c>int</c> overload
+/// delegates to it) to fire once per entry.
 /// </summary>
 [HarmonyPatch(typeof(SandBoxMissions))]
 internal class PlayerLocationEntryPatches
@@ -37,6 +37,30 @@ internal class PlayerLocationEntryPatches
         new[] { typeof(string), typeof(Location), typeof(CharacterObject), typeof(string) })]
     [HarmonyPostfix]
     static void OpenIndoorMission_WithSceneLevels(string scene, Location location, Mission __result)
+    {
+        Handle(scene, location, __result);
+    }
+
+    [HarmonyPatch(nameof(SandBoxMissions.OpenTownCenterMission),
+        new[] { typeof(string), typeof(string), typeof(Location), typeof(CharacterObject), typeof(string) })]
+    [HarmonyPostfix]
+    static void OpenTownCenterMission_Postfix(string scene, Location location, Mission __result)
+    {
+        Handle(scene, location, __result);
+    }
+
+    [HarmonyPatch(nameof(SandBoxMissions.OpenCastleCourtyardMission),
+        new[] { typeof(string), typeof(string), typeof(Location), typeof(CharacterObject) })]
+    [HarmonyPostfix]
+    static void OpenCastleCourtyardMission_Postfix(string scene, Location location, Mission __result)
+    {
+        Handle(scene, location, __result);
+    }
+
+    [HarmonyPatch(nameof(SandBoxMissions.OpenVillageMission),
+        new[] { typeof(string), typeof(Location), typeof(CharacterObject), typeof(string) })]
+    [HarmonyPostfix]
+    static void OpenVillageMission_Postfix(string scene, Location location, Mission __result)
     {
         Handle(scene, location, __result);
     }

@@ -3,10 +3,8 @@ using Common.Messaging;
 namespace Common.Network.Instances.Messages;
 
 /// <summary>
-/// Local (broker-only) event published by the P2P mission layer once the local player's instance is
-/// populated — the first remote peer's agent has spawned in the live interior. Lets the campaign side
-/// drop the "connecting to players" loading screen shown to a joining client while the interior loads
-/// and the P2P link is established.
+/// Broker event raised when the first remote peer spawns in the instance. Lets the campaign side drop
+/// the joining client's "connecting to players" loading screen.
 /// </summary>
 public record InstanceReady : IEvent
 {

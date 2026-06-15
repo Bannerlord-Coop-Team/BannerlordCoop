@@ -115,16 +115,17 @@ namespace Missions.Services.Network
 
         private void Handle_InstanceCleared(MessagePayload<InstanceCleared> payload)
         {
-            Logger.Information("[LocationSync] InstanceCleared — tearing down P2P client");
+            // Drop peers but keep the socket: re-punched for the next location. A Stop/Start between
+            // locations churns the port and re-enters the Poller, leaving the next scene unable to connect.
+            Logger.Information("[LocationSync] InstanceCleared — dropping P2P peers (socket stays up)");
             try
             {
-                p2pClient?.Stop();
+                p2pClient?.DisconnectPeers();
             }
             catch (Exception ex)
             {
-                Logger.Warning(ex, "[LocationSync] Error stopping P2P client on clear");
+                Logger.Warning(ex, "[LocationSync] Error disconnecting P2P peers on clear");
             }
-            p2pClient = null;
             activeInstanceId = null;
             ClearAgentRegistry();
         }
@@ -267,9 +268,8 @@ namespace Missions.Services.Network
                 return;
             }
 
-            // The double OpenIndoorMission can drive this twice for the same mission. CoopTavernsController
-            // is InstancePerDependency, so a second attach would add a second controller with its own
-            // identity and a duplicate broker subscription. Skip if one is already present.
+            // Double OpenIndoorMission can drive this twice; avoid a second (InstancePerDependency)
+            // controller with its own id + duplicate subscription.
             if (mission.GetMissionBehavior<CoopTavernsController>() != null)
             {
                 Logger.Information("[LocationSync] CoopTavernsController already attached to mission '{Scene}' — skipping duplicate attach.", mission.SceneName);
@@ -281,8 +281,7 @@ namespace Missions.Services.Network
                 var netBehavior = missionContainer.Resolve<CoopMissionNetworkBehavior>();
                 var tavernController = missionContainer.Resolve<CoopTavernsController>();
 
-                // Live campaign: leaving the tavern must return to the settlement, not EndGame() to the
-                // main menu (that behaviour is only for the standalone Missions test harness).
+                // Live: leaving a location returns to the settlement, not EndGame() to the main menu.
                 netBehavior.IsLiveInstance = true;
 
                 Common.GameLoopRunner.RunOnMainThread(() =>

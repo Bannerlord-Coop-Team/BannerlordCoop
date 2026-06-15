@@ -95,6 +95,19 @@ namespace Missions.Services.Network
             netManager.Stop();
         }
 
+        /// <summary>
+        /// Drop all peers but keep the socket/poller running, so the client is reused across locations
+        /// without a fragile Stop/Start (which churns the port and re-enters the Poller). The poller stays
+        /// up so OnPeerDisconnected is still delivered.
+        /// </summary>
+        public void DisconnectPeers()
+        {
+            Logger.Debug("Disconnecting P2P peers (keeping socket alive)");
+            netManager.DisconnectAll();
+            // Reset the punch latch so the next instance is punched and stragglers from this one are rejected.
+            instance = null;
+        }
+
         public void Update(TimeSpan frameTime)
         {
             netManager.PollEvents();

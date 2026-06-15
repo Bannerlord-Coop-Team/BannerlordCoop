@@ -11,22 +11,15 @@ using System.Threading.Tasks;
 namespace GameInterface.Services.Locations.Handlers;
 
 /// <summary>
-/// Shows a loading screen on a client that is <em>joining</em> a settlement interior (tavern) instance
-/// while the scene loads and the P2P link to the players already inside is established. Entering an
-/// interior in live co-op leaves the joiner standing in an empty room for several seconds — the remote
-/// players cannot spawn until the joiner's own scene load finishes freeing the main thread, and the
-/// NAT-punched P2P link comes up. Holding the engine's loading window over that gap hides the empty
-/// interior until at least one remote player has spawned (<see cref="InstanceReady"/>).
-///
-/// Only the joining client is blocked: the first member of an instance is its host
-/// (<see cref="InstanceAssigned.IsHost"/>), has nobody to wait for, and is skipped.
+/// Holds a loading screen on a joining client until a peer spawns (<see cref="InstanceReady"/>), hiding
+/// the empty interior while the scene loads and the P2P link comes up. The host (first member) has nobody
+/// to wait for and is skipped.
 /// </summary>
 public class LocationLoadingScreenHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<LocationLoadingScreenHandler>();
 
-    // Safety net: if the P2P link never comes up (NAT punch failed, the other player left), drop the
-    // loading screen anyway rather than trapping the player on it forever.
+    // Safety net so a failed NAT punch can't trap the player on the loading screen.
     private static readonly TimeSpan MaxWait = TimeSpan.FromSeconds(45);
 
     private readonly IMessageBroker messageBroker;
@@ -56,8 +49,7 @@ public class LocationLoadingScreenHandler : IHandler
 
     private void Handle_Assigned(MessagePayload<InstanceAssigned> payload)
     {
-        // The host is the first member of the instance — there is nobody to wait for, so it never shows
-        // the loading screen. Only a later joiner (IsHost == false) is held until a peer appears.
+        // Host has nobody to wait for; only a joiner (IsHost == false) is held.
         if (ModInformation.IsServer || payload.What.IsHost) return;
 
         Logger.Information("[LocationSync] Joining instance {Id} — showing loading screen until a peer connects", payload.What.InstanceId);
@@ -84,8 +76,7 @@ public class LocationLoadingScreenHandler : IHandler
             StartTimeout(timeoutCts.Token);
         }
 
-        // Engine UI calls must run on the main thread; InstanceAssigned is published off the network
-        // receive thread.
+        // Engine UI calls must run on the main thread (InstanceAssigned arrives off the network thread).
         GameLoopRunner.RunOnMainThread(() =>
             loadingInterface.ShowLoadingScreen("Entering location", "Connecting to other players..."));
     }

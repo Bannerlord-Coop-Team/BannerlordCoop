@@ -18,11 +18,8 @@ namespace Missions.Services.Network
         public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
 
         /// <summary>
-        /// True when this behavior runs inside a live campaign (the location-sync tavern bridge) rather
-        /// than the standalone Missions test harness. In the test harness the mission IS the whole game
-        /// session, so ending it ends the game; in a live campaign the mission is just an interior, so
-        /// ending it must return to the settlement — never tear the campaign down to the main menu.
-        /// Set by <see cref="LiveInstanceLauncher"/> when it attaches the behavior.
+        /// Set by <see cref="LiveInstanceLauncher"/> in live campaign play. Gates the test-harness-only
+        /// teardown (EndGame + disposing shared singletons) that must not run when leaving an interior.
         /// </summary>
         public bool IsLiveInstance { get; set; }
 
@@ -58,6 +55,10 @@ namespace Missions.Services.Network
         {
             agentRegistry.Clear();
 
+            // Live: the client/handlers are singletons reused across locations (launcher owns them).
+            // Disposing on mission end would leave the next location wired to dead, unsubscribed handlers.
+            if (IsLiveInstance) return;
+
             foreach (var disposable in disposables)
             {
                 disposable.Dispose();
@@ -68,9 +69,7 @@ namespace Missions.Services.Network
         {
             base.OnEndMission();
 
-            // Only the standalone test harness should drop to the main menu on mission end. In a live
-            // campaign, leaving the tavern must keep the campaign running (the game returns the player
-            // to the settlement on its own).
+            // Only the test harness (mission == whole session) drops to the main menu on end.
             if (IsLiveInstance == false)
             {
                 MBGameManager.EndGame();

@@ -48,16 +48,14 @@ internal class InstanceIntroducer
 
         lock (gate)
         {
+            // A punch = (re)entering now. Drop any earlier slot for this endpoint first, else a re-joiner
+            // (same endpoint, since the socket persists) is mistaken for a duplicate and never reconnected.
+            RemoveEndpointEverywhere(remoteEndPoint);
+
             if (byInstance.TryGetValue(instance, out var peers) == false)
             {
                 peers = new List<Endpoints>();
                 byInstance[instance] = peers;
-            }
-
-            // Already known in this instance — its existing peers were introduced on its first request.
-            foreach (var existing in peers)
-            {
-                if (existing.External.Equals(remoteEndPoint)) return;
             }
 
             foreach (var existing in peers)
@@ -72,6 +70,15 @@ internal class InstanceIntroducer
             }
 
             peers.Add(new Endpoints(localEndPoint, remoteEndPoint));
+        }
+    }
+
+    // A peer is in at most one instance, so any prior listing for this endpoint is stale on a new punch.
+    private void RemoveEndpointEverywhere(IPEndPoint external)
+    {
+        foreach (var peers in byInstance.Values)
+        {
+            peers.RemoveAll(e => e.External.Equals(external));
         }
     }
 

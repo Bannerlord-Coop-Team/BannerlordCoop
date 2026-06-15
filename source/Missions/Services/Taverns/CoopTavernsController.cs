@@ -29,12 +29,8 @@ namespace Missions.Services.Taverns
 
         private readonly BoardGameManager _boardGameManager;
 
-        // Stable identity for the local player, NOT regenerated per controller. The remote side dedupes
-        // spawns by this id (Handle_JoinInfo), so every CoopTavernsController the local player produces
-        // for the same instance MUST broadcast the same id. The double OpenIndoorMission / a duplicate
-        // NAT connection can otherwise yield a second controller with a fresh Guid.NewGuid(), which the
-        // remote spawns as a phantom, never-moving duplicate. A process-wide id collapses all of these
-        // to one agent. (Re-entry is safe: the peer disconnect on leave despawns the remote agent first.)
+        // Process-wide, not per-controller: the remote dedupes spawns by this id, so a second controller
+        // (double OpenIndoorMission / duplicate NAT connection) must reuse it or it spawns a phantom.
         private static readonly Guid LocalPlayerId = Guid.NewGuid();
 
         private readonly Guid playerId;
@@ -179,8 +175,7 @@ namespace Missions.Services.Taverns
             Logger.Information("[LocationSync] Spawned + registered remote agent {AgentID} at {Pos} (mission '{Scene}')",
                 newAgentId, newAgent.Position, Mission.Current?.SceneName);
 
-            // The instance is now populated with at least one remote player. Tell the campaign side so a
-            // joining client can drop its "connecting to players" loading screen. Publish once.
+            // First remote player spawned — let the campaign side drop the joiner's loading screen (once).
             if (_instanceReadyPublished == false)
             {
                 _instanceReadyPublished = true;
