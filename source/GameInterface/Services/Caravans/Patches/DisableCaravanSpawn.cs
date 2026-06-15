@@ -18,7 +18,7 @@ protected override void OnSubModuleLoad()
             }
             catch (Exception ex)
             {
-                InformationManager.DisplayMessage(new InformationMessage("CaravanBlock: InitializationArgs type not found"));
+                Logger.Error("CaravanBlock: Didnt Applied");
             }
         }
 
@@ -30,7 +30,7 @@ protected override void OnSubModuleLoad()
 
             if (nestedType == null)
             {
-                InformationManager.DisplayMessage(new InformationMessage("CaravanBlock: InitializationArgs type not found"));
+                Logger.Error("CaravanBlock: InitializationArgs type not found");
                 return;
             }
 
@@ -39,7 +39,7 @@ protected override void OnSubModuleLoad()
 
             if (original == null)
             {
-                InformationManager.DisplayMessage(new InformationMessage("CaravanBlock: InitializeCaravanOnCreation method not found"));
+                Logger.Error("CaravanBlock: InitializeCaravanOnCreation method not found");
                 return;
             }
 
@@ -47,7 +47,7 @@ protected override void OnSubModuleLoad()
 
             _harmony.Patch(original, postfix: new HarmonyMethod(postfix));
 
-            InformationManager.DisplayMessage(new InformationMessage("CaravanBlock: patched InitializeCaravanOnCreation successfully"));
+            Logger.Error("CaravanBlock: patched InitializeCaravanOnCreation successfully");
         }
     
     public static class CaravanBlockPatch
