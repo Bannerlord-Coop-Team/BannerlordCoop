@@ -52,9 +52,20 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
             obj.StringId = id;
             obj._sides = new MapEventSide[2];
             obj.WonRounds = new MBList<BattleSideEnum>();
-
-            Campaign.Current.MapEventManager.OnMapEventCreated(obj);
         }
+
+        // OnMapEventCreated adds to MapEventManager._mapEvents, the list the main-thread map tick
+        // (MapEventManager.Tick) walks every frame. This callback runs on the network thread, so defer
+        // the add to the main thread — matching OnClientDestroyed — so it can't race that iteration and
+        // leave a torn/null slot the tick dereferences (the client NRE'd while a settlement screen kept
+        // the backgrounded map ticking during battle replication).
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            using (new AllowedThread())
+            {
+                Campaign.Current.MapEventManager.OnMapEventCreated(obj);
+            }
+        });
     }
 
     public override void OnClientDestroyed(MapEvent obj, string id)
