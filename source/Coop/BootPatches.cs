@@ -35,6 +35,47 @@ namespace Coop
 
         private static bool _applied = false;
 
+
+
+        private void PatchInitializeCaravanOnCreation()
+        {
+            Type nestedType = typeof(CaravanPartyComponent)
+                .GetNestedType("InitializationArgs", BindingFlags.NonPublic | BindingFlags.Public);
+
+            if (nestedType == null)
+            {
+                InformationManager.DisplayMessage(new InformationMessage("CaravanBlock: InitializationArgs type not found"));
+                return;
+            }
+
+            MethodInfo original = nestedType.GetMethod("InitializeCaravanOnCreation",
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+
+            if (original == null)
+            {
+                InformationManager.DisplayMessage(new InformationMessage("CaravanBlock: InitializeCaravanOnCreation method not found"));
+                return;
+            }
+
+            MethodInfo postfix = typeof(CaravanBlockPatch).GetMethod(nameof(CaravanBlockPatch.Postfix));
+
+            _harmony.Patch(original, postfix: new HarmonyMethod(postfix));
+
+            InformationManager.DisplayMessage(new InformationMessage("CaravanBlock: patched InitializeCaravanOnCreation successfully"));
+        }
+    
+    public static class CaravanBlockPatch
+    {
+
+        public static void Postfix(MobileParty mobileParty)
+        {
+            if (mobileParty != null)
+            {
+                DestroyPartyAction.Apply(null, mobileParty);
+            }
+        }
+    }
+
         internal static void Apply()
         {
             if (_applied) return;
