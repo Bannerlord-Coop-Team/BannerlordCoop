@@ -31,12 +31,10 @@ internal class GameStateInterface : IGameStateInterface
     private static readonly ILogger Logger = LogManager.GetLogger<GameStateInterface>();
 
     private readonly IMessageBroker messageBroker;
-    private readonly ILoadingInterface loadingInterface;
 
-    public GameStateInterface(IMessageBroker messageBroker, ILoadingInterface loadingInterface)
+    public GameStateInterface(IMessageBroker messageBroker)
     {
         this.messageBroker = messageBroker;
-        this.loadingInterface = loadingInterface;
     }
 
     public void GoToMainMenu()
