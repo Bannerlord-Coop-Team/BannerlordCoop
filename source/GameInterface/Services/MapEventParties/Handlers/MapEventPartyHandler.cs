@@ -70,9 +70,6 @@ internal class MapEventPartyHandler : IHandler
     {
         var obj = payload.What;
 
-        // Update mutates the party roster and its postfix rebroadcasts to clients; both
-        // must run on the main thread that the game loop reads, not the network thread
-        // that delivered the request.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try

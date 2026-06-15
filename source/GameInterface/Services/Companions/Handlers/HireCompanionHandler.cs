@@ -79,7 +79,6 @@ internal class HireCompanionHandler : IHandler
                 AddCompanionAction.Apply(playerClan, oneToOneConversationHero);
                 AddHeroToPartyAction.Apply(oneToOneConversationHero, mainParty, true);
 
-                // Give client notification of changed gold, only after the gold change has applied
                 network.Send(peer, new NotifyGoldChange(-data.HiringPrice));
             }
             catch (Exception e)

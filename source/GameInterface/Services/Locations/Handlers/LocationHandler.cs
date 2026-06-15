@@ -141,8 +141,6 @@ public class LocationHandler : IHandler
     {
         var data = payload.What.Data;
 
-        // Creating the LocationCharacter builds AgentData and FaceGen monsters,
-        // which must run on the main thread like all other game object construction.
         GameLoopRunner.RunOnMainThread(() =>
         {
             using (new AllowedThread())

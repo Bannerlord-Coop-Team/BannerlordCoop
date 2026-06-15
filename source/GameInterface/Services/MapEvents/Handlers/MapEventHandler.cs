@@ -62,10 +62,6 @@ internal class MapEventHandler : IHandler
         // the client gets no capture UI and the player party is never parked. The server's BattleState
         // setter does not re-broadcast (MapEventPatches.Prefix_BattleState returns without publishing on the
         // server), so no AllowedThread is needed to prevent an echo.
-
-        // This handler runs inline on the network (poller) thread, so set BattleState on the
-        // game-loop thread to avoid racing MapEventManager.Tick. The id is resolved at drain time so the
-        // apply stays queue-ordered behind the event's create and ahead of its evict.
         var mapEventId = payload.What.MapEventId;
         var battleState = payload.What.BattleState;
         GameLoopRunner.RunOnMainThread(() =>

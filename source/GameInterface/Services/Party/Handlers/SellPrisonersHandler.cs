@@ -61,9 +61,6 @@ internal class SellPrisonersHandler : IHandler
         var data = obj.What;
         var peer = obj.Who as NetPeer;
 
-        // Selling prisoners mutates game state, so defer the apply to the game loop and
-        // reply only after it has run. Object resolution stays inside so the apply stays
-        // queue-ordered behind the party's create and ahead of its destroy.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try

@@ -40,7 +40,6 @@ internal class ServerTroopRosterHandler : IHandler
         var data = payload.What;
         var peer = payload.Who as NetPeer;
 
-        // The server replies with the gold change only after it has applied the recruitment.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try

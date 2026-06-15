@@ -122,9 +122,6 @@ internal class PartyDoneLogicHandler : IHandler
 
         var peer = obj.Who as NetPeer;
 
-        // The apply runs patched vanilla code (roster mutations, gold/influence/skill
-        // actions, morale) and must run on the main thread, not the network thread that
-        // delivered the message; the reply is sent only after the gold action runs.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try

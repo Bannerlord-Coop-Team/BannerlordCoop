@@ -58,10 +58,6 @@ internal class TeleportHeroHandler : IHandler
     {
         var data = obj.What;
 
-        // Server-authoritative apply: defer to the game loop so the vanilla teleport (and its
-        // re-broadcasting patches) runs on the main thread instead of the network thread. No
-        // AllowedThread here so the patch chain is allowed to execute and re-broadcast. Ids are
-        // resolved at drain time so the apply stays ordered behind the object's create.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try

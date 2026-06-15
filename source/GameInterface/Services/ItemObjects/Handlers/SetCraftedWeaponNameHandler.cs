@@ -55,7 +55,6 @@ namespace GameInterface.Services.ItemObjects.Handlers
         {
             NetworkSetCraftedWeaponNameClients nameChange = new(obj.What);
 
-            // The server relays to all clients only after it has applied the change itself.
             GameLoopRunner.RunOnMainThread(() =>
             {
                 try

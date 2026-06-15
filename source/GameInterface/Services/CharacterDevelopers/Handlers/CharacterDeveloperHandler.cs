@@ -48,8 +48,6 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
 
         private void Handle(MessagePayload<NetworkApplyChangesServer> obj)
         {
-            // Server-authoritative: apply on the game-loop thread, then relay to all
-            // clients after the apply so the change goes out only once it has run here.
             NetworkApplyChangesClients changes = new(obj.What);
 
             // AddFocuses overwrites SkillOrgFocusAmounts entry-by-entry during the apply

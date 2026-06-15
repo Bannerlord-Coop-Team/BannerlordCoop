@@ -76,8 +76,6 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
         {
             var data = obj.What;
 
-            // Apply on the game-loop thread; object resolution happens at drain time so the
-            // write stays queue-ordered behind the hero's create and ahead of its destroy.
             GameLoopRunner.RunOnMainThread(() =>
             {
                 try
@@ -113,8 +111,6 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
         {
             var data = obj.What;
 
-            // Apply on the game-loop thread; object resolution happens at drain time so the
-            // write stays queue-ordered behind the hero's create and ahead of its destroy.
             GameLoopRunner.RunOnMainThread(() =>
             {
                 try
@@ -150,8 +146,6 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
         {
             var data = obj.What;
 
-            // Apply on the game-loop thread; object resolution happens at drain time so the
-            // write stays queue-ordered behind the hero's create and ahead of its destroy.
             GameLoopRunner.RunOnMainThread(() =>
             {
                 try

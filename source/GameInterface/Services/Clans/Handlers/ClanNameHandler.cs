@@ -57,8 +57,6 @@ namespace GameInterface.Services.Clans.Handlers
             }
 
             // The refresh touches the clan screen UI, which is main-thread only.
-            // The server relays to the other clients only after it has applied the
-            // change itself.
             GameLoopRunner.RunOnMainThread(() =>
             {
                 try

@@ -62,8 +62,6 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
                 {
                     OnOpenedPerkInternal(hero, perk);
 
-                    // Broadcast to clients only after the server has applied the perk
-                    // locally, so the reply stays ordered after the local apply.
                     network.SendAll(message);
                 }
                 catch (Exception e)

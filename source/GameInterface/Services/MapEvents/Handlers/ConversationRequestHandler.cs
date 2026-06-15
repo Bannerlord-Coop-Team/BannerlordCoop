@@ -271,9 +271,6 @@ internal class ConversationRequestHandler : IHandler
             return;
         }
 
-        // Restarting the encounter reopens the encounter menu and reads PlayerEncounter state
-        // the main-thread tick mutates; both must run on the main thread, not the network
-        // thread that delivered the approval.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try

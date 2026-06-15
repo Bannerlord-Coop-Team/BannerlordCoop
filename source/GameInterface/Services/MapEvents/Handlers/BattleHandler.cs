@@ -134,10 +134,10 @@ internal class BattleHandler : IHandler
         var requester = payload.Who as NetPeer;
 
         // _sides is game state the main-thread tick also touches; mutating it from the
-        // network thread races the tick. Make the sides mission-ready on the main thread,
-        // then reply so the start goes out only after they are ready. Re-resolve the event
-        // at drain time: it may have finalized between this request arriving and the queued
-        // action running, in which case a captured reference would point at a torn-down event.
+        // network thread races the tick. Make the sides mission-ready on the main thread.
+        // Re-resolve the event at drain time: it may have finalized between this request
+        // arriving and the queued action running, in which case a captured reference would
+        // point at a torn-down event.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try
@@ -344,9 +344,6 @@ internal class BattleHandler : IHandler
     {
         var message = payload.What;
 
-        // The map event's troop-upgrade tracker is game state the main-thread tick also
-        // touches, so defer the apply to the game loop. Ids are resolved at drain time so
-        // the apply stays queue-ordered behind the event's create and ahead of its evict.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try

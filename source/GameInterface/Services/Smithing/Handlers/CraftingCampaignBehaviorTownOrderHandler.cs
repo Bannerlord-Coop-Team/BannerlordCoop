@@ -85,8 +85,6 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void Handle(MessagePayload<NetworkCompleteOrderServer> obj)
         {
-            // The client-removal broadcast is moved into CompleteOrderServer so it goes out
-            // only after the server has applied its gold/relation/roster/event changes.
             CompleteOrderServer(obj.What);
         }
 
@@ -97,7 +95,6 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void CreateTownOrderServer(TownOrderCreated obj)
         {
-            // The reply is sent only after the order is registered and added.
             GameLoopRunner.RunOnMainThread(() =>
             {
                 try
@@ -240,7 +237,6 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void CompleteOrderServer(NetworkCompleteOrderServer obj)
         {
-            // Clients are told to remove the order only after the server has applied its changes.
             GameLoopRunner.RunOnMainThread(() =>
             {
                 try
@@ -303,7 +299,6 @@ namespace GameInterface.Services.Smithing.Handlers
 
                     CampaignEventDispatcher.Instance.OnCraftingOrderCompleted(town, craftingOrder, craftedItem, completerHero);
 
-                    // Tell clients to remove the order only after the server apply above.
                     network.SendAll(new NetworkCompleteOrderClients(obj));
                 }
                 catch (Exception e)

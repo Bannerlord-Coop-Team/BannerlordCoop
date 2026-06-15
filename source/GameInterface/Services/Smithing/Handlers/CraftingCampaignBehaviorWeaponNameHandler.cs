@@ -57,7 +57,6 @@ namespace GameInterface.Services.Smithing.Handlers
         {
             NetworkBehaviorSetCraftedWeaponNameClients nameChange = new(obj.What);
 
-            // The server relays to all clients only after it has applied the change itself.
             GameLoopRunner.RunOnMainThread(() =>
             {
                 try

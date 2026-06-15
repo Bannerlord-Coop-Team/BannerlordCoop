@@ -65,9 +65,6 @@ internal class BuildingHelperHandler : IHandler
     {
         var data = obj.What;
 
-        // Applying the default building runs vanilla game code, so defer it to the game
-        // loop. The objects are resolved at drain time because they may unregister between
-        // enqueue and execution.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try
@@ -104,9 +101,6 @@ internal class BuildingHelperHandler : IHandler
     {
         var data = obj.What;
 
-        // Applying the building queue runs vanilla game code, so defer it to the game
-        // loop. The objects are resolved at drain time because they may unregister between
-        // enqueue and execution.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try
@@ -147,10 +141,6 @@ internal class BuildingHelperHandler : IHandler
         var data = obj.What;
         var peer = obj.Who as NetPeer;
 
-        // The gold transfer and building boost run vanilla game code, so defer the whole
-        // apply to the game loop. The objects are resolved at drain time because they may
-        // unregister between enqueue and execution, and the gold-change reply goes out only
-        // after the work runs so 'difference' is computed on the main thread.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try
