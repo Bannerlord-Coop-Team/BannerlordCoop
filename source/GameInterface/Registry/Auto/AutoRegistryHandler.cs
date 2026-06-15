@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
@@ -155,25 +156,33 @@ class AutoRegistryHandler<T> : IHandler where T : class
     {
         // TODO drop on loading clients
 
-        if (!ObjectManager.TryGetObjectWithLogging(payload.What.InstanceId, out T obj)) return;
-
-        if (Registry.Debug)
+        // Resolve and tear down on the game-loop thread, in queue order with the marshaled DynamicSync
+        // applies, so a destroy whose object is already gone (e.g. a duplicate) is dropped instead of
+        // tearing down twice.
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            Logger.Debug("[Client][{CallingMethod}] Destroyed instance of {type} with id {id}",
-                $"{nameof(AutoRegistryHandler<T>)}.{nameof(Handle_NetworkDestroyInstance)}",
-                typeof(T).Name,
-                payload.What.InstanceId);
-        }
+            if (!ObjectManager.TryGetObjectWithLogging(payload.What.InstanceId, out T obj)) return;
 
-        try { 
-            // Callback before object is removed from registry
-            Registry.OnClientDestroyed(obj, payload.What.InstanceId);
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "Failed to run OnClientCreated for {MessageType}", payload.What.GetType());
-        }
+            if (Registry.Debug)
+            {
+                Logger.Debug("[Client][{CallingMethod}] Destroyed instance of {type} with id {id}",
+                    $"{nameof(AutoRegistryHandler<T>)}.{nameof(Handle_NetworkDestroyInstance)}",
+                    typeof(T).Name,
+                    payload.What.InstanceId);
+            }
 
-        ObjectManager.Remove(obj);
+            // Guard the callback so the de-registration below still runs if it throws.
+            try
+            {
+                // Callback before object is removed from registry
+                Registry.OnClientDestroyed(obj, payload.What.InstanceId);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Failed to run OnClientDestroyed for {MessageType}", payload.What.GetType());
+            }
+
+            ObjectManager.Remove(obj);
+        });
     }
 }

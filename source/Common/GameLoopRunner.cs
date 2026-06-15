@@ -2,6 +2,8 @@
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 
 namespace Common;
@@ -13,8 +15,8 @@ public class GameLoopRunner : IUpdateable
     private static readonly Lazy<GameLoopRunner> m_Instance =
         new Lazy<GameLoopRunner>(() => new GameLoopRunner());
 
-    private readonly Queue<(Action, EventWaitHandle)> m_Queue =
-        new Queue<(Action, EventWaitHandle)>();
+    private readonly Queue<(Action Action, EventWaitHandle WaitHandle, StrongBox<ExceptionDispatchInfo> Error)> m_Queue =
+        new Queue<(Action, EventWaitHandle, StrongBox<ExceptionDispatchInfo>)>();
 
     private readonly object m_QueueLock = new object();
     private int m_GameLoopThreadId;
@@ -45,7 +47,7 @@ public class GameLoopRunner : IUpdateable
             throw new ArgumentException("Wrong thread!");
         }
 
-        List<(Action, EventWaitHandle)> toBeRun = new List<(Action, EventWaitHandle)>();
+        var toBeRun = new List<(Action Action, EventWaitHandle WaitHandle, StrongBox<ExceptionDispatchInfo> Error)>();
 
         lock (Instance.m_QueueLock)
         {
@@ -54,11 +56,32 @@ public class GameLoopRunner : IUpdateable
                 toBeRun.Add(m_Queue.Dequeue());
             }
         }
-        
-        foreach ((Action, EventWaitHandle) task in toBeRun)
+
+        foreach (var task in toBeRun)
         {
-            task.Item1?.Invoke();
-            task.Item2?.Set();
+            try
+            {
+                task.Action?.Invoke();
+            }
+            catch (Exception ex)
+            {
+                // Guard each queued action so one that throws cannot abort the drain of the rest of
+                // the frame's actions. For a blocking caller, hand the failure back so it rethrows
+                // instead of resuming as if the work succeeded; a fire-and-forget action is logged.
+                if (task.Error != null)
+                {
+                    task.Error.Value = ExceptionDispatchInfo.Capture(ex);
+                }
+                else
+                {
+                    Logger.Error(ex, "A queued game-loop action threw");
+                }
+            }
+            finally
+            {
+                // Always signal the waiter so a blocking caller is not left waiting out the full timeout.
+                task.WaitHandle?.Set();
+            }
         }
     }
     public int Priority { get; } = UpdatePriority.MainLoop.GameLoopRunner;
@@ -91,17 +114,27 @@ public class GameLoopRunner : IUpdateable
             EventWaitHandle ewh = blocking ?
                 new EventWaitHandle(false, EventResetMode.ManualReset) :
                 null;
+            StrongBox<ExceptionDispatchInfo> error = blocking ?
+                new StrongBox<ExceptionDispatchInfo>() :
+                null;
             lock (Instance.m_QueueLock)
             {
-                Instance.m_Queue.Enqueue((action, ewh));
+                Instance.m_Queue.Enqueue((action, ewh, error));
             }
 
-            if (ewh != null && ewh.WaitOne(BlockingTimeout) == false)
+            if (ewh != null)
             {
-                throw new TimeoutException(
-                    $"A blocking {nameof(RunOnMainThread)} action was not processed by the game loop " +
-                    $"within {BlockingTimeout.TotalSeconds:0} seconds. The game loop thread is not pumping " +
-                    $"{nameof(GameLoopRunner)}.{nameof(Update)} (initialized: {Instance.IsInitialized}).");
+                if (ewh.WaitOne(BlockingTimeout) == false)
+                {
+                    throw new TimeoutException(
+                        $"A blocking {nameof(RunOnMainThread)} action was not processed by the game loop " +
+                        $"within {BlockingTimeout.TotalSeconds:0} seconds. The game loop thread is not pumping " +
+                        $"{nameof(GameLoopRunner)}.{nameof(Update)} (initialized: {Instance.IsInitialized}).");
+                }
+
+                // If the action threw on the game loop, rethrow it here on the calling thread so a
+                // blocking caller sees the failure instead of resuming as if the work succeeded.
+                error.Value?.Throw();
             }
         }
     }

@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
@@ -84,19 +85,12 @@ namespace GameInterface.Utils
             Action<MessagePayload<TMessage>> payloadHandler = (payload) =>
             {
                 var data = payload.What;
-                if (!objectManager.TryGetObjectWithLogging(data.InstanceId, out TInstance instance)) return;
 
-                try
+                MarshalApply(() =>
                 {
-                    using (new AllowedThread())
-                    {
-                        messageHandler(instance, data);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Logger.Error(ex, "Failed to run message handler");
-                }
+                    if (!objectManager.TryGetObjectWithLogging(data.InstanceId, out TInstance instance)) return;
+                    messageHandler(instance, data);
+                });
             };
             messageBroker.Subscribe(payloadHandler);
             disposeFunctions.Add(() => messageBroker.Unsubscribe(payloadHandler));
@@ -108,25 +102,37 @@ namespace GameInterface.Utils
             Action<MessagePayload<TMessage>> payloadHandler = (payload) =>
             {
                 var data = payload.What;
-                if (!objectManager.TryGetObjectWithLogging(data.InstanceId, out TInstance instance)) return;
 
-                TValue value = null;
-                if (data.ValueId != null && !objectManager.TryGetObjectWithLogging(data.ValueId, out value)) return;
+                MarshalApply(() =>
+                {
+                    if (!objectManager.TryGetObjectWithLogging(data.InstanceId, out TInstance instance)) return;
 
-                try
-                {
-                    using (new AllowedThread())
-                    {
-                        messageHandler(instance, value, data);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Logger.Error(ex, "Failed to run message handler");
-                }
+                    TValue value = null;
+                    if (data.ValueId != null && !objectManager.TryGetObjectWithLogging(data.ValueId, out value)) return;
+
+                    messageHandler(instance, value, data);
+                });
             };
             messageBroker.Subscribe(payloadHandler);
             disposeFunctions.Add(() => messageBroker.Unsubscribe(payloadHandler));
+        }
+
+        /// <summary>
+        /// Marshals a received apply onto the game-loop thread inside an <see cref="AllowedThread"/>
+        /// scope, so the re-run vanilla setter does not race the game loop or re-trigger the patches.
+        /// Resolve object ids INSIDE the supplied action so the lookups run in queue order with the
+        /// marshaled AutoRegistry destroy — an apply for an already-destroyed object resolves nothing
+        /// and is dropped.
+        /// </summary>
+        protected void MarshalApply(Action apply)
+        {
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                using (new AllowedThread())
+                {
+                    apply();
+                }
+            });
         }
 
         public void Dispose()
