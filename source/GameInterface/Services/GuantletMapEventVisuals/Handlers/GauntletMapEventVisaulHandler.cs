@@ -8,6 +8,7 @@ using GameInterface.Services.ObjectManager;
 using SandBox.GauntletUI.Map;
 using Serilog;
 using System;
+using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.GuantletMapEventVisuals.Handlers;
 
@@ -46,16 +47,21 @@ internal class GauntletMapEventVisaulHandler : IHandler
 
     private void Handle_NetworkGauntletMapEventVisualInitialized(MessagePayload<NetworkGauntletMapEventVisualInitialized> payload)
     {
-        if (!objectManager.TryGetObjectWithLogging<GauntletMapEventVisual>(payload.What.InstanceId, out var visual))
-            return;
-
-        var position = payload.What.Position;
         var instanceId = payload.What.InstanceId;
+        var position = payload.What.Position;
 
         // Initializing the visual touches Gauntlet map UI, which is only safe on the main
-        // thread; this handler runs on the network thread that delivered the message.
+        // thread; this handler runs on the network thread that delivered the message. The
+        // visual is re-resolved on the main thread so that a matching destroy which arrived
+        // first (and ran synchronously on the network thread) is observed here and the now
+        // stale init is skipped.
         GameLoopRunner.RunOnMainThread(() =>
         {
+            if (Campaign.Current == null) return;
+
+            if (!objectManager.TryGetObjectWithLogging<GauntletMapEventVisual>(instanceId, out var visual))
+                return;
+
             using (new AllowedThread())
             {
                 try

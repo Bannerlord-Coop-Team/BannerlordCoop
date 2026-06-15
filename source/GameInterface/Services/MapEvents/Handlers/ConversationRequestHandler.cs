@@ -276,26 +276,32 @@ internal class ConversationRequestHandler : IHandler
         // thread that delivered the approval.
         GameLoopRunner.RunOnMainThread(() =>
         {
-            if (Campaign.Current == null) return;
-
-            if (PlayerEncounter.Current != null)
+            if (Campaign.Current == null)
             {
-                // A duplicate approval for the encounter that is already open (the rate-limited request was retried
-                // while the first approval was in flight): ignore it. Sending ConversationEnded here would release
-                // the server-side hold while the conversation is still active.
-                if (PlayerEncounter.EncounteredParty == defender || PlayerEncounter.EncounteredParty == attacker)
-                {
-                    Logger.Debug("Ignoring duplicate conversation approval for the already-open encounter");
-                    return;
-                }
-
-                Logger.Warning("Conversation allowed but PlayerEncounter.Current is not null; cannot restart encounter");
+                // The client can no longer open the encounter; release the server-side hold the
+                // server took before approving, so the AI party is not left frozen.
                 SendConversationEndedToServer();
                 return;
             }
 
             try
             {
+                if (PlayerEncounter.Current != null)
+                {
+                    // A duplicate approval for the encounter that is already open (the rate-limited request was retried
+                    // while the first approval was in flight): ignore it. Sending ConversationEnded here would release
+                    // the server-side hold while the conversation is still active.
+                    if (PlayerEncounter.EncounteredParty == defender || PlayerEncounter.EncounteredParty == attacker)
+                    {
+                        Logger.Debug("Ignoring duplicate conversation approval for the already-open encounter");
+                        return;
+                    }
+
+                    Logger.Warning("Conversation allowed but PlayerEncounter.Current is not null; cannot restart encounter");
+                    SendConversationEndedToServer();
+                    return;
+                }
+
                 using (new AllowedThread())
                 {
                     if (message.Source == ConversationRestartSource.EncounterManager)

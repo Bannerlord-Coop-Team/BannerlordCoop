@@ -41,6 +41,8 @@ internal class GameMenuRefreshHandler : IHandler
         // this handler runs on the network thread that delivered the message.
         GameLoopRunner.RunOnMainThread(() =>
         {
+            if (Campaign.Current == null) return;
+
             try
             {
                 GameMenu.SwitchToMenu(menuName);
