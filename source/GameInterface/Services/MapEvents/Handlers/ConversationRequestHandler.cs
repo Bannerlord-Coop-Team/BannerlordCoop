@@ -7,6 +7,7 @@ using Common.Util;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Utils;
 using HarmonyLib;
 using LiteNetLib;
 using Serilog;
@@ -271,34 +272,40 @@ internal class ConversationRequestHandler : IHandler
             return;
         }
 
-        if (PlayerEncounter.Current != null)
+        // Restarting the encounter reopens the encounter menu, and the PlayerEncounter
+        // state it reads is mutated by the main-thread tick; both must run on the main
+        // thread rather than the network thread that delivered the approval.
+        MainThreadDispatch.RunWhenCampaignReady("restart approved conversation encounter", () =>
         {
-            // A duplicate approval for the encounter that is already open (the rate-limited request was retried
-            // while the first approval was in flight): ignore it. Sending ConversationEnded here would release
-            // the server-side hold while the conversation is still active.
-            if (PlayerEncounter.EncounteredParty == defender || PlayerEncounter.EncounteredParty == attacker)
+            if (PlayerEncounter.Current != null)
             {
-                Logger.Debug("Ignoring duplicate conversation approval for the already-open encounter");
+                // A duplicate approval for the encounter that is already open (the rate-limited request was retried
+                // while the first approval was in flight): ignore it. Sending ConversationEnded here would release
+                // the server-side hold while the conversation is still active.
+                if (PlayerEncounter.EncounteredParty == defender || PlayerEncounter.EncounteredParty == attacker)
+                {
+                    Logger.Debug("Ignoring duplicate conversation approval for the already-open encounter");
+                    return;
+                }
+
+                Logger.Warning("Conversation allowed but PlayerEncounter.Current is not null; cannot restart encounter");
+                SendConversationEndedToServer();
                 return;
             }
 
-            Logger.Warning("Conversation allowed but PlayerEncounter.Current is not null; cannot restart encounter");
-            SendConversationEndedToServer();
-            return;
-        }
-
-        using (new AllowedThread())
-        {
-            if (message.Source == ConversationRestartSource.EncounterManager)
+            using (new AllowedThread())
             {
-                EncounterManager.RestartPlayerEncounter(attacker, defender);
+                if (message.Source == ConversationRestartSource.EncounterManager)
+                {
+                    EncounterManager.RestartPlayerEncounter(attacker, defender);
+                }
+                else
+                {
+                    // PlayerEncounter.RestartPlayerEncounter(defenderParty, attackerParty, forcePlayerOutFromSettlement)
+                    PlayerEncounter.RestartPlayerEncounter(defender, attacker, message.ForcePlayerOutFromSettlement);
+                }
             }
-            else
-            {
-                // PlayerEncounter.RestartPlayerEncounter(defenderParty, attackerParty, forcePlayerOutFromSettlement)
-                PlayerEncounter.RestartPlayerEncounter(defender, attacker, message.ForcePlayerOutFromSettlement);
-            }
-        }
+        });
     }
 
     /// <summary>[Client] This player's encounter finished; tell the server to release the held party.</summary>

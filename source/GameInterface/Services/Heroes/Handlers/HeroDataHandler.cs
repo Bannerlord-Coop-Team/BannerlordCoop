@@ -7,6 +7,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Template.Handlers;
 using GameInterface.Services.Template.Messages;
 using GameInterface.Services.Template.Patches;
+using GameInterface.Utils;
 using SandBox.GauntletUI;
 using Serilog;
 using System;
@@ -49,16 +50,22 @@ internal class HeroDataHandler : IHandler
             return;
         }
 
-        var fullName = new TextObject(data.FullName);
-        var firstName = new TextObject(data.FirstName);
-
-        HeroDataPatches.SetNameOverride(hero, fullName, firstName);
-
-        InformationManager.DisplayMessage(new InformationMessage($"Changed hero name to {fullName}"));
-
-        if (ScreenManager.TopScreen is GauntletClanScreen clanScreen)
+        // Applying the name runs vanilla game code and the refresh touches the clan
+        // screen UI; both must run on the main thread, not the network thread that
+        // delivered the message.
+        MainThreadDispatch.RunWhenCampaignReady("change hero name", () =>
         {
-            clanScreen._dataSource?.RefreshValues();
-        }
+            var fullName = new TextObject(data.FullName);
+            var firstName = new TextObject(data.FirstName);
+
+            HeroDataPatches.SetNameOverride(hero, fullName, firstName);
+
+            InformationManager.DisplayMessage(new InformationMessage($"Changed hero name to {fullName}"));
+
+            if (ScreenManager.TopScreen is GauntletClanScreen clanScreen)
+            {
+                clanScreen._dataSource?.RefreshValues();
+            }
+        });
     }
 }
