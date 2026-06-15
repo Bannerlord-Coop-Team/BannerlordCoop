@@ -9,7 +9,7 @@ using Coop.Core.Common.Services.Connection.Messages;
 using Coop.Core.Server;
 using GameInterface;
 using GameInterface.DynamicSync;
-using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.UI.Messages;
 using System;
 
@@ -61,7 +61,9 @@ namespace Coop.Core
         {
             StartAsServer();
 
-            messageBroker.Publish(this, new LoadGame(obj.What.SaveName));
+            container
+                .Resolve<IGameStateInterface>()
+                .LoadGame(obj.What.SaveName);
         }
 
         private void Handle(MessagePayload<EndCoopMode> payload)

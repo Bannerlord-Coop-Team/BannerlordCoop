@@ -59,7 +59,7 @@ namespace Coop.Tests.Client.States
 
             // Assert — the world is reset to the main menu, then the received save is loaded.
             gameStateMock.Verify(x => x.GoToMainMenu(), Times.Once);
-            gameStateMock.Verify(x => x.LoadSaveGame(gameSaveData), Times.Once);
+            gameStateMock.Verify(x => x.LoadSaveData(gameSaveData), Times.Once);
             Assert.IsType<LoadingState>(clientLogic.State);
             loadingInterfaceMock.Verify(x => x.SetLoadingMessage(
                 "Joining Coop Campaign",
@@ -81,7 +81,7 @@ namespace Coop.Tests.Client.States
 
             // Assert — no save to load, so we go to the main menu but remain waiting.
             gameStateMock.Verify(x => x.GoToMainMenu(), Times.Once);
-            gameStateMock.Verify(x => x.LoadSaveGame(It.IsAny<byte[]>()), Times.Never);
+            gameStateMock.Verify(x => x.LoadSaveData(It.IsAny<byte[]>()), Times.Never);
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
         }
 
@@ -97,7 +97,7 @@ namespace Coop.Tests.Client.States
 
             // Assert
             gameStateMock.Verify(x => x.GoToMainMenu(), Times.Once);
-            gameStateMock.Verify(x => x.LoadSaveGame(It.IsAny<byte[]>()), Times.Never);
+            gameStateMock.Verify(x => x.LoadSaveData(It.IsAny<byte[]>()), Times.Never);
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
         }
 
