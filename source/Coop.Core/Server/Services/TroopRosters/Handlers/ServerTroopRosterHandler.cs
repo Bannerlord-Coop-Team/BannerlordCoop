@@ -47,10 +47,14 @@ internal class ServerTroopRosterHandler : IHandler
         {
             try
             {
-                // Recruitment commits troops through TroopRoster.AddToCounts, whose sync patch
-                // (TroopRosterAddToCountsPatch) replicates the recruited troops to clients only
-                // while inside an AllowedThread — the same scope vanilla recruitment runs in.
-                // The gold-change reply follows the apply.
+                // Heads up: AllowedThread on the SERVER looks backwards. Everywhere else it means
+                // "this change arrived over the network, don't broadcast it again." Recruitment is
+                // the exception. Adding troops goes through TroopRoster.AddToCounts, and the patch on
+                // THAT method is wired the opposite way from the other roster patches: it sends the
+                // recruited troops out to clients ONLY when we're inside an AllowedThread. So we wrap
+                // the apply on purpose — here AllowedThread turns syncing ON, not off. Remove it and
+                // the host recruits fine but nobody else ever sees the new troops. The gold-change
+                // notification to the recruiting client rides out right after the apply.
                 using (new AllowedThread())
                 {
                     troopRosterInterface.HandleOnRecruitmentDone(data.MobilePartyId, data.TroopsInCart, out var changedGold);

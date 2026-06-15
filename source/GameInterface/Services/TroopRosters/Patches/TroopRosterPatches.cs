@@ -142,9 +142,10 @@ internal class TroopRosterPatches
         MessageBroker.Instance.Publish(__instance, new TroopsSwappedAtIndices(__instance, firstIndex, secondIndex));
     }
 }
-// RecruitmentCampaignBehavior.ApplyInternal runs inside AllowedThread (via OverrideApplyForParty),
-// which suppresses the AddNewElement and AddToCountsAtIndex patches. This patch explicitly
-// publishes sync messages for that case using the return value as the final index.
+// Some co-op flows commit troops via AddToCounts while inside an AllowedThread — the server
+// recruitment apply (ServerTroopRosterHandler) and prisoner/battle capture, for example. Inside
+// an AllowedThread the lower-level AddNewElement and AddToCountsAtIndex patches are suppressed,
+// so this patch publishes the sync messages for that case, using the return value as the final index.
 [HarmonyPatch(typeof(TroopRoster), nameof(TroopRoster.AddToCounts))]
 internal class TroopRosterAddToCountsPatch
 {
