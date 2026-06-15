@@ -1,5 +1,4 @@
-﻿using Common.Logging.Attributes;
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
 using System;
 using System.Collections.Generic;
@@ -11,7 +10,6 @@ namespace Coop.Core.Server.Services.Villages.Messages;
 /// Notify client of LastDemandTimeSatifised Change.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-[BatchLogMessage]
 public record NetworkChangeVillageDemandTime : IEvent
 {
     [ProtoMember(1)]

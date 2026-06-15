@@ -1,18 +1,13 @@
-﻿using Common.Logging;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Server.Connections.Messages;
-using GameInterface.Services.Heroes.Interfaces;
-using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.Players;
-using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Serilog;
 using System.Linq;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
 
 namespace Coop.Core.Server.Connections.States;
@@ -30,12 +25,13 @@ public class ResolveCharacterState : ConnectionStateBase
     private readonly IModuleValidator moduleValidator;
     private readonly IPlayerManager playerManager;
     private readonly IModuleInfoProvider moduleInfoProvider;
+
     public ResolveCharacterState(IConnectionLogic connectionLogic,
         IMessageBroker messageBroker,
         INetwork network,
         IModuleValidator moduleValidator,
         IPlayerManager playerManager,
-        IModuleInfoProvider moduleInfoProvider) 
+        IModuleInfoProvider moduleInfoProvider)
         : base(connectionLogic)
     {
         this.messageBroker = messageBroker;
@@ -63,7 +59,7 @@ public class ResolveCharacterState : ConnectionStateBase
 
         var validateMessage = new NetworkModuleVersionsValidated(result, error);
         var playerPeer = ConnectionLogic.Peer;
-        network.Send(playerPeer, validateMessage);
+        network.SendImmediate(playerPeer, validateMessage);
     }
 
     internal void Handle_ClientValidate(MessagePayload<NetworkClientValidate> obj)
@@ -73,12 +69,12 @@ public class ResolveCharacterState : ConnectionStateBase
 
         if (playerManager.TryGetPlayer(obj.What.PlayerId, out var player))
         {
-            network.Send(peer, new NetworkClientValidated(true, player));
+            network.SendImmediate(peer, new NetworkClientValidated(true, player));
             ConnectionLogic.TransferSave();
         }
         else
         {
-            network.Send(peer, new NetworkClientValidated(false, null));
+            network.SendImmediate(peer, new NetworkClientValidated(false, null));
             ConnectionLogic.CreateCharacter();
         }
     }
@@ -115,6 +111,7 @@ public class ResolveCharacterState : ConnectionStateBase
         {
             Id = networkModuleInfo.Id,
             IsOfficial = networkModuleInfo.IsOfficial,
+            IsDlc = networkModuleInfo.IsDlc,
             Version = new ApplicationVersion((ApplicationVersionType)networkModuleInfo.Version.ApplicationVersionType, networkModuleInfo.Version.Major, networkModuleInfo.Version.Minor, networkModuleInfo.Version.Revision, networkModuleInfo.Version.ChangeSet)
         };
     }

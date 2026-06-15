@@ -1,8 +1,15 @@
 ﻿using GameInterface.Services.Kingdoms.Data;
+using GameInterface.Services.Kingdoms.Extentions;
+using GameInterface.Services.ObjectManager;
 using ProtoBuf;
+using Serilog;
 using System.IO;
 using System.Reflection;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Election;
+using TaleWorlds.CampaignSystem.Settlements;
 using Xunit;
+using FormatterServices = System.Runtime.Serialization.FormatterServices;
 
 namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision
 {
@@ -45,6 +52,42 @@ namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision
             Assert.NotNull(obj2);
             object? obj3 = fieldInfo3?.GetValue(null);
             Assert.NotNull(obj3);
+        }
+
+        [Fact]
+        public void RoundTrip_WithNullCapturerAndClanToExclude_DoesNotThrowAndPreservesNulls()
+        {
+            // Vanilla raises this decision with capturerHero and clanToExclude both null
+            // (e.g. a fief reassignment after a clan leaves or dies), so both ids are null on the wire.
+            ObjectManager objectManager = new ObjectManager(new LoggerConfiguration().CreateLogger());
+            Clan proposerClan = (Clan)FormatterServices.GetUninitializedObject(typeof(Clan));
+            proposerClan.StringId = "ProposerClan";
+            Kingdom kingdom = (Kingdom)FormatterServices.GetUninitializedObject(typeof(Kingdom));
+            kingdom.StringId = "Kingdom";
+            Settlement settlement = (Settlement)FormatterServices.GetUninitializedObject(typeof(Settlement));
+            settlement.StringId = "Settlement";
+            objectManager.AddExisting(proposerClan.StringId, proposerClan);
+            objectManager.AddExisting(kingdom.StringId, kingdom);
+            objectManager.AddExisting(settlement.StringId, settlement);
+
+            SettlementClaimantDecisionData data = new SettlementClaimantDecisionData(
+                proposerClan.StringId, kingdom.StringId, 10, true, true, true, settlement.StringId, null, null);
+
+            // Deserialization: null optional ids must reconstruct the decision, not drop it.
+            Assert.True(data.TryGetKingdomDecision(objectManager, out var kingdomDecision));
+            Assert.True(kingdomDecision is SettlementClaimantDecision);
+            SettlementClaimantDecision decision = (SettlementClaimantDecision)kingdomDecision;
+            Assert.Null(decision._capturerHero);
+            Assert.Null(decision.ClanToExclude);
+            Assert.Same(settlement, decision.Settlement);
+
+            // Serialization: converting back must not throw on the null fields and must keep them null.
+            KingdomDecisionData roundTrippedData = decision.ToKingdomDecisionData();
+            Assert.True(roundTrippedData is SettlementClaimantDecisionData);
+            SettlementClaimantDecisionData roundTripped = (SettlementClaimantDecisionData)roundTrippedData;
+            Assert.Null(roundTripped.CapturerHeroId);
+            Assert.Null(roundTripped.ClanToExcludeId);
+            Assert.Equal(settlement.StringId, roundTripped.SettlementId);
         }
     }
 }

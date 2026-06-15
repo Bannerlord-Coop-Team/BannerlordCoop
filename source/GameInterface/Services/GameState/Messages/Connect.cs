@@ -13,7 +13,7 @@ public readonly struct Connect : ICommand
     }
 }
 
-public readonly struct Connected : IResponse
+public readonly struct Connected : IEvent
 {
     public Guid TransactionID { get; }
 

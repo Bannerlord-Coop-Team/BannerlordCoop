@@ -1,5 +1,4 @@
-﻿using Common.Logging.Attributes;
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
 
 namespace Coop.Core.Server.Services.ItemRosters.Messages;
@@ -7,7 +6,6 @@ namespace Coop.Core.Server.Services.ItemRosters.Messages;
 /// <summary>
 /// Sent to the client by the server when an ItemRoster is updated.
 /// </summary>
-[BatchLogMessage]
 [ProtoContract(SkipConstructor = true)]
 public readonly struct NetworkItemRosterUpdate : IMessage
 {

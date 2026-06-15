@@ -1,8 +1,6 @@
 ﻿using Common;
-using Common.Messaging;
 using Common.Network;
 using Coop.Core.Common.Network.Packets;
-using Coop.Core.Server.Services.Connection.Messages;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
@@ -18,17 +16,19 @@ public class TransferSaveState : ConnectionStateBase
 {
     public TransferSaveState(
         IConnectionLogic connectionLogic,
-        IMessageBroker messageBroker,
         INetwork network,
         ICoopSessionProvider coopSessionProvider,
         ISaveInterface saveInterface,
-        ITimeControlInterface timeControlInterface)
+        ITimeControlInterface timeControlInterface,
+        IConnectionMessageQueue connectionMessageQueue)
         : base(connectionLogic)
     {
-        messageBroker.Publish(this, new PlayerLoading());
-
         GameLoopRunner.RunOnMainThread(() =>
         {
+            // Pause so the save snapshot is taken from a stationary world. This is local to the
+            // save and runs before the connection has been assigned this state, so it precedes
+            // the registry's loading lock; ConnectionCollection drives the broadcast loading pause once
+            // the transition completes (see IsLoading below).
             timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
 
             var saveResults = saveInterface.SaveCurrentGame();
@@ -44,10 +44,19 @@ public class TransferSaveState : ConnectionStateBase
                 connectionLogic.Peer.Disconnect();
                 return;
             }
-                
-            network.Send(ConnectionLogic.Peer, savePacket);
+
+            // Start holding this peer's broadcasts now that the snapshot has been taken. The whole save
+            // runs in a blocking RunOnMainThread call issued from the network thread, so the poller is
+            // parked for its duration and cannot broadcast a received delta that races the snapshot;
+            // taking the cut right after the snapshot cleanly separates "in the save" (dropped while
+            // Dropping) from "after the save" (queued for replay).
+            connectionMessageQueue.BeginQueueing(ConnectionLogic.Peer);
+
+            network.SendImmediate(ConnectionLogic.Peer, savePacket);
         }, blocking: true);
     }
+
+    public override bool IsLoading => true;
 
     public override void Dispose()
     {

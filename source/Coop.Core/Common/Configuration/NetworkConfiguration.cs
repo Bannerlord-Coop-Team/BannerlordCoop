@@ -24,7 +24,7 @@ public class NetworkConfiguration : INetworkConfiguration
 
     public string P2PToken => throw new NotImplementedException();
 
-    public int MaxPacketsInQueue => 1000;
+    public int MaxPacketsInQueue => 10000;
 
     public TimeSpan AuditTimeout => TimeSpan.FromSeconds(15);
 

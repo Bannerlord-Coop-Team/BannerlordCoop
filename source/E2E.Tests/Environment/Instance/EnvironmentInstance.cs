@@ -146,31 +146,47 @@ public abstract class EnvironmentInstance : IDisposable
         public StaticScope(EnvironmentInstance instance)
         {
             Monitor.Enter(GameInstance.@lock);
-            
-            // Save previous static values
-            wasServer = ModInformation.IsServer;
-            if (GameInterface.ContainerProvider.TryGetContainer(out previousContainer) == false)
+
+            // The lock must be released even when the body throws (resolving from an instance a
+            // concurrent test already disposed), otherwise it stays owned by this (possibly
+            // recycled) thread forever and every later scope or GameInstance build deadlocks.
+            try
             {
-                // If no previous container is set, set it to the current container
-                previousContainer = instance.Container;
+                // Save previous static values
+                wasServer = ModInformation.IsServer;
+                if (GameInterface.ContainerProvider.TryGetContainer(out previousContainer) == false)
+                {
+                    // If no previous container is set, set it to the current container
+                    previousContainer = instance.Container;
+                }
+
+                // Set new static values
+                instance.GameInstance.SetStatics();
+
+                ModInformation.IsServer = instance is ServerInstance;
+                instance.Container.Resolve<TestMessageBroker>().SetStaticInstance();
+                GameInterface.ContainerProvider.SetContainer(instance.Container);
             }
-
-            // Set new static values
-            instance.GameInstance.SetStatics();
-
-            ModInformation.IsServer = instance is ServerInstance;
-            instance.Container.Resolve<TestMessageBroker>().SetStaticInstance();
-            GameInterface.ContainerProvider.SetContainer(instance.Container);
+            catch
+            {
+                Monitor.Exit(GameInstance.@lock);
+                throw;
+            }
         }
 
         public void Dispose()
         {
-            // Restore previous static values
-            ModInformation.IsServer = wasServer;
-            GameInterface.ContainerProvider.SetContainer(previousContainer);
-            previousContainer.Resolve<TestMessageBroker>().SetStaticInstance();
-
-            Monitor.Exit(GameInstance.@lock);
+            try
+            {
+                // Restore previous static values
+                ModInformation.IsServer = wasServer;
+                GameInterface.ContainerProvider.SetContainer(previousContainer);
+                previousContainer.Resolve<TestMessageBroker>().SetStaticInstance();
+            }
+            finally
+            {
+                Monitor.Exit(GameInstance.@lock);
+            }
         }
     }
 

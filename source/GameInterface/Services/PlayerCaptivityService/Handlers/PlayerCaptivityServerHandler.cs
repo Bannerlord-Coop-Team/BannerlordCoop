@@ -173,6 +173,10 @@ internal class PlayerCaptivityServerHandler : IHandler
 
         ReleasePlayerFromCaptivity(playerHero, playerParty, payload.What.Detail, facilitator, payload.What.PlayerPartyPosition);
 
+        if (payload.What.Detail == EndCaptivityDetail.Ransom && payload.What.RansomAmount!=0)
+        {
+            GiveGoldAction.ApplyBetweenCharacters(playerHero, null, payload.What.RansomAmount, false);
+        }
         var message = new NetworkPlayerCaptivityEnded();
         network.Send(payload.Who as NetPeer, message);
     }
@@ -235,17 +239,6 @@ internal class PlayerCaptivityServerHandler : IHandler
         if (playerHero.IsAlive)
         {
             playerHero.ChangeState(Hero.CharacterStates.Active);
-
-            // Restore the released hero to full health BEFORE re-adding it to the party. The client that
-            // fought the battle wounds the hero locally (HitPoints -> 1) and that synced to everyone; vanilla
-            // never re-adds a released hero as wounded, and ChangeState(Active) does not heal. Healing first
-            // means the member roster never counts the hero as wounded, and the HitPoints write (server is
-            // authoritative) replicates the heal so the restored party shows the hero healthy everywhere.
-            if (playerHero.HitPoints < playerHero.MaxHitPoints)
-            {
-                playerHero.HitPoints = playerHero.MaxHitPoints;
-            }
-
             playerParty.AddElementToMemberRoster(playerHero.CharacterObject, 1, true);
             playerParty.ChangePartyLeader(playerHero);
         }

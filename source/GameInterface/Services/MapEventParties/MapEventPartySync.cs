@@ -15,7 +15,8 @@ namespace GameInterface.Services.MapEventParties
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEventParty), nameof(MapEventParty.Party)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEventParty), nameof(MapEventParty.PlunderedGold)));
 
-            autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventParty), nameof(MapEventParty._contributionToBattle)));
+            // Not needed on client as it only is used in server calculations
+            //autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventParty), nameof(MapEventParty._contributionToBattle)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventParty), nameof(MapEventParty._healthyManCountAtStart)));
 
             autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventParty), nameof(MapEventParty._diedInBattle)));

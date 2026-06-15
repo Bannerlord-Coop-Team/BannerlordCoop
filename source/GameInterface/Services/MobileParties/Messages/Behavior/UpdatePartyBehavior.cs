@@ -1,5 +1,4 @@
-﻿using Common.Logging.Attributes;
-using Common.Messaging;
+﻿using Common.Messaging;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Handlers;
 using TaleWorlds.CampaignSystem.Party;
@@ -10,7 +9,6 @@ namespace GameInterface.Services.MobileParties.Messages.Behavior;
 /// Updates <see cref="MobilePartyAi"/> behavior on the campaign map.
 /// </summary>
 /// <seealso cref="MobilePartyBehaviorHandler"/>
-[BatchLogMessage]
 public struct UpdatePartyBehavior : ICommand
 {
     public PartyBehaviorUpdateData BehaviorUpdateData;
@@ -25,7 +23,6 @@ public struct UpdatePartyBehavior : ICommand
 /// Notifies that PartyBehavior was updated
 /// </summary>
 /// <seealso cref="MobilePartyBehaviorHandler"/>
-[BatchLogMessage]
 public struct PartyBehaviorUpdated : IEvent
 {
     public PartyBehaviorUpdateData BehaviorUpdateData { get; }

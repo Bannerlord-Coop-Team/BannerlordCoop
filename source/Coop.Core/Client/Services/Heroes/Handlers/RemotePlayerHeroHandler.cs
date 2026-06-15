@@ -1,29 +1,23 @@
 ﻿using Common.Logging;
 using Common.Messaging;
-using Coop.Core.Client.Messages;
-using Coop.Core.Client.Services.Heroes.Data;
 using Coop.Core.Client.Services.Heroes.Messages;
-using GameInterface.Services.Entity;
-using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Players;
-using GameInterface.Services.Players.Data;
 using Serilog;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.Core;
 
 namespace Coop.Core.Client.Services.Heroes.Handlers;
 
 /// <summary>
-/// Persistent client handler for remote-player hero creation.
+/// Persistent client handler that instantiates a remote player's hero when the server announces one.
 /// </summary>
 /// <remarks>
-/// Subscribes to <see cref="NetworkNewPlayerHeroCreated"/> for the whole client lifetime so the message is never
-/// dropped in the gap between join states (ReceivingSavedData → Loading → Campaign) — previously a player that
-/// joined while this client was loading could be lost. While the campaign is still loading, heroes are deferred;
-/// once the client has entered the campaign (<see cref="ClientCampaignEntered"/>) the backlog is drained and any
-/// further heroes are instantiated immediately. Leaving to the main menu resets readiness so a reconnect defers
-/// again instead of instantiating against an unloaded campaign.
+/// The server's per-peer connection message queue withholds <see cref="NetworkNewPlayerHeroCreated"/>
+/// (and every other world broadcast) from a client until that client reports it has entered the
+/// campaign. By the time this handler sees the message the campaign save is loaded and the hero, party
+/// and clan ids the message references are already registered, so the hero can be instantiated
+/// immediately — there is no client-side deferral here. Reconnect correctness relies on the coop
+/// container being finalized on disconnect, which yields a fresh handler per session; this handler no
+/// longer resets itself when leaving to the main menu.
 /// </remarks>
 internal class RemotePlayerHeroHandler : IHandler
 {
@@ -32,75 +26,38 @@ internal class RemotePlayerHeroHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IHeroInterface heroInterface;
     private readonly IPlayerManager playerRegistry;
-    private readonly IDeferredHeroRepository deferredHeroRepo;
-    private bool campaignReady;
 
     public RemotePlayerHeroHandler(
         IMessageBroker messageBroker,
         IHeroInterface heroInterface,
-        IPlayerManager playerRegistry,
-        IDeferredHeroRepository deferredHeroRepo)
+        IPlayerManager playerRegistry)
     {
         this.messageBroker = messageBroker;
         this.heroInterface = heroInterface;
         this.playerRegistry = playerRegistry;
-        this.deferredHeroRepo = deferredHeroRepo;
 
         messageBroker.Subscribe<NetworkNewPlayerHeroCreated>(Handle_NetworkNewPlayerHeroCreated);
-        messageBroker.Subscribe<ClientCampaignEntered>(Handle_ClientCampaignEntered);
-        messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkNewPlayerHeroCreated>(Handle_NetworkNewPlayerHeroCreated);
-        messageBroker.Unsubscribe<ClientCampaignEntered>(Handle_ClientCampaignEntered);
-        messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
     }
 
     private void Handle_NetworkNewPlayerHeroCreated(MessagePayload<NetworkNewPlayerHeroCreated> payload)
     {
-        if (campaignReady)
-        {
-            CreatePlayerHero(payload.What);
-        }
-        else
-        {
-            // Still loading: defer until the campaign is ready so the message is never lost in a state gap.
-            deferredHeroRepo.AddDeferredHero(payload.What);
-        }
-    }
-
-    private void Handle_ClientCampaignEntered(MessagePayload<ClientCampaignEntered> payload)
-    {
-        campaignReady = true;
-
-        foreach (var message in deferredHeroRepo.GetAllDeferredHeroes())
-        {
-            CreatePlayerHero(message);
-        }
-
-        deferredHeroRepo.Clear();
-    }
-
-    private void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> payload)
-    {
-        // Left the campaign (e.g. disconnect): drop any backlog and require a fresh campaign before
-        // instantiating again, so a reconnect doesn't create heroes against an unloaded campaign.
-        campaignReady = false;
-        deferredHeroRepo.Clear();
-    }
-
-    private void CreatePlayerHero(NetworkNewPlayerHeroCreated message)
-    {
+        var message = payload.What;
         var player = message.Player;
 
-        if (!playerRegistry.AddPlayer(message.Player))
+        if (!playerRegistry.AddPlayer(player))
         {
-            Logger.Error("Player {HeroId} has already been added.", message.Player.HeroId);
+            // The queue should deliver this exactly once, after the campaign is ready. A repeat here
+            // signals a delivery hole (a broadcast that reached this peer outside the queue) rather
+            // than normal operation, so keep it observable.
+            Logger.Error("Player {HeroId} has already been added.", player.HeroId);
             return;
         }
-            
+
         // Unpack + set up in one main-thread pass, registering the host's ids carried by the Player.
         heroInterface.ClientUnpackHero(message.HeroData, player);
     }

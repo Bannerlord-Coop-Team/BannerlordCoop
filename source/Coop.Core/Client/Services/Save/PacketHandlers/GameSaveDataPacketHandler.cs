@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.PacketHandlers;
 using Coop.Core.Client.Messages;
 using Coop.Core.Common.Network.Packets;
@@ -10,7 +10,8 @@ namespace Coop.Core.Client.Services.Save.PacketHandlers;
 /// Receives the transfer save (<see cref="GameSaveDataPacket"/>) and republishes it as the local
 /// <see cref="NetworkGameSaveDataReceived"/> event, leaving the client join state machine
 /// (<c>ReceivingSavedDataState</c>) unchanged. The save travels as its own packet type — rather than
-/// a message — so <c>LoadingPacketBuffer</c> can use its arrival as the start-of-buffering divider.
+/// a message — so it is delivered separately from the world-change stream, which the server withholds
+/// from this client until it has entered the campaign.
 /// </summary>
 internal class GameSaveDataPacketHandler : IPacketHandler
 {

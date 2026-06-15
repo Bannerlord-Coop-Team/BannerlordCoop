@@ -28,6 +28,26 @@ public class KingdomHandler : IHandler
         this.objectManager = objectManager;
         messageBroker.Subscribe<AddDecision>(HandleAddDecision);
         messageBroker.Subscribe<RemoveDecision>(HandleRemoveDecision);
+        messageBroker.Subscribe<ChangeKingdomPolicy>(HandleChangeKingdomPolicy);
+    }
+
+    private void HandleChangeKingdomPolicy(MessagePayload<ChangeKingdomPolicy> obj)
+    {
+        var payload = obj.What;
+
+        if (!objectManager.TryGetObject(payload.KingdomId, out Kingdom kingdom))
+        {
+            Logger.Debug("Kingdom not found in KingdomHandler with KingdomId: {id}", payload.KingdomId);
+            return;
+        }
+
+        if (!objectManager.TryGetObject(payload.PolicyId, out PolicyObject policy))
+        {
+            Logger.Debug("PolicyObject not found in KingdomHandler with PolicyId: {id}", payload.PolicyId);
+            return;
+        }
+
+        KingdomPatches.RunChangeKingdomPolicy(kingdom, policy, payload.IsAdd);
     }
 
     private void HandleRemoveDecision(MessagePayload<RemoveDecision> obj)
@@ -36,7 +56,7 @@ public class KingdomHandler : IHandler
 
         if (!objectManager.TryGetObject(payload.KingdomId, out Kingdom kingdom))
         {
-            Logger.Verbose("Kingdom not found in KingdomDecisionHandler with KingdomId: {id}", payload.KingdomId);
+            Logger.Debug("Kingdom not found in KingdomDecisionHandler with KingdomId: {id}", payload.KingdomId);
             return;
         }
 
@@ -44,7 +64,7 @@ public class KingdomHandler : IHandler
         var decisions = kingdom._unresolvedDecisions;
         if (decisions == null)
         {
-            Logger.Verbose("Kingdom {id} has no unresolved decision list.", payload.KingdomId);
+            Logger.Debug("Kingdom {id} has no unresolved decision list.", payload.KingdomId);
             return;
         }
 
@@ -54,7 +74,7 @@ public class KingdomHandler : IHandler
         }
         else
         {
-            Logger.Verbose("Index is out of bounds of the list.");
+            Logger.Warning("Index is out of bounds of the list.");
             return;
         }
     }
@@ -65,13 +85,13 @@ public class KingdomHandler : IHandler
 
         if (!objectManager.TryGetObject(payload.KingdomId, out Kingdom kingdom))
         {
-            Logger.Verbose("Kingdom not found in KingdomDecisionHandler with KingdomId: {id}", payload.KingdomId);
+            Logger.Debug("Kingdom not found in KingdomDecisionHandler with KingdomId: {id}", payload.KingdomId);
             return;
         }
 
         if (!payload.Data.TryGetKingdomDecision(objectManager, out KingdomDecision kingdomDecision))
         {
-            Logger.Verbose("KingdomDecision could not be deserialized in KingdomDecisionHandler.");
+            Logger.Warning("KingdomDecision could not be deserialized in KingdomDecisionHandler.");
             return;
         }
 
@@ -82,5 +102,6 @@ public class KingdomHandler : IHandler
     {
         messageBroker.Unsubscribe<AddDecision>(HandleAddDecision);
         messageBroker.Unsubscribe<RemoveDecision>(HandleRemoveDecision);
+        messageBroker.Unsubscribe<ChangeKingdomPolicy>(HandleChangeKingdomPolicy);
     }
 }

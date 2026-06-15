@@ -1,4 +1,4 @@
-using Common.PacketHandlers;
+﻿using Common.PacketHandlers;
 using GameInterface.Services.Smithing;
 using LiteNetLib;
 using ProtoBuf;
@@ -10,10 +10,11 @@ namespace Coop.Core.Common.Network.Packets;
 /// </summary>
 /// <remarks>
 /// Sent as its own packet type rather than a <see cref="MessagePacket"/> so it is structurally
-/// separate from the world-change message stream: the client uses its arrival as the divider that
-/// starts buffering subsequent deltas until the campaign has finished loading (see
-/// <c>LoadingPacketBuffer</c>). Uses <see cref="DeliveryMethod.ReliableOrdered"/> — the same channel
-/// as <see cref="MessagePacket"/> — so it stays correctly ordered relative to those deltas.
+/// separate from the world-change message stream. World deltas are withheld from a joining client on
+/// the server side (the connection message queue) until it has loaded and entered the campaign, so the
+/// save's arrival no longer drives any client-side buffering. Uses <see cref="DeliveryMethod.ReliableOrdered"/>
+/// — the same channel as <see cref="MessagePacket"/> — so it stays correctly ordered relative to the
+/// deltas that follow once the client is live.
 /// </remarks>
 [ProtoContract(SkipConstructor = true)]
 public readonly struct GameSaveDataPacket : IPacket

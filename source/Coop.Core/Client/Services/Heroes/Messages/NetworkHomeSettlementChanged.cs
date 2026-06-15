@@ -1,5 +1,4 @@
-﻿using Common.Logging.Attributes;
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
 
 namespace Coop.Core.Client.Services.Heroes.Messages;
@@ -8,7 +7,6 @@ namespace Coop.Core.Client.Services.Heroes.Messages;
 /// Command to change the _homeSettlement of a hero.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-[BatchLogMessage]
 public record NetworkHomeSettlementChanged : ICommand
 {
     [ProtoMember(1)]

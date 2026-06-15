@@ -2,7 +2,6 @@
 
 using Common.Messaging;
 using Common.Network;
-using Coop.Core.Client.Messages;
 using Coop.Core.Common;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.GameState.Interfaces;
@@ -39,12 +38,8 @@ public class CampaignState : ClientStateBase
             "Loading Host Campaign",
             "Creating remote player heroes...");
 
-        // Campaign is fully loaded and our hero is switched in. Signal the persistent RemotePlayerHeroHandler so
-        // it drains any remote heroes deferred during loading and starts instantiating further ones immediately.
-        // (Remote-hero creation lives in that handler so the NetworkNewPlayerHeroCreated message is never dropped
-        // in the gap between the loading states.)
-        messageBroker.Publish(this, new ClientCampaignEntered());
-
+        // Tell the server we have fully entered the campaign so it flushes the broadcasts it withheld
+        // for us (the per-peer ConnectionMessageQueue) and resumes sending the live world stream.
         network.SendAll(new NetworkPlayerCampaignEntered());
 
         loadingInterface.HideLoadingScreen();

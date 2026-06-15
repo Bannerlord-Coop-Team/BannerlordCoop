@@ -1,12 +1,10 @@
-﻿using Common.Logging.Attributes;
-using Common.Messaging;
+﻿using Common.Messaging;
 
 namespace GameInterface.Services.Towns.Messages
 {
     /// <summary>
     /// Used when the Loyalty changes in a Town.
     /// </summary>
-    [BatchLogMessage]
     public record ChangeTownLoyalty : ICommand
     {
         public string TownId { get; }

@@ -4,6 +4,7 @@ about: Default epic template
 title: "Epic: "
 labels: ''
 assignees: ''
+projects: ["Bannerlord-Coop-Team/37"]
 
 ---
 

@@ -100,12 +100,6 @@ internal class MapEventPatches
         return true;
     }
 
-    [HarmonyPatch(nameof(MapEvent.Update))]
-    [HarmonyPrefix]
-    // Disable update on clients
-    private static bool PrefixUpdate() => ModInformation.IsServer;
-
-
     [HarmonyPatch(nameof(MapEvent.OnBattleWon))]
     [HarmonyPrefix]
     private static bool Prefix_OnBattleWon(MapEvent __instance)
@@ -124,15 +118,17 @@ internal class MapEventPatches
         return true;
     }
 
+    [HarmonyPatch(nameof(MapEvent.Update))]
     [HarmonyPrefix]
-    [HarmonyPatch("Update")]
-    static bool PrefixUpdate(MapEvent __instance)
+    private static bool PrefixUpdate(MapEvent __instance)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed())
-            return true;
-
+        // Clients never tick a map event locally; the server is authoritative for battle resolution.
         if (ModInformation.IsClient)
             return false;
+
+        // Receive path / setup: let the original run when patches are standing down.
+        if (CallOriginalPolicy.IsOriginalAllowed())
+            return true;
 
         // Skip if any parties are not set
         if (__instance.InvolvedParties.Any(x => x?.MobileParty is null))

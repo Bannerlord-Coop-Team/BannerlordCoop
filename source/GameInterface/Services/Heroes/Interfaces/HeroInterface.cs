@@ -79,13 +79,20 @@ internal class HeroInterface : IHeroInterface
         Hero hero = null;
 
         GameLoopRunner.RunOnMainThread(() => {
-            using (new AllowedThread())
+            try
             {
-                hero = BinaryFormatterSerializer
-                    .Deserialize<HeroBinaryPackage>(bytes)
-                    .Unpack<Hero>(binaryPackageFactory);
+                using (new AllowedThread())
+                {
+                    hero = BinaryFormatterSerializer
+                        .Deserialize<HeroBinaryPackage>(bytes)
+                        .Unpack<Hero>(binaryPackageFactory);
 
-                SetupNewHero(hero, assignNetworkIds);
+                    SetupNewHero(hero, assignNetworkIds);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Failed to unpack hero");
             }
         },
         blocking: true);
