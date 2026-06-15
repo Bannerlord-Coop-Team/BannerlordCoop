@@ -29,7 +29,5 @@ public class ClientModule : CommonModule
 
         RegisterAllTypesWithInterface<ClientModule, IHandler>(builder, autoInstantiate: true);
         RegisterAllTypesWithInterface<ClientModule, IPacketHandler>(builder, autoInstantiate: true);
-
-        RegisterAllTypesWithInterface<ClientModule, IClientState>(builder);
     }
 }
