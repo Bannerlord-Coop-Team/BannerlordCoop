@@ -40,8 +40,6 @@ internal class ServerTroopRosterHandler : IHandler
         var data = payload.What;
         var peer = payload.Who as NetPeer;
 
-        // Recruitment runs vanilla roster/gold code and the result must replicate to clients;
-        // both must run on the main thread, not the network thread that delivered the request.
         // The server replies with the gold change only after it has applied the recruitment.
         GameLoopRunner.RunOnMainThread(() =>
         {

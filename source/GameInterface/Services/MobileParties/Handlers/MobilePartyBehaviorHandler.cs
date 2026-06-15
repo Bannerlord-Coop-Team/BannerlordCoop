@@ -93,10 +93,6 @@ internal class MobilePartyBehaviorHandler : IHandler
     {
         var data = obj.What.BehaviorUpdateData;
 
-        // Applying the behavior runs vanilla campaign-map AI/movement code; it must run
-        // on the main thread, not the network thread that delivered the message. Ids are
-        // resolved at drain time so the apply stays queue-ordered with the party's other
-        // game-loop work.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try

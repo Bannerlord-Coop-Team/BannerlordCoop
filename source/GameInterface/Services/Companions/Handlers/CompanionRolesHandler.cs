@@ -88,11 +88,6 @@ internal class CompanionRolesHandler : IHandler
     {
         var data = obj.What;
 
-        // Creating the clan runs vanilla game code (companion removal, clan/party creation,
-        // roster mutations) and touches party visuals, all of which are main-thread-only;
-        // this handler runs on the network thread that delivered the message. The ids are
-        // re-resolved on the main thread so the apply stays queued behind the objects'
-        // creation and ahead of their destruction.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try
@@ -152,9 +147,6 @@ internal class CompanionRolesHandler : IHandler
     {
         var data = obj.What;
 
-        // These vanilla actions run main-thread-only game code; this handler runs on the
-        // network thread that delivered the message. The hero is re-resolved on the main
-        // thread so the apply stays queued behind its creation and ahead of its destruction.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try
@@ -188,9 +180,6 @@ internal class CompanionRolesHandler : IHandler
     {
         var data = obj.What;
 
-        // The vanilla action runs main-thread-only game code; this handler runs on the
-        // network thread that delivered the message. The ids are re-resolved on the main
-        // thread so the apply stays queued behind their creation and ahead of their destruction.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try
@@ -224,10 +213,6 @@ internal class CompanionRolesHandler : IHandler
     {
         var data = obj.What;
 
-        // The captivity end, state change, and roster add run main-thread-only game code;
-        // this handler runs on the network thread that delivered the message. The ids are
-        // re-resolved on the main thread so the apply stays queued behind their creation and
-        // ahead of their destruction.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try
@@ -271,10 +256,6 @@ internal class CompanionRolesHandler : IHandler
     {
         var data = obj.What;
 
-        // PartyScreenClosed runs roster transfers (main-thread-only vanilla game code); this
-        // handler runs on the network thread that delivered the message. The ids are re-resolved
-        // on the main thread so the apply stays queued behind their creation and ahead of their
-        // destruction.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try
@@ -318,9 +299,6 @@ internal class CompanionRolesHandler : IHandler
     {
         var data = obj.What;
 
-        // EndCaptivityAction runs main-thread-only game code; this handler runs on the network
-        // thread that delivered the message. The hero is re-resolved on the main thread so the
-        // apply stays queued behind its creation and ahead of its destruction.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try

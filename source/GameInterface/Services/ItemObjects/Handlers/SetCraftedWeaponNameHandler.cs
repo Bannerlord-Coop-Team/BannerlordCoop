@@ -55,9 +55,7 @@ namespace GameInterface.Services.ItemObjects.Handlers
         {
             NetworkSetCraftedWeaponNameClients nameChange = new(obj.What);
 
-            // Applying the rename runs vanilla game code, so it must run on the main thread,
-            // not the network thread that delivered the message. The server relays to all
-            // clients only after it has applied the change itself.
+            // The server relays to all clients only after it has applied the change itself.
             GameLoopRunner.RunOnMainThread(() =>
             {
                 try
@@ -78,8 +76,6 @@ namespace GameInterface.Services.ItemObjects.Handlers
         {
             var data = obj.What;
 
-            // Applying the rename runs vanilla game code, so it must run on the main thread,
-            // not the network thread that delivered the message.
             GameLoopRunner.RunOnMainThread(() =>
             {
                 try

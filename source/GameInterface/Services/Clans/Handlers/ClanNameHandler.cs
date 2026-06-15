@@ -56,9 +56,8 @@ namespace GameInterface.Services.Clans.Handlers
                 return;
             }
 
-            // Applying the name runs vanilla game code and the refresh touches the clan screen
-            // UI; both must run on the main thread, not the network thread that delivered the
-            // message. The server relays to the other clients only after it has applied the
+            // The refresh touches the clan screen UI, which is main-thread only.
+            // The server relays to the other clients only after it has applied the
             // change itself.
             GameLoopRunner.RunOnMainThread(() =>
             {

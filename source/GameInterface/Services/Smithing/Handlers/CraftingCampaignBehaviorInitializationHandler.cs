@@ -73,9 +73,6 @@ namespace GameInterface.Services.Smithing.Handlers
         {
             var data = obj.What;
 
-            // Seeding the per-player crafting keys reads CraftingTemplate.All and resolves
-            // template ids, which touches game state the main-thread tick also reads; apply
-            // it on the game loop rather than the network thread that delivered the message.
             GameLoopRunner.RunOnMainThread(() =>
             {
                 try

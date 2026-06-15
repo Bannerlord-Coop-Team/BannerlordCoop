@@ -111,11 +111,6 @@ internal class TradeHandler : IHandler
         var message = payload.What;
         var peer = payload.Who as NetPeer;
 
-        // The apply path runs vanilla game code and mutates managed/Harmony-patched roster,
-        // troop and equipment state; it must run on the main thread, not the network thread
-        // that delivered the message. Object-id resolution is moved inside so the apply stays
-        // queue-ordered behind the objects' creation and ahead of their destruction, and the
-        // replies are sent only after the work has run.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try
@@ -204,10 +199,6 @@ internal class TradeHandler : IHandler
     {
         var message = obj.What;
 
-        // The equipment writes run vanilla game code and mark managed party state as dirty;
-        // they must run on the main thread, not the network thread that delivered the message.
-        // Object-id resolution is moved inside so the apply stays queue-ordered against the
-        // party's lifetime.
         GameLoopRunner.RunOnMainThread(() =>
         {
             using (new AllowedThread())

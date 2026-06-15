@@ -90,8 +90,6 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             var data = payload.What;
 
-            // Mutating the volunteer-types array runs vanilla game code; defer it to the
-            // game-loop thread instead of the network thread that delivered the message.
             GameLoopRunner.RunOnMainThread(() =>
             {
                 try
@@ -125,8 +123,6 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             var data = payload.What;
 
-            // Adding to the hero's children list runs vanilla game code; defer it to the
-            // game-loop thread instead of the network thread that delivered the message.
             GameLoopRunner.RunOnMainThread(() =>
             {
                 try
@@ -160,8 +156,6 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             var data = payload.What;
 
-            // Adding to the hero's owned-caravans list runs vanilla game code; defer it to the
-            // game-loop thread instead of the network thread that delivered the message.
             GameLoopRunner.RunOnMainThread(() =>
             {
                 try
@@ -195,8 +189,6 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             var data = payload.What;
 
-            // Removing from the hero's owned-caravans list runs vanilla game code; defer it to the
-            // game-loop thread instead of the network thread that delivered the message.
             GameLoopRunner.RunOnMainThread(() =>
             {
                 try
@@ -230,8 +222,6 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             var data = payload.What;
 
-            // Adding to the hero's owned-alleys list runs vanilla game code; defer it to the
-            // game-loop thread instead of the network thread that delivered the message.
             GameLoopRunner.RunOnMainThread(() =>
             {
                 try
@@ -265,8 +255,6 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             var data = payload.What;
 
-            // Removing from the hero's owned-alleys list runs vanilla game code; defer it to the
-            // game-loop thread instead of the network thread that delivered the message.
             GameLoopRunner.RunOnMainThread(() =>
             {
                 try
@@ -300,8 +288,6 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             var data = payload.What;
 
-            // Adding to the hero's owned-workshops list runs vanilla game code; defer it to the
-            // game-loop thread instead of the network thread that delivered the message.
             GameLoopRunner.RunOnMainThread(() =>
             {
                 try
@@ -335,8 +321,6 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             var data = payload.What;
 
-            // Removing from the hero's owned-workshops list runs vanilla game code; defer it to the
-            // game-loop thread instead of the network thread that delivered the message.
             GameLoopRunner.RunOnMainThread(() =>
             {
                 try

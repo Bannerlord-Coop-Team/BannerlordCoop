@@ -57,9 +57,6 @@ internal class VolunteerTypesHandler : IHandler
         var individualId = obj.What.IndividualId;
         var bitCode = obj.What.BitCode;
 
-        // The volunteer array write touches game state and must run on the main thread, not the
-        // network thread that delivered the message. Resolving the hero inside the lambda keeps
-        // the apply queue-ordered behind the hero's create and ahead of its destroy.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try
@@ -104,9 +101,6 @@ internal class VolunteerTypesHandler : IHandler
     {
         var updatedVolunteerTypeIds = obj.What.UpdatedVolunteerTypeIds;
 
-        // The volunteer array writes touch game state and must run on the main thread, not the
-        // network thread that delivered the message. Resolving the heroes/characters inside the
-        // lambda keeps the apply queue-ordered behind their create and ahead of their destroy.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try

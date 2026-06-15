@@ -69,10 +69,6 @@ internal class PartyScreenHelperHandler : IHandler
     {
         var data = obj.What;
 
-        // This mutates campaign state (creates/registers the garrison party, mutates its
-        // roster) and runs a vanilla campaign action, all of which must run on the game
-        // loop rather than the network thread that delivered the message. The objects are
-        // re-resolved at drain time so the apply stays queue-ordered behind their create.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try
@@ -120,10 +116,6 @@ internal class PartyScreenHelperHandler : IHandler
     {
         var data = obj.What;
 
-        // The vanilla EnterSettlementAction and the campaign event dispatch mutate hero /
-        // settlement prisoner state and fire campaign behaviors, all main-thread-only; this
-        // handler runs on the network thread. The roster is deserialized and the objects are
-        // re-resolved at drain time so the apply stays queue-ordered behind their create.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try
@@ -165,10 +157,6 @@ internal class PartyScreenHelperHandler : IHandler
     {
         var data = obj.What;
 
-        // Both loops invoke vanilla EnterSettlementAction which mutates settlement / hero
-        // state and fires events, all main-thread-only; this handler runs on the network
-        // thread. The objects are re-resolved at drain time so the apply stays queue-ordered
-        // behind their create.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try
@@ -219,9 +207,8 @@ internal class PartyScreenHelperHandler : IHandler
 
         // The vanilla EndCaptivityAction / TakePrisonerAction route through patched
         // ApplyInternal whose prefixes block the client original (and log an error) unless
-        // the running thread is allowed; they also mutate hero / party state that is
-        // main-thread-only. Defer to the game loop and run inside AllowedThread so the
-        // patched actions run the original. The rosters are deserialized at drain time.
+        // the running thread is allowed. Run inside AllowedThread so the patched actions
+        // run the original.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try

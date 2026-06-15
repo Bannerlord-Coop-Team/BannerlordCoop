@@ -52,10 +52,6 @@ internal class ExecuteTroopHandler : IHandler
     {
         var data = obj.What;
 
-        // ApplyByExecution is heavy vanilla campaign code (removes the hero from its party/army,
-        // fires death/relation/event-driven behavior, mutates rosters) and must run on the main
-        // thread, not the network thread that delivered the message. The heroes are re-resolved
-        // inside the deferred body so the apply stays ordered behind their create on the queue.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try

@@ -73,8 +73,6 @@ internal class MobilePartyAiHandler : IHandler
 
         if (payload.What.IsNull)
         {
-            // Setting AiBehaviorInteractable runs vanilla game code (Harmony-prefixed); defer it
-            // to the game-loop thread instead of the network thread that delivered the message.
             GameLoopRunner.RunOnMainThread(() =>
             {
                 try
@@ -97,8 +95,6 @@ internal class MobilePartyAiHandler : IHandler
             return;
         }
 
-        // Setting AiBehaviorInteractable runs vanilla game code (Harmony-prefixed); defer it
-        // to the game-loop thread instead of the network thread that delivered the message.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try

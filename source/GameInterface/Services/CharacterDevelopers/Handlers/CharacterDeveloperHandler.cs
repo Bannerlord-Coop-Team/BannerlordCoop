@@ -146,10 +146,6 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
 
         private void ApplyChanges(NetworkApplyChangesClients obj, Action afterApply = null)
         {
-            // Applying perks/attributes/focuses runs vanilla game code, so it must run on
-            // the main thread, not the network thread that delivered the message. Ids are
-            // resolved at drain time so the apply stays queue-ordered behind the hero's
-            // create and ahead of its destroy.
             GameLoopRunner.RunOnMainThread(() =>
             {
                 try

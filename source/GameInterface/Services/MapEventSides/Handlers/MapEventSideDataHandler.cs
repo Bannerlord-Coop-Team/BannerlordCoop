@@ -129,8 +129,6 @@ internal class MapEventSideDataHandler : IHandler
     {
         var data = payload.What;
 
-        // Removing from the vanilla _battleParties collection runs Harmony-patched game code;
-        // defer it to the game-loop thread instead of the network thread that delivered the message.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try
@@ -162,8 +160,6 @@ internal class MapEventSideDataHandler : IHandler
     {
         var data = payload.What;
 
-        // Adding to the vanilla _battleParties collection (and reading side.MapEvent) is game
-        // state; defer it to the game-loop thread instead of the network thread that delivered the message.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try
@@ -211,8 +207,6 @@ internal class MapEventSideDataHandler : IHandler
 
         var side = (int)data.Side;
 
-        // Assigning into the vanilla _sides array races main-thread MapEventManager.Tick iterating
-        // sides; defer it to the game-loop thread instead of the network thread that delivered the message.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try
@@ -247,8 +241,6 @@ internal class MapEventSideDataHandler : IHandler
     {
         var data = payload.What;
 
-        // Adding to the vanilla _battleParties collection runs Harmony-patched game code;
-        // defer it to the game-loop thread instead of the network thread that delivered the message.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try

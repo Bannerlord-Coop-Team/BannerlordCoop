@@ -58,9 +58,6 @@ internal class CustomPartyComponentHandler : IHandler
     {
         var obj = payload.What;
 
-        // These are direct backing-field writes on a live CustomPartyComponent the game loop
-        // reads concurrently; defer the resolve + apply to the game-loop thread so it does not
-        // race the network thread that delivered the message.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try

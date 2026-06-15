@@ -125,7 +125,6 @@ public class TroopRosterHandler : IHandler
     {
         var obj = payload.What;
 
-        // Applying the roster change runs vanilla game code; defer it to the game-loop thread instead of the network thread that delivered the message.
         GameLoopRunner.RunOnMainThread(() =>
         {
             using (new AllowedThread())
@@ -160,7 +159,6 @@ public class TroopRosterHandler : IHandler
     {
         var obj = payload.What;
 
-        // Applying the roster change runs vanilla game code; defer it to the game-loop thread instead of the network thread that delivered the message.
         GameLoopRunner.RunOnMainThread(() =>
         {
             using (new AllowedThread())
@@ -193,7 +191,6 @@ public class TroopRosterHandler : IHandler
     {
         var troopRosterId = payload.What.TroopRosterId;
 
-        // Applying the roster change runs vanilla game code; defer it to the game-loop thread instead of the network thread that delivered the message.
         GameLoopRunner.RunOnMainThread(() =>
         {
             using (new AllowedThread())
@@ -227,7 +224,6 @@ public class TroopRosterHandler : IHandler
     {
         var obj = payload.What;
 
-        // Applying the roster change runs vanilla game code; defer it to the game-loop thread instead of the network thread that delivered the message.
         GameLoopRunner.RunOnMainThread(() =>
         {
             using (new AllowedThread())
@@ -261,7 +257,6 @@ public class TroopRosterHandler : IHandler
     {
         var obj = payload.What;
 
-        // Applying the roster change runs vanilla game code; defer it to the game-loop thread instead of the network thread that delivered the message.
         GameLoopRunner.RunOnMainThread(() =>
         {
             using (new AllowedThread())
@@ -295,7 +290,6 @@ public class TroopRosterHandler : IHandler
     {
         var obj = payload.What;
 
-        // Applying the roster change runs vanilla game code; defer it to the game-loop thread instead of the network thread that delivered the message.
         GameLoopRunner.RunOnMainThread(() =>
         {
             using (new AllowedThread())
@@ -329,7 +323,6 @@ public class TroopRosterHandler : IHandler
     {
         var obj = payload.What;
 
-        // Applying the roster change runs vanilla game code; defer it to the game-loop thread instead of the network thread that delivered the message.
         GameLoopRunner.RunOnMainThread(() =>
         {
             using (new AllowedThread())
@@ -363,7 +356,6 @@ public class TroopRosterHandler : IHandler
     {
         var obj = payload.What;
 
-        // Applying the roster change runs vanilla game code; defer it to the game-loop thread instead of the network thread that delivered the message.
         GameLoopRunner.RunOnMainThread(() =>
         {
             using (new AllowedThread())

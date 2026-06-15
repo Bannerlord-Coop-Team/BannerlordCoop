@@ -80,11 +80,6 @@ internal class PartyComponentHandler : IHandler
     {
         var data = payload.What.Data;
 
-        // Registering the SkipConstructor'd component and reconstituting the Garrison/Patrol
-        // links mutate the shared campaign object graph (DynamicSync-registered members,
-        // Settlement.SetPatrolParty, the garrison/town back-links) read by the game loop
-        // (nameplate VM, settlement.PatrolParty); deferring keeps that work on the game-loop
-        // thread instead of the network thread that delivered the message.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try
@@ -206,10 +201,7 @@ internal class PartyComponentHandler : IHandler
     {
         var obj = payload.What;
 
-        // The MobileParty assignment mutates the shared campaign object graph
-        // (PartyComponent↔MobileParty back-link read by the game loop) off-thread;
-        // defer it so it applies on the game-loop thread, not the network thread that
-        // delivered the message. Re-resolve inside in case the object is removed concurrently.
+        // Re-resolve inside in case the object is removed concurrently.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try

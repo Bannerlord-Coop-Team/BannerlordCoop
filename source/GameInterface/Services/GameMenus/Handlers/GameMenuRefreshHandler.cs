@@ -37,8 +37,7 @@ internal class GameMenuRefreshHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.TargetHeroId, out var targetHero) || targetHero != Hero.MainHero) return;
 
         var menuName = obj.What.MenuName;
-        // SwitchToMenu changes the active menu/screen, which is only safe on the main thread;
-        // this handler runs on the network thread that delivered the message.
+        // SwitchToMenu changes the active menu/screen, which is only safe on the main thread.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try
