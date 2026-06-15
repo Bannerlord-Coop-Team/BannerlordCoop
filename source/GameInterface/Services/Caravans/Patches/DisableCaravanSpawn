@@ -1,6 +1,15 @@
+using HarmonyLib;
+using System;
+using System.Linq;
+using System.Reflection;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade; 
         
-        
-        
+namespace GameInterface.Services.Caravans.Patches;
 protected override void OnSubModuleLoad()
         {
             try

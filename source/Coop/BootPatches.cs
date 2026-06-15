@@ -35,10 +35,6 @@ namespace Coop
 
         private static bool _applied = false;
 
-
-
-
-
         internal static void Apply()
         {
             if (_applied) return;
