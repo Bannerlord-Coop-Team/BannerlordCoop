@@ -124,10 +124,8 @@ internal class BattleHandler : IHandler
 
     private void Handle_NetworkAttackMissionAttempted(MessagePayload<NetworkAttackMissionAttempted> payload)
     {
-        if (!objectManager.TryGetObject(payload.What.MapEventId, out MapEvent mapEvent))
+        if (!objectManager.TryGetObject(payload.What.MapEventId, out MapEvent _))
             return;
-
-        mapEventLogger.DebugMapEvent(mapEvent, "Handling network attack mission attempted for map event. Making sides mission-ready and replying with mission start");
 
         // Roll the terrain seed once for this map event and reuse it for every client
         // that opens the battle, so they all use the same terrain seed. The seed is
@@ -137,11 +135,18 @@ internal class BattleHandler : IHandler
 
         // _sides is game state the main-thread tick also touches; mutating it from the
         // network thread races the tick. Make the sides mission-ready on the main thread,
-        // then reply so the start goes out only after they are ready.
+        // then reply so the start goes out only after they are ready. Re-resolve the event
+        // at drain time: it may have finalized between this request arriving and the queued
+        // action running, in which case a captured reference would point at a torn-down event.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try
             {
+                if (!objectManager.TryGetObject(payload.What.MapEventId, out MapEvent mapEvent))
+                    return;
+
+                mapEventLogger.DebugMapEvent(mapEvent, "Handling network attack mission attempted for map event. Making sides mission-ready and replying with mission start");
+
                 foreach (var side in mapEvent._sides)
                 {
                     side.MakeReadyForMission(null);

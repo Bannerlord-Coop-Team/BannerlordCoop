@@ -51,11 +51,23 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
             // Server-authoritative: apply on the game-loop thread, then relay to all
             // clients after the apply so the change goes out only once it has run here.
             NetworkApplyChangesClients changes = new(obj.What);
+
+            // AddFocuses overwrites SkillOrgFocusAmounts entry-by-entry during the apply
+            // (it sets each to the new focus level to track remaining points). That list is
+            // shared with the apply payload, so the relay must carry its own copy of the
+            // original deltas; relaying the applied object would send zeroed focus deltas
+            // and clients would never raise their focuses.
+            NetworkApplyChangesClients relay = new(obj.What);
+            if (obj.What.SkillOrgFocusAmounts != null)
+            {
+                relay.SkillOrgFocusAmounts = new List<int>(obj.What.SkillOrgFocusAmounts);
+            }
+
             ApplyChanges(changes, () =>
             {
                 if (ModInformation.IsServer)
                 {
-                    network.SendAll(changes);
+                    network.SendAll(relay);
                 }
             });
         }
