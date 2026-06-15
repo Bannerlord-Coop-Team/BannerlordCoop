@@ -11,7 +11,7 @@ namespace ServerHeadless.Bootstrap.Patches
     [HarmonyPatch]
     internal class EnginePatches
     {
-        // DebugGameInterface.StartGame calls MouseManager.ShowCursor (native) after loading.
+        // GameStateInterface.StartGame calls MouseManager.ShowCursor (native) after loading.
         [HarmonyPatch(typeof(MouseManager), nameof(MouseManager.ShowCursor))]
         [HarmonyPrefix]
         static bool ShowCursorPrefix() => false;
