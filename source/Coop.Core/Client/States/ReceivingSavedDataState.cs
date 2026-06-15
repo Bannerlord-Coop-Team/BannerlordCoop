@@ -53,7 +53,7 @@ public class ReceivingSavedDataState : ClientStateBase
             "Loading Host Campaign",
             "Loading host save data...");
 
-        gameStateInterface.LoadSaveGame(saveData);
+        gameStateInterface.LoadSaveData(saveData);
 
         Logic.LoadSavedData();
     }
