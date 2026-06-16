@@ -47,7 +47,7 @@ namespace Missions.Services.Taverns
         // The campaign network config — the same INetworkConfiguration CoopClient is connected to. Its
         // Address/Port are the rendezvous server; the P2P client's own config is pointed at it before
         // connecting so the NAT punch / relay reaches the co-host instead of compiled-in defaults.
-        private readonly INetworkConfiguration campaignConfiguration;
+        private readonly INetworkConfig campaignConfiguration;
 
         public CoopTavernsController(
             IMeshNetwork network,
@@ -56,7 +56,7 @@ namespace Missions.Services.Taverns
             IControllerIdProvider controllerIdProvider,
             BoardGameManager boardGameManager,
             IObjectManager objectManager,
-            INetworkConfiguration campaignConfiguration,
+            INetworkConfig campaignConfiguration,
             IAgentMovementHandler agentMovementHandler,
             IMissileHandler missileHandler,
             IWeaponDropHandler weaponDropHandler,

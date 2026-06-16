@@ -1,4 +1,6 @@
-﻿using System;
+﻿using LiteNetLib;
+using System;
+using System.Net;
 
 namespace Common.Network;
 
@@ -14,4 +16,14 @@ public interface INetworkConfig
     TimeSpan AuditTimeout { get; }
     TimeSpan ObjectCreationTimeout { get; }
     TimeSpan NetworkPollInterval { get; }
+    IPAddress LanAddress { get; }
+    int LanPort { get; }
+    IPAddress WanAddress { get; }
+    int WanPort { get; }
+    TimeSpan PingInterval { get; }
+    TimeSpan ReconnectDelay { get; }
+    TimeSpan DisconnectTimeout { get; }
+    NatAddressType NATType { get; }
+
+    void SetRendezvous(string address, int port);
 }
