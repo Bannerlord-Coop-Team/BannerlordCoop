@@ -74,7 +74,14 @@ public sealed class PacketProfiler : IDisposable
             .Select(entry => $"{entry.Key}: {entry.Value.PacketsSent} packets, {entry.Value.BytesSent:N0} bytes")
             .ToList();
 
-        Logger.Information("Packet profile over {Seconds:0.#} seconds: {@PacketProfile}", dt.TotalSeconds, ordered);
+        // Average outbound throughput over the window: total bytes sent divided by the elapsed seconds.
+        var totalBytes = snapshot.Values.Sum(s => s.BytesSent);
+        var seconds = dt.TotalSeconds;
+        var bytesPerSecond = seconds > 0 ? totalBytes / seconds : 0;
+
+        Logger.Information(
+            "Packet profile over {Seconds:0.#} seconds ({BytesPerSecond:N0} bytes/sec avg): {@PacketProfile}",
+            seconds, bytesPerSecond, ordered);
     }
 
     private static string GetPacketName(IPacket packet)
