@@ -214,7 +214,7 @@ internal class MapEventPartyHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(obj.MapEventParty, out var mapEventPartyId))
             return;
 
-        var message = new NetworkTroopWounded(mapEventPartyId, obj.TroopSeed);
+        var message = new NetworkTroopRouted(mapEventPartyId, obj.TroopSeed);
 
         network.SendAll(message);
     }
@@ -235,7 +235,10 @@ internal class MapEventPartyHandler : IHandler
 
                 var troopDescriptor = new UniqueTroopDescriptor(obj.TroopSeed);
 
-                mapEventParty.OnTroopRouted(troopDescriptor);
+                using (new AllowedThread())
+                {
+                    mapEventParty.OnTroopRouted(troopDescriptor);
+                }
             }
             catch (Exception ex)
             {
