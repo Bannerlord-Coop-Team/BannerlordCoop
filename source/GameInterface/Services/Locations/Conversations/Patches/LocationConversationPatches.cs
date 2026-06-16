@@ -35,7 +35,7 @@ internal static class LocationConversationPatches
         }
     }
 
-    // Accessed only on the game thread (the interaction, the approval applied via RunOnMainThread, the
+    // Accessed only on the main thread (the interaction, the approval applied via RunOnMainThread, the
     // conversation-end callback, and the mission-end callback all run there).
     private static PendingConversation? pending;
     private static string heldNpcKey;
@@ -134,7 +134,7 @@ internal static class LocationConversationPatches
     }
 
     /// <summary>
-    /// [Client, game thread] Server approved: start the held-back conversation, unless the approval is for a
+    /// [Client, main thread] Server approved: start the held-back conversation, unless the approval is for a
     /// request the player has since abandoned (generation mismatch), in which case it is ignored.
     /// </summary>
     internal static void StartApprovedConversation(int generation)
@@ -172,7 +172,7 @@ internal static class LocationConversationPatches
     }
 
     /// <summary>
-    /// [Client, game thread] Server denied: drop the pending request and report whether it matched, so a stale
+    /// [Client, main thread] Server denied: drop the pending request and report whether it matched, so a stale
     /// denial for an abandoned request neither clears the current pending nor shows a busy message.
     /// </summary>
     internal static bool CancelPending(int generation)

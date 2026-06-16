@@ -12,7 +12,7 @@ namespace GameInterface.Services.Locations.Patches;
 /// <remarks>
 /// The four re-enabled behaviors' spawn handlers run inside <see cref="BeginScope"/>/<see cref="EndScope"/>, so
 /// any <see cref="LocationCharacter"/> constructed during that window is ambient crowd; its (shared culture)
-/// character template is recorded so every agent later built from it is recognised. Game-thread only.
+/// character template is recorded so every agent later built from it is recognised. Main-thread only.
 /// </remarks>
 internal static class AmbientCrowd
 {

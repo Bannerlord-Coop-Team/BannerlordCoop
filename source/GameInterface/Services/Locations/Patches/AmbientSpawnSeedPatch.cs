@@ -22,7 +22,7 @@ namespace GameInterface.Services.Locations.Patches;
 internal class AmbientSpawnSeedPatch
 {
     // Set only while the seeded pass is running, so the count-pin patch knows when to fix the
-    // per-player civilian-count config. Thread-scoped because the pass runs on the game thread and
+    // per-player civilian-count config. Thread-scoped because the pass runs on the main thread and
     // the config getter must not be overridden for reads on any other thread.
     [ThreadStatic]
     internal static bool AmbientPassActive;

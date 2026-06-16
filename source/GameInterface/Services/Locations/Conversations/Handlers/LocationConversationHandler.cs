@@ -98,7 +98,7 @@ internal class LocationConversationHandler : IHandler
         }
     }
 
-    /// <summary>[Client] Server approved: start the held-back conversation on the game thread.</summary>
+    /// <summary>[Client] Server approved: start the held-back conversation on the main thread.</summary>
     private void Handle_NetworkAllowLocationConversation(MessagePayload<NetworkAllowLocationConversation> payload)
     {
         if (ModInformation.IsServer) return;
