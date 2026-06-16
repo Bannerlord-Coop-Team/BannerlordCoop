@@ -25,12 +25,12 @@ internal class HeroAgentSpawnRosterPatches
     [HarmonyPostfix]
     static void OnGovernorChangedPostfix(Town town, Hero oldGovernor, Hero newGovernor)
     {
-        if (ModInformation.IsServer == false) return;
+        if (!ModInformation.IsServer) return;
         if (town?.Settlement == null) return;
 
         // The old governor moves out of the governor spot; the new one moves into it. Mirror vanilla
         // and refresh both - the handler ignores the nulls.
-        Publish(town.Settlement, new[] { oldGovernor, newGovernor });
+        MessageBroker.Instance.Publish(null, new SettlementRosterHeroesChanged(town.Settlement, new[] { oldGovernor, newGovernor }));
     }
 
     [HarmonyPatch(nameof(HeroAgentSpawnCampaignBehavior.OnPrisonersChangeInSettlement))]
@@ -38,9 +38,9 @@ internal class HeroAgentSpawnRosterPatches
     static void OnPrisonersChangeInSettlementPostfix(
         Settlement settlement, FlattenedTroopRoster prisonerRoster, Hero prisonerHero)
     {
-        if (ModInformation.IsServer == false) return;
+        if (!ModInformation.IsServer) return;
         // Vanilla only refreshes prisoner placement for fortifications (towns/castles).
-        if (settlement == null || settlement.IsFortification == false) return;
+        if (settlement == null || !settlement.IsFortification) return;
 
         var heroes = new List<Hero>();
 
@@ -63,11 +63,6 @@ internal class HeroAgentSpawnRosterPatches
 
         if (heroes.Count == 0) return;
 
-        Publish(settlement, heroes.ToArray());
-    }
-
-    private static void Publish(Settlement settlement, Hero[] heroes)
-    {
-        MessageBroker.Instance.Publish(null, new SettlementRosterHeroesChanged(settlement, heroes));
+        MessageBroker.Instance.Publish(null, new SettlementRosterHeroesChanged(settlement, heroes.ToArray()));
     }
 }

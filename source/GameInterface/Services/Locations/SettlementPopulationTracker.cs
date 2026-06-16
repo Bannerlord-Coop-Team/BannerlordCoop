@@ -139,7 +139,7 @@ internal class SettlementPopulationTracker : IHandler
     // it update live instead of only on their next entry.
     private void Handle_SettlementRosterHeroesChanged(MessagePayload<SettlementRosterHeroesChanged> payload)
     {
-        if (ModInformation.IsServer == false) return;
+        if (!ModInformation.IsServer) return;
 
         var settlement = payload.What.Settlement;
         var heroes = payload.What.Heroes;
@@ -147,7 +147,7 @@ internal class SettlementPopulationTracker : IHandler
 
         GameLoopRunner.RunOnMainThread(() =>
         {
-            if (populatedSettlements.ContainsKey(settlement.StringId) == false) return;
+            if (!populatedSettlements.ContainsKey(settlement.StringId)) return;
             if (settlement.LocationComplex == null) return;
 
             var refreshed = false;
@@ -161,8 +161,8 @@ internal class SettlementPopulationTracker : IHandler
                 refreshed = true;
             }
 
-            if (refreshed == false) return;
-            if (objectManager.TryGetIdWithLogging(settlement, out var settlementId) == false) return;
+            if (!refreshed) return;
+            if (!objectManager.TryGetIdWithLogging(settlement, out var settlementId)) return;
 
             BroadcastRosterSnapshot(settlement, settlementId);
         });
