@@ -17,7 +17,7 @@ namespace Coop.Core.Common.Network;
 /// <inheritdoc cref="INetwork"/>
 public abstract class CoopNetworkBase : INetwork, INetEventListener
 {
-    public INetworkConfig Configuration { get; }
+    public INetworkConfig Config { get; }
     public abstract int Priority { get; }
 
     protected readonly ICommonSerializer serializer;
@@ -35,7 +35,7 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
 
     protected CoopNetworkBase(INetworkConfig configuration, ICommonSerializer serializer)
     {
-        Configuration = configuration;
+        Config = configuration;
         this.serializer = serializer;
 
         netManager = new NetManager(this)
@@ -44,7 +44,7 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
         };
 
         CancellationTokenSource = new CancellationTokenSource();
-        poller = new Poller(Update, Configuration.NetworkPollInterval);
+        poller = new Poller(Update, Config.NetworkPollInterval);
         poller.Start();
     }
 

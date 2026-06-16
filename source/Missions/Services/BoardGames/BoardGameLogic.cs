@@ -2,6 +2,7 @@
 using Common.Network;
 using Missions.Services.Agents.Messages;
 using Missions.Services.BoardGames.Messages;
+using Missions.Services.Network;
 using SandBox;
 using SandBox.BoardGames;
 using SandBox.BoardGames.MissionLogics;
@@ -22,13 +23,13 @@ namespace Missions.Services.BoardGames
         public static bool IsChallenged { get; private set; }
         public Guid GameId { get; private set; }
 
-        private readonly INetwork network;
+        private readonly IMeshNetwork network;
         private readonly IMessageBroker _messageBroker;
         private readonly MissionBoardGameLogic _boardGameLogic;
         private readonly BoardGameType _boardGameType;
 
         public BoardGameLogic(
-            INetwork network,
+            IMeshNetwork network,
             IMessageBroker messageBroker,
             Guid gameId, 
             MissionBoardGameLogic boardGameLogic, 

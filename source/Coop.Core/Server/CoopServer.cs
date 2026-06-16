@@ -7,6 +7,7 @@ using Common.Serialization;
 using Coop.Core.Common.Network;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
+using Coop.Core.Server.Services.Instances;
 using Coop.Core.Server.Services.Time;
 using GameInterface.Services.Entity;
 using LiteNetLib;
@@ -40,12 +41,17 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     // on INetwork (this server). It is only needed each Update, so deferring construction is fine.
     private readonly Lazy<IOverloadedPeerManager> overloadedPeerManager;
 
+    // Co-hosted NAT-punch rendezvous for P2P instances (taverns etc.). The server's NetManager
+    // already has NatPunchEnabled; the MissionManager answers the introduction requests.
+    private readonly IMissionManager missionManager;
+
     public CoopServer(
         INetworkConfig configuration,
         IMessageBroker messageBroker,
         IPacketManager packetManager,
         IConnectionMessageQueue connectionMessageQueue,
         IControllerIdProvider controllerIdProvider,
+        IMissionManager missionManager,
         Lazy<IOverloadedPeerManager> overloadedPeerManager,
         ICommonSerializer serializer) : base(configuration, serializer)
     {
@@ -53,6 +59,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         this.messageBroker = messageBroker;
         this.packetManager = packetManager;
         this.connectionMessageQueue = connectionMessageQueue;
+        this.missionManager = missionManager;
         this.overloadedPeerManager = overloadedPeerManager;
 
         // Netmanager initialization
@@ -70,7 +77,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public void OnNatIntroductionRequest(IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token)
     {
-        throw new NotImplementedException();
+        missionManager.HandleIntroductionRequest(netManager.NatPunchModule, localEndPoint, remoteEndPoint, token);
     }
 
     public void OnNatIntroductionSuccess(IPEndPoint targetEndPoint, NatAddressType type, string token)
@@ -121,8 +128,8 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void Start()
     {
-        Logger.Information("Server starting on port {Port}", Configuration.Port);
-        netManager.Start(IPAddress.Any, IPAddress.IPv6Any, Configuration.Port);
+        Logger.Information("Server starting on port {Port}", Config.Port);
+        netManager.Start(IPAddress.Any, IPAddress.IPv6Any, Config.Port);
     }
 
     public override void SendAll(IPacket packet)

@@ -22,9 +22,12 @@ namespace Missions.Services.Network
     {
         private static readonly ILogger Logger = LogManager.GetLogger<EventQueueManager>();
         private readonly ICommonSerializer serializer;
-        Dictionary<NetPeer, ConcurrentQueue<IMessage>> Queues = new Dictionary<NetPeer, ConcurrentQueue<IMessage>>();
+        // Mutated from LiteNetLib's network pump (the Poller runs on background thread-pool threads), so
+        // these must be concurrent: PeerConnected / PeerDisconnect / HandlePacket can interleave across
+        // threads, and a plain Dictionary would corrupt or throw under that.
+        readonly ConcurrentDictionary<NetPeer, ConcurrentQueue<IMessage>> Queues = new ConcurrentDictionary<NetPeer, ConcurrentQueue<IMessage>>();
 
-        Dictionary<NetPeer, bool> ReadyPeers = new Dictionary<NetPeer, bool>();
+        readonly ConcurrentDictionary<NetPeer, bool> ReadyPeers = new ConcurrentDictionary<NetPeer, bool>();
 
         public EventQueueManager(IMessageBroker messageBroker, IPacketManager packetManager, ICommonSerializer serializer) : base(messageBroker, packetManager, serializer)
         {
@@ -40,28 +43,24 @@ namespace Missions.Services.Network
         {
             var peer = obj.What.Peer;
 
-            if(ReadyPeers.ContainsKey(peer) == false)
+            if (ReadyPeers.TryGetValue(peer, out var isReady) == false)
             {
-                Logger.Error("Tried to process queue for peer that was " +
-                    "not registered {endpoint}, registered peers {readyPeers}",
-                    peer, ReadyPeers);
+                Logger.Error("Tried to process queue for peer that was not registered {endpoint}", peer);
                 return;
             }
 
             // Peer is already ready, there is no need to process prejoin event queue
-            if (ReadyPeers[peer] == true) return;
+            if (isReady) return;
 
-            if(Queues.ContainsKey(peer) == false)
+            if (Queues.TryGetValue(peer, out var queue) == false)
             {
-                Logger.Error("Tried to process queue for peer that was " +
-                    "not registered {endpoint}, registered peers {readyPeers}",
-                    peer, Queues);
+                Logger.Error("Tried to process queue for peer that was not registered {endpoint}", peer);
                 return;
             }
 
-            while (Queues[peer].IsEmpty == false)
+            while (queue.IsEmpty == false)
             {
-                if (Queues[peer].TryDequeue(out var message))
+                if (queue.TryDequeue(out var message))
                 {
                     HandlePacket(peer, (IPacket)message);
                 }
@@ -79,16 +78,29 @@ namespace Missions.Services.Network
                 return;
             }
 
-            ReadyPeers.Add(peer, false);
-            Queues.Add(peer, new ConcurrentQueue<IMessage>());
+            // NetPeer equality is by endpoint, so a reconnecting peer (or a duplicate NAT-punch
+            // connection to the same endpoint) collides with any leftover entry. Dictionary.Add throws
+            // on a duplicate key, and this runs in the swallowed network pump — which would silently
+            // break packet delivery for that peer on rejoin. Assign idempotently with a fresh queue.
+            bool wasAlreadyTracked = ReadyPeers.ContainsKey(peer);
+            ReadyPeers[peer] = false;
+            Queues[peer] = new ConcurrentQueue<IMessage>();
+
+            // wasAlreadyTracked=true flags an endpoint collision (reconnect / duplicate NAT connection)
+            // that the old Dictionary.Add would have thrown on — the suspected rejoin-failure cause.
+            Logger.Information("[LocationSync] EventQueue +peer {peer} (wasAlreadyTracked={wasAlreadyTracked}, totalPeers={count})",
+                peer, wasAlreadyTracked, ReadyPeers.Count);
         }
 
         private void Handle_PeerDisconnect(MessagePayload<PeerDisconnected> obj)
         {
             var peer = obj.What.NetPeer;
 
-            ReadyPeers.Remove(peer);
-            Queues.Remove(peer);
+            bool wasTracked = ReadyPeers.TryRemove(peer, out _);
+            Queues.TryRemove(peer, out _);
+
+            Logger.Information("[LocationSync] EventQueue -peer {peer} (wasTracked={wasTracked}, totalPeers={count})",
+                peer, wasTracked, ReadyPeers.Count);
         }
 
         public override void HandlePacket(NetPeer peer, IPacket packet)
@@ -105,13 +117,22 @@ namespace Missions.Services.Network
 
                     var message = serializer.Deserialize<IMessage>(convertedPacket.Data);
 
-                    if (message is NetworkMissionJoinInfo)
+                    // Join + leave must be processed immediately rather than queued behind the
+                    // not-ready gate — a leave especially, since the sender disconnects right after.
+                    if (message is NetworkMissionJoinInfo || message is NetworkLeaveMission)
                     {
+                        Logger.Information("[LocationSync] EventQueue: {messageType} from {peer} delivered immediately (peer not yet ready)", message.GetType().Name, peer);
                         base.HandlePacket(peer, packet);
                         return;
                     }
 
-                    Queues[peer].Enqueue(message);
+                    Logger.Debug("[LocationSync] EventQueue: queued {messageType} from not-ready peer {peer}", message?.GetType().Name, peer);
+                    // The peer can be removed concurrently (disconnect on another pump thread) between the
+                    // ReadyPeers check and here, so guard the queue lookup rather than risk a KeyNotFound.
+                    if (Queues.TryGetValue(peer, out var queue))
+                    {
+                        queue.Enqueue(message);
+                    }
                 }
             }
             else

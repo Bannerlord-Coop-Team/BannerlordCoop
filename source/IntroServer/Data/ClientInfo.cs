@@ -9,9 +9,9 @@ namespace IntroServer.Data
     [ProtoContract]
     public class ClientInfo
     {
-        public ClientInfo(Guid clientId, Version version)
+        public ClientInfo(string clientId, Version version)
         {
-            if (clientId == Guid.Empty) throw new ArgumentNullException($"{nameof(clientId)} is invalid, use Guid.NewGuid().");
+            if (string.IsNullOrEmpty(clientId)) throw new ArgumentNullException($"{nameof(clientId)} is invalid, it cannot be null or empty.");
             if (version == null) throw new ArgumentNullException($"{nameof(version)} cannot be null.");
 
             ClientId = clientId;
@@ -21,7 +21,7 @@ namespace IntroServer.Data
         private readonly static char Delimiter = '%';
 
         [ProtoMember(1)]
-        public Guid ClientId { get; }
+        public string ClientId { get; }
         [ProtoMember(2)]
         public Version ModVersion { get; }
 
@@ -31,7 +31,7 @@ namespace IntroServer.Data
 
             string[] items = new string[]
             {
-                ClientId.ToString(),
+                ClientId,
                 ModVersion.ToString(),
             };
 
@@ -62,13 +62,13 @@ namespace IntroServer.Data
 
                 if (values.Length != 2) return false;
 
-                Guid guid = new Guid(values[0]);
+                string clientId = values[0];
                 Version modVersion = Version.Parse(values[1]);
 
-                if (guid == Guid.Empty) return false;
+                if (string.IsNullOrEmpty(clientId)) return false;
                 if (modVersion == null) return false;
 
-                clientInfo = new ClientInfo(guid, modVersion);
+                clientInfo = new ClientInfo(clientId, modVersion);
                 return true;
             }
             catch

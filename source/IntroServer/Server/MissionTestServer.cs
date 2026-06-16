@@ -132,9 +132,10 @@ namespace IntroServer.Server
                 }
 
                 string instance = data[1];
-                if (Guid.TryParse(data[0], out Guid id) == false)
+                string id = data[0];
+                if (string.IsNullOrEmpty(id))
                 {
-                    _logger.LogWarning("Invalid Guid format from {endpoint}: {token}", remoteEndPoint, token);
+                    _logger.LogWarning("Invalid peer id from {endpoint}: {token}", remoteEndPoint, token);
                     return;
                 }
 

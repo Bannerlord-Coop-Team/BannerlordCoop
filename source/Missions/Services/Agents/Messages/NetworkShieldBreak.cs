@@ -16,14 +16,14 @@ namespace Missions.Services.Agents.Messages
     public readonly struct NetworkShieldBreak : IEvent
     {
         [ProtoMember(1)]
-        public Guid AgentGuid { get; }
+        public string AgentId { get; }
 
         [ProtoMember(2)]
         public EquipmentIndex EquipmentIndex { get; }
 
-        public NetworkShieldBreak(Guid agentId, EquipmentIndex equipmentIndex)
+        public NetworkShieldBreak(string agentId, EquipmentIndex equipmentIndex)
         {
-            AgentGuid = agentId;
+            AgentId = agentId;
             EquipmentIndex = equipmentIndex;
         }
     }
