@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.MapEvents;
+﻿using Common;
+using GameInterface.Services.MapEvents;
 using HarmonyLib;
 using Helpers;
 using System.Collections.Generic;
@@ -36,7 +37,21 @@ internal class DefaultMobilePartyAIModelPatches
         if (ConversationPartyHold.IsInPlayerConversation(targetParty))
             __result = false;
     }
+    [HarmonyPatch(typeof(DefaultMobilePartyAIModel))]
+    internal class FixGarrisonFleePatch
+    {
+        [HarmonyPatch("CalculateInitiativeScoresForEnemy")]
+        static bool Prefix(MobileParty mobileParty, MobileParty enemyParty, ref float avoidScore, ref float attackScore)
+        {
+            if (!ModInformation.IsServer) return true;
+            if (!enemyParty.IsGarrison) return true;
+            if (enemyParty.CurrentSettlement == null) return true;
 
+            avoidScore = 0f;
+            attackScore = 0f;
+            return false;
+        }
+    }
     private static bool CanAttackTargetParty(MobileParty party, MobileParty targetParty)
     {
         if (party?.Ai == null || targetParty == null)

@@ -7,15 +7,15 @@ namespace Missions.Services.BoardGames.Messages
     [ProtoContract]
     public readonly struct BoardGameChallengeRequest : ICommand
     {
-        public BoardGameChallengeRequest(Guid requestingPlayer, Guid targetPlayer)
+        public BoardGameChallengeRequest(string requestingPlayer, string targetPlayer)
         {
             RequestingPlayer = requestingPlayer;
             TargetPlayer = targetPlayer;
         }
 
         [ProtoMember(1)]
-        public Guid RequestingPlayer { get; }
+        public string RequestingPlayer { get; }
         [ProtoMember(2)]
-        public Guid TargetPlayer { get; }
+        public string TargetPlayer { get; }
     }
 }

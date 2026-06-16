@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Locations.Messages;
 using HarmonyLib;
 using Serilog;
@@ -41,6 +42,14 @@ internal class LocationCharacterListPatches
             Logger.Debug("Client add of hero {Hero} to location {Location} blocked",
                 locationCharacter.Character.StringId, __instance.StringId);
             return false;
+        }
+
+        // Players are represented inside interiors by the P2P mission layer, not the location roster.
+        // Keep the server's own roster intact (return true) but don't broadcast the add, so clients
+        // never spawn a frozen roster duplicate beside the P2P agent.
+        if (locationCharacter.Character.IsHero && locationCharacter.Character.HeroObject?.IsPlayerHero() == true)
+        {
+            return true;
         }
 
         MessageBroker.Instance.Publish(__instance,

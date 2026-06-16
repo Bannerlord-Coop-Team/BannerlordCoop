@@ -8,6 +8,8 @@ using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.MapEventParties;
+using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
@@ -310,10 +312,20 @@ internal class BattleHandler : IHandler
 
         foreach (var addedParty in message.AddedParties)
         {
-            if (objectManager.TryGetIdWithLogging(addedParty, out var mapEventPartyId))
-            {
-                partyIds.Add(mapEventPartyId);
-            }
+            if (!objectManager.TryGetIdWithLogging(addedParty, out var mapEventPartyId))
+                continue;
+
+            partyIds.Add(mapEventPartyId);
+
+            // A player just created or joined this map event, so push every involved party's
+            // flattened roster to clients (AI-only battles never reach here). Clients need these to
+            // spawn troops in the mission; in-progress AI parties already have a roster built from
+            // server simulation. Per-troop changes after this are kept in sync incrementally.
+            if (addedParty._roster == null)
+                continue;
+
+            var flattenedTroops = FlattenedTroopSerializer.Serialize(addedParty._roster, objectManager);
+            network.SendAll(new NetworkUpdateMapEventParty(mapEventPartyId, flattenedTroops));
         }
 
         network.SendAll(new NetworkAddInvolvedParties(
