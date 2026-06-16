@@ -12,6 +12,7 @@ using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
@@ -307,18 +308,24 @@ internal class BattleHandler : IHandler
         mapEventLogger.DebugMapEvent(message.MapEvent, "Map event involved parties added. Added party count: {AddedPartyCount}", message.AddedParties.Count());
 
         var partyIds = new List<string>();
+        var partyPositions = new List<CampaignVec2>();
 
         foreach (var addedParty in message.AddedParties)
         {
             if (objectManager.TryGetIdWithLogging(addedParty, out var mapEventPartyId))
             {
                 partyIds.Add(mapEventPartyId);
+                // Capture the party's authoritative map position so clients can snap it to
+                // the battle. Settlement parties have no MobileParty; their slot is a default
+                // the client never applies.
+                partyPositions.Add(addedParty.Party.MobileParty?.Position ?? default);
             }
         }
 
         network.SendAll(new NetworkAddInvolvedParties(
             mapEventSideId,
-            partyIds.ToArray()
+            partyIds.ToArray(),
+            partyPositions.ToArray()
         ));
     }
 
@@ -331,15 +338,28 @@ internal class BattleHandler : IHandler
 
         mapEventLogger.DebugMapEvent(mapEvent, "Handling network add involved parties. Party count: {MapEventPartyCount}", message.MapEventPartyIds.Length);
 
+        var positions = message.Positions;
+
         using (new AllowedThread())
         {
-            foreach (var mapEventPartyId in message.MapEventPartyIds)
+            for (int i = 0; i < message.MapEventPartyIds.Length; i++)
             {
+                var mapEventPartyId = message.MapEventPartyIds[i];
                 if (!objectManager.TryGetObjectWithLogging<MapEventParty>(mapEventPartyId, out var mapEventParty))
                     continue;
 
                 mapEventLogger.DebugMapEvent(mapEvent, "Adding involved map event party {MapEventPartyId} to troop upgrade tracker", mapEventPartyId);
                 mapEvent.TroopUpgradeTracker.AddParty(mapEventParty);
+
+                // Snap the party to its server-side map position so it lines up with the
+                // battle. The locally controlled party is left alone since this client is
+                // authoritative for its own position.
+                var mobileParty = mapEventParty.Party.MobileParty;
+                if (mobileParty != null && !mobileParty.IsControlledByThisInstance() &&
+                    positions != null && i < positions.Length)
+                {
+                    mobileParty.Position = positions[i];
+                }
             }
         }
     }
