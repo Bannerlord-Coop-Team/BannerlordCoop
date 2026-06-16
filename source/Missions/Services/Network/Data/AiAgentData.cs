@@ -11,7 +11,7 @@ namespace Missions.Services.Network.Data
     public class AiAgentData
     {
         [ProtoMember(1)]
-        public readonly Guid UnitId;
+        public readonly string UnitId;
         [ProtoMember(2)]
         public readonly Vec3 UnitPosition;
         [ProtoMember(3)]
@@ -19,7 +19,7 @@ namespace Missions.Services.Network.Data
         [ProtoMember(4)]
         public readonly float UnitHealth;
 
-        public AiAgentData(Guid unitId, Vec3 unitPosition, string unitIdString, float unitHealth)
+        public AiAgentData(string unitId, Vec3 unitPosition, string unitIdString, float unitHealth)
         {
             UnitId = unitId;
             UnitPosition = unitPosition;

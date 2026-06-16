@@ -125,7 +125,7 @@ internal class ConversationRequestHandler : IHandler
         // Mark and hold on the game thread, then reply, so the party is frozen and protected before the client
         // (re)opens the encounter. The filter above runs on the network thread; game state can change while the
         // approval is queued, so the hold step re-validates everything it depends on.
-        GameLoopRunner.RunOnMainThread(() => HoldAndApprove(requestingPeer, request, aiPartyId, playerPartyId));
+        GameThread.Run(() => HoldAndApprove(requestingPeer, request, aiPartyId, playerPartyId));
     }
 
     /// <summary>
@@ -271,34 +271,47 @@ internal class ConversationRequestHandler : IHandler
             return;
         }
 
-        if (PlayerEncounter.Current != null)
+        GameThread.Run(() =>
         {
-            // A duplicate approval for the encounter that is already open (the rate-limited request was retried
-            // while the first approval was in flight): ignore it. Sending ConversationEnded here would release
-            // the server-side hold while the conversation is still active.
-            if (PlayerEncounter.EncounteredParty == defender || PlayerEncounter.EncounteredParty == attacker)
+            try
             {
-                Logger.Debug("Ignoring duplicate conversation approval for the already-open encounter");
-                return;
-            }
+                if (PlayerEncounter.Current != null)
+                {
+                    // A duplicate approval for the encounter that is already open (the rate-limited request was retried
+                    // while the first approval was in flight): ignore it. Sending ConversationEnded here would release
+                    // the server-side hold while the conversation is still active.
+                    if (PlayerEncounter.EncounteredParty == defender || PlayerEncounter.EncounteredParty == attacker)
+                    {
+                        Logger.Debug("Ignoring duplicate conversation approval for the already-open encounter");
+                        return;
+                    }
 
-            Logger.Warning("Conversation allowed but PlayerEncounter.Current is not null; cannot restart encounter");
-            SendConversationEndedToServer();
-            return;
-        }
+                    Logger.Warning("Conversation allowed but PlayerEncounter.Current is not null; cannot restart encounter");
+                    SendConversationEndedToServer();
+                    return;
+                }
 
-        using (new AllowedThread())
-        {
-            if (message.Source == ConversationRestartSource.EncounterManager)
-            {
-                EncounterManager.RestartPlayerEncounter(attacker, defender);
+                using (new AllowedThread())
+                {
+                    if (message.Source == ConversationRestartSource.EncounterManager)
+                    {
+                        EncounterManager.RestartPlayerEncounter(attacker, defender);
+                    }
+                    else
+                    {
+                        // PlayerEncounter.RestartPlayerEncounter(defenderParty, attackerParty, forcePlayerOutFromSettlement)
+                        PlayerEncounter.RestartPlayerEncounter(defender, attacker, message.ForcePlayerOutFromSettlement);
+                    }
+                }
             }
-            else
+            catch (Exception e)
             {
-                // PlayerEncounter.RestartPlayerEncounter(defenderParty, attackerParty, forcePlayerOutFromSettlement)
-                PlayerEncounter.RestartPlayerEncounter(defender, attacker, message.ForcePlayerOutFromSettlement);
+                // The server engaged and held the AI party before approving; if the restart fails,
+                // release that hold so the party does not stay frozen for other players.
+                Logger.Error(e, "Failed to restart approved conversation encounter; releasing the server-side party hold");
+                SendConversationEndedToServer();
             }
-        }
+        });
     }
 
     /// <summary>[Client] This player's encounter finished; tell the server to release the held party.</summary>
@@ -336,7 +349,7 @@ internal class ConversationRequestHandler : IHandler
     {
         if (ModInformation.IsServer) return;
 
-        GameLoopRunner.RunOnMainThread(ConversationPartyHold.ShowInteractionBlockedMessage);
+        GameThread.Run(ConversationPartyHold.ShowInteractionBlockedMessage);
     }
 
     /// <summary>[Server] A player disconnected: release the AI party held for them, if any.</summary>
@@ -350,7 +363,7 @@ internal class ConversationRequestHandler : IHandler
     /// <summary>[Server] Releases the given player's engagement on the game thread.</summary>
     private void ReleaseEngagementOnMainThread(NetPeer peer)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
             ConversationPartyHold.EndEngagement(conversationPartyTracker, peer));
     }
 }

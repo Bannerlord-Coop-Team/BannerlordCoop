@@ -102,7 +102,7 @@ internal class SettlementExitEnterHandler : IHandler
 
         if (PlayerEncounter.Current != null) return;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {
@@ -114,7 +114,7 @@ internal class SettlementExitEnterHandler : IHandler
 
     private void Handle(MessagePayload<EndSettlementEncounter> obj)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {

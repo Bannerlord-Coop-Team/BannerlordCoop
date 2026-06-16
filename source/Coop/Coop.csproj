@@ -227,6 +227,14 @@
       <Project>{D22CB8FA-40CC-4F47-986F-1C5A4415980B}</Project>
       <Name>GameInterface</Name>
     </ProjectReference>
+    <!-- Live-play P2P bridge (LocationSync): pulls the Missions instance stack into the live module. -->
+    <ProjectReference Include="..\Missions\Missions.csproj">
+      <Project>{E12F967C-1CC9-4E4D-8D8F-5029E0BA96EE}</Project>
+      <Name>Missions</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\IntroServer\IntroServer.csproj">
+      <Name>IntroServer</Name>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <Content Include="ILLink\ILLink.Descriptors.LibraryBuild.xml" />

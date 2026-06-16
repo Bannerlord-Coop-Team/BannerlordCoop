@@ -70,7 +70,7 @@ namespace GameInterface.Services.Banners.Handlers
                 return;
             }
 
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 using (new AllowedThread())
                 {

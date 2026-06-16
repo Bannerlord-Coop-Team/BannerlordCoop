@@ -32,21 +32,21 @@ public abstract class EnvironmentInstance
     /// </summary>
     public MessageCollection NetworkSentMessages => mockNetwork.NetworkSentMessages;
 
-    public IContainer Container => containerProvider.GetContainer();
+    public ILifetimeScope Container => container;
     public IObjectManager ObjectManager => Container.Resolve<IObjectManager>();
 
     private readonly TestMessageBroker messageBroker;
     private readonly MockNetworkBase mockNetwork;
-    private readonly IContainerProvider containerProvider;
+    private readonly ILifetimeScope container;
 
     public EnvironmentInstance(
         TestMessageBroker messageBroker,
         MockNetworkBase mockNetwork,
-        IContainerProvider containerProvider)
+        ILifetimeScope container)
     {
         this.messageBroker = messageBroker;
         this.mockNetwork = mockNetwork;
-        this.containerProvider = containerProvider;
+        this.container = container;
     }
 
     /// <summary>

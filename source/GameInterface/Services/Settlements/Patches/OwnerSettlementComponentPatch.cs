@@ -40,7 +40,7 @@ namespace GameInterface.Services.Settlements.Patches
 
         internal static void RunSettlementComponentOwnerChanged(SettlementComponent settlementComp, PartyBase owner)
         {
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 using (new AllowedThread())
                 {

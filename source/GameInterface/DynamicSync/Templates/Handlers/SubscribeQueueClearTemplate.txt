@@ -15,21 +15,14 @@ SubscribeTracked((MessagePayload<Network_{{ MemberDeclaringType}}_{{ MemberName 
 {
     var data = payload.What;
 
-    if (!objectManager.TryGetObjectWithLogging(data.InstanceId, out {{ MemberDeclaringType }} instance))
-        return;
+    MarshalApply(() =>
+    {
+        if (!objectManager.TryGetObjectWithLogging(data.InstanceId, out {{ MemberDeclaringType }} instance))
+            return;
 
-    try
-    {
-        using (new AllowedThread())
-        {
-            {{~ if Debug ~}}
-            Logger.Debug("[Client] Clearing Queue {MemberName}", "{{MemberDeclaringType}}.{{MemberName}}");
-            {{~ end ~}}
-            instance.{{ MemberName }}.Clear();
-        }
-    }
-    catch (Exception ex)
-    {
-        Logger.Error(ex, "Failed to run message handler");
-    }
+        {{~ if Debug ~}}
+        Logger.Debug("[Client] Clearing Queue {MemberName}", "{{MemberDeclaringType}}.{{MemberName}}");
+        {{~ end ~}}
+        instance.{{ MemberName }}.Clear();
+    });
 });

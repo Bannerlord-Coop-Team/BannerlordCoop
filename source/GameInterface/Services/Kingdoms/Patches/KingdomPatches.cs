@@ -36,7 +36,7 @@ namespace GameInterface.Services.Kingdoms.Patches
 
         public static void RunCoopAddDecision(Kingdom kingdom, KingdomDecision kingdomDecision, bool ignoreInfluenceCost, float randomFloat)
         {
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 ModifiedAddDecision(kingdom, kingdomDecision, ignoreInfluenceCost, randomFloat);
             }, true); 
@@ -93,7 +93,7 @@ namespace GameInterface.Services.Kingdoms.Patches
 
         public static void RunOriginalRemoveDecision(Kingdom kingdom, KingdomDecision kingdomDecision)
         {
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 using (new AllowedThread())
                 {
@@ -138,7 +138,7 @@ namespace GameInterface.Services.Kingdoms.Patches
 
         public static void RunChangeKingdomPolicy(Kingdom kingdom, PolicyObject policy, bool isAdd)
         {
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 using (new AllowedThread())
                 {

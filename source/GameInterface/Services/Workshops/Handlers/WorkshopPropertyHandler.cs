@@ -49,7 +49,7 @@ namespace GameInterface.Services.Workshops.Handlers
                 return;
             }
 
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 using (new AllowedThread())
                 {

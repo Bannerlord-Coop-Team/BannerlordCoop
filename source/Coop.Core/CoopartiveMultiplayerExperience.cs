@@ -11,6 +11,8 @@ using GameInterface;
 using GameInterface.DynamicSync;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.UI.Messages;
+using Missions;
+using Missions.Services.Network;
 using System;
 
 namespace Coop.Core
@@ -18,14 +20,14 @@ namespace Coop.Core
     public class CoopartiveMultiplayerExperience : IDisposable
     {
         private IMessageBroker messageBroker;
-        private INetworkConfiguration configuration;
+        private INetworkConfig configuration;
         private IContainer container;
 
         public CoopartiveMultiplayerExperience()
         {
             // TODO use DI maybe?
             messageBroker = MessageBroker.Instance;
-            configuration = new NetworkConfiguration();
+            configuration = new NetworkConfig();
 
             messageBroker.Subscribe<AttemptJoin>(Handle);
             messageBroker.Subscribe<HostSaveGame>(Handle);
@@ -48,7 +50,7 @@ namespace Coop.Core
         {
             var connectMessage = obj.What;
 
-            configuration = new NetworkConfiguration()
+            configuration = new NetworkConfig()
             {
                 Address = connectMessage.Address.ToString(),
                 Port = connectMessage.Port,
@@ -81,15 +83,11 @@ namespace Coop.Core
 
             ModInformation.IsServer = true;
 
-            var containerProvider = new ContainerProvider();
-
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<ServerModule>();
-            builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance().ExternallyOwned();
             builder.RegisterModule<GameInterfaceModule>();
             container = builder.Build();
 
-            containerProvider.SetProvider(container);
             GameInterface.ContainerProvider.SetContainer(container);
 
             // Create harmony patches
@@ -99,27 +97,24 @@ namespace Coop.Core
             logic.Start();
         }
 
-        public void StartAsClient(INetworkConfiguration configuration = null)
+        public void StartAsClient(INetworkConfig configuration = null)
         {
             DestroyContainer();
 
             ModInformation.IsServer = false;
 
-            var containerProvider = new ContainerProvider();
-
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<ClientModule>();
-            builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance().ExternallyOwned();
             builder.RegisterModule<GameInterfaceModule>();
+            builder.RegisterModule<MissionModule>();
 
             if (configuration != null)
             {
-                builder.RegisterInstance(configuration).As<INetworkConfiguration>().SingleInstance();
+                builder.RegisterInstance(configuration).As<INetworkConfig>().SingleInstance();
             }
 
             container = builder.Build();
 
-            containerProvider.SetProvider(container);
             GameInterface.ContainerProvider.SetContainer(container);
 
             // Client process does not own the export directory — only the server writes

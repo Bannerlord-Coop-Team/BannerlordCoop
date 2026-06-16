@@ -12,15 +12,15 @@ namespace Missions.Services.Agents.Messages
     public readonly struct NetworkShieldDamaged : IEvent
     {
         [ProtoMember(1)]
-        public Guid AgentGuid { get; }
+        public string AgentId { get; }
         [ProtoMember(2)]
         public EquipmentIndex EquipmentIndex { get; }
         [ProtoMember(3)]
         public int InflictedDamage { get; }
 
-        public NetworkShieldDamaged(Guid agentGuid, EquipmentIndex equipmentIndex, int inflictedDamage)
+        public NetworkShieldDamaged(string agentId, EquipmentIndex equipmentIndex, int inflictedDamage)
         {
-            AgentGuid = agentGuid;
+            AgentId = agentId;
             EquipmentIndex = equipmentIndex;
             InflictedDamage = inflictedDamage;
         }

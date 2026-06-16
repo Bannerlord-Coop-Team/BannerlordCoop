@@ -50,7 +50,7 @@ public class LastAttackerPartySettlementPatch
 
     internal static void RunLastAttackerPartyChange(Settlement settlement, MobileParty mobileParty)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {

@@ -45,16 +45,17 @@ namespace Missions.Services.Taverns
 
         public void StartGame()
         {
-            if (_client.ConnectToP2PServer())
-            {
-                StartNewGame(this);
-            }
-            else
-            {
-                ScreenManager.PopScreen();
-                // TODO add popup message
-                Logger.Error("Server Unreachable");
-            }
+            // This currently wont work
+            //if (_client.ConnectToInstance("TestInstance"))
+            //{
+            //    StartNewGame(this);
+            //}
+            //else
+            //{
+            //    ScreenManager.PopScreen();
+            //    // TODO add popup message
+            //    Logger.Error("Server Unreachable");
+            //}
         }
 
         public override void OnLoadFinished()
@@ -103,7 +104,7 @@ namespace Missions.Services.Taverns
 
             Logger.Information("Spawning Agent");
             Agent agent = default;
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 agent = Mission.Current.SpawnAgent(agentBuildData);
                 agent.FadeIn();

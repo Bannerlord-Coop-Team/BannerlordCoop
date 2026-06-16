@@ -1,5 +1,7 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
+using System;
 using GameInterface.Services.ItemRosters.Messages;
 using GameInterface.Services.ItemRosters.Patches;
 using GameInterface.Services.ObjectManager;
@@ -28,11 +30,21 @@ namespace GameInterface.Services.ItemRosters.Handlers
 
         public void Handle(MessagePayload<ClearItemRoster> payload)
         {
-            ClearItemRoster msg = payload.What;
+            var data = payload.What;
 
-            if (!objectManager.TryGetObjectWithLogging<ItemRoster>(msg.ItemRosterId, out var itemRoster)) return;
+            GameThread.Run(() =>
+            {
+                try
+                {
+                    if (!objectManager.TryGetObjectWithLogging<ItemRoster>(data.ItemRosterId, out var itemRoster)) return;
 
-            ItemRosterPatch.ClearOverride(itemRoster);
+                    ItemRosterPatch.ClearOverride(itemRoster);
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to apply ClearItemRoster");
+                }
+            });
         }
 
         public void Dispose()

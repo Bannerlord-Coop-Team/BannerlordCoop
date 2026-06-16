@@ -12,14 +12,14 @@ namespace Missions.Services.Agents.Messages
     public readonly struct NetworkWeaponDropped : IEvent
     {
         [ProtoMember(1)]
-        public Guid AgentGuid { get; }
+        public string AgentId { get; }
 
         [ProtoMember(2)]
         public EquipmentIndex EquipmentIndex { get; }
 
-        public NetworkWeaponDropped(Guid agentGuid, EquipmentIndex equipmentIndex)
+        public NetworkWeaponDropped(string agentId, EquipmentIndex equipmentIndex)
         {
-            AgentGuid = agentGuid;
+            AgentId = agentId;
             EquipmentIndex = equipmentIndex;
         }
     }

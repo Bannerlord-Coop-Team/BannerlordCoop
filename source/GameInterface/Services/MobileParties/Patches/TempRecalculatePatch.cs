@@ -9,7 +9,7 @@ namespace GameInterface.Services.MobileParties.Patches;
 [HarmonyPatch(typeof(MobileParty), (nameof(MobileParty.RecalculateShortTermBehavior)))]
 class TempRecalculatePatch
 {
-    private static ILogger Logger = LogManager.GetLogger<GameLoopRunner>();
+    private static ILogger Logger = LogManager.GetLogger<GameThread>();
 
     [HarmonyPrefix]
     private static bool Prefix(MobileParty __instance)

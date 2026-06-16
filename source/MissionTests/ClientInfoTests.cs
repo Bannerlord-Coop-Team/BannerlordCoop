@@ -9,7 +9,7 @@ namespace MissionTests
         [Fact]
         public void NominalClientInfoStringify()
         {
-            ClientInfo clientInfo = new ClientInfo(Guid.NewGuid(), new Version(1,1,1,1));
+            ClientInfo clientInfo = new ClientInfo(Guid.NewGuid().ToString(), new Version(1,1,1,1));
 
             string strClientInfo = clientInfo.ToString();
 
@@ -25,13 +25,13 @@ namespace MissionTests
         {
             Assert.Throws<ArgumentNullException>(() => 
             {
-                new ClientInfo(Guid.Empty, /* Invalid */
+                new ClientInfo("", /* Invalid */
                                new Version(1, 1, 1, 1));
             });
 
             Assert.Throws<ArgumentNullException>(() =>
             {
-                new ClientInfo(Guid.NewGuid(), 
+                new ClientInfo(Guid.NewGuid().ToString(),
                                null /* Invalid */);
             });
         }
