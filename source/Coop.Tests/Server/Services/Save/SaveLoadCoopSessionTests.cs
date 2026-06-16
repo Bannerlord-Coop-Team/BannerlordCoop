@@ -10,6 +10,7 @@ using GameInterface.Services.Players.Data;
 using System.IO;
 using Xunit;
 using Xunit.Abstractions;
+using GameInterface.Services.Workshops;
 
 namespace Coop.Tests.Server.Services.Save
 {
@@ -42,7 +43,7 @@ namespace Coop.Tests.Server.Services.Save
                 new Player("MyPlayer2", "MyHero2","MyParty2", "MyClan2", "MyCharacter2"),
             };
 
-            ICoopSession sessionData = new CoopSession("SaveManagerTest", players, new CraftingPlayerData(new(), new(), new()));
+            ICoopSession sessionData = new CoopSession("SaveManagerTest", players, new CraftingPlayerData(new(), new(), new()), new WorkshopPlayerData(new()));
 
             string saveFile = sessionData.UniqueGameId;
 
@@ -75,7 +76,7 @@ namespace Coop.Tests.Server.Services.Save
                 new Player("MyPlayer2", "MyHero2","MyParty2", "MyClan2", "MyCharacter2"),
             };
 
-            ICoopSession sessionData = new CoopSession("SaveManagerTest", players, new CraftingPlayerData(new(), new(), new()));
+            ICoopSession sessionData = new CoopSession("SaveManagerTest", players, new CraftingPlayerData(new(), new(), new()), new WorkshopPlayerData(new()));
 
             string saveFile = SAVE_PATH + sessionData.UniqueGameId;
 

@@ -36,7 +36,8 @@ public class TransferSaveState : ConnectionStateBase
             var savePacket = new GameSaveDataPacket(
                 saveResults.Data,
                 saveResults.CampaignId,
-                coopSessionProvider.CoopSession?.CraftingPlayerData);
+                coopSessionProvider.CoopSession?.CraftingPlayerData,
+                coopSessionProvider.CoopSession?.WorkshopPlayerData);
 
             // Disconnect peer on failure
             if (!saveResults.Success)

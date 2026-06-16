@@ -4,12 +4,11 @@ using Common.Network;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.ObjectManager;
 using Helpers;
+using LiteNetLib;
 using Serilog;
-using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Party.PartyComponents;
 
 namespace GameInterface.Services.Clans.Handlers;
 
@@ -69,6 +68,8 @@ internal class ClanPartiesVMHandler : IHandler
             GiveGoldAction.ApplyBetweenCharacters(mainHero, newLeader, obj.What.PartyGoldLowerThreshold - newLeader.Gold, false);
         }
         mobileParty.SetMoveModeHold();
+
+        network.Send(obj.Who as NetPeer, new RefreshPartiesList());
     }
 
     private void Handle_ClanPartyLeaderChanged(MessagePayload<ClanPartyLeaderChanged> obj)

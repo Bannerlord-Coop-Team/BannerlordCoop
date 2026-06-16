@@ -24,7 +24,6 @@ internal class WorkshopTypeRegistry : AutoRegistryBase<WorkshopType>
 
     public override void RegisterAllObjects()
     {
-        // Old version broke save games? Maybe watch out for that
         foreach(WorkshopType workshopType in WorkshopType.All)
         {
             RegisterExistingObject(workshopType.StringId, workshopType);

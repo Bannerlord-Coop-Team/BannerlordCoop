@@ -1,11 +1,13 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.MapEventParties;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Messages;
 using GameInterface.Services.TroopRosters.Interfaces;
 using Helpers;
+using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -103,6 +105,8 @@ internal class PartyScreenHelperHandler : IHandler
             mobileParty.PrisonRoster.Add(troopRosterElement);
             //rightOwnerParty.PrisonRoster.AddToCounts(troopRosterElement2.Character, -troopRosterElement2.Number, false, -troopRosterElement2.WoundedNumber, -troopRosterElement2.Xp, true, -1);
         }
+
+        network.Send(obj.Who as NetPeer, new RefreshPartiesList());
     }
 
     private void Handle_GarrisonDonated(MessagePayload<GarrisonDonated> obj)

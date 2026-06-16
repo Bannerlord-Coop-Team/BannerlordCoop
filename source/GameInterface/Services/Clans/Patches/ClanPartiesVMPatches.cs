@@ -1,12 +1,16 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Clans.Messages;
 using HarmonyLib;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement;
 using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement.Categories;
+using TaleWorlds.Core;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Clans.Patches;
 
@@ -20,6 +24,7 @@ internal class ClanPartiesVMPatches
         if (newLeader.PartyBelongedTo == MobileParty.MainParty)
         {
             __instance._openPartyAsManage(newLeader);
+            __instance.RefreshPartiesList();
             return false;
         }
 

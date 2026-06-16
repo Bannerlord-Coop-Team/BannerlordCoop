@@ -1,5 +1,6 @@
 ﻿using Common.PacketHandlers;
 using GameInterface.Services.Smithing;
+using GameInterface.Services.Workshops;
 using LiteNetLib;
 using ProtoBuf;
 
@@ -32,10 +33,14 @@ public readonly struct GameSaveDataPacket : IPacket
     [ProtoMember(3)]
     public readonly CraftingPlayerData CraftingPlayerData;
 
-    public GameSaveDataPacket(byte[] gameSaveData, string campaignID, CraftingPlayerData craftingPlayerData)
+    [ProtoMember(4)]
+    public readonly WorkshopPlayerData WorkshopPlayerData;
+
+    public GameSaveDataPacket(byte[] gameSaveData, string campaignID, CraftingPlayerData craftingPlayerData, WorkshopPlayerData workshopPlayerData)
     {
         GameSaveData = gameSaveData;
         CampaignID = campaignID;
         CraftingPlayerData = craftingPlayerData;
+        WorkshopPlayerData = workshopPlayerData;
     }
 }
