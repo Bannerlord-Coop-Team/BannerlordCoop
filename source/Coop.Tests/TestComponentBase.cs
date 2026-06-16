@@ -17,6 +17,7 @@ using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using GameInterface.Services.Time.Interfaces;
 using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.UI.Interfaces;
@@ -81,7 +82,7 @@ internal abstract class TestComponentBase
         RegisterMock<IHeroInterface>(builder);
         RegisterMock<IModuleInfoProvider>(builder);
         RegisterMock<IRegistryManager>(builder);
-        RegisterMock<IPlayerManager>(builder);
+        RegisterPlayerManagerMock(builder);
         RegisterMock<ITimeControlInterface>(builder);
         RegisterMock<ITroopRosterInterface>(builder);
         RegisterMock<IMapTimeTrackerInterface>(builder);
@@ -110,4 +111,25 @@ internal abstract class TestComponentBase
         builder.RegisterInstance(mock.Object).As<T>().SingleInstance();
     }
 
+    /// <summary>
+    /// The connection states replay the existing players to a joining peer, iterating
+    /// <see cref="IPlayerManager.Players"/>. Default it to empty so simply entering those states does not
+    /// NRE; tests that exercise the replay re-stub it.
+    /// </summary>
+    private void RegisterPlayerManagerMock(ContainerBuilder builder)
+    {
+        var mock = new Mock<IPlayerManager>();
+        mock.Setup(m => m.Players).Returns(Array.Empty<Player>());
+        builder.RegisterInstance(mock).AsSelf().SingleInstance();
+        builder.RegisterInstance(mock.Object).As<IPlayerManager>().SingleInstance();
+    }
+
+    private IContainer SetupContainerProvider(ContainerBuilder builder)
+    {
+        var container = builder.Build();
+
+        global::GameInterface.ContainerProvider.SetContainer(container);
+
+        return container;
+    }
 }

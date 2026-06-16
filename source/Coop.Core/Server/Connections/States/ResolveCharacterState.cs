@@ -71,6 +71,10 @@ public class ResolveCharacterState : ConnectionStateBase
         {
             network.SendImmediate(peer, new NetworkClientValidated(true, player));
             ConnectionLogic.TransferSave();
+
+            // TransferSave has taken the save snapshot and begun queueing this peer's broadcasts, so a
+            // reconnecting player is told about every other existing player too, not just itself.
+            JoiningPlayerSync.SendExistingPlayers(network, playerManager, peer, obj.What.PlayerId);
         }
         else
         {
