@@ -30,25 +30,25 @@ public abstract class EnvironmentInstance : IDisposable
     /// </summary>
     public MessageCollection NetworkSentMessages => mockNetwork.NetworkSentMessages;
 
-    public IContainer Container => containerProvider.GetContainer();
+    public ILifetimeScope Container => container;
     public IObjectManager ObjectManager => Container.Resolve<IObjectManager>();
 
     public GameInstance GameInstance = new GameInstance();
 
     private readonly TestMessageBroker messageBroker;
     private readonly MockNetworkBase mockNetwork;
-    private readonly IContainerProvider containerProvider;
+    private readonly ILifetimeScope container;
 
     private readonly static object _lock = new object();
 
     public EnvironmentInstance(
         TestMessageBroker messageBroker,
         MockNetworkBase mockNetwork,
-        IContainerProvider containerProvider)
+        ILifetimeScope container)
     {
         this.messageBroker = messageBroker;
         this.mockNetwork = mockNetwork;
-        this.containerProvider = containerProvider;
+        this.container = container;
     }
 
     /// <summary>

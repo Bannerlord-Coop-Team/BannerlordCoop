@@ -52,7 +52,7 @@ internal abstract class TestComponentBase
     {
         RegisterCommonTypes(builder);
 
-        var container = SetupContainerProvider(builder);
+        var container = builder.Build();
 
         TestMessageBroker = container.Resolve<TestMessageBroker>();
         TestNetwork = container.Resolve<TestNetwork>();
@@ -69,7 +69,6 @@ internal abstract class TestComponentBase
         builder.RegisterType<SerializableTypeMapper>().As<ISerializableTypeMapper>().InstancePerLifetimeScope();
         builder.RegisterType<ProtoBufSerializer>().As<ICommonSerializer>().InstancePerLifetimeScope();
         builder.RegisterType<TestMessageBroker>().AsSelf().As<IMessageBroker>().InstancePerLifetimeScope();
-        builder.RegisterType<ContainerProvider>().As<IContainerProvider>().InstancePerLifetimeScope();
         builder.RegisterType<TestNetwork>().AsSelf().As<INetwork>().InstancePerLifetimeScope();
         builder.RegisterType<ModuleValidator>().As<IModuleValidator>().SingleInstance();
 

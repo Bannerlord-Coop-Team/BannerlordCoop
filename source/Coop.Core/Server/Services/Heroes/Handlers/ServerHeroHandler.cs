@@ -15,9 +15,9 @@ internal class ServerHeroHandler : IHandler
     private readonly ILogger Logger = LogManager.GetLogger<ServerHeroHandler>();
     private readonly IMessageBroker messageBroker;
     private readonly ICoopServer server;
-    private readonly INetworkConfiguration configuration;
+    private readonly INetworkConfig configuration;
 
-    public ServerHeroHandler(IMessageBroker messageBroker, ICoopServer server, INetworkConfiguration configuration)
+    public ServerHeroHandler(IMessageBroker messageBroker, ICoopServer server, INetworkConfig configuration)
     {
         this.messageBroker = messageBroker;
         this.server = server;

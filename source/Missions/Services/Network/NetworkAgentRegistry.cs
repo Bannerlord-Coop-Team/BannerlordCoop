@@ -21,11 +21,11 @@ namespace Missions.Services.Network
         /// <remarks>
         /// Works with controlled and non-controlled agents
         /// </remarks>
-        IReadOnlyDictionary<Agent, Guid> AgentToId { get; }
+        IReadOnlyDictionary<Agent, string> AgentToId { get; }
         /// <summary>
         /// Agents directly controlled by the client
         /// </summary>
-        IReadOnlyDictionary<Guid, Agent> ControlledAgents { get; }
+        IReadOnlyDictionary<string, Agent> ControlledAgents { get; }
         /// <summary>
         /// Agents not controlled by the client.
         /// These are controlled by network events.
@@ -47,7 +47,7 @@ namespace Missions.Services.Network
         /// <param name="agentId">Id to assign the agent</param>
         /// <param name="agent">Agent to add</param>
         /// <returns>True if addition was successful, false otherwise</returns>
-        bool RegisterControlledAgent(Guid agentId, Agent agent);
+        bool RegisterControlledAgent(string controllerId, Agent agent);
 
         /// <summary>
         /// Register a network controlled agent.
@@ -60,21 +60,21 @@ namespace Missions.Services.Network
         /// <param name="agentId">Id assigned to the agent</param>
         /// <param name="agent">Agent to register</param>
         /// <returns>True if addition was successful, false otherwise</returns>
-        bool RegisterNetworkControlledAgent(NetPeer peer, Guid agentId, Agent agent);
+        bool RegisterNetworkControlledAgent(NetPeer peer, string agentId, Agent agent);
 
         /// <summary>
         /// Remove a controlled agent.
         /// </summary>
         /// <param name="agentId">Agent id to remove</param>
         /// <returns>True if removal was successful, false otherwise</returns>
-        bool RemoveControlledAgent(Guid agentId);
+        bool RemoveControlledAgent(string agentId);
 
         /// <summary>
         /// Remove a network controlled agent.
         /// </summary>
         /// <param name="agentId">Agent id to remove</param>
         /// <returns>True if removal was successful, false otherwise</returns>
-        bool RemoveNetworkControlledAgent(Guid agentId);
+        bool RemoveNetworkControlledAgent(string agentId);
 
         /// <summary>
         /// Remove peer from network controllers.
@@ -96,7 +96,7 @@ namespace Missions.Services.Network
         /// </summary>
         /// <param name="guid">Agent guid to check if controlled</param>
         /// <returns>True if Agent guid is controlled locally, false otherwise</returns>
-        bool IsControlled(Guid guid);
+        bool IsControlled(string guid);
 
         /// <summary>
         /// Is Agent registered?
@@ -110,21 +110,21 @@ namespace Missions.Services.Network
         /// </summary>
         /// <param name="guid">Agent guid to check if registered</param>
         /// <returns>True if Agent guid is registered, false otherwise</returns>
-        bool IsAgentRegistered(Guid guid);
+        bool IsAgentRegistered(string guid);
 
         /// <summary>
         /// Try to get the Agent guid from the Agent
         /// </summary>
         /// <param name="agent">Agent to check for guid</param>
         /// <returns>True if Agent guid is found and assigns guid, false otherwise</returns>
-        bool TryGetAgentId(Agent agent, out Guid guid);
+        bool TryGetAgentId(Agent agent, out string guid);
 
         /// <summary>
         /// Try to get the Agent from a guid
         /// </summary>
         /// <param name="guid">guid to check for Agent</param>
         /// <returns>True if guid is found and assigns agent, false otherwise</returns>
-        bool TryGetAgent(Guid guid, out Agent agent);
+        bool TryGetAgent(string guid, out Agent agent);
 
         /// <summary>
         /// Try to get the Agent from a guid
@@ -153,7 +153,7 @@ namespace Missions.Services.Network
         /// <param name="agentId">AgentId to get controller</param>
         /// <param name="controllerPeer">Controlling peer</param>
         /// <returns>True if retrieval of controlling peer was successful, otherwise False</returns>
-        bool TryGetExternalController(Guid agentId, out NetPeer controllerPeer);
+        bool TryGetExternalController(string agentId, out NetPeer controllerPeer);
     }
 
     /// <inheritdoc cref="INetworkAgentRegistry"/>
@@ -175,33 +175,33 @@ namespace Missions.Services.Network
         private static INetworkAgentRegistry _instance;
 
         /// <inheritdoc/>
-        public IReadOnlyDictionary<Agent, Guid> AgentToId => _agentToId;
-        private readonly ConcurrentDictionary<Agent, Guid> _agentToId = new ConcurrentDictionary<Agent, Guid>();
+        public IReadOnlyDictionary<Agent, string> AgentToId => _agentToId;
+        private readonly ConcurrentDictionary<Agent, string> _agentToId = new ConcurrentDictionary<Agent, string>();
 
         /// <inheritdoc/>
-        public IReadOnlyDictionary<Guid, Agent> ControlledAgents => _controlledAgents;
-        private readonly ConcurrentDictionary<Guid, Agent> _controlledAgents = new ConcurrentDictionary<Guid, Agent>();
+        public IReadOnlyDictionary<string, Agent> ControlledAgents => _controlledAgents;
+        private readonly ConcurrentDictionary<string, Agent> _controlledAgents = new ConcurrentDictionary<string, Agent>();
 
         /// <inheritdoc/>
         public IReadOnlyDictionary<NetPeer, AgentGroupController> OtherAgents => _otherAgents;
         private readonly ConcurrentDictionary<NetPeer, AgentGroupController> _otherAgents = new ConcurrentDictionary<NetPeer, AgentGroupController>();
 
         /// <inheritdoc/>
-        public bool RegisterControlledAgent(Guid agentId, Agent agent)
+        public bool RegisterControlledAgent(string controllerId, Agent agent)
         {
             if (agent == null) return false;
 
             if (_agentToId.ContainsKey(agent)) return false;
-            if (_controlledAgents.ContainsKey(agentId)) return false;
+            if (_controlledAgents.ContainsKey(controllerId)) return false;
 
-            _controlledAgents.TryAdd(agentId, agent);
-            _agentToId.TryAdd(agent, agentId);
+            _controlledAgents.TryAdd(controllerId, agent);
+            _agentToId.TryAdd(agent, controllerId);
 
             return true;
         }
 
         /// <inheritdoc/>
-        public bool RegisterNetworkControlledAgent(NetPeer peer, Guid agentId, Agent agent)
+        public bool RegisterNetworkControlledAgent(NetPeer peer, string agentId, Agent agent)
         {
             if (agent == null) return false;
 
@@ -225,7 +225,7 @@ namespace Missions.Services.Network
         }
 
         /// <inheritdoc/>
-        public bool RemoveControlledAgent(Guid agentId)
+        public bool RemoveControlledAgent(string agentId)
         {
             if (_controlledAgents.TryGetValue(agentId, out Agent agent))
             {
@@ -236,7 +236,7 @@ namespace Missions.Services.Network
         }
 
         /// <inheritdoc/>
-        public bool RemoveNetworkControlledAgent(Guid agentId)
+        public bool RemoveNetworkControlledAgent(string agentId)
         {
             return _otherAgents.Values.Any(group =>
             {
@@ -280,7 +280,7 @@ namespace Missions.Services.Network
         }
 
         /// <inheritdoc/>
-        public bool IsControlled(Guid agentId)
+        public bool IsControlled(string agentId)
         {
             if (ControlledAgents.ContainsKey(agentId)) { return true; }
             return false;
@@ -295,7 +295,7 @@ namespace Missions.Services.Network
         }
 
         /// <inheritdoc/>
-        public bool IsAgentRegistered(Guid guid)
+        public bool IsAgentRegistered(string guid)
         {
             if (ControlledAgents.ContainsKey(guid)) { return true; }
 
@@ -308,12 +308,12 @@ namespace Missions.Services.Network
         }
 
         /// <inheritdoc/>
-        public bool TryGetAgentId(Agent agent, out Guid guid)
+        public bool TryGetAgentId(Agent agent, out string guid)
         {
             guid = default;
             if (agent == null) return false;
 
-            if (AgentToId.TryGetValue(agent, out Guid agentId))
+            if (AgentToId.TryGetValue(agent, out string agentId))
             {
                 guid = agentId;
                 return true;
@@ -323,7 +323,7 @@ namespace Missions.Services.Network
         }
 
         /// <inheritdoc/>
-        public bool TryGetAgent(Guid guid, out Agent agent)
+        public bool TryGetAgent(string guid, out Agent agent)
         {
             if (ControlledAgents.TryGetValue(guid, out Agent resolvedAgent))
             {
@@ -380,7 +380,7 @@ namespace Missions.Services.Network
         }
 
         /// <inheritdoc/>
-        public bool TryGetExternalController(Guid agentId, out NetPeer controllerPeer)
+        public bool TryGetExternalController(string agentId, out NetPeer controllerPeer)
         {
             controllerPeer = default;
 
