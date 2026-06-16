@@ -61,12 +61,14 @@ internal class SettlementPopulationTracker : IHandler
 
         messageBroker.Subscribe<PartyEnterSettlement>(Handle_PartyEnterSettlement);
         messageBroker.Subscribe<PartyLeaveSettlement>(Handle_PartyLeaveSettlement);
+        messageBroker.Subscribe<SettlementRosterHeroesChanged>(Handle_SettlementRosterHeroesChanged);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<PartyEnterSettlement>(Handle_PartyEnterSettlement);
         messageBroker.Unsubscribe<PartyLeaveSettlement>(Handle_PartyLeaveSettlement);
+        messageBroker.Unsubscribe<SettlementRosterHeroesChanged>(Handle_SettlementRosterHeroesChanged);
     }
 
     private void Handle_PartyEnterSettlement(MessagePayload<PartyEnterSettlement> payload)
@@ -128,6 +130,41 @@ internal class SettlementPopulationTracker : IHandler
                 ClearSettlementRosters(settlement);
                 populatedSettlements.Remove(settlement.StringId);
             }
+        });
+    }
+
+    // Vanilla refreshes hero placement on governor and prisoner events, but only for the settlement
+    // the local player is inside; the host is never inside one. Apply the same refresh for any
+    // settlement that currently has player visitors, then re-broadcast the roster so clients inside
+    // it update live instead of only on their next entry.
+    private void Handle_SettlementRosterHeroesChanged(MessagePayload<SettlementRosterHeroesChanged> payload)
+    {
+        if (ModInformation.IsServer == false) return;
+
+        var settlement = payload.What.Settlement;
+        var heroes = payload.What.Heroes;
+        if (settlement == null || heroes == null) return;
+
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            if (populatedSettlements.ContainsKey(settlement.StringId) == false) return;
+            if (settlement.LocationComplex == null) return;
+
+            var refreshed = false;
+            foreach (var hero in heroes)
+            {
+                if (hero == null) continue;
+                // Player heroes are the player agents themselves and are never placed as roster NPCs.
+                if (PlayerManager.TryGetControlledObjectInfo(hero, out _)) continue;
+
+                RefreshHeroPlacement(hero, settlement);
+                refreshed = true;
+            }
+
+            if (refreshed == false) return;
+            if (objectManager.TryGetIdWithLogging(settlement, out var settlementId) == false) return;
+
+            BroadcastRosterSnapshot(settlement, settlementId);
         });
     }
 
