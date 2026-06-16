@@ -30,9 +30,13 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 
     public override IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(MapEvent));
 
+    // Watch FinalizeEventAux, not FinishBattle: every way a battle ends on the server funnels through
+    // FinalizeEventAux (FinishBattle -> FinalizeEventAux, FinalizeEvent -> FinalizeEventAux, and the
+    // finalize-on-request handler calls it directly), whereas FinishBattle is a tiny wrapper the JIT
+    // inlines into MapEvent.Update, so a postfix on it never runs and the destroy is never replicated.
     public override IEnumerable<MethodBase> DestroyMethods => new MethodBase[]
     {
-        AccessTools.Method(typeof(MapEvent), nameof(MapEvent.FinishBattle))
+        AccessTools.Method(typeof(MapEvent), nameof(MapEvent.FinalizeEventAux))
     };
 
     public override void RegisterAllObjects()
@@ -71,11 +75,44 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
     {
         GameLoopRunner.RunOnMainThread(() =>
         {
+            // The action is deferred, so the campaign can be torn down (disconnect, save-load) before it runs.
+            if (Campaign.Current == null) return;
+
             using (new AllowedThread())
             {
-                obj.Component?.FinishComponent();
-                obj.FinishBattle();
+                // The event's own FinalizeEventAux would short-circuit on IsFinalized before clearing anything,
+                // and PartyBase.MapEventSide is not a synced member, so clear each involved party's battle state
+                // here directly: nulling MapEventSide makes MobileParty.MapEvent null and SetVisualAsDirty
+                // re-marks the map figure, together dropping the party out of its fighting animation. The full
+                // vanilla finalize is deliberately not re-run, so the client does not re-apply battle results
+                // the server already replicated.
 
+                // Mark the event finalized first. Clearing the last party of a side re-enters
+                // RemovePartyInternal, which calls FinalizeEvent; with IsFinalized already true that is a no-op
+                // instead of a full client-side finalize. The synced State normally already reads this, but set
+                // it explicitly so the cleanup never depends on the State sync landing before this destroy.
+                obj.State = MapEventState.WaitingRemoval;
+
+                foreach (var side in obj._sides)
+                {
+                    if (side == null) continue;
+
+                    // Nulling MapEventSide removes the party from the side, so snapshot before iterating.
+                    foreach (var mapEventParty in new List<MapEventParty>(side.Parties))
+                    {
+                        var party = mapEventParty?.Party;
+                        if (party == null) continue;
+
+                        party.MapEventSide = null;
+                        party.SetVisualAsDirty();
+                    }
+                }
+
+                // Stop the battle icon and sound. The visual is also torn down through its own registry, and
+                // OnMapEventEnd is idempotent, so this is just a belt-and-suspenders stop on this client.
+                obj.MapEventVisual?.OnMapEventEnd();
+
+                // Drop the finalized event from the manager's tick list.
                 Campaign.Current.MapEventManager.Tick();
             }
         });
