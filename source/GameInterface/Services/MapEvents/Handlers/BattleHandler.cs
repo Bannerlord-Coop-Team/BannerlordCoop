@@ -252,7 +252,7 @@ internal class BattleHandler : IHandler
         }
         catch (Exception e)
         {
-            // GameLoopRunner runs queued actions unguarded, so a throw from here
+            // GameThread runs queued actions unguarded, so a throw from here
             // would escape into the game's main tick and crash it.
             Logger.Error(e, "Failed to open the battle mission for {Message}", nameof(NetworkStartAttackMission));
         }

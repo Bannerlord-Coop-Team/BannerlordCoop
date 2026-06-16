@@ -46,7 +46,7 @@ public class TransferSaveState : ConnectionStateBase
             }
 
             // Start holding this peer's broadcasts now that the snapshot has been taken. The whole save
-            // runs in a blocking RunOnMainThread call issued from the network thread, so the poller is
+            // runs in a blocking GameThread.Run call issued from the network thread, so the poller is
             // parked for its duration and cannot broadcast a received delta that races the snapshot;
             // taking the cut right after the snapshot cleanly separates "in the save" (dropped while
             // Dropping) from "after the save" (queued for replay).

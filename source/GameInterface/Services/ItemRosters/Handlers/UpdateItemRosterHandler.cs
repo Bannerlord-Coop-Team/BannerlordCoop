@@ -38,7 +38,7 @@ internal class UpdateItemRosterHandler : IHandler
         // resolution below ran on the receive thread, so it could miss an item or roster
         // whose create was deferred and has not drained yet. Resolving inside the game
         // loop keeps this lookup ordered behind that create. The override's own
-        // RunOnMainThread then runs inline because we are already on the game-loop thread.
+        // GameThread.Run then runs inline because we are already on the game-loop thread.
         GameThread.Run(() =>
         {
             try

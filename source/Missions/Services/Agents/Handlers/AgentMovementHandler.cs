@@ -115,7 +115,7 @@ namespace Missions.Services.Agents.Handlers
             {
                 foreach (var agent in controller.ControlledAgents.Values)
                 {
-                    GameLoopRunner.RunOnMainThread(() =>
+                    GameThread.Run(() =>
                     {
                         if (agent.Health > 0)
                         {

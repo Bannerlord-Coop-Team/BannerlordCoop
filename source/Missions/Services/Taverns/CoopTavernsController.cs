@@ -124,7 +124,7 @@ namespace Missions.Services.Taverns
             agentBuildData.Controller(AgentControllerType.None);
 
             Agent agent = default;
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 agent = Mission.Current.SpawnAgent(agentBuildData);
                 agent.FadeIn();

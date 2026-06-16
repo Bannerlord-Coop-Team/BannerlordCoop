@@ -61,7 +61,7 @@ public class GameThread : IUpdateable
             task.Item2?.Set();
         }
     }
-    public int Priority { get; } = UpdatePriority.MainLoop.GameLoopRunner;
+    public int Priority { get; } = UpdatePriority.MainLoop.GameThread;
 
     /// <summary>
     /// Maximum time a blocking <see cref="Run(Action, bool)"/> call waits for the game

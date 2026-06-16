@@ -86,7 +86,7 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void Handle(MessagePayload<NetworkRefreshSmelting> obj)
         {
-            GameThread.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 currentSmeltingVM?.RefreshValues();
                 currentSmeltingVM?.RefreshList();
@@ -134,7 +134,7 @@ namespace GameInterface.Services.Smithing.Handlers
             if (Settlement.CurrentSettlement?.Town != town || currentCraftingVM == null || currentCraftingVM.IsInCraftingMode == false) return;
 
             // Have to run on main thread to avoid UI related crashes
-            GameThread.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 using (new AllowedThread())
                 {

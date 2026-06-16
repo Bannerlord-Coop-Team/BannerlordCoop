@@ -129,7 +129,7 @@ namespace Missions.Services.Agents.Handlers
 
             if (networkAgentRegistry.TryGetAgent(payload.What.VictimAgentId, out Agent victimAgent) == false) return;
 
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
@@ -255,7 +255,7 @@ namespace Missions.Services.Agents.Handlers
 
                 Agent.KillInfo overrideKillInfo = blow.IsFallDamage ? Agent.KillInfo.Gravity : Agent.KillInfo.Invalid;
 
-                GameLoopRunner.RunOnMainThread(() =>
+                GameThread.Run(() =>
                 {
                     agent.Die(blow, overrideKillInfo);
                 }, true);

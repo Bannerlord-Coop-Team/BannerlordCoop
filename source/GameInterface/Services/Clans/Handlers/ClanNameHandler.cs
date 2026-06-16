@@ -57,7 +57,7 @@ namespace GameInterface.Services.Clans.Handlers
             }
 
             // The refresh touches the clan screen UI, which is main-thread only.
-            GameThread.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
