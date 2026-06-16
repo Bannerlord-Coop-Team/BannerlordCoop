@@ -76,22 +76,22 @@ internal class PartyScreenHelperHandler : IHandler
                 if (!objectManager.TryGetObjectWithLogging<Settlement>(data.CurrentSettlementId, out var currentSettlement)) return;
                 if (!objectManager.TryGetObjectWithLogging<TroopRoster>(data.LeftMemberRosterId, out var leftMemberRoster)) return;
 
-                using (new AllowedThread())
+                // Server-authoritative apply: run with patches live (no AllowedThread) so a
+                // newly created garrison party registers and replicates to clients, and the
+                // donated troops broadcast as roster deltas.
+                MobileParty garrisonParty = currentSettlement.Town.GarrisonParty;
+                if (garrisonParty == null)
                 {
-                    MobileParty garrisonParty = currentSettlement.Town.GarrisonParty;
-                    if (garrisonParty == null)
+                    currentSettlement.AddGarrisonParty();
+                    garrisonParty = currentSettlement.Town.GarrisonParty;
+                }
+                for (int i = 0; i < leftMemberRoster.Count; i++)
+                {
+                    TroopRosterElement elementCopyAtIndex = leftMemberRoster.GetElementCopyAtIndex(i);
+                    garrisonParty.AddElementToMemberRoster(elementCopyAtIndex.Character, elementCopyAtIndex.Number, false);
+                    if (elementCopyAtIndex.Character.IsHero)
                     {
-                        currentSettlement.AddGarrisonParty();
-                        garrisonParty = currentSettlement.Town.GarrisonParty;
-                    }
-                    for (int i = 0; i < leftMemberRoster.Count; i++)
-                    {
-                        TroopRosterElement elementCopyAtIndex = leftMemberRoster.GetElementCopyAtIndex(i);
-                        garrisonParty.AddElementToMemberRoster(elementCopyAtIndex.Character, elementCopyAtIndex.Number, false);
-                        if (elementCopyAtIndex.Character.IsHero)
-                        {
-                            EnterSettlementAction.ApplyForCharacterOnly(elementCopyAtIndex.Character.HeroObject, currentSettlement);
-                        }
+                        EnterSettlementAction.ApplyForCharacterOnly(elementCopyAtIndex.Character.HeroObject, currentSettlement);
                     }
                 }
             }
@@ -205,10 +205,6 @@ internal class PartyScreenHelperHandler : IHandler
     {
         var data = obj.What;
 
-        // The vanilla EndCaptivityAction / TakePrisonerAction route through patched
-        // ApplyInternal whose prefixes block the client original (and log an error) unless
-        // the running thread is allowed. Run inside AllowedThread so the patched actions
-        // run the original.
         GameLoopRunner.RunOnMainThread(() =>
         {
             try
@@ -216,16 +212,17 @@ internal class PartyScreenHelperHandler : IHandler
                 FlattenedTroopRoster takenPrisonerRoster = FlattenedTroopSerializer.Deserialize(data.TakenPrisonerRoster, objectManager);
                 FlattenedTroopRoster releasedPrisonerRoster = FlattenedTroopSerializer.Deserialize(data.ReleasedPrisonerRoster, objectManager);
 
-                using (new AllowedThread())
+                // Server-authoritative apply: run with patches live (no AllowedThread) so each
+                // capture/release side effect replicates to clients as its own message (roster
+                // deltas and auto-synced hero state), and so a player hero's release routes
+                // through the coop captivity path instead of the partial native one.
+                if (!releasedPrisonerRoster.IsEmpty<FlattenedTroopRosterElement>())
                 {
-                    if (!releasedPrisonerRoster.IsEmpty<FlattenedTroopRosterElement>())
-                    {
-                        EndCaptivityAction.ApplyByReleasedByChoice(releasedPrisonerRoster);
-                    }
-                    if (!takenPrisonerRoster.IsEmpty<FlattenedTroopRosterElement>())
-                    {
-                        TakePrisonerAction.ApplyByTakenFromPartyScreen(takenPrisonerRoster);
-                    }
+                    EndCaptivityAction.ApplyByReleasedByChoice(releasedPrisonerRoster);
+                }
+                if (!takenPrisonerRoster.IsEmpty<FlattenedTroopRosterElement>())
+                {
+                    TakePrisonerAction.ApplyByTakenFromPartyScreen(takenPrisonerRoster);
                 }
             }
             catch (Exception e)
