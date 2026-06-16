@@ -366,6 +366,12 @@ internal class BattleHandler : IHandler
         {
             try
             {
+                // The campaign can tear down (exit to menu, disconnect, save load) between
+                // enqueuing this and the main thread draining it; bail before touching
+                // campaign state (the position snap below dereferences Campaign.Current).
+                if (Campaign.Current == null)
+                    return;
+
                 if (!objectManager.TryGetObjectWithLogging<MapEvent>(message.MapEventId, out var mapEvent))
                     return;
 
