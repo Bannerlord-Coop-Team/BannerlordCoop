@@ -72,10 +72,7 @@ internal class PartyRolesHandler : IHandler
     {
         var data = obj.What;
 
-        // Removing party roles runs vanilla campaign code that mutates party-member
-        // state the main-thread tick also touches; it must run on the game loop, not
-        // the network thread that delivered the command.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -107,10 +104,7 @@ internal class PartyRolesHandler : IHandler
     {
         var data = obj.What;
 
-        // Removing a party role runs vanilla campaign code that mutates party-member
-        // state the main-thread tick also touches; it must run on the game loop, not
-        // the network thread that delivered the command.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -142,10 +136,7 @@ internal class PartyRolesHandler : IHandler
     {
         var data = obj.What;
 
-        // Setting a party role runs vanilla campaign code that mutates party-member
-        // state the main-thread tick also touches; it must run on the game loop, not
-        // the network thread that delivered the command.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -177,10 +168,7 @@ internal class PartyRolesHandler : IHandler
     {
         var data = obj.What;
 
-        // Setting a party role runs vanilla campaign code that mutates party-member
-        // state the main-thread tick also touches; it must run on the game loop, not
-        // the network thread that delivered the command.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -212,10 +200,7 @@ internal class PartyRolesHandler : IHandler
     {
         var data = obj.What;
 
-        // Setting a party role runs vanilla campaign code that mutates party-member
-        // state the main-thread tick also touches; it must run on the game loop, not
-        // the network thread that delivered the command.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -247,10 +232,7 @@ internal class PartyRolesHandler : IHandler
     {
         var data = obj.What;
 
-        // Setting a party role runs vanilla campaign code that mutates party-member
-        // state the main-thread tick also touches; it must run on the game loop, not
-        // the network thread that delivered the command.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {

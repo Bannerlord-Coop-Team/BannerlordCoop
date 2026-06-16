@@ -60,7 +60,7 @@ namespace GameInterface.Services.Equipments.Handlers
             // The struct array-element store mutates live campaign equipment state read by the
             // game loop / renderer; defer it to the main thread so it is ordered and atomic.
             // Resolve the ids inside the lambda so a deferred create can land before the lookup.
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {

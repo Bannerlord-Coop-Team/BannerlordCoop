@@ -32,9 +32,7 @@ namespace GameInterface.Services.ItemRosters.Handlers
         {
             var data = payload.What;
 
-            // Resolving the roster and applying the clear both run vanilla game code and must
-            // happen on the main thread, not the network thread that delivered the message.
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {

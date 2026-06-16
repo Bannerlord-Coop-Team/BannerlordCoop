@@ -136,7 +136,7 @@ internal class PlayerCaptivityServerHandler : IHandler
         PlayerCaptivityLogger.Debug("Handle_NetworkPlayerSurrendered: applying surrender for party={PartyId} in mapEvent={MapEventId}",
             playerParty.StringId, payload.What.MapEventId);
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -171,7 +171,7 @@ internal class PlayerCaptivityServerHandler : IHandler
         // apply to the game loop; resolve the object ids inside the lambda so a deferred create that lands
         // first is visible, and send the reply inside the lambda after the release runs so the client only
         // leaves the captivity menus once the server has actually applied it.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {

@@ -27,7 +27,7 @@ namespace Coop.Core.Server.Connections;
 /// <item><b>Open</b> (on <see cref="PlayerCampaignEntered"/>): held packets are replayed FIFO, the
 /// channel is dropped, and the peer goes live (a peer with no channel is live).</item>
 /// </list>
-/// The drop/queue cut is clean: the save runs in a blocking <c>RunOnMainThread</c> on the network
+/// The drop/queue cut is clean: the save runs in a blocking <c>GameThread.Run</c> on the network
 /// thread, so the poller is parked and nothing races the snapshot. Replay-before-live is held by the
 /// per-peer gate lock (across the whole flush, Open flipped last), not by thread identity or the
 /// non-thread-safe broker.
@@ -43,7 +43,7 @@ public interface IConnectionMessageQueue
 
     /// <summary>
     /// Moves a peer from <c>Dropping</c> to <c>Queueing</c>. Call on the main thread immediately after
-    /// the transfer-save snapshot is taken. Because that save runs under a blocking RunOnMainThread
+    /// the transfer-save snapshot is taken. Because that save runs under a blocking GameThread.Run
     /// call issued from the network thread the poller is parked, so the snapshot is not raced and this
     /// cut cleanly separates "in the save" (dropped) from "after the save" (queued for replay).
     /// </summary>

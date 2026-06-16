@@ -38,7 +38,7 @@ internal class SettlementRegistry : AutoRegistryBase<Settlement>
 
     public override void OnClientCreated(Settlement obj, string id)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {

@@ -63,10 +63,7 @@ internal class BanditPartyComponentHandler : IHandler
     {
         var obj = payload.What;
 
-        // Applying the component change runs vanilla setter code that must run on the
-        // main thread, not the network thread that delivered the message. Resolve the ids
-        // at drain time so the apply stays ordered behind the object's create.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -119,10 +116,7 @@ internal class BanditPartyComponentHandler : IHandler
     {
         var message = payload.What;
 
-        // Storing the init args is a cross-thread campaign-state mutation; defer it to the
-        // main thread and resolve the ids at drain time so it stays ordered behind the
-        // object's create on the game loop.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {

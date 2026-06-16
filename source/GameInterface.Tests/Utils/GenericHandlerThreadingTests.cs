@@ -41,20 +41,20 @@ public class GenericHandlerThreadingTests
     private static readonly TimeSpan ApplyTimeout = TimeSpan.FromSeconds(10);
 
     /// <summary>
-    /// Captures the GameLoopRunner's game-loop thread id by running a probe on it. The probe is
+    /// Captures the game-loop thread id by running a probe on it. The probe is
     /// blocking, so it has completed (and recorded the id) by the time this returns.
     /// </summary>
     private static int GetGameLoopThreadId()
     {
         int gameLoopThreadId = 0;
-        GameLoopRunner.RunOnMainThread(() => gameLoopThreadId = Environment.CurrentManagedThreadId, blocking: true);
+        GameThread.Run(() => gameLoopThreadId = Environment.CurrentManagedThreadId, blocking: true);
         return gameLoopThreadId;
     }
 
     [Fact]
     public void SubscribeNetwork_MarshalsApplyOntoGameLoopThread()
     {
-        Assert.True(GameLoopRunner.Instance.IsInitialized, "game-loop pump was not initialized");
+        Assert.True(GameThread.Instance.IsInitialized, "game-loop pump was not initialized");
 
         var instance = new TestInstance();
         var objectManager = new Mock<IObjectManager>();
@@ -82,7 +82,7 @@ public class GenericHandlerThreadingTests
 
         int publishThreadId = Environment.CurrentManagedThreadId;
         int gameLoopThreadId = GetGameLoopThreadId();
-        // The publisher must not itself be the game-loop thread, otherwise RunOnMainThread runs inline
+        // The publisher must not itself be the game-loop thread, otherwise GameThread.Run runs inline
         // and the marshaling would be unobservable.
         Assert.NotEqual(publishThreadId, gameLoopThreadId);
 
@@ -96,7 +96,7 @@ public class GenericHandlerThreadingTests
     [Fact]
     public void SubscribeNetworkReference_MarshalsApplyOntoGameLoopThread()
     {
-        Assert.True(GameLoopRunner.Instance.IsInitialized, "game-loop pump was not initialized");
+        Assert.True(GameThread.Instance.IsInitialized, "game-loop pump was not initialized");
 
         var instance = new TestInstance();
         var value = new TestReference();
@@ -128,7 +128,7 @@ public class GenericHandlerThreadingTests
 
         int publishThreadId = Environment.CurrentManagedThreadId;
         int gameLoopThreadId = GetGameLoopThreadId();
-        // The publisher must not itself be the game-loop thread, otherwise RunOnMainThread runs inline
+        // The publisher must not itself be the game-loop thread, otherwise GameThread.Run runs inline
         // and the marshaling would be unobservable.
         Assert.NotEqual(publishThreadId, gameLoopThreadId);
 

@@ -21,7 +21,7 @@ namespace Missions.Services.BoardGames
     {
         private readonly ILogger m_Logger = LogManager.GetLogger<BoardGameManager>();
 
-        private readonly INetwork network;
+        private readonly IMeshNetwork network;
         
         private readonly IMessageBroker _messageBroker;
         private readonly INetworkAgentRegistry _agentRegistry;
@@ -29,7 +29,7 @@ namespace Missions.Services.BoardGames
         private BoardGameLogic BoardGameLogic;
 
         public BoardGameManager(
-            INetwork network,
+            IMeshNetwork network,
             IMessageBroker messageBroker, 
             INetworkAgentRegistry agentRegistry)
         {
@@ -45,7 +45,7 @@ namespace Missions.Services.BoardGames
         {
             _messageBroker.Unsubscribe<AgentInteraction>(Handle_OnAgentInteraction);
             _messageBroker.Unsubscribe<BoardGameChallengeRequest>(Handle_ChallengeRequest);
-            _messageBroker.Unsubscribe<BoardGameChallengeResponse>(Handle_ChallengeResponse);
+            //_messageBroker.Unsubscribe<BoardGameChallengeResponse>(Handle_ChallengeResponse);
         }
 
         private void Handle_OnAgentInteraction(MessagePayload<AgentInteraction> payload)
@@ -58,13 +58,13 @@ namespace Missions.Services.BoardGames
 
         private void SendGameRequest(Agent sender, Agent other)
         {
-            if (_agentRegistry.TryGetAgentId(sender, out Guid senderGuid) &&
-                _agentRegistry.TryGetAgentId(other, out Guid otherGuid))
+            if (_agentRegistry.TryGetAgentId(sender, out string senderGuid) &&
+                _agentRegistry.TryGetAgentId(other, out string otherGuid))
             {
                 _agentRegistry.TryGetExternalController(other, out NetPeer otherPeer);
                 BoardGameChallengeRequest request = new BoardGameChallengeRequest(senderGuid, otherGuid);
                 // TODO associate a client id so we don't have to subscribe here
-                _messageBroker.Subscribe<BoardGameChallengeResponse>(Handle_ChallengeResponse);
+                //_messageBroker.Subscribe<BoardGameChallengeResponse>(Handle_ChallengeResponse);
                 network.Send(otherPeer, request);
             }
             else
@@ -75,8 +75,8 @@ namespace Missions.Services.BoardGames
 
         private void Handle_ChallengeRequest(MessagePayload<BoardGameChallengeRequest> payload)
         {
-            Guid sender = payload.What.TargetPlayer;
-            Guid other = payload.What.RequestingPlayer;
+            string sender = payload.What.TargetPlayer;
+            string other = payload.What.RequestingPlayer;
             NetPeer netPeer = payload.Who as NetPeer ?? throw new InvalidCastException("Payload 'Who' was not of type NetPeer");
 
             if (_agentRegistry.TryGetAgent(sender, out Agent agent) == false) return;
@@ -94,12 +94,12 @@ namespace Missions.Services.BoardGames
             }
         }
 
-        private void AcceptGameRequest(Guid sender, Guid other, NetPeer netPeer)
+        private void AcceptGameRequest(string sender, string other, NetPeer netPeer)
         {
             Guid gameId = Guid.NewGuid();
 
-            BoardGameChallengeResponse response = new BoardGameChallengeResponse(sender, other, true, gameId);
-            network.Send(netPeer, response);
+            //BoardGameChallengeResponse response = new BoardGameChallengeResponse(sender, other, true, gameId);
+            //network.Send(netPeer, response);
 
             //Has to do same thing as if (accepted) in Handle_ChallengeResponse
             if (_agentRegistry.TryGetAgent(other, out Agent opponent))
@@ -108,27 +108,27 @@ namespace Missions.Services.BoardGames
             }
         }
 
-        private void DenyGameRequest(Guid sender, Guid other, NetPeer netPeer)
+        private void DenyGameRequest(string sender, string other, NetPeer netPeer)
         {
-            BoardGameChallengeResponse response = new BoardGameChallengeResponse(sender, other, false, Guid.Empty);
-            network.Send(netPeer, response);
+            //BoardGameChallengeResponse response = new BoardGameChallengeResponse(sender, other, false, Guid.Empty);
+            //network.Send(netPeer, response);
         }
 
-        private void Handle_ChallengeResponse(MessagePayload<BoardGameChallengeResponse> payload)
-        {
-            bool accepted = payload.What.Accepted;
-            Guid gameId = payload.What.GameId;
-            Guid opponentId = payload.What.RequestingPlayer;
+        //private void Handle_ChallengeResponse(MessagePayload<BoardGameChallengeResponse> payload)
+        //{
+        //    bool accepted = payload.What.Accepted;
+        //    Guid gameId = payload.What.GameId;
+        //    Guid opponentId = payload.What.RequestingPlayer;
 
-            if (accepted)
-            {
-                NetPeer netPeer = payload.Who as NetPeer;
-                if (_agentRegistry.TryGetAgent(opponentId, out Agent opponent))
-                {
-                    StartGame(true, gameId, opponent);
-                }
-            }
-        }
+        //    if (accepted)
+        //    {
+        //        NetPeer netPeer = payload.Who as NetPeer;
+        //        if (_agentRegistry.TryGetAgent(opponentId, out Agent opponent))
+        //        {
+        //            StartGame(true, gameId, opponent);
+        //        }
+        //    }
+        //}
 
         private void StartGame(bool startFirst, Guid gameId, Agent opposingAgent)
         {

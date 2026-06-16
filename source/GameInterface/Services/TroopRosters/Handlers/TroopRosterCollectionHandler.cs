@@ -59,10 +59,7 @@ namespace GameInterface.Services.TroopRosters.Handlers
         {
             var data = payload.What;
 
-            // Mutating the roster touches game state and must run on the main thread, not the
-            // network thread that delivered the message. Ids are resolved inside the lambda so
-            // the apply stays queue-ordered behind the roster's create and ahead of its destroy.
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {

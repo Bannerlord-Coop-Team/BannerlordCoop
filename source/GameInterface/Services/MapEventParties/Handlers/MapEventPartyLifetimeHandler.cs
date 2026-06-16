@@ -55,7 +55,7 @@ internal class MapEventPartyLifetimeHandler : IHandler
 
         if (objectManager.TryGetObject(obj.PartyBaseId, out PartyBase partyBase) == false) return;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {

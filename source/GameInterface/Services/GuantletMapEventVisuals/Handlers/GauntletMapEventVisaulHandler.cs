@@ -50,11 +50,10 @@ internal class GauntletMapEventVisaulHandler : IHandler
         var position = payload.What.Position;
 
         // Initializing the visual touches Gauntlet map UI, which is only safe on the main
-        // thread; this handler runs on the network thread that delivered the message. The
-        // visual is re-resolved on the main thread so that a matching destroy which arrived
-        // first (and ran synchronously on the network thread) is observed here and the now
-        // stale init is skipped.
-        GameLoopRunner.RunOnMainThread(() =>
+        // thread. The visual is re-resolved on the main thread so that a matching destroy
+        // which arrived first (and ran synchronously on the network thread) is observed here
+        // and the now stale init is skipped.
+        GameThread.Run(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<GauntletMapEventVisual>(instanceId, out var visual))
                 return;

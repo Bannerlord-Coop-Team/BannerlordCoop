@@ -76,7 +76,7 @@ internal class PlayerCaptivityClientHandler : IHandler
 
         var captorParty = payload.What.CaptorParty;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             if (Campaign.Current is null) return;
 
@@ -190,7 +190,7 @@ internal class PlayerCaptivityClientHandler : IHandler
         // local captivity state, all touch game state the main-thread tick also touches, so defer the
         // apply to the game loop. Ids are resolved inside the lambda so a deferred create that lands
         // first is visible, and the forward to the server goes out from the main thread after the read.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -229,7 +229,7 @@ internal class PlayerCaptivityClientHandler : IHandler
 
         PlayerCaptivityLogger.Debug("Handle_NetworkPlayerCaptivityEnded (client): leaving captivity menus/encounter");
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             if (PlayerEncounter.Current != null)
             {

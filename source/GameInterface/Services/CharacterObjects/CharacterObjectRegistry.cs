@@ -7,6 +7,7 @@ using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
@@ -28,7 +29,7 @@ internal class CharacterObjectRegistry : AutoRegistryBase<CharacterObject>
 
     public override void RegisterAllObjects()
     {
-        foreach (CharacterObject character in CharacterObject.All)
+        foreach (CharacterObject character in Hero.DeadOrDisabledHeroes.Concat(Hero.AllAliveHeroes).Select(hero => hero.CharacterObject))
         {
             RegisterExistingObject(character.StringId, character);
         }

@@ -2,7 +2,6 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Common.Util;
 using Coop.Core.Client.Services.TroopRosters.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Interfaces;
@@ -40,22 +39,13 @@ internal class ServerTroopRosterHandler : IHandler
         var data = payload.What;
         var peer = payload.Who as NetPeer;
 
-        // Recruitment runs vanilla roster/gold code and the result must replicate to clients;
-        // both must run on the main thread, not the network thread that delivered the request.
-        // The server replies with the gold change only after it has applied the recruitment.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
-                // The TroopRoster AddToCounts patch publishes its sync messages while inside an
-                // AllowedThread, so the recruited troops only replicate to clients when the apply
-                // runs inside this scope.
-                using (new AllowedThread())
-                {
-                    troopRosterInterface.HandleOnRecruitmentDone(data.MobilePartyId, data.TroopsInCart, out var changedGold);
+                troopRosterInterface.HandleOnRecruitmentDone(data.MobilePartyId, data.TroopsInCart, out var changedGold);
 
-                    network.Send(peer, new NotifyGoldChange(changedGold));
-                }
+                network.Send(peer, new NotifyGoldChange(changedGold));
             }
             catch (Exception e)
             {

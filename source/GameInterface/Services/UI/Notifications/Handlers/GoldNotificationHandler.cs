@@ -33,9 +33,7 @@ internal class GoldNotificationHandler : IHandler
     {
         var goldAmount = obj.What.GoldAmount;
 
-        // OnHeroOrPartyTradedGold runs vanilla campaign/UI code (showNotification:true); it must run on the
-        // main thread, not the network thread that delivered the notification.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {

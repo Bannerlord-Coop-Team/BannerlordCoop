@@ -126,13 +126,13 @@ namespace GameInterface.Utils
         /// </summary>
         protected void MarshalApply(Action apply)
         {
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.RunSafe(() =>
             {
                 using (new AllowedThread())
                 {
                     apply();
                 }
-            });
+            }, context: typeof(THandler).Name);
         }
 
         public void Dispose()

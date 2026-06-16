@@ -159,7 +159,7 @@ class AutoRegistryHandler<T> : IHandler where T : class
         // Resolve and tear down on the game-loop thread, in queue order with the marshaled DynamicSync
         // applies, so a destroy whose object is already gone (e.g. a duplicate) is dropped instead of
         // tearing down twice.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.RunSafe(() =>
         {
             if (!ObjectManager.TryGetObjectWithLogging(payload.What.InstanceId, out T obj)) return;
 
@@ -171,7 +171,6 @@ class AutoRegistryHandler<T> : IHandler where T : class
                     payload.What.InstanceId);
             }
 
-            // Guard the callback so the de-registration below still runs if it throws.
             try
             {
                 // Callback before object is removed from registry
@@ -183,6 +182,6 @@ class AutoRegistryHandler<T> : IHandler where T : class
             }
 
             ObjectManager.Remove(obj);
-        });
+        }, context: $"NetworkDestroy {typeof(T).Name}");
     }
 }

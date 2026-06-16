@@ -122,10 +122,7 @@ internal class PartyDoneLogicHandler : IHandler
 
         var peer = obj.Who as NetPeer;
 
-        // The apply runs patched vanilla code (roster mutations, gold/influence/skill
-        // actions, morale) and must run on the main thread, not the network thread that
-        // delivered the message; the reply is sent only after the gold action runs.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -171,17 +168,6 @@ internal class PartyDoneLogicHandler : IHandler
                     {
                         CampaignEventDispatcher.Instance.OnPrisonersChangeInSettlement(Settlement.CurrentSettlement, donatedPrisonersRoster, null, true);
                     }
-                    if (!obj.What.DoNotApplyGoldTransactions)
-                    {
-                        GiveGoldAction.ApplyBetweenCharacters(null, mainHero, obj.What.PartyGoldChangeAmount, false);
-                        network.Send(peer, new NotifyGoldChange(obj.What.PartyGoldChangeAmount));
-                    }
-                    if (obj.What.PartyInfluenceChangeAmount != 0)
-                    {
-                        // TODO
-                        GainKingdomInfluenceAction.ApplyForLeavingTroopToGarrison(Hero.MainHero, (float)obj.What.PartyInfluenceChangeAmount);
-                    }
-
                     //Replacement for CampaignEventDispatcher.Instance.OnPlayerUpgradedTroops(tuple.Item1, tuple.Item2, tuple.Item3) without MainParty
                     foreach (Tuple<CharacterObject, CharacterObject, int> tuple in upgradedTroopHistory)
                     {
@@ -209,6 +195,21 @@ internal class PartyDoneLogicHandler : IHandler
                             mainHero.PartyBelongedTo.RecentEventsMorale += (float)prisonerRecruitmentMoraleEffect;
                         }
                     }
+                }
+
+                // Gold and influence are AutoSynced (Hero.Gold, Clan._influence); apply them
+                // OUTSIDE the AllowedThread above so their setters broadcast the new values to
+                // clients. Inside that scope they would be suppressed, leaving only the UI-only
+                // NotifyGoldChange and a silently desynced value.
+                if (!obj.What.DoNotApplyGoldTransactions)
+                {
+                    GiveGoldAction.ApplyBetweenCharacters(null, mainHero, obj.What.PartyGoldChangeAmount, false);
+                    network.Send(peer, new NotifyGoldChange(obj.What.PartyGoldChangeAmount));
+                }
+                if (obj.What.PartyInfluenceChangeAmount != 0)
+                {
+                    // TODO
+                    GainKingdomInfluenceAction.ApplyForLeavingTroopToGarrison(Hero.MainHero, (float)obj.What.PartyInfluenceChangeAmount);
                 }
             }
             catch (Exception e)

@@ -81,7 +81,7 @@ namespace GameInterface.Services.Smithing.Handlers
 
             // Mutating the campaign crafting-records dictionary touches state the main-thread
             // crafting VM/tick reads, so defer the resolution and apply to the game-loop thread.
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {

@@ -56,11 +56,7 @@ internal class ChangeGovernorHandler : IHandler
     {
         var data = obj.What;
 
-        // ChangeGovernor arrives on the network thread, but ApplyInternal mutates campaign
-        // state and dispatches vanilla campaign events; defer it to the game loop. Ids are
-        // resolved inside the lambda so the apply stays ordered behind the objects' create
-        // and ahead of their destroy.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -88,11 +84,7 @@ internal class ChangeGovernorHandler : IHandler
     {
         var data = obj.What;
 
-        // RemoveGovernor arrives on the network thread, but ApplyGiveUpInternal mutates
-        // campaign state and dispatches a vanilla campaign event; defer it to the game loop.
-        // GovernorId is resolved inside the lambda so the apply stays ordered behind the
-        // object's create and ahead of its destroy.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {

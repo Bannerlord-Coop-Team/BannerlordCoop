@@ -8,6 +8,8 @@ using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.MapEventParties;
+using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
@@ -124,10 +126,8 @@ internal class BattleHandler : IHandler
 
     private void Handle_NetworkAttackMissionAttempted(MessagePayload<NetworkAttackMissionAttempted> payload)
     {
-        if (!objectManager.TryGetObject(payload.What.MapEventId, out MapEvent mapEvent))
+        if (!objectManager.TryGetObject(payload.What.MapEventId, out MapEvent _))
             return;
-
-        mapEventLogger.DebugMapEvent(mapEvent, "Handling network attack mission attempted for map event. Making sides mission-ready and replying with mission start");
 
         // Roll the terrain seed once for this map event and reuse it for every client
         // that opens the battle, so they all use the same terrain seed. The seed is
@@ -136,12 +136,19 @@ internal class BattleHandler : IHandler
         var requester = payload.Who as NetPeer;
 
         // _sides is game state the main-thread tick also touches; mutating it from the
-        // network thread races the tick. Make the sides mission-ready on the main thread,
-        // then reply so the start goes out only after they are ready.
-        GameLoopRunner.RunOnMainThread(() =>
+        // network thread races the tick. Make the sides mission-ready on the main thread.
+        // Re-resolve the event at drain time: it may have finalized between this request
+        // arriving and the queued action running, in which case a captured reference would
+        // point at a torn-down event.
+        GameThread.Run(() =>
         {
             try
             {
+                if (!objectManager.TryGetObject(payload.What.MapEventId, out MapEvent mapEvent))
+                    return;
+
+                mapEventLogger.DebugMapEvent(mapEvent, "Handling network attack mission attempted for map event. Making sides mission-ready and replying with mission start");
+
                 foreach (var side in mapEvent._sides)
                 {
                     side.MakeReadyForMission(null);
@@ -173,7 +180,7 @@ internal class BattleHandler : IHandler
         // changes from the main thread; doing it from the network thread races its
         // layer lists and crashes the game.
         var randomTerrainSeed = payload.What.RandomTerrainSeed;
-        GameLoopRunner.RunOnMainThread(() => OpenAttackMission(randomTerrainSeed));
+        GameThread.Run(() => OpenAttackMission(randomTerrainSeed));
     }
 
     private static void OpenAttackMission(int randomTerrainSeed)
@@ -247,7 +254,7 @@ internal class BattleHandler : IHandler
         }
         catch (Exception e)
         {
-            // GameLoopRunner runs queued actions unguarded, so a throw from here
+            // GameThread runs queued actions unguarded, so a throw from here
             // would escape into the game's main tick and crash it.
             Logger.Error(e, "Failed to open the battle mission for {Message}", nameof(NetworkStartAttackMission));
         }
@@ -273,7 +280,7 @@ internal class BattleHandler : IHandler
         if (MapEventConfig.Debug)
             mapEventLogger.DebugMapEvent(mapEvent, "Handling network map event finalize attempted. Finalizing map event.");
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             mapEvent.FinalizeEventAux();
         }, blocking: true);
@@ -285,7 +292,7 @@ internal class BattleHandler : IHandler
 
     private void Handle_NetworkMapEventFinalized(MessagePayload<NetworkMapEventFinalized> payload)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             if (Campaign.Current == null) return;
 
@@ -323,10 +330,20 @@ internal class BattleHandler : IHandler
 
         foreach (var addedParty in message.AddedParties)
         {
-            if (objectManager.TryGetIdWithLogging(addedParty, out var mapEventPartyId))
-            {
-                partyIds.Add(mapEventPartyId);
-            }
+            if (!objectManager.TryGetIdWithLogging(addedParty, out var mapEventPartyId))
+                continue;
+
+            partyIds.Add(mapEventPartyId);
+
+            // A player just created or joined this map event, so push every involved party's
+            // flattened roster to clients (AI-only battles never reach here). Clients need these to
+            // spawn troops in the mission; in-progress AI parties already have a roster built from
+            // server simulation. Per-troop changes after this are kept in sync incrementally.
+            if (addedParty._roster == null)
+                continue;
+
+            var flattenedTroops = FlattenedTroopSerializer.Serialize(addedParty._roster, objectManager);
+            network.SendAll(new NetworkUpdateMapEventParty(mapEventPartyId, flattenedTroops));
         }
 
         network.SendAll(new NetworkAddInvolvedParties(
@@ -339,10 +356,7 @@ internal class BattleHandler : IHandler
     {
         var message = payload.What;
 
-        // The map event's troop-upgrade tracker is game state the main-thread tick also
-        // touches, so defer the apply to the game loop. Ids are resolved at drain time so
-        // the apply stays queue-ordered behind the event's create and ahead of its evict.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {

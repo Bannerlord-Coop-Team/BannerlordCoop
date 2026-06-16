@@ -47,7 +47,7 @@ internal class GameStateInterface : IGameStateInterface
 
     public void LoadSaveData(byte[] saveData)
     {
-        GameLoopRunner.RunOnMainThread(() => InteralLoadSaveGame(saveData), blocking: true);
+        GameThread.Run(() => InteralLoadSaveGame(saveData), blocking: true);
     }
 
     private void InteralLoadSaveGame(byte[] saveData)
@@ -66,7 +66,7 @@ internal class GameStateInterface : IGameStateInterface
 
     public void StartNewGame()
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             MBGameManager.StartNewGame(new SandBoxGameManager(() => new Campaign(CampaignGameMode.Campaign)));
         });
@@ -74,7 +74,7 @@ internal class GameStateInterface : IGameStateInterface
 
     public void LoadGame(string saveName)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             var save = MBSaveLoad.GetSaveFiles(null).SingleOrDefault(x => x.Name == saveName);
 
@@ -96,7 +96,7 @@ internal class GameStateInterface : IGameStateInterface
 
     public void EndGame()
     {
-        GameLoopRunner.RunOnMainThread(MBGameManager.EndGame, blocking: true);
+        GameThread.Run(MBGameManager.EndGame, blocking: true);
 
         messageBroker.Publish(this, new MainMenuEntered());
     }

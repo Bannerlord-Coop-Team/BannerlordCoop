@@ -56,14 +56,12 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
             // OnOpenedPerkInternal mutates campaign hero state (HitPoints, attributes/focus,
             // roster version, power modifier), which is main-thread-only; defer it off the
             // poller thread that delivered this message.
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
                     OnOpenedPerkInternal(hero, perk);
 
-                    // Broadcast to clients only after the server has applied the perk
-                    // locally, so the reply stays ordered after the local apply.
                     network.SendAll(message);
                 }
                 catch (Exception e)
@@ -81,7 +79,7 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
             // OnOpenedPerkInternal mutates campaign hero state (HitPoints, attributes/focus,
             // roster version, power modifier), which is main-thread-only; defer it off the
             // network receive thread that delivered this message.
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {

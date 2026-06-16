@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEventParties.Messages;
 using HarmonyLib;
 using Serilog;
@@ -30,6 +31,12 @@ internal class MapEventPartyUpdatePatch
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
         if (ModInformation.IsClient)
+            return;
+
+        // The full flattened roster is only needed by clients when a player party is in the battle
+        // (to spawn the troops in the mission). Pure AI battles are simulated entirely server-side, so
+        // skip the large NetworkUpdateMapEventParty broadcast for them.
+        if (__instance.Party?.MapEvent.ContainsPlayerParty() != true)
             return;
 
         var message = new MapEventPartyUpdated(__instance, __instance._roster);

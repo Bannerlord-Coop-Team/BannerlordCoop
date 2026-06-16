@@ -85,8 +85,6 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void Handle(MessagePayload<NetworkCompleteOrderServer> obj)
         {
-            // The client-removal broadcast is moved into CompleteOrderServer so it goes out
-            // only after the server has applied its gold/relation/roster/event changes.
             CompleteOrderServer(obj.What);
         }
 
@@ -97,11 +95,7 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void CreateTownOrderServer(TownOrderCreated obj)
         {
-            // Building the order constructs vanilla game objects and mutates the campaign
-            // crafting-order collection; defer to the game-loop thread instead of the
-            // network thread that delivered the message. The reply is sent only after the
-            // order is registered and added.
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
@@ -155,10 +149,7 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void CreateTownOrder(NetworkCreateTownOrder obj)
         {
-            // Generating the item runs vanilla game code and the refresh touches crafting
-            // UI; both must run on the game-loop thread, not the network thread that
-            // delivered the message.
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
@@ -204,9 +195,7 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void ReplaceCraftingOrder(NetworkReplaceCraftingOrder obj)
         {
-            // Mutating the campaign crafting-order collection must run on the game-loop
-            // thread, not the network thread that delivered the message.
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
@@ -248,12 +237,7 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void CompleteOrderServer(NetworkCompleteOrderServer obj)
         {
-            // Completing the order runs vanilla actions (gold/relation/roster) and the
-            // campaign event dispatch, and mutates the campaign crafting-order collection;
-            // all must run on the game-loop thread, not the network thread that delivered
-            // the message. Clients are told to remove the order only after the server has
-            // applied its changes.
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
@@ -315,7 +299,6 @@ namespace GameInterface.Services.Smithing.Handlers
 
                     CampaignEventDispatcher.Instance.OnCraftingOrderCompleted(town, craftingOrder, craftedItem, completerHero);
 
-                    // Tell clients to remove the order only after the server apply above.
                     network.SendAll(new NetworkCompleteOrderClients(obj));
                 }
                 catch (Exception e)
@@ -327,10 +310,7 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void CompleteOrderClients(NetworkCompleteOrderClients obj)
         {
-            // Mutating the campaign crafting-order collection, dispatching the vanilla
-            // campaign event, and the refresh all touch game/UI state; defer to the
-            // game-loop thread instead of the network thread that delivered the message.
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {

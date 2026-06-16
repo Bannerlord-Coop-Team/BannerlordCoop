@@ -70,10 +70,7 @@ internal class MapEventPartyHandler : IHandler
     {
         var obj = payload.What;
 
-        // Update mutates the party roster and its postfix rebroadcasts to clients; both
-        // must run on the main thread that the game loop reads, not the network thread
-        // that delivered the request.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -111,7 +108,7 @@ internal class MapEventPartyHandler : IHandler
         // so writing it from the network thread races the tick.
         var roster = FlattenedTroopSerializer.Deserialize(obj.FlattenedTroops, objectManager);
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -148,7 +145,7 @@ internal class MapEventPartyHandler : IHandler
         // OnTroopKilled mutates the roster the game loop reads, so it is deferred to the
         // main thread. OnTroopKilled is Harmony-patched, so AllowedThread silences the
         // client prefix to stop it re-running and rebroadcasting in a loop.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -189,7 +186,7 @@ internal class MapEventPartyHandler : IHandler
         // OnTroopWounded mutates the roster the game loop reads, so it is deferred to the
         // main thread. OnTroopWounded is Harmony-patched, so AllowedThread silences the
         // client prefix to stop it re-running and rebroadcasting in a loop.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -217,7 +214,7 @@ internal class MapEventPartyHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(obj.MapEventParty, out var mapEventPartyId))
             return;
 
-        var message = new NetworkTroopWounded(mapEventPartyId, obj.TroopSeed);
+        var message = new NetworkTroopRouted(mapEventPartyId, obj.TroopSeed);
 
         network.SendAll(message);
     }
@@ -229,7 +226,7 @@ internal class MapEventPartyHandler : IHandler
         // OnTroopRouted mutates the roster the game loop reads, so it is deferred to the
         // main thread. OnTroopRouted is Harmony-patched, so AllowedThread silences the
         // client prefix to stop it re-running and rebroadcasting in a loop.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -238,7 +235,10 @@ internal class MapEventPartyHandler : IHandler
 
                 var troopDescriptor = new UniqueTroopDescriptor(obj.TroopSeed);
 
-                mapEventParty.OnTroopRouted(troopDescriptor);
+                using (new AllowedThread())
+                {
+                    mapEventParty.OnTroopRouted(troopDescriptor);
+                }
             }
             catch (Exception ex)
             {

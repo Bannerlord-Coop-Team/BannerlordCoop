@@ -50,9 +50,8 @@ internal class HeroDataHandler : IHandler
             return;
         }
 
-        // Applying the name runs vanilla game code and the refresh touches the clan screen
-        // UI; both must run on the main thread, not the network thread that delivered it.
-        GameLoopRunner.RunOnMainThread(() =>
+        // The refresh touches the clan screen UI, which must run on the main thread.
+        GameThread.Run(() =>
         {
             try
             {

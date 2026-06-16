@@ -1,5 +1,4 @@
-﻿using Common;
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
@@ -8,14 +7,12 @@ using Common.Serialization;
 using Coop.Core.Common.Network;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
-using Coop.Core.Server.Services.Time.Messages;
-using GameInterface.Registry.Messages;
+using Coop.Core.Server.Services.Instances;
+using Coop.Core.Server.Services.Time;
 using GameInterface.Services.Entity;
 using LiteNetLib;
 using Serilog;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 
@@ -26,7 +23,6 @@ namespace Coop.Core.Server;
 /// </summary>
 public interface ICoopServer : INetwork, INatPunchListener, IDisposable
 {
-    IEnumerable<NetPeer> ConnectedPeers { get; }
 }
 
 /// <inheritdoc cref="ICoopServer"/>
@@ -38,24 +34,33 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override int Priority => 0;
 
-    public IEnumerable<NetPeer> ConnectedPeers => netManager;
-
     private readonly IMessageBroker messageBroker;
     private readonly IPacketManager packetManager;
     private readonly IConnectionMessageQueue connectionMessageQueue;
+    // Lazy breaks the construction cycle: the manager depends on ITimeControlInterface, which depends
+    // on INetwork (this server). It is only needed each Update, so deferring construction is fine.
+    private readonly Lazy<IOverloadedPeerManager> overloadedPeerManager;
+
+    // Co-hosted NAT-punch rendezvous for P2P instances (taverns etc.). The server's NetManager
+    // already has NatPunchEnabled; the MissionManager answers the introduction requests.
+    private readonly IMissionManager missionManager;
 
     public CoopServer(
-        INetworkConfiguration configuration,
+        INetworkConfig configuration,
         IMessageBroker messageBroker,
         IPacketManager packetManager,
         IConnectionMessageQueue connectionMessageQueue,
         IControllerIdProvider controllerIdProvider,
+        IMissionManager missionManager,
+        Lazy<IOverloadedPeerManager> overloadedPeerManager,
         ICommonSerializer serializer) : base(configuration, serializer)
     {
         // Dependancy assignment
         this.messageBroker = messageBroker;
         this.packetManager = packetManager;
         this.connectionMessageQueue = connectionMessageQueue;
+        this.missionManager = missionManager;
+        this.overloadedPeerManager = overloadedPeerManager;
 
         // Netmanager initialization
         netManager.NatPunchEnabled = true;
@@ -72,7 +77,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public void OnNatIntroductionRequest(IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token)
     {
-        throw new NotImplementedException();
+        missionManager.HandleIntroductionRequest(netManager.NatPunchModule, localEndPoint, remoteEndPoint, token);
     }
 
     public void OnNatIntroductionSuccess(IPEndPoint targetEndPoint, NatAddressType type, string token)
@@ -115,19 +120,20 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void Update(TimeSpan frameTime)
     {
+        overloadedPeerManager.Value.CheckForOverloadedPeers();
+
         netManager.PollEvents();
         netManager.NatPunchModule.PollEvents();
     }
 
     public override void Start()
     {
-        Logger.Information("Server starting on port {Port}", Configuration.Port);
-        netManager.Start(IPAddress.Any, IPAddress.IPv6Any, Configuration.Port);
+        Logger.Information("Server starting on port {Port}", Config.Port);
+        netManager.Start(IPAddress.Any, IPAddress.IPv6Any, Config.Port);
     }
 
     public override void SendAll(IPacket packet)
     {
-        CheckNetworkQueueOverloaded();
         SendAll(netManager, packet);
     }
 
@@ -144,22 +150,5 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     {
         if (connectionMessageQueue.TryHandleBroadcast(netPeer, packet)) return;
         base.Send(netPeer, packet);
-    }
-
-    private void CheckNetworkQueueOverloaded(NetPeer ignoredPeer = null)
-    {
-        // TODO see if Parallel.ForEach works here
-        foreach (var netPeer in ConnectedPeers.Where(peer => peer != ignoredPeer).Where(peer => peer.ConnectionState == ConnectionState.Connected))
-        {
-            // Sending defaults to channel 0
-            int outgoingPacketCount = 
-                  netPeer.GetPacketsCountInReliableQueue(0, true)
-                + netPeer.GetPacketsCountInReliableQueue(0, false);
-
-            if (outgoingPacketCount > Configuration.MaxPacketsInQueue)
-            {
-                messageBroker.Publish(this, new PeerQueueOverloaded(netPeer));
-            }
-        }
     }
 }

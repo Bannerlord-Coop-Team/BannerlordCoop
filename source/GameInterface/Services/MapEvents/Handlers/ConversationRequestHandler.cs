@@ -125,7 +125,7 @@ internal class ConversationRequestHandler : IHandler
         // Mark and hold on the game thread, then reply, so the party is frozen and protected before the client
         // (re)opens the encounter. The filter above runs on the network thread; game state can change while the
         // approval is queued, so the hold step re-validates everything it depends on.
-        GameLoopRunner.RunOnMainThread(() => HoldAndApprove(requestingPeer, request, aiPartyId, playerPartyId));
+        GameThread.Run(() => HoldAndApprove(requestingPeer, request, aiPartyId, playerPartyId));
     }
 
     /// <summary>
@@ -271,10 +271,7 @@ internal class ConversationRequestHandler : IHandler
             return;
         }
 
-        // Restarting the encounter reopens the encounter menu and reads PlayerEncounter state
-        // the main-thread tick mutates; both must run on the main thread, not the network
-        // thread that delivered the approval.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -352,7 +349,7 @@ internal class ConversationRequestHandler : IHandler
     {
         if (ModInformation.IsServer) return;
 
-        GameLoopRunner.RunOnMainThread(ConversationPartyHold.ShowInteractionBlockedMessage);
+        GameThread.Run(ConversationPartyHold.ShowInteractionBlockedMessage);
     }
 
     /// <summary>[Server] A player disconnected: release the AI party held for them, if any.</summary>
@@ -366,7 +363,7 @@ internal class ConversationRequestHandler : IHandler
     /// <summary>[Server] Releases the given player's engagement on the game thread.</summary>
     private void ReleaseEngagementOnMainThread(NetPeer peer)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
             ConversationPartyHold.EndEngagement(conversationPartyTracker, peer));
     }
 }

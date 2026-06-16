@@ -61,7 +61,7 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
         private void Handle(MessagePayload<NetworkSetSkillXpServer> obj)
         {
             // Send to all clients and apply on server
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 using (new AllowedThread())
                 {
@@ -76,9 +76,7 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
         {
             var data = obj.What;
 
-            // Apply on the game-loop thread; object resolution happens at drain time so the
-            // write stays queue-ordered behind the hero's create and ahead of its destroy.
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
@@ -98,7 +96,7 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
         private void Handle(MessagePayload<NetworkSkillLevelChangeServer> obj)
         {
             // Send to all clients and apply on server
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 using (new AllowedThread())
                 {
@@ -113,9 +111,7 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
         {
             var data = obj.What;
 
-            // Apply on the game-loop thread; object resolution happens at drain time so the
-            // write stays queue-ordered behind the hero's create and ahead of its destroy.
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
@@ -135,7 +131,7 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
         private void Handle(MessagePayload<NetworkRawXpGainServer> obj)
         {
             // Send to all clients and apply on server
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 using (new AllowedThread())
                 {
@@ -150,9 +146,7 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
         {
             var data = obj.What;
 
-            // Apply on the game-loop thread; object resolution happens at drain time so the
-            // write stays queue-ordered behind the hero's create and ahead of its destroy.
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {

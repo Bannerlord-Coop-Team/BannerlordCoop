@@ -131,10 +131,7 @@ public class SettlementHandler : IHandler
     {
         var data = payload.What;
 
-        // Applying the last-visit time runs vanilla game code; defer it to the game-loop
-        // thread instead of the network thread that delivered the message. The settlement is
-        // re-resolved on the main thread so the apply stays ordered behind the object's create.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {

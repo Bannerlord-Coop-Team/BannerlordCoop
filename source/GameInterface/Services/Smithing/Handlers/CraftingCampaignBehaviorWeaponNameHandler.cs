@@ -57,10 +57,7 @@ namespace GameInterface.Services.Smithing.Handlers
         {
             NetworkBehaviorSetCraftedWeaponNameClients nameChange = new(obj.What);
 
-            // Applying the rename runs vanilla game code, so it must run on the main thread,
-            // not the network thread that delivered the message. The server relays to all
-            // clients only after it has applied the change itself.
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
@@ -83,10 +80,7 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void SetCraftedWeaponName(NetworkBehaviorSetCraftedWeaponNameClients obj)
         {
-            // Resolving the ids and writing the crafted-item dictionary must run on the main
-            // thread, not the network thread that delivered the message. Resolving inside the
-            // lambda keeps the write queue-ordered behind the object's create at drain time.
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
