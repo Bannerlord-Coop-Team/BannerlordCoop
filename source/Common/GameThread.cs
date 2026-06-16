@@ -117,7 +117,9 @@ public class GameThread : IUpdateable
     /// <param name="blocking">Flag to pause code execution,
     /// True blocks execution until task is complete,
     /// False queues and returns</param>
-    public static void RunSafe(Action action, bool blocking = false)
+    /// <param name="context">Optional description of the action, attached to the error log to
+    /// identify which caller's action failed.</param>
+    public static void RunSafe(Action action, bool blocking = false, string context = null)
     {
         Run(() =>
         {
@@ -127,7 +129,7 @@ public class GameThread : IUpdateable
             }
             catch (Exception e)
             {
-                Logger.Error(e, "Failed to run action on the game thread");
+                Logger.Error(e, "Failed to run action on the game thread: {Context}", context ?? "(none)");
             }
         }, blocking);
     }
