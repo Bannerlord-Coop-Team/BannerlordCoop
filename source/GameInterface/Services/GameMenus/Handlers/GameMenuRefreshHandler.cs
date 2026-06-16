@@ -38,7 +38,7 @@ internal class GameMenuRefreshHandler : IHandler
 
         var menuName = obj.What.MenuName;
         // SwitchToMenu changes the active menu/screen, which is only safe on the main thread.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {

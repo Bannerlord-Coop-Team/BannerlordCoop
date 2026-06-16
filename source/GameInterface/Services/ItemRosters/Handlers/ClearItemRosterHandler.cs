@@ -32,7 +32,7 @@ namespace GameInterface.Services.ItemRosters.Handlers
         {
             var data = payload.What;
 
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {

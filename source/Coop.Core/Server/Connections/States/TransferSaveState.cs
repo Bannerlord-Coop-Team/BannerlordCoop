@@ -23,7 +23,7 @@ public class TransferSaveState : ConnectionStateBase
         IConnectionMessageQueue connectionMessageQueue)
         : base(connectionLogic)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             // Pause so the save snapshot is taken from a stationary world. This is local to the
             // save and runs before the connection has been assigned this state, so it precedes

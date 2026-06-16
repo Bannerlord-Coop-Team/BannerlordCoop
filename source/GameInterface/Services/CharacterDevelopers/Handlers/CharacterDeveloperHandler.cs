@@ -144,7 +144,7 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
 
         private void ApplyChanges(NetworkApplyChangesClients obj, Action afterApply = null)
         {
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {

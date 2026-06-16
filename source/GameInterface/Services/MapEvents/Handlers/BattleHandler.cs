@@ -138,7 +138,7 @@ internal class BattleHandler : IHandler
         // Re-resolve the event at drain time: it may have finalized between this request
         // arriving and the queued action running, in which case a captured reference would
         // point at a torn-down event.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -178,7 +178,7 @@ internal class BattleHandler : IHandler
         // changes from the main thread; doing it from the network thread races its
         // layer lists and crashes the game.
         var randomTerrainSeed = payload.What.RandomTerrainSeed;
-        GameLoopRunner.RunOnMainThread(() => OpenAttackMission(randomTerrainSeed));
+        GameThread.Run(() => OpenAttackMission(randomTerrainSeed));
     }
 
     private static void OpenAttackMission(int randomTerrainSeed)
@@ -278,7 +278,7 @@ internal class BattleHandler : IHandler
         if (MapEventConfig.Debug)
             mapEventLogger.DebugMapEvent(mapEvent, "Handling network map event finalize attempted. Finalizing map event.");
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             mapEvent.FinalizeEventAux();
         }, blocking: true);
@@ -290,7 +290,7 @@ internal class BattleHandler : IHandler
 
     private void Handle_NetworkMapEventFinalized(MessagePayload<NetworkMapEventFinalized> payload)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             if (Campaign.Current == null) return;
 
@@ -344,7 +344,7 @@ internal class BattleHandler : IHandler
     {
         var message = payload.What;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {

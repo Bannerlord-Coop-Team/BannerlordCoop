@@ -73,7 +73,7 @@ internal class MobilePartyAiHandler : IHandler
 
         if (payload.What.IsNull)
         {
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
@@ -95,7 +95,7 @@ internal class MobilePartyAiHandler : IHandler
             return;
         }
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {

@@ -58,7 +58,7 @@ internal class CustomPartyComponentHandler : IHandler
     {
         var obj = payload.What;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {

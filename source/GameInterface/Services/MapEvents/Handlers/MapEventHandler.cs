@@ -64,7 +64,7 @@ internal class MapEventHandler : IHandler
         // server), so no AllowedThread is needed to prevent an echo.
         var mapEventId = payload.What.MapEventId;
         var battleState = payload.What.BattleState;
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {

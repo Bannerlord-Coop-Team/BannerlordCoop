@@ -80,7 +80,7 @@ internal class PartyComponentHandler : IHandler
     {
         var data = payload.What.Data;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -202,7 +202,7 @@ internal class PartyComponentHandler : IHandler
         var obj = payload.What;
 
         // Re-resolve inside in case the object is removed concurrently.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {

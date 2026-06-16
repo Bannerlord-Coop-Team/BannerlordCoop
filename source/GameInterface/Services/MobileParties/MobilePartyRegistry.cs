@@ -70,7 +70,7 @@ internal class MobilePartyRegistry : AutoRegistryBase<MobileParty>
 
         MBObjectManager.Instance?.RegisterObjectInternalWithoutTypeId(obj, false, out _);
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             Campaign.Current?.CampaignObjectManager?.AddMobileParty(obj);
         });
@@ -78,7 +78,7 @@ internal class MobilePartyRegistry : AutoRegistryBase<MobileParty>
 
     public override void OnClientDestroyed(MobileParty obj, string id)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {

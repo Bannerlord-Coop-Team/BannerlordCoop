@@ -39,7 +39,7 @@ internal class UpdateItemRosterHandler : IHandler
         // whose create was deferred and has not drained yet. Resolving inside the game
         // loop keeps this lookup ordered behind that create. The override's own
         // RunOnMainThread then runs inline because we are already on the game-loop thread.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {

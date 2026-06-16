@@ -57,7 +57,7 @@ namespace GameInterface.Services.Smithing.Handlers
         {
             NetworkBehaviorSetCraftedWeaponNameClients nameChange = new(obj.What);
 
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
@@ -80,7 +80,7 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void SetCraftedWeaponName(NetworkBehaviorSetCraftedWeaponNameClients obj)
         {
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {

@@ -59,7 +59,7 @@ namespace GameInterface.Services.TroopRosters.Handlers
         {
             var data = payload.What;
 
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {

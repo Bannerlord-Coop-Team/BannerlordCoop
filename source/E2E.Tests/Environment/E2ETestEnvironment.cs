@@ -46,7 +46,7 @@ internal class E2ETestEnvironment : IDisposable
         // Setup logging for tests
         OutputSinkManager.AddLogCallback(TestOutputCallback);
 
-        GameLoopRunner.Instance.SetGameLoopThread();
+        GameThread.Instance.SetGameThreadThread();
 
         GameBootStrap.Initialize();
 

@@ -46,7 +46,7 @@ internal class MobilePartyHandler : IHandler
             return;
         }
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {
@@ -65,7 +65,7 @@ internal class MobilePartyHandler : IHandler
             return;
         }
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {

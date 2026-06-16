@@ -152,7 +152,7 @@ namespace GameInterface.Services.Smithing.Handlers
             // The roster mutation and event dispatch race the host's main-thread tick, so
             // resolve ids and apply the smelting on the game loop. The stamina and refresh
             // broadcasts go out from inside the deferral, after the server-side apply.
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
@@ -228,7 +228,7 @@ namespace GameInterface.Services.Smithing.Handlers
             // The roster mutations and event dispatch race the host's main-thread tick, so
             // resolve ids and apply the refinement on the game loop. The stamina and refresh
             // broadcasts go out from inside the deferral, after the server-side apply.
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
@@ -343,7 +343,7 @@ namespace GameInterface.Services.Smithing.Handlers
             // apply the crafting on the game loop. The stamina broadcast goes out from inside
             // the deferral, after the server-side apply. Server-authoritative, so only the
             // pre-existing inner AllowedThread around Crafting.GenerateItem is used here.
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
@@ -429,7 +429,7 @@ namespace GameInterface.Services.Smithing.Handlers
             // The vanilla crafting flow reads/writes the live CraftingState UI logic and the
             // MBObjectManager, so resolve ids and apply on the game loop. AllowedThread wraps
             // the whole deferred body since this is a client receive-apply of vanilla code.
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
@@ -513,7 +513,7 @@ namespace GameInterface.Services.Smithing.Handlers
         {
             // GetRecordForCompanion can lazily create the per-companion record and the write
             // mutates campaign state the tick reads, so resolve ids and apply on the game loop.
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {

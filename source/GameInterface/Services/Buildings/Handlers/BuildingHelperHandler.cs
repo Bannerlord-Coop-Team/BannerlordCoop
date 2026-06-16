@@ -65,7 +65,7 @@ internal class BuildingHelperHandler : IHandler
     {
         var data = obj.What;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -101,7 +101,7 @@ internal class BuildingHelperHandler : IHandler
     {
         var data = obj.What;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -141,7 +141,7 @@ internal class BuildingHelperHandler : IHandler
         var data = obj.What;
         var peer = obj.Who as NetPeer;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {

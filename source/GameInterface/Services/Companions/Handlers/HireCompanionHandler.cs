@@ -66,7 +66,7 @@ internal class HireCompanionHandler : IHandler
 
         // The hire applies vanilla game actions; defer them to the game-loop thread so they
         // run there instead of on the network (poller) thread that delivered the message.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {

@@ -76,7 +76,7 @@ namespace Coop
                 EnsureSafeExitConfig();
             }
 
-            GameLoopRunner.Instance.SetGameLoopThread();
+            GameThread.Instance.SetGameThreadThread();
         }
 
         private void SetupLogging()
@@ -166,7 +166,7 @@ namespace Coop
         {
             Coop = new CoopartiveMultiplayerExperience();
 
-            Updateables.Add(GameLoopRunner.Instance);
+            Updateables.Add(GameThread.Instance);
 
 
             // Skip startup splash screen
@@ -251,7 +251,7 @@ namespace Coop
         {
             if(m_IsFirstTick)
             {
-                GameLoopRunner.Instance.SetGameLoopThread();
+                GameThread.Instance.SetGameThreadThread();
                 
                 m_IsFirstTick = false;
             }    

@@ -111,7 +111,7 @@ internal class TradeHandler : IHandler
         var message = payload.What;
         var peer = payload.Who as NetPeer;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -199,7 +199,7 @@ internal class TradeHandler : IHandler
     {
         var message = obj.What;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {

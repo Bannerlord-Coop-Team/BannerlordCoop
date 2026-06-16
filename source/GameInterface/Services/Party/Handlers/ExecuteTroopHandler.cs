@@ -52,7 +52,7 @@ internal class ExecuteTroopHandler : IHandler
     {
         var data = obj.What;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {

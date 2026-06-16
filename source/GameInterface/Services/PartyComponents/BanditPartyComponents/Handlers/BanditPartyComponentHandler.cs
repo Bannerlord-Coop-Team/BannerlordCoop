@@ -63,7 +63,7 @@ internal class BanditPartyComponentHandler : IHandler
     {
         var obj = payload.What;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -116,7 +116,7 @@ internal class BanditPartyComponentHandler : IHandler
     {
         var message = payload.What;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {

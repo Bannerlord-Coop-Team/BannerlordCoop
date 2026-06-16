@@ -131,7 +131,7 @@ public class SettlementHandler : IHandler
     {
         var data = payload.What;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {

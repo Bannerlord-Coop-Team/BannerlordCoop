@@ -37,7 +37,7 @@ namespace GameInterface.Services.Stances.Handlers
 
             // ApplyInternal is the funnel for every war cause; calling it directly (publicized)
             // preserves the original DeclareWarDetail so detail-sensitive client listeners match the server.
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 using (new AllowedThread())
                 {
@@ -54,7 +54,7 @@ namespace GameInterface.Services.Stances.Handlers
 
             // ApplyInternal is the funnel for every peace cause; calling it directly (publicized)
             // preserves the original MakePeaceDetail and the daily tribute.
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 using (new AllowedThread())
                 {

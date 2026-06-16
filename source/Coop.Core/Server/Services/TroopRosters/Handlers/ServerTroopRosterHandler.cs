@@ -39,7 +39,7 @@ internal class ServerTroopRosterHandler : IHandler
         var data = payload.What;
         var peer = payload.Who as NetPeer;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {

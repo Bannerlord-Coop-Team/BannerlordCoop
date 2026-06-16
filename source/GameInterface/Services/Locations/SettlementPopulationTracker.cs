@@ -80,7 +80,7 @@ internal class SettlementPopulationTracker : IHandler
         if (objectManager.TryGetObjectWithLogging(partyId, out MobileParty party) == false) return;
         if (settlement.LocationComplex == null) return;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             if (party.IsPlayerParty())
             {
@@ -110,7 +110,7 @@ internal class SettlementPopulationTracker : IHandler
 
         var partyId = payload.What.PartyId;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             if (playerPartySettlements.TryGetValue(partyId, out var settlementId) == false)
             {
@@ -140,7 +140,7 @@ internal class SettlementPopulationTracker : IHandler
         if (settlement?.LocationComplex == null) return;
         if (objectManager.TryGetIdWithLogging(settlement, out var settlementId) == false) return;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             if (populatedSettlements.ContainsKey(settlement.StringId) == false)
             {

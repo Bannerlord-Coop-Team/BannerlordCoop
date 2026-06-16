@@ -56,7 +56,7 @@ internal class ChangeGovernorHandler : IHandler
     {
         var data = obj.What;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -84,7 +84,7 @@ internal class ChangeGovernorHandler : IHandler
     {
         var data = obj.What;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {

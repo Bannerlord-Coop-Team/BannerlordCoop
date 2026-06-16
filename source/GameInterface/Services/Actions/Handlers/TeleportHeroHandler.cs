@@ -58,7 +58,7 @@ internal class TeleportHeroHandler : IHandler
     {
         var data = obj.What;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {

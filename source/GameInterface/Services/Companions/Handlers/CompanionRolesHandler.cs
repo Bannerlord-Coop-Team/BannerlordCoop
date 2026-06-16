@@ -88,7 +88,7 @@ internal class CompanionRolesHandler : IHandler
     {
         var data = obj.What;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -147,7 +147,7 @@ internal class CompanionRolesHandler : IHandler
     {
         var data = obj.What;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -180,7 +180,7 @@ internal class CompanionRolesHandler : IHandler
     {
         var data = obj.What;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -213,7 +213,7 @@ internal class CompanionRolesHandler : IHandler
     {
         var data = obj.What;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -256,7 +256,7 @@ internal class CompanionRolesHandler : IHandler
     {
         var data = obj.What;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -299,7 +299,7 @@ internal class CompanionRolesHandler : IHandler
     {
         var data = obj.What;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {

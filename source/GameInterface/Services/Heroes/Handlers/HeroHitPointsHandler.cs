@@ -60,7 +60,7 @@ public class HeroHitPointsHandler : IHandler
 
         // Setting Hero.HitPoints runs the server-side property-sync intercept; defer it to the
         // game-loop thread so the value change (and its replication) fire on the main thread.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {

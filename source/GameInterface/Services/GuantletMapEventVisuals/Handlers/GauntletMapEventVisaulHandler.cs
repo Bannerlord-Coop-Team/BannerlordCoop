@@ -53,7 +53,7 @@ internal class GauntletMapEventVisaulHandler : IHandler
         // thread. The visual is re-resolved on the main thread so that a matching destroy
         // which arrived first (and ran synchronously on the network thread) is observed here
         // and the now stale init is skipped.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<GauntletMapEventVisual>(instanceId, out var visual))
                 return;

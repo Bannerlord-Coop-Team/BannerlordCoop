@@ -48,7 +48,7 @@ namespace GameInterface.Services.GameDebug.Interfaces
             if (InCharacterCreationIntro() == false) return;
 
             // Logic
-            GameLoopRunner.RunOnMainThread(SkipCharacterCreationInternal);
+            GameThread.Run(SkipCharacterCreationInternal);
         }
 
         public void SkipCharacterCreationInternal()

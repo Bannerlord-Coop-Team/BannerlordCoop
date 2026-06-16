@@ -61,7 +61,7 @@ internal class SellPrisonersHandler : IHandler
         var data = obj.What;
         var peer = obj.Who as NetPeer;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {

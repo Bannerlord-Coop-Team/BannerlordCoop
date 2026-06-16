@@ -122,7 +122,7 @@ internal class PartyDoneLogicHandler : IHandler
 
         var peer = obj.Who as NetPeer;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {

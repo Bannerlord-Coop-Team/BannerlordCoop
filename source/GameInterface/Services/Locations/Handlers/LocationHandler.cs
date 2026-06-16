@@ -141,7 +141,7 @@ public class LocationHandler : IHandler
     {
         var data = payload.What.Data;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {
@@ -203,7 +203,7 @@ public class LocationHandler : IHandler
 
         var entries = obj.Entries ?? Array.Empty<LocationCharacterData>();
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {

@@ -51,7 +51,7 @@ internal class HeroDataHandler : IHandler
         }
 
         // The refresh touches the clan screen UI, which must run on the main thread.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.RunOnMainThread(() =>
         {
             try
             {

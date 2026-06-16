@@ -125,7 +125,7 @@ public class TroopRosterHandler : IHandler
     {
         var obj = payload.What;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {
@@ -159,7 +159,7 @@ public class TroopRosterHandler : IHandler
     {
         var obj = payload.What;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {
@@ -191,7 +191,7 @@ public class TroopRosterHandler : IHandler
     {
         var troopRosterId = payload.What.TroopRosterId;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {
@@ -224,7 +224,7 @@ public class TroopRosterHandler : IHandler
     {
         var obj = payload.What;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {
@@ -257,7 +257,7 @@ public class TroopRosterHandler : IHandler
     {
         var obj = payload.What;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {
@@ -290,7 +290,7 @@ public class TroopRosterHandler : IHandler
     {
         var obj = payload.What;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {
@@ -323,7 +323,7 @@ public class TroopRosterHandler : IHandler
     {
         var obj = payload.What;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {
@@ -356,7 +356,7 @@ public class TroopRosterHandler : IHandler
     {
         var obj = payload.What;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {

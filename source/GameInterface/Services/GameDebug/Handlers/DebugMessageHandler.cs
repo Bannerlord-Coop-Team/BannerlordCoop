@@ -38,7 +38,7 @@ internal class DebugMessageHandler : IHandler
         var text = payload.What.Text;
         // DisplayMessage touches UI, so run it on the main thread. No campaign guard: these
         // messages also fire outside a loaded campaign (connecting, disconnected, etc.).
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -56,7 +56,7 @@ internal class DebugMessageHandler : IHandler
         var text = payload.What.Text;
         // ShowInquiry pushes a screen/layer, which is only safe on the main thread. No campaign
         // guard: these popups also fire outside a loaded campaign (e.g. "Server has been stopped").
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {

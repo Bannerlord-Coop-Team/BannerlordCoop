@@ -33,7 +33,7 @@ internal class GoldNotificationHandler : IHandler
     {
         var goldAmount = obj.What.GoldAmount;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {

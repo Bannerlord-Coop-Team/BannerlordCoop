@@ -55,7 +55,7 @@ namespace GameInterface.Services.ItemObjects.Handlers
         {
             NetworkSetCraftedWeaponNameClients nameChange = new(obj.What);
 
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
@@ -75,7 +75,7 @@ namespace GameInterface.Services.ItemObjects.Handlers
         {
             var data = obj.What;
 
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {

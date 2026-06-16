@@ -73,7 +73,7 @@ namespace GameInterface.Services.Smithing.Handlers
         {
             var data = obj.What;
 
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {

@@ -34,7 +34,7 @@ public class LeaveSettlementActionPatches
 
     public static void OverrideApplyForParty(MobileParty party)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {

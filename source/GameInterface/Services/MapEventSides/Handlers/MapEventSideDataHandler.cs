@@ -96,7 +96,7 @@ internal class MapEventSideDataHandler : IHandler
 
     private void UpdateIFaction(MapEventSide side, IFaction faction)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {
@@ -129,7 +129,7 @@ internal class MapEventSideDataHandler : IHandler
     {
         var data = payload.What;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -160,7 +160,7 @@ internal class MapEventSideDataHandler : IHandler
     {
         var data = payload.What;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -207,7 +207,7 @@ internal class MapEventSideDataHandler : IHandler
 
         var side = (int)data.Side;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -241,7 +241,7 @@ internal class MapEventSideDataHandler : IHandler
     {
         var data = payload.What;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {

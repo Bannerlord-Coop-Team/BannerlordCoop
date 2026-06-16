@@ -57,7 +57,7 @@ internal class VolunteerTypesHandler : IHandler
         var individualId = obj.What.IndividualId;
         var bitCode = obj.What.BitCode;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -101,7 +101,7 @@ internal class VolunteerTypesHandler : IHandler
     {
         var updatedVolunteerTypeIds = obj.What.UpdatedVolunteerTypeIds;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {

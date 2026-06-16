@@ -61,7 +61,7 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
         private void Handle(MessagePayload<NetworkSetSkillXpServer> obj)
         {
             // Send to all clients and apply on server
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 using (new AllowedThread())
                 {
@@ -76,7 +76,7 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
         {
             var data = obj.What;
 
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
@@ -96,7 +96,7 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
         private void Handle(MessagePayload<NetworkSkillLevelChangeServer> obj)
         {
             // Send to all clients and apply on server
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 using (new AllowedThread())
                 {
@@ -111,7 +111,7 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
         {
             var data = obj.What;
 
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
@@ -131,7 +131,7 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
         private void Handle(MessagePayload<NetworkRawXpGainServer> obj)
         {
             // Send to all clients and apply on server
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 using (new AllowedThread())
                 {
@@ -146,7 +146,7 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
         {
             var data = obj.What;
 
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {

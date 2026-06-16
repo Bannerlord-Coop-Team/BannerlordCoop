@@ -25,12 +25,12 @@ internal static class TestGameLoopPump
 
         var thread = new Thread(() =>
         {
-            GameLoopRunner.Instance.SetGameLoopThread();
+            GameThread.Instance.SetGameThreadThread();
             ready.Set();
 
             while (true)
             {
-                GameLoopRunner.Instance.Update(TimeSpan.FromMilliseconds(16));
+                GameThread.Instance.Update(TimeSpan.FromMilliseconds(16));
                 Thread.Sleep(1);
             }
         })

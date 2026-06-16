@@ -95,7 +95,7 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void CreateTownOrderServer(TownOrderCreated obj)
         {
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
@@ -149,7 +149,7 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void CreateTownOrder(NetworkCreateTownOrder obj)
         {
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
@@ -195,7 +195,7 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void ReplaceCraftingOrder(NetworkReplaceCraftingOrder obj)
         {
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
@@ -237,7 +237,7 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void CompleteOrderServer(NetworkCompleteOrderServer obj)
         {
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
@@ -310,7 +310,7 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void CompleteOrderClients(NetworkCompleteOrderClients obj)
         {
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {

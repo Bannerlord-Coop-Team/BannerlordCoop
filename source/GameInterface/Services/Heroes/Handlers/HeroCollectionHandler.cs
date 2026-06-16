@@ -90,7 +90,7 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             var data = payload.What;
 
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
@@ -123,7 +123,7 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             var data = payload.What;
 
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
@@ -156,7 +156,7 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             var data = payload.What;
 
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
@@ -189,7 +189,7 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             var data = payload.What;
 
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
@@ -222,7 +222,7 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             var data = payload.What;
 
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
@@ -255,7 +255,7 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             var data = payload.What;
 
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
@@ -288,7 +288,7 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             var data = payload.What;
 
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
@@ -321,7 +321,7 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             var data = payload.What;
 
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
