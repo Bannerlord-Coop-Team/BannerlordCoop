@@ -21,4 +21,8 @@ public static class LogManager
 	public static ILogger GetLogger<T>() => _logger.Value
 		.ForContext<T>();
 
+	// For static classes, which cannot be used as the generic type argument above.
+	public static ILogger GetLogger(Type type) => _logger.Value
+		.ForContext(type);
+
 }
