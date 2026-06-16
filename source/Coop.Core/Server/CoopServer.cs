@@ -1,5 +1,4 @@
-﻿using Common;
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
@@ -9,14 +8,10 @@ using Coop.Core.Common.Network;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Time;
-using Coop.Core.Server.Services.Time.Messages;
-using GameInterface.Registry.Messages;
 using GameInterface.Services.Entity;
 using LiteNetLib;
 using Serilog;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 

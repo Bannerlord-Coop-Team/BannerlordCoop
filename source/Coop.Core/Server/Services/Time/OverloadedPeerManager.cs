@@ -13,7 +13,7 @@ using System.Linq;
 
 namespace Coop.Core.Server.Services.Time;
 
-public interface IOverloadedPeerManager
+public interface IOverloadedPeerManager : IDisposable
 {
     void CheckForOverloadedPeers();
 }
@@ -30,7 +30,7 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
     private readonly IConnectionCollection connectionCollection;
 
     private TimeControlEnum? originalSpeed;
-    private IEnumerable<NetPeer> cachedOverloadedPeers = Array.Empty<NetPeer>();
+    private volatile IEnumerable<NetPeer> cachedOverloadedPeers = Array.Empty<NetPeer>();
 
     public OverloadedPeerManager(
         INetworkConfig config,
