@@ -39,7 +39,7 @@ namespace GameInterface.Services.Towns.Patches
 
         public static void ChangeTownGovernor(Town town, Hero governor)
         {
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 using (new AllowedThread())
                 {
@@ -65,7 +65,7 @@ namespace GameInterface.Services.Towns.Patches
 
         public static void ChangeTownLastCapturedBy(Town town, Clan lastCapturedBy)
         {
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 using (new AllowedThread())
                 {
@@ -77,7 +77,7 @@ namespace GameInterface.Services.Towns.Patches
 
         public static void ChangeTownInRebelliousState(Town town, bool inRebelliousState)
         {
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 town.InRebelliousState = inRebelliousState;
             });
@@ -85,7 +85,7 @@ namespace GameInterface.Services.Towns.Patches
 
         public static void ChangeTownGarrisonAutoRecruitmentIsEnabled(Town town, bool garrisonAutoRecruitmentIsEnabled)
         {
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 town.GarrisonAutoRecruitmentIsEnabled = garrisonAutoRecruitmentIsEnabled;
             });
@@ -107,7 +107,7 @@ namespace GameInterface.Services.Towns.Patches
 
         public static void ChangeTradeTaxAccumulated(Town town, int tradeTaxAccumulated)
         {
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 using (new AllowedThread())
                 {
@@ -131,7 +131,7 @@ namespace GameInterface.Services.Towns.Patches
 
         public static void ChangeSetSoldItems(Town town, IEnumerable<Town.SellLog> logList)
         {
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 using (new AllowedThread())
                 {

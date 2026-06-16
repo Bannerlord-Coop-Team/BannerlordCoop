@@ -56,7 +56,7 @@ internal class PartyLeaderHandler : IHandler
     {
         // Resolve and apply on the main thread: objectManager can be mutated concurrently by the main
         // thread's Add/Remove, and ChangePartyLeader must only run there.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(payload.What.MobilePartyId, out var mobileParty))
                 return;

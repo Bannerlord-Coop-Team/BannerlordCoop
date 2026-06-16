@@ -39,7 +39,7 @@ namespace GameInterface.Services.Settlements.Patches
 
         internal static void RunSettlementComponentIsOwnerUnassignedChanged(SettlementComponent settlementComp, bool value)
         {
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 using (new AllowedThread())
                 {

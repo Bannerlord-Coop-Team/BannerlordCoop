@@ -1,9 +1,12 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using GameInterface.Services.MobileParties.Messages.Roles;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -67,10 +70,25 @@ internal class PartyRolesHandler : IHandler
 
     private void Handle_RemoveAllPartyRolesOfHero(MessagePayload<RemoveAllPartyRolesOfHero> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
+        var data = obj.What;
 
-        mobileParty.RemoveAllPartyRolesOfHero(hero);
+        GameThread.Run(() =>
+        {
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging<Hero>(data.HeroId, out var hero)) return;
+                if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MobilePartyId, out var mobileParty)) return;
+
+                using (new AllowedThread())
+                {
+                    mobileParty.RemoveAllPartyRolesOfHero(hero);
+                }
+            }
+            catch (Exception e)
+            {
+                logger.Error(e, "Failed to apply {Message}", nameof(RemoveAllPartyRolesOfHero));
+            }
+        });
     }
 
     private void Handle_PartyRoleOfHeroRemoved(MessagePayload<PartyRoleOfHeroRemoved> obj)
@@ -84,10 +102,25 @@ internal class PartyRolesHandler : IHandler
 
     private void Handle_RemovePartyRoleOfHero(MessagePayload<RemovePartyRoleOfHero> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
+        var data = obj.What;
 
-        mobileParty.RemovePartyRoleOfHero(hero, obj.What.PartyRole);
+        GameThread.Run(() =>
+        {
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging<Hero>(data.HeroId, out var hero)) return;
+                if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MobilePartyId, out var mobileParty)) return;
+
+                using (new AllowedThread())
+                {
+                    mobileParty.RemovePartyRoleOfHero(hero, data.PartyRole);
+                }
+            }
+            catch (Exception e)
+            {
+                logger.Error(e, "Failed to apply {Message}", nameof(RemovePartyRoleOfHero));
+            }
+        });
     }
 
     private void Handle_PartyScoutSet(MessagePayload<PartyScoutSet> obj)
@@ -101,10 +134,25 @@ internal class PartyRolesHandler : IHandler
 
     private void Handle_SetPartyScout(MessagePayload<SetPartyScout> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
+        var data = obj.What;
 
-        mobileParty.SetPartyScout(hero);
+        GameThread.Run(() =>
+        {
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging<Hero>(data.HeroId, out var hero)) return;
+                if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MobilePartyId, out var mobileParty)) return;
+
+                using (new AllowedThread())
+                {
+                    mobileParty.SetPartyScout(hero);
+                }
+            }
+            catch (Exception e)
+            {
+                logger.Error(e, "Failed to apply {Message}", nameof(SetPartyScout));
+            }
+        });
     }
 
     private void Handle_PartyQuartermasterSet(MessagePayload<PartyQuartermasterSet> obj)
@@ -118,10 +166,25 @@ internal class PartyRolesHandler : IHandler
 
     private void Handle_SetPartyQuartermaster(MessagePayload<SetPartyQuartermaster> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
+        var data = obj.What;
 
-        mobileParty.SetPartyQuartermaster(hero);
+        GameThread.Run(() =>
+        {
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging<Hero>(data.HeroId, out var hero)) return;
+                if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MobilePartyId, out var mobileParty)) return;
+
+                using (new AllowedThread())
+                {
+                    mobileParty.SetPartyQuartermaster(hero);
+                }
+            }
+            catch (Exception e)
+            {
+                logger.Error(e, "Failed to apply {Message}", nameof(SetPartyQuartermaster));
+            }
+        });
     }
 
     private void Handle_PartyEngineerSet(MessagePayload<PartyEngineerSet> obj)
@@ -135,10 +198,25 @@ internal class PartyRolesHandler : IHandler
 
     private void Handle_SetPartyEngineer(MessagePayload<SetPartyEngineer> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
+        var data = obj.What;
 
-        mobileParty.SetPartyEngineer(hero);
+        GameThread.Run(() =>
+        {
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging<Hero>(data.HeroId, out var hero)) return;
+                if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MobilePartyId, out var mobileParty)) return;
+
+                using (new AllowedThread())
+                {
+                    mobileParty.SetPartyEngineer(hero);
+                }
+            }
+            catch (Exception e)
+            {
+                logger.Error(e, "Failed to apply {Message}", nameof(SetPartyEngineer));
+            }
+        });
     }
 
     private void Handle_PartySurgeonSet(MessagePayload<PartySurgeonSet> obj)
@@ -152,9 +230,24 @@ internal class PartyRolesHandler : IHandler
 
     private void Handle_SetPartySurgeon(MessagePayload<SetPartySurgeon> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
+        var data = obj.What;
 
-        mobileParty.SetPartySurgeon(hero);
+        GameThread.Run(() =>
+        {
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging<Hero>(data.HeroId, out var hero)) return;
+                if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MobilePartyId, out var mobileParty)) return;
+
+                using (new AllowedThread())
+                {
+                    mobileParty.SetPartySurgeon(hero);
+                }
+            }
+            catch (Exception e)
+            {
+                logger.Error(e, "Failed to apply {Message}", nameof(SetPartySurgeon));
+            }
+        });
     }
 }

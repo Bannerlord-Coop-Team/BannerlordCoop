@@ -34,7 +34,7 @@ internal class SettlementHitPointsPatch
 
     internal static void RunSettlementHitPointsChange(Settlement settlement, float settlementHitPoints)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {

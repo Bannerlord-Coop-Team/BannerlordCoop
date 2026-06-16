@@ -39,7 +39,7 @@ public class MilitiaSettlementPatch
 
     internal static void RunMiltiaChange(Settlement settlement, float militia)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {

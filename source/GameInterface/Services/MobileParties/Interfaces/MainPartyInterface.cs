@@ -12,7 +12,7 @@ internal class MainPartyInterface : IMainPartyInterface
 {
     public void RemoveMainParty()
     {
-        GameLoopRunner.RunOnMainThread(RemoveMainPartyInternal);
+        GameThread.Run(RemoveMainPartyInternal);
     }
 
     private void RemoveMainPartyInternal()

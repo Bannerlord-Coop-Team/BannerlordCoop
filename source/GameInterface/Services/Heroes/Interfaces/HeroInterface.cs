@@ -78,7 +78,7 @@ internal class HeroInterface : IHeroInterface
     {
         Hero hero = null;
 
-        GameLoopRunner.RunOnMainThread(() => {
+        GameThread.Run(() => {
             try
             {
                 using (new AllowedThread())

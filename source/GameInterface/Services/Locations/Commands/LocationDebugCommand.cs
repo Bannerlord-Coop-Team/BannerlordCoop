@@ -150,7 +150,7 @@ public class LocationDebugCommand
             useCivilianEquipment: true);
 
         // The real mutator runs so the patched chokepoint broadcasts the change.
-        GameLoopRunner.RunOnMainThread(() => location.AddCharacter(locationCharacter));
+        GameThread.Run(() => location.AddCharacter(locationCharacter));
 
         return $"Added '{args[1]}' to '{args[0]}'";
     }
@@ -181,7 +181,7 @@ public class LocationDebugCommand
             return $"No character '{args[1]}' in '{args[0]}'";
         }
 
-        GameLoopRunner.RunOnMainThread(() => location.RemoveLocationCharacter(entry));
+        GameThread.Run(() => location.RemoveLocationCharacter(entry));
 
         return $"Removed '{args[1]}' from '{args[0]}'";
     }
@@ -205,7 +205,7 @@ public class LocationDebugCommand
 
         if (TryResolveLocation(args[0], out var location, out var error) == false) return error;
 
-        GameLoopRunner.RunOnMainThread(() => location.RemoveAllCharacters());
+        GameThread.Run(() => location.RemoveAllCharacters());
 
         return $"Cleared '{args[0]}'";
     }
@@ -230,7 +230,7 @@ public class LocationDebugCommand
         if (TryResolveLocation(args[0], out var location, out var error) == false) return error;
         if (TryResolveObject<ItemObject>(args[1], out var item, out error) == false) return error;
 
-        GameLoopRunner.RunOnMainThread(() => location.AddSpecialItem(item));
+        GameThread.Run(() => location.AddSpecialItem(item));
 
         return $"Added '{args[1]}' to '{args[0]}'";
     }
@@ -261,7 +261,7 @@ public class LocationDebugCommand
             return $"No item '{args[1]}' in '{args[0]}'";
         }
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             location.SpecialItems.Remove(item);
             MessageBroker.Instance.Publish(location, new LocationSpecialItemRemoved(location, item));

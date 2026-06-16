@@ -128,7 +128,7 @@ internal abstract class TestComponentBase
     {
         var container = builder.Build();
 
-        container.Resolve<IContainerProvider>().SetProvider(container);
+        global::GameInterface.ContainerProvider.SetContainer(container);
 
         return container;
     }

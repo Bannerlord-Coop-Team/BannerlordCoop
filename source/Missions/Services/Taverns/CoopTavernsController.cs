@@ -275,7 +275,7 @@ namespace Missions.Services.Taverns
 
             if (agentRegistry.TryGetAgent(leftAgentId, out Agent agent))
             {
-                GameLoopRunner.RunOnMainThread(() =>
+                GameThread.Run(() =>
                 {
                     if (agent.Health > 0)
                     {
@@ -374,7 +374,7 @@ namespace Missions.Services.Taverns
             // on the main thread, so build AND spawn entirely inside the game-loop closure — not just the
             // final SpawnAgent call. Doing the ctor off-thread NREs intermittently (notably on rejoin).
             Agent agent = null;
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {

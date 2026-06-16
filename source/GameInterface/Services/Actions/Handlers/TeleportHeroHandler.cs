@@ -1,9 +1,11 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Actions.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
@@ -54,14 +56,26 @@ internal class TeleportHeroHandler : IHandler
 
     private void Handle_TeleportHero(MessagePayload<TeleportHero> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
+        var data = obj.What;
 
-        Settlement targetSettlement = null;
-        if (obj.What.TargetSettlementId != null && !objectManager.TryGetObjectWithLogging(obj.What.TargetSettlementId, out targetSettlement)) return;
+        GameThread.Run(() =>
+        {
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging<Hero>(data.HeroId, out var hero)) return;
 
-        MobileParty targetParty = null;
-        if (obj.What.TargetPartyId != null && !objectManager.TryGetObjectWithLogging(obj.What.TargetPartyId, out targetParty)) return;
+                Settlement targetSettlement = null;
+                if (data.TargetSettlementId != null && !objectManager.TryGetObjectWithLogging(data.TargetSettlementId, out targetSettlement)) return;
 
-        TeleportHeroAction.ApplyInternal(hero, targetSettlement, targetParty, obj.What.Detail);
+                MobileParty targetParty = null;
+                if (data.TargetPartyId != null && !objectManager.TryGetObjectWithLogging(data.TargetPartyId, out targetParty)) return;
+
+                TeleportHeroAction.ApplyInternal(hero, targetSettlement, targetParty, data.Detail);
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to apply {Message}", nameof(TeleportHero));
+            }
+        });
     }
 }

@@ -11,9 +11,9 @@ namespace Coop.Tests;
 /// </summary>
 /// <remarks>
 /// Some production code paths (e.g. <c>TransferSaveState</c> packaging a save) call
-/// <c>GameLoopRunner.RunOnMainThread(..., blocking: true)</c>, which blocks the caller until the
+/// <c>GameThread.Run(..., blocking: true)</c>, which blocks the caller until the
 /// game-loop thread processes the queued action. No engine runs in unit tests, so without a pump
-/// those calls time out after <c>GameLoopRunner.BlockingTimeout</c> (30s). Running the pump once at
+/// those calls time out after <c>GameThread.BlockingTimeout</c> (30s). Running the pump once at
 /// assembly load lets those blocking calls complete from any (parallel) test thread.
 /// </remarks>
 internal static class TestGameLoopPump
@@ -25,12 +25,12 @@ internal static class TestGameLoopPump
 
         var thread = new Thread(() =>
         {
-            GameLoopRunner.Instance.SetGameLoopThread();
+            GameThread.Instance.MarkGameThread();
             ready.Set();
 
             while (true)
             {
-                GameLoopRunner.Instance.Update(TimeSpan.FromMilliseconds(16));
+                GameThread.Instance.Update(TimeSpan.FromMilliseconds(16));
                 Thread.Sleep(1);
             }
         })

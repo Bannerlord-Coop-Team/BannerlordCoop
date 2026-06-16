@@ -45,7 +45,7 @@ internal class SetWallHitPointsSettlementPatch
 
     internal static void RunSetWallSectionHitPointsRatioAtIndex(Settlement settlement, int index, float hitPointsRatio)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {

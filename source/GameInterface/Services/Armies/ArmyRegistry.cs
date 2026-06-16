@@ -62,7 +62,7 @@ internal class ArmyRegistry : AutoRegistryBase<Army>
     // Just clean up the fields directly.
     public override void OnClientDestroyed(Army obj, string id)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {

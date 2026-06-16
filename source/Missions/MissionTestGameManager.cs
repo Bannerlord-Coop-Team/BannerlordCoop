@@ -229,7 +229,7 @@ namespace Missions
             agentBuildData.Controller(Agent.ControllerType.None);
 
             Agent agent = default;
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 agent = Mission.Current.SpawnAgent(agentBuildData);
                 agent.FadeIn();
@@ -259,7 +259,7 @@ namespace Missions
 
             Logger.Information("Spawning Agent");
             Agent agent = default;
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 agent = Mission.Current.SpawnAgent(agentBuildData);
                 agent.FadeIn();

@@ -104,7 +104,7 @@ namespace Missions.Services.Missiles.Handlers
                     null,
                 };
 
-                GameLoopRunner.RunOnMainThread(() =>
+                GameThread.Run(() =>
                 {
                     num = (int)AddMissileSingleUsageAux.Invoke(Mission.Current, parameters);
                 }, true);
@@ -134,7 +134,7 @@ namespace Missions.Services.Missiles.Handlers
                     null,
                 };
 
-                GameLoopRunner.RunOnMainThread(() =>
+                GameThread.Run(() =>
                 {
                     num = (int)AddMissileAux.Invoke(Mission.Current, parameters);
                 }, true);

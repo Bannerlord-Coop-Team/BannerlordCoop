@@ -104,7 +104,7 @@ internal class LocationConversationHandler : IHandler
         if (ModInformation.IsServer) return;
 
         var generation = payload.What.Generation;
-        GameLoopRunner.RunOnMainThread(() => LocationConversationPatches.StartApprovedConversation(generation));
+        GameThread.Run(() => LocationConversationPatches.StartApprovedConversation(generation));
     }
 
     /// <summary>[Client] Server denied: drop the pending request and tell the player why.</summary>
@@ -113,7 +113,7 @@ internal class LocationConversationHandler : IHandler
         if (ModInformation.IsServer) return;
 
         var generation = payload.What.Generation;
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             // Only explain the refusal if this denial still matches our current pending request; a stale denial
             // (the player left and started another) neither clears the new pending nor pops a message.

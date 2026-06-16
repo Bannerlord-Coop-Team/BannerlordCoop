@@ -85,9 +85,6 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void Handle(MessagePayload<NetworkCompleteOrderServer> obj)
         {
-            NetworkCompleteOrderClients message = new(obj.What);
-            network.SendAll(message);
-
             CompleteOrderServer(obj.What);
         }
 
@@ -98,25 +95,35 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void CreateTownOrderServer(TownOrderCreated obj)
         {
-            // Replace TaleWorlds implementation for server
-            float townOrderDifficulty = CraftingCampaignBehavior.GetTownOrderDifficulty(obj.OrderOwner.CurrentSettlement.Town, obj.OrderSlot);
-            int pieceTier = (int)townOrderDifficulty / 50;
-            CraftingTemplate randomElement = CraftingTemplate.All.GetRandomElement<CraftingTemplate>();
-            string nextTownOrderId = obj.CraftingCampaignBehavior.GetNextTownOrderId();
-
-            WeaponDesign weaponDesignTemplate = new WeaponDesign(randomElement, TextObject.GetEmpty(), obj.CraftingCampaignBehavior.GetWeaponPieces(randomElement, pieceTier), nextTownOrderId);
-            objectManager.AddNewObject(weaponDesignTemplate, out var weaponDesignId);
-
-            CraftingOrder order;
-            order = new CraftingOrder(obj.OrderOwner, townOrderDifficulty, weaponDesignTemplate, randomElement, obj.OrderSlot, nextTownOrderId);
-            using (new AllowedThread())
+            GameThread.Run(() =>
             {
-                order.PreCraftedWeaponDesignItem.StringId = nextTownOrderId;
-            }
+                try
+                {
+                    // Replace TaleWorlds implementation for server
+                    float townOrderDifficulty = CraftingCampaignBehavior.GetTownOrderDifficulty(obj.OrderOwner.CurrentSettlement.Town, obj.OrderSlot);
+                    int pieceTier = (int)townOrderDifficulty / 50;
+                    CraftingTemplate randomElement = CraftingTemplate.All.GetRandomElement<CraftingTemplate>();
+                    string nextTownOrderId = obj.CraftingCampaignBehavior.GetNextTownOrderId();
 
-            obj.CraftingCampaignBehavior._craftingOrders[obj.OrderOwner.CurrentSettlement.Town].AddTownOrder(order);
+                    WeaponDesign weaponDesignTemplate = new WeaponDesign(randomElement, TextObject.GetEmpty(), obj.CraftingCampaignBehavior.GetWeaponPieces(randomElement, pieceTier), nextTownOrderId);
+                    objectManager.AddNewObject(weaponDesignTemplate, out var weaponDesignId);
 
-            SendTownOrderCreated(obj, order, randomElement, pieceTier, nextTownOrderId);
+                    CraftingOrder order;
+                    order = new CraftingOrder(obj.OrderOwner, townOrderDifficulty, weaponDesignTemplate, randomElement, obj.OrderSlot, nextTownOrderId);
+                    using (new AllowedThread())
+                    {
+                        order.PreCraftedWeaponDesignItem.StringId = nextTownOrderId;
+                    }
+
+                    obj.CraftingCampaignBehavior._craftingOrders[obj.OrderOwner.CurrentSettlement.Town].AddTownOrder(order);
+
+                    SendTownOrderCreated(obj, order, randomElement, pieceTier, nextTownOrderId);
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to apply {Message}", nameof(TownOrderCreated));
+                }
+            });
         }
 
         private void SendTownOrderCreated(TownOrderCreated obj, CraftingOrder craftingOrder, CraftingTemplate randomElement, int pieceTier, string nextTownOrderId)
@@ -142,24 +149,34 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void CreateTownOrder(NetworkCreateTownOrder obj)
         {
-            if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
-            if (!objectManager.TryGetObjectWithLogging(obj.RandomElementId, out CraftingTemplate randomElement)) return;
-            if (!objectManager.TryGetObjectWithLogging(obj.OrderOwnerId, out Hero orderOwner)) return;
-            if (!objectManager.TryGetObjectWithLogging(obj.CraftingOrderId, out CraftingOrder craftingOrder)) return;
-
-            using (new AllowedThread())
+            GameThread.Run(() =>
             {
-                WeaponDesign weaponDesignTemplate = new WeaponDesign(randomElement, TextObject.GetEmpty(), craftingCampaignBehavior.GetWeaponPieces(randomElement, obj.PieceTier), obj.NextTownOrderId);
-                craftingOrder._weaponDesignTemplate = weaponDesignTemplate;
-                Crafting.GenerateItem(weaponDesignTemplate, TextObject.GetEmpty(), orderOwner.Culture, randomElement.ItemModifierGroup, ref craftingOrder.PreCraftedWeaponDesignItem, obj.NextTownOrderId);
-                craftingOrder._preCraftedWeaponDesignItemData = new CraftingCampaignBehavior.CraftedItemInitializationData(craftingOrder.WeaponDesignTemplate, craftingOrder.PreCraftedWeaponDesignItem.Name, craftingOrder.OrderOwner.Culture);
+                try
+                {
+                    if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
+                    if (!objectManager.TryGetObjectWithLogging(obj.RandomElementId, out CraftingTemplate randomElement)) return;
+                    if (!objectManager.TryGetObjectWithLogging(obj.OrderOwnerId, out Hero orderOwner)) return;
+                    if (!objectManager.TryGetObjectWithLogging(obj.CraftingOrderId, out CraftingOrder craftingOrder)) return;
 
-                // Replace TaleWorlds implementation
-                craftingCampaignBehavior._craftingOrders[orderOwner.CurrentSettlement.Town].AddTownOrder(craftingOrder);
-            }
+                    using (new AllowedThread())
+                    {
+                        WeaponDesign weaponDesignTemplate = new WeaponDesign(randomElement, TextObject.GetEmpty(), craftingCampaignBehavior.GetWeaponPieces(randomElement, obj.PieceTier), obj.NextTownOrderId);
+                        craftingOrder._weaponDesignTemplate = weaponDesignTemplate;
+                        Crafting.GenerateItem(weaponDesignTemplate, TextObject.GetEmpty(), orderOwner.Culture, randomElement.ItemModifierGroup, ref craftingOrder.PreCraftedWeaponDesignItem, obj.NextTownOrderId);
+                        craftingOrder._preCraftedWeaponDesignItemData = new CraftingCampaignBehavior.CraftedItemInitializationData(craftingOrder.WeaponDesignTemplate, craftingOrder.PreCraftedWeaponDesignItem.Name, craftingOrder.OrderOwner.Culture);
 
-            // Need to refresh client weapon designs for potential new orders while in CraftingState
-            MessageBroker.Instance.Publish(this, new RefreshWeaponDesignVM(orderOwner.CurrentSettlement.Town));
+                        // Replace TaleWorlds implementation
+                        craftingCampaignBehavior._craftingOrders[orderOwner.CurrentSettlement.Town].AddTownOrder(craftingOrder);
+                    }
+
+                    // Need to refresh client weapon designs for potential new orders while in CraftingState
+                    MessageBroker.Instance.Publish(this, new RefreshWeaponDesignVM(orderOwner.CurrentSettlement.Town));
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to apply {Message}", nameof(NetworkCreateTownOrder));
+                }
+            });
         }
 
         private void SendCraftingOrderReplaced(CraftingOrderReplaced obj)
@@ -178,12 +195,22 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void ReplaceCraftingOrder(NetworkReplaceCraftingOrder obj)
         {
-            if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
-            if (!objectManager.TryGetObjectWithLogging(obj.TownId, out Town town)) return;
+            GameThread.Run(() =>
+            {
+                try
+                {
+                    if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
+                    if (!objectManager.TryGetObjectWithLogging(obj.TownId, out Town town)) return;
 
-            // Replace TaleWorlds implementation
-            craftingCampaignBehavior._craftingOrders[town].Slots[obj.DifficultyLevel] = null; // Equivalent to craftingCampaignBehavior._craftingOrders[town].RemoveTownOrder(order)
-            //craftingCampaignBehavior.CreateTownOrder(hero, obj.DifficultyLevel); // Changes applied on clients from CreateTownOrder call in ReplaceCraftingOrder patch
+                    // Replace TaleWorlds implementation
+                    craftingCampaignBehavior._craftingOrders[town].Slots[obj.DifficultyLevel] = null; // Equivalent to craftingCampaignBehavior._craftingOrders[town].RemoveTownOrder(order)
+                    //craftingCampaignBehavior.CreateTownOrder(hero, obj.DifficultyLevel); // Changes applied on clients from CreateTownOrder call in ReplaceCraftingOrder patch
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to apply {Message}", nameof(NetworkReplaceCraftingOrder));
+                }
+            });
         }
 
         private void SendOrderCompleted(OrderCompleted obj)
@@ -210,86 +237,111 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void CompleteOrderServer(NetworkCompleteOrderServer obj)
         {
-            if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
-            if (!objectManager.TryGetObjectWithLogging(obj.TownId, out Town town)) return;
-            if (!objectManager.TryGetObjectWithLogging(obj.CompleterHeroId, out Hero completerHero)) return;
-            if (!objectManager.TryGetObjectWithLogging(obj.MainHeroId, out Hero mainHero)) return;
-            if (!objectManager.TryGetObjectWithLogging(obj.CraftingOrderId, out CraftingOrder craftingOrder)) return;
-            if (!objectManager.TryGetObjectWithLogging(obj.CraftedItemId, out ItemObject craftedItem)) return;
-
-            // Replace TaleWorlds implementation
-
-            // Manage hero gold with dynamic sync
-            int amount = craftingCampaignBehavior.CalculateOrderPriceDifference(craftingOrder, craftedItem);
-            GiveGoldAction.ApplyBetweenCharacters(null, mainHero, amount, false);
-
-            Hero orderOwner = craftingOrder.OrderOwner;
-            if (craftingCampaignBehavior._craftingOrders[town].CustomOrders.Contains(craftingOrder))
+            GameThread.Run(() =>
             {
-                craftingCampaignBehavior._craftingOrders[town].RemoveCustomOrder(craftingOrder);
-            }
-            else
-            {
-                if (craftingOrder.IsLordOrder)
+                try
                 {
-                    // Manage Hero.BattleEquipment with dynamic sync
-                    craftingCampaignBehavior.ChangeCraftedOrderWithTheNoblesWeaponIfItIsBetter(craftedItem, craftingOrder);
-                    if (orderOwner.PartyBelongedTo != null)
+                    if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
+                    if (!objectManager.TryGetObjectWithLogging(obj.TownId, out Town town)) return;
+                    if (!objectManager.TryGetObjectWithLogging(obj.CompleterHeroId, out Hero completerHero)) return;
+                    if (!objectManager.TryGetObjectWithLogging(obj.MainHeroId, out Hero mainHero)) return;
+                    if (!objectManager.TryGetObjectWithLogging(obj.CraftingOrderId, out CraftingOrder craftingOrder)) return;
+                    if (!objectManager.TryGetObjectWithLogging(obj.CraftedItemId, out ItemObject craftedItem)) return;
+
+                    // Replace TaleWorlds implementation
+
+                    // Manage hero gold with dynamic sync
+                    int amount = craftingCampaignBehavior.CalculateOrderPriceDifference(craftingOrder, craftedItem);
+                    GiveGoldAction.ApplyBetweenCharacters(null, mainHero, amount, false);
+
+                    Hero orderOwner = craftingOrder.OrderOwner;
+                    if (craftingCampaignBehavior._craftingOrders[town].CustomOrders.Contains(craftingOrder))
                     {
-                        // Manage party roster with dynamic sync
-                        craftingCampaignBehavior.GiveTroopToNobleAtWeaponTier((int)craftedItem.Tier, orderOwner);
+                        craftingCampaignBehavior._craftingOrders[town].RemoveCustomOrder(craftingOrder);
                     }
-                    if (obj.Flag && completerHero.GetPerkValue(DefaultPerks.Crafting.SteelMaker3))
+                    else
                     {
-                        // Manage hero relations with dynamic sync
-                        ChangeRelationAction.ApplyRelationChangeBetweenHeroes(completerHero, orderOwner, (int)DefaultPerks.Crafting.SteelMaker3.SecondaryBonus, true);
+                        if (craftingOrder.IsLordOrder)
+                        {
+                            // Manage Hero.BattleEquipment with dynamic sync
+                            craftingCampaignBehavior.ChangeCraftedOrderWithTheNoblesWeaponIfItIsBetter(craftedItem, craftingOrder);
+                            if (orderOwner.PartyBelongedTo != null)
+                            {
+                                // Manage party roster with dynamic sync
+                                craftingCampaignBehavior.GiveTroopToNobleAtWeaponTier((int)craftedItem.Tier, orderOwner);
+                            }
+                            if (obj.Flag && completerHero.GetPerkValue(DefaultPerks.Crafting.SteelMaker3))
+                            {
+                                // Manage hero relations with dynamic sync
+                                ChangeRelationAction.ApplyRelationChangeBetweenHeroes(completerHero, orderOwner, (int)DefaultPerks.Crafting.SteelMaker3.SecondaryBonus, true);
+                            }
+                        }
+                        else
+                        {
+                            // Manage Hero.Power with dynamic sync
+                            orderOwner.AddPower((float)(craftedItem.Tier + 1));
+                            if (obj.Flag && completerHero.GetPerkValue(DefaultPerks.Crafting.ExperiencedSmith))
+                            {
+                                // Manage hero relations with dynamic sync
+                                ChangeRelationAction.ApplyRelationChangeBetweenHeroes(completerHero, orderOwner, (int)DefaultPerks.Crafting.ExperiencedSmith.SecondaryBonus, true);
+                            }
+                        }
+                        CraftingOrder previousOrder = craftingCampaignBehavior._craftingOrders[town].Slots[craftingOrder.DifficultyLevel];
+
+                        craftingCampaignBehavior._craftingOrders[town].RemoveTownOrder(craftingOrder);
+
+                        // Remove previous order from objectManager
+                        if (previousOrder is not null)
+                        {
+                            MessageBroker.Instance.Publish(null, new InstanceDestroyed<CraftingOrder>(previousOrder));
+                        }
                     }
+
+                    CampaignEventDispatcher.Instance.OnCraftingOrderCompleted(town, craftingOrder, craftedItem, completerHero);
+
+                    network.SendAll(new NetworkCompleteOrderClients(obj));
                 }
-                else
+                catch (Exception e)
                 {
-                    // Manage Hero.Power with dynamic sync
-                    orderOwner.AddPower((float)(craftedItem.Tier + 1));
-                    if (obj.Flag && completerHero.GetPerkValue(DefaultPerks.Crafting.ExperiencedSmith))
-                    {
-                        // Manage hero relations with dynamic sync
-                        ChangeRelationAction.ApplyRelationChangeBetweenHeroes(completerHero, orderOwner, (int)DefaultPerks.Crafting.ExperiencedSmith.SecondaryBonus, true);
-                    }
+                    Logger.Error(e, "Failed to apply {Message}", nameof(NetworkCompleteOrderServer));
                 }
-                CraftingOrder previousOrder = craftingCampaignBehavior._craftingOrders[town].Slots[craftingOrder.DifficultyLevel];
-
-                craftingCampaignBehavior._craftingOrders[town].RemoveTownOrder(craftingOrder);
-
-                // Remove previous order from objectManager
-                if (previousOrder is not null)
-                {
-                    MessageBroker.Instance.Publish(null, new InstanceDestroyed<CraftingOrder>(previousOrder));
-                }
-            }
-
-            CampaignEventDispatcher.Instance.OnCraftingOrderCompleted(town, craftingOrder, craftedItem, completerHero);
+            });
         }
 
         private void CompleteOrderClients(NetworkCompleteOrderClients obj)
         {
-            if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
-            if (!objectManager.TryGetObjectWithLogging(obj.TownId, out Town town)) return;
-            if (!objectManager.TryGetObjectWithLogging(obj.CompleterHeroId, out Hero completerHero)) return;
-            if (!objectManager.TryGetObjectWithLogging(obj.CraftingOrderId, out CraftingOrder craftingOrder)) return;
-            if (!objectManager.TryGetObjectWithLogging(obj.CraftedItemId, out ItemObject craftedItem)) return;
-
-            // Replace TaleWorlds implementation for clients
-            if (craftingCampaignBehavior._craftingOrders[town].CustomOrders.Contains(craftingOrder))
+            GameThread.Run(() =>
             {
-                craftingCampaignBehavior._craftingOrders[town].RemoveCustomOrder(craftingOrder);
-            }
-            else
-            {
-                craftingCampaignBehavior._craftingOrders[town].RemoveTownOrder(craftingOrder);
-            }
+                try
+                {
+                    if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
+                    if (!objectManager.TryGetObjectWithLogging(obj.TownId, out Town town)) return;
+                    if (!objectManager.TryGetObjectWithLogging(obj.CompleterHeroId, out Hero completerHero)) return;
+                    if (!objectManager.TryGetObjectWithLogging(obj.CraftingOrderId, out CraftingOrder craftingOrder)) return;
+                    if (!objectManager.TryGetObjectWithLogging(obj.CraftedItemId, out ItemObject craftedItem)) return;
 
-            CampaignEventDispatcher.Instance.OnCraftingOrderCompleted(town, craftingOrder, craftedItem, completerHero);
+                    using (new AllowedThread())
+                    {
+                        // Replace TaleWorlds implementation for clients
+                        if (craftingCampaignBehavior._craftingOrders[town].CustomOrders.Contains(craftingOrder))
+                        {
+                            craftingCampaignBehavior._craftingOrders[town].RemoveCustomOrder(craftingOrder);
+                        }
+                        else
+                        {
+                            craftingCampaignBehavior._craftingOrders[town].RemoveTownOrder(craftingOrder);
+                        }
 
-            MessageBroker.Instance.Publish(this, new RefreshWeaponDesignVM(town));
+                        CampaignEventDispatcher.Instance.OnCraftingOrderCompleted(town, craftingOrder, craftedItem, completerHero);
+
+                        MessageBroker.Instance.Publish(this, new RefreshWeaponDesignVM(town));
+                    }
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to apply {Message}", nameof(NetworkCompleteOrderClients));
+                }
+            });
         }
     }
 }

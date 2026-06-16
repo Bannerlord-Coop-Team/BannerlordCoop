@@ -31,7 +31,7 @@ namespace Coop.IntegrationTests.MobileParties
             // The objects are intentionally NOT registered on the other clients: this test only
             // verifies the PartyEnterSettlement message reaches them, and resolving the objects
             // there would run EnterSettlementActionPatches.OverrideApplyForParty, whose blocking
-            // RunOnMainThread call cannot complete in this environment (no game loop is pumping).
+            // GameThread.Run call cannot complete in this environment (no game loop is pumping).
             var party = client1.CreateRegisteredObject<MobileParty>("party1");
             var settlement = client1.CreateRegisteredObject<Settlement>("settlement1");
 

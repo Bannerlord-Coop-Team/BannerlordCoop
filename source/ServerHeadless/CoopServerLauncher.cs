@@ -17,20 +17,20 @@ namespace ServerHeadless
     /// </summary>
     internal static class CoopServerLauncher
     {
-        private static object _gameLoopRunner;     // Common.GameLoopRunner.Instance
-        private static MethodInfo _update;         // GameLoopRunner.Update(TimeSpan)
+        private static object _gameThread;     // Common.GameThread.Instance
+        private static MethodInfo _update;         // GameThread.Update(TimeSpan)
         private static object _coop;               // CoopartiveMultiplayerExperience (kept alive)
 
         /// <summary>
         /// Marks the current (main) thread as the Coop game-loop thread so the mod's
-        /// RunOnMainThread executes work inline rather than queuing for another thread.
+        /// GameThread.Run executes work inline rather than queuing for another thread.
         /// </summary>
         public static void Initialize()
         {
-            Type gameLoopRunnerType = Load("Common", "Common.GameLoopRunner");
-            _gameLoopRunner = gameLoopRunnerType.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static).GetValue(null);
-            gameLoopRunnerType.GetMethod("SetGameLoopThread").Invoke(_gameLoopRunner, null);
-            _update = gameLoopRunnerType.GetMethod("Update", new[] { typeof(TimeSpan) });
+            Type gameThreadType = Load("Common", "Common.GameThread");
+            _gameThread = gameThreadType.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static).GetValue(null);
+            gameThreadType.GetMethod("MarkGameThread").Invoke(_gameThread, null);
+            _update = gameThreadType.GetMethod("Update", new[] { typeof(TimeSpan) });
         }
 
         /// <summary>
@@ -110,7 +110,7 @@ namespace ServerHeadless
         }
 
         /// <summary>Runs the Coop main-thread work queue (must be called on the game-loop thread).</summary>
-        public static void PumpGameLoop(TimeSpan dt) => _update.Invoke(_gameLoopRunner, new object[] { dt });
+        public static void PumpGameLoop(TimeSpan dt) => _update.Invoke(_gameThread, new object[] { dt });
 
         private static object Broker()
         {

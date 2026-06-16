@@ -72,7 +72,7 @@ public class ArmyPatches
    
     public static void AddMobilePartyInArmy(MobileParty mobileParty, Army army)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {
@@ -86,7 +86,7 @@ public class ArmyPatches
 
     public static void RemoveMobilePartyInArmy(MobileParty mobileParty, Army army)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {
@@ -98,7 +98,7 @@ public class ArmyPatches
     }
     public static void SetAiBehaviorObject(Army army, IMapPoint mapPoint)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {
