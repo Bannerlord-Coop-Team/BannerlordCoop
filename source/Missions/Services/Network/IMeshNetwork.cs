@@ -7,7 +7,10 @@ namespace Missions.Services.Network;
 /// Distinguishes the mission-scoped P2P network from any other <see cref="INetwork"/> so mission
 /// services bind to it explicitly.
 /// </summary>
-public interface IMissionNetwork : INetwork
+public interface IMeshNetwork : INetwork
 {
     void ConnectToInstance(string instanceId);
+    void DisconnectPeers();
+    void SetRendezvous(string address, int port);
+    void Stop();
 }

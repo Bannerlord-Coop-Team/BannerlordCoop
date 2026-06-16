@@ -29,7 +29,7 @@ namespace Missions.Services.Taverns
         private static readonly ILogger Logger = LogManager.GetLogger<CoopArenaController>();
         public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
 
-        private readonly LiteNetP2PClient network;
+        private readonly IMeshNetwork network;
         private readonly IMessageBroker messageBroker;
         private readonly INetworkAgentRegistry agentRegistry;
         private readonly IControllerIdProvider controllerIdProvider;
@@ -42,7 +42,7 @@ namespace Missions.Services.Taverns
         // Critically, AgentMovementHandler is the one that both broadcasts movement and cleans up a peer's
         // agents on disconnect/reconnect; without it a leaver's agent is never removed and a rejoining
         // player is deduped as "already registered".
-        private readonly IDisposable[] handlers;
+        private readonly IDisposable[] disposables;
 
         // The campaign network config — the same INetworkConfiguration CoopClient is connected to. Its
         // Address/Port are the rendezvous server; the P2P client's own config is pointed at it before
@@ -50,7 +50,7 @@ namespace Missions.Services.Taverns
         private readonly INetworkConfiguration campaignConfiguration;
 
         public CoopTavernsController(
-            LiteNetP2PClient network,
+            IMeshNetwork network,
             IMessageBroker messageBroker,
             INetworkAgentRegistry agentRegistry,
             IControllerIdProvider controllerIdProvider,
@@ -74,7 +74,7 @@ namespace Missions.Services.Taverns
             this.objectManager = objectManager;
             this.campaignConfiguration = campaignConfiguration;
 
-            handlers = new IDisposable[]
+            disposables = new IDisposable[]
             {
                 agentMovementHandler,
                 missileHandler,
@@ -199,7 +199,7 @@ namespace Missions.Services.Taverns
 
         private NetworkMissionJoinInfo BuildJoinInfo(string characterObjectId)
         {
-            bool isPlayerAlive = Agent.Main != null && Agent.Main.Health > 0;
+            bool isPlayerAlive = Agent.Main.Health > 0;
             Vec3 position = Agent.Main.Position;
             float health = Agent.Main.Health;
 
@@ -233,6 +233,11 @@ namespace Missions.Services.Taverns
 
         public void Dispose()
         {
+            foreach (var disposable in disposables)
+            {
+                disposable.Dispose();
+            }
+
             messageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
             messageBroker.Unsubscribe<NetworkLeaveMission>(Handle_LeaveMission);
             messageBroker.Unsubscribe<PeerConnected>(Handle_PeerConnected);
@@ -379,7 +384,7 @@ namespace Missions.Services.Taverns
                     AgentBuildData agentBuildData = new AgentBuildData(character);
                     agentBuildData.BodyProperties(character.GetBodyPropertiesMax());
                     agentBuildData.InitialPosition(startingPos);
-                    agentBuildData.Team(Mission.Current.Teams.Attacker);
+                    agentBuildData.Team(Mission.Current.PlayerAllyTeam);
                     agentBuildData.InitialDirection(Vec2.Forward);
                     agentBuildData.NoHorses(true);
                     agentBuildData.Equipment(character.FirstCivilianEquipment);

@@ -36,7 +36,7 @@ namespace Missions.Services
 
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
-        private readonly IMissionNetwork network;
+        private readonly IMeshNetwork network;
         private readonly INetworkAgentRegistry agentRegistry;
         private readonly IRandomEquipmentGenerator equipmentGenerator;
         private readonly IBinaryPackageFactory packageFactory;
@@ -49,7 +49,7 @@ namespace Missions.Services
         public CoopBattlesController(
             IMessageBroker messageBroker,
             IObjectManager objectManager,
-            IMissionNetwork network,
+            IMeshNetwork network,
             INetworkAgentRegistry agentRegistry, 
             IRandomEquipmentGenerator equipmentGenerator,
             IBinaryPackageFactory packageFactory,

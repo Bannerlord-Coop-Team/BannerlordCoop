@@ -21,7 +21,7 @@ namespace Missions.Services.BoardGames
     {
         private readonly ILogger m_Logger = LogManager.GetLogger<BoardGameManager>();
 
-        private readonly IMissionNetwork network;
+        private readonly IMeshNetwork network;
         
         private readonly IMessageBroker _messageBroker;
         private readonly INetworkAgentRegistry _agentRegistry;
@@ -29,7 +29,7 @@ namespace Missions.Services.BoardGames
         private BoardGameLogic BoardGameLogic;
 
         public BoardGameManager(
-            IMissionNetwork network,
+            IMeshNetwork network,
             IMessageBroker messageBroker, 
             INetworkAgentRegistry agentRegistry)
         {

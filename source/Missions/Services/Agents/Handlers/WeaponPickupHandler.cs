@@ -29,12 +29,12 @@ namespace Missions.Services.Agents.Handlers
     public class WeaponPickupHandler : IWeaponPickupHandler
     {
         readonly INetworkAgentRegistry networkAgentRegistry;
-        readonly IMissionNetwork network;
+        readonly IMeshNetwork network;
         readonly IMessageBroker messageBroker;
         readonly static ILogger Logger = LogManager.GetLogger<WeaponPickupHandler>();
         public WeaponPickupHandler(
             INetworkAgentRegistry networkAgentRegistry,
-            IMissionNetwork network,
+            IMeshNetwork network,
             IMessageBroker messageBroker)
         {
             this.networkAgentRegistry = networkAgentRegistry;

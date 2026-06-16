@@ -23,13 +23,13 @@ namespace Missions.Services.BoardGames
         public static bool IsChallenged { get; private set; }
         public Guid GameId { get; private set; }
 
-        private readonly IMissionNetwork network;
+        private readonly IMeshNetwork network;
         private readonly IMessageBroker _messageBroker;
         private readonly MissionBoardGameLogic _boardGameLogic;
         private readonly BoardGameType _boardGameType;
 
         public BoardGameLogic(
-            IMissionNetwork network,
+            IMeshNetwork network,
             IMessageBroker messageBroker,
             Guid gameId, 
             MissionBoardGameLogic boardGameLogic, 

@@ -58,20 +58,20 @@ namespace Missions
 
             // Interface classes. Registered As<IMissionNetwork> (NOT As<INetwork>) so it does not collide
             // with CoopClient's INetwork registration in the shared client container.
-            builder.RegisterType<LiteNetP2PClient>().As<IMissionNetwork>().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<LiteNetP2PClient>().As<IMeshNetwork>().AsSelf().InstancePerLifetimeScope();
 
             builder.RegisterType<NetworkMissileRegistry>().As<INetworkMissileRegistry>();
 
             builder.RegisterType<RandomEquipmentGenerator>().As<IRandomEquipmentGenerator>();
-            builder.RegisterType<EventQueueManager>().As<IMessagePacketHandler>().InstancePerLifetimeScope();
-            builder.RegisterType<AgentMovementHandler>().As<IAgentMovementHandler>().InstancePerLifetimeScope();
-            builder.RegisterType<MissileHandler>().As<IMissileHandler>().InstancePerLifetimeScope();
-            builder.RegisterType<WeaponPickupHandler>().As<IWeaponPickupHandler>().InstancePerLifetimeScope();
-            builder.RegisterType<WeaponDropHandler>().As<IWeaponDropHandler>().InstancePerLifetimeScope();
-            builder.RegisterType<ShieldDamageHandler>().As<IShieldDamageHandler>().InstancePerLifetimeScope();
-            builder.RegisterType<AgentDamageHandler>().As<IAgentDamageHandler>().InstancePerLifetimeScope();
-            builder.RegisterType<AgentDeathHandler>().As<IAgentDeathHandler>().InstancePerLifetimeScope();
-            builder.RegisterType<ServerDisconnectHandler>().As<IServerDisconnectHandler>().InstancePerLifetimeScope();
+            builder.RegisterType<EventQueueManager>().As<IMessagePacketHandler>();
+            builder.RegisterType<AgentMovementHandler>().As<IAgentMovementHandler>();
+            builder.RegisterType<MissileHandler>().As<IMissileHandler>();
+            builder.RegisterType<WeaponPickupHandler>().As<IWeaponPickupHandler>();
+            builder.RegisterType<WeaponDropHandler>().As<IWeaponDropHandler>();
+            builder.RegisterType<ShieldDamageHandler>().As<IShieldDamageHandler>();
+            builder.RegisterType<AgentDamageHandler>().As<IAgentDamageHandler>();
+            builder.RegisterType<AgentDeathHandler>().As<IAgentDeathHandler>();
+            builder.RegisterType<ServerDisconnectHandler>().As<IServerDisconnectHandler>();
 
             base.Load(builder);
         }

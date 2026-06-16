@@ -33,13 +33,13 @@ namespace Missions.Services.Agents.Handlers
         private readonly static ILogger Logger = LogManager.GetLogger<AgentDamageHandler>();
 
         private readonly INetworkAgentRegistry networkAgentRegistry;
-        private readonly IMissionNetwork network;
+        private readonly IMeshNetwork network;
         private readonly IMessageBroker messageBroker;
         private readonly INetworkMissileRegistry networkMissileRegistry;
 
         public AgentDamageHandler(
             INetworkAgentRegistry networkAgentRegistry,
-            IMissionNetwork network,
+            IMeshNetwork network,
             IMessageBroker messageBroker,
             INetworkMissileRegistry networkMissileRegistry) 
         {

@@ -28,12 +28,12 @@ namespace Missions.Services.Agents.Handlers
 
         private readonly Poller poller;
         private readonly IPacketManager packetManager;
-        private readonly IMissionNetwork client;
+        private readonly IMeshNetwork client;
         private readonly IMessageBroker messageBroker;
         private readonly INetworkAgentRegistry agentRegistry;
 
         public AgentMovementHandler(
-            IMissionNetwork client,
+            IMeshNetwork client,
             IPacketManager packetManager,
             IMessageBroker messageBroker,
             INetworkAgentRegistry agentRegistry)

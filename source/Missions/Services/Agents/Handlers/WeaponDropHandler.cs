@@ -21,14 +21,14 @@ namespace Missions.Services.Agents.Handlers
     public class WeaponDropHandler : IWeaponDropHandler
     {
         readonly INetworkAgentRegistry networkAgentRegistry;
-        readonly IMissionNetwork network;
+        readonly IMeshNetwork network;
         readonly IMessageBroker messageBroker;
         readonly static ILogger Logger = LogManager.GetLogger<WeaponDropHandler>();
 
         public WeaponDropHandler(
             INetworkAgentRegistry networkAgentRegistry,
             IMessageBroker messageBroker,
-            IMissionNetwork network)
+            IMeshNetwork network)
         {
             this.networkAgentRegistry = networkAgentRegistry;
             this.messageBroker = messageBroker;
