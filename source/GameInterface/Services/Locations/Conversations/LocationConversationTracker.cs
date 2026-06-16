@@ -80,7 +80,8 @@ internal sealed class LocationConversationTracker : IHandler
 
             if (npcKeyByEngager.TryGetValue(engagerKey, out var currentNpcKey))
             {
-                // Same NPC: refresh. Different NPC: refuse, the live engagement must not be superseded.
+                // Already holds this exact NPC: idempotent success. A different NPC: refuse - a player holds
+                // at most one engagement, and overwriting it would orphan (permanently lock) the first NPC.
                 return currentNpcKey == npcKey;
             }
 
