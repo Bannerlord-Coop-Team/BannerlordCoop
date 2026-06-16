@@ -6,7 +6,9 @@ using Common.PacketHandlers;
 using Coop.Core.Common;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Policies;
+using Coop.Core.Server.Services.Instances;
 using Coop.Core.Server.Services.Save;
+using Coop.Core.Server.Services.Time;
 using Coop.Core.Server.States;
 using GameInterface.Policies;
 using LiteNetLib;
@@ -33,7 +35,10 @@ public class ServerModule : CommonModule
         // campaign. AutoActivate so it subscribes to connection lifecycle events before any peer joins.
         builder.RegisterType<ConnectionMessageQueue>().As<IConnectionMessageQueue>().InstancePerLifetimeScope().AutoActivate();
 
-        builder.RegisterType<Services.Instances.MissionManager>().As<Services.Instances.IMissionManager>().InstancePerLifetimeScope();
+        builder.RegisterType<MissionManager>().As<IMissionManager>().InstancePerLifetimeScope();
+        // Pauses time while a peer's packet queue is overloaded (slow client catching up). Constructed
+        // as a CoopServer dependency, so it registers its unpause policy when the server is built.
+        builder.RegisterType<OverloadedPeerManager>().As<IOverloadedPeerManager>().InstancePerLifetimeScope().AutoActivate();
 
         // Policies
         builder.RegisterType<ServerSyncPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();

@@ -2,7 +2,7 @@
 
 namespace Common.Network;
 
-public interface INetworkConfiguration
+public interface INetworkConfig
 {
     string Address { get; }
     int Port { get; }
@@ -10,6 +10,7 @@ public interface INetworkConfiguration
     string P2PToken { get; }
     TimeSpan ConnectionTimeout { get; }
     int MaxPacketsInQueue { get; }
+    int ResumePacketsInQueue { get; }
     TimeSpan AuditTimeout { get; }
     TimeSpan ObjectCreationTimeout { get; }
     TimeSpan NetworkPollInterval { get; }

@@ -11,7 +11,7 @@ namespace IntroServer.Config
     /// <summary>
     ///     Network settings for both client & server.
     /// </summary>
-    public class NetworkConfiguration : INetworkConfiguration
+    public class NetworkConfiguration : INetworkConfig
     {
         private string LanAddressText { get; set; } = "127.0.0.1";
         /// <summary>
@@ -124,6 +124,8 @@ namespace IntroServer.Config
         public TimeSpan ConnectionTimeout => DisconnectTimeout;
 
         public int MaxPacketsInQueue => 10000;
+
+        public int ResumePacketsInQueue => 5000;
 
         public TimeSpan AuditTimeout => DisconnectTimeout;
 

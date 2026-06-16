@@ -22,7 +22,7 @@ public abstract class MockNetworkBase : INetwork
         NetPeer = NetPeerExtensions.CreatePeer(InstanceCount);
     }
 
-    public INetworkConfiguration Configuration => throw new NotImplementedException();
+    public INetworkConfig Configuration => throw new NotImplementedException();
 
     public int Priority => throw new NotImplementedException();
 

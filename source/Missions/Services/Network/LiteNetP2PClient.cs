@@ -42,7 +42,6 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     private readonly IPacketManager packetManager;
 
     private readonly NetManager netManager;
-    private readonly NetworkConfiguration config;
     private readonly ICommonSerializer serializer;
     private readonly IMessageBroker messageBroker;
     private readonly IControllerIdProvider controllerIdProvider;
@@ -69,17 +68,18 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         }
     }
 
-    public INetworkConfiguration Configuration => throw new NotImplementedException();
+    public INetworkConfig Config { get; }
 
     public LiteNetP2PClient(
-        NetworkConfiguration config,
+        INetworkConfig config,
         ICommonSerializer serializer,
         IMessageBroker messageBroker,
         IPacketManager packetManager,
         IControllerIdProvider controllerIdProvider)
     {
+        Config = config;
+
         this.packetManager = packetManager;
-        this.config = config;
         this.serializer = serializer;
         this.messageBroker = messageBroker;
         this.controllerIdProvider = controllerIdProvider;
@@ -87,9 +87,9 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         netManager = new NetManager(this)
         {
             NatPunchEnabled = true,
-            DisconnectTimeout = (int)config.DisconnectTimeout.TotalMilliseconds,
-            PingInterval = (int)config.PingInterval.TotalMilliseconds,
-            ReconnectDelay = (int)config.ReconnectDelay.TotalMilliseconds,
+            DisconnectTimeout = (int)Config.DisconnectTimeout.TotalMilliseconds,
+            PingInterval = (int)Config.PingInterval.TotalMilliseconds,
+            ReconnectDelay = (int)Config.ReconnectDelay.TotalMilliseconds,
         };
 
         poller = new Poller(Update, TimeSpan.FromMilliseconds(1000 / 120));
@@ -175,7 +175,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     /// Point the NAT-punch rendezvous (and relay target) at a specific server — typically the campaign
     /// server CoopClient is already connected to — instead of the compiled-in defaults.
     /// </summary>
-    public void SetRendezvous(string address, int port) => config.SetRendezvous(address, port);
+    public void SetRendezvous(string address, int port) => Config.SetRendezvous(address, port);
 
     /// <summary>
     /// Opens a direct connection to the rendezvous/relay server (tracked as <see cref="PeerServer"/>).
@@ -190,15 +190,15 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         Logger.Information("Connecting to P2P Server");
         string connectionAddress;
         int port;
-        if (config.NATType == NatAddressType.Internal)
+        if (Config.NATType == NatAddressType.Internal)
         {
-            connectionAddress = config.LanAddress.ToString();
-            port = config.LanPort;
+            connectionAddress = Config.LanAddress.ToString();
+            port = Config.LanPort;
         }
         else
         {
-            connectionAddress = config.WanAddress.ToString();
-            port = config.WanPort;
+            connectionAddress = Config.WanAddress.ToString();
+            port = Config.WanPort;
         }
 
         Logger.Information($"Connecting to {connectionAddress}:{port}");
@@ -228,14 +228,14 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     {
         Logger.Verbose("Attempting NAT Punch");
 
-        ConnectionToken token = new ConnectionToken(ControllerId, instanceId, config.NATType);
-        if (config.NATType == NatAddressType.Internal)
+        ConnectionToken token = new ConnectionToken(ControllerId, instanceId, Config.NATType);
+        if (Config.NATType == NatAddressType.Internal)
         {
-            netManager.NatPunchModule.SendNatIntroduceRequest(config.LanAddress.ToString(), config.LanPort, token);
+            netManager.NatPunchModule.SendNatIntroduceRequest(Config.LanAddress.ToString(), Config.LanPort, token);
         }
-        else if (config.NATType == NatAddressType.External)
+        else if (Config.NATType == NatAddressType.External)
         {
-            netManager.NatPunchModule.SendNatIntroduceRequest(config.WanAddress.ToString(), config.WanPort, token);
+            netManager.NatPunchModule.SendNatIntroduceRequest(Config.WanAddress.ToString(), Config.WanPort, token);
         }
 
         this.instanceId = instanceId;
@@ -306,7 +306,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         // a direct client-to-client link, not server-relayed.
         Logger.Information("[LocationSync] P2P link established: remote(other client)={Remote} | myP2PPort={LocalPort} | rendezvous(server)={Server}:{ServerPort}. " +
             "remote != rendezvous => DIRECT P2P (not server-relayed).",
-            peer, netManager.LocalPort, config.LanAddress, config.LanPort);
+            peer, netManager.LocalPort, Config.LanAddress, Config.LanPort);
     }
 
     public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
