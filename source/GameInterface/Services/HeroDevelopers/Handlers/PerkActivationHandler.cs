@@ -2,11 +2,13 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using GameInterface.Services.HeroDevelopers.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.Core;
@@ -46,19 +48,54 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
             if (!objectManager.TryGetIdWithLogging(obj.What.Hero, out var heroId)) return;
             if (!objectManager.TryGetIdWithLogging(obj.What.Perk, out var perkId)) return;
 
-            // Run on all clients
             var message = new OpenPerk(heroId, perkId);
-            network.SendAll(message);
 
-            OnOpenedPerkInternal(obj.What.Hero, obj.What.Perk);
+            var hero = obj.What.Hero;
+            var perk = obj.What.Perk;
+
+            // OnOpenedPerkInternal mutates campaign hero state (HitPoints, attributes/focus,
+            // roster version, power modifier), which is main-thread-only; defer it off the
+            // poller thread that delivered this message.
+            GameThread.Run(() =>
+            {
+                try
+                {
+                    OnOpenedPerkInternal(hero, perk);
+
+                    network.SendAll(message);
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to apply PerkOpened");
+                }
+            });
         }
 
         private void Handle_OpenPerk(MessagePayload<OpenPerk> obj)
         {
-            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
-            if (!objectManager.TryGetObjectWithLogging<PerkObject>(obj.What.PerkId, out var perk)) return;
+            var heroId = obj.What.HeroId;
+            var perkId = obj.What.PerkId;
 
-            OnOpenedPerkInternal(hero, perk);
+            // OnOpenedPerkInternal mutates campaign hero state (HitPoints, attributes/focus,
+            // roster version, power modifier), which is main-thread-only; defer it off the
+            // network receive thread that delivered this message.
+            GameThread.Run(() =>
+            {
+                try
+                {
+                    if (!objectManager.TryGetObjectWithLogging<Hero>(heroId, out var hero)) return;
+                    if (!objectManager.TryGetObjectWithLogging<PerkObject>(perkId, out var perk)) return;
+
+                    using (new AllowedThread())
+                    {
+                        OnOpenedPerkInternal(hero, perk);
+                    }
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to apply OpenPerk");
+                }
+            });
         }
 
         private void OnOpenedPerkInternal(Hero hero, PerkObject perk)

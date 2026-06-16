@@ -61,7 +61,7 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
         private void Handle(MessagePayload<NetworkSetSkillXpServer> obj)
         {
             // Send to all clients and apply on server
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 using (new AllowedThread())
                 {
@@ -74,7 +74,19 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
 
         private void Handle(MessagePayload<NetworkSetSkillXpClients> obj)
         {
-            SetSkillXp(obj.What);
+            var data = obj.What;
+
+            GameThread.Run(() =>
+            {
+                try
+                {
+                    SetSkillXp(data);
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to apply NetworkSetSkillXpClients");
+                }
+            });
         }
 
         private void Handle(MessagePayload<SkillLevelChange> obj)
@@ -84,7 +96,7 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
         private void Handle(MessagePayload<NetworkSkillLevelChangeServer> obj)
         {
             // Send to all clients and apply on server
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 using (new AllowedThread())
                 {
@@ -97,7 +109,19 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
 
         private void Handle(MessagePayload<NetworkSkillLevelChangeClients> obj)
         {
-            ChangeSkillLevel(obj.What);
+            var data = obj.What;
+
+            GameThread.Run(() =>
+            {
+                try
+                {
+                    ChangeSkillLevel(data);
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to apply NetworkSkillLevelChangeClients");
+                }
+            });
         }
 
         private void Handle(MessagePayload<RawXpGain> obj)
@@ -107,7 +131,7 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
         private void Handle(MessagePayload<NetworkRawXpGainServer> obj)
         {
             // Send to all clients and apply on server
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 using (new AllowedThread())
                 {
@@ -120,7 +144,19 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
 
         private void Handle(MessagePayload<NetworkRawXpGainClients> obj)
         {
-            ChangeRawXp(obj.What);
+            var data = obj.What;
+
+            GameThread.Run(() =>
+            {
+                try
+                {
+                    ChangeRawXp(data);
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to apply NetworkRawXpGainClients");
+                }
+            });
         }
 
         private void SendSkillXp(SkillXpSet obj)
@@ -211,18 +247,24 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
             if (!objectManager.TryGetObject(obj.SkillObjectId, out SkillObject skillObject))
             {
                 Logger.Error("Unable to get object for skill object id {id}", obj.SkillObjectId);
+                return;
             }
 
             // Replace original TaleWorlds implementation
             if (obj.ChangeAmount != 0)
             {
-                int value = hero.GetSkillValue(skillObject) + obj.ChangeAmount;
-                hero.SetSkillValue(skillObject, value);
+                // Hero.SetSkillValue is patched and only runs the original on a client when the
+                // thread is allowed, so the vanilla skill write must be marked as allowed here.
+                using (new AllowedThread())
+                {
+                    int value = hero.GetSkillValue(skillObject) + obj.ChangeAmount;
+                    hero.SetSkillValue(skillObject, value);
 
-                // Only notify if running on client where the updated hero is their main hero
-                bool shouldNotify = (hero == Hero.MainHero) && obj.ShouldNotify;
+                    // Only notify if running on client where the updated hero is their main hero
+                    bool shouldNotify = (hero == Hero.MainHero) && obj.ShouldNotify;
 
-                CampaignEventDispatcher.Instance.OnHeroGainedSkill(hero, skillObject, obj.ChangeAmount, shouldNotify);
+                    CampaignEventDispatcher.Instance.OnHeroGainedSkill(hero, skillObject, obj.ChangeAmount, shouldNotify);
+                }
             }
         }
 
@@ -254,17 +296,22 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
             }
 
             // Replace original TaleWorlds implementation
-            if ((long)hero.HeroDeveloper._totalXp + (long)MathF.Round(obj.RawXp) < (long)Campaign.Current.Models.CharacterDevelopmentModel.GetMaxSkillPoint())
+            // HeroDeveloper.CheckLevel is patched and only runs the original on a client when the
+            // thread is allowed, so the vanilla level-up must be marked as allowed here.
+            using (new AllowedThread())
             {
-                hero.HeroDeveloper._totalXp += MathF.Round(obj.RawXp);
+                if ((long)hero.HeroDeveloper._totalXp + (long)MathF.Round(obj.RawXp) < (long)Campaign.Current.Models.CharacterDevelopmentModel.GetMaxSkillPoint())
+                {
+                    hero.HeroDeveloper._totalXp += MathF.Round(obj.RawXp);
 
-                // Only notify if running on client where the updated hero is their main hero
-                bool shouldNotify = (hero == Hero.MainHero) && obj.ShouldNotify;
+                    // Only notify if running on client where the updated hero is their main hero
+                    bool shouldNotify = (hero == Hero.MainHero) && obj.ShouldNotify;
 
-                hero.HeroDeveloper.CheckLevel(shouldNotify);
-                return;
+                    hero.HeroDeveloper.CheckLevel(shouldNotify);
+                    return;
+                }
+                hero.HeroDeveloper._totalXp = Campaign.Current.Models.CharacterDevelopmentModel.GetMaxSkillPoint();
             }
-            hero.HeroDeveloper._totalXp = Campaign.Current.Models.CharacterDevelopmentModel.GetMaxSkillPoint();
         }
     }
 }

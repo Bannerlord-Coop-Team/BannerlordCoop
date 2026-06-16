@@ -12,7 +12,7 @@
             public const int PollNetwork = Update - 1;      // Polls all events received over the network connection.
             public const int RailGun = PollNetwork - 1;     // The update loop of the clientside RailGun instance.
             
-            public const int GameLoopRunner = 2000;         // Processes the pending requests in the GameLoopRunner. This is processed in the main game loop AFTER the client updates are done
+            public const int GameThread = 2000;             // Processes the pending requests in the GameThread. This is processed in the main game loop AFTER the client updates are done
             
             public const int SyncBufferedFields = 1000;     // Processes pending synchronization of buffered field changes.
             

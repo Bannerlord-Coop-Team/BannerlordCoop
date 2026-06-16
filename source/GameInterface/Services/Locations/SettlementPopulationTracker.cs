@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Locations.Messages;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
@@ -61,12 +62,14 @@ internal class SettlementPopulationTracker : IHandler
 
         messageBroker.Subscribe<PartyEnterSettlement>(Handle_PartyEnterSettlement);
         messageBroker.Subscribe<PartyLeaveSettlement>(Handle_PartyLeaveSettlement);
+        messageBroker.Subscribe<SettlementRosterHeroesChanged>(Handle_SettlementRosterHeroesChanged);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<PartyEnterSettlement>(Handle_PartyEnterSettlement);
         messageBroker.Unsubscribe<PartyLeaveSettlement>(Handle_PartyLeaveSettlement);
+        messageBroker.Unsubscribe<SettlementRosterHeroesChanged>(Handle_SettlementRosterHeroesChanged);
     }
 
     private void Handle_PartyEnterSettlement(MessagePayload<PartyEnterSettlement> payload)
@@ -80,7 +83,7 @@ internal class SettlementPopulationTracker : IHandler
         if (objectManager.TryGetObjectWithLogging(partyId, out MobileParty party) == false) return;
         if (settlement.LocationComplex == null) return;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             if (party.IsPlayerParty())
             {
@@ -110,7 +113,7 @@ internal class SettlementPopulationTracker : IHandler
 
         var partyId = payload.What.PartyId;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             if (playerPartySettlements.TryGetValue(partyId, out var settlementId) == false)
             {
@@ -131,6 +134,41 @@ internal class SettlementPopulationTracker : IHandler
         });
     }
 
+    // Vanilla refreshes hero placement on governor and prisoner events, but only for the settlement
+    // the local player is inside; the host is never inside one. Apply the same refresh for any
+    // settlement that currently has player visitors, then re-broadcast the roster so clients inside
+    // it update live instead of only on their next entry.
+    private void Handle_SettlementRosterHeroesChanged(MessagePayload<SettlementRosterHeroesChanged> payload)
+    {
+        if (!ModInformation.IsServer) return;
+
+        var settlement = payload.What.Settlement;
+        var heroes = payload.What.Heroes;
+        if (settlement == null || heroes == null) return;
+
+        GameThread.Run(() =>
+        {
+            if (!populatedSettlements.ContainsKey(settlement.StringId)) return;
+            if (settlement.LocationComplex == null) return;
+
+            var refreshed = false;
+            foreach (var hero in heroes)
+            {
+                if (hero == null) continue;
+                // Player heroes are the player agents themselves and are never placed as roster NPCs.
+                if (PlayerManager.TryGetControlledObjectInfo(hero, out _)) continue;
+
+                RefreshHeroPlacement(hero, settlement);
+                refreshed = true;
+            }
+
+            if (!refreshed) return;
+            if (!objectManager.TryGetIdWithLogging(settlement, out var settlementId)) return;
+
+            BroadcastRosterSnapshot(settlement, settlementId);
+        });
+    }
+
     /// <summary>
     /// Allows the debug command to populate and broadcast a settlement without a visiting party.
     /// </summary>
@@ -140,7 +178,7 @@ internal class SettlementPopulationTracker : IHandler
         if (settlement?.LocationComplex == null) return;
         if (objectManager.TryGetIdWithLogging(settlement, out var settlementId) == false) return;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             if (populatedSettlements.ContainsKey(settlement.StringId) == false)
             {
@@ -315,6 +353,12 @@ internal class SettlementPopulationTracker : IHandler
 
             foreach (var locationCharacter in location.GetCharacterList() ?? Enumerable.Empty<LocationCharacter>())
             {
+                // Players are represented inside interiors by the P2P mission layer, never by the
+                // location roster. Excluding them here (server is authoritative on who is a player)
+                // keeps clients from spawning a frozen roster duplicate next to the P2P agent.
+                var hero = locationCharacter?.Character?.HeroObject;
+                if (hero != null && hero.IsPlayerHero()) continue;
+
                 if (LocationCharacterFactory.TryCreateData(objectManager, locationId, locationCharacter, out var data))
                 {
                     entries.Add(data);

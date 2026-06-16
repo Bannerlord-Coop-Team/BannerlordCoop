@@ -43,14 +43,32 @@ public class RemotePlayerHeroHandlerTests
     }
 
     [Fact]
+    public void ExistingPlayer_NoHeroData_RegistersWithoutUnpacking()
+    {
+        // A player already in the session when we joined carries no hero blob (its hero is in the save we
+        // loaded), so it is registered as controlled without unpacking.
+        var player = new Player("ctrl", "hero1", "party1", "clan1", "char1");
+        playerManager.Setup(x => x.AddPlayer(player)).Returns(true);
+
+        messageBroker.Publish(this, new NetworkNewPlayerHeroCreated("ctrl", player, System.Array.Empty<byte>()));
+
+        playerManager.Verify(x => x.AddPlayer(player), Times.Once);
+        heroInterface.Verify(x => x.ClientUnpackHero(It.IsAny<byte[]>(), It.IsAny<Player>()), Times.Never);
+    }
+
+    [Fact]
     public void DuplicatePlayer_DoesNotUnpack()
     {
         var message = NewHeroMessage(out var player, out _);
-        playerManager.Setup(x => x.AddPlayer(player)).Returns(false);
+        // Already-known player: TryGetPlayer reports it, so the handler must bail before unpacking.
+        playerManager
+            .Setup(x => x.TryGetPlayer(player.ControllerId, out It.Ref<Player>.IsAny))
+            .Returns(true);
 
         messageBroker.Publish(this, message);
 
-        // A duplicate registration is logged and skipped — never unpacked a second time.
+        // A duplicate registration is logged and skipped — never unpacked or re-registered.
         heroInterface.Verify(x => x.ClientUnpackHero(It.IsAny<byte[]>(), It.IsAny<Player>()), Times.Never);
+        playerManager.Verify(x => x.AddPlayer(It.IsAny<Player>()), Times.Never);
     }
 }

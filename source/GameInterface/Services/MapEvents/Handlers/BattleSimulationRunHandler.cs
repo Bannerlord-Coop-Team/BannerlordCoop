@@ -131,7 +131,7 @@ internal class BattleSimulationRunHandler : IHandler
 
         var observer = new ForwardingBattleObserver(objectManager);
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             // v1: simulate the full participating troop count (null), not the player's selected subset.
             // Set up before attaching the observer: setup fires +1 TroopNumberChanged calls to populate the
@@ -173,7 +173,7 @@ internal class BattleSimulationRunHandler : IHandler
         var maxRounds = payload.What.MaxRounds;
         var finished = false;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             // Accumulate every round resolved in this advance into one update. Normal playback advances
             // a single round per call (one packet per round, as before), but a "skip" resolves the whole
@@ -223,7 +223,7 @@ internal class BattleSimulationRunHandler : IHandler
 
         // Resolve and enqueue on the main thread: objectManager can be mutated by the main thread's
         // Add/Remove, and BattleSimulationReplay's round queue is drained on the main-thread tick.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             var resolved = new List<BattleSimulationReplay.ResolvedChange>(message.Changes.Length);
             foreach (var change in message.Changes)
@@ -248,7 +248,7 @@ internal class BattleSimulationRunHandler : IHandler
     private void Handle_NetworkBattleSimulationFinished(MessagePayload<NetworkBattleSimulationFinished> payload)
     {
         // Both the encounter state and the replay's finish flag belong to the main-thread tick.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             if (PlayerEncounter.CurrentBattleSimulation == null)
             {
@@ -280,7 +280,7 @@ internal class BattleSimulationRunHandler : IHandler
         if (orphaned.Count == 0)
             return;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             foreach (var entry in orphaned)
             {

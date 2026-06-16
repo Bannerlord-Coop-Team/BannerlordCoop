@@ -43,7 +43,7 @@ public class CurrentSiegeStateSettlementPatch
 
     internal static void RunCurrentSiegeStateChange(Settlement settlement, SiegeState siegeState)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {

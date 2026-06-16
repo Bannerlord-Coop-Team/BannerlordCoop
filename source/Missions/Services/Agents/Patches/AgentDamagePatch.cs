@@ -42,7 +42,7 @@ namespace Missions.Services.Agents.Patches
 
         public static void RunOriginalRegisterBlow(Agent agent, Blow blow, AttackCollisionData collisionData)
         {
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 using(new AllowedThread())
                 {

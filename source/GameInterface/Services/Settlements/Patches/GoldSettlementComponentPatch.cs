@@ -39,7 +39,7 @@ namespace GameInterface.Services.Settlements.Patches
 
         internal static void RunSettlementComponentGoldChanged(SettlementComponent settlementComp, int gold)
         {
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 using (new AllowedThread())
                 {

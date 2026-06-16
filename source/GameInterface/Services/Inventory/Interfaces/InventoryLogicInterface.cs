@@ -57,7 +57,7 @@ namespace GameInterface.Services.Inventory.Interfaces
             List<ValueTuple<ItemRosterElement, int>> boughtItems,
             List<ValueTuple<ItemRosterElement, int>> soldItems)
         {
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 try
                 {

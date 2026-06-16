@@ -8,6 +8,8 @@ using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.MapEventParties;
+using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
@@ -124,23 +126,41 @@ internal class BattleHandler : IHandler
 
     private void Handle_NetworkAttackMissionAttempted(MessagePayload<NetworkAttackMissionAttempted> payload)
     {
-        if (!objectManager.TryGetObject(payload.What.MapEventId, out MapEvent mapEvent))
+        if (!objectManager.TryGetObject(payload.What.MapEventId, out MapEvent _))
             return;
-
-        mapEventLogger.DebugMapEvent(mapEvent, "Handling network attack mission attempted for map event. Making sides mission-ready and replying with mission start");
-
-        foreach(var side in mapEvent._sides)
-        {
-            side.MakeReadyForMission(null);
-        }
 
         // Roll the terrain seed once for this map event and reuse it for every client
         // that opens the battle, so they all use the same terrain seed. The seed is
         // chosen server-side and carried in the message instead of rolled per machine.
         var randomTerrainSeed = mapEventTerrainSeeds.GetOrAdd(payload.What.MapEventId, _ => RollTerrainSeed());
+        var requester = payload.Who as NetPeer;
 
-        var message = new NetworkStartAttackMission(randomTerrainSeed);
-        network.Send(payload.Who as NetPeer, message);
+        // _sides is game state the main-thread tick also touches; mutating it from the
+        // network thread races the tick. Make the sides mission-ready on the main thread.
+        // Re-resolve the event at drain time: it may have finalized between this request
+        // arriving and the queued action running, in which case a captured reference would
+        // point at a torn-down event.
+        GameThread.Run(() =>
+        {
+            try
+            {
+                if (!objectManager.TryGetObject(payload.What.MapEventId, out MapEvent mapEvent))
+                    return;
+
+                mapEventLogger.DebugMapEvent(mapEvent, "Handling network attack mission attempted for map event. Making sides mission-ready and replying with mission start");
+
+                foreach (var side in mapEvent._sides)
+                {
+                    side.MakeReadyForMission(null);
+                }
+
+                network.Send(requester, new NetworkStartAttackMission(randomTerrainSeed));
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to make map event sides mission-ready for {Message}", nameof(NetworkAttackMissionAttempted));
+            }
+        });
     }
 
     private int RollTerrainSeed()
@@ -160,7 +180,7 @@ internal class BattleHandler : IHandler
         // changes from the main thread; doing it from the network thread races its
         // layer lists and crashes the game.
         var randomTerrainSeed = payload.What.RandomTerrainSeed;
-        GameLoopRunner.RunOnMainThread(() => OpenAttackMission(randomTerrainSeed));
+        GameThread.Run(() => OpenAttackMission(randomTerrainSeed));
     }
 
     private static void OpenAttackMission(int randomTerrainSeed)
@@ -234,7 +254,7 @@ internal class BattleHandler : IHandler
         }
         catch (Exception e)
         {
-            // GameLoopRunner runs queued actions unguarded, so a throw from here
+            // GameThread runs queued actions unguarded, so a throw from here
             // would escape into the game's main tick and crash it.
             Logger.Error(e, "Failed to open the battle mission for {Message}", nameof(NetworkStartAttackMission));
         }
@@ -260,7 +280,7 @@ internal class BattleHandler : IHandler
         if (MapEventConfig.Debug)
             mapEventLogger.DebugMapEvent(mapEvent, "Handling network map event finalize attempted. Finalizing map event.");
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             mapEvent.FinalizeEventAux();
         }, blocking: true);
@@ -272,7 +292,7 @@ internal class BattleHandler : IHandler
 
     private void Handle_NetworkMapEventFinalized(MessagePayload<NetworkMapEventFinalized> payload)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             if (Campaign.Current == null) return;
 
@@ -311,14 +331,24 @@ internal class BattleHandler : IHandler
 
         foreach (var addedParty in message.AddedParties)
         {
-            if (objectManager.TryGetIdWithLogging(addedParty, out var mapEventPartyId))
-            {
-                partyIds.Add(mapEventPartyId);
-                // Capture the party's authoritative map position so clients can snap it to
-                // the battle. Settlement parties have no MobileParty; their slot is a default
-                // the client never applies.
-                partyPositions.Add(addedParty.Party.MobileParty?.Position ?? default);
-            }
+            if (!objectManager.TryGetIdWithLogging(addedParty, out var mapEventPartyId))
+                continue;
+
+            partyIds.Add(mapEventPartyId);
+            // Capture the party's authoritative map position, in lockstep with the id and
+            // before the roster check below so the two arrays stay index-aligned. Settlement
+            // parties have no MobileParty; their slot is a default the client never applies.
+            partyPositions.Add(addedParty.Party.MobileParty?.Position ?? default);
+
+            // A player just created or joined this map event, so push every involved party's
+            // flattened roster to clients (AI-only battles never reach here). Clients need these to
+            // spawn troops in the mission; in-progress AI parties already have a roster built from
+            // server simulation. Per-troop changes after this are kept in sync incrementally.
+            if (addedParty._roster == null)
+                continue;
+
+            var flattenedTroops = FlattenedTroopSerializer.Serialize(addedParty._roster, objectManager);
+            network.SendAll(new NetworkUpdateMapEventParty(mapEventPartyId, flattenedTroops));
         }
 
         network.SendAll(new NetworkAddInvolvedParties(
@@ -332,56 +362,45 @@ internal class BattleHandler : IHandler
     {
         var message = payload.What;
 
-        if (!objectManager.TryGetObjectWithLogging<MapEvent>(message.MapEventId, out var mapEvent))
-            return;
-
-        mapEventLogger.DebugMapEvent(mapEvent, "Handling network add involved parties. Party count: {MapEventPartyCount}", message.MapEventPartyIds.Length);
-
-        var positions = message.Positions;
-        var partiesToReposition = new List<(MobileParty Party, CampaignVec2 Position)>();
-
-        using (new AllowedThread())
+        GameThread.Run(() =>
         {
-            for (int i = 0; i < message.MapEventPartyIds.Length; i++)
+            try
             {
-                var mapEventPartyId = message.MapEventPartyIds[i];
-                if (!objectManager.TryGetObjectWithLogging<MapEventParty>(mapEventPartyId, out var mapEventParty))
-                    continue;
+                if (!objectManager.TryGetObjectWithLogging<MapEvent>(message.MapEventId, out var mapEvent))
+                    return;
 
-                mapEventLogger.DebugMapEvent(mapEvent, "Adding involved map event party {MapEventPartyId} to troop upgrade tracker", mapEventPartyId);
-                mapEvent.TroopUpgradeTracker.AddParty(mapEventParty);
+                mapEventLogger.DebugMapEvent(mapEvent, "Handling network add involved parties. Party count: {MapEventPartyCount}", message.MapEventPartyIds.Length);
 
-                // Collect the party's server-side map position to snap it to the battle.
-                // Every involved party is snapped, including this client's own, so all
-                // clients place the parties where the server has them, lined up with the
-                // battle center the server is authoritative for.
-                var mobileParty = mapEventParty.Party.MobileParty;
-                if (mobileParty != null && positions != null && i < positions.Length)
+                var positions = message.Positions;
+
+                // Re-applying campaign-collection state replicated from the server; the
+                // DynamicSync TroopUpgradeTracker patches must stand down during the apply.
+                using (new AllowedThread())
                 {
-                    partiesToReposition.Add((mobileParty, positions[i]));
+                    for (int i = 0; i < message.MapEventPartyIds.Length; i++)
+                    {
+                        var mapEventPartyId = message.MapEventPartyIds[i];
+                        if (!objectManager.TryGetObjectWithLogging<MapEventParty>(mapEventPartyId, out var mapEventParty))
+                            continue;
+
+                        mapEventLogger.DebugMapEvent(mapEvent, "Adding involved map event party {MapEventPartyId} to troop upgrade tracker", mapEventPartyId);
+                        mapEvent.TroopUpgradeTracker.AddParty(mapEventParty);
+
+                        // Snap the party to its server-side map position so it lines up with the
+                        // battle. Every involved party is snapped, including this client's own, so
+                        // all clients place the parties where the server has them, lined up with the
+                        // battle center the server is authoritative for.
+                        var mobileParty = mapEventParty.Party.MobileParty;
+                        if (mobileParty != null && positions != null && i < positions.Length)
+                        {
+                            mobileParty.Position = positions[i];
+                        }
+                    }
                 }
             }
-        }
-
-        if (partiesToReposition.Count == 0)
-            return;
-
-        // Apply the position snaps on the main thread so the writes never race the
-        // campaign-map render or the party locator the main tick reads.
-        GameLoopRunner.RunOnMainThread(() =>
-        {
-            // The campaign can tear down (exit to menu, disconnect, save load) between
-            // enqueuing this and the main thread draining it; the Position setter
-            // dereferences Campaign.Current, and GameLoopRunner runs actions unguarded.
-            if (Campaign.Current == null)
-                return;
-
-            using (new AllowedThread())
+            catch (Exception e)
             {
-                foreach (var (party, position) in partiesToReposition)
-                {
-                    party.Position = position;
-                }
+                Logger.Error(e, "Failed to apply {Message}", nameof(NetworkAddInvolvedParties));
             }
         });
     }

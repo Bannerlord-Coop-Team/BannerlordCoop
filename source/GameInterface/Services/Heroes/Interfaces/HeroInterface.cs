@@ -78,7 +78,7 @@ internal class HeroInterface : IHeroInterface
     {
         Hero hero = null;
 
-        GameLoopRunner.RunOnMainThread(() => {
+        GameThread.Run(() => {
             try
             {
                 using (new AllowedThread())
@@ -182,9 +182,6 @@ internal class HeroInterface : IHeroInterface
         RegisterPrimary(hero, NewServerStringId(hero));
         RegisterPrimary(party, NewServerStringId(party));
         RegisterPrimary(hero.Clan, NewServerStringId(hero.Clan));
-        // CharacterObject is 1:1 with its hero and isn't tracked by the CampaignObjectManager, so we can't mint a
-        // "PlayerN" id for it via FindNextUniqueStringId (that only knows campaign object types). Reuse the hero's
-        // freshly-assigned unique StringId; the type-prefixed coop key ("CharacterObject_PlayerN") keeps it distinct.
         RegisterPrimary(hero.CharacterObject, hero.StringId);
 
         RegisterPartyChildren(party);

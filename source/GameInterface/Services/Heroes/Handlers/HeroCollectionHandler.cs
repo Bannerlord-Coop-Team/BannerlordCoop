@@ -1,9 +1,12 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using GameInterface.Services.Heroes.Messages.Collections;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -87,10 +90,23 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             var data = payload.What;
 
-            if (!objectManager.TryGetObject(data.HeroId, out Hero hero)) return;
-            if (!objectManager.TryGetObject(data.ValueId, out CharacterObject characterObject) && data.ValueId != null) return;
+            GameThread.Run(() =>
+            {
+                try
+                {
+                    if (!objectManager.TryGetObject(data.HeroId, out Hero hero)) return;
+                    if (!objectManager.TryGetObject(data.ValueId, out CharacterObject characterObject) && data.ValueId != null) return;
 
-            hero.VolunteerTypes[data.Index] = characterObject;
+                    using (new AllowedThread())
+                    {
+                        hero.VolunteerTypes[data.Index] = characterObject;
+                    }
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to apply NetworkUpdateArray");
+                }
+            });
         }
 
         private void Handle(MessagePayload<ChildrenListUpdated> payload)
@@ -107,10 +123,23 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             var data = payload.What;
 
-            if (!objectManager.TryGetObject(data.HeroId, out Hero hero)) return;
-            if (!objectManager.TryGetObject(data.ValueId, out Hero child)) return;
+            GameThread.Run(() =>
+            {
+                try
+                {
+                    if (!objectManager.TryGetObject(data.HeroId, out Hero hero)) return;
+                    if (!objectManager.TryGetObject(data.ValueId, out Hero child)) return;
 
-            hero._children.Add(child);
+                    using (new AllowedThread())
+                    {
+                        hero._children.Add(child);
+                    }
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to apply NetworkUpdateChildrenList");
+                }
+            });
         }
 
         private void Handle(MessagePayload<CaravanListUpdated> payload)
@@ -127,10 +156,23 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             var data = payload.What;
 
-            if (!objectManager.TryGetObject(data.HeroId, out Hero hero)) return;
-            if (!objectManager.TryGetObject(data.ValueId, out PartyComponent caravan)) return;
+            GameThread.Run(() =>
+            {
+                try
+                {
+                    if (!objectManager.TryGetObject(data.HeroId, out Hero hero)) return;
+                    if (!objectManager.TryGetObject(data.ValueId, out PartyComponent caravan)) return;
 
-            hero.OwnedCaravans.Add((CaravanPartyComponent)caravan);
+                    using (new AllowedThread())
+                    {
+                        hero.OwnedCaravans.Add((CaravanPartyComponent)caravan);
+                    }
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to apply NetworkUpdateCaravanList");
+                }
+            });
         }
 
         private void Handle(MessagePayload<CaravanListRemoved> payload)
@@ -147,10 +189,23 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             var data = payload.What;
 
-            if (!objectManager.TryGetObject(data.HeroId, out Hero hero)) return;
-            if (!objectManager.TryGetObject(data.ValueId, out PartyComponent caravan)) return;
+            GameThread.Run(() =>
+            {
+                try
+                {
+                    if (!objectManager.TryGetObject(data.HeroId, out Hero hero)) return;
+                    if (!objectManager.TryGetObject(data.ValueId, out PartyComponent caravan)) return;
 
-            hero.OwnedCaravans.Remove((CaravanPartyComponent)caravan);
+                    using (new AllowedThread())
+                    {
+                        hero.OwnedCaravans.Remove((CaravanPartyComponent)caravan);
+                    }
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to apply NetworkRemoveCaravanList");
+                }
+            });
         }
 
         private void Handle(MessagePayload<AlleyListUpdated> payload)
@@ -167,10 +222,23 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             var data = payload.What;
 
-            if (!objectManager.TryGetObject(data.HeroId, out Hero hero)) return;
-            if (!objectManager.TryGetObject(data.ValueId, out Alley alley)) return;
+            GameThread.Run(() =>
+            {
+                try
+                {
+                    if (!objectManager.TryGetObject(data.HeroId, out Hero hero)) return;
+                    if (!objectManager.TryGetObject(data.ValueId, out Alley alley)) return;
 
-            hero.OwnedAlleys.Add(alley);
+                    using (new AllowedThread())
+                    {
+                        hero.OwnedAlleys.Add(alley);
+                    }
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to apply NetworkUpdateAlleyList");
+                }
+            });
         }
 
         private void Handle(MessagePayload<AlleyListRemoved> payload)
@@ -187,10 +255,23 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             var data = payload.What;
 
-            if (!objectManager.TryGetObject(data.HeroId, out Hero hero)) return;
-            if (!objectManager.TryGetObject(data.ValueId, out Alley alley)) return;
+            GameThread.Run(() =>
+            {
+                try
+                {
+                    if (!objectManager.TryGetObject(data.HeroId, out Hero hero)) return;
+                    if (!objectManager.TryGetObject(data.ValueId, out Alley alley)) return;
 
-            hero.OwnedAlleys.Remove(alley);
+                    using (new AllowedThread())
+                    {
+                        hero.OwnedAlleys.Remove(alley);
+                    }
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to apply NetworkRemoveAlleyList");
+                }
+            });
         }
 
         private void Handle(MessagePayload<WorkshopListUpdated> payload)
@@ -207,10 +288,23 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             var data = payload.What;
 
-            if (!objectManager.TryGetObject(data.HeroId, out Hero hero)) return;
-            if (!objectManager.TryGetObject(data.ValueId, out Workshop workshop)) return;
+            GameThread.Run(() =>
+            {
+                try
+                {
+                    if (!objectManager.TryGetObject(data.HeroId, out Hero hero)) return;
+                    if (!objectManager.TryGetObject(data.ValueId, out Workshop workshop)) return;
 
-            hero._ownedWorkshops.Add(workshop);
+                    using (new AllowedThread())
+                    {
+                        hero._ownedWorkshops.Add(workshop);
+                    }
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to apply NetworkUpdateWorkshopList");
+                }
+            });
         }
 
         private void Handle(MessagePayload<WorkshopListRemoved> payload)
@@ -227,10 +321,23 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             var data = payload.What;
 
-            if (!objectManager.TryGetObject(data.HeroId, out Hero hero)) return;
-            if (!objectManager.TryGetObject(data.ValueId, out Workshop workshop)) return;
+            GameThread.Run(() =>
+            {
+                try
+                {
+                    if (!objectManager.TryGetObject(data.HeroId, out Hero hero)) return;
+                    if (!objectManager.TryGetObject(data.ValueId, out Workshop workshop)) return;
 
-            hero._ownedWorkshops.Remove(workshop);  
+                    using (new AllowedThread())
+                    {
+                        hero._ownedWorkshops.Remove(workshop);
+                    }
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to apply NetworkRemoveWorkshopList");
+                }
+            });
         }
 
         private bool TryGetId<T>(T value, out string id)

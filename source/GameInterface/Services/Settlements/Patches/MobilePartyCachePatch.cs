@@ -76,7 +76,7 @@ public class MobilePartyCachePatch
 
     internal static void RunMobileParty(Settlement settlement, MobileParty party, bool AddMobileParty)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {

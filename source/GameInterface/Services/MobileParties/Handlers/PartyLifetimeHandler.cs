@@ -197,7 +197,7 @@ internal class PartyLifetimeHandler : IHandler
         Action action,
         params object[] logArgs)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {
