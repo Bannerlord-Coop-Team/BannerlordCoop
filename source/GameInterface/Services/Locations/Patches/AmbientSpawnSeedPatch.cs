@@ -21,9 +21,9 @@ namespace GameInterface.Services.Locations.Patches;
 [HarmonyPatch(typeof(MissionAgentHandler), nameof(MissionAgentHandler.SpawnLocationCharacters))]
 internal class AmbientSpawnSeedPatch
 {
-    // Set only while the seeded pass is running, so the count-pin patch knows when to fix the
-    // per-player civilian-count config. Thread-scoped because the pass runs on the main thread and
-    // the config getter must not be overridden for reads on any other thread.
+    // True only while the seeded spawn pass runs. CivilianAgentCountPinPatch reads it to override the
+    // civilian-count config during that pass and leave it alone otherwise. [ThreadStatic] so it scopes
+    // to the spawning (main) thread.
     [ThreadStatic]
     internal static bool AmbientPassActive;
 
@@ -39,7 +39,6 @@ internal class AmbientSpawnSeedPatch
     {
         __state = default;
 
-        // Only a client ever loads a settlement mission scene; in single player the mod is inert.
         if (!ModInformation.IsClient) return;
         if (Game.Current == null || RandomGeneratorProperty == null) return;
         if (!TryGetAmbientSeed(out var seed)) return;
@@ -51,8 +50,8 @@ internal class AmbientSpawnSeedPatch
         __state = new SeedScope { Active = true, Previous = previous };
     }
 
-    // A finalizer (not a postfix) so the campaign generator is always restored even when the spawn
-    // pass throws - a skipped restore would leave the whole campaign running on the seeded generator.
+    // A finalizer so the campaign generator is always restored even when the spawn pass throws - a
+    // skipped restore would leave the whole campaign running on the seeded generator.
     static void Finalizer(SeedScope __state)
     {
         if (!__state.Active) return;
@@ -72,13 +71,14 @@ internal class AmbientSpawnSeedPatch
         var location = CampaignMission.Current?.Location;
         if (settlement == null || location == null) return false;
 
-        // A deterministic per-location key: stable across machines (unlike string.GetHashCode) and
-        // distinct per location so the tavern and the town centre do not share an identical crowd.
+        // A deterministic per-location key, distinct per location so the tavern and the town centre do
+        // not share an identical crowd.
         seed = StableHash($"{settlement.StringId}_{location.StringId}");
         return true;
     }
 
-    // FNV-1a: a fixed function of the bytes, identical on every machine and across runs.
+    // Maps the per-location key to a seed that is identical on every machine. A runtime string hash is
+    // randomized per process, so clients would derive different seeds and spawn different crowds.
     private static uint StableHash(string value)
     {
         const uint offsetBasis = 2166136261;
