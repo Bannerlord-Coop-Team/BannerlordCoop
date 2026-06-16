@@ -16,17 +16,17 @@ namespace Missions.Services.Agents.Messages
     {
 
         [ProtoMember(1)]
-        public Guid AttackerAgentId { get; }
+        public string AttackerAgentId { get; }
         [ProtoMember(2)]
-        public Guid VictimAgentId { get; }
+        public string VictimAgentId { get; }
         [ProtoMember(3)]
         public Blow Blow { get; }
         [ProtoMember(4)]
         public AttackCollisionData AttackCollisionData { get; }
 
         public NetworkDamageAgent(
-            Guid attackerAgentId,
-            Guid victimAgentId, 
+            string attackerAgentId,
+            string victimAgentId, 
             AttackCollisionData attackCollisionData, 
             Blow blow)
         {

@@ -8,7 +8,7 @@ namespace Missions.Services.Agents.Messages
     [ProtoContract]
     public readonly struct NetworkAgentKilled : IEvent
     {
-        public NetworkAgentKilled(Guid victimAgentId, Guid attackingAgent, Blow blow)
+        public NetworkAgentKilled(string victimAgentId, string attackingAgent, Blow blow)
         {
             VictimAgentId = victimAgentId;
             AttackingAgentId = attackingAgent;
@@ -16,9 +16,9 @@ namespace Missions.Services.Agents.Messages
         }
 
         [ProtoMember(1)]
-        public Guid VictimAgentId { get; }
+        public string VictimAgentId { get; }
         [ProtoMember(2)]
-        public Guid AttackingAgentId { get; }
+        public string AttackingAgentId { get; }
         [ProtoMember(3)]
         public Blow Blow { get; }
     }

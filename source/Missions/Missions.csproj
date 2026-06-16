@@ -1,7 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="..\packages\Krafs.Publicizer.2.3.0\build\Krafs.Publicizer.props" Condition="Exists('..\packages\Krafs.Publicizer.2.3.0\build\Krafs.Publicizer.props')" />
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
@@ -10,13 +7,18 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Missions</RootNamespace>
     <AssemblyName>Missions</AssemblyName>
-    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
+    <TargetFramework>netstandard2.0</TargetFramework>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
-    <NuGetPackageImportStamp>
-    </NuGetPackageImportStamp>
+    <LangVersion>10</LangVersion>
+    <Platforms>x64</Platforms>
+    <!-- Keep the hand-written Properties\AssemblyInfo.cs instead of the SDK-generated one. -->
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
@@ -26,7 +28,7 @@
     <WarningLevel>4</WarningLevel>
     <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
     <DebugType>pdbonly</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Release\</OutputPath>
@@ -35,25 +37,18 @@
     <WarningLevel>4</WarningLevel>
     <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
+  <!-- These files live in the project folder but were never compiled by the
+       legacy project. Exclude them so the SDK-style glob keeps the same set. -->
   <ItemGroup>
-    <Reference Include="0Harmony, Version=2.4.2.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\Lib.Harmony.2.4.2\lib\net472\0Harmony.dll</HintPath>
-    </Reference>
-    <Reference Include="Autofac, Version=8.2.0.0, Culture=neutral, PublicKeyToken=17863af14b0044da, processorArchitecture=MSIL">
-      <HintPath>..\packages\Autofac.8.2.0\lib\netstandard2.0\Autofac.dll</HintPath>
-    </Reference>
-    <Reference Include="LiteNetLib, Version=1.3.1.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\LiteNetLib.1.3.1\lib\net471\LiteNetLib.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.Bcl.AsyncInterfaces, Version=8.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.Bcl.AsyncInterfaces.8.0.0\lib\net462\Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
-    </Reference>
-    <Reference Include="protobuf-net, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
-      <HintPath>..\packages\protobuf-net.3.2.26\lib\net462\protobuf-net.dll</HintPath>
-    </Reference>
-    <Reference Include="protobuf-net.Core, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
-      <HintPath>..\packages\protobuf-net.Core.3.2.26\lib\net462\protobuf-net.Core.dll</HintPath>
-    </Reference>
+    <Compile Remove="CoopMission.cs" />
+    <Compile Remove="MissionTestGameManager.cs" />
+    <Compile Remove="Services\Agents\Patches\WeaponDropPatch.cs" />
+    <Compile Remove="Services\Agents\Patches\WeaponPickupPatch.cs" />
+    <Compile Remove="Services\Network\IMissionPlayerNetwork.cs" />
+    <Compile Remove="Services\Network\MissionClient.cs" />
+    <Compile Remove="Services\Network\NetworkMessageBroker.cs" />
+  </ItemGroup>
+  <ItemGroup>
     <Reference Include="SandBox">
       <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.dll</HintPath>
     </Reference>
@@ -66,44 +61,6 @@
     <Reference Include="SandBox.ViewModelCollection">
       <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.ViewModelCollection.dll</HintPath>
     </Reference>
-    <Reference Include="Serilog, Version=4.2.0.0, Culture=neutral, PublicKeyToken=24c2f752a8e58a10, processorArchitecture=MSIL">
-      <HintPath>..\packages\Serilog.4.2.0\lib\net471\Serilog.dll</HintPath>
-    </Reference>
-    <Reference Include="System" />
-    <Reference Include="System.Buffers, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Buffers.4.5.1\lib\net461\System.Buffers.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Collections.Immutable, Version=7.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Collections.Immutable.7.0.0\lib\net462\System.Collections.Immutable.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Configuration" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Diagnostics.DiagnosticSource, Version=8.0.0.1, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Diagnostics.DiagnosticSource.8.0.1\lib\net462\System.Diagnostics.DiagnosticSource.dll</HintPath>
-    </Reference>
-    <Reference Include="System.IO.Compression" />
-    <Reference Include="System.Memory, Version=4.0.1.2, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Memory.4.5.5\lib\net461\System.Memory.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Numerics" />
-    <Reference Include="System.Numerics.Vectors, Version=4.1.4.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Numerics.Vectors.4.5.0\lib\net46\System.Numerics.Vectors.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Runtime.CompilerServices.Unsafe, Version=6.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Runtime.CompilerServices.Unsafe.6.0.0\lib\net461\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Threading.Channels, Version=8.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Threading.Channels.8.0.0\lib\net462\System.Threading.Channels.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Threading.Tasks.Extensions, Version=4.2.0.1, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Threading.Tasks.Extensions.4.5.4\lib\net461\System.Threading.Tasks.Extensions.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Xml.Linq" />
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Net.Http" />
-    <Reference Include="System.Xml" />
     <Reference Include="TaleWorlds.CampaignSystem">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.CampaignSystem.dll</HintPath>
     </Reference>
@@ -167,104 +124,15 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Services\Agents\Handlers\AgentDamageHandler.cs" />
-    <Compile Include="Services\Agents\Handlers\AgentDeathHandler.cs" />
-    <Compile Include="Services\Agents\Messages\NetworkAgentKilled.cs" />
-    <Compile Include="Services\Agents\Handlers\ShieldDamageHandler.cs" />
-    <Compile Include="Services\Agents\Handlers\WeaponDropHandler.cs" />
-    <Compile Include="Services\Agents\Handlers\WeaponPickupHandler.cs" />
-    <Compile Include="Services\Agents\Messages\NetworkAgentDamaged.cs" />
-    <Compile Include="Services\Agents\Messages\NetworkShieldBreak.cs" />
-    <Compile Include="Services\Agents\Messages\NetworkWeaponDropped.cs" />
-    <Compile Include="Services\Agents\Messages\NetworkWeaponPickedup.cs" />
-    <Compile Include="Services\Agents\Messages\NetworkShieldDamaged.cs" />
-    <Compile Include="Services\Agents\Messages\ShieldDamaged.cs" />
-    <Compile Include="Services\Agents\Messages\WeaponPickedup.cs" />
-    <Compile Include="Services\Agents\Messages\WeaponDropped.cs" />
-    <Compile Include="ContainerProvider.cs" />
-    <Compile Include="MissionModule.cs" />
-    <Compile Include="Services\Agents\Packets\MovementPacket.cs" />
-    <Compile Include="Services\Agents\Patches\AgentDropPatch.cs" />
-    <Compile Include="Services\Agents\Patches\AgentPickupPatch.cs" />
-    <Compile Include="Services\Agents\Patches\AgentShieldDamagePatch.cs" />
-    <Compile Include="Services\Arena\Patches\DisableMainAgentCheerBarkMultiplayer.cs" />
-    <Compile Include="Services\Arena\Patches\WarPartyComponentFix.cs" />
-    <Compile Include="Services\Exceptions\ExceptionLogger.cs" />
-    <Compile Include="Services\Battles\BattlesTestGameManager.cs" />
-    <Compile Include="Services\Battles\CoopBattlesController.cs" />
-    <Compile Include="Services\Missiles\Handlers\MissileHandler.cs" />
-    <Compile Include="Services\Missiles\Message\PeerMissileAdded.cs" />
-    <Compile Include="Services\Missiles\Message\NetworkAgentShoot.cs" />
-    <Compile Include="Services\Missiles\Message\AgentShoot.cs" />
-    <Compile Include="Services\Agents\Messages\AgentDamaged.cs" />
-    <Compile Include="Services\Agents\Messages\NetworkDamageAgent.cs" />
-    <Compile Include="Services\Agents\Messages\AgentDied.cs" />
-    <Compile Include="Services\Agents\Patches\AgentDamagePatch.cs" />
-    <Compile Include="Services\Agents\Patches\AgentKilledPatch.cs" />
-    <Compile Include="Services\Arena\ArenaTestGameManager.cs" />
-    <Compile Include="Services\Arena\RandomEquipmentGenerator.cs" />
-    <Compile Include="Services\Missiles\NetworkMissileRegistry.cs" />
-    <Compile Include="Services\Missiles\Patches\MissileAuxPatches.cs" />
-    <Compile Include="Services\Network\EventQueueManager.cs" />
-    <Compile Include="Services\Network\IP2PClient.cs" />
-    <Compile Include="Services\Network\Messages\PeerReady.cs" />
-    <Compile Include="Services\Network\Data\AiAgentData.cs" />
-    <Compile Include="Services\Network\Messages\ServerDisconnected.cs" />
-    <Compile Include="Services\Network\Handlers\ServerDisconnectHandler.cs" />
-    <Compile Include="Services\Network\Surrogates\EquipmentSurrogate.cs" />
-    <Compile Include="Services\Network\Surrogates\ItemModifierSurrogate.cs" />
-    <Compile Include="Services\Network\Surrogates\ItemObjectSurrogate.cs" />
-    <Compile Include="Services\Network\Surrogates\BannerSurrogate.cs" />
-    <Compile Include="Services\Network\Surrogates\Mat3Surrogate.cs" />
-    <Compile Include="Services\Network\Surrogates\AttackCollisionDataSurrogate.cs" />
-    <Compile Include="Services\Network\Surrogates\BlowSurrogate.cs" />
-    <Compile Include="Services\Network\Surrogates\CharacterObjectSurrogate.cs" />
-    <Compile Include="Services\RobustnessPatches.cs" />
-    <Compile Include="View\MissionsLoadUI.cs" />
-    <Compile Include="Services\BoardGames\Messages\BoardGameMoveMessage.cs" />
-    <Compile Include="Services\BoardGames\Messages\OnSetPawnCapturedMessage.cs" />
-    <Compile Include="Services\BoardGames\Messages\OnHandlePreMovementStageMessage.cs" />
-    <Compile Include="Services\BoardGames\Messages\OnForfeitMessage.cs" />
-    <Compile Include="Services\BoardGames\Messages\PreplaceUnitsSeegaMessage.cs" />
-    <Compile Include="Services\BoardGames\Messages\StopConvoAfterGameMessage.cs" />
-    <Compile Include="Services\Agents\Messages\AgentInteraction.cs" />
-    <Compile Include="Services\Agents\Messages\AgentDeleted.cs" />
-    <Compile Include="Services\BoardGames\BoardGameLogic.cs" />
-    <Compile Include="Services\BoardGames\BoardGameManager.cs" />
-    <Compile Include="Services\Agents\Extensions\AgentExtensions.cs" />
-    <Compile Include="IMissionGameManager.cs" />
-    <Compile Include="Services\Arena\CoopArenaController.cs" />
-    <Compile Include="Services\BoardGames\Messages\BoardGameChallengeRequest.cs" />
-    <Compile Include="Services\BoardGames\Messages\BoardGameChallengeResponse.cs" />
-    <Compile Include="Services\BoardGames\Messages\BoardGameMoveRequest.cs" />
-    <Compile Include="Services\BoardGames\Messages\ForfeitGameMessage.cs" />
-    <Compile Include="Services\BoardGames\Messages\PawnCapturedMessage.cs" />
-    <Compile Include="Services\Network\Messages\NetworkMissionJoinInfo.cs" />
-    <Compile Include="Services\Network\Messages\PeerConnected.cs" />
-    <Compile Include="Services\Network\Messages\PeerDisconnected.cs" />
-    <Compile Include="Services\Network\MissionNetworkBehavior.cs" />
-    <Compile Include="Services\Network\Enums\EDisconnectReason.cs" />
-    <Compile Include="Services\Network\LiteNetP2PClient.cs" />
-    <Compile Include="Services\Network\NetworkAgentRegistry.cs" />
-    <Compile Include="Services\Agents\Packets\AgentActionData.cs" />
-    <Compile Include="Services\Agents\Packets\AgentData.cs" />
-    <Compile Include="Services\Agents\Packets\AgentEquipmentData.cs" />
-    <Compile Include="Services\Agents\Packets\AgentGroupController.cs" />
-    <Compile Include="Services\Agents\Packets\AgentMountData.cs" />
-    <Compile Include="Services\Agents\Handlers\AgentMovementHandler.cs" />
-    <Compile Include="Services\Agents\Patches\AgentInteractionPatches.cs" />
-    <Compile Include="Services\BoardGames\Patches\BoardGamePatches.cs" />
-    <Compile Include="Services\Pausing\Patches\PausePatch.cs" />
-    <Compile Include="PlayerId.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Services\Network\Surrogates\Vec2Surrogate.cs" />
-    <Compile Include="Services\Network\Surrogates\Vec3Surrogate.cs" />
-    <Compile Include="Services\Taverns\CoopTavernsController.cs" />
-    <Compile Include="Services\Taverns\TavernsGameManager.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="app.config" />
-    <None Include="packages.config" />
+    <PackageReference Include="Autofac" Version="8.2.0" />
+    <PackageReference Include="Krafs.Publicizer" Version="2.3.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Lib.Harmony" Version="2.4.2" />
+    <PackageReference Include="LiteNetLib" Version="1.3.1" />
+    <PackageReference Include="protobuf-net" Version="3.2.46" />
+    <PackageReference Include="Serilog" Version="4.2.0" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj">
@@ -281,73 +149,18 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="Services\Network\Packets\" />
-  </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
-    <PropertyGroup>
-      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
-    </PropertyGroup>
-    <Error Condition="!Exists('..\packages\Krafs.Publicizer.2.3.0\build\Krafs.Publicizer.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Krafs.Publicizer.2.3.0\build\Krafs.Publicizer.props'))" />
-    <Error Condition="!Exists('..\packages\Krafs.Publicizer.2.3.0\build\Krafs.Publicizer.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Krafs.Publicizer.2.3.0\build\Krafs.Publicizer.targets'))" />
-  </Target>
-  <Import Project="..\packages\Krafs.Publicizer.2.3.0\build\Krafs.Publicizer.targets" Condition="Exists('..\packages\Krafs.Publicizer.2.3.0\build\Krafs.Publicizer.targets')" />
-  <ItemGroup>
     <Publicize Include="SandBox" />
     <Publicize Include="SandBox.GauntletUI" />
     <Publicize Include="SandBox.View" />
     <Publicize Include="SandBox.ViewModelCollection" />
     <Publicize Include="SandBox.ViewModelCollection.SaveLoad" />
-    <!--<Publicize Include="TaleWorlds.AchievementSystem"/>                   -->
-    <!--<Publicize Include="TaleWorlds.ActivitySystem"/>-->
     <Publicize Include="TaleWorlds.CampaignSystem" />
     <Publicize Include="TaleWorlds.CampaignSystem.ViewModelCollection" />
     <Publicize Include="TaleWorlds.Core" />
-    <!--<Publicize Include="TaleWorlds.Core.ViewModelCollection"/>                                                               -->
-    <!--<Publicize Include="TaleWorlds.Diamond"/>                                                                                -->
-    <!--<Publicize Include="TaleWorlds.Diamond.AccessProvider.Epic"/>                                                            -->
-    <!--<Publicize Include="TaleWorlds.Diamond.AccessProvider.GDK"/>                                                             -->
-    <!--<Publicize Include="TaleWorlds.Diamond.AccessProvider.GOG"/>                                                             -->
-    <!--<Publicize Include="TaleWorlds.Diamond.AccessProvider.Steam"/>                                                           -->
-    <!--<Publicize Include="TaleWorlds.Diamond.AccessProvider.Test"/>                                                            -->
-    <!--<Publicize Include="TaleWorlds.Diamond.ChatSystem.Library"/>                                                             -->
-    <!--<Publicize Include="TaleWorlds.DotNet"/>                                                                                 -->
-    <!--<Publicize Include="TaleWorlds.DotNet.AutoGenerated"/>                                                                   -->
-    <!--<Publicize Include="TaleWorlds.Engine"/>                                                                                 -->
-    <!--<Publicize Include="TaleWorlds.Engine.AutoGenerated"/>                                                                   -->
-    <!--<Publicize Include="TaleWorlds.Engine.GauntletUI"/>                                                                      -->
     <Publicize Include="TaleWorlds.GauntletUI" />
     <Publicize Include="TaleWorlds.GauntletUI.Data" />
-    <!--<Publicize Include="TaleWorlds.GauntletUI.ExtraWidgets"/>                                                                -->
-    <!--<Publicize Include="TaleWorlds.GauntletUI.PrefabSystem"/>                                                                -->
-    <!--<Publicize Include="TaleWorlds.GauntletUI.TooltipExtensions"/>                                                           -->
-    <!--<Publicize Include="TaleWorlds.InputSystem"/>                                                                            -->
-    <!--<Publicize Include="TaleWorlds.Library"/>                                                                                -->
-    <!--<Publicize Include="TaleWorlds.LinQuick"/>                                                                               -->
-    <!--<Publicize Include="TaleWorlds.Localization"/>                                                                           -->
-    <!--<Publicize Include="TaleWorlds.ModuleManager"/>                                                                          -->
     <Publicize Include="TaleWorlds.MountAndBlade" />
-    <!--<Publicize Include="TaleWorlds.MountAndBlade.AutoGenerated"/>                                                            -->
-    <!--<Publicize Include="TaleWorlds.MountAndBlade.Diamond"/>                                                                  -->
-    <!--<Publicize Include="TaleWorlds.MountAndBlade.GauntletUI"/>                                                               -->
-    <!--<Publicize Include="TaleWorlds.MountAndBlade.GauntletUI.Widgets"/>                                                       -->
-    <!--<Publicize Include="TaleWorlds.MountAndBlade.Helpers"/>                                                                  -->
-    <!--<Publicize Include="TaleWorlds.MountAndBlade.Launcher.Library"/>                                                         -->
-    <!--<Publicize Include="TaleWorlds.MountAndBlade.Launcher.Steam"/>                                                           -->
-    <!--<Publicize Include="TaleWorlds.MountAndBlade.View, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64"/>      -->
-    <!--<Publicize Include="TaleWorlds.MountAndBlade.ViewModelCollection"/>                                                      -->
-    <!--<Publicize Include="TaleWorlds.NavigationSystem"/>                                                                       -->
-    <!--<Publicize Include="TaleWorlds.Network"/>                                                                                -->
     <Publicize Include="TaleWorlds.ObjectSystem" />
-    <!--<Publicize Include="TaleWorlds.PlatformService"/>                                                                        -->
-    <!--<Publicize Include="TaleWorlds.PlatformService.Epic"/>                                                                   -->
-    <!--<Publicize Include="TaleWorlds.PlatformService.GOG"/>                                                                    -->
-    <!--<Publicize Include="TaleWorlds.PlatformService.Steam"/>                                                                  -->
-    <!--<Publicize Include="TaleWorlds.PlayerServices"/>                                                                         -->
-    <!--<Publicize Include="TaleWorlds.PSAI"/>                                                                                   -->
     <Publicize Include="TaleWorlds.SaveSystem" />
-    <!--<Publicize Include="TaleWorlds.Starter.Library"/>                                                                        -->
-    <!--<Publicize Include="TaleWorlds.TwoDimension"/>                                                                           -->
-    <!--<Publicize Include="TaleWorlds.TwoDimension.Standalone"/>                                                             -->
   </ItemGroup>
 </Project>

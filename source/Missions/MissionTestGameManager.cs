@@ -3,9 +3,8 @@ using Common.Logging;
 using Common.Messaging;
 using HarmonyLib;
 using IntroServer.Config;
+using GameInterface.Surrogates;
 using Missions.Services.Network;
-using Missions.Services.Network.Surrogates;
-using ProtoBuf.Meta;
 using SandBox;
 using Serilog;
 using System.Collections.Generic;
@@ -28,8 +27,9 @@ namespace Missions
     {
         static MissionTestGameManager()
         {
-            RuntimeTypeModel.Default.SetSurrogate<Vec3, Vec3Surrogate>();
-            RuntimeTypeModel.Default.SetSurrogate<Vec2, Vec2Surrogate>();
+            // Register every ProtoBuf surrogate centrally (this standalone flow does not run
+            // GameInterfaceModule, which AutoActivates the same collection in the live container).
+            new SurrogateCollection();
         }
 
         private static readonly ILogger Logger = LogManager.GetLogger<MissionTestGameManager>();

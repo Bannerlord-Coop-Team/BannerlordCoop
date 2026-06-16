@@ -1,20 +1,20 @@
-﻿using Common.Serialization;
+using Common.Serialization;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using ProtoBuf;
 using TaleWorlds.MountAndBlade;
 
-namespace Missions.Services.Network.Surrogates
+namespace GameInterface.Surrogates
 {
     [ProtoContract(SkipConstructor = true)]
-    public class BlowSurrogate
+    internal class AttackCollisionDataSurrogate
     {
         [ProtoMember(1)]
         public byte[] data { get; }
 
-        public BlowSurrogate(Blow obj)
+        public AttackCollisionDataSurrogate(AttackCollisionData obj)
         {
-            if (obj.Equals(default(Blow))) return;
+            if (obj.Equals(default(AttackCollisionData))) return;
 
             if (ContainerProvider.TryResolve(out IBinaryPackageFactory packageFactory) == false) return;
 
@@ -23,23 +23,23 @@ namespace Missions.Services.Network.Surrogates
             data = BinaryFormatterSerializer.Serialize(package);
         }
 
-        private Blow Deserialize()
+        private AttackCollisionData Deserialize()
         {
             if (data == null) return default;
 
             if (ContainerProvider.TryResolve(out IBinaryPackageFactory packageFactory) == false) return default;
 
-            var package = BinaryFormatterSerializer.Deserialize<BlowBinaryPackage>(data);
+            var package = BinaryFormatterSerializer.Deserialize<AttackCollisionDataBinaryPackage>(data);
 
-            return package.Unpack<Blow>(packageFactory);
+            return package.Unpack<AttackCollisionData>(packageFactory);
         }
 
-        public static implicit operator BlowSurrogate(Blow obj)
+        public static implicit operator AttackCollisionDataSurrogate(AttackCollisionData obj)
         {
-            return new BlowSurrogate(obj);
+            return new AttackCollisionDataSurrogate(obj);
         }
 
-        public static implicit operator Blow(BlowSurrogate surrogate)
+        public static implicit operator AttackCollisionData(AttackCollisionDataSurrogate surrogate)
         {
             return surrogate.Deserialize();
         }

@@ -1,10 +1,6 @@
 ﻿using Autofac;
-using Common.Messaging;
-using Common.Network;
 using Common.PacketHandlers;
-using Common.Serialization;
-using GameInterface;
-using IntroServer.Config;
+using GameInterface.Services.Locations;
 using Missions.Services;
 using Missions.Services.Agents.Handlers;
 using Missions.Services.Arena;
@@ -16,62 +12,50 @@ using Missions.Services.Network;
 using Missions.Services.Network.Handlers;
 using Missions.Services.Taverns;
 
-namespace Missions
+namespace Missions;
+
+public class MissionModule : Module
 {
-    public class MissionModule : Module
+    protected override void Load(ContainerBuilder builder)
     {
-        protected override void Load(ContainerBuilder builder)
-        {
+        builder.RegisterType<ExceptionLogger>().AsSelf().AutoActivate().SingleInstance();
 
-            builder.RegisterModule<GameInterfaceModule>();
+        // TODO create handler collector
+        builder.RegisterType<BattlesTestGameManager>().AsSelf();
+        builder.RegisterType<CoopBattlesController>().AsSelf();
+        builder.RegisterType<ArenaTestGameManager>().AsSelf();
+        builder.RegisterType<TavernsGameManager>().AsSelf();
+        builder.RegisterType<CoopArenaController>().AsSelf();
+        builder.RegisterType<BoardGameManager>().AsSelf();
 
-            builder.RegisterType<ExceptionLogger>().AsSelf().AutoActivate().SingleInstance();
+        // The P2P location behaviors are attached to the interior mission by the OpenIndoorMission
+        // postfix, which resolves them from the shared container as ILocationMissionBehavior (it cannot
+        // reference these Missions types directly). Register the marker alongside AsSelf.
+        builder.RegisterType<CoopTavernsController>().As<ILocationMissionBehavior>().AsSelf();
+        builder.RegisterType<CoopMissionNetworkBehavior>().As<ILocationMissionBehavior>().AsSelf();
 
-            // Non interface classes
-            builder.RegisterType<NetworkConfiguration>().As<INetworkConfiguration>().AsSelf().InstancePerLifetimeScope();
-            builder.RegisterType<ProtoBufSerializer>().As<ICommonSerializer>().InstancePerLifetimeScope();
-            builder.RegisterType<SerializableTypeMapper>().As<ISerializableTypeMapper>().InstancePerLifetimeScope();
+        // Singletons
+        builder.RegisterInstance(NetworkAgentRegistry.Instance)
+            .As<INetworkAgentRegistry>()
+            .SingleInstance();
 
+        // Interface classes. Registered As<IMissionNetwork> (NOT As<INetwork>) so it does not collide
+        // with CoopClient's INetwork registration in the shared client container.
+        builder.RegisterType<LiteNetP2PClient>().As<IMeshNetwork>().AsSelf().InstancePerLifetimeScope();
 
-            // TODO create handler collector
-            builder.RegisterType<BattlesTestGameManager>().AsSelf();
-            builder.RegisterType<CoopBattlesController>().AsSelf();
-            builder.RegisterType<ArenaTestGameManager>().AsSelf();
-            builder.RegisterType<TavernsGameManager>().AsSelf();
-            builder.RegisterType<CoopArenaController>().AsSelf();
-            builder.RegisterType<CoopTavernsController>().AsSelf();
-            builder.RegisterType<BoardGameManager>().AsSelf();
-            builder.RegisterType<CoopMissionNetworkBehavior>().AsSelf();
-            
-            // Singletons
-            builder.RegisterInstance(MessageBroker.Instance)
-                .As<IMessageBroker>()
-                .SingleInstance()
-                .PropertiesAutowired(PropertyWiringOptions.AllowCircularDependencies);
+        builder.RegisterType<NetworkMissileRegistry>().As<INetworkMissileRegistry>();
 
+        builder.RegisterType<RandomEquipmentGenerator>().As<IRandomEquipmentGenerator>();
+        builder.RegisterType<EventQueueManager>().As<IMessagePacketHandler>();
+        builder.RegisterType<AgentMovementHandler>().As<IAgentMovementHandler>();
+        builder.RegisterType<MissileHandler>().As<IMissileHandler>();
+        builder.RegisterType<WeaponPickupHandler>().As<IWeaponPickupHandler>();
+        builder.RegisterType<WeaponDropHandler>().As<IWeaponDropHandler>();
+        builder.RegisterType<ShieldDamageHandler>().As<IShieldDamageHandler>();
+        builder.RegisterType<AgentDamageHandler>().As<IAgentDamageHandler>();
+        builder.RegisterType<AgentDeathHandler>().As<IAgentDeathHandler>();
+        builder.RegisterType<ServerDisconnectHandler>().As<IServerDisconnectHandler>();
 
-            builder.RegisterInstance(NetworkAgentRegistry.Instance)
-                .As<INetworkAgentRegistry>()
-                .SingleInstance();
-
-            // Interface classes
-            builder.RegisterType<LiteNetP2PClient>().As<IP2PClient>().As<INetwork>().AsSelf().InstancePerLifetimeScope();
-
-            builder.RegisterType<NetworkMissileRegistry>().As<INetworkMissileRegistry>();
-
-            builder.RegisterType<RandomEquipmentGenerator>().As<IRandomEquipmentGenerator>();
-            builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
-            builder.RegisterType<EventQueueManager>().As<IMessagePacketHandler>().InstancePerLifetimeScope();
-            builder.RegisterType<AgentMovementHandler>().As<IAgentMovementHandler>().InstancePerLifetimeScope();
-            builder.RegisterType<MissileHandler>().As<IMissileHandler>().InstancePerLifetimeScope();
-            builder.RegisterType<WeaponPickupHandler>().As<IWeaponPickupHandler>().InstancePerLifetimeScope();
-            builder.RegisterType<WeaponDropHandler>().As<IWeaponDropHandler>().InstancePerLifetimeScope();
-            builder.RegisterType<ShieldDamageHandler>().As<IShieldDamageHandler>().InstancePerLifetimeScope();
-            builder.RegisterType<AgentDamageHandler>().As<IAgentDamageHandler>().InstancePerLifetimeScope();
-            builder.RegisterType<AgentDeathHandler>().As<IAgentDeathHandler>().InstancePerLifetimeScope();
-            builder.RegisterType<ServerDisconnectHandler>().As<IServerDisconnectHandler>().InstancePerLifetimeScope();
-
-            base.Load(builder);
-        }
+        base.Load(builder);
     }
 }

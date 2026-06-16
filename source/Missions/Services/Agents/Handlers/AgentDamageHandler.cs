@@ -33,13 +33,13 @@ namespace Missions.Services.Agents.Handlers
         private readonly static ILogger Logger = LogManager.GetLogger<AgentDamageHandler>();
 
         private readonly INetworkAgentRegistry networkAgentRegistry;
-        private readonly INetwork network;
+        private readonly IMeshNetwork network;
         private readonly IMessageBroker messageBroker;
         private readonly INetworkMissileRegistry networkMissileRegistry;
 
         public AgentDamageHandler(
             INetworkAgentRegistry networkAgentRegistry,
-            INetwork network,
+            IMeshNetwork network,
             IMessageBroker messageBroker,
             INetworkMissileRegistry networkMissileRegistry) 
         {
@@ -69,12 +69,12 @@ namespace Missions.Services.Agents.Handlers
         {
 
             // first, check if the attacker exists in the agent to ID groud, if not, no networking is needed (not a network agent)
-            if (networkAgentRegistry.TryGetAgentId(payload.What.AttackerAgent, out Guid attackerId) == false) return;
+            if (networkAgentRegistry.TryGetAgentId(payload.What.AttackerAgent, out string attackerId) == false) return;
 
             // next, check if the attacker is one of ours, if not, no networking is needed (not our agent dealing damage)
             if (networkAgentRegistry.IsControlled(attackerId) == false) return;
 
-            if (networkAgentRegistry.TryGetAgentId(payload.What.VictimAgent, out Guid victimId) == false)
+            if (networkAgentRegistry.TryGetAgentId(payload.What.VictimAgent, out string victimId) == false)
             {
                 Logger.Warning("Unable to get id for {agent} in {class}", payload.What.VictimAgent, typeof(AgentDamageHandler));
                 return;
