@@ -4,6 +4,7 @@ using Common.Network;
 using Common.PacketHandlers;
 using Common.Serialization;
 using GameInterface;
+using GameInterface.Services.Locations;
 using IntroServer.Config;
 using Missions.Services;
 using Missions.Services.Agents.Handlers;
@@ -22,16 +23,19 @@ namespace Missions
     {
         protected override void Load(ContainerBuilder builder)
         {
-
-            builder.RegisterModule<GameInterfaceModule>();
+            // NOTE: This module is composed INTO the Coop.Core client container (see
+            // CoopartiveMultiplayerExperience.StartAsClient). It deliberately does NOT register
+            // GameInterfaceModule, the serializer, type mapper, packet manager, or the message broker —
+            // those are already provided by ClientModule/CommonModule + GameInterfaceModule in that
+            // container. Registering them here would double-register and make INetwork ambiguous
+            // (LiteNetP2PClient vs CoopClient), so Missions resolves them from the shared container and
+            // only registers Missions-specific services below.
 
             builder.RegisterType<ExceptionLogger>().AsSelf().AutoActivate().SingleInstance();
 
-            // Non interface classes
-            builder.RegisterType<NetworkConfiguration>().As<INetworkConfiguration>().AsSelf().InstancePerLifetimeScope();
-            builder.RegisterType<ProtoBufSerializer>().As<ICommonSerializer>().InstancePerLifetimeScope();
-            builder.RegisterType<SerializableTypeMapper>().As<ISerializableTypeMapper>().InstancePerLifetimeScope();
-
+            // Concrete NetworkConfiguration only (the P2P client ctor + rendezvous use it). INetworkConfiguration
+            // resolves to the campaign config in the shared container — do NOT register it As<INetworkConfiguration>.
+            builder.RegisterType<NetworkConfiguration>().AsSelf().InstancePerLifetimeScope();
 
             // TODO create handler collector
             builder.RegisterType<BattlesTestGameManager>().AsSelf();
@@ -39,28 +43,26 @@ namespace Missions
             builder.RegisterType<ArenaTestGameManager>().AsSelf();
             builder.RegisterType<TavernsGameManager>().AsSelf();
             builder.RegisterType<CoopArenaController>().AsSelf();
-            builder.RegisterType<CoopTavernsController>().AsSelf();
             builder.RegisterType<BoardGameManager>().AsSelf();
-            builder.RegisterType<CoopMissionNetworkBehavior>().AsSelf();
-            
+
+            // The P2P location behaviors are attached to the interior mission by the OpenIndoorMission
+            // postfix, which resolves them from the shared container as ILocationMissionBehavior (it cannot
+            // reference these Missions types directly). Register the marker alongside AsSelf.
+            builder.RegisterType<CoopTavernsController>().As<ILocationMissionBehavior>().AsSelf();
+            builder.RegisterType<CoopMissionNetworkBehavior>().As<ILocationMissionBehavior>().AsSelf();
+
             // Singletons
-            builder.RegisterInstance(MessageBroker.Instance)
-                .As<IMessageBroker>()
-                .SingleInstance()
-                .PropertiesAutowired(PropertyWiringOptions.AllowCircularDependencies);
-
-
             builder.RegisterInstance(NetworkAgentRegistry.Instance)
                 .As<INetworkAgentRegistry>()
                 .SingleInstance();
 
-            // Interface classes
-            builder.RegisterType<LiteNetP2PClient>().As<IMissionNetwork>().As<INetwork>().AsSelf().InstancePerLifetimeScope();
+            // Interface classes. Registered As<IMissionNetwork> (NOT As<INetwork>) so it does not collide
+            // with CoopClient's INetwork registration in the shared client container.
+            builder.RegisterType<LiteNetP2PClient>().As<IMissionNetwork>().AsSelf().InstancePerLifetimeScope();
 
             builder.RegisterType<NetworkMissileRegistry>().As<INetworkMissileRegistry>();
 
             builder.RegisterType<RandomEquipmentGenerator>().As<IRandomEquipmentGenerator>();
-            builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
             builder.RegisterType<EventQueueManager>().As<IMessagePacketHandler>().InstancePerLifetimeScope();
             builder.RegisterType<AgentMovementHandler>().As<IAgentMovementHandler>().InstancePerLifetimeScope();
             builder.RegisterType<MissileHandler>().As<IMissileHandler>().InstancePerLifetimeScope();

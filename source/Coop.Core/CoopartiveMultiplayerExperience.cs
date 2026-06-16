@@ -11,6 +11,8 @@ using GameInterface;
 using GameInterface.DynamicSync;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.UI.Messages;
+using Missions;
+using Missions.Services.Network;
 using System;
 
 namespace Coop.Core
@@ -111,6 +113,7 @@ namespace Coop.Core
             builder.RegisterModule<ClientModule>();
             builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance().ExternallyOwned();
             builder.RegisterModule<GameInterfaceModule>();
+            builder.RegisterModule<MissionModule>();
 
             if (configuration != null)
             {

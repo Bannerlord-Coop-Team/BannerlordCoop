@@ -28,22 +28,28 @@ namespace Missions.Services.Network
     {
         private static readonly ILogger Logger = LogManager.GetLogger<LiteNetP2PClient>();
         public int ConnectedPeersCount => netManager.ConnectedPeersCount;
-
-        public NetPeer PeerServer { get; private set; }
         public int Priority => 2;
 
-        public IPacketManager PacketManager { get; private set; }
-        public INetworkConfiguration Configuration { get; }
+        /// <summary>
+        /// The connection to the rendezvous/relay server, when one is opened via
+        /// <see cref="ConnectToP2PServer"/>. Null in the pure NAT-punch flow (the live co-host path), where
+        /// every connected peer is a genuine punched-through client. Kept so the eventual relay fallback can
+        /// route traffic through the server when a direct punch fails, and so the server's own
+        /// connect/disconnect can be told apart from a peer's (see <see cref="OnPeerDisconnected"/>).
+        /// </summary>
+        public NetPeer PeerServer { get; private set; }
 
-        private string instance;
+        private readonly IPacketManager packetManager;
 
         private readonly NetManager netManager;
-        private readonly NetworkConfiguration networkConfig;
+        private readonly NetworkConfiguration config;
         private readonly ICommonSerializer serializer;
-        private readonly Version version = typeof(MissionTestServer).Assembly.GetName().Version;
         private readonly IMessageBroker messageBroker;
         private readonly IControllerIdProvider controllerIdProvider;
         private readonly Poller poller;
+        private readonly Version version = typeof(MissionTestServer).Assembly.GetName().Version;
+
+        private string instanceId = null;
 
         /// <summary>
         /// This client's network identity. It is the campaign <see cref="IControllerIdProvider.ControllerId"/>
@@ -63,6 +69,8 @@ namespace Missions.Services.Network
             }
         }
 
+        public INetworkConfiguration Configuration => throw new NotImplementedException();
+
         public LiteNetP2PClient(
             NetworkConfiguration config,
             ICommonSerializer serializer,
@@ -70,8 +78,8 @@ namespace Missions.Services.Network
             IPacketManager packetManager,
             IControllerIdProvider controllerIdProvider)
         {
-            PacketManager = packetManager;
-            networkConfig = config;
+            this.packetManager = packetManager;
+            this.config = config;
             this.serializer = serializer;
             this.messageBroker = messageBroker;
             this.controllerIdProvider = controllerIdProvider;
@@ -79,9 +87,9 @@ namespace Missions.Services.Network
             netManager = new NetManager(this)
             {
                 NatPunchEnabled = true,
-                //DisconnectTimeout = config.DisconnectTimeout.Milliseconds,
-                //PingInterval = config.PingInterval.Milliseconds,
-                //ReconnectDelay = config.ReconnectDelay.Milliseconds,
+                DisconnectTimeout = (int)config.DisconnectTimeout.TotalMilliseconds,
+                PingInterval = (int)config.PingInterval.TotalMilliseconds,
+                ReconnectDelay = (int)config.ReconnectDelay.TotalMilliseconds,
             };
 
             poller = new Poller(Update, TimeSpan.FromMilliseconds(1000 / 120));
@@ -102,7 +110,7 @@ namespace Missions.Services.Network
         {
             if (netManager.IsRunning == false)
             {
-                Logger.Debug("Starting Client");
+                Logger.Debug("Starting P2P Client");
                 netManager.Start();
                 poller.Start();
             }
@@ -110,9 +118,9 @@ namespace Missions.Services.Network
 
         public void Stop()
         {
-            Logger.Debug("Stopping Client");
+            Logger.Debug("Stopping P2P Client");
+            DisconnectPeers();
             poller.Stop();
-            netManager.DisconnectAll();
             netManager.Stop();
         }
 
@@ -124,9 +132,14 @@ namespace Missions.Services.Network
         public void DisconnectPeers()
         {
             Logger.Debug("Disconnecting P2P peers (keeping socket alive)");
+            // Nudge the logic thread to flush queued reliable sends (e.g. the LeaveMission just broadcast
+            // on OnEndMission) before we drop the connections — DisconnectAll would otherwise cut them
+            // off. Best-effort: the disconnect/timeout path is the guaranteed fallback if a leave still
+            // races the disconnect.
+            netManager.TriggerUpdate();
             netManager.DisconnectAll();
-            // Reset the punch latch so the next instance is punched and stragglers from this one are rejected.
-            instance = null;
+
+            instanceId = null;
         }
 
         public void Update(TimeSpan frameTime)
@@ -135,6 +148,18 @@ namespace Missions.Services.Network
             netManager.NatPunchModule.PollEvents();
         }
 
+        /// <summary>
+        /// Point the NAT-punch rendezvous (and relay target) at a specific server — typically the campaign
+        /// server CoopClient is already connected to — instead of the compiled-in defaults.
+        /// </summary>
+        public void SetRendezvous(string address, int port) => config.SetRendezvous(address, port);
+
+        /// <summary>
+        /// Opens a direct connection to the rendezvous/relay server (tracked as <see cref="PeerServer"/>).
+        /// NOT used by the live co-host flow, which relies on pure NAT punch — this is the entry point for
+        /// the eventual relay fallback (route packets through the server when a direct punch fails). Blocks
+        /// up to one second for the handshake; returns whether it completed in time.
+        /// </summary>
         public bool ConnectToP2PServer()
         {
             Start();
@@ -142,15 +167,15 @@ namespace Missions.Services.Network
             Logger.Information("Connecting to P2P Server");
             string connectionAddress;
             int port;
-            if (networkConfig.NATType == NatAddressType.Internal)
+            if (config.NATType == NatAddressType.Internal)
             {
-                connectionAddress = networkConfig.LanAddress.ToString();
-                port = networkConfig.LanPort;
+                connectionAddress = config.LanAddress.ToString();
+                port = config.LanPort;
             }
             else
             {
-                connectionAddress = networkConfig.WanAddress.ToString();
-                port = networkConfig.WanPort;
+                connectionAddress = config.WanAddress.ToString();
+                port = config.WanPort;
             }
 
             Logger.Information($"Connecting to {connectionAddress}:{port}");
@@ -176,34 +201,21 @@ namespace Missions.Services.Network
             }
         }
 
-        public void NatPunch(string instance)
-        {
-            // Idempotent: the live bridge and CoopMissionNetworkBehavior.OnRenderingStarted can both
-            // request a punch for the same instance. Re-introducing duplicates the P2P connection (and
-            // thus the spawned agent), so punch each instance only once.
-            if (instance == this.instance)
-            {
-                Logger.Debug("Already punched for instance {instance}; skipping duplicate", instance);
-                return;
-            }
-
-            this.instance = instance;
-            TryPunch(instance);
-        }
-
-        private void TryPunch(string instance)
+        public void ConnectToInstance(string instanceId)
         {
             Logger.Verbose("Attempting NAT Punch");
 
-            ConnectionToken token = new ConnectionToken(ControllerId, instance, networkConfig.NATType);
-            if (networkConfig.NATType == NatAddressType.Internal)
+            ConnectionToken token = new ConnectionToken(ControllerId, instanceId, config.NATType);
+            if (config.NATType == NatAddressType.Internal)
             {
-                netManager.NatPunchModule.SendNatIntroduceRequest(networkConfig.LanAddress.ToString(), networkConfig.LanPort, token);
+                netManager.NatPunchModule.SendNatIntroduceRequest(config.LanAddress.ToString(), config.LanPort, token);
             }
-            else if (networkConfig.NATType == NatAddressType.External)
+            else if (config.NATType == NatAddressType.External)
             {
-                netManager.NatPunchModule.SendNatIntroduceRequest(networkConfig.WanAddress.ToString(), networkConfig.WanPort, token);
+                netManager.NatPunchModule.SendNatIntroduceRequest(config.WanAddress.ToString(), config.WanPort, token);
             }
+
+            this.instanceId = instanceId;
         }
 
         public void Send(NetPeer netPeer, IPacket packet)
@@ -257,8 +269,8 @@ namespace Missions.Services.Network
 
         public void OnPeerConnected(NetPeer peer)
         {
-            // peer != PeerServer covers both modes: when connected to a rendezvous server PeerServer is
-            // that connection (excluded here); when co-hosting via pure NAT punch PeerServer is null, so
+            // peer != PeerServer covers both modes: when connected to a rendezvous/relay server PeerServer
+            // is that connection (excluded here); when co-hosting via pure NAT punch PeerServer is null, so
             // every connected peer is a genuine punched-through P2P peer.
             if (peer != PeerServer)
             {
@@ -271,11 +283,19 @@ namespace Missions.Services.Network
             // a direct client-to-client link, not server-relayed.
             Logger.Information("[LocationSync] P2P link established: remote(other client)={Remote} | myP2PPort={LocalPort} | rendezvous(server)={Server}:{ServerPort}. " +
                 "remote != rendezvous => DIRECT P2P (not server-relayed).",
-                peer, netManager.LocalPort, networkConfig.LanAddress, networkConfig.LanPort);
+                peer, netManager.LocalPort, config.LanAddress, config.LanPort);
         }
 
         public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
         {
+            // Reason distinguishes a real graceful leave (RemoteConnectionClose) from a transient
+            // timeout/NAT drop (Timeout/ConnectionFailed). A one-sided timeout is the suspected rejoin
+            // failure: we drop the peer but it never saw us drop, so it never re-announces its join info.
+            Logger.Information("[LocationSync] OnPeerDisconnected from {peer}: reason={Reason}, socketError={SocketError}",
+                peer, disconnectInfo.Reason, disconnectInfo.SocketErrorCode);
+
+            // A relay-server drop is a different event than a P2P peer leaving. PeerServer is null in the
+            // pure NAT-punch flow, so this always takes the peer branch there.
             if (PeerServer != peer)
             {
                 var peerDisconnectedEvent = new PeerDisconnected(peer, disconnectInfo);
@@ -286,8 +306,6 @@ namespace Missions.Services.Network
                 ServerDisconnected serverDisconnected = new ServerDisconnected(disconnectInfo);
                 messageBroker.Publish(this, serverDisconnected);
             }
-
-            Logger.Verbose("{LocalPort} received disconnected from {peer}", netManager.LocalPort, peer);
         }
 
         public void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
@@ -311,7 +329,7 @@ namespace Missions.Services.Network
 
             if (ConnectionToken.TryParse(token, out var connectionToken) == false) return;
 
-            if (instance == connectionToken.InstanceName)
+            if (instanceId == connectionToken.InstanceId)
             {
                 request.Accept();
             }
@@ -342,7 +360,7 @@ namespace Missions.Services.Network
         {
             var packet = serializer.Deserialize<IPacket>(reader.GetRemainingBytes());
 
-            PacketManager.HandleReceive(peer, packet);
+            packetManager.HandleReceive(peer, packet);
         }
     }
 }

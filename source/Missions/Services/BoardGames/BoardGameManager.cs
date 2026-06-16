@@ -58,8 +58,8 @@ namespace Missions.Services.BoardGames
 
         private void SendGameRequest(Agent sender, Agent other)
         {
-            if (_agentRegistry.TryGetAgentId(sender, out Guid senderGuid) &&
-                _agentRegistry.TryGetAgentId(other, out Guid otherGuid))
+            if (_agentRegistry.TryGetAgentId(sender, out string senderGuid) &&
+                _agentRegistry.TryGetAgentId(other, out string otherGuid))
             {
                 _agentRegistry.TryGetExternalController(other, out NetPeer otherPeer);
                 BoardGameChallengeRequest request = new BoardGameChallengeRequest(senderGuid, otherGuid);
@@ -75,8 +75,8 @@ namespace Missions.Services.BoardGames
 
         private void Handle_ChallengeRequest(MessagePayload<BoardGameChallengeRequest> payload)
         {
-            Guid sender = payload.What.TargetPlayer;
-            Guid other = payload.What.RequestingPlayer;
+            string sender = payload.What.TargetPlayer;
+            string other = payload.What.RequestingPlayer;
             NetPeer netPeer = payload.Who as NetPeer ?? throw new InvalidCastException("Payload 'Who' was not of type NetPeer");
 
             if (_agentRegistry.TryGetAgent(sender, out Agent agent) == false) return;
@@ -94,7 +94,7 @@ namespace Missions.Services.BoardGames
             }
         }
 
-        private void AcceptGameRequest(Guid sender, Guid other, NetPeer netPeer)
+        private void AcceptGameRequest(string sender, string other, NetPeer netPeer)
         {
             Guid gameId = Guid.NewGuid();
 
@@ -108,7 +108,7 @@ namespace Missions.Services.BoardGames
             }
         }
 
-        private void DenyGameRequest(Guid sender, Guid other, NetPeer netPeer)
+        private void DenyGameRequest(string sender, string other, NetPeer netPeer)
         {
             //BoardGameChallengeResponse response = new BoardGameChallengeResponse(sender, other, false, Guid.Empty);
             //network.Send(netPeer, response);

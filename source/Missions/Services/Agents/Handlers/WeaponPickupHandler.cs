@@ -62,7 +62,7 @@ namespace Missions.Services.Agents.Handlers
 
             if (networkAgentRegistry.IsControlled(payload.Agent) == false) return;
 
-            if(networkAgentRegistry.TryGetAgentId(payload.Agent, out Guid agentId) == false)
+            if(networkAgentRegistry.TryGetAgentId(payload.Agent, out string agentId) == false)
             {
                 Logger.Warning("No agentID was found for the Agent: {agent} in {class}", payload.Agent, typeof(WeaponPickupHandler));
                 return;

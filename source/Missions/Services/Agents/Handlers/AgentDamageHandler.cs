@@ -69,12 +69,12 @@ namespace Missions.Services.Agents.Handlers
         {
 
             // first, check if the attacker exists in the agent to ID groud, if not, no networking is needed (not a network agent)
-            if (networkAgentRegistry.TryGetAgentId(payload.What.AttackerAgent, out Guid attackerId) == false) return;
+            if (networkAgentRegistry.TryGetAgentId(payload.What.AttackerAgent, out string attackerId) == false) return;
 
             // next, check if the attacker is one of ours, if not, no networking is needed (not our agent dealing damage)
             if (networkAgentRegistry.IsControlled(attackerId) == false) return;
 
-            if (networkAgentRegistry.TryGetAgentId(payload.What.VictimAgent, out Guid victimId) == false)
+            if (networkAgentRegistry.TryGetAgentId(payload.What.VictimAgent, out string victimId) == false)
             {
                 Logger.Warning("Unable to get id for {agent} in {class}", payload.What.VictimAgent, typeof(AgentDamageHandler));
                 return;

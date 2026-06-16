@@ -53,7 +53,7 @@ namespace Missions.Services.Agents.Handlers
         {
             if (networkAgentRegistry.IsControlled(obj.What.Agent) == false) return;
             
-            if(networkAgentRegistry.TryGetAgentId(obj.What.Agent, out Guid agentId) == false)
+            if(networkAgentRegistry.TryGetAgentId(obj.What.Agent, out string agentId) == false)
             {
                 Logger.Warning("No agentID was found for the Agent: {agent} in {class}", obj.What.Agent, typeof(WeaponDropHandler));
                 return;
@@ -66,9 +66,9 @@ namespace Missions.Services.Agents.Handlers
 
         private void WeaponDropReceive(MessagePayload<NetworkWeaponDropped> obj)
         { 
-            if(networkAgentRegistry.TryGetAgent(obj.What.AgentGuid, out Agent agent) == false)
+            if(networkAgentRegistry.TryGetAgent(obj.What.AgentId, out Agent agent) == false)
             {
-                Logger.Warning("No agent found for {guid} in {class}", obj.What.AgentGuid, typeof(WeaponDropHandler));
+                Logger.Warning("No agent found for {guid} in {class}", obj.What.AgentId, typeof(WeaponDropHandler));
                 return;
             }
 

@@ -8,6 +8,7 @@ using Common.Serialization;
 using Coop.Core.Common.Network;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
+using Coop.Core.Server.Services.Instances;
 using Coop.Core.Server.Services.Time.Messages;
 using GameInterface.Registry.Messages;
 using GameInterface.Services.Entity;
@@ -46,7 +47,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     // Co-hosted NAT-punch rendezvous for P2P instances (taverns etc.). The server's NetManager
     // already has NatPunchEnabled; the MissionManager answers the introduction requests.
-    private readonly Services.Instances.IMissionManager missionManager;
+    private readonly IMissionManager missionManager;
 
     public CoopServer(
         INetworkConfiguration configuration,
@@ -54,7 +55,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         IPacketManager packetManager,
         IConnectionMessageQueue connectionMessageQueue,
         IControllerIdProvider controllerIdProvider,
-        Services.Instances.IMissionManager missionManager,
+        IMissionManager missionManager,
         ICommonSerializer serializer) : base(configuration, serializer)
     {
         // Dependancy assignment

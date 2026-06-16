@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Serialization;
+using GameInterface.Services.ObjectManager;
 using LiteNetLib;
 using Missions.Services.Agents.Handlers;
 using Missions.Services.Arena;
@@ -34,6 +35,7 @@ namespace Missions.Services
         public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
 
         private readonly IMessageBroker messageBroker;
+        private readonly IObjectManager objectManager;
         private readonly IMissionNetwork network;
         private readonly INetworkAgentRegistry agentRegistry;
         private readonly IRandomEquipmentGenerator equipmentGenerator;
@@ -42,10 +44,11 @@ namespace Missions.Services
 
         private List<MatrixFrame> spawnFrames = new List<MatrixFrame>();
         private CharacterObject[] gameCharacters;
-        private readonly Guid playerId;
+        private readonly string playerId;
 
         public CoopBattlesController(
             IMessageBroker messageBroker,
+            IObjectManager objectManager,
             IMissionNetwork network,
             INetworkAgentRegistry agentRegistry, 
             IRandomEquipmentGenerator equipmentGenerator,
@@ -59,6 +62,7 @@ namespace Missions.Services
             INetworkMissileRegistry networkMissileRegistry)
         {
             this.messageBroker = messageBroker;
+            this.objectManager = objectManager;
             this.network = network;
             this.agentRegistry = agentRegistry;
             this.equipmentGenerator = equipmentGenerator;
@@ -75,7 +79,7 @@ namespace Missions.Services
                 networkMissileRegistry,
             };
 
-            playerId = Guid.NewGuid();
+            playerId = Guid.NewGuid().ToString();
 
             this.messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
             this.messageBroker.Subscribe<PeerConnected>(Handle_PeerConnected);
@@ -118,7 +122,7 @@ namespace Missions.Services
 
             List<AiAgentData> aiAgentDatas = new List<AiAgentData>();
 
-            foreach (Guid agentId in agentRegistry.ControlledAgents.Keys)
+            foreach (string agentId in agentRegistry.ControlledAgents.Keys)
             {
                 Agent agent = agentRegistry.ControlledAgents[agentId];
 
@@ -140,8 +144,11 @@ namespace Missions.Services
             Vec3 position = Agent.Main?.Position ?? default;
             float health = Agent.Main?.Health ?? 0;
 
+            if (!objectManager.TryGetIdWithLogging(CharacterObject.PlayerCharacter, out var characterObjectId))
+                return;
+
             NetworkMissionJoinInfo request = new NetworkMissionJoinInfo(
-                characterObject, 
+                characterObjectId, 
                 isPlayerAlive, 
                 playerId, 
                 position, 
@@ -151,7 +158,7 @@ namespace Missions.Services
             network.Send(peer, request);
             Logger.Information("Sent {AgentType} Join Request for {AgentName}({PlayerID}) to {Peer}",
                 characterObject.IsPlayerCharacter ? "Player" : "Agent",
-                characterObject.Name, request.PlayerId, peer);
+                characterObject.Name, request.ControllerId, peer);
         }
 
         private void Handle_JoinInfo(MessagePayload<NetworkMissionJoinInfo> payload)
@@ -161,14 +168,16 @@ namespace Missions.Services
 
             NetworkMissionJoinInfo joinInfo = payload.What;
 
-            Guid newAgentId = joinInfo.PlayerId;
+            string newAgentId = joinInfo.ControllerId;
             Vec3 startingPos = joinInfo.StartingPosition;
+
+            if (!objectManager.TryGetObjectWithLogging(joinInfo.CharacterObjectId, out CharacterObject characterObject))
+                return;
 
             try
             {
-                Logger.Information("Spawning {EntityType} called {AgentName}({AgentID}) from {Peer} with {ControlledAgentCount} controlled agents",
-                joinInfo.CharacterObject.IsPlayerCharacter ? "Player" : "Agent",
-                joinInfo.CharacterObject.Name,
+                Logger.Information("Spawning Player called {AgentName}({AgentID}) from {Peer} with {ControlledAgentCount} controlled agents",
+                characterObject.Name,
                 newAgentId,
                 netPeer,
                 joinInfo?.AiAgentData?.Length);
@@ -177,11 +186,11 @@ namespace Missions.Services
 
             if (joinInfo.IsPlayerAlive)
             {
-                Agent newAgent = SpawnAgent(startingPos, joinInfo.CharacterObject, true, joinInfo.Equipment);
+                Agent newAgent = SpawnAgent(startingPos, characterObject, true, characterObject.Equipment);
 
                 newAgent.Health = joinInfo.PlayerHealth;
 
-                agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.PlayerId, newAgent);
+                agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.ControllerId, newAgent);
             }
 
             for (int i = 0; i < joinInfo.AiAgentData?.Length; i++)
@@ -245,7 +254,7 @@ namespace Missions.Services
             Agent ai = SpawnAgent(randomElement.origin, gameCharacters[rand.Next(gameCharacters.Length - 1)], false);
 
             agentRegistry.RegisterControlledAgent(playerId, Agent.Main);
-            agentRegistry.RegisterControlledAgent(Guid.NewGuid(), ai);
+            agentRegistry.RegisterControlledAgent(Guid.NewGuid().ToString(), ai);
         }
 
         private static readonly PropertyInfo Hero_BattleEquipment = typeof(Hero).GetProperty("BattleEquipment", BindingFlags.Public | BindingFlags.Instance);

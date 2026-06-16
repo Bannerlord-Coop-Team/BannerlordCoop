@@ -67,7 +67,7 @@ namespace Missions.Services.Missiles.Handlers
 
             NetworkAgentShoot shot = payload.What;
 
-            Agent shooter = agentGroupController.ControlledAgents[shot.AgentGuid];
+            Agent shooter = agentGroupController.ControlledAgents[shot.AgentId];
 
             Logger.Debug("Firing missile with id {id}", shot.MissileIndex);
 
@@ -159,7 +159,7 @@ namespace Missions.Services.Missiles.Handlers
 
             if (networkAgentRegistry.IsControlled(payload.What.Agent))
             {
-                Guid shooterAgentGuid = networkAgentRegistry.AgentToId[payload.What.Agent];
+                string shooterAgentGuid = networkAgentRegistry.AgentToId[payload.What.Agent];
                 MissionWeapon missionWeapon;
 
                 bool singleUse;

@@ -53,16 +53,16 @@ namespace Missions.Services.Agents.Handlers
         private void ShieldDamageSend(MessagePayload<ShieldDamaged> payload)
         {
 
-            if (networkAgentRegistry.TryGetAgentId(payload.What.Agent, out Guid agentId) == false) return;
+            if (networkAgentRegistry.TryGetAgentId(payload.What.Agent, out string agentId) == false) return;
             NetworkShieldDamaged message = new NetworkShieldDamaged(agentId, payload.What.EquipmentIndex, payload.What.InflictedDamage);
             network.SendAll(message);
         }
         private static readonly MethodInfo OnShieldDamaged = typeof(Agent).GetMethod("OnShieldDamaged", BindingFlags.NonPublic | BindingFlags.Instance);
         private void ShieldDamageReceive(MessagePayload<NetworkShieldDamaged> payload)
         {
-            if (networkAgentRegistry.TryGetAgent(payload.What.AgentGuid, out Agent agent) == false)
+            if (networkAgentRegistry.TryGetAgent(payload.What.AgentId, out Agent agent) == false)
             {
-                Logger.Warning("No agent found at {guid} in {class}", payload.What.AgentGuid, typeof(ShieldDamageHandler));
+                Logger.Warning("No agent found at {guid} in {class}", payload.What.AgentId, typeof(ShieldDamageHandler));
                 return;
             }
 

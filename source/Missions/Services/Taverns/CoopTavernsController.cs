@@ -2,10 +2,15 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Common.Network.Instances;
-using Common.Network.Instances.Messages;
+using GameInterface.Services.Entity;
+using GameInterface.Services.Locations;
+using GameInterface.Services.Locations.Messages;
+using GameInterface.Services.ObjectManager;
 using LiteNetLib;
+using Missions.Services.Agents.Handlers;
 using Missions.Services.BoardGames;
+using Missions.Services.Missiles;
+using Missions.Services.Missiles.Handlers;
 using Missions.Services.Network;
 using Missions.Services.Network.Messages;
 using Serilog;
@@ -18,56 +23,85 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Taverns
 {
-    public class CoopTavernsController : MissionBehavior, IDisposable
+    public class CoopTavernsController : MissionBehavior, ILocationMissionBehavior, IDisposable
     {
         private static readonly ILogger Logger = LogManager.GetLogger<CoopArenaController>();
         public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
 
-        private readonly IMissionNetwork network;
-        private readonly IMessageBroker _messageBroker;
-        private readonly INetworkAgentRegistry _agentRegistry;
+        private readonly LiteNetP2PClient network;
+        private readonly IMessageBroker messageBroker;
+        private readonly INetworkAgentRegistry agentRegistry;
+        private readonly IControllerIdProvider controllerIdProvider;
+        private readonly BoardGameManager boardGameManager;
+        private readonly IObjectManager objectManager;
 
-        private readonly BoardGameManager _boardGameManager;
+        // The sync handlers. Held only to force their construction — they are InstancePerLifetimeScope
+        // singletons in the shared client container, so the container owns their lifetime/disposal; this
+        // controller must NOT dispose them or a re-entered tavern would get already-disposed handlers.
+        // Critically, AgentMovementHandler is the one that both broadcasts movement and cleans up a peer's
+        // agents on disconnect/reconnect; without it a leaver's agent is never removed and a rejoining
+        // player is deduped as "already registered".
+        private readonly IDisposable[] handlers;
 
-        // Process-wide, not per-controller: the remote dedupes spawns by this id, so a second controller
-        // (double OpenIndoorMission / duplicate NAT connection) must reuse it or it spawns a phantom.
-        private static readonly Guid LocalPlayerId = Guid.NewGuid();
-
-        private readonly Guid playerId;
+        // The campaign network config — the same INetworkConfiguration CoopClient is connected to. Its
+        // Address/Port are the rendezvous server; the P2P client's own config is pointed at it before
+        // connecting so the NAT punch / relay reaches the co-host instead of compiled-in defaults.
+        private readonly INetworkConfiguration campaignConfiguration;
 
         public CoopTavernsController(
-            IMissionNetwork network,
+            LiteNetP2PClient network,
             IMessageBroker messageBroker,
             INetworkAgentRegistry agentRegistry,
-            BoardGameManager boardGameManager)
+            IControllerIdProvider controllerIdProvider,
+            BoardGameManager boardGameManager,
+            IObjectManager objectManager,
+            INetworkConfiguration campaignConfiguration,
+            IAgentMovementHandler agentMovementHandler,
+            IMissileHandler missileHandler,
+            IWeaponDropHandler weaponDropHandler,
+            IWeaponPickupHandler weaponPickupHandler,
+            IShieldDamageHandler shieldDamageHandler,
+            IAgentDamageHandler agentDamageHandler,
+            IAgentDeathHandler agentDeathHandler,
+            INetworkMissileRegistry networkMissileRegistry)
         {
             this.network = network;
-            _messageBroker = messageBroker;
-            _agentRegistry = agentRegistry;
-            _boardGameManager = boardGameManager;
+            this.messageBroker = messageBroker;
+            this.agentRegistry = agentRegistry;
+            this.controllerIdProvider = controllerIdProvider;
+            this.boardGameManager = boardGameManager;
+            this.objectManager = objectManager;
+            this.campaignConfiguration = campaignConfiguration;
 
-            playerId = LocalPlayerId;
+            handlers = new IDisposable[]
+            {
+                agentMovementHandler,
+                missileHandler,
+                weaponDropHandler,
+                weaponPickupHandler,
+                shieldDamageHandler,
+                agentDamageHandler,
+                agentDeathHandler,
+                networkMissileRegistry,
+            };
 
             messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
+            messageBroker.Subscribe<NetworkLeaveMission>(Handle_LeaveMission);
             messageBroker.Subscribe<PeerConnected>(Handle_PeerConnected);
+            messageBroker.Subscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation);
         }
 
         private bool _localAgentRegistered;
-        private bool _instanceReadyPublished;
+        private bool _instanceRequested;
 
-        public override void AfterStart()
+        public override void OnCreated()
         {
             TryRegisterLocalAgent();
         }
 
-        // When this controller is attached AFTER the mission has already started (the live
-        // location-sync bridge path), AfterStart never fires, so the local agent is never registered
-        // as a controlled agent and AgentMovementHandler never broadcasts its movement (remote players
-        // see it frozen). Retry on tick until Agent.Main exists and is registered.
-        public override void OnMissionTick(float dt)
+        public override void OnRenderingStarted()
         {
-            base.OnMissionTick(dt);
-            if (_localAgentRegistered == false) TryRegisterLocalAgent();
+            TryRegisterLocalAgent();
         }
 
         private void TryRegisterLocalAgent()
@@ -75,34 +109,85 @@ namespace Missions.Services.Taverns
             if (_localAgentRegistered) return;
             if (Agent.Main == null) return;
 
-            if (_agentRegistry.RegisterControlledAgent(playerId, Agent.Main))
+            if (agentRegistry.RegisterControlledAgent(controllerIdProvider.ControllerId, Agent.Main))
             {
                 _localAgentRegistered = true;
-                Logger.Information("[LocationSync] Registered local controlled agent {PlayerID}; broadcasting join info", playerId);
+                Logger.Information("[LocationSync] Registered local controlled agent {PlayerID}; broadcasting join info", controllerIdProvider.ControllerId);
+
+                if (!objectManager.TryGetIdWithLogging(CharacterObject.PlayerCharacter, out var characterObjectId))
+                    return;
 
                 // Announce to peers that connected before this controller was attached/subscribed
                 // (their PeerConnected was missed). Remote side dedupes by the stable player id.
-                network.SendAll(BuildJoinInfo());
+                network.SendAll(BuildJoinInfo(characterObjectId));
             }
+        }
+
+        // The interior mission was opened locally. This controller is attached to the mission by the
+        // OpenIndoorMission postfix BEFORE the event is published, so it is the live, mission-scoped owner
+        // of the P2P connection. The instance id is derived locally from (settlement, location): the
+        // server creates the instance on the first NAT punch, so no separate assignment round-trip is
+        // needed and both co-located clients independently compute the same id.
+        private void Handle_PlayerEnteredLocation(MessagePayload<PlayerEnteredLocation> payload)
+        {
+            // OpenIndoorMission fires several times per entry; connect once per mission.
+            if (_instanceRequested) return;
+
+            var data = payload.What;
+
+            if (data.Settlement == null)
+            {
+                Logger.Warning("[LocationSync] PlayerEnteredLocation with no settlement — skipping instance request");
+                return;
+            }
+
+            if (objectManager.TryGetIdWithLogging(data.Settlement, out var settlementId) == false)
+            {
+                Logger.Warning("[LocationSync] Could not resolve settlement id for '{Settlement}' — skipping instance request", data.Settlement.StringId);
+                return;
+            }
+
+            if (objectManager.TryGetIdWithLogging(data.Location, out var locationId) == false)
+            {
+                Logger.Warning("[LocationSync] Could not resolve location id for '{Location}' — skipping instance request", data.Location.StringId);
+                return;
+            }
+
+            _instanceRequested = true;
+            Logger.Information("[LocationSync] Requesting P2P instance settlement={SettlementId} location={LocationId}", settlementId, locationId);
+
+            // Point the P2P client's rendezvous at the same server CoopClient is connected to, so the NAT
+            // punch reaches the co-host instead of the compiled-in defaults.
+            network.SetRendezvous(campaignConfiguration.Address, campaignConfiguration.Port);
+
+            // Just start the socket — do NOT open a connection to the server. NAT introduction
+            // (SendNatIntroduceRequest below) is an unconnected message, and the co-host CoopServer accepts
+            // any connection as a campaign player, so connecting here would register a phantom peer. The
+            // relay fallback (ConnectToP2PServer) is deferred until the server can distinguish it.
+            network.Start();
+
+            // '|' separator, NOT '%': ConnectionToken serializes as PeerId%InstanceId%NatType and splits
+            // on '%', so a '%' inside the instance id would break token parsing on both ends.
+            network.ConnectToInstance($"{settlementId}|{locationId}");
+            agentRegistry.Clear();
         }
 
         private void Handle_PeerConnected(MessagePayload<PeerConnected> obj)
         {
-            Logger.Information("[LocationSync] P2P peer connected {Peer}; sending join info {PlayerID}", obj.What.Peer, playerId);
+            Logger.Information("[LocationSync] P2P peer connected {Peer}; sending join info {PlayerID}", obj.What.Peer, controllerIdProvider.ControllerId);
             SendJoinInfo(obj.What.Peer);
         }
 
-        private NetworkMissionJoinInfo BuildJoinInfo()
+        private NetworkMissionJoinInfo BuildJoinInfo(string characterObjectId)
         {
-            CharacterObject characterObject = CharacterObject.PlayerCharacter;
             bool isPlayerAlive = Agent.Main != null && Agent.Main.Health > 0;
             Vec3 position = Agent.Main?.Position ?? default;
             float health = Agent.Main?.Health ?? 0;
 
             return new NetworkMissionJoinInfo(
-                characterObject,
+                characterObjectId,
                 isPlayerAlive,
-                playerId,
+                controllerIdProvider.ControllerId,
                 position,
                 health,
                 null);
@@ -112,26 +197,59 @@ namespace Missions.Services.Taverns
         {
             Logger.Debug("Sending join request");
 
-            NetworkMissionJoinInfo request = BuildJoinInfo();
+            if (!objectManager.TryGetIdWithLogging(CharacterObject.PlayerCharacter, out var characterObjectId))
+                return;
+
+            NetworkMissionJoinInfo request = BuildJoinInfo(characterObjectId);
 
             network.Send(peer, request);
-            Logger.Information("Sent Join Request for {PlayerID} to {Peer}", request.PlayerId, peer);
+            Logger.Information("Sent Join Request for {PlayerID} to {Peer}", request.ControllerId, peer);
         }
 
         public void Dispose()
         {
-            _messageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
-            _messageBroker.Unsubscribe<PeerConnected>(Handle_PeerConnected);
+            messageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
+            messageBroker.Unsubscribe<NetworkLeaveMission>(Handle_LeaveMission);
+            messageBroker.Unsubscribe<PeerConnected>(Handle_PeerConnected);
+            messageBroker.Unsubscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation);
         }
 
         public override void OnEndMission()
         {
-            // Left the instance (tavern). Signal the campaign side to reset InstanceContext and tear
-            // down the P2P client. The server releases membership separately via NetworkPlayerCampaignEntered.
-            _messageBroker.Publish(this, new InstanceCleared());
+            // Deliberate leave: tell mesh peers to drop our agent NOW, before we drop the P2P connection.
+            network.SendAll(new NetworkLeaveMission(controllerIdProvider.ControllerId));
+
+            // Drop the peers but keep the socket/poller alive so the next location reuses it without a
+            // fragile Stop/Start (which churns the port and re-enters the Poller). DisconnectPeers flushes
+            // the queued LeaveMission before dropping the connections.
+            network.DisconnectPeers();
 
             base.OnEndMission();
             Dispose();
+        }
+
+        private void Handle_LeaveMission(MessagePayload<NetworkLeaveMission> payload)
+        {
+            string leftAgentId = payload.What.ControllerId;
+
+            // Our own broadcast echoed back by a peer — ignore.
+            if (leftAgentId == controllerIdProvider.ControllerId) return;
+
+            Logger.Information("[LocationSync] Received LeaveMission for {AgentID} — removing remote agent", leftAgentId);
+
+            if (agentRegistry.TryGetAgent(leftAgentId, out Agent agent))
+            {
+                GameLoopRunner.RunOnMainThread(() =>
+                {
+                    if (agent.Health > 0)
+                    {
+                        agent.MakeDead(false, ActionIndexCache.act_none);
+                        agent.FadeOut(false, true);
+                    }
+                });
+            }
+
+            agentRegistry.RemoveNetworkControlledAgent(leftAgentId);
         }
 
         private void Handle_JoinInfo(MessagePayload<NetworkMissionJoinInfo> payload)
@@ -140,13 +258,13 @@ namespace Missions.Services.Taverns
 
             NetworkMissionJoinInfo joinInfo = payload.What;
 
-            Guid newAgentId = joinInfo.PlayerId;
+            string newAgentId = joinInfo.ControllerId;
             Vec3 startingPos = joinInfo.StartingPosition;
 
             Logger.Information("[LocationSync] Received join info for {AgentID} from {Peer} at pos {Pos}", newAgentId, netPeer, startingPos);
 
             // Don't spawn our own broadcast echoed back by a peer.
-            if (newAgentId == playerId)
+            if (newAgentId == controllerIdProvider.ControllerId)
             {
                 Logger.Debug("[LocationSync] Join info {AgentID} is our own id — ignoring", newAgentId);
                 return;
@@ -154,33 +272,32 @@ namespace Missions.Services.Taverns
 
             // Dedupe across all peers: NAT punch can yield more than one connection to the same remote
             // client, delivering its join info multiple times. Only spawn one agent per player id.
-            if (_agentRegistry.IsAgentRegistered(newAgentId))
+            if (agentRegistry.IsAgentRegistered(newAgentId))
             {
-                Logger.Debug("[LocationSync] Agent {AgentID} already registered — skipping duplicate spawn", newAgentId);
+                // On a clean rejoin this should NOT fire — if it does, the leaver's agent was left in the
+                // registry on disconnect (stale collection), which blocks the re-spawn.
+                Logger.Information("[LocationSync] Agent {AgentID} already registered — skipping spawn (expected only for duplicate NAT connections, NOT on rejoin)", newAgentId);
                 return;
             }
 
+            if (!objectManager.TryGetObjectWithLogging(joinInfo.CharacterObjectId, out CharacterObject characterObject))
+                return;
+
             Logger.Information("Spawning {EntityType} called {AgentName}({AgentID}) from {Peer}",
-                joinInfo.CharacterObject?.IsPlayerCharacter == true ? "Player" : "Agent",
-                joinInfo.CharacterObject?.Name?.ToString() ?? "<unresolved>", newAgentId, netPeer);
+                characterObject?.IsPlayerCharacter == true ? "Player" : "Agent",
+                characterObject?.Name?.ToString() ?? "<unresolved>", newAgentId, netPeer);
 
 
-            Agent newAgent = SpawnAgent(startingPos, joinInfo.CharacterObject);
+            Agent newAgent = SpawnAgent(startingPos, characterObject);
+
             if (newAgent == null)
             {
                 Logger.Error("[LocationSync] Failed to spawn remote agent {AgentID} — skipping registration.", newAgentId);
                 return;
             }
-            _agentRegistry.RegisterNetworkControlledAgent(netPeer, newAgentId, newAgent);
+            agentRegistry.RegisterNetworkControlledAgent(netPeer, newAgentId, newAgent);
             Logger.Information("[LocationSync] Spawned + registered remote agent {AgentID} at {Pos} (mission '{Scene}')",
                 newAgentId, newAgent.Position, Mission.Current?.SceneName);
-
-            // First remote player spawned — let the campaign side drop the joiner's loading screen (once).
-            if (_instanceReadyPublished == false)
-            {
-                _instanceReadyPublished = true;
-                _messageBroker.Publish(this, new InstanceReady(InstanceContext.Instance.CurrentInstanceId));
-            }
         }
 
         public Agent SpawnAgent(Vec3 startingPos, CharacterObject character)
@@ -195,24 +312,35 @@ namespace Missions.Services.Taverns
                 Logger.Warning("[LocationSync] Remote CharacterObject '{Name}' looks unresolved (null culture/etc). " +
                     "Falling back to the local player character so an agent still spawns. REPORT THIS.",
                     character?.StringId ?? "<null>");
-                character = CharacterObject.PlayerCharacter;
+                return null;
             }
 
-            var agent = TryBuildAndSpawn(character, startingPos);
-            if (agent != null) return agent;
-
-            // The cheap pre-check can miss other null internals; retry once with the local player char.
-            var local = CharacterObject.PlayerCharacter;
-            if (ReferenceEquals(local, character) == false)
+            try
             {
-                Logger.Warning("[LocationSync] Spawn with the supplied character failed; retrying with the local player character. REPORT THIS.");
-                agent = TryBuildAndSpawn(local, startingPos);
+                AgentBuildData agentBuildData = new AgentBuildData(character);
+                agentBuildData.BodyProperties(character.GetBodyPropertiesMax());
+                agentBuildData.InitialPosition(startingPos);
+                agentBuildData.Team(Mission.Current.PlayerAllyTeam);
+                agentBuildData.InitialDirection(Vec2.Forward);
+                agentBuildData.NoHorses(true);
+                agentBuildData.Equipment(character.FirstCivilianEquipment);
+                agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
+                agentBuildData.Controller(AgentControllerType.None);
+
+                Agent agent = null;
+                GameLoopRunner.RunOnMainThread(() =>
+                {
+                    agent = Mission.Current.SpawnAgent(agentBuildData);
+                    agent.FadeIn();
+                }, true);
+
+                return agent;
             }
-
-            if (agent == null)
-                Logger.Error("[LocationSync] Could not spawn remote agent with either the remote or local character.");
-
-            return agent;
+            catch (Exception ex)
+            {
+                Logger.Warning(ex, "[LocationSync] Build/spawn failed for character '{Name}'", character?.StringId ?? "<null>");
+                return null;
+            }
         }
 
         // Cheap, non-throwing pre-filter for the common "unresolved remote hero" case, so the normal
@@ -230,36 +358,5 @@ namespace Missions.Services.Taverns
             }
         }
 
-        private Agent TryBuildAndSpawn(CharacterObject character, Vec3 startingPos)
-        {
-            if (character == null) return null;
-
-            try
-            {
-                AgentBuildData agentBuildData = new AgentBuildData(character);
-                agentBuildData.BodyProperties(character.GetBodyPropertiesMax());
-                agentBuildData.InitialPosition(startingPos);
-                agentBuildData.Team(Mission.Current.PlayerAllyTeam);
-                agentBuildData.InitialDirection(Vec2.Forward);
-                agentBuildData.NoHorses(true);
-                agentBuildData.Equipment(character.FirstCivilianEquipment);
-                agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
-                agentBuildData.Controller(AgentControllerType.None);
-
-                Agent agent = default;
-                GameLoopRunner.RunOnMainThread(() =>
-                {
-                    agent = Mission.Current.SpawnAgent(agentBuildData);
-                    agent.FadeIn();
-                }, true);
-
-                return agent;
-            }
-            catch (Exception ex)
-            {
-                Logger.Warning(ex, "[LocationSync] Build/spawn failed for character '{Name}'", character?.StringId ?? "<null>");
-                return null;
-            }
-        }
     }
 }

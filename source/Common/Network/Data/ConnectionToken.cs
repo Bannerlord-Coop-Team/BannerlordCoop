@@ -13,7 +13,7 @@ namespace Common.Network.Data
         private static readonly ILogger Logger = LogManager.GetLogger<ConnectionToken>();
 
         public string PeerId { get; }
-        public string InstanceName { get; }
+        public string InstanceId { get; }
         public NatAddressType NatType { get; }
 
         /// <summary>
@@ -36,7 +36,7 @@ namespace Common.Network.Data
             }
 
             PeerId = peerId;
-            InstanceName = instanceName;
+            InstanceId = instanceName;
             NatType = natType;
         }
 
@@ -62,7 +62,7 @@ namespace Common.Network.Data
 
             ConnectionToken token = (ConnectionToken)obj;
 
-            if (token.InstanceName != InstanceName) return false;
+            if (token.InstanceId != InstanceId) return false;
             if (token.NatType != NatType) return false;
             if (token.PeerId != PeerId) return false;
 
@@ -104,7 +104,7 @@ namespace Common.Network.Data
 
         public static implicit operator string(ConnectionToken token)
         {
-            return string.Join("%", token.PeerId, token.InstanceName, token.NatType);
+            return string.Join("%", token.PeerId, token.InstanceId, token.NatType);
         }
     }
 }

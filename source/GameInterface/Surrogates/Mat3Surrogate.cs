@@ -1,23 +1,13 @@
-﻿using GameInterface.Serialization.External;
-using GameInterface.Serialization;
 using ProtoBuf;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using TaleWorlds.Library;
-using Common.Serialization;
-using Autofac.Core;
-using Autofac;
 
-namespace Missions.Services.Network.Surrogates
+namespace GameInterface.Surrogates
 {
     /// <summary>
-    /// Surrogate for the Mat3 Class
+    /// Surrogate for the Mat3 struct.
     /// </summary>
     [ProtoContract(SkipConstructor = true)]
-    public readonly struct Mat3Surrogate
+    internal readonly struct Mat3Surrogate
     {
         [ProtoMember(1)]
         public Vec3 S { get; }

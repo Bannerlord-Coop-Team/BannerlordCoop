@@ -3,19 +3,10 @@ using Common.Messaging;
 using Common.Serialization;
 using GameInterface.Serialization;
 using GameInterface.Services.ObjectManager;
-using Missions;
+using GameInterface.Surrogates;
 using Missions.Services.Agents.Messages;
 using Missions.Services.Network.Data;
 using Missions.Services.Network.Messages;
-using Missions.Services.Network.Surrogates;
-using ProtoBuf;
-using ProtoBuf.Meta;
-using ProtoBuf.Serializers;
-using System.Runtime.Serialization;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.Core;
-using TaleWorlds.Library;
-using TaleWorlds.MountAndBlade;
 
 namespace IntroductionServerTests
 {
@@ -35,40 +26,24 @@ namespace IntroductionServerTests
             builder.RegisterType<GameInterface.Services.ObjectManager.ObjectManager>().As<IObjectManager>().InstancePerLifetimeScope();
             builder.RegisterType<BinaryPackageFactory>().As<IBinaryPackageFactory>().AutoActivate().SingleInstance();
 
-            // The CharacterObject surrogate resolves ids against the campaign (main-map) registry.
+            // The binary-package surrogates (Blow/AttackCollisionData) resolve the factory through this container.
             GameInterface.ContainerProvider.SetContainer(builder.Build());
-        }
 
-        /// <summary>
-        /// Registers a surrogate unless the type is already handled by the (process-wide) default
-        /// runtime model. Mirrors SurrogateCollection.AddSurrogate: once any serializer has been
-        /// generated for a type, protobuf-net freezes it and a repeated SetSurrogate throws.
-        /// </summary>
-        private static void TrySetSurrogate<T, TSurrogate>()
-        {
-            if (RuntimeTypeModel.Default.CanSerialize(typeof(T))) return;
-
-            RuntimeTypeModel.Default.SetSurrogate<T, TSurrogate>();
+            // Register every ProtoBuf surrogate centrally — same collection GameInterfaceModule AutoActivates
+            // in the live container. Idempotent (guarded by CanSerialize), so safe across test instances.
+            new SurrogateCollection();
         }
 
         [Fact]
         public void Serialize_Test()
         {
-            TrySetSurrogate<Vec3, Vec3Surrogate>();
-            TrySetSurrogate<Vec2, Vec2Surrogate>();
-            TrySetSurrogate<CharacterObject, CharacterObjectSurrogate>();
-            TrySetSurrogate<Equipment, EquipmentSurrogate>();
-
-            var character = (CharacterObject)FormatterServices.GetUninitializedObject(typeof(CharacterObject));
-
-            character.StringId = "Test Character";
-
-            // Surrogate now sends the registry id, so the character must be registered to round-trip.
-            GameInterface.ContainerProvider.TryResolve(out IObjectManager objectManager);
-            objectManager.AddExisting(character.StringId, character);
+            // NetworkMissionJoinInfo now carries the character's object-manager id (a plain string),
+            // not the CharacterObject itself — the receiver resolves it via IObjectManager. So this is a
+            // straight string round-trip; no CharacterObject surrogate/registration needed.
+            const string characterObjectId = "Test Character";
 
             NetworkMissionJoinInfo missionJoinInfo = new NetworkMissionJoinInfo(
-                character, 
+                characterObjectId,
                 default,
                 default,
                 default,
@@ -81,19 +56,13 @@ namespace IntroductionServerTests
 
             NetworkMissionJoinInfo newEvent = (NetworkMissionJoinInfo)serializer.Deserialize(bytes);
 
-            Assert.Equal(character.StringId, newEvent.CharacterObject.StringId);
+            Assert.Equal(characterObjectId, newEvent.CharacterObjectId);
         }
 
         [Fact]
         public void Serialize2_Test()
         {
-            TrySetSurrogate<Vec3, Vec3Surrogate>();
-            TrySetSurrogate<Vec2, Vec2Surrogate>();
-            TrySetSurrogate<CharacterObject, CharacterObjectSurrogate>();
-            TrySetSurrogate<AttackCollisionData, AttackCollisionDataSurrogate>();
-            TrySetSurrogate<Blow, BlowSurrogate>();
-
-            var attackerGuid = Guid.NewGuid();
+            var attackerGuid = Guid.NewGuid().ToString();
 
             NetworkDamageAgent missionJoinInfo = new NetworkDamageAgent(attackerGuid, default, default, default);
 
