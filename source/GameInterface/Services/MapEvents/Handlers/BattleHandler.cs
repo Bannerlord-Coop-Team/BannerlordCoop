@@ -339,6 +339,7 @@ internal class BattleHandler : IHandler
         mapEventLogger.DebugMapEvent(mapEvent, "Handling network add involved parties. Party count: {MapEventPartyCount}", message.MapEventPartyIds.Length);
 
         var positions = message.Positions;
+        var partiesToReposition = new List<(MobileParty Party, CampaignVec2 Position)>();
 
         using (new AllowedThread())
         {
@@ -351,17 +352,33 @@ internal class BattleHandler : IHandler
                 mapEventLogger.DebugMapEvent(mapEvent, "Adding involved map event party {MapEventPartyId} to troop upgrade tracker", mapEventPartyId);
                 mapEvent.TroopUpgradeTracker.AddParty(mapEventParty);
 
-                // Snap the party to its server-side map position so it lines up with the
-                // battle. The locally controlled party is left alone since this client is
+                // Collect the party's server-side map position to snap it to the battle.
+                // The locally controlled party is left alone since this client is
                 // authoritative for its own position.
                 var mobileParty = mapEventParty.Party.MobileParty;
                 if (mobileParty != null && !mobileParty.IsControlledByThisInstance() &&
                     positions != null && i < positions.Length)
                 {
-                    mobileParty.Position = positions[i];
+                    partiesToReposition.Add((mobileParty, positions[i]));
                 }
             }
         }
+
+        if (partiesToReposition.Count == 0)
+            return;
+
+        // Apply the position snaps on the main thread so the writes never race the
+        // campaign-map render or the party locator the main tick reads.
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            using (new AllowedThread())
+            {
+                foreach (var (party, position) in partiesToReposition)
+                {
+                    party.Position = position;
+                }
+            }
+        });
     }
 
     private void Handle_PlayerJoinedBattle(MessagePayload<PlayerJoinedBattle> payload)
