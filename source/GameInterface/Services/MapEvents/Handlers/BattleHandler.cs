@@ -14,6 +14,7 @@ using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
@@ -268,14 +269,37 @@ internal class BattleHandler : IHandler
         if (MapEventConfig.Debug)
             mapEventLogger.DebugMapEvent(mapEvent, "Handling network map event finalize attempted. Finalizing map event.");
 
+        // Capture the player parties on both sides before finalize clears them. They get a reliable,
+        // server-addressed close (below) instead of each racing its own local teardown.
+        var playerPartyIds = CollectPlayerPartyIds(mapEvent);
+
         GameLoopRunner.RunOnMainThread(() =>
         {
             mapEvent.FinalizeEventAux();
         }, blocking: true);
-        
+
 
         var message = new NetworkMapEventFinalized();
         network.Send(payload.Who as NetPeer, message);
+
+        // PvP (more than one player party): tell every involved player party to close its encounter menu.
+        if (playerPartyIds.Length > 1)
+            network.SendAll(new NetworkClosePvpEncounter(playerPartyIds));
+    }
+
+    /// <summary>[Server] Ids of the player parties on both sides of the event, captured before finalize clears them.</summary>
+    private string[] CollectPlayerPartyIds(MapEvent mapEvent)
+    {
+        var ids = new List<string>();
+        if (mapEvent?.AttackerSide == null || mapEvent.DefenderSide == null) return ids.ToArray();
+
+        foreach (var party in mapEvent.InvolvedParties)
+        {
+            if (party?.MobileParty?.IsPlayerParty() == true && objectManager.TryGetId(party, out var id))
+                ids.Add(id);
+        }
+
+        return ids.ToArray();
     }
 
     private void Handle_NetworkMapEventFinalized(MessagePayload<NetworkMapEventFinalized> payload)

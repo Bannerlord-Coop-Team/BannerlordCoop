@@ -1,7 +1,9 @@
 ﻿using Common;
+using Common.Messaging;
 using Common.Util;
 using GameInterface.Registry;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using SandBox.GauntletUI.Map;
@@ -32,7 +34,14 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 
     public override IEnumerable<MethodBase> DestroyMethods => new MethodBase[]
     {
-        AccessTools.Method(typeof(MapEvent), nameof(MapEvent.FinishBattle))
+        AccessTools.Method(typeof(MapEvent), nameof(MapEvent.FinishBattle)),
+
+        // Abandoning a not-yet-fought encounter (e.g. the attacker leaves) tears the event down through
+        // FinalizeEvent, not FinishBattle. Track it too so the destroy replicates to every client; otherwise a
+        // party that joined the event (but did not initiate the leave) is left referencing a finalized "ghost"
+        // map event and stays locked in its encounter menu. FinishBattle goes straight to FinalizeEventAux without
+        // calling FinalizeEvent, so normal battle ends still destroy exactly once.
+        AccessTools.Method(typeof(MapEvent), nameof(MapEvent.FinalizeEvent)),
     };
 
     public override void RegisterAllObjects()
@@ -71,6 +80,10 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
     {
         GameLoopRunner.RunOnMainThread(() =>
         {
+            // Captured before FinishBattle clears it; kept for the debug log only — the PvP encounter close is now
+            // driven server-side via NetworkClosePvpEncounter, not from this teardown.
+            bool localPartyWasInvolved = MobileParty.MainParty?.MapEvent == obj;
+
             using (new AllowedThread())
             {
                 obj.Component?.FinishComponent();
@@ -78,6 +91,13 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 
                 Campaign.Current.MapEventManager.Tick();
             }
+
+            Logger.Debug("[MapEvent] {Who}: OnClientDestroyed {Id}: involved={Involved} mainPartyMapEvent={Me} menu={Menu}",
+                Hero.MainHero?.Name?.ToString() ?? "?",
+                id,
+                localPartyWasInvolved,
+                MobileParty.MainParty?.MapEvent != null,
+                Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "<none>");
         });
     }
 

@@ -31,8 +31,6 @@ internal class DisablePvpEncounterAttackPatch
     {
         "game_menu_encounter_attack_on_condition",        // "Attack!"
         "game_menu_army_attack_on_condition",             // "Attack army"
-        "game_menu_join_encounter_help_attackers_on_condition", // join a battle on the attacker side
-        "game_menu_join_encounter_help_defenders_on_condition", // join a battle on the defender side
     };
 
     static IEnumerable<MethodBase> TargetMethods()

@@ -2,6 +2,7 @@ using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
+using System;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MobileParties.Extensions;
@@ -12,6 +13,7 @@ using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.MapEvents.Handlers;
 
@@ -33,6 +35,9 @@ internal class PvPInteractionClientHandler : IHandler
     // Only touched on the game main thread.
     private string shownDefenderPartyId;
 
+    // This instance's player hero name, to tell instances apart in a combined log.
+    private static string Who => Hero.MainHero?.Name?.ToString() ?? "?";
+
     public PvPInteractionClientHandler(IMessageBroker messageBroker, IObjectManager objectManager)
     {
         this.messageBroker = messageBroker;
@@ -41,6 +46,7 @@ internal class PvPInteractionClientHandler : IHandler
         messageBroker.Subscribe<NetworkPlayerInteractionStarted>(Handle_NetworkPlayerInteractionStarted);
         messageBroker.Subscribe<NetworkPlayerInteractionEnded>(Handle_NetworkPlayerInteractionEnded);
         messageBroker.Subscribe<MapEventInvolvedPartiesAdded>(Handle_MapEventInvolvedPartiesAdded);
+        messageBroker.Subscribe<NetworkClosePvpEncounter>(Handle_NetworkClosePvpEncounter);
     }
 
     public void Dispose()
@@ -48,6 +54,7 @@ internal class PvPInteractionClientHandler : IHandler
         messageBroker.Unsubscribe<NetworkPlayerInteractionStarted>(Handle_NetworkPlayerInteractionStarted);
         messageBroker.Unsubscribe<NetworkPlayerInteractionEnded>(Handle_NetworkPlayerInteractionEnded);
         messageBroker.Unsubscribe<MapEventInvolvedPartiesAdded>(Handle_MapEventInvolvedPartiesAdded);
+        messageBroker.Unsubscribe<NetworkClosePvpEncounter>(Handle_NetworkClosePvpEncounter);
 
         // Make sure a popup never outlives the co-op session.
         if (shownDefenderPartyId != null)
@@ -81,7 +88,7 @@ internal class PvPInteractionClientHandler : IHandler
         });
     }
 
-    /// <summary>The attacker ended (or disconnected from) the interaction; close our popup.</summary>
+    /// <summary>The attacker ended (or disconnected from) the interaction; close our popup and leave the encounter.</summary>
     private void Handle_NetworkPlayerInteractionEnded(MessagePayload<NetworkPlayerInteractionEnded> payload)
     {
         if (ModInformation.IsServer) return;
@@ -97,7 +104,32 @@ internal class PvPInteractionClientHandler : IHandler
             // The attacker left without a battle. When the attacker engaged, native opened a local encounter menu
             // on the defender's client too (its own party ran HandleEncounterForMobileParty); close it so the
             // defender returns to the map instead of being stranded in the now-meaningless menu.
-            CloseDefenderEncounter();
+            CloseEncounter();
+        });
+    }
+
+    /// <summary>
+    /// [Server -&gt; client] A PvP map event was finalized. If our party was one of the involved player parties, close
+    /// our encounter menu. This is the reliable close for every involved party (attacker, defender, and joiners alike).
+    /// </summary>
+    private void Handle_NetworkClosePvpEncounter(MessagePayload<NetworkClosePvpEncounter> payload)
+    {
+        if (ModInformation.IsServer) return;
+
+        var partyIds = payload.What.PartyIds;
+
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            if (Campaign.Current == null) return;
+            if (!objectManager.TryGetId(MobileParty.MainParty?.Party, out var myPartyId)) return;
+            if (Array.IndexOf(partyIds, myPartyId) < 0) return;
+
+            Logger.Debug("[MapEvent] {Who}: NetworkClosePvpEncounter for my party; closing", Who);
+
+            if (shownDefenderPartyId != null)
+                HideWaitingPopup();
+
+            CloseEncounter();
         });
     }
 
@@ -139,21 +171,44 @@ internal class PvPInteractionClientHandler : IHandler
     }
 
     /// <summary>
-    /// Closes the local encounter menu the defender opened when the attacker engaged. Skipped when a battle is
-    /// underway (the defender belongs in it). <see cref="PlayerEncounter.Finish"/>'s postfix
-    /// (<see cref="Patches.PlayerEncounterPatches"/>) holds the party so it does not immediately re-engage.
+    /// Leaves the local encounter the party opened when the attacker engaged. Skipped only when a battle mission is
+    /// actually running (the party belongs in it) — being on a map-event side is not enough, since a joiner sits on a
+    /// side in the pre-battle encounter the attacker just abandoned. For such a joiner we set
+    /// <see cref="PlayerEncounter.LeaveEncounter"/> so native removes it from the (now-abandoned) map event on finish.
+    /// <see cref="PlayerEncounter.Finish"/>'s postfix (<see cref="Patches.PlayerEncounterPatches"/>) holds the party so
+    /// it does not immediately re-engage.
     /// </summary>
-    private static void CloseDefenderEncounter()
+    private static void CloseEncounter()
     {
-        if (MobileParty.MainParty?.MapEvent != null) return;
+        Logger.Debug("[MapEvent] {Who}: CloseEncounter before: mission={Mission} encounter={Enc} mainPartyMapEvent={Me} menu={Menu}",
+            Who,
+            MissionState.Current != null,
+            PlayerEncounter.Current != null,
+            MobileParty.MainParty?.MapEvent != null,
+            Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "<none>");
+
+        // A battle mission is open — the party belongs in it; never pull it out.
+        if (MissionState.Current != null) return;
+
+        // A joiner stays bound to its map-event side after the attacker abandons the encounter: the abandon tears
+        // the event down via FinalizeEvent, which (unlike FinishBattle) does not remove joined parties. The dangling
+        // MainParty.MapEvent makes the encounter menu reopen the instant Finish closes it. Detach locally so it stays
+        // closed — RemovePartyInternal's client prefix keeps this a local-only cleanup.
+        if (MobileParty.MainParty?.MapEvent != null)
+            MobileParty.MainParty.Party.MapEventSide = null;
 
         if (PlayerEncounter.Current != null)
-        {
             PlayerEncounter.Finish(true);
-        }
-        else if (Campaign.Current?.CurrentMenuContext != null)
-        {
+
+        // Finishing the encounter does not itself close the open game menu; exit it explicitly. Mirrors
+        // BattleHandler.Handle_NetworkMapEventFinalized, the proven post-battle menu teardown.
+        if (Campaign.Current?.CurrentMenuContext != null)
             GameMenu.ExitToLast();
-        }
+
+        Logger.Debug("[MapEvent] {Who}: CloseEncounter after: encounter={Enc} mainPartyMapEvent={Me} menu={Menu}",
+            Who,
+            PlayerEncounter.Current != null,
+            MobileParty.MainParty?.MapEvent != null,
+            Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "<none>");
     }
 }

@@ -299,7 +299,12 @@ internal class ConversationRequestHandler : IHandler
         network.SendAll(new NetworkPlayerInteractionStarted(request.DefenderId, attackerName));
     }
 
-    /// <summary>[Server] Ends the given attacker's PvP interaction, telling the defending player's client to close the popup.</summary>
+    /// <summary>
+    /// [Server] Ends the given attacker's PvP interaction (the attacker left before any battle), telling the
+    /// defending player's client to close its popup and leave the encounter. Once a battle map event exists, every
+    /// involved player party — defender and joiners — is instead closed on finalize via
+    /// <see cref="Messages.NetworkClosePvpEncounter"/> (see <see cref="BattleHandler"/>).
+    /// </summary>
     private void EndPvpInteraction(NetPeer attackerPeer)
     {
         if (attackerPeer == null) return;
