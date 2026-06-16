@@ -23,14 +23,14 @@ internal class MobilePartyAuditor : IAuditor
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
-    private readonly INetworkConfiguration configuration;
+    private readonly INetworkConfig configuration;
     private TaskCompletionSource<string> tcs;
 
     public MobilePartyAuditor(
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
-        INetworkConfiguration configuration)
+        INetworkConfig configuration)
     {
         this.messageBroker = messageBroker;
         this.network = network;

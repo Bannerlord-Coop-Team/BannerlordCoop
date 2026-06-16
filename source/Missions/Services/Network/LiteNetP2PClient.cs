@@ -32,7 +32,7 @@ namespace Missions.Services.Network
         public int Priority => 2;
 
         public IPacketManager PacketManager { get; private set; }
-        public INetworkConfiguration Configuration { get; }
+        public INetworkConfig Configuration { get; }
 
         private string instance;
 

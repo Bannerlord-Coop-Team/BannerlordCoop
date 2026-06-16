@@ -7,7 +7,7 @@ namespace Coop.Core.Common.Configuration;
 /// <summary>
 /// Network configuration used by the client and server
 /// </summary>
-public class NetworkConfiguration : INetworkConfiguration
+public class NetworkConfig : INetworkConfig
 {
 #if DEBUG
     public string Address { get; set; } =  "localhost";
@@ -25,6 +25,10 @@ public class NetworkConfiguration : INetworkConfiguration
     public string P2PToken => throw new NotImplementedException();
 
     public int MaxPacketsInQueue => 10000;
+
+    // Resume threshold is well below the pause threshold so a chronically slow peer drains its backlog
+    // before time resumes, instead of flapping pause/resume around a single limit (hysteresis).
+    public int ResumePacketsInQueue => 5000;
 
     public TimeSpan AuditTimeout => TimeSpan.FromSeconds(15);
 

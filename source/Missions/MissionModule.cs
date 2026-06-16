@@ -28,7 +28,7 @@ namespace Missions
             builder.RegisterType<ExceptionLogger>().AsSelf().AutoActivate().SingleInstance();
 
             // Non interface classes
-            builder.RegisterType<NetworkConfiguration>().As<INetworkConfiguration>().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<NetworkConfiguration>().As<INetworkConfig>().AsSelf().InstancePerLifetimeScope();
             builder.RegisterType<ProtoBufSerializer>().As<ICommonSerializer>().InstancePerLifetimeScope();
             builder.RegisterType<SerializableTypeMapper>().As<ISerializableTypeMapper>().InstancePerLifetimeScope();
 

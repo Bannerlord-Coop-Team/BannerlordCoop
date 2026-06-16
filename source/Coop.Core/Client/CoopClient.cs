@@ -40,7 +40,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
     private IPEndPoint connectEndPoint;
 
     public CoopClient(
-        INetworkConfiguration config,
+        INetworkConfig config,
         IMessageBroker messageBroker,
         IPacketManager packetManager,
         ICommonSerializer serializer) : base(config, serializer)
