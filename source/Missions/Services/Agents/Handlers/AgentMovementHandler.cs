@@ -138,6 +138,9 @@ namespace Missions.Services.Agents.Handlers
                 {
                     GameLoopRunner.RunOnMainThread(() =>
                     {
+                        if (Mission.Current == null)
+                            return;
+
                         if (agent.Health > 0)
                         {
                             agent.MakeDead(false, ActionIndexCache.act_none);

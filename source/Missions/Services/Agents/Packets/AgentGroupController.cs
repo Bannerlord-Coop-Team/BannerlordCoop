@@ -59,6 +59,13 @@ namespace Missions.Services.Agents.Packets
             {
                 GameLoopRunner.RunOnMainThread(() =>
                 {
+                    // This action is queued from the network thread and runs a frame later. By then the
+                    // local player may have left the instance (mission torn down) or moved to a new one,
+                    // leaving this agent invalid — applying movement to it crashes. Only apply while the
+                    // agent is still active in the current mission.
+                    if (Mission.Current == null || agent.Mission != Mission.Current || agent.IsActive() == false)
+                        return;
+
                     using (new AllowedThread())
                     {
                         movement.Apply(agent);

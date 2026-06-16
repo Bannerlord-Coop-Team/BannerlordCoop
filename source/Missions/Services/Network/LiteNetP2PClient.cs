@@ -16,9 +16,11 @@ using Missions.Services.Network.Messages;
 using Serilog;
 using Serilog.Events;
 using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 using Version = System.Version;
 
@@ -132,14 +134,37 @@ namespace Missions.Services.Network
         public void DisconnectPeers()
         {
             Logger.Debug("Disconnecting P2P peers (keeping socket alive)");
-            // Nudge the logic thread to flush queued reliable sends (e.g. the LeaveMission just broadcast
-            // on OnEndMission) before we drop the connections — DisconnectAll would otherwise cut them
-            // off. Best-effort: the disconnect/timeout path is the guaranteed fallback if a leave still
-            // races the disconnect.
-            netManager.TriggerUpdate();
+            // Flush queued reliable sends (notably the NetworkLeaveMission broadcast on OnEndMission)
+            // before dropping the connections, so a graceful leave reliably reaches peers instead of being
+            // cut off by DisconnectAll. The disconnect/timeout path stays the fallback for ungraceful exits.
+            FlushReliableSends();
             netManager.DisconnectAll();
 
             instanceId = null;
+        }
+
+        // LiteNetLib 1.3.1 has no synchronous flush, so nudge the logic thread and wait (bounded) for each
+        // connected peer's reliable queue to drain — a queued ReliableOrdered packet stays until acked, so
+        // an empty queue means the leave was delivered. Runs on the game thread during mission teardown;
+        // the cap keeps an unresponsive peer from hitching it for more than a frame or two.
+        private void FlushReliableSends()
+        {
+            const int maxWaitMs = 100;
+            var stopwatch = Stopwatch.StartNew();
+            while (stopwatch.ElapsedMilliseconds < maxWaitMs)
+            {
+                netManager.TriggerUpdate();
+
+                bool pending = netManager.ConnectedPeerList.Any(peer =>
+                    peer.GetPacketsCountInReliableQueue(0, true) > 0 ||
+                    peer.GetPacketsCountInReliableQueue(0, false) > 0);
+
+                if (pending == false) return;
+
+                Thread.Sleep(2);
+            }
+
+            Logger.Warning("[LocationSync] Reliable send queue did not drain within {Ms}ms before disconnect", maxWaitMs);
         }
 
         public void Update(TimeSpan frameTime)

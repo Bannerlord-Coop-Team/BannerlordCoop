@@ -7,6 +7,7 @@ using GameInterface.Services.Locations;
 using GameInterface.Services.Locations.Messages;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
+using System.Collections.Concurrent;
 using Missions.Services.Agents.Handlers;
 using Missions.Services.BoardGames;
 using Missions.Services.Missiles;
@@ -91,13 +92,17 @@ namespace Missions.Services.Taverns
             messageBroker.Subscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation);
         }
 
-        private bool _localAgentRegistered;
+        // Read on the network thread (Handle_JoinInfo gate) and written on the main thread
+        // (TryRegisterLocalAgent), so volatile to ensure the gate sees the flip promptly.
+        private volatile bool _localAgentRegistered;
         private bool _instanceRequested;
 
-        public override void OnCreated()
-        {
-            TryRegisterLocalAgent();
-        }
+        // Join info can arrive before the local interior mission has finished setting up (teams/player
+        // agent) — notably on a rejoin, where the kept-alive socket reconnects and delivers the peer's
+        // join info almost immediately. Spawning a remote agent into a not-yet-initialized mission corrupts
+        // team setup, so buffer early join info and drain it once we are ready (see TryRegisterLocalAgent).
+        private readonly ConcurrentQueue<(NetPeer peer, NetworkMissionJoinInfo info)> _pendingJoinInfos
+            = new ConcurrentQueue<(NetPeer, NetworkMissionJoinInfo)>();
 
         public override void OnRenderingStarted()
         {
@@ -120,6 +125,20 @@ namespace Missions.Services.Taverns
                 // Announce to peers that connected before this controller was attached/subscribed
                 // (their PeerConnected was missed). Remote side dedupes by the stable player id.
                 network.SendAll(BuildJoinInfo(characterObjectId));
+
+                // The mission is now set up (player agent + teams exist). Spawn any join info that arrived
+                // before we were ready.
+                DrainPendingJoinInfos();
+            }
+        }
+
+        private void DrainPendingJoinInfos()
+        {
+            if (_localAgentRegistered == false) return;
+
+            while (_pendingJoinInfos.TryDequeue(out var pending))
+            {
+                ProcessJoinInfo(pending.peer, pending.info);
             }
         }
 
@@ -181,8 +200,8 @@ namespace Missions.Services.Taverns
         private NetworkMissionJoinInfo BuildJoinInfo(string characterObjectId)
         {
             bool isPlayerAlive = Agent.Main != null && Agent.Main.Health > 0;
-            Vec3 position = Agent.Main?.Position ?? default;
-            float health = Agent.Main?.Health ?? 0;
+            Vec3 position = Agent.Main.Position;
+            float health = Agent.Main.Health;
 
             return new NetworkMissionJoinInfo(
                 characterObjectId,
@@ -196,6 +215,12 @@ namespace Missions.Services.Taverns
         private void SendJoinInfo(NetPeer peer)
         {
             Logger.Debug("Sending join request");
+
+            if (Agent.Main == null)
+            {
+                Logger.Information("[LocationSync] Skipping join info to {Peer} — local Agent.Main not ready yet (will re-announce on render)", peer);
+                return;
+            }
 
             if (!objectManager.TryGetIdWithLogging(CharacterObject.PlayerCharacter, out var characterObjectId))
                 return;
@@ -219,10 +244,16 @@ namespace Missions.Services.Taverns
             // Deliberate leave: tell mesh peers to drop our agent NOW, before we drop the P2P connection.
             network.SendAll(new NetworkLeaveMission(controllerIdProvider.ControllerId));
 
-            // Drop the peers but keep the socket/poller alive so the next location reuses it without a
-            // fragile Stop/Start (which churns the port and re-enters the Poller). DisconnectPeers flushes
-            // the queued LeaveMission before dropping the connections.
-            network.DisconnectPeers();
+            // Full teardown on exit: Stop() drops the peers (flushing the queued LeaveMission first via
+            // DisconnectPeers), then stops the poller and the socket. The next location entry calls Start()
+            // again on this singleton client, rebinding a fresh socket/poller — so a re-entry reconnects
+            // from scratch rather than via a kept-alive mapping (which avoids the instant-reconnect races).
+            network.Stop();
+
+            // Clear our stored peers/agents now, while we're leaving and nothing is racing it. Doing this
+            // here (rather than only on the next entry) means re-entry starts from a clean registry without
+            // the network thread concurrently delivering join info during the clear.
+            agentRegistry.Clear();
 
             base.OnEndMission();
             Dispose();
@@ -259,9 +290,8 @@ namespace Missions.Services.Taverns
             NetworkMissionJoinInfo joinInfo = payload.What;
 
             string newAgentId = joinInfo.ControllerId;
-            Vec3 startingPos = joinInfo.StartingPosition;
 
-            Logger.Information("[LocationSync] Received join info for {AgentID} from {Peer} at pos {Pos}", newAgentId, netPeer, startingPos);
+            Logger.Information("[LocationSync] Received join info for {AgentID} from {Peer} at pos {Pos}", newAgentId, netPeer, joinInfo.StartingPosition);
 
             // Don't spawn our own broadcast echoed back by a peer.
             if (newAgentId == controllerIdProvider.ControllerId)
@@ -269,6 +299,25 @@ namespace Missions.Services.Taverns
                 Logger.Debug("[LocationSync] Join info {AgentID} is our own id — ignoring", newAgentId);
                 return;
             }
+
+            // Spawning needs the interior mission fully set up (player agent + teams). On a rejoin the join
+            // info beats the mission setup, so buffer it and drain once we are ready (TryRegisterLocalAgent).
+            // Re-check readiness after enqueuing to close the race with the main thread flipping it.
+            if (_localAgentRegistered == false)
+            {
+                _pendingJoinInfos.Enqueue((netPeer, joinInfo));
+                Logger.Information("[LocationSync] Mission not ready — buffered join info for {AgentID}", newAgentId);
+                DrainPendingJoinInfos();
+                return;
+            }
+
+            ProcessJoinInfo(netPeer, joinInfo);
+        }
+
+        private void ProcessJoinInfo(NetPeer netPeer, NetworkMissionJoinInfo joinInfo)
+        {
+            string newAgentId = joinInfo.ControllerId;
+            Vec3 startingPos = joinInfo.StartingPosition;
 
             // Dedupe across all peers: NAT punch can yield more than one connection to the same remote
             // client, delivering its join info multiple times. Only spawn one agent per player id.
@@ -315,32 +364,39 @@ namespace Missions.Services.Taverns
                 return null;
             }
 
-            try
+            // Handle_JoinInfo runs on the network thread. AgentBuildData's ctor (and SpawnAgent) touch
+            // TaleWorlds engine statics (Team.Invalid -> Team.Initialize -> Formation.Reset) that must run
+            // on the main thread, so build AND spawn entirely inside the game-loop closure — not just the
+            // final SpawnAgent call. Doing the ctor off-thread NREs intermittently (notably on rejoin).
+            Agent agent = null;
+            GameLoopRunner.RunOnMainThread(() =>
             {
-                AgentBuildData agentBuildData = new AgentBuildData(character);
-                agentBuildData.BodyProperties(character.GetBodyPropertiesMax());
-                agentBuildData.InitialPosition(startingPos);
-                agentBuildData.Team(Mission.Current.PlayerAllyTeam);
-                agentBuildData.InitialDirection(Vec2.Forward);
-                agentBuildData.NoHorses(true);
-                agentBuildData.Equipment(character.FirstCivilianEquipment);
-                agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
-                agentBuildData.Controller(AgentControllerType.None);
-
-                Agent agent = null;
-                GameLoopRunner.RunOnMainThread(() =>
+                try
                 {
+                    // The player may have left between receiving the join info and this running.
+                    if (Mission.Current == null) return;
+
+                    AgentBuildData agentBuildData = new AgentBuildData(character);
+                    agentBuildData.BodyProperties(character.GetBodyPropertiesMax());
+                    agentBuildData.InitialPosition(startingPos);
+                    agentBuildData.Team(Mission.Current.Teams.Attacker);
+                    agentBuildData.InitialDirection(Vec2.Forward);
+                    agentBuildData.NoHorses(true);
+                    agentBuildData.Equipment(character.FirstCivilianEquipment);
+                    agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
+                    agentBuildData.Controller(AgentControllerType.None);
+
                     agent = Mission.Current.SpawnAgent(agentBuildData);
                     agent.FadeIn();
-                }, true);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warning(ex, "[LocationSync] Build/spawn failed for character '{Name}'", character?.StringId ?? "<null>");
+                    agent = null;
+                }
+            }, true);
 
-                return agent;
-            }
-            catch (Exception ex)
-            {
-                Logger.Warning(ex, "[LocationSync] Build/spawn failed for character '{Name}'", character?.StringId ?? "<null>");
-                return null;
-            }
+            return agent;
         }
 
         // Cheap, non-throwing pre-filter for the common "unresolved remote hero" case, so the normal
