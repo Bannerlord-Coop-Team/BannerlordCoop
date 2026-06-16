@@ -12,7 +12,6 @@ using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
-using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
@@ -353,11 +352,11 @@ internal class BattleHandler : IHandler
                 mapEvent.TroopUpgradeTracker.AddParty(mapEventParty);
 
                 // Collect the party's server-side map position to snap it to the battle.
-                // The locally controlled party is left alone since this client is
-                // authoritative for its own position.
+                // Every involved party is snapped, including this client's own, so all
+                // clients place the parties where the server has them, lined up with the
+                // battle center the server is authoritative for.
                 var mobileParty = mapEventParty.Party.MobileParty;
-                if (mobileParty != null && !mobileParty.IsControlledByThisInstance() &&
-                    positions != null && i < positions.Length)
+                if (mobileParty != null && positions != null && i < positions.Length)
                 {
                     partiesToReposition.Add((mobileParty, positions[i]));
                 }
