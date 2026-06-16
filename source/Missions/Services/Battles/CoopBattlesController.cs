@@ -279,7 +279,7 @@ namespace Missions.Services
             agentBuildData.Controller(AgentControllerType.Player);
 
             Agent agent = default;
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 agent = Mission.Current.SpawnAgent(agentBuildData);
                 agent.FadeIn();
@@ -302,7 +302,7 @@ namespace Missions.Services
             agentBuildData.Controller(isEnemy ? AgentControllerType.None : AgentControllerType.AI);
 
             Agent agent = default;
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 agent = Mission.Current.SpawnAgent(agentBuildData);
                 agent.FadeIn();

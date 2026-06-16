@@ -70,7 +70,7 @@ internal class ClanLifetimeHandler : IHandler
             return;
         }
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {

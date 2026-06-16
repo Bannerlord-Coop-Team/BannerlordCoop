@@ -35,7 +35,7 @@ internal static class LocationConversationPatches
         }
     }
 
-    // Accessed only on the main thread (the interaction, the approval applied via RunOnMainThread, the
+    // Accessed only on the main thread (the interaction, the approval applied via GameThread.Run, the
     // conversation-end callback, and the mission-end callback all run there).
     private static PendingConversation? pending;
     private static string heldNpcKey;

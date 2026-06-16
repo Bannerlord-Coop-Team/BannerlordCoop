@@ -47,7 +47,7 @@ internal class BribePaidSettlementPatch
 
     internal static void RunBribePaidChange(Settlement settlement, int bribePaid)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {

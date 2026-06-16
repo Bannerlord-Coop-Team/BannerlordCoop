@@ -49,7 +49,7 @@ public class GarrisonWagePaymentLimitSettlementPatch
 
     internal static void RunGarrisonWagePaymentLimitChange(Settlement settlement, int garrisonWagePaymentLimit)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {

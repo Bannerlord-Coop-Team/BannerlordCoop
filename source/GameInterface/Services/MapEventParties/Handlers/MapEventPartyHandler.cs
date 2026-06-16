@@ -1,6 +1,8 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
@@ -66,10 +68,22 @@ internal class MapEventPartyHandler : IHandler
 
     private void Handle_NetworkRequestMapEventPartyUpdate(MessagePayload<NetworkRequestMapEventPartyUpdate> payload)
     {
-        if (!objectManager.TryGetObjectWithLogging<MapEventParty>(payload.What.MapEventPartyId, out var mapEventParty))
-            return;
+        var obj = payload.What;
 
-        mapEventParty.Update();
+        GameThread.Run(() =>
+        {
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging<MapEventParty>(obj.MapEventPartyId, out var mapEventParty))
+                    return;
+
+                mapEventParty.Update();
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to apply {Message}", nameof(NetworkRequestMapEventPartyUpdate));
+            }
+        });
     }
 
     private void Handle_MapEventPartyUpdated(MessagePayload<MapEventPartyUpdated> payload)
@@ -89,12 +103,27 @@ internal class MapEventPartyHandler : IHandler
     {
         var obj = payload.What;
 
-        if (!objectManager.TryGetObjectWithLogging<MapEventParty>(obj.MapEventPartyId, out var mapEventParty))
-            return;
+        // Deserialize is pure CPU work, so it stays on the network thread; only the
+        // roster assignment is deferred. The game loop reads and iterates the roster,
+        // so writing it from the network thread races the tick.
+        var roster = FlattenedTroopSerializer.Deserialize(obj.FlattenedTroops, objectManager);
 
-        mapEventParty._roster = FlattenedTroopSerializer.Deserialize(obj.FlattenedTroops, objectManager);
+        GameThread.Run(() =>
+        {
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging<MapEventParty>(obj.MapEventPartyId, out var mapEventParty))
+                    return;
 
-        messageBroker.Publish(this, new MapEventTroopsUpdated(mapEventParty));
+                mapEventParty._roster = roster;
+
+                messageBroker.Publish(this, new MapEventTroopsUpdated(mapEventParty));
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to apply {Message}", nameof(NetworkUpdateMapEventParty));
+            }
+        });
     }
 
     private void Handle_OnTroopKilledAttempted(MessagePayload<OnTroopKilledAttempted> payload)
@@ -113,20 +142,29 @@ internal class MapEventPartyHandler : IHandler
     {
         var obj = payload.What;
 
-        if (!objectManager.TryGetObjectWithLogging(obj.MapEventPartyId, out MapEventParty mapEventParty))
-            return;
-
-        try
+        // OnTroopKilled mutates the roster the game loop reads, so it is deferred to the
+        // main thread. OnTroopKilled is Harmony-patched, so AllowedThread silences the
+        // client prefix to stop it re-running and rebroadcasting in a loop.
+        GameThread.Run(() =>
         {
-            var troopDescriptor = new UniqueTroopDescriptor(obj.TroopSeed);
-            var troop = mapEventParty._roster[troopDescriptor].Troop;
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging(obj.MapEventPartyId, out MapEventParty mapEventParty))
+                    return;
 
-            mapEventParty.OnTroopKilled(troopDescriptor);
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "Error handling NetworkTroopKilled message for MapEventParty with ID {MapEventPartyId}", obj.MapEventPartyId);
-        }
+                var troopDescriptor = new UniqueTroopDescriptor(obj.TroopSeed);
+                var troop = mapEventParty._roster[troopDescriptor].Troop;
+
+                using (new AllowedThread())
+                {
+                    mapEventParty.OnTroopKilled(troopDescriptor);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Error handling NetworkTroopKilled message for MapEventParty with ID {MapEventPartyId}", obj.MapEventPartyId);
+            }
+        });
     }
 
     private void Handle_OnTroopWoundedAttempted(MessagePayload<OnTroopWoundedAttempted> payload)
@@ -145,18 +183,28 @@ internal class MapEventPartyHandler : IHandler
     {
         var obj = payload.What;
 
-        if (!objectManager.TryGetObjectWithLogging(obj.MapEventPartyId, out MapEventParty mapEventParty))
-            return;
+        // OnTroopWounded mutates the roster the game loop reads, so it is deferred to the
+        // main thread. OnTroopWounded is Harmony-patched, so AllowedThread silences the
+        // client prefix to stop it re-running and rebroadcasting in a loop.
+        GameThread.Run(() =>
+        {
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging(obj.MapEventPartyId, out MapEventParty mapEventParty))
+                    return;
 
-        try
-        {
-            var troopDescriptor = new UniqueTroopDescriptor(obj.TroopSeed);
-            mapEventParty.OnTroopWounded(troopDescriptor);
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "Error handling NetworkTroopWounded message for MapEventParty with ID {MapEventPartyId}", obj.MapEventPartyId);
-        }
+                var troopDescriptor = new UniqueTroopDescriptor(obj.TroopSeed);
+
+                using (new AllowedThread())
+                {
+                    mapEventParty.OnTroopWounded(troopDescriptor);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Error handling NetworkTroopWounded message for MapEventParty with ID {MapEventPartyId}", obj.MapEventPartyId);
+            }
+        });
     }
 
     private void Handle_OnTroopRoutedAttempted(MessagePayload<OnTroopRoutedAttempted> payload)
@@ -166,7 +214,7 @@ internal class MapEventPartyHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(obj.MapEventParty, out var mapEventPartyId))
             return;
 
-        var message = new NetworkTroopWounded(mapEventPartyId, obj.TroopSeed);
+        var message = new NetworkTroopRouted(mapEventPartyId, obj.TroopSeed);
 
         network.SendAll(message);
     }
@@ -175,17 +223,27 @@ internal class MapEventPartyHandler : IHandler
     {
         var obj = payload.What;
 
-        if (!objectManager.TryGetObjectWithLogging(obj.MapEventPartyId, out MapEventParty mapEventParty))
-            return;
+        // OnTroopRouted mutates the roster the game loop reads, so it is deferred to the
+        // main thread. OnTroopRouted is Harmony-patched, so AllowedThread silences the
+        // client prefix to stop it re-running and rebroadcasting in a loop.
+        GameThread.Run(() =>
+        {
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging(obj.MapEventPartyId, out MapEventParty mapEventParty))
+                    return;
 
-        try
-        {
-            var troopDescriptor = new UniqueTroopDescriptor(obj.TroopSeed);
-            mapEventParty.OnTroopRouted(troopDescriptor);
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "Error handling NetworkTroopRouted message for MapEventParty with ID {MapEventPartyId}", obj.MapEventPartyId);
-        }
+                var troopDescriptor = new UniqueTroopDescriptor(obj.TroopSeed);
+
+                using (new AllowedThread())
+                {
+                    mapEventParty.OnTroopRouted(troopDescriptor);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Error handling NetworkTroopRouted message for MapEventParty with ID {MapEventPartyId}", obj.MapEventPartyId);
+            }
+        });
     }
 }

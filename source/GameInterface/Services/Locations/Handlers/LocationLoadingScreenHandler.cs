@@ -77,7 +77,7 @@
 //        }
 
 //        // Engine UI calls must run on the main thread (InstanceAssigned arrives off the network thread).
-//        GameLoopRunner.RunOnMainThread(() =>
+//        GameThread.Run(() =>
 //            loadingInterface.ShowLoadingScreen("Entering location", "Connecting to other players..."));
 //    }
 
@@ -92,7 +92,7 @@
 //            timeoutCts = null;
 //        }
 
-//        GameLoopRunner.RunOnMainThread(() => loadingInterface.HideLoadingScreen());
+//        GameThread.Run(() => loadingInterface.HideLoadingScreen());
 //    }
 
 //    private void StartTimeout(CancellationToken token)

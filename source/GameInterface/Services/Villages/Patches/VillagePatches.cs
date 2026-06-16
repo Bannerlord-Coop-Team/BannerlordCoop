@@ -40,7 +40,7 @@ internal class VillagePatches
 
     public static void RunVillageStateChange(Village village, VillageStates state)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using(new AllowedThread())
             {
@@ -73,7 +73,7 @@ internal class VillagePatches
 
     public static void ChangeHearth(Village village, float Hearth)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {
@@ -100,7 +100,7 @@ internal class VillagePatches
 
     internal static void RunTradeBoundChange(Village village, Settlement tradebound)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {
@@ -125,7 +125,7 @@ internal class VillagePatches
 
     internal static void RunTradeTaxChange(Village village, int tradeTaxAccumulated)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {
@@ -149,7 +149,7 @@ internal class VillagePatches
 
     internal static void RunLastDemandTimeSatisified(Village village, float LastDemandSatisfiedTime)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {

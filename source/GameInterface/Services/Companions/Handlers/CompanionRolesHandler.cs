@@ -1,9 +1,12 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using GameInterface.Services.Companions.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -83,40 +86,52 @@ internal class CompanionRolesHandler : IHandler
 
     private void Handle_DoClanNameSelection(MessagePayload<DoClanNameSelection> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.OneToOneConversationHeroId, out var oneToOneConversationHero)) return;
-        if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.SelectedFiefId, out var selectedFief)) return;
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
+        var data = obj.What;
 
-        var companionRolesCampaignBehavior = Campaign.Current.GetCampaignBehavior<CompanionRolesCampaignBehavior>();
+        GameThread.Run(() =>
+        {
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
+                if (!objectManager.TryGetObjectWithLogging<Hero>(data.OneToOneConversationHeroId, out var oneToOneConversationHero)) return;
+                if (!objectManager.TryGetObjectWithLogging<Settlement>(data.SelectedFiefId, out var selectedFief)) return;
+                if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty)) return;
 
-        RemoveCompanionAction.ApplyByByTurningToLord(mainHero.Clan, oneToOneConversationHero);
-        oneToOneConversationHero.SetNewOccupation(Occupation.Lord);
-        TextObject textObject = GameTexts.FindText("str_generic_clan_name", null);
-        textObject.SetTextVariable("CLAN_NAME", new TextObject(obj.What.ClanName, null));
-        int randomBannerIdForNewClan = companionRolesCampaignBehavior.GetRandomBannerIdForNewClan();
-        Clan clan = Clan.CreateCompanionToLordClan(oneToOneConversationHero, selectedFief, textObject, randomBannerIdForNewClan);
-        if (oneToOneConversationHero.PartyBelongedTo == mainParty)
-        {
-            mainParty.MemberRoster.AddToCounts(oneToOneConversationHero.CharacterObject, -1, false, 0, 0, true, -1);
-        }
-        MobileParty partyBelongedTo = oneToOneConversationHero.PartyBelongedTo;
-        if (partyBelongedTo == null)
-        {
-            MobileParty mobileParty = LordPartyComponent.CreateLordParty(oneToOneConversationHero.CharacterObject.StringId, oneToOneConversationHero, mainParty.Position, 3f, selectedFief, oneToOneConversationHero);
-            mobileParty.MemberRoster.AddToCounts(clan.Culture.BasicTroop, MBRandom.RandomInt(12, 15), false, 0, 0, true, -1);
-            mobileParty.MemberRoster.AddToCounts(clan.Culture.EliteBasicTroop, MBRandom.RandomInt(10, 15), false, 0, 0, true, -1);
-        }
-        else
-        {
-            partyBelongedTo.ActualClan = clan;
-            partyBelongedTo.Party.SetVisualAsDirty();
-        }
-        companionRolesCampaignBehavior.AdjustCompanionsEquipment(oneToOneConversationHero);
-        companionRolesCampaignBehavior.SpawnNewHeroesForNewCompanionClan(oneToOneConversationHero, clan, selectedFief); // Gives relation with Hero.MainHero, need to expand this to work for mainHero
-        GiveGoldAction.ApplyBetweenCharacters(mainHero, oneToOneConversationHero, 20000, false);
-        GainKingdomInfluenceAction.ApplyForDefault(mainHero, -500f);
-        ChangeRelationAction.ApplyPlayerRelation(oneToOneConversationHero, 50, true, true);
+                var companionRolesCampaignBehavior = Campaign.Current.GetCampaignBehavior<CompanionRolesCampaignBehavior>();
+
+                RemoveCompanionAction.ApplyByByTurningToLord(mainHero.Clan, oneToOneConversationHero);
+                oneToOneConversationHero.SetNewOccupation(Occupation.Lord);
+                TextObject textObject = GameTexts.FindText("str_generic_clan_name", null);
+                textObject.SetTextVariable("CLAN_NAME", new TextObject(data.ClanName, null));
+                int randomBannerIdForNewClan = companionRolesCampaignBehavior.GetRandomBannerIdForNewClan();
+                Clan clan = Clan.CreateCompanionToLordClan(oneToOneConversationHero, selectedFief, textObject, randomBannerIdForNewClan);
+                if (oneToOneConversationHero.PartyBelongedTo == mainParty)
+                {
+                    mainParty.MemberRoster.AddToCounts(oneToOneConversationHero.CharacterObject, -1, false, 0, 0, true, -1);
+                }
+                MobileParty partyBelongedTo = oneToOneConversationHero.PartyBelongedTo;
+                if (partyBelongedTo == null)
+                {
+                    MobileParty mobileParty = LordPartyComponent.CreateLordParty(oneToOneConversationHero.CharacterObject.StringId, oneToOneConversationHero, mainParty.Position, 3f, selectedFief, oneToOneConversationHero);
+                    mobileParty.MemberRoster.AddToCounts(clan.Culture.BasicTroop, MBRandom.RandomInt(12, 15), false, 0, 0, true, -1);
+                    mobileParty.MemberRoster.AddToCounts(clan.Culture.EliteBasicTroop, MBRandom.RandomInt(10, 15), false, 0, 0, true, -1);
+                }
+                else
+                {
+                    partyBelongedTo.ActualClan = clan;
+                    partyBelongedTo.Party.SetVisualAsDirty();
+                }
+                companionRolesCampaignBehavior.AdjustCompanionsEquipment(oneToOneConversationHero);
+                companionRolesCampaignBehavior.SpawnNewHeroesForNewCompanionClan(oneToOneConversationHero, clan, selectedFief); // Gives relation with Hero.MainHero, need to expand this to work for mainHero
+                GiveGoldAction.ApplyBetweenCharacters(mainHero, oneToOneConversationHero, 20000, false);
+                GainKingdomInfluenceAction.ApplyForDefault(mainHero, -500f);
+                ChangeRelationAction.ApplyPlayerRelation(oneToOneConversationHero, 50, true, true);
+            }
+            catch (Exception e)
+            {
+                logger.Error(e, "Failed to apply {Message}", nameof(DoClanNameSelection));
+            }
+        });
     }
 
     private void Handle_CompanionFired(MessagePayload<CompanionFired> obj)
@@ -130,10 +145,22 @@ internal class CompanionRolesHandler : IHandler
 
     private void Handle_FireCompanion(MessagePayload<FireCompanion> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.OneToOneConversationHeroId, out var oneToOneConversationHero)) return;
+        var data = obj.What;
 
-        RemoveCompanionAction.ApplyByFire(oneToOneConversationHero.CompanionOf, oneToOneConversationHero);
-        KillCharacterAction.ApplyByRemove(oneToOneConversationHero, false, true);
+        GameThread.Run(() =>
+        {
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging<Hero>(data.OneToOneConversationHeroId, out var oneToOneConversationHero)) return;
+
+                RemoveCompanionAction.ApplyByFire(oneToOneConversationHero.CompanionOf, oneToOneConversationHero);
+                KillCharacterAction.ApplyByRemove(oneToOneConversationHero, false, true);
+            }
+            catch (Exception e)
+            {
+                logger.Error(e, "Failed to apply {Message}", nameof(FireCompanion));
+            }
+        });
     }
 
     private void Handle_CompanionRejoinAfterEmprisonment(MessagePayload<CompanionRejoinAfterEmprisonment> obj)
@@ -151,10 +178,22 @@ internal class CompanionRolesHandler : IHandler
 
     private void Handle_DoCompanionRejoinAfterEmprisonment(MessagePayload<DoCompanionRejoinAfterEmprisonment> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.OneToOneConversationHeroId, out var oneToOneConversationHero)) return;
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
+        var data = obj.What;
 
-        AddHeroToPartyAction.Apply(oneToOneConversationHero, mainParty, true);
+        GameThread.Run(() =>
+        {
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging<Hero>(data.OneToOneConversationHeroId, out var oneToOneConversationHero)) return;
+                if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty)) return;
+
+                AddHeroToPartyAction.Apply(oneToOneConversationHero, mainParty, true);
+            }
+            catch (Exception e)
+            {
+                logger.Error(e, "Failed to apply {Message}", nameof(DoCompanionRejoinAfterEmprisonment));
+            }
+        });
     }
 
     private void Handle_CompanionJoinedPartyByRescue(MessagePayload<CompanionJoinedPartyByRescue> obj)
@@ -172,12 +211,24 @@ internal class CompanionRolesHandler : IHandler
 
     private void Handle_DoCompanionJoinedPartyByRescue(MessagePayload<DoCompanionJoinedPartyByRescue> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.OneToOneConversationHeroId, out var oneToOneConversationHero)) return;
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
+        var data = obj.What;
 
-        EndCaptivityAction.ApplyByReleasedAfterBattle(oneToOneConversationHero);
-        oneToOneConversationHero.ChangeState(Hero.CharacterStates.Active);
-        mainParty.AddElementToMemberRoster(oneToOneConversationHero.CharacterObject, 1, false);
+        GameThread.Run(() =>
+        {
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging<Hero>(data.OneToOneConversationHeroId, out var oneToOneConversationHero)) return;
+                if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty)) return;
+
+                EndCaptivityAction.ApplyByReleasedAfterBattle(oneToOneConversationHero);
+                oneToOneConversationHero.ChangeState(Hero.CharacterStates.Active);
+                mainParty.AddElementToMemberRoster(oneToOneConversationHero.CharacterObject, 1, false);
+            }
+            catch (Exception e)
+            {
+                logger.Error(e, "Failed to apply {Message}", nameof(DoCompanionJoinedPartyByRescue));
+            }
+        });
     }
 
     private void Handle_PartyScreenClosedFromRescuing(MessagePayload<PartyScreenClosedFromRescuing> obj)
@@ -203,23 +254,36 @@ internal class CompanionRolesHandler : IHandler
 
     private void Handle_DoPartyScreenClosedFromRescuing(MessagePayload<DoPartyScreenClosedFromRescuing> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<PartyBase>(obj.What.LeftOwnerPartyId, out var leftOwnerParty)) return;
-        if (!objectManager.TryGetObjectWithLogging<TroopRoster>(obj.What.LeftMemberRosterId, out var leftMemberRoster)) return;
-        if (!objectManager.TryGetObjectWithLogging<TroopRoster>(obj.What.LeftPrisonRosterId, out var leftPrisonRoster)) return;
-        if (!objectManager.TryGetObjectWithLogging<PartyBase>(obj.What.RightOwnerPartyId, out var rightOwnerParty)) return;
-        if (!objectManager.TryGetObjectWithLogging<TroopRoster>(obj.What.RightMemberRosterId, out var rightMemberRoster)) return;
-        if (!objectManager.TryGetObjectWithLogging<TroopRoster>(obj.What.RightPrisonRosterId, out var rightPrisonRoster)) return;
+        var data = obj.What;
 
-        var companionRolesCampaignBehavior = Campaign.Current.GetCampaignBehavior<CompanionRolesCampaignBehavior>();
-        companionRolesCampaignBehavior.PartyScreenClosed(
-            leftOwnerParty,
-            leftMemberRoster,
-            leftPrisonRoster,
-            rightOwnerParty,
-            rightMemberRoster,
-            rightPrisonRoster,
-            false
-        );
+        GameThread.Run(() =>
+        {
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.LeftOwnerPartyId, out var leftOwnerParty)) return;
+                if (!objectManager.TryGetObjectWithLogging<TroopRoster>(data.LeftMemberRosterId, out var leftMemberRoster)) return;
+                if (!objectManager.TryGetObjectWithLogging<TroopRoster>(data.LeftPrisonRosterId, out var leftPrisonRoster)) return;
+                if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.RightOwnerPartyId, out var rightOwnerParty)) return;
+                if (!objectManager.TryGetObjectWithLogging<TroopRoster>(data.RightMemberRosterId, out var rightMemberRoster)) return;
+                if (!objectManager.TryGetObjectWithLogging<TroopRoster>(data.RightPrisonRosterId, out var rightPrisonRoster)) return;
+
+                var companionRolesCampaignBehavior = Campaign.Current.GetCampaignBehavior<CompanionRolesCampaignBehavior>();
+
+                companionRolesCampaignBehavior.PartyScreenClosed(
+                    leftOwnerParty,
+                    leftMemberRoster,
+                    leftPrisonRoster,
+                    rightOwnerParty,
+                    rightMemberRoster,
+                    rightPrisonRoster,
+                    false
+                );
+            }
+            catch (Exception e)
+            {
+                logger.Error(e, "Failed to apply {Message}", nameof(DoPartyScreenClosedFromRescuing));
+            }
+        });
     }
 
     private void Handle_CompanionRescued(MessagePayload<CompanionRescued> obj)
@@ -233,8 +297,20 @@ internal class CompanionRolesHandler : IHandler
 
     private void Handle_RescueCompanion(MessagePayload<RescueCompanion> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.OneToOneConversationHeroId, out var oneToOneConversationHero)) return;
+        var data = obj.What;
 
-        EndCaptivityAction.ApplyByReleasedAfterBattle(oneToOneConversationHero);
+        GameThread.Run(() =>
+        {
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging<Hero>(data.OneToOneConversationHeroId, out var oneToOneConversationHero)) return;
+
+                EndCaptivityAction.ApplyByReleasedAfterBattle(oneToOneConversationHero);
+            }
+            catch (Exception e)
+            {
+                logger.Error(e, "Failed to apply {Message}", nameof(RescueCompanion));
+            }
+        });
     }
 }

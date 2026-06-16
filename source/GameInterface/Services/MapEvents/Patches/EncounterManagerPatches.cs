@@ -51,6 +51,20 @@ internal class EncounterManagerPatches
         if (!mobileParty.IsControlledByThisInstance())
             return false;
 
+        // On a client, the controlled party's engage state arrives from the server across independent,
+        // non-atomic sync channels (ShortTermBehavior, AiBehaviorPartyBase, AiBehaviorInteractable). While
+        // an engage behavior has arrived but its target/interactable has not, vanilla dereferences the
+        // still-null target and throws, crashing the campaign tick. Skip this tick; the state converges
+        // shortly and the encounter then proceeds normally.
+        if (ModInformation.IsClient)
+        {
+            if (mobileParty.Ai.AiBehaviorInteractable == null)
+                return false;
+
+            if (mobileParty.ShortTermBehavior == AiBehavior.EngageParty && mobileParty.ShortTermTargetParty == null)
+                return false;
+        }
+
         return true;
     }
 

@@ -17,7 +17,7 @@ namespace GameInterface.Services.UI.Patches
         [HarmonyPrefix]
         static bool OnEscapeMenuToggled(MapScreen __instance, bool isOpened)
         {
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 __instance.MapCameraView.OnEscapeMenuToggled(isOpened);
                 if (__instance.IsEscapeMenuOpened == isOpened)

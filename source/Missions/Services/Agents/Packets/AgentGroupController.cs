@@ -57,7 +57,7 @@ namespace Missions.Services.Agents.Packets
         {
             if (m_ControlledAgents.TryGetValue(movement.AgentId, out Agent agent))
             {
-                GameLoopRunner.RunOnMainThread(() =>
+                GameThread.Run(() =>
                 {
                     // This action is queued from the network thread and runs a frame later. By then the
                     // local player may have left the instance (mission torn down) or moved to a new one,

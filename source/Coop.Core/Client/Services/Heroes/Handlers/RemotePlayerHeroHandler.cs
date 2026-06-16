@@ -61,7 +61,7 @@ internal class RemotePlayerHeroHandler : IHandler
         // Run on the main thread: unpack (if a hero blob was sent) THEN register control. AddPlayer
         // resolves the hero/party/clan to mark them controlled, so they must already exist — both the
         // unpack and the local player's own registration also run here.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             if (message.HeroData != null && message.HeroData.Length > 0)
                 heroInterface.ClientUnpackHero(message.HeroData, player);

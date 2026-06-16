@@ -52,7 +52,7 @@ namespace MissionTestMod
 
             Logger.Verbose("Building Network Configuration");
 
-            Updateables.Add(GameLoopRunner.Instance);
+            Updateables.Add(GameThread.Instance);
 
             JoinTavern = new InitialStateOption(
               "Join Online Tavern",
@@ -146,7 +146,7 @@ namespace MissionTestMod
         {
             if (m_IsFirstTick)
             {
-                GameLoopRunner.Instance.SetGameLoopThread();
+                GameThread.Instance.MarkGameThread();
 
                 m_IsFirstTick = false;
             }

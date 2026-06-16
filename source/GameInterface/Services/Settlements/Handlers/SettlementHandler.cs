@@ -1,9 +1,11 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Messages;
 using GameInterface.Services.Settlements.Patches;
 using Serilog;
+using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -127,13 +129,25 @@ public class SettlementHandler : IHandler
 
     private void HandleLastVisitTimeOfOwner(MessagePayload<ChangeSettlementLastVisitTimeOfOwner> payload)
     {
-        var obj = payload.What;
-        if (objectManager.TryGetObject<Settlement>(obj.SettlementID, out var settlement) == false)
+        var data = payload.What;
+
+        GameThread.Run(() =>
         {
-            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementID);
-            return;
-        }
-        LastVisitTimeOwnerSettlementActionPatch.RunLastVisitTimeOfOwner(settlement, obj.CurrentTime);
+            try
+            {
+                if (objectManager.TryGetObject<Settlement>(data.SettlementID, out var settlement) == false)
+                {
+                    Logger.Error("Unable to find Settlement ({SettlementId})", data.SettlementID);
+                    return;
+                }
+
+                LastVisitTimeOwnerSettlementActionPatch.RunLastVisitTimeOfOwner(settlement, data.CurrentTime);
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to apply ChangeSettlementLastVisitTimeOfOwner");
+            }
+        });
     }
 
     private void HandleHitPointsRatio(MessagePayload<ChangeSettlementWallHitPointsRatio> payload)

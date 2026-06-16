@@ -53,7 +53,7 @@ internal class LastThreatTimeSettlementPatch
 
     internal static void LastThreatTimeChange(Settlement settlement, long? lastThreatTime)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {

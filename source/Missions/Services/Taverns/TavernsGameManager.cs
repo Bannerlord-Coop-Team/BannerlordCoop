@@ -104,7 +104,7 @@ namespace Missions.Services.Taverns
 
             Logger.Information("Spawning Agent");
             Agent agent = default;
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 agent = Mission.Current.SpawnAgent(agentBuildData);
                 agent.FadeIn();

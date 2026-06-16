@@ -150,7 +150,7 @@ internal class LocationCharacterListPatches
 
     public static void AddLocationCharacter(Location location, LocationCharacter locationCharacter)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {
@@ -183,7 +183,7 @@ internal class LocationCharacterListPatches
 
     public static void RemoveLocationCharacter(Location location, CharacterObject character)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {
@@ -222,7 +222,7 @@ internal class LocationCharacterListPatches
 
     public static void RemoveAllLocationCharacters(Location location)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {

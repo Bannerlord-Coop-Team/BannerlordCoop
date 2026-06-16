@@ -73,7 +73,7 @@ public class PartyVisualLifetimeHandler : IHandler
         // Doing this on the network thread races that tick and corrupts memory, so marshal it onto
         // the main thread. Re-read Current there: it can be torn down or replaced (campaign exit,
         // save reload, mission entry) between this enqueue and the queued action running.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {
@@ -112,7 +112,7 @@ public class PartyVisualLifetimeHandler : IHandler
         // thread, would race a create whose registration is still queued: the lookup would miss the
         // not-yet-registered id, the destroy would be dropped, and the queued create would then leave
         // a zombie visual on the map.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {
