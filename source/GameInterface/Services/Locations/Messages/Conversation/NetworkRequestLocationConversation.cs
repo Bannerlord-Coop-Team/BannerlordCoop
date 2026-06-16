@@ -4,7 +4,7 @@ using ProtoBuf;
 namespace GameInterface.Services.Locations.Messages.Conversation;
 
 /// <summary>
-/// Client -&gt; Server request to start a conversation with a settlement-location NPC. The server replies
+/// Client -> Server request to start a conversation with a settlement-location NPC. The server replies
 /// with <see cref="NetworkAllowLocationConversation"/> when the NPC is free, or
 /// <see cref="NetworkLocationConversationDenied"/> when another player already holds it. The reply echoes
 /// <see cref="Generation"/> so the client can ignore a stale reply for a request it has since abandoned.

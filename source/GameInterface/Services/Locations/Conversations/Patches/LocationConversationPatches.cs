@@ -51,23 +51,8 @@ internal static class LocationConversationPatches
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (!ModInformation.IsClient) return true;
 
-        // Only synced heroes (notables, companions, quest givers) are a shared identity across clients;
-        // ambient crowd shares a culture template and is left unlocked.
-        if (!(agent?.Character is CharacterObject character) || !character.IsHero) return true;
-
-        // Mirror vanilla's start guard so we only gate an interaction that would actually open a
-        // conversation (distance, enemy, interactability, not already conversing).
-        var conversationManager = __instance.ConversationManager;
-        if (conversationManager == null || conversationManager.IsConversationInProgress) return true;
-        if (!__instance.IsThereAgentAction(userAgent, agent)) return true;
-
-        var tracker = LocationConversationTracker.Instance;
-        var objectManager = tracker?.ObjectManager;
-        var location = CampaignMission.Current?.Location;
-        if (tracker == null || objectManager == null || location == null) return true;
-
-        if (!objectManager.TryGetId(character, out var characterId)) return true;
-        if (!objectManager.TryGetId(location, out var locationId)) return true;
+        // Not a lock target (ambient crowd, no real interaction, or unresolved ids) -> let vanilla run.
+        if (!TryGetLockTarget(__instance, userAgent, agent, out var locationId, out var characterId)) return true;
 
         // A request is already in flight, or we already hold a conversation: block re-entry without re-asking.
         if (pending.HasValue || heldNpcKey != null) return false;
@@ -78,6 +63,34 @@ internal static class LocationConversationPatches
 
         // Hold the conversation; it starts when the server approves.
         return false;
+    }
+
+    /// <summary>
+    /// True only for an interaction this client should gate: a synced hero NPC in the current location, where
+    /// vanilla would actually open a conversation and both NPC and location resolve to co-op ids.
+    /// </summary>
+    private static bool TryGetLockTarget(MissionConversationLogic instance, Agent userAgent, Agent agent,
+        out string locationId, out string characterId)
+    {
+        locationId = null;
+        characterId = null;
+
+        // Only synced heroes (notables, companions, quest givers) are a shared identity across clients;
+        // ambient crowd shares a culture template and is left unlocked.
+        if (!(agent?.Character is CharacterObject character) || !character.IsHero) return false;
+
+        // Mirror vanilla's start guard so we only gate an interaction that would actually open a
+        // conversation (distance, enemy, interactability, not already conversing).
+        var conversationManager = instance.ConversationManager;
+        if (conversationManager == null || conversationManager.IsConversationInProgress) return false;
+        if (!instance.IsThereAgentAction(userAgent, agent)) return false;
+
+        var tracker = LocationConversationTracker.Instance;
+        var objectManager = tracker?.ObjectManager;
+        var location = CampaignMission.Current?.Location;
+        if (tracker == null || objectManager == null || location == null) return false;
+
+        return objectManager.TryGetId(character, out characterId) && objectManager.TryGetId(location, out locationId);
     }
 
     [HarmonyPatch(typeof(MissionConversationLogic), "OnConversationEnd")]
@@ -97,11 +110,7 @@ internal static class LocationConversationPatches
         // A fresh settlement mission is starting. Any lock state left over from a prior mission that did not
         // tear down cleanly (a crash mid-teardown) is stale; release it server-side and clear it so it cannot
         // block the first interaction of this visit.
-        if (!pending.HasValue && heldNpcKey == null) return;
-
-        pending = null;
-        heldNpcKey = null;
-        MessageBroker.Instance.Publish(null, new LocationConversationEnded());
+        ReleaseStaleLock();
     }
 
     [HarmonyPatch(typeof(MissionConversationLogic), "OnEndMission")]
@@ -111,6 +120,12 @@ internal static class LocationConversationPatches
         // The mission tore down (the player left the settlement, etc.). A held conversation already
         // released via OnConversationEnd; anything still set here is a pending request whose reply never
         // arrived - release it server-side and clear local state so a lost reply cannot wedge the next visit.
+        ReleaseStaleLock();
+    }
+
+    // Drop any stale local lock (pending request or held conversation) and tell the server to release it.
+    static void ReleaseStaleLock()
+    {
         if (!pending.HasValue && heldNpcKey == null) return;
 
         pending = null;

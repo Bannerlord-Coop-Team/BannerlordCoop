@@ -4,7 +4,7 @@ using ProtoBuf;
 namespace GameInterface.Services.Locations.Messages.Conversation;
 
 /// <summary>
-/// Server -&gt; Client approval to open the requested settlement-location conversation. <see cref="Generation"/>
+/// Server -> Client approval to open the requested settlement-location conversation. <see cref="Generation"/>
 /// echoes the request's id so the client starts the approval only when it still matches its current pending
 /// request, ignoring a stale approval for one it abandoned (e.g. after leaving the settlement).
 /// </summary>
