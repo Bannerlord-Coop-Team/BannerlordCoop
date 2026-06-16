@@ -37,17 +37,12 @@ internal static class AmbientSpawnReenable
         // Run the handler inside an ambient scope so the crowd it spawns can be recognised (and made static /
         // non-interactable) without affecting other NPCs spawned by un-wrapped behaviors in the same pass.
         CampaignEvents.LocationCharactersAreReadyToSpawnEvent.AddNonSerializedListener(behavior,
-            (Action<Dictionary<string, int>>)(unusedUsablePointCount =>
+            unusedUsablePointCount =>
             {
-                AmbientCrowd.BeginScope();
-                try
+                using (new AmbientCrowd.SpawnScope())
                 {
                     handler(unusedUsablePointCount);
                 }
-                finally
-                {
-                    AmbientCrowd.EndScope();
-                }
-            }));
+            });
     }
 }
