@@ -275,7 +275,7 @@ namespace Missions.Services.Taverns
 
             if (agentRegistry.TryGetAgent(leftAgentId, out Agent agent))
             {
-                GameLoopRunner.RunOnMainThread(() =>
+                GameThread.Run(() =>
                 {
                     if (agent.Health > 0)
                     {

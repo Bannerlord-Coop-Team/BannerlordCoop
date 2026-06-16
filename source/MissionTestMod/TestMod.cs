@@ -146,7 +146,7 @@ namespace MissionTestMod
         {
             if (m_IsFirstTick)
             {
-                GameThread.Instance.SetGameThreadThread();
+                GameThread.Instance.MarkGameThread();
 
                 m_IsFirstTick = false;
             }

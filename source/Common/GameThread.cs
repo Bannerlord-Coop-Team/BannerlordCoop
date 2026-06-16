@@ -134,7 +134,7 @@ public class GameThread : IUpdateable
         }, blocking);
     }
 
-    public void SetGameThreadThread()
+    public void MarkGameThread()
     {
         m_GameLoopThreadId = Thread.CurrentThread.ManagedThreadId;
     }

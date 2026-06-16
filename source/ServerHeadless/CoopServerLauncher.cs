@@ -29,7 +29,7 @@ namespace ServerHeadless
         {
             Type gameThreadType = Load("Common", "Common.GameThread");
             _gameThread = gameThreadType.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static).GetValue(null);
-            gameThreadType.GetMethod("SetGameThreadThread").Invoke(_gameThread, null);
+            gameThreadType.GetMethod("MarkGameThread").Invoke(_gameThread, null);
             _update = gameThreadType.GetMethod("Update", new[] { typeof(TimeSpan) });
         }
 

@@ -76,7 +76,7 @@ namespace Coop
                 EnsureSafeExitConfig();
             }
 
-            GameThread.Instance.SetGameThreadThread();
+            GameThread.Instance.MarkGameThread();
         }
 
         private void SetupLogging()
@@ -251,7 +251,7 @@ namespace Coop
         {
             if(m_IsFirstTick)
             {
-                GameThread.Instance.SetGameThreadThread();
+                GameThread.Instance.MarkGameThread();
                 
                 m_IsFirstTick = false;
             }    
