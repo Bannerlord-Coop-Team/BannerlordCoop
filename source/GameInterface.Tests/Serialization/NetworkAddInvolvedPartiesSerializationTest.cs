@@ -1,4 +1,4 @@
-using GameInterface.Services.MapEvents.Messages;
+﻿using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Surrogates;
 using ProtoBuf.Meta;
 using System.IO;

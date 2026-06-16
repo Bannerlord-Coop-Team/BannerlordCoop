@@ -370,6 +370,12 @@ internal class BattleHandler : IHandler
         // campaign-map render or the party locator the main tick reads.
         GameLoopRunner.RunOnMainThread(() =>
         {
+            // The campaign can tear down (exit to menu, disconnect, save load) between
+            // enqueuing this and the main thread draining it; the Position setter
+            // dereferences Campaign.Current, and GameLoopRunner runs actions unguarded.
+            if (Campaign.Current == null)
+                return;
+
             using (new AllowedThread())
             {
                 foreach (var (party, position) in partiesToReposition)
