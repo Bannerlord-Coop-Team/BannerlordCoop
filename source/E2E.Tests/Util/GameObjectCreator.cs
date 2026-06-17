@@ -63,7 +63,9 @@ internal class GameObjectCreator
         { typeof(VillagerPartyComponent), new VillagerPartyComponentBuilder() },
         { typeof(SiegeEvent.SiegeEngineMissile), new SiegeEngineMissileBuilder() },
         { typeof(TraitObject), new TraitObjectBuilder() },
-        { typeof(PropertyOwner<TraitObject>), new PropertyOwnerBuilder() }
+        { typeof(PropertyOwner<TraitObject>), new PropertyOwnerBuilder() },
+        { typeof(SiegeEngineType), new SiegeEngineTypeBuilder() },
+        { typeof(SiegeEngineConstructionProgress), new SiegeEngineConstructionProgressBuilder()  },
     };
 
     public static T CreateInitializedObject<T>()

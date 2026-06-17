@@ -9,7 +9,7 @@ namespace E2E.Tests.Util.ObjectBuilders
         {
             var siegeEngineType = new SiegeEngineType();
             var prog = new SiegeEngineConstructionProgress(siegeEngineType, 1, 100);
-            return new SiegeEnginesContainer(TaleWorlds.Core.BattleSideEnum.Attacker, prog);
+            return new SiegeEnginesContainer(BattleSideEnum.Attacker, prog);
         }
     }
 }

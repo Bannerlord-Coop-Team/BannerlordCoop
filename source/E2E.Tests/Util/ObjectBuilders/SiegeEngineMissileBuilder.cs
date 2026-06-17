@@ -8,19 +8,12 @@ namespace E2E.Tests.Util.ObjectBuilders
     {
         public object Build()
         {
-
-            var target = new SiegeEvent.SiegeEngineConstructionProgress(
-                null,
-                1f,
-                100f
-            );
-
             return new SiegeEvent.SiegeEngineMissile(
                 null,
                 0,
                 SiegeBombardTargets.None,
                 0,
-                target,
+                null,
                 CampaignTime.Now,
                 CampaignTime.Now,
                 false
