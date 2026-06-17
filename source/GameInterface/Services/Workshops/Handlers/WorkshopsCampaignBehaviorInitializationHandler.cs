@@ -89,9 +89,9 @@ namespace GameInterface.Services.Workshops.Handlers
                 if (!objectManager.TryGetObjectWithLogging<Settlement>(settlementRoster.Key, out var settlement)) continue;
 
                 var itemRoster = new ItemRoster();
-                foreach (var item in settlementRoster.Value)
+                foreach (var elementData in settlementRoster.Value)
                 {
-                    itemRoster.Add(itemRoster);
+                    itemRoster.Add(sessionWorkshopPlayerDataInterface.GetItemRosterElementFromData(elementData));
                 }
 
                 warehouseRosterPerSettlement[index] = new(settlement, itemRoster);

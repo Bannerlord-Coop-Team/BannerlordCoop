@@ -49,6 +49,7 @@ internal class InventoryLogicPatches
             __instance._rosters[1],
             __instance.IsTrading,
             __instance.CanGainXpFromDiscarding,
+            __instance._inventoryMode == Helpers.InventoryScreenHelper.InventoryMode.Warehouse, // IsManagingWarehouse
             __instance.OwnerParty.LeaderHero,
             __instance.TotalAmount,
             __instance.InventoryListener.GetGold(),

@@ -1,4 +1,6 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
+using GameInterface.Policies;
 using GameInterface.Services.Actions.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Actions;
@@ -13,6 +15,8 @@ internal class ChangeProductionTypeOfWorkshopActionPatches
     [HarmonyPrefix]
     public static bool ApplyPrefix(Workshop workshop, WorkshopType newWorkshopType, bool ignoreCost = false)
     {
+        if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed()) return true;
+
         var message = new ProductionTypeOfWorkshopChanged(workshop, newWorkshopType, ignoreCost);
         MessageBroker.Instance.Publish(null, message);
 

@@ -9,6 +9,7 @@ using GameInterface.Services.Inventory.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.UI.Notifications.Messages;
+using GameInterface.Services.Workshops.Messages;
 using HarmonyLib;
 using LiteNetLib;
 using Serilog;
@@ -62,7 +63,7 @@ internal class TradeHandler : IHandler
         var what = payload.What;
 
         string fromRosterId = null;
-        if (!what.CanGainXpFromDiscarding && !objectManager.TryGetIdWithLogging(what.FromRoster, out fromRosterId)) return;
+        if (!what.CanGainXpFromDiscarding && !what.IsManagingWarehouse && !objectManager.TryGetIdWithLogging(what.FromRoster, out fromRosterId)) return;
 
         if (!objectManager.TryGetIdWithLogging(what.ToRoster, out var toRosterId)) return;
         if (!objectManager.TryGetIdWithLogging(what.Hero, out var heroId)) return;
@@ -90,6 +91,7 @@ internal class TradeHandler : IHandler
             characterIdEquipmentsData,
             what.IsTrading,
             what.CanGainXpFromDiscarding,
+            what.IsManagingWarehouse,
             heroId,
             what.TotalAmount,
             what.MerchantGold,
@@ -153,8 +155,14 @@ internal class TradeHandler : IHandler
         }
 
         // Update rosters with new data
-        if (fromRoster != null) inventoryLogicInterface.UpdateRosterWithData(fromRoster, fromItemRosterData);
         if (toRoster != null) inventoryLogicInterface.UpdateRosterWithData(toRoster, toItemRosterData);
+        if (fromRoster != null) inventoryLogicInterface.UpdateRosterWithData(fromRoster, fromItemRosterData);
+        else if (message.IsManagingWarehouse)
+        {
+            // Manage warehouse rosters separately as they involve more complicated logic
+            MessageBroker.Instance.Publish(this, new WarehouseRosterManaged(payload.Who as NetPeer, hero, currentSettlementComponent.Settlement, fromItemRosterData));
+        }
+        
 
         // Update hero equipment with new data
         inventoryLogicInterface.UpdateEquipmentWithData(mobileParty, characterEquipmentsData);

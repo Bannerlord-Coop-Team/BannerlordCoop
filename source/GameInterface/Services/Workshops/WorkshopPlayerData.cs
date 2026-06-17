@@ -1,4 +1,5 @@
-﻿using ProtoBuf;
+﻿using GameInterface.Services.Inventory.Data;
+using ProtoBuf;
 using System.Collections.Generic;
 using TaleWorlds.Core;
 
@@ -14,9 +15,9 @@ public class WorkshopPlayerData
 {
     // Dictionary<PlayerHeroId, KeyValuePair<SettlementId, List<ItemRosterElement>>[]>
     [ProtoMember(1)]
-    public Dictionary<string, KeyValuePair<string, List<ItemRosterElement>>[]> PlayerWarehouseRosterPerSettlement { get; }
+    public Dictionary<string, KeyValuePair<string, List<ItemRosterElementData>>[]> PlayerWarehouseRosterPerSettlement { get; }
 
-    public WorkshopPlayerData(Dictionary<string, KeyValuePair<string, List<ItemRosterElement>>[]> playerWarehouseRosterPerSettlement)
+    public WorkshopPlayerData(Dictionary<string, KeyValuePair<string, List<ItemRosterElementData>>[]> playerWarehouseRosterPerSettlement)
     {
         PlayerWarehouseRosterPerSettlement = playerWarehouseRosterPerSettlement;
     }

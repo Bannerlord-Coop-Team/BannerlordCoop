@@ -27,26 +27,28 @@ internal readonly struct CompleteTrade : ICommand
     [ProtoMember(8)]
     public readonly bool CanGainXpFromDiscarding;
     [ProtoMember(9)]
-    public readonly string HeroId;
+    public readonly bool IsManagingWarehouse;
     [ProtoMember(10)]
-    public readonly int TotalAmount;
+    public readonly string HeroId;
     [ProtoMember(11)]
-    public readonly int MerchantGold;
+    public readonly int TotalAmount;
     [ProtoMember(12)]
-    public readonly string PartyId;
+    public readonly int MerchantGold;
     [ProtoMember(13)]
-    public readonly bool IsSettlementComponentNull;
+    public readonly string PartyId;
     [ProtoMember(14)]
+    public readonly bool IsSettlementComponentNull;
+    [ProtoMember(15)]
     public readonly string CurrentSettlementComponentId;
 
-    [ProtoMember(15)]
-    public readonly (ItemRosterElementData, int)[] BoughtItems;
     [ProtoMember(16)]
+    public readonly (ItemRosterElementData, int)[] BoughtItems;
+    [ProtoMember(17)]
     public readonly (ItemRosterElementData, int)[] SoldItems;
 
-    [ProtoMember(17)]
-    public readonly string TroopRosterId;
     [ProtoMember(18)]
+    public readonly string TroopRosterId;
+    [ProtoMember(19)]
     public readonly TroopRosterData TroopRosterData;
 
     public CompleteTrade(
@@ -58,6 +60,7 @@ internal readonly struct CompleteTrade : ICommand
         Dictionary<string, EquipmentData[]> characterIdEquipmentsData,
         bool isTrading,
         bool canGainXpFromDiscarding,
+        bool isManagingWarehouse,
         string heroId,
         int totalAmount,
         int merchantGold,
@@ -77,6 +80,7 @@ internal readonly struct CompleteTrade : ICommand
         CharacterIdEquipmentsData = characterIdEquipmentsData;
         IsTrading = isTrading;
         CanGainXpFromDiscarding = canGainXpFromDiscarding;
+        IsManagingWarehouse = isManagingWarehouse;
         HeroId = heroId;
         TotalAmount = totalAmount;
         MerchantGold = merchantGold;
