@@ -48,10 +48,11 @@ public class DynamicSyncFieldPropertyOwnerBuilder : DynamicSyncBuilderBase
         var fieldInfo = fieldItem.Value;
         return new
         {
-            MemberDeclaringType = fieldInfo.DeclaringType.Name,
+            MemberDeclaringType = DynamicSyncUtils.GetSimpleTypeName(fieldInfo.DeclaringType),
+            MemberDeclaringTypeName = fieldInfo.DeclaringType.Name,
             MemberName = fieldInfo.Name,
-            MemberType = fieldInfo.FieldType.Name,
-            ElementType = GetElementType(fieldInfo.FieldType).Name,
+            MemberType = DynamicSyncUtils.GetSimpleTypeName(fieldInfo.FieldType),
+            ElementType = DynamicSyncUtils.GetSimpleTypeName(GetElementType(fieldInfo.FieldType)),
             Libraries = DynamicSyncUtils.GetLibraries(fieldInfo),
             ReadOnly = fieldInfo.IsInitOnly,
             Debug = fieldItem.Debug

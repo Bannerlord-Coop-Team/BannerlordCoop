@@ -1,13 +1,16 @@
 ﻿using E2E.Tests.Util;
+using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
+using static TaleWorlds.MountAndBlade.Mission;
 
 namespace E2E.Tests.Services.SiegeEngineMissiles
 {
@@ -23,10 +26,13 @@ namespace E2E.Tests.Services.SiegeEngineMissiles
         {
             Server.ObjectManager.TryGetObject(siegeEngineMissileId, out SiegeEvent.SiegeEngineMissile siegeEngineMissile);
 
-
-            //TestEnvironment.AssertField<SiegeEvent.SiegeEngineMissile,int>(nameof(SiegeEvent.SiegeEngineMissile.ShooterSlotIndex), 2);
-            //TestEnvironment.AssertReferenceField<SiegeEvent.SiegeEngineMissile, SiegeEngineType>(nameof(SiegeEvent.SiegeEngineMissile.ShooterSiegeEngineType));
-
+            //TestEnvironment.AssertReferenceField<SiegeEvent.SiegeEngineMissile, SiegeEngineType>(nameof(SiegeEvent.SiegeEngineMissile.ShooterSiegeEngineType), referenceStringId: catapultId); TestEnvironment.AssertField<SiegeEvent.SiegeEngineMissile, int>(nameof(SiegeEvent.SiegeEngineMissile.ShooterSlotIndex), 2);
+            TestEnvironment.AssertField<SiegeEvent.SiegeEngineMissile, SiegeBombardTargets>(nameof(SiegeEvent.SiegeEngineMissile.TargetType), SiegeBombardTargets.Wall);
+            TestEnvironment.AssertField<SiegeEvent.SiegeEngineMissile, int>(nameof(SiegeEvent.SiegeEngineMissile.TargetSlotIndex), 2);
+            //TestEnvironment.AssertReferenceField<SiegeEvent.SiegeEngineMissile, SiegeEvent.SiegeEngineConstructionProgress>(nameof(SiegeEvent.SiegeEngineMissile.TargetSiegeEngine));
+            TestEnvironment.AssertField<SiegeEvent.SiegeEngineMissile, bool>(nameof(SiegeEvent.SiegeEngineMissile.HitSuccessful), true);
+            TestEnvironment.AssertField<SiegeEvent.SiegeEngineMissile, CampaignTime>(nameof(SiegeEvent.SiegeEngineMissile.CollisionTime), CampaignTime.Now);
+            TestEnvironment.AssertField<SiegeEvent.SiegeEngineMissile, CampaignTime>(nameof(SiegeEvent.SiegeEngineMissile.FireDecisionTime), CampaignTime.Now);
         }
 
     }

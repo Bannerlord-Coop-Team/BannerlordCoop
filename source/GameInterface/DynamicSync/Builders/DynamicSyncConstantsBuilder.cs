@@ -36,7 +36,10 @@ namespace GameInterface.DynamicSync.Builders
             {
                 Types = items.Select(i => new { Type = i, Index = items.IndexOf(i) }),
                 Libraries = ReadOnlyFields.SelectMany(f => DynamicSyncUtils.GetLibraries(f)).Distinct().ToList(),
-                ReadOnlyFields = ReadOnlyFields
+                ReadOnlyFields = ReadOnlyFields.Select(f => new {
+                    DeclaringTypeName = DynamicSyncUtils.GetSimpleTypeName(f.DeclaringType),
+                    Name = f.Name
+                }).ToList()
             });
 
             DynamicSyncConfiguration.ExportFile("Constants.cs", constantsTemplate);

@@ -98,10 +98,11 @@ public class DynamicSyncPropertyListBuilder : DynamicSyncBuilderBase
         var serializers = GetSerializerMethodNames(GetElementType(propertyInfo.PropertyType));
         return new
         {
-            MemberDeclaringType = propertyInfo.DeclaringType.Name,
+            MemberDeclaringType = DynamicSyncUtils.GetSimpleTypeName(propertyInfo.DeclaringType),
+            MemberDeclaringTypeName = propertyInfo.DeclaringType.Name,
             MemberName = propertyInfo.Name,
             MemberType = GetListTypeName(propertyInfo.PropertyType),
-            ElementType = GetElementType(propertyInfo.PropertyType).Name,
+            ElementType = DynamicSyncUtils.GetSimpleTypeName(GetElementType(propertyInfo.PropertyType)),
             Libraries = DynamicSyncUtils.GetLibraries(propertyInfo),
             NotReadOnly = propertyInfo.SetMethod != null,
             SerializeMethod = serializers.serialize,

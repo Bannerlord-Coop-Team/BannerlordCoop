@@ -56,9 +56,10 @@ public class DynamicSyncFieldBuilder : DynamicSyncBuilderBase
         var serializerNames = GetSerializerMethodNames(fieldInfo.FieldType);
         return new
         {
-            MemberDeclaringType = fieldInfo.DeclaringType.Name,
+            MemberDeclaringType = DynamicSyncUtils.GetSimpleTypeName(fieldInfo.DeclaringType),
+            MemberDeclaringTypeName = fieldInfo.DeclaringType.Name,
             MemberName = fieldInfo.Name,
-            MemberType = fieldInfo.FieldType.Name,
+            MemberType = DynamicSyncUtils.GetSimpleTypeName(fieldInfo.FieldType),
             Libraries = DynamicSyncUtils.GetLibraries(fieldInfo),
             SerializeMethod = serializerNames.serialize,
             DeserializeMethod = serializerNames.deserialize,

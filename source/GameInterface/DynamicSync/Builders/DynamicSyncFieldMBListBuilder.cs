@@ -95,7 +95,8 @@ public class DynamicSyncFieldMBListBuilder : DynamicSyncBuilderBase
         var serializers = GetSerializerMethodNames(GetElementType(fieldInfo.FieldType));
         return new
         {
-            MemberDeclaringType = fieldInfo.DeclaringType.Name,
+            MemberDeclaringType = DynamicSyncUtils.GetSimpleTypeName(fieldInfo.DeclaringType),
+            MemberDeclaringTypeName = fieldInfo.DeclaringType.Name,
             MemberName = fieldInfo.Name,
             MemberType = GetMbListTypeName(fieldInfo.FieldType),
             ElementType = GetElementType(fieldInfo.FieldType).Name,

@@ -21,9 +21,9 @@ using {{ library }};
 namespace DynamicSync;
 
 [HarmonyPatch]
-public class {{DeclaringType}}_DynamicPatches : GenericPatches<{{DeclaringType}}_DynamicPatches, {{DeclaringType}}>
+public class {{DeclaringTypeName}}_DynamicPatches : GenericPatches<{{DeclaringTypeName}}_DynamicPatches, {{DeclaringType}}>
 {
-    private readonly static ILogger Logger = LogManager.GetLogger<{{DeclaringType}}_DynamicPatches>();
+    private readonly static ILogger Logger = LogManager.GetLogger<{{DeclaringTypeName}}_DynamicPatches>();
 
     private static IEnumerable<MethodBase> TargetMethods()
     {

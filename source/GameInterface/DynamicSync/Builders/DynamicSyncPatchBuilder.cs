@@ -166,7 +166,8 @@ namespace GameInterface.DynamicSync.Builders
             var patchTemplate = TemplateParser.Parse("Patches.DynamicPatchTemplate", new
             {
                 Libraries = usings.Distinct(),
-                DeclaringType = declaringType.Name,
+                DeclaringType = DynamicSyncUtils.GetSimpleTypeName(declaringType),
+                DeclaringTypeName = declaringType.Name,
                 TargetMethods = dynamicRegistryItem.TargetMethods,
                 Prefixes = prefixes,
                 Transpilers = transpilers,
@@ -177,7 +178,8 @@ namespace GameInterface.DynamicSync.Builders
             var handlerTemplate = TemplateParser.Parse("Handlers.DynamicHandlerTemplate", new
             {
                 Libraries = usings.Distinct(),
-                DeclaringType = declaringType.Name,
+                DeclaringType = DynamicSyncUtils.GetSimpleTypeName(declaringType),
+                DeclaringTypeName = declaringType.Name,
                 Subscriptions = messageHandlers
             });
 

@@ -10,7 +10,7 @@ using {{ library }};
 namespace DynamicSync
 {
     [ProtoContract(SkipConstructor = true)]
-    public record {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage : GenericNetworkEvent<{{ MemberDeclaringType}}, {{ MemberType }}>
+    public record {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage : GenericNetworkEvent<{{ MemberDeclaringType}}, {{ MemberType }}>
     {
         [ProtoMember(1)]
         public override string InstanceId { get; set; }
@@ -21,7 +21,7 @@ namespace DynamicSync
         [ProtoMember(3)]
         public int Length { get; set; }
 
-        public {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage(string instanceId, List<(int Index, string Id)> value, int length) : base(instanceId)
+        public {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage(string instanceId, List<(int Index, string Id)> value, int length) : base(instanceId)
         {
             Value = value;
             Length = length;

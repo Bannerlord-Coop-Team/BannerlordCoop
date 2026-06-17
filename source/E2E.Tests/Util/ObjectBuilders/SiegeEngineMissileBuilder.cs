@@ -8,24 +8,22 @@ namespace E2E.Tests.Util.ObjectBuilders
     {
         public object Build()
         {
-            var type =
-                Game.Current.ObjectManager.GetObject<SiegeEngineType>("catapult");
 
             var target = new SiegeEvent.SiegeEngineConstructionProgress(
-                type,
+                null,
                 1f,
                 100f
             );
 
             return new SiegeEvent.SiegeEngineMissile(
-                type,
+                null,
                 0,
-                SiegeBombardTargets.RangedEngines,
-                1,
+                SiegeBombardTargets.None,
+                0,
                 target,
                 CampaignTime.Now,
                 CampaignTime.Now,
-                true
+                false
             );
         }
     }

@@ -1,13 +1,13 @@
 ﻿{{~ if Interface ~}}
-Subscribe<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage>((instanceId, data) => 
+Subscribe<{{MemberType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetLocalMessage>((instanceId, data) => 
 {
     int index = DynamicSync.Constants.TypeMap[data.Value.GetType()];
     if (!this.objectManager.TryGetId(data.Value.GetType(), data.Value, out string valueId) && data.Value != null) return;
                 
-    network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage(instanceId, valueId, index));
+    network.SendAll(new {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage(instanceId, valueId, index));
 });
 
-SubscribeNetwork<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage>((instance, data) => 
+SubscribeNetwork<{{MemberType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage>((instance, data) => 
 {
     var type = DynamicSync.Constants.TypeMapReverse[data.ValueTypeIndex];
     if (!objectManager.TryGetObjectWithLogging(type, data.ValueId, out object value) && data.ValueId != null) return;
@@ -21,9 +21,9 @@ SubscribeNetwork<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetNe
 {{~ end ~}}
 });
 {{~ else ~}}
-SubscribeGenericReference<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage, {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage>();
+SubscribeGenericReference<{{MemberType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetLocalMessage, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage>();
 
-SubscribeNetworkReference<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage >((instance, value, _) => { 
+SubscribeNetworkReference<{{MemberType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage >((instance, value, _) => { 
 {{~ if Debug ~}}
 	Logger.Debug("[Client] Received network set message for {type}", "{{MemberName}}");
 {{~ end ~}}

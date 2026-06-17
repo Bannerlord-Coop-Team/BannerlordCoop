@@ -22,10 +22,11 @@ public class DynamicSyncPropertyArrayBuilder : DynamicSyncBuilderBase
         return TemplateParser.Parse("Patches.PropertyArrayChangeTranspilerTemplate",
                 new
                 {
-                    MemberDeclaringType = propertyInfo.DeclaringType.Name,
+                    MemberDeclaringType = DynamicSyncUtils.GetSimpleTypeName(propertyInfo.DeclaringType),
+                    MemberDeclaringTypeName = propertyInfo.DeclaringType.Name,
                     MemberName = propertyInfo.Name,
                     MemberType = GetArrayType(propertyInfo.PropertyType),
-                    ElementType = propertyInfo.PropertyType.GetElementType().Name,
+                    ElementType = DynamicSyncUtils.GetSimpleTypeName(propertyInfo.PropertyType.GetElementType()),
                     Libraries = DynamicSyncUtils.GetLibraries(propertyInfo),
                     Debug = propertyitem.Debug
                 });
@@ -92,10 +93,11 @@ public class DynamicSyncPropertyArrayBuilder : DynamicSyncBuilderBase
         var serializers = GetSerializerMethodNames(propertyInfo.PropertyType.GetElementType());
         return new
         {
-            MemberDeclaringType = propertyInfo.DeclaringType.Name,
+            MemberDeclaringType = DynamicSyncUtils.GetSimpleTypeName(propertyInfo.DeclaringType),
+            MemberDeclaringTypeName = propertyInfo.DeclaringType.Name,
             MemberName = propertyInfo.Name,
             MemberType = GetArrayType(propertyInfo.PropertyType),
-            ElementType = propertyInfo.PropertyType.GetElementType().Name,
+            ElementType = DynamicSyncUtils.GetSimpleTypeName(propertyInfo.PropertyType.GetElementType()),
             Libraries = DynamicSyncUtils.GetLibraries(propertyInfo),
             NotReadOnly = propertyInfo.SetMethod != null,
             SerializeMethod = serializers.serialize,

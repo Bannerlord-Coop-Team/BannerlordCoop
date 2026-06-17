@@ -22,6 +22,7 @@ using TaleWorlds.SaveSystem;
 using TaleWorlds.SaveSystem.Load;
 using TaleWorlds.ScreenSystem;
 using Module = TaleWorlds.MountAndBlade.Module;
+using GameInterface;
 
 namespace MissionTestMod
 {

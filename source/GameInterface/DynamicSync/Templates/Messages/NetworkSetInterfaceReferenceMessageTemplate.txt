@@ -10,7 +10,7 @@ using {{ library }};
 namespace DynamicSync
 {
     [ProtoContract(SkipConstructor = true)]
-    public record {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage : GenericNetworkReferenceEvent<{{ MemberDeclaringType}}, {{ MemberType }}>
+    public record {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage : GenericNetworkReferenceEvent<{{ MemberDeclaringType}}, {{ MemberType }}>
     {
         [ProtoMember(1)]
         public override string InstanceId { get; set; }
@@ -22,7 +22,7 @@ namespace DynamicSync
         public int ValueTypeIndex { get; set; }
 
 
-        public {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage(string instanceId, string valueId, int valueTypeIndex) : base(instanceId, valueId)
+        public {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage(string instanceId, string valueId, int valueTypeIndex) : base(instanceId, valueId)
         {
             ValueTypeIndex = valueTypeIndex;
         }

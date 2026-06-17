@@ -206,6 +206,10 @@
       <Project>{3DE1F959-54AB-435F-BDE4-A8132BA18E6E}</Project>
       <Name>Common</Name>
     </ProjectReference>
+    <ProjectReference Include="..\GameInterface\GameInterface.csproj">
+      <Project>{d22cb8fa-40cc-4f47-986f-1c5a4415980b}</Project>
+      <Name>GameInterface</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Missions\Missions.csproj">
       <Project>{E12F967C-1CC9-4E4D-8D8F-5029E0BA96EE}</Project>
       <Name>Missions</Name>
