@@ -10,13 +10,12 @@ namespace GameInterface.Services.TroopRosters.Messages;
 /// roster indexing past the end of an under-populated array.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-internal record NetworkUpdateTroopRoster : ICommand
+internal readonly struct NetworkUpdateTroopRoster : ICommand
 {
     [ProtoMember(1)]
-    public string RosterId { get; }
-
+    public readonly string RosterId;
     [ProtoMember(2)]
-    public TroopRosterData Data { get; }
+    public readonly TroopRosterData Data;
 
     public NetworkUpdateTroopRoster(string rosterId, TroopRosterData data)
     {

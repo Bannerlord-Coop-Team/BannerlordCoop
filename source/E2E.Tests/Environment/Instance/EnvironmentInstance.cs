@@ -110,12 +110,13 @@ public abstract class EnvironmentInstance : IDisposable
     /// call and received message, mirroring the game loop, so authoritative roster changes replicate
     /// to the clients. No-op when no roster changed (or when this instance has no coalescer).
     /// </summary>
+    private TroopRosterSyncCoalescer troopRosterCoalescer;
+
     private void PumpTroopRosterSnapshots()
     {
-        if (container.TryResolve<TroopRosterSyncCoalescer>(out var coalescer))
-        {
-            coalescer.Update(default);
-        }
+        if (troopRosterCoalescer == null && !container.TryResolve(out troopRosterCoalescer)) return;
+
+        troopRosterCoalescer.Update(TimeSpan.Zero);
     }
 
     /// <summary>

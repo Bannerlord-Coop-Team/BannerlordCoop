@@ -51,7 +51,7 @@ namespace E2E.Tests.Services.TroopRosters
                 roster.AddToCountsAtIndex(0, countChange: 3, woundedCountChange: 0, xpChange: 0, removeDepleted: false);
             });
 
-            FlushServerRosters();
+            PumpCoalescer();
 
             foreach (var client in Clients)
             {
@@ -65,7 +65,7 @@ namespace E2E.Tests.Services.TroopRosters
         public void Server_RemoveZeroCounts_SyncsToClients()
         {
             // A zero-count element (CharacterId1) and a populated element (CharacterId2) on the server.
-            SeedEmptyElementOnServer(CharacterId1);
+            SeedTroopOnServer(CharacterId1, count: 0);
             SeedTroopOnServer(CharacterId2, count: 3);
 
             Server.Call(() =>
@@ -76,7 +76,7 @@ namespace E2E.Tests.Services.TroopRosters
                 roster.RemoveZeroCounts();
             });
 
-            FlushServerRosters();
+            PumpCoalescer();
 
             foreach (var client in Clients)
             {
@@ -100,7 +100,7 @@ namespace E2E.Tests.Services.TroopRosters
                 roster.SetElementNumber(0, 10);
             });
 
-            FlushServerRosters();
+            PumpCoalescer();
 
             foreach (var client in Clients)
             {
@@ -121,7 +121,7 @@ namespace E2E.Tests.Services.TroopRosters
                 roster.SetElementWoundedNumber(0, 2);
             });
 
-            FlushServerRosters();
+            PumpCoalescer();
 
             foreach (var client in Clients)
             {
@@ -142,7 +142,7 @@ namespace E2E.Tests.Services.TroopRosters
                 roster.SetElementXp(0, 100);
             });
 
-            FlushServerRosters();
+            PumpCoalescer();
 
             foreach (var client in Clients)
             {
@@ -165,7 +165,7 @@ namespace E2E.Tests.Services.TroopRosters
                 roster.AddToCounts(character, 5);
             });
 
-            FlushServerRosters();
+            PumpCoalescer();
 
             foreach (var client in Clients)
             {
@@ -192,7 +192,7 @@ namespace E2E.Tests.Services.TroopRosters
                 roster.Clear();
             });
 
-            FlushServerRosters();
+            PumpCoalescer();
 
             foreach (var client in Clients)
             {
@@ -215,7 +215,7 @@ namespace E2E.Tests.Services.TroopRosters
                 roster.WoundTroop(character, 2, default);
             });
 
-            FlushServerRosters();
+            PumpCoalescer();
 
             foreach (var client in Clients)
             {
@@ -242,7 +242,7 @@ namespace E2E.Tests.Services.TroopRosters
                 roster.SetElementWoundedNumber(0, 1);
             });
 
-            FlushServerRosters();
+            PumpCoalescer();
 
             foreach (var client in Clients)
             {
@@ -265,19 +265,19 @@ namespace E2E.Tests.Services.TroopRosters
 
         #region Helpers
         /// <summary>
-        /// Flushes the server's coalesced roster changes, the step the game's main loop performs once
-        /// per frame, sending a whole-roster snapshot to every client.
+        /// Pumps the server's snapshot coalescer, the step the game's main loop performs once per
+        /// frame, sending a whole-roster snapshot to every client.
         /// </summary>
-        private void FlushServerRosters()
+        private void PumpCoalescer()
         {
             Server.Call(() => Server.Resolve<TroopRosterSyncCoalescer>().Update(TimeSpan.Zero));
         }
 
         /// <summary>
         /// Adds <paramref name="count"/> of <paramref name="characterId"/> to the roster on the server
-        /// only, without triggering sync, so the server starts from a known state. Clients receive the
-        /// state through the snapshot rather than being seeded directly. <see cref="AllowedThread"/>
-        /// suppresses the authority patches.
+        /// only, without triggering sync, so the server starts from a known state. A <paramref name="count"/>
+        /// of zero seeds an empty (zero-count) element. Clients receive the state through the snapshot
+        /// rather than being seeded directly. <see cref="AllowedThread"/> suppresses the authority patches.
         /// </summary>
         private void SeedTroopOnServer(string characterId, int count)
         {
@@ -293,26 +293,11 @@ namespace E2E.Tests.Services.TroopRosters
                     // publishes sync for AddToCounts even on an allowed thread (the recruitment flow
                     // runs under AllowedThread), so seeding through it would sync the seed too.
                     roster.AddNewElement(character, -1);
-                    var index = roster.FindIndexOfTroop(character);
-                    roster.AddToCountsAtIndex(index, count, woundedCountChange: 0, xpChange: 0, removeDepleted: false);
-                }
-            });
-        }
-
-        /// <summary>
-        /// Adds a zero-count element for <paramref name="characterId"/> on the server only, without
-        /// triggering sync.
-        /// </summary>
-        private void SeedEmptyElementOnServer(string characterId)
-        {
-            Server.Call(() =>
-            {
-                using (new AllowedThread())
-                {
-                    Assert.True(Server.ObjectManager.TryGetObject<TroopRoster>(TroopRosterId, out var roster));
-                    Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(characterId, out var character));
-
-                    roster.AddNewElement(character, -1);
+                    if (count > 0)
+                    {
+                        var index = roster.FindIndexOfTroop(character);
+                        roster.AddToCountsAtIndex(index, count, woundedCountChange: 0, xpChange: 0, removeDepleted: false);
+                    }
                 }
             });
         }
