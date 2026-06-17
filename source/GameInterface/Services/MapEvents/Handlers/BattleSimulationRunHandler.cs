@@ -364,6 +364,10 @@ internal class BattleSimulationRunHandler : IHandler
 
                 EndSimulationSession(sim);
                 mapEventLogger.DebugMapEvent(sim.MapEvent, "Battle simulation client disconnected; finished server-side. BattleState={BattleState}", sim.MapEvent.BattleState);
+
+                // Tell the spectators the simulation is over, otherwise they stay stuck in the spectator window now
+                // that the pacing client (which would have driven it to completion) is gone.
+                network.SendAll(new NetworkBattleSimulationFinished(entry.Key));
             }
         }, blocking: true);
 

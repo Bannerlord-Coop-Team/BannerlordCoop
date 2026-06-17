@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
 using Common.Util;
+using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
@@ -68,6 +69,7 @@ internal class ConversationRequestHandler : IHandler
         messageBroker.Subscribe<ConversationEnded>(Handle_ConversationEnded);
         messageBroker.Subscribe<NetworkConversationEnded>(Handle_NetworkConversationEnded);
         messageBroker.Subscribe<NetworkConversationDenied>(Handle_NetworkConversationDenied);
+        messageBroker.Subscribe<NetworkPvpDefenderShown>(Handle_NetworkPvpDefenderShown);
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
     }
 
@@ -79,6 +81,7 @@ internal class ConversationRequestHandler : IHandler
         messageBroker.Unsubscribe<ConversationEnded>(Handle_ConversationEnded);
         messageBroker.Unsubscribe<NetworkConversationEnded>(Handle_NetworkConversationEnded);
         messageBroker.Unsubscribe<NetworkConversationDenied>(Handle_NetworkConversationDenied);
+        messageBroker.Unsubscribe<NetworkPvpDefenderShown>(Handle_NetworkPvpDefenderShown);
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
     }
 
@@ -436,13 +439,38 @@ internal class ConversationRequestHandler : IHandler
         GameThread.Run(ConversationPartyHold.ShowInteractionBlockedMessage);
     }
 
-    /// <summary>[Server] A player disconnected: release the AI party held for them, if any.</summary>
+    /// <summary>[Server] The defender's client reports it is showing the "hold on" popup; record its peer so a
+    /// later disconnect can be mapped back to this conversation.</summary>
+    private void Handle_NetworkPvpDefenderShown(MessagePayload<NetworkPvpDefenderShown> payload)
+    {
+        if (!ModInformation.IsServer) return;
+
+        if (payload.Who is NetPeer defenderPeer)
+            conversationPartyTracker.SetPvpDefenderPeer(payload.What.DefenderPartyId, defenderPeer);
+    }
+
+    /// <summary>[Server] A player disconnected: release the AI party held for them, the PvP interaction they drove
+    /// (as attacker), and the PvP conversation they were the defender of.</summary>
     private void Handle_PlayerDisconnected(MessagePayload<PlayerDisconnected> payload)
     {
         if (!ModInformation.IsServer) return;
 
         ReleaseEngagementOnMainThread(payload.What.PlayerId);
         EndPvpInteraction(payload.What.PlayerId);
+        EndPvpInteractionForDefender(payload.What.PlayerId);
+    }
+
+    /// <summary>[Server] The disconnected peer was a PvP defender: end the conversation and make the attacker (its
+    /// partner) leave the encounter, since the party it was interacting with is gone.</summary>
+    private void EndPvpInteractionForDefender(NetPeer defenderPeer)
+    {
+        if (!conversationPartyTracker.TryGetPvpPartyByPeer(defenderPeer, out var defenderPartyId))
+            return;
+
+        if (conversationPartyTracker.TryGetPvpPartner(defenderPartyId, out var attackerPartyId))
+            network.SendAll(new NetworkClosePvpEncounter(new[] { attackerPartyId }));
+
+        conversationPartyTracker.EndPvpConversation(defenderPartyId);
     }
 
     /// <summary>[Server] Releases the given player's engagement on the game thread.</summary>

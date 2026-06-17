@@ -289,10 +289,12 @@ internal class BattleHandler : IHandler
 
         // Capture the player parties on both sides before finalize clears them. They get a reliable,
         // server-addressed close (below) instead of each racing its own local teardown.
-        var playerPartyIds = CollectPlayerPartyIds(mapEvent);
+
+        string[] playerPartyIds = null;
         
         GameThread.Run(() =>
         {
+            playerPartyIds = CollectPlayerPartyIds(mapEvent);
             mapEvent.FinalizeEventAux();
         }, blocking: true);
 
@@ -456,11 +458,11 @@ internal class BattleHandler : IHandler
 
         var data = payload.What;
 
-        if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.MapEventId, out var mapEvent)) return;
-        if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.PartyId, out var party)) return;
-
         GameThread.Run(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.MapEventId, out var mapEvent)) return;
+            if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.PartyId, out var party)) return;
+
             if (party.MapEventSide != null)
             {
                 Logger.Warning("Ignoring join request: party {PartyId} is already in a map event", data.PartyId);

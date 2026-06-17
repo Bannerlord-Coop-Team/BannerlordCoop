@@ -35,6 +35,11 @@ internal sealed class ConversationPartyTracker : IHandler
     // map event forms (or the conversation ends).
     private readonly Dictionary<string, string> pvpPartnersByPartyId = new Dictionary<string, string>();
 
+    // Defender party id <-> the defender client's peer, learned from NetworkPvpDefenderShown. The attacker peer is
+    // tracked elsewhere (it sent the request); this lets a disconnecting defender be mapped back to its conversation.
+    private readonly Dictionary<string, object> pvpPeerByPartyId = new Dictionary<string, object>();
+    private readonly Dictionary<object, string> pvpPartyIdByPeer = new Dictionary<object, string>();
+
     private volatile bool isEmpty = true;
     private volatile bool pvpIsEmpty = true;
 
@@ -62,6 +67,8 @@ internal sealed class ConversationPartyTracker : IHandler
             engagementsByPartyId.Clear();
             partyIdsByEngager.Clear();
             pvpPartnersByPartyId.Clear();
+            pvpPeerByPartyId.Clear();
+            pvpPartyIdByPeer.Clear();
             isEmpty = true;
             pvpIsEmpty = true;
         }
@@ -195,6 +202,8 @@ internal sealed class ConversationPartyTracker : IHandler
             {
                 pvpPartnersByPartyId.Remove(partyId);
                 pvpPartnersByPartyId.Remove(partnerId);
+                RemovePvpPeer(partyId);
+                RemovePvpPeer(partnerId);
             }
 
             pvpIsEmpty = pvpPartnersByPartyId.Count == 0;
@@ -210,6 +219,40 @@ internal sealed class ConversationPartyTracker : IHandler
         lock (stateLock)
         {
             return pvpPartnersByPartyId.TryGetValue(partyId, out partnerId);
+        }
+    }
+
+    /// <summary>Records the peer of the (defender) client showing the popup for the given party.</summary>
+    public void SetPvpDefenderPeer(string partyId, object peer)
+    {
+        if (partyId == null || peer == null) return;
+
+        lock (stateLock)
+        {
+            pvpPeerByPartyId[partyId] = peer;
+            pvpPartyIdByPeer[peer] = partyId;
+        }
+    }
+
+    /// <summary>Maps a peer back to the PvP party it is the defender of, if any (for disconnect handling).</summary>
+    public bool TryGetPvpPartyByPeer(object peer, out string partyId)
+    {
+        partyId = null;
+        if (peer == null) return false;
+
+        lock (stateLock)
+        {
+            return pvpPartyIdByPeer.TryGetValue(peer, out partyId);
+        }
+    }
+
+    // Drops the peer<->party mapping for a party leaving a PvP conversation. Must be called under stateLock.
+    private void RemovePvpPeer(string partyId)
+    {
+        if (pvpPeerByPartyId.TryGetValue(partyId, out var peer))
+        {
+            pvpPeerByPartyId.Remove(partyId);
+            pvpPartyIdByPeer.Remove(peer);
         }
     }
 }

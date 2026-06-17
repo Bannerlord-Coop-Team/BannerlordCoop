@@ -1,6 +1,7 @@
 using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Network;
 using Common.Util;
 using System;
 using GameInterface.Services.MapEvents.Messages;
@@ -30,6 +31,7 @@ internal class PvPInteractionClientHandler : IHandler
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
+    private readonly INetwork network;
 
     // Party id the popup is currently shown for (always this client's own party), or null when nothing is shown.
     // Only touched on the game main thread.
@@ -38,10 +40,11 @@ internal class PvPInteractionClientHandler : IHandler
     // This instance's player hero name, to tell instances apart in a combined log.
     private static string Who => Hero.MainHero?.Name?.ToString() ?? "?";
 
-    public PvPInteractionClientHandler(IMessageBroker messageBroker, IObjectManager objectManager)
+    public PvPInteractionClientHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
+        this.network = network;
 
         messageBroker.Subscribe<NetworkPlayerInteractionStarted>(Handle_NetworkPlayerInteractionStarted);
         messageBroker.Subscribe<NetworkPlayerInteractionEnded>(Handle_NetworkPlayerInteractionEnded);
@@ -85,6 +88,10 @@ internal class PvPInteractionClientHandler : IHandler
 
             ShowWaitingPopup(message.AttackerName);
             shownDefenderPartyId = message.DefenderPartyId;
+
+            // Tell the server which peer is the defender, so it can end the conversation and free the attacker if we
+            // disconnect. On a client, SendAll targets the server.
+            network.SendAll(new NetworkPvpDefenderShown(message.DefenderPartyId));
         });
     }
 
@@ -175,10 +182,10 @@ internal class PvPInteractionClientHandler : IHandler
     /// <summary>
     /// Leaves the local encounter the party opened when the attacker engaged. Skipped only when a battle mission is
     /// actually running (the party belongs in it) — being on a map-event side is not enough, since a joiner sits on a
-    /// side in the pre-battle encounter the attacker just abandoned. For such a joiner we set
-    /// <see cref="PlayerEncounter.LeaveEncounter"/> so native removes it from the (now-abandoned) map event on finish.
-    /// <see cref="PlayerEncounter.Finish"/>'s postfix (<see cref="Patches.PlayerEncounterPatches"/>) holds the party so
-    /// it does not immediately re-engage.
+    /// side in the pre-battle encounter the attacker just abandoned. For such a joiner we clear its map-event back-ref
+    /// so the dangling <see cref="MobileParty.MapEvent"/> stops the encounter menu reopening the instant
+    /// <see cref="PlayerEncounter.Finish"/> closes it. Finish's postfix
+    /// (<see cref="Patches.PlayerEncounterPatches"/>) holds the party so it does not immediately re-engage.
     /// </summary>
     private static void CloseEncounter()
     {
@@ -192,12 +199,19 @@ internal class PvPInteractionClientHandler : IHandler
         // A battle mission is open — the party belongs in it; never pull it out.
         if (MissionState.Current != null) return;
 
+        // The local player was captured in this battle: the captivity flow owns the UI (prisoner menu) and leaves the
+        // encounter itself. Finishing/exiting here would close the capture screen. Mirrors
+        // BattleHandler.Handle_NetworkMapEventFinalized.
+        if (PlayerCaptivity.IsCaptive) return;
+
         // A joiner stays bound to its map-event side after the attacker abandons the encounter: the abandon tears
         // the event down via FinalizeEvent, which (unlike FinishBattle) does not remove joined parties. The dangling
-        // MainParty.MapEvent makes the encounter menu reopen the instant Finish closes it. Detach locally so it stays
-        // closed — RemovePartyInternal's client prefix keeps this a local-only cleanup.
+        // MainParty.MapEvent makes the encounter menu reopen the instant Finish closes it. Null the back-reference
+        // directly to detach locally. NOT via the MapEventSide setter: that runs MapEventSide.RemovePartyInternal,
+        // whose client patch calls FinalizeEvent when the removed party is its side's leader — which broadcasts a
+        // finalize to the server (MapEventPatches.Prefix_FinalizeEventAux). We only want a local detach.
         if (MobileParty.MainParty?.MapEvent != null)
-            MobileParty.MainParty.Party.MapEventSide = null;
+            MobileParty.MainParty.Party._mapEventSide = null;
 
         if (PlayerEncounter.Current != null)
             PlayerEncounter.Finish(true);
