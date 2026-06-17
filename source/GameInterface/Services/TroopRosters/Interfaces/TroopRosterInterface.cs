@@ -58,10 +58,12 @@ internal class TroopRosterInterface : ITroopRosterInterface
 
     public void UpdateWithData(TroopRoster targetTroopRoster, TroopRosterData packedTroopRosterElements, Hero mainHero)
     {
-        // Clear without removing MainHero (causes issues if MainHero is removed)
+        // Clear without removing MainHero (causes issues if MainHero is removed). When there is no
+        // main hero to preserve (mainHero is null), every element must be cleared, otherwise the
+        // null == null match would skip non-hero troops and they would be doubled on rebuild.
         for (int i = targetTroopRoster._count - 1; i >= 0; i--)
         {
-            if (targetTroopRoster.data[i].Character?.HeroObject == mainHero) continue;
+            if (mainHero != null && targetTroopRoster.data[i].Character?.HeroObject == mainHero) continue;
             targetTroopRoster.AddToCounts(targetTroopRoster.data[i].Character, -targetTroopRoster.data[i].Number, false, -targetTroopRoster.data[i].WoundedNumber, 0, true);
         }
 
@@ -73,7 +75,7 @@ internal class TroopRosterInterface : ITroopRosterInterface
             TroopRosterElement troopRosterElement;
             if (objectManager.TryGetObjectWithLogging<Hero>(troopRosterElementData.CharacterId, out var hero))
             {
-                if (hero == mainHero) continue;
+                if (mainHero != null && hero == mainHero) continue;
                 troopRosterElement = new TroopRosterElement(hero.CharacterObject);
             }
             else if (objectManager.TryGetObjectWithLogging<CharacterObject>(troopRosterElementData.CharacterId, out var character))
