@@ -80,17 +80,14 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 
             using (new AllowedThread())
             {
-                // The event's own FinalizeEventAux would short-circuit on IsFinalized before clearing anything,
-                // and PartyBase.MapEventSide is not a synced member, so clear each involved party's battle state
-                // here directly: nulling MapEventSide makes MobileParty.MapEvent null and SetVisualAsDirty
-                // re-marks the map figure, together dropping the party out of its fighting animation. The full
-                // vanilla finalize is deliberately not re-run, so the client does not re-apply battle results
-                // the server already replicated.
+                // Clear each involved party's battle state directly: the event's own FinalizeEventAux
+                // short-circuits on IsFinalized, and PartyBase.MapEventSide isn't synced. Nulling MapEventSide
+                // makes MobileParty.MapEvent null and SetVisualAsDirty re-marks the figure, dropping it out of
+                // the fighting animation. The full vanilla finalize is deliberately not re-run — the server
+                // already replicated the battle results.
 
-                // Mark the event finalized first. Clearing the last party of a side re-enters
-                // RemovePartyInternal, which calls FinalizeEvent; with IsFinalized already true that is a no-op
-                // instead of a full client-side finalize. The synced State normally already reads this, but set
-                // it explicitly so the cleanup never depends on the State sync landing before this destroy.
+                // Mark finalized first so clearing a side's last party (which re-enters FinalizeEvent via
+                // RemovePartyInternal) no-ops on IsFinalized instead of depending on the State sync arriving first.
                 obj.State = MapEventState.WaitingRemoval;
 
                 foreach (var side in obj._sides)
