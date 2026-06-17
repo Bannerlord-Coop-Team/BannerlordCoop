@@ -47,10 +47,25 @@ internal class TroopRosterInterface : ITroopRosterInterface
         var packedData = new TroopRosterData(new());
         foreach (TroopRosterElement troopRosterElement in troopRoster.data)
         {
-            if (!objectManager.TryGetIdWithLogging(troopRosterElement.Character?.HeroObject, out string characterId)
-                && !objectManager.TryGetIdWithLogging(troopRosterElement.Character, out characterId)) continue;
+            // troopRoster.data is the backing array and includes empty padding slots past the live count;
+            // those have no Character, so skip them before resolving ids. Otherwise every padding slot
+            // logs a "null object" error, multiplied by every roster the snapshot packs each frame.
+            if (troopRosterElement.Character == null) continue;
 
-            packedData.Data.Add(new TroopRosterElementData(characterId, troopRosterElement.Number, troopRosterElement.WoundedNumber, troopRosterElement.Xp));
+            // A roster element is either a hero (synced by its Hero id) or a basic troop (synced by its
+            // CharacterObject id). Resolve the id that matches, rather than probing the Hero id first: a
+            // basic troop has no HeroObject, and probing it would log a failed lookup for every basic troop.
+            Hero hero = troopRosterElement.Character.HeroObject;
+            bool isHero = hero != null;
+
+            string characterId;
+            if (isHero)
+            {
+                if (!objectManager.TryGetIdWithLogging(hero, out characterId)) continue;
+            }
+            else if (!objectManager.TryGetIdWithLogging(troopRosterElement.Character, out characterId)) continue;
+
+            packedData.Data.Add(new TroopRosterElementData(characterId, troopRosterElement.Number, troopRosterElement.WoundedNumber, troopRosterElement.Xp, isHero));
         }
 
         return packedData;
@@ -69,22 +84,23 @@ internal class TroopRosterInterface : ITroopRosterInterface
 
         if (packedTroopRosterElements.Data == null) return;
 
-        // Rebuild roster with new data
+        // Rebuild roster with new data. Each element is resolved as the exact type it was packed as
+        // (hero or basic troop), so a basic troop never triggers a failed Hero cast. Probing Hero first
+        // would log that failed cast for every basic troop, which at snapshot frequency floods the log
+        // and stalls the game thread.
         foreach (var troopRosterElementData in packedTroopRosterElements.Data)
         {
             TroopRosterElement troopRosterElement;
-            if (objectManager.TryGetObjectWithLogging<Hero>(troopRosterElementData.CharacterId, out var hero))
+            if (troopRosterElementData.IsHero)
             {
+                if (!objectManager.TryGetObjectWithLogging<Hero>(troopRosterElementData.CharacterId, out var hero)) continue;
                 if (mainHero != null && hero == mainHero) continue;
                 troopRosterElement = new TroopRosterElement(hero.CharacterObject);
             }
-            else if (objectManager.TryGetObjectWithLogging<CharacterObject>(troopRosterElementData.CharacterId, out var character))
-            {
-                troopRosterElement = new TroopRosterElement(character);
-            }
             else
             {
-                continue;
+                if (!objectManager.TryGetObjectWithLogging<CharacterObject>(troopRosterElementData.CharacterId, out var character)) continue;
+                troopRosterElement = new TroopRosterElement(character);
             }
 
             troopRosterElement._number = troopRosterElementData.Number;
