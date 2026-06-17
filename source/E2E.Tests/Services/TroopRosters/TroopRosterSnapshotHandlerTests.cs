@@ -263,6 +263,71 @@ namespace E2E.Tests.Services.TroopRosters
             }
         }
 
+        [Fact]
+        public void Server_HeroServingInRoster_SyncsToClients()
+        {
+            // A hero serving in a roster is packed by its Hero id (IsHero = true) and rebuilt on the client
+            // by resolving the Hero and taking its CharacterObject, rather than being treated as a basic
+            // troop. This exercises the hero branch of the pack/apply that the basic-troop tests above do not.
+            string heroId = TestEnvironment.CreateRegisteredObject<Hero>();
+
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<TroopRoster>(TroopRosterId, out var roster));
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+
+                roster.AddToCounts(hero.CharacterObject, 1);
+            });
+
+            PumpCoalescer();
+
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<TroopRoster>(TroopRosterId, out var roster));
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+
+                Assert.Equal(1, roster.Count);
+                Assert.True(roster.Contains(hero.CharacterObject));
+                Assert.Equal(1, roster.GetElementCopyAtIndex(0).Number);
+            }
+        }
+
+        [Fact]
+        public void Server_HeroAndBasicTroopInRoster_SyncToClients()
+        {
+            // One snapshot carrying both a hero (packed by Hero id) and a basic troop (packed by
+            // CharacterObject id) rebuilds both on the client, exercising both branches of the discriminator
+            // in a single apply.
+            string heroId = TestEnvironment.CreateRegisteredObject<Hero>();
+            SeedTroopOnServer(CharacterId1, count: 4);
+
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<TroopRoster>(TroopRosterId, out var roster));
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+
+                roster.AddToCounts(hero.CharacterObject, 1);
+            });
+
+            PumpCoalescer();
+
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<TroopRoster>(TroopRosterId, out var roster));
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+                Assert.True(client.ObjectManager.TryGetObject<CharacterObject>(CharacterId1, out var troop));
+
+                Assert.Equal(2, roster.Count);
+
+                var heroIndex = roster.FindIndexOfTroop(hero.CharacterObject);
+                var troopIndex = roster.FindIndexOfTroop(troop);
+                Assert.True(heroIndex >= 0);
+                Assert.True(troopIndex >= 0);
+                Assert.Equal(1, roster.GetElementCopyAtIndex(heroIndex).Number);
+                Assert.Equal(4, roster.GetElementCopyAtIndex(troopIndex).Number);
+            }
+        }
+
         #region Helpers
         /// <summary>
         /// Pumps the server's snapshot coalescer, the step the game's main loop performs once per
