@@ -133,6 +133,11 @@ public class TroopRosterHandler : IHandler
                 {
                     if (!objectManager.TryGetObjectWithLogging(obj.TroopRosterId, out TroopRoster troopRoster)) return;
 
+                    // The client roster may have no populated element at the server-side index (rosters are
+                    // created empty and not every roster receives a content sync), so skip instead of letting
+                    // the vanilla indexer throw on an out-of-range slot or a null-character element.
+                    if (obj.Index < 0 || obj.Index >= troopRoster.data.Length || troopRoster.data[obj.Index].Character == null) return;
+
                     troopRoster.AddToCountsAtIndex(obj.Index, obj.CountChange, obj.WoundedCountChange, obj.XpChange, obj.RemoveDepleted);
                 }
                 catch (Exception ex)
@@ -297,6 +302,10 @@ public class TroopRosterHandler : IHandler
                 try
                 {
                     if (!objectManager.TryGetObjectWithLogging<TroopRoster>(obj.TroopRosterId, out var troopRoster)) return;
+
+                    // The client roster may have no populated element at the server-side index, so skip instead
+                    // of letting the vanilla indexer throw on an out-of-range slot or a null-character element.
+                    if (obj.Index < 0 || obj.Index >= troopRoster.data.Length || troopRoster.data[obj.Index].Character == null) return;
 
                     troopRoster.SetElementXp(obj.Index, obj.Number);
                 }
