@@ -380,6 +380,19 @@ internal class BattleHandler : IHandler
             mapEventSideId,
             partyIds.ToArray()
         ));
+
+        // Tell any player parties just added to the battle to drop their "hold on" PvP popup — the battle menu
+        // blocks them now. Server-driven because the client-side MapEventInvolvedPartiesAdded never fires for a
+        // synced add (the client's own add is intercepted and routed to the server).
+        var playerPartyIds = new List<string>();
+        foreach (var addedParty in message.AddedParties)
+        {
+            if (addedParty.Party?.MobileParty?.IsPlayerParty() == true && objectManager.TryGetId(addedParty.Party, out var playerPartyId))
+                playerPartyIds.Add(playerPartyId);
+        }
+
+        if (playerPartyIds.Count > 0)
+            network.SendAll(new NetworkHidePvpPopup(playerPartyIds.ToArray()));
     }
 
     private void Handle_NetworkAddInvolvedParties(MessagePayload<NetworkAddInvolvedParties> payload)

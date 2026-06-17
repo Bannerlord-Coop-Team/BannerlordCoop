@@ -45,7 +45,7 @@ internal class PvPInteractionClientHandler : IHandler
 
         messageBroker.Subscribe<NetworkPlayerInteractionStarted>(Handle_NetworkPlayerInteractionStarted);
         messageBroker.Subscribe<NetworkPlayerInteractionEnded>(Handle_NetworkPlayerInteractionEnded);
-        messageBroker.Subscribe<MapEventInvolvedPartiesAdded>(Handle_MapEventInvolvedPartiesAdded);
+        messageBroker.Subscribe<NetworkHidePvpPopup>(Handle_NetworkHidePvpPopup);
         messageBroker.Subscribe<NetworkClosePvpEncounter>(Handle_NetworkClosePvpEncounter);
     }
 
@@ -53,7 +53,7 @@ internal class PvPInteractionClientHandler : IHandler
     {
         messageBroker.Unsubscribe<NetworkPlayerInteractionStarted>(Handle_NetworkPlayerInteractionStarted);
         messageBroker.Unsubscribe<NetworkPlayerInteractionEnded>(Handle_NetworkPlayerInteractionEnded);
-        messageBroker.Unsubscribe<MapEventInvolvedPartiesAdded>(Handle_MapEventInvolvedPartiesAdded);
+        messageBroker.Unsubscribe<NetworkHidePvpPopup>(Handle_NetworkHidePvpPopup);
         messageBroker.Unsubscribe<NetworkClosePvpEncounter>(Handle_NetworkClosePvpEncounter);
 
         // Make sure a popup never outlives the co-op session.
@@ -133,15 +133,17 @@ internal class PvPInteractionClientHandler : IHandler
         });
     }
 
-    /// <summary>The defender was pulled into the battle the attacker started; the "hold on" popup has served its purpose.</summary>
-    private void Handle_MapEventInvolvedPartiesAdded(MessagePayload<MapEventInvolvedPartiesAdded> payload)
+    /// <summary>The defender was added to the map event (battle started); drop the popup — the battle menu blocks them now.</summary>
+    private void Handle_NetworkHidePvpPopup(MessagePayload<NetworkHidePvpPopup> payload)
     {
         if (ModInformation.IsServer) return;
+
+        var partyIds = payload.What.PartyIds;
 
         GameThread.Run(() =>
         {
             if (shownDefenderPartyId == null) return;
-            if (MobileParty.MainParty?.MapEvent == null) return;
+            if (Array.IndexOf(partyIds, shownDefenderPartyId) < 0) return;
 
             HideWaitingPopup();
         });
