@@ -89,6 +89,10 @@ namespace GameInterface.Tests.Services.GuantletMapEventVisuals
             Assert.False(GauntletMapEventVisualPatches.BattleSizeComputable(mapEvent));
         }
 
+        // An empty-but-present side is computable, not "unready": the guard asks whether the battle-size
+        // calc can run without throwing, not whether the battle is fully populated. Vanilla walks zero
+        // parties and reports 0 men (the smallest size), so the guard lets it through to compute that real
+        // 0 rather than defaulting - the two paths yield the same 0 here either way.
         [Fact]
         public void BattleSizeComputable_SidesPresentNoParties_ReturnsTrue()
         {
