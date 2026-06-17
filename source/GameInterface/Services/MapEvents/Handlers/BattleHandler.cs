@@ -359,6 +359,7 @@ internal class BattleHandler : IHandler
         mapEventLogger.DebugMapEvent(message.MapEvent, "Map event involved parties added. Added party count: {AddedPartyCount}", message.AddedParties.Count());
 
         var partyIds = new List<string>();
+        var partyPositions = new List<CampaignVec2>();
 
         foreach (var addedParty in message.AddedParties)
         {
@@ -366,6 +367,10 @@ internal class BattleHandler : IHandler
                 continue;
 
             partyIds.Add(mapEventPartyId);
+            // Capture the party's authoritative map position, in lockstep with the id and
+            // before the roster check below so the two arrays stay index-aligned. Settlement
+            // parties have no MobileParty; their slot is a default the client never applies.
+            partyPositions.Add(addedParty.Party.MobileParty?.Position ?? default);
 
             // A player just created or joined this map event, so push every involved party's
             // flattened roster to clients (AI-only battles never reach here). Clients need these to
@@ -380,7 +385,8 @@ internal class BattleHandler : IHandler
 
         network.SendAll(new NetworkAddInvolvedParties(
             mapEventSideId,
-            partyIds.ToArray()
+            partyIds.ToArray(),
+            partyPositions.ToArray()
         ));
 
         // Tell any player parties just added to the battle to drop their "hold on" PvP popup — the battle menu
@@ -411,22 +417,41 @@ internal class BattleHandler : IHandler
         {
             try
             {
+                // The campaign can tear down (exit to menu, disconnect, save load) between
+                // enqueuing this and the main thread draining it; bail before touching
+                // campaign state (the position snap below dereferences Campaign.Current).
+                if (Campaign.Current == null)
+                    return;
+
                 if (!objectManager.TryGetObjectWithLogging<MapEvent>(message.MapEventId, out var mapEvent))
                     return;
 
                 mapEventLogger.DebugMapEvent(mapEvent, "Handling network add involved parties. Party count: {MapEventPartyCount}", message.MapEventPartyIds.Length);
 
+                var positions = message.Positions;
+
                 // Re-applying campaign-collection state replicated from the server; the
                 // DynamicSync TroopUpgradeTracker patches must stand down during the apply.
                 using (new AllowedThread())
                 {
-                    foreach (var mapEventPartyId in message.MapEventPartyIds)
+                    for (int i = 0; i < message.MapEventPartyIds.Length; i++)
                     {
+                        var mapEventPartyId = message.MapEventPartyIds[i];
                         if (!objectManager.TryGetObjectWithLogging<MapEventParty>(mapEventPartyId, out var mapEventParty))
                             continue;
 
                         mapEventLogger.DebugMapEvent(mapEvent, "Adding involved map event party {MapEventPartyId} to troop upgrade tracker", mapEventPartyId);
                         mapEvent.TroopUpgradeTracker.AddParty(mapEventParty);
+
+                        // Snap the party to its server-side map position so it lines up with the
+                        // battle. Every involved party is snapped, including this client's own, so
+                        // all clients place the parties where the server has them, lined up with the
+                        // battle center the server is authoritative for.
+                        var mobileParty = mapEventParty.Party.MobileParty;
+                        if (mobileParty != null && positions != null && i < positions.Length)
+                        {
+                            mobileParty.Position = positions[i];
+                        }
                     }
                 }
             }
