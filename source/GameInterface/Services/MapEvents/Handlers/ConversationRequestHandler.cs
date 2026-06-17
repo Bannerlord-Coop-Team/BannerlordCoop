@@ -181,6 +181,18 @@ internal class ConversationRequestHandler : IHandler
         // so there is nothing to hold; the defending player is shown a "hold on" popup instead.
         if (attackerIsPlayer && defenderIsPlayer)
         {
+            // Reject if either player is already conversing with someone else (first interaction wins) — otherwise a
+            // third player could open an encounter with a defender already locked in a conversation.
+            if (IsConversingWithOther(request.DefenderId, request.AttackerId) ||
+                IsConversingWithOther(request.AttackerId, request.DefenderId))
+            {
+                Logger.Debug(
+                    "Rejecting PvP conversation: a party is already conversing with another player. AttackerId={AttackerId}, DefenderId={DefenderId}",
+                    request.AttackerId, request.DefenderId);
+                network.Send(requestingPeer, new NetworkConversationDenied());
+                return false;
+            }
+
             isPlayerVsPlayer = true;
             Logger.Debug(
                 "Allowing conversation: both parties are players (PvP). AttackerId={AttackerId}, DefenderId={DefenderId}",
@@ -297,7 +309,16 @@ internal class ConversationRequestHandler : IHandler
         var attackerName = attacker.LeaderHero?.Name?.ToString() ?? attacker.Name?.ToString() ?? "Another player";
 
         network.SendAll(new NetworkPlayerInteractionStarted(request.DefenderId, attackerName));
+
+        // Mark both players as conversing so no other party can interact with them while the (no-map-event-yet)
+        // conversation is open; the interaction guards consult the tracker. Released in EndPvpInteraction.
+        conversationPartyTracker.BeginPvpConversation(request.AttackerId, request.DefenderId);
     }
+
+    /// <summary>[Server] True when <paramref name="partyId"/> is already in a PvP conversation with someone other than
+    /// <paramref name="allowedPartnerId"/> (so the same pair re-requesting is still allowed).</summary>
+    private bool IsConversingWithOther(string partyId, string allowedPartnerId)
+        => conversationPartyTracker.TryGetPvpPartner(partyId, out var partner) && partner != allowedPartnerId;
 
     /// <summary>
     /// [Server] Ends the given attacker's PvP interaction (the attacker left before any battle), telling the
@@ -310,7 +331,10 @@ internal class ConversationRequestHandler : IHandler
         if (attackerPeer == null) return;
 
         if (pvpDefenderByAttacker.TryRemove(attackerPeer, out var defenderPartyId))
+        {
             network.SendAll(new NetworkPlayerInteractionEnded(defenderPartyId));
+            conversationPartyTracker.EndPvpConversation(defenderPartyId);
+        }
     }
 
     /// <summary>[Client] Server approved: re-run RestartPlayerEncounter with the same parameters.</summary>

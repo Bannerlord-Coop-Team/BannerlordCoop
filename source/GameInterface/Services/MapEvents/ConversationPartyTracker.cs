@@ -30,10 +30,16 @@ internal sealed class ConversationPartyTracker : IHandler
     private readonly Dictionary<string, Engagement> engagementsByPartyId = new Dictionary<string, Engagement>();
     private readonly Dictionary<object, string> partyIdsByEngager = new Dictionary<object, string>();
 
-    private volatile bool isEmpty = true;
+    // Player-vs-player conversations: both player parties' ids -> the partner's id. Unlike an AI engagement no party
+    // is held/AI-disabled; this just marks the two players unattackable by anyone but each other until the battle
+    // map event forms (or the conversation ends).
+    private readonly Dictionary<string, string> pvpPartnersByPartyId = new Dictionary<string, string>();
 
-    /// <summary>Lock-free fast path for per-frame guards: true when no engagements exist.</summary>
-    public bool IsEmpty => isEmpty;
+    private volatile bool isEmpty = true;
+    private volatile bool pvpIsEmpty = true;
+
+    /// <summary>Lock-free fast path for per-frame guards: true when no AI engagements and no PvP conversations exist.</summary>
+    public bool IsEmpty => isEmpty && pvpIsEmpty;
 
     /// <summary>
     /// Object manager shared with the engagement guards, so per-frame checks reuse the DI-wired instance instead
@@ -55,7 +61,9 @@ internal sealed class ConversationPartyTracker : IHandler
             leftovers = new List<KeyValuePair<string, Engagement>>(engagementsByPartyId);
             engagementsByPartyId.Clear();
             partyIdsByEngager.Clear();
+            pvpPartnersByPartyId.Clear();
             isEmpty = true;
+            pvpIsEmpty = true;
         }
 
         // The campaign can outlive this co-op session (the container is disposed on leaving the mode while the
@@ -160,6 +168,48 @@ internal sealed class ConversationPartyTracker : IHandler
         lock (stateLock)
         {
             return engagementsByPartyId.TryGetValue(partyId, out var engagement) && !Equals(engagement.EngagerKey, engagerKey);
+        }
+    }
+
+    /// <summary>Marks two player parties as being in a conversation with each other; only they may interact until it ends.</summary>
+    public void BeginPvpConversation(string partyIdA, string partyIdB)
+    {
+        if (partyIdA == null || partyIdB == null) return;
+
+        lock (stateLock)
+        {
+            pvpPartnersByPartyId[partyIdA] = partyIdB;
+            pvpPartnersByPartyId[partyIdB] = partyIdA;
+            pvpIsEmpty = false;
+        }
+    }
+
+    /// <summary>Ends the PvP conversation containing the given party, releasing both it and its partner.</summary>
+    public void EndPvpConversation(string partyId)
+    {
+        if (partyId == null) return;
+
+        lock (stateLock)
+        {
+            if (pvpPartnersByPartyId.TryGetValue(partyId, out var partnerId))
+            {
+                pvpPartnersByPartyId.Remove(partyId);
+                pvpPartnersByPartyId.Remove(partnerId);
+            }
+
+            pvpIsEmpty = pvpPartnersByPartyId.Count == 0;
+        }
+    }
+
+    /// <summary>Gets the conversation partner of a party in a PvP conversation, if any.</summary>
+    public bool TryGetPvpPartner(string partyId, out string partnerId)
+    {
+        partnerId = null;
+        if (partyId == null) return false;
+
+        lock (stateLock)
+        {
+            return pvpPartnersByPartyId.TryGetValue(partyId, out partnerId);
         }
     }
 }

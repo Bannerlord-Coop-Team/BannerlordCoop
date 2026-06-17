@@ -393,6 +393,12 @@ internal class BattleHandler : IHandler
 
         if (playerPartyIds.Count > 0)
             network.SendAll(new NetworkHidePvpPopup(playerPartyIds.ToArray()));
+
+        // The conversation is over once the battle map event forms, so release the PvP interaction block. Holding it
+        // longer re-blocks the parties (and hangs the encounter menu) when they later leave the map event; the map
+        // event itself keeps others out while the battle runs.
+        foreach (var id in playerPartyIds)
+            ConversationPartyTracker.Instance?.EndPvpConversation(id);
     }
 
     private void Handle_NetworkAddInvolvedParties(MessagePayload<NetworkAddInvolvedParties> payload)
