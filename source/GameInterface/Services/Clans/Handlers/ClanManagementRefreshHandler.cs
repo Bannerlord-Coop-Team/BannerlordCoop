@@ -23,6 +23,7 @@ internal class ClanManagementRefreshHandler : IHandler
 
         messageBroker.Subscribe<ClanManagementVMCreated>(Handle_ClanManagementVMCreated);
         messageBroker.Subscribe<RefreshPartiesList>(Handle_RefreshPartiesList);
+        messageBroker.Subscribe<RefreshWorkshopsList>(Handle_RefreshWorkshopsList);
 
         currentClanManagementVM = null;
     }
@@ -31,6 +32,7 @@ internal class ClanManagementRefreshHandler : IHandler
     {
         messageBroker.Unsubscribe<ClanManagementVMCreated>(Handle_ClanManagementVMCreated);
         messageBroker.Unsubscribe<RefreshPartiesList>(Handle_RefreshPartiesList);
+        messageBroker.Unsubscribe<RefreshWorkshopsList>(Handle_RefreshWorkshopsList);
     }
 
     private void Handle_ClanManagementVMCreated(MessagePayload<ClanManagementVMCreated> obj)
@@ -43,6 +45,14 @@ internal class ClanManagementRefreshHandler : IHandler
         GameLoopRunner.RunOnMainThread(() =>
         {
             currentClanManagementVM?.ClanParties?.RefreshPartiesList();
+        });
+    }
+
+    private void Handle_RefreshWorkshopsList(MessagePayload<RefreshWorkshopsList> obj)
+    {
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            currentClanManagementVM?.ClanIncome?.RefreshList();
         });
     }
 }

@@ -3,7 +3,9 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Actions.Messages;
 using GameInterface.Services.Actions.Patches;
+using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.ObjectManager;
+using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
@@ -54,5 +56,8 @@ internal class ChangeOwnerOfWorkshopHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<WorkshopType>(obj.What.WorkshopTypeId, out var workshopType)) return;
 
         ChangeOwnerOfWorkshopActionPatches.ApplyInternalOverride(workshop, newOwner, workshopType, obj.What.Capital, obj.What.Cost);
+
+        // ClanManagementVM when selling a workshop, also used when changing type of workshop
+        network.Send(obj.Who as NetPeer, new RefreshWorkshopsList());
     }
 }

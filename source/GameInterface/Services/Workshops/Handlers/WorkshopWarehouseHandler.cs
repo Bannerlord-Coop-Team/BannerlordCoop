@@ -11,7 +11,6 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.Core;
@@ -19,26 +18,28 @@ using TaleWorlds.Library;
 
 namespace GameInterface.Services.Workshops.Handlers;
 
-internal class WarehouseRosterHandler : IHandler
+internal class WorkshopWarehouseHandler : IHandler
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<WarehouseRosterHandler>();
+    private static readonly ILogger Logger = LogManager.GetLogger<WorkshopWarehouseHandler>();
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ISessionWorkshopPlayerDataInterface sessionWorkshopPlayerDataInterface;
+    private readonly IWorkshopsCampaignBehaviorInterface workshopsCampaignBehaviorInterface;
 
-    public WarehouseRosterHandler(
+    public WorkshopWarehouseHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        ISessionWorkshopPlayerDataInterface sessionWorkshopPlayerDataInterface)
+        ISessionWorkshopPlayerDataInterface sessionWorkshopPlayerDataInterface,
+        IWorkshopsCampaignBehaviorInterface workshopsCampaignBehaviorInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.sessionWorkshopPlayerDataInterface = sessionWorkshopPlayerDataInterface;
-
+        this.workshopsCampaignBehaviorInterface = workshopsCampaignBehaviorInterface;
         messageBroker.Subscribe<WorkshopOwnerChanged>(Handle_WorkshopOwnerChanged);
         messageBroker.Subscribe<ChangeWorkshopOwner>(Handle_ChangeWorkshopOwner);
         messageBroker.Subscribe<OutputProducedToWarehouse>(Handle_OutputProducedToWarehouse);
@@ -48,6 +49,8 @@ internal class WarehouseRosterHandler : IHandler
 
         messageBroker.Subscribe<WarehouseRosterManaged>(Handle_WarehouseRosterManaged);
         messageBroker.Subscribe<ManageWarehouseRoster>(Handle_ManageWarehouseRoster);
+
+        messageBroker.Subscribe<TownWorkshopRun>(Handle_TownWorkshopRun);
     }
 
     public void Dispose()
@@ -61,6 +64,8 @@ internal class WarehouseRosterHandler : IHandler
 
         messageBroker.Unsubscribe<WarehouseRosterManaged>(Handle_WarehouseRosterManaged);
         messageBroker.Unsubscribe<ManageWarehouseRoster>(Handle_ManageWarehouseRoster);
+
+        messageBroker.Unsubscribe<TownWorkshopRun>(Handle_TownWorkshopRun);
     }
 
     private void Handle_WorkshopOwnerChanged(MessagePayload<WorkshopOwnerChanged> obj)
@@ -86,7 +91,7 @@ internal class WarehouseRosterHandler : IHandler
             {
                 if (oldOwner.CurrentSettlement != null && oldOwner.CurrentSettlement == workshop.Settlement)
                 {
-                    foreach (ItemRosterElement itemRosterElement in workshopsBehavior.GetWarehouseRoster(oldOwner.CurrentSettlement))
+                    foreach (ItemRosterElement itemRosterElement in sessionWorkshopPlayerDataInterface.GetWarehouseRoster(oldOwnerId, settlementId))
                     {
                         oldOwner.PartyBelongedTo.ItemRoster.AddToCounts(itemRosterElement.EquipmentElement, itemRosterElement.Amount);
                     }
@@ -231,6 +236,11 @@ internal class WarehouseRosterHandler : IHandler
                 }
             }
         }
+    }
+
+    private void Handle_TownWorkshopRun(MessagePayload<TownWorkshopRun> obj)
+    {
+        workshopsCampaignBehaviorInterface.RunTownWorkshop(obj.What.Town, obj.What.Workshop);
     }
 
     private WorkshopsCampaignBehavior GetWorkshopsBehavior()

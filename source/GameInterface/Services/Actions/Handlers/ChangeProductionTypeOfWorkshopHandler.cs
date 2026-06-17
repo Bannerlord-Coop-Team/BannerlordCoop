@@ -2,7 +2,9 @@
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Actions.Messages;
+using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.ObjectManager;
+using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
@@ -51,5 +53,7 @@ internal class ChangeProductionTypeOfWorkshopHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<WorkshopType>(obj.What.WorkshopTypeId, out var workshopType)) return;
 
         ChangeProductionTypeOfWorkshopAction.Apply(workshop, workshopType, obj.What.IgnoreCost);
+
+        network.Send(obj.Who as NetPeer, new RefreshWorkshopsList());
     }
 }

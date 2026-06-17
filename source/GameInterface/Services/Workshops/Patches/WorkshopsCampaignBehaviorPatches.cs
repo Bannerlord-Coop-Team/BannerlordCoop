@@ -1,13 +1,10 @@
 ﻿using Common;
 using Common.Messaging;
+using GameInterface.Policies;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Workshops.Messages;
 using HarmonyLib;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -63,6 +60,8 @@ internal class WorkshopsCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool ProduceAnOutputToWarehousePrefix(ref WorkshopsCampaignBehavior __instance, EquipmentElement outputItem, Workshop workshop)
     {
+        if (ModInformation.IsClient && CallOriginalPolicy.IsOriginalAllowed()) return true;
+
         var message = new OutputProducedToWarehouse(workshop, outputItem);
         MessageBroker.Instance.Publish(__instance, message);
 
@@ -81,51 +80,22 @@ internal class WorkshopsCampaignBehaviorPatches
         return false;
     }
 
+    [HarmonyPatch(nameof(WorkshopsCampaignBehavior.TickOneProductionCycleForPlayerWorkshop))]
+    [HarmonyPrefix]
+    public static bool TickOneProductionCycleForPlayerWorkshopPrefix(ref WorkshopsCampaignBehavior __instance, ref bool __result, WorkshopType.Production production, Workshop workshop, bool effectCapital)
+    {
+        // Entirely manage this function in WorkshopsCampaignBehaviorInterface instead, called from RunTownWorkshopInternal
+        __result = false;
+        return false;
+    }
+
     // Possibly replace with transpiler for replacing the one line Hero.MainHero with IsPlayerHero()
     [HarmonyPatch(nameof(WorkshopsCampaignBehavior.RunTownWorkshop))]
     [HarmonyPrefix]
     public static bool RunTownWorkshopPrefix(ref WorkshopsCampaignBehavior __instance, Town townComponent, Workshop workshop)
     {
-        WorkshopType workshopType = workshop.WorkshopType;
-        bool flag = false;
-        for (int i = 0; i < workshopType.Productions.Count; i++)
-        {
-            float num = workshop.GetProductionProgress(i);
-            if (num > 1f)
-            {
-                num = 1f;
-            }
-            num += Campaign.Current.Models.WorkshopModel.GetEffectiveConversionSpeedOfProduction(workshop, workshopType.Productions[i].ConversionSpeed, false).ResultNumber;
-            if (num >= 1f)
-            {
-                bool flag2 = true;
-                while (flag2 && num >= 1f)
-                {
-                    WorkshopType.Production production = workshopType.Productions[i];
-                    bool flag3;
-                    if (!production.Inputs.Any((ValueTuple<ItemCategory, int> x) => !x.Item1.IsTradeGood))
-                    {
-                        flag3 = !production.Outputs.Any((ValueTuple<ItemCategory, int> x) => !x.Item1.IsTradeGood);
-                    }
-                    else
-                    {
-                        flag3 = false;
-                    }
-                    bool flag4 = flag3;
-                    flag2 = ((workshop.Owner.IsPlayerHero()) ? __instance.TickOneProductionCycleForPlayerWorkshop(production, workshop, flag4) : __instance.TickOneProductionCycleForNotableWorkshop(production, workshop, flag4));
-                    if (flag2 && flag4)
-                    {
-                        flag = true;
-                    }
-                    num -= 1f;
-                }
-            }
-            workshop.SetProgress(i, num);
-        }
-        if (flag)
-        {
-            workshop.UpdateLastRunTime();
-        }
+        var message = new TownWorkshopRun(townComponent, workshop);
+        MessageBroker.Instance.Publish(__instance, message);
 
         return false;
     }

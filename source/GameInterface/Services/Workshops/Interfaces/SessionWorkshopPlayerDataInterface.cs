@@ -27,19 +27,19 @@ public class SessionWorkshopPlayerDataInterface : ISessionWorkshopPlayerDataInte
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SessionWorkshopPlayerDataInterface>();
     private readonly ICoopSessionProvider coopSessionProvider;
-    private readonly IPlayerManager playerManager;
     private readonly IObjectManager objectManager;
     private WorkshopPlayerData WorkshopPlayerData => coopSessionProvider.CoopSession.WorkshopPlayerData;
 
-    public SessionWorkshopPlayerDataInterface(ICoopSessionProvider coopSessionProvider, IPlayerManager playerManager, IObjectManager objectManager)
+    public SessionWorkshopPlayerDataInterface(ICoopSessionProvider coopSessionProvider, IObjectManager objectManager)
     {
         this.coopSessionProvider = coopSessionProvider;
-        this.playerManager = playerManager;
         this.objectManager = objectManager;
     }
 
     public void AddNewWarehouseDataIfNeeded(string ownerId, string settlementId)
     {
+        if (!IsPlayerHeroIdValid(ownerId)) return;
+
         bool existingData = false;
         foreach (var settlementWarehouseRoster in WorkshopPlayerData.PlayerWarehouseRosterPerSettlement[ownerId])
         {
@@ -66,6 +66,8 @@ public class SessionWorkshopPlayerDataInterface : ISessionWorkshopPlayerDataInte
 
     public void RemoveWarehouseData(string ownerId, string settlementId)
     {
+        if (!IsPlayerHeroIdValid(ownerId)) return;
+
         for (int i = 0; i < WorkshopPlayerData.PlayerWarehouseRosterPerSettlement[ownerId].Length; i++)
         {
             if (WorkshopPlayerData.PlayerWarehouseRosterPerSettlement[ownerId][i].Key == settlementId)
@@ -78,6 +80,8 @@ public class SessionWorkshopPlayerDataInterface : ISessionWorkshopPlayerDataInte
 
     public void AddToWarehouse(string ownerId, string settlementId, EquipmentElement outputItem)
     {
+        if (!IsPlayerHeroIdValid(ownerId)) return;
+
         if (!objectManager.TryGetIdWithLogging(outputItem.Item, out var outputItemId)) return;
 
         string itemModifierId = null;
@@ -101,12 +105,14 @@ public class SessionWorkshopPlayerDataInterface : ISessionWorkshopPlayerDataInte
             }
 
             // No existing item roster element was found, add a new one
-            settlementWarehouseRoster.Value.AddItem(new ItemRosterElementData(new(outputItemId, itemModifierId, itemModifierId == null), 1));
+            settlementWarehouseRoster.Value.Add(new ItemRosterElementData(new(outputItemId, itemModifierId, itemModifierId == null), 1));
         }
     }
 
     public void RemoveFromWarehouse(string ownerId, string settlementId, ItemObject itemAtIndex, int inputCount)
     {
+        if (!IsPlayerHeroIdValid(ownerId)) return;
+
         foreach (var settlementWarehouseRoster in WorkshopPlayerData.PlayerWarehouseRosterPerSettlement[ownerId])
         {
             if (settlementWarehouseRoster.Key != settlementId) continue;
@@ -129,6 +135,8 @@ public class SessionWorkshopPlayerDataInterface : ISessionWorkshopPlayerDataInte
 
     public List<ItemRosterElement> GetWarehouseRoster(string ownerId, string settlementId)
     {
+        if (!IsPlayerHeroIdValid(ownerId)) return new();
+
         foreach (var settlementWarehouseRoster in WorkshopPlayerData.PlayerWarehouseRosterPerSettlement[ownerId])
         {
             if (settlementWarehouseRoster.Key == settlementId)
@@ -142,6 +150,8 @@ public class SessionWorkshopPlayerDataInterface : ISessionWorkshopPlayerDataInte
 
     public void UpdateWarehouseRoster(string ownerId, string settlementId, ItemRosterElement[] newWarehouseData)
     {
+        if (!IsPlayerHeroIdValid(ownerId)) return;
+
         var playerWarehouseRosters = WorkshopPlayerData.PlayerWarehouseRosterPerSettlement[ownerId];
         for (int i = 0; i < playerWarehouseRosters.Length; i++)
         {
@@ -216,5 +226,10 @@ public class SessionWorkshopPlayerDataInterface : ISessionWorkshopPlayerDataInte
             }
             resolvedRosterElements.Add(resolvedElement);
         }
+    }
+
+    private bool IsPlayerHeroIdValid(string playerHeroId)
+    {
+        return objectManager.TryGetObjectWithLogging(playerHeroId, out Hero _);
     }
 }

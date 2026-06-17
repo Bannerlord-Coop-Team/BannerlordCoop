@@ -16,3 +16,6 @@ public readonly struct ClanManagementVMCreated : IEvent
 
 [ProtoContract(SkipConstructor = true)]
 internal readonly struct RefreshPartiesList : ICommand {}
+
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct RefreshWorkshopsList : ICommand { }
