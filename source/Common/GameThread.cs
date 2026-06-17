@@ -1,7 +1,11 @@
-﻿using Common.Logging;
+using Common.Logging;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 
 namespace Common;
@@ -13,8 +17,8 @@ public class GameThread : IUpdateable
     private static readonly Lazy<GameThread> m_Instance =
         new Lazy<GameThread>(() => new GameThread());
 
-    private readonly Queue<(Action, EventWaitHandle)> m_Queue =
-        new Queue<(Action, EventWaitHandle)>();
+    private readonly Queue<(Action Act, EventWaitHandle Wait, string Label)> m_Queue =
+        new Queue<(Action, EventWaitHandle, string)>();
 
     private readonly object m_QueueLock = new object();
     private int m_GameLoopThreadId;
@@ -38,6 +42,39 @@ public class GameThread : IUpdateable
 
     public static GameThread Instance => m_Instance.Value;
 
+    #region Instrumentation
+
+    /// <summary>
+    /// When true, <see cref="Update"/> times how long it spends draining the queue each frame and
+    /// periodically logs a summary: total drain time, action count and rate, the worst single-frame
+    /// hitch, the deepest backlog, and the top contributors by cumulative time. This attributes
+    /// game-thread (render-thread) lag to the handlers that cause it. Each queued action is labeled
+    /// automatically from its caller (file + method) unless an explicit context is supplied, so no
+    /// call site needs to change. Off by default; toggle it at runtime on the process you want to
+    /// profile (typically the client) with the <c>coop.debug.gamethread.instrument</c> console command.
+    /// </summary>
+    public static bool Instrument = false;
+
+    /// <summary>How often the drain summary is written to the log.</summary>
+    private static readonly TimeSpan ReportInterval = TimeSpan.FromSeconds(1);
+
+    /// <summary>How many of the heaviest labels to list in each summary.</summary>
+    private const int TopLabelCount = 10;
+
+    private readonly Stopwatch m_ReportTimer = Stopwatch.StartNew();
+    private readonly Dictionary<string, (long Ticks, int Count)> m_PerLabel =
+        new Dictionary<string, (long, int)>();
+    private int m_WindowFrames;
+    private int m_WindowActions;
+    private long m_WindowTicks;
+    private long m_WorstFrameTicks;
+    private int m_WorstFrameActions;
+    private int m_WorstBacklog;
+
+    private static double ToMs(long ticks) => 1000.0 * ticks / Stopwatch.Frequency;
+
+    #endregion
+
     public void Update(TimeSpan frameTime)
     {
         if (Thread.CurrentThread.ManagedThreadId != Instance.m_GameLoopThreadId)
@@ -45,27 +82,104 @@ public class GameThread : IUpdateable
             throw new ArgumentException("Wrong thread!");
         }
 
-        List<(Action, EventWaitHandle)> toBeRun = new List<(Action, EventWaitHandle)>();
+        List<(Action Act, EventWaitHandle Wait, string Label)> toBeRun =
+            new List<(Action, EventWaitHandle, string)>();
 
+        int backlog;
         lock (Instance.m_QueueLock)
         {
+            backlog = m_Queue.Count;
             while (m_Queue.Count > 0)
             {
                 toBeRun.Add(m_Queue.Dequeue());
             }
         }
-        
-        foreach ((Action, EventWaitHandle) task in toBeRun)
+
+        if (!Instrument)
         {
-            task.Item1?.Invoke();
-            task.Item2?.Set();
+            foreach ((Action Act, EventWaitHandle Wait, string Label) task in toBeRun)
+            {
+                task.Act?.Invoke();
+                task.Wait?.Set();
+            }
+            return;
+        }
+
+        long frameStart = Stopwatch.GetTimestamp();
+        foreach ((Action Act, EventWaitHandle Wait, string Label) task in toBeRun)
+        {
+            long actionStart = Stopwatch.GetTimestamp();
+            task.Act?.Invoke();
+            long actionTicks = Stopwatch.GetTimestamp() - actionStart;
+            task.Wait?.Set();
+
+            string label = task.Label ?? "(unlabeled)";
+            m_PerLabel.TryGetValue(label, out (long Ticks, int Count) agg);
+            m_PerLabel[label] = (agg.Ticks + actionTicks, agg.Count + 1);
+        }
+        long frameTicks = Stopwatch.GetTimestamp() - frameStart;
+
+        m_WindowFrames++;
+        m_WindowActions += toBeRun.Count;
+        m_WindowTicks += frameTicks;
+        if (frameTicks > m_WorstFrameTicks)
+        {
+            m_WorstFrameTicks = frameTicks;
+            m_WorstFrameActions = toBeRun.Count;
+        }
+        if (backlog > m_WorstBacklog)
+        {
+            m_WorstBacklog = backlog;
+        }
+
+        if (m_ReportTimer.Elapsed >= ReportInterval)
+        {
+            ReportAndReset();
         }
     }
+
+    private void ReportAndReset()
+    {
+        double seconds = m_ReportTimer.Elapsed.TotalSeconds;
+
+        // Skip the noisy log when the game thread did no marshaled work this window.
+        if (m_WindowActions > 0)
+        {
+            string top = string.Join(", ", m_PerLabel
+                .OrderByDescending(kv => kv.Value.Ticks)
+                .Take(TopLabelCount)
+                .Select(kv => $"{kv.Key}={ToMs(kv.Value.Ticks):0.0}ms/{kv.Value.Count}"));
+
+            Logger.Information(
+                "[GameThread] {Frames} frames | {Actions} actions ({Rate:0}/s) | drain {Drain:0.0}ms " +
+                "({PerFrame:0.00}ms/frame) | worst frame {Worst:0.0}ms/{WorstActions} actions | " +
+                "max backlog {Backlog} | top: {Top}",
+                m_WindowFrames,
+                m_WindowActions,
+                m_WindowActions / seconds,
+                ToMs(m_WindowTicks),
+                ToMs(m_WindowTicks) / Math.Max(1, m_WindowFrames),
+                ToMs(m_WorstFrameTicks),
+                m_WorstFrameActions,
+                m_WorstBacklog,
+                top);
+        }
+
+        m_PerLabel.Clear();
+        m_WindowFrames = 0;
+        m_WindowActions = 0;
+        m_WindowTicks = 0;
+        m_WorstFrameTicks = 0;
+        m_WorstFrameActions = 0;
+        m_WorstBacklog = 0;
+        m_ReportTimer.Restart();
+    }
+
     public int Priority { get; } = UpdatePriority.MainLoop.GameThread;
 
     /// <summary>
-    /// Maximum time a blocking <see cref="Run(Action, bool)"/> call waits for the game
-    /// loop to process the queued action before failing. Turns a silent deadlock into a loud error
+    /// Maximum time a blocking <see cref="Run(Action, bool, string, string, string)"/> call waits for the
+    /// game loop to process the queued action before failing. Turns a silent deadlock into a loud error
     /// when the game loop is not pumping (or was never initialized, as in test environments).
     /// </summary>
     public static readonly TimeSpan BlockingTimeout = TimeSpan.FromSeconds(30);
@@ -77,10 +191,14 @@ public class GameThread : IUpdateable
     /// <param name="blocking">Flag to pause code execution,
     /// True blocks execution until task is complete,
     /// False queues and returns</param>
+    /// <param name="label">Optional name used to attribute drain time in the instrumentation summary.
+    /// Defaults to the calling file and method, so call sites do not need to pass anything.</param>
     /// <exception cref="TimeoutException">
     /// Thrown for blocking calls when the action was not processed within <see cref="BlockingTimeout"/>.
     /// </exception>
-    public static void Run(Action action, bool blocking = false)
+    public static void Run(Action action, bool blocking = false, string label = null,
+        [CallerFilePath] string callerFile = null,
+        [CallerMemberName] string callerMember = null)
     {
         if (Thread.CurrentThread.ManagedThreadId == Instance.m_GameLoopThreadId)
         {
@@ -91,9 +209,11 @@ public class GameThread : IUpdateable
             EventWaitHandle ewh = blocking ?
                 new EventWaitHandle(false, EventResetMode.ManualReset) :
                 null;
+
+            string resolved = label ?? BuildLabel(callerFile, callerMember);
             lock (Instance.m_QueueLock)
             {
-                Instance.m_Queue.Enqueue((action, ewh));
+                Instance.m_Queue.Enqueue((action, ewh, resolved));
             }
 
             if (ewh != null && ewh.WaitOne(BlockingTimeout) == false)
@@ -118,9 +238,13 @@ public class GameThread : IUpdateable
     /// True blocks execution until task is complete,
     /// False queues and returns</param>
     /// <param name="context">Optional description of the action, attached to the error log to
-    /// identify which caller's action failed.</param>
-    public static void RunSafe(Action action, bool blocking = false, string context = null)
+    /// identify which caller's action failed, and used to attribute drain time in the instrumentation
+    /// summary. Defaults to the calling file and method.</param>
+    public static void RunSafe(Action action, bool blocking = false, string context = null,
+        [CallerFilePath] string callerFile = null,
+        [CallerMemberName] string callerMember = null)
     {
+        string label = context ?? BuildLabel(callerFile, callerMember);
         Run(() =>
         {
             try
@@ -131,7 +255,16 @@ public class GameThread : IUpdateable
             {
                 Logger.Error(e, "Failed to run action on the game thread: {Context}", context ?? "(none)");
             }
-        }, blocking);
+        }, blocking, label);
+    }
+
+    private static string BuildLabel(string callerFile, string callerMember)
+    {
+        if (string.IsNullOrEmpty(callerFile))
+        {
+            return callerMember ?? "(unknown)";
+        }
+        return $"{Path.GetFileNameWithoutExtension(callerFile)}.{callerMember}";
     }
 
     public void MarkGameThread()
