@@ -292,7 +292,7 @@ internal class BattleSimulationRunHandler : IHandler
 
         var mapEventId = payload.What.MapEventId;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             // Initiator already has it open and is pacing it.
             if (BattleSimulationReplay.IsActiveFor(mapEventId))

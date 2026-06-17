@@ -71,7 +71,7 @@ internal class PvPInteractionClientHandler : IHandler
 
         var message = payload.What;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             if (Campaign.Current == null) return;
 
@@ -95,7 +95,7 @@ internal class PvPInteractionClientHandler : IHandler
 
         var message = payload.What;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             if (shownDefenderPartyId == null || shownDefenderPartyId != message.DefenderPartyId) return;
 
@@ -118,7 +118,7 @@ internal class PvPInteractionClientHandler : IHandler
 
         var partyIds = payload.What.PartyIds;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             if (Campaign.Current == null) return;
             if (!objectManager.TryGetId(MobileParty.MainParty?.Party, out var myPartyId)) return;
@@ -138,7 +138,7 @@ internal class PvPInteractionClientHandler : IHandler
     {
         if (ModInformation.IsServer) return;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             if (shownDefenderPartyId == null) return;
             if (MobileParty.MainParty?.MapEvent == null) return;

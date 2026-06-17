@@ -440,7 +440,7 @@ internal class BattleHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.MapEventId, out var mapEvent)) return;
         if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.PartyId, out var party)) return;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             if (party.MapEventSide != null)
             {
