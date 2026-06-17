@@ -6,9 +6,6 @@ using GameInterface.Services.GuantletMapEventVisuals.Messages;
 using HarmonyLib;
 using SandBox.GauntletUI.Map;
 using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.GuantletMapEventVisuals.Patches;

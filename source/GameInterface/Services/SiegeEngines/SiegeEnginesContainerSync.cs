@@ -1,10 +1,4 @@
-﻿using GameInterface.AutoSync;
-using GameInterface.DynamicSync;
-using HarmonyLib;
-using System;
-using System.Collections.Generic;
-using System.Text;
-using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
+﻿using GameInterface.DynamicSync;
 
 namespace GameInterface.Services.SiegeEngines
 {

@@ -2,9 +2,6 @@
 using Common.Messaging;
 using GameInterface.Policies;
 using HarmonyLib;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Map;
 using GameInterface.Services.Armies.Messages;

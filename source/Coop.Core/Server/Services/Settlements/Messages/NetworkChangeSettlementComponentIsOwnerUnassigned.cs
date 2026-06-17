@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace GameInterface.Services.Settlements.Messages
+namespace Coop.Core.Server.Services.Settlements.Messages
 {
     /// <summary>
     /// Notify clients of <see cref="TaleWorlds.CampaignSystem.Settlements.SettlementComponent.IsOwnerUnassigned"/> set

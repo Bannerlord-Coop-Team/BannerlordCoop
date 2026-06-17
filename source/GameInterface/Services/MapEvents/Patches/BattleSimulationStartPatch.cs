@@ -2,7 +2,6 @@ using Common;
 using Common.Messaging;
 using GameInterface.Services.MapEvents.Messages.Start;
 using HarmonyLib;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameState;
 

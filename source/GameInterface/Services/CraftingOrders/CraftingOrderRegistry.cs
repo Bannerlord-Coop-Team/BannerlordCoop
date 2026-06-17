@@ -1,5 +1,4 @@
-﻿using Common;
-using GameInterface.Registry.Auto;
+﻿using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
@@ -9,7 +8,6 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CraftingSystem;
-using TaleWorlds.Core;
 
 namespace GameInterface.Services.SiegeEvents;
 internal class CraftingOrderRegistry : AutoRegistryBase<CraftingOrder>

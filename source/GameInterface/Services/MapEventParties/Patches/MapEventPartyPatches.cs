@@ -11,7 +11,6 @@ using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
-using TaleWorlds.Library;
 using MathF = TaleWorlds.Library.MathF;
 
 namespace GameInterface.Services.MapEventParties.Patches;

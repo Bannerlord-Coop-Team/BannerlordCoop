@@ -1,7 +1,4 @@
-﻿using GameInterface.AutoSync;
-using GameInterface.DynamicSync;
-using HarmonyLib;
-using TaleWorlds.CampaignSystem.Roster;
+﻿using GameInterface.DynamicSync;
 
 namespace GameInterface.Services.ItemRosters
 {

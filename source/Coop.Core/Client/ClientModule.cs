@@ -3,6 +3,7 @@ using Common.LogicStates;
 using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
+using Coop.Core.Client.Missions;
 using Coop.Core.Client.Policies;
 using Coop.Core.Client.States;
 using Coop.Core.Common;
@@ -19,6 +20,8 @@ public class ClientModule : CommonModule
     protected override void Load(ContainerBuilder builder)
     {
         base.Load(builder);
+
+        builder.RegisterModule<MissionModule>();
 
         builder.RegisterType<ClientContext>().AsSelf().InstancePerLifetimeScope();
         builder.RegisterType<ClientLogic>().As<ILogic>().As<IClientLogic>().InstancePerLifetimeScope();

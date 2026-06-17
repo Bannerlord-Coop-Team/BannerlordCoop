@@ -1,6 +1,5 @@
 ﻿using ProtoBuf;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.Localization;
 
 namespace GameInterface.Surrogates;
 

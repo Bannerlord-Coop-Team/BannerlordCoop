@@ -1,4 +1,5 @@
-﻿using LiteNetLib;
+﻿using GameInterface.Missions.Services.Network;
+using LiteNetLib;
 using Missions.Services.Network;
 using System;
 using System.Runtime.Serialization;

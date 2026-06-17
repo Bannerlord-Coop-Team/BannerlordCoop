@@ -1,6 +1,9 @@
 ﻿using Autofac;
 using Common.Messaging;
 using Common.Serialization;
+using GameInterface.Missions.Agents.Messages;
+using GameInterface.Missions.Services.Network.Data;
+using GameInterface.Missions.Services.Network.Messages;
 using GameInterface.Serialization;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Surrogates;

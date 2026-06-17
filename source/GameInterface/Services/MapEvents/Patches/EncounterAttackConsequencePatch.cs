@@ -3,13 +3,10 @@ using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.MapEvents.Messages.Start;
-using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Helpers;
 using Serilog;
 using TaleWorlds.CampaignSystem.Encounters;
-using TaleWorlds.CampaignSystem.GameMenus;
-using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.Services.MapEvents.Patches;
 

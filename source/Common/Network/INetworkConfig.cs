@@ -24,6 +24,4 @@ public interface INetworkConfig
     TimeSpan ReconnectDelay { get; }
     TimeSpan DisconnectTimeout { get; }
     NatAddressType NATType { get; }
-
-    void SetRendezvous(string address, int port);
 }

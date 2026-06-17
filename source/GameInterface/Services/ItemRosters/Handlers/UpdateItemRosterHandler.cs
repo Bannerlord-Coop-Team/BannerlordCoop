@@ -1,11 +1,9 @@
 ﻿using Common;
 using Common.Messaging;
 using System;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using Serilog;
 using Common.Logging;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Roster;
 using GameInterface.Services.ItemRosters.Patches;
 using GameInterface.Services.ItemRosters.Messages;

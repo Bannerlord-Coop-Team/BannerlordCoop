@@ -1,6 +1,5 @@
 using Common.Logging;
 using Serilog;
-using Serilog.Core;
 using System;
 
 namespace GameInterface.Services.PlayerCaptivityService;

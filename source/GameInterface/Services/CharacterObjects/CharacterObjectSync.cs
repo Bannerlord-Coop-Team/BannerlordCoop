@@ -1,9 +1,5 @@
 ﻿using Common.Logging;
-using GameInterface.AutoSync;
 using GameInterface.DynamicSync;
-using GameInterface.Registry.Auto;
-using GameInterface.Services.CharacterObjects;
-using GameInterface.Services.SiegeEvents;
 using HarmonyLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;

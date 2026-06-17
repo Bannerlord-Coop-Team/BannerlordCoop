@@ -2,10 +2,6 @@
 using HarmonyLib;
 using SandBox.View.Map;
 using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Reflection.Emit;
-using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade.ViewModelCollection.EscapeMenu;
 
 namespace GameInterface.Services.UI.Patches

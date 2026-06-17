@@ -6,11 +6,8 @@ using GameInterface.Policies;
 using GameInterface.Services.Settlements.Messages;
 using Common.Messaging;
 using Common;
-using System.Reflection;
-using System;
 using Common.Logging;
 using Serilog;
-using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Settlements.Patches;
 

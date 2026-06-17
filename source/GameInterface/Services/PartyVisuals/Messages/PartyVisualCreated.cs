@@ -1,5 +1,4 @@
 ﻿using Common.Messaging;
-using SandBox.View.Map;
 using SandBox.View.Map.Visuals;
 using TaleWorlds.CampaignSystem.Party;
 

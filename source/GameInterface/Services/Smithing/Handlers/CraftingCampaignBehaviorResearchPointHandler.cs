@@ -1,13 +1,10 @@
-﻿using Common;
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Smithing.Interfaces;
 using GameInterface.Services.Smithing.Messages;
 using Serilog;
-using System.Reflection.Metadata;
-using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Smithing.Handlers
 {

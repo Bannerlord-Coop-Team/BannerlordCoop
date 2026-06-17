@@ -95,11 +95,6 @@ namespace IntroServer.Config
         public TimeSpan ObjectCreationTimeout => DisconnectTimeout;
 
         public TimeSpan NetworkPollInterval => UpdateTime;
-
-        public void SetRendezvous(string address, int port)
-        {
-            throw new NotImplementedException();
-        }
         #endregion
     }
 }

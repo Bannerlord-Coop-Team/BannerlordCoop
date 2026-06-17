@@ -28,7 +28,6 @@
     <ProjectReference Include="..\Common\Common.csproj" />
     <ProjectReference Include="..\GameInterface.Tests\GameInterface.Tests.csproj" />
     <ProjectReference Include="..\GameInterface\GameInterface.csproj" />
-    <ProjectReference Include="..\Missions\Missions.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,7 +1,4 @@
-﻿using GameInterface.AutoSync;
-using GameInterface.DynamicSync;
-using HarmonyLib;
-using TaleWorlds.Core;
+﻿using GameInterface.DynamicSync;
 
 namespace GameInterface.Services.ItemModifiers;
 

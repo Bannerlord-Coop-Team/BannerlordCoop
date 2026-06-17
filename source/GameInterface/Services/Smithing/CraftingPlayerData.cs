@@ -1,8 +1,5 @@
-﻿using GameInterface.Services.Players.Data;
-using ProtoBuf;
-using System;
+﻿using ProtoBuf;
 using System.Collections.Generic;
-using System.Text;
 
 namespace GameInterface.Services.Smithing;
 

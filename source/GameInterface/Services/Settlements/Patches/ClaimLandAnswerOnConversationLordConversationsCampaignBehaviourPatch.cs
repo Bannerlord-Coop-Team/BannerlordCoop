@@ -1,13 +1,7 @@
 ﻿using HarmonyLib;
-using System.Collections.Generic;
-using System.Reflection.Emit;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem;
-using Common.Util;
-using Common.Messaging;
-using GameInterface.Services.Settlements.Messages;
 
 namespace GameInterface.Services.Settlements.Patches;
 

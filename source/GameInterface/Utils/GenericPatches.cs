@@ -4,7 +4,6 @@ using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Utils.LocalEvents;
 using HarmonyLib;
-using Newtonsoft.Json.Linq;
 using Serilog;
 using System;
 using System.Collections.Concurrent;
@@ -13,7 +12,6 @@ using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using TaleWorlds.Core;
-using TaleWorlds.Diamond;
 using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
 

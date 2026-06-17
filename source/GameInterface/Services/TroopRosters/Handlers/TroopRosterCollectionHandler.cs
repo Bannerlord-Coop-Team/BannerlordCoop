@@ -1,12 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using GameInterface.Services.Heroes.Handlers;
-using GameInterface.Services.Heroes.Messages.Collections;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Messages;
 using Serilog;

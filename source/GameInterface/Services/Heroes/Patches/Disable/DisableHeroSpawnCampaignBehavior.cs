@@ -1,6 +1,5 @@
 ﻿using Common;
 using GameInterface.Policies;
-using GameInterface.Services.Towns.Messages;
 using HarmonyLib;
 using System.Collections.Generic;
 using System.Reflection;

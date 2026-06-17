@@ -3,12 +3,8 @@ using Common.Messaging;
 using GameInterface.Services.HeroDevelopers.Messages;
 using HarmonyLib;
 using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.Core;
-using TaleWorlds.Library;
 
 namespace GameInterface.Services.HeroDevelopers.Patches
 {

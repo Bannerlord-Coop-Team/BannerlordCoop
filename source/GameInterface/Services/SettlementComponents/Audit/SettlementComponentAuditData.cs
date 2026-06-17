@@ -1,5 +1,4 @@
 ﻿using ProtoBuf;
-using TaleWorlds.CampaignSystem.Settlements;
 namespace GameInterface.Services.SettlementComponents.Audit;
 
 /// <summary>

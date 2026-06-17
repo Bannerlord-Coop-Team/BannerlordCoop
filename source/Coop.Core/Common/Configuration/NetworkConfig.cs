@@ -93,44 +93,5 @@ public class NetworkConfig : INetworkConfig
     ///     Update cycle time for the network receiver.
     /// </summary>
     public TimeSpan UpdateTime { get; } = TimeSpan.FromMilliseconds(15);
-
-    /// <summary>
-    ///     Point the NAT-punch rendezvous at a specific endpoint (e.g. the co-hosting Coop
-    ///     server) instead of the compiled-in defaults. Sets both LAN and WAN so the punch
-    ///     reaches the target regardless of <see cref="NATType"/>.
-    /// </summary>
-    public void SetRendezvous(string address, int port)
-    {
-        // LanAddress/WanAddress parse the stored text with IPAddress.Parse, which rejects
-        // hostnames like "localhost". Resolve to a numeric IP up front (preferring IPv4) so the
-        // getters never throw and LiteNetLib gets a usable address.
-        string resolved = ResolveToIp(address);
-        LanAddressText = resolved;
-        WanAddressText = resolved;
-        LanPort = port;
-        WanPort = port;
-    }
-
-    private static string ResolveToIp(string address)
-    {
-        if (string.IsNullOrWhiteSpace(address)) return address;
-        if (IPAddress.TryParse(address, out _)) return address;
-
-        try
-        {
-            var addresses = Dns.GetHostAddresses(address);
-            var ipv4 = addresses.FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork);
-            if (ipv4 != null) return ipv4.ToString();
-
-            var any = addresses.FirstOrDefault();
-            if (any != null) return any.ToString();
-        }
-        catch
-        {
-            // Fall through: keep the original text (will surface as a parse error if unusable).
-        }
-
-        return address;
-    }
     #endregion
 }

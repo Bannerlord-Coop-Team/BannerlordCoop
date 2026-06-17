@@ -1,6 +1,5 @@
 ﻿using Autofac;
 using Common.Audit;
-using Common.Extensions;
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;

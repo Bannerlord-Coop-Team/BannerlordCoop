@@ -79,10 +79,6 @@
       <Project>{D22CB8FA-40CC-4F47-986F-1C5A4415980B}</Project>
       <Name>GameInterface</Name>
     </ProjectReference>
-    <ProjectReference Include="..\Missions\Missions.csproj">
-      <Project>{E12F967C-1CC9-4E4D-8D8F-5029E0BA96EE}</Project>
-      <Name>Missions</Name>
-    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <Content Include="FodyWeavers.xml" />
@@ -104,6 +100,9 @@
     <Compile Include="Server\Services\Kingdoms\Messages\NetworkChangeKingdomPolicy.cs" />
   </ItemGroup>
   <ItemGroup>
+	  <Reference Include="SandBox.View">
+	    <HintPath>..\Missions\obj\x64\Release\netstandard2.0\PublicizedAssemblies\SandBox.View.D6E4F8483DFBE29785FE2E22277CF29C\SandBox.View.dll</HintPath>
+	  </Reference>
 	  <Reference Include="TaleWorlds.CampaignSystem">
 	    <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.CampaignSystem.dll</HintPath>
 	  </Reference>
@@ -113,8 +112,14 @@
 	  <Reference Include="TaleWorlds.Core">
 	    <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Core.dll</HintPath>
 	  </Reference>
+	  <Reference Include="TaleWorlds.GauntletUI.Data">
+	    <HintPath>..\GameInterface\obj\x64\Release\netstandard2.0\PublicizedAssemblies\TaleWorlds.GauntletUI.Data.EADFA9568C011469B6AD1D7E21237613\TaleWorlds.GauntletUI.Data.dll</HintPath>
+	  </Reference>
 	  <Reference Include="TaleWorlds.Library">
 		  <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Library.dll</HintPath>
+	  </Reference>
+	  <Reference Include="TaleWorlds.MountAndBlade">
+	    <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.dll</HintPath>
 	  </Reference>
 	  <Reference Include="TaleWorlds.ObjectSystem">
 	    <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ObjectSystem.dll</HintPath>

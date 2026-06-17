@@ -1,11 +1,8 @@
 ﻿using Common;
-using Common.Util;
 using HarmonyLib;
-using Helpers;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.Inventory;
 
 namespace GameInterface.Services.CampaignService.Patches;
 

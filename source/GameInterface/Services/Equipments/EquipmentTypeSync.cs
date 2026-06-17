@@ -1,4 +1,3 @@
-using GameInterface.AutoSync;
 using GameInterface.DynamicSync;
 using HarmonyLib;
 using TaleWorlds.Core;

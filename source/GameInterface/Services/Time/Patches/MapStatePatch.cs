@@ -1,10 +1,8 @@
 ﻿using HarmonyLib;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection.Emit;
 using System.Reflection;
-using System.Text;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.Core;
 
