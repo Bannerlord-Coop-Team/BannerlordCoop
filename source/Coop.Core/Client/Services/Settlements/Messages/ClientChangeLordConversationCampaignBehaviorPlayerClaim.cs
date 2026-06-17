@@ -1,5 +1,4 @@
-﻿using Common.Logging.Attributes;
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
 
 namespace Coop.Core.Client.Services.Settlements.Messages;
@@ -7,7 +6,6 @@ namespace Coop.Core.Client.Services.Settlements.Messages;
 /// <summary>
 /// Client notifies server of claim request
 /// </summary>
-[BatchLogMessage]
 [ProtoContract(SkipConstructor = true)] 
 public readonly struct ClientChangeLordConversationCampaignBehaviorPlayerClaim : IEvent
 {

@@ -3,6 +3,6 @@ using System;
 
 namespace Coop.Core.Templates.ServiceTemplate.Messages;
 
-public record ResponseTemplate : IResponse
+public record ResponseTemplate : IEvent
 {
 }

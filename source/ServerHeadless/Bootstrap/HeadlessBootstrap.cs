@@ -33,7 +33,7 @@ namespace ServerHeadless.Bootstrap
 
             // The native engine normally installs the platform file helper; provide a managed one so
             // the save system can map virtual paths (User -> Documents\...) to real files.
-            Common.PlatformFileHelper = new HeadlessPlatformFileHelper(applicationRoot);
+            TaleWorlds.Library.Common.PlatformFileHelper = new HeadlessPlatformFileHelper(applicationRoot);
 
             // Apply every [HarmonyPatch] in this assembly (Bootstrap/Patches/*) — these neutralise
             // the native-only calls that would otherwise crash a headless process.

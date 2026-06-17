@@ -1,5 +1,4 @@
-﻿using Common.Logging.Attributes;
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
 
 namespace Coop.Core.Server.Services.Settlements.Messages;
@@ -8,7 +7,6 @@ namespace Coop.Core.Server.Services.Settlements.Messages;
 /// Notify client of Militia Change.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-[BatchLogMessage]
 public record NetworkChangeSettlementMilitia : IEvent
 {
     [ProtoMember(1)]

@@ -6,7 +6,7 @@ using LiteNetLib;
 namespace Common.Tests.Utils;
 internal class DummyNetwork : INetwork
 {
-    public INetworkConfiguration Configuration => throw new NotImplementedException();
+    public INetworkConfig Config => throw new NotImplementedException();
 
     public int Priority => throw new NotImplementedException();
 
@@ -20,6 +20,16 @@ internal class DummyNetwork : INetwork
     }
 
     public void Send(NetPeer netPeer, IMessage message)
+    {
+        throw new NotImplementedException();
+    }
+
+    public void SendImmediate(NetPeer netPeer, IPacket packet)
+    {
+        throw new NotImplementedException();
+    }
+
+    public void SendImmediate(NetPeer netPeer, IMessage message)
     {
         throw new NotImplementedException();
     }

@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -40,7 +40,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
     private IPEndPoint connectEndPoint;
 
     public CoopClient(
-        INetworkConfiguration config,
+        INetworkConfig config,
         IMessageBroker messageBroker,
         IPacketManager packetManager,
         ICommonSerializer serializer) : base(config, serializer)
@@ -68,8 +68,16 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 
     public override void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
     {
-        IPacket packet = (IPacket)serializer.Deserialize(reader.GetRemainingBytes());
-        packetManager.HandleReceive(peer, packet);
+        try
+        {
+            IPacket packet = (IPacket)serializer.Deserialize(reader.GetRemainingBytes());
+
+            packetManager.HandleReceive(peer, packet);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to process packet");
+        }
     }
 
     public override void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
@@ -119,11 +127,11 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 
         netManager.Start();
 
-        var ip = ResolveConnectAddress(Configuration.Address, preferIPv6: false);
-        connectEndPoint = new IPEndPoint(ip, Configuration.Port);
+        var ip = ResolveConnectAddress(Config.Address, preferIPv6: false);
+        connectEndPoint = new IPEndPoint(ip, Config.Port);
 
         Logger.Information("Attempting connection to {Endpoint}...", connectEndPoint);
-        netManager.Connect(connectEndPoint, Configuration.Token);
+        netManager.Connect(connectEndPoint, Config.Token);
     }
 
     private static IPAddress ResolveConnectAddress(string address, bool preferIPv6)
@@ -173,7 +181,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 
             messageBroker.Publish(this, new SendInformationMessage($"Retrying connection to {connectEndPoint}..."));
             Logger.Information("Retrying connection to {Endpoint}...", connectEndPoint);
-            netManager.Connect(connectEndPoint, Configuration.Token);
+            netManager.Connect(connectEndPoint, Config.Token);
         }
     }
 

@@ -48,13 +48,13 @@ internal class TimePatches
         __result = CurrentMode;
     }
 
-    public static void OverrideTimeControlMode(Campaign campaign, CampaignTimeControlMode value)
+    public static void OverrideTimeControlMode(CampaignTimeControlMode value)
     {
-        if (campaign == null) return;
+        if (Campaign.Current == null) return;
 
         // _timeControlMode is getting set magically somewhere so we use our own value instead
         CurrentMode = value;
-        campaign._timeControlMode = value;
+        Campaign.Current._timeControlMode = value;
     }
 
     internal static bool CanApplyTimeControl(TimeControlEnum controlMode)

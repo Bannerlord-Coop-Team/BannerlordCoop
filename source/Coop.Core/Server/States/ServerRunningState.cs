@@ -2,6 +2,7 @@
 using Common.Network;
 using Coop.Core.Common.Services.Connection.Messages;
 using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.UI.Interfaces;
 
@@ -14,10 +15,17 @@ public class ServerRunningState : ServerStateBase
 {
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
+    private readonly IGameStateInterface gameStateInterface;
 
-    public ServerRunningState(IServerLogic logic, IMessageBroker messageBroker, INetwork network, ILoadingInterface loadingInterface) : base(logic)    {
+    public ServerRunningState(
+        IServerLogic logic,
+        IMessageBroker messageBroker,
+        INetwork network,
+        IGameStateInterface gameStateInterface,
+        ILoadingInterface loadingInterface) : base(logic)    {
         this.messageBroker = messageBroker;
         this.network = network;
+        this.gameStateInterface = gameStateInterface;
 
         // Start server
         network.Start();
@@ -42,7 +50,7 @@ public class ServerRunningState : ServerStateBase
         network.Dispose();
 
         // Go to main menu
-        messageBroker.Publish(this, new EnterMainMenu());
+        gameStateInterface.GoToMainMenu();
     }
 
     internal void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> payload)

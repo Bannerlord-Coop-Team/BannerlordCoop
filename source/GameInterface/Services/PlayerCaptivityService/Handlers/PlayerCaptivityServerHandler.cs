@@ -75,21 +75,22 @@ internal class PlayerCaptivityServerHandler : IHandler
     }
 
     /// <summary>
-    /// Runs from the <see cref="TakePrisonerAction.ApplyInternal"/> prefix, before the native body.
-    /// Native does the canonical capture right after this returns (hero state → Prisoner, add to the
-    /// captor's prison roster, which sets <see cref="Hero.PartyBelongedToAsPrisoner"/> and replicates
-    /// it to the clients). Only the coop-specific extras happen here: the player party's troops are
-    /// forfeited so native <see cref="MapEvent.CaptureDefeatedPartyMembers"/> cannot re-process or
-    /// scatter them, and the party is parked until captivity ends.
+    /// Runs from the <see cref="TakePrisonerAction.ApplyInternal"/> postfix, after the native capture
+    /// applied with patches live (hero state → Prisoner, member-roster removal, prison-roster add —
+    /// each replicating to the clients as its own message, with
+    /// <see cref="Hero.PartyBelongedToAsPrisoner"/> auto-synced). Only the coop-specific extras happen
+    /// here: the player party's remaining troops are forfeited so native
+    /// <see cref="MapEvent.CaptureDefeatedPartyMembers"/> cannot re-process or scatter them, and the
+    /// party is parked until captivity ends.
     /// </summary>
     private void Handle_PrisonerTaken(MessagePayload<PrisonerTaken> payload)
     {
         if (ModInformation.IsClient) return;
 
         var hero = payload.What.PrisonerHero;
-        // TakePrisonerActionPatches runs native TakePrisonerAction.Apply before publishing this, which
-        // already cleared hero.PartyBelongedTo and set PartyBelongedToAsPrisoner. The party the hero was
-        // captured from therefore has to come from the message, not from the (now-null) hero.PartyBelongedTo.
+        // PrisonerTaken is published from the TakePrisonerAction.ApplyInternal postfix, so native already
+        // cleared hero.PartyBelongedTo and set PartyBelongedToAsPrisoner. The party the hero was captured
+        // from therefore has to come from the message, not from the (now-null) hero.PartyBelongedTo.
         var playerParty = payload.What.PrisonerParty;
 
         PlayerCaptivityLogger.Debug("Handle_PrisonerTaken: hero={HeroId} party={PartyId} captor={CaptorId}",
@@ -110,7 +111,10 @@ internal class PlayerCaptivityServerHandler : IHandler
         }
 
         // Park the now-leaderless player party so native post-battle processing cannot scatter or destroy
-        // it; the captivity-end flow reactivates it.
+        // it; the captivity-end flow reactivates it. The clears run with patches live: each per-element
+        // removal replicates to the clients, whose rosters have tracked the same sequence of replicated
+        // deltas (the hero's own removal already replicated from the patches-live native capture), so
+        // the indices line up everywhere.
         playerParty.MemberRoster.Clear();
         playerParty.PrisonRoster.Clear();
         playerParty.IsActive = false;
@@ -132,7 +136,7 @@ internal class PlayerCaptivityServerHandler : IHandler
         PlayerCaptivityLogger.Debug("Handle_NetworkPlayerSurrendered: applying surrender for party={PartyId} in mapEvent={MapEventId}",
             playerParty.StringId, payload.What.MapEventId);
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             try
             {
@@ -155,22 +159,48 @@ internal class PlayerCaptivityServerHandler : IHandler
     {
         if (ModInformation.IsClient) return;
 
-        if (!objectManager.TryGetObjectWithLogging<Hero>(payload.What.PlayerHeroId, out var playerHero))
-            return;
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(payload.What.PlayerPartyId, out var playerParty))
-            return;
+        var heroId = payload.What.PlayerHeroId;
+        var partyId = payload.What.PlayerPartyId;
+        var facilitatorId = payload.What.FacilitatorId;
+        var detail = payload.What.Detail;
+        var ransomAmount = payload.What.RansomAmount;
+        var releasePosition = payload.What.PlayerPartyPosition;
+        var peer = payload.Who as NetPeer;
 
-        Hero facilitator = null;
-        if (payload.What.FacilitatorId != null && !objectManager.TryGetObjectWithLogging(payload.What.FacilitatorId, out facilitator))
-            return;
+        // The release touches party/roster game state the main-thread tick also touches, so defer the
+        // apply to the game loop; resolve the object ids inside the lambda so a deferred create that lands
+        // first is visible, and send the reply inside the lambda after the release runs so the client only
+        // leaves the captivity menus once the server has actually applied it.
+        GameThread.Run(() =>
+        {
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging<Hero>(heroId, out var playerHero))
+                    return;
+                if (!objectManager.TryGetObjectWithLogging<MobileParty>(partyId, out var playerParty))
+                    return;
 
-        PlayerCaptivityLogger.Debug("Handle_NetworkEndPlayerCaptivityAttempted (server): hero={HeroId} party={PartyId} detail={Detail} facilitator={FacilitatorId}",
-            playerHero.StringId, playerParty.StringId, payload.What.Detail, facilitator?.StringId);
+                Hero facilitator = null;
+                if (facilitatorId != null && !objectManager.TryGetObjectWithLogging(facilitatorId, out facilitator))
+                    return;
 
-        ReleasePlayerFromCaptivity(playerHero, playerParty, payload.What.Detail, facilitator, payload.What.PlayerPartyPosition);
+                PlayerCaptivityLogger.Debug("Handle_NetworkEndPlayerCaptivityAttempted (server): hero={HeroId} party={PartyId} detail={Detail} facilitator={FacilitatorId}",
+                    playerHero.StringId, playerParty.StringId, detail, facilitator?.StringId);
 
-        var message = new NetworkPlayerCaptivityEnded();
-        network.Send(payload.Who as NetPeer, message);
+                ReleasePlayerFromCaptivity(playerHero, playerParty, detail, facilitator, releasePosition);
+
+                if (detail == EndCaptivityDetail.Ransom && ransomAmount != 0)
+                {
+                    GiveGoldAction.ApplyBetweenCharacters(playerHero, null, ransomAmount, false);
+                }
+
+                network.Send(peer, new NetworkPlayerCaptivityEnded());
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to apply {Message}", nameof(NetworkEndPlayerCaptivityAttempted));
+            }
+        }, blocking: true);
     }
 
     /// <summary>
@@ -212,6 +242,17 @@ internal class PlayerCaptivityServerHandler : IHandler
     /// </summary>
     private void ReleasePlayerFromCaptivity(Hero playerHero, MobileParty playerParty, EndCaptivityDetail detail, Hero facilitator, CampaignVec2 releasePosition)
     {
+        // Guard against re-processing an already-ended captivity: a client release request can race a
+        // server-initiated release, and a second pass would re-add the hero to the member roster,
+        // doubling the troop count. The captor reference is the captivity's source of truth — it is
+        // still set on every legitimate entry (the EndCaptivityAction prefix intercepts before native
+        // clears anything, including a death in captivity) and cleared below on the first pass.
+        if (playerHero.PartyBelongedToAsPrisoner == null)
+        {
+            PlayerCaptivityLogger.Debug("ReleasePlayerFromCaptivity: skipping, hero {HeroId} is no longer captive", playerHero.StringId);
+            return;
+        }
+
         // Snapshot the captor before the release: clearing the captivity below nulls
         // PartyBelongedToAsPrisoner, and a captor defeated in battle may already be inactive.
         PartyBase captorParty = playerHero.PartyBelongedToAsPrisoner;
@@ -220,17 +261,6 @@ internal class PlayerCaptivityServerHandler : IHandler
         if (playerHero.IsAlive)
         {
             playerHero.ChangeState(Hero.CharacterStates.Active);
-
-            // Restore the released hero to full health BEFORE re-adding it to the party. The client that
-            // fought the battle wounds the hero locally (HitPoints -> 1) and that synced to everyone; vanilla
-            // never re-adds a released hero as wounded, and ChangeState(Active) does not heal. Healing first
-            // means the member roster never counts the hero as wounded, and the HitPoints write (server is
-            // authoritative) replicates the heal so the restored party shows the hero healthy everywhere.
-            if (playerHero.HitPoints < playerHero.MaxHitPoints)
-            {
-                playerHero.HitPoints = playerHero.MaxHitPoints;
-            }
-
             playerParty.AddElementToMemberRoster(playerHero.CharacterObject, 1, true);
             playerParty.ChangePartyLeader(playerHero);
         }

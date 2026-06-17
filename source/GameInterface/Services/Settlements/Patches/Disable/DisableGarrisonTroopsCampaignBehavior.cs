@@ -17,6 +17,9 @@ internal class DisableGarrisonTroopsCampaignBehavior
     [HarmonyPrefix]
     public static bool OnSettlementEnteredPrefix(MobileParty mobileParty)
     {
+        if (mobileParty == null)
+            return true;
+
         return !mobileParty.IsPlayerParty();
     }
 }

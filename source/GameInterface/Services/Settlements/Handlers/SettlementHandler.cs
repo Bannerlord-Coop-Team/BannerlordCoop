@@ -1,9 +1,11 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Messages;
 using GameInterface.Services.Settlements.Patches;
 using Serilog;
+using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -35,9 +37,6 @@ public class SettlementHandler : IHandler
         messageBroker.Subscribe<ChangeSettlementCurrentSiegeState>(HandleCurrentSiegeState);
         messageBroker.Subscribe<ChangeSettlementMilitia>(HandleMilitia);
         messageBroker.Subscribe<ChangeSettlementGarrisonWagePaymentLimit>(HandleGarrisonWageLimit);
-        messageBroker.Subscribe<ChangeSettlementNotablesCache>(HandleCollectNotablesToCache);
-        messageBroker.Subscribe<ChangeSettlementHeroWithoutParty>(HandleHeroWithoutParty);
-        messageBroker.Subscribe<ChangeSettlementHeroWithoutPartyRemove>(HandleHeroRemoveWithoutParty);
         messageBroker.Subscribe<ChangeMobileParty>(HandleMobileParty);
         messageBroker.Subscribe<ChangeSettlementWallHitPointsRatio>(HandleHitPointsRatio);
 
@@ -130,13 +129,25 @@ public class SettlementHandler : IHandler
 
     private void HandleLastVisitTimeOfOwner(MessagePayload<ChangeSettlementLastVisitTimeOfOwner> payload)
     {
-        var obj = payload.What;
-        if (objectManager.TryGetObject<Settlement>(obj.SettlementID, out var settlement) == false)
+        var data = payload.What;
+
+        GameThread.Run(() =>
         {
-            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementID);
-            return;
-        }
-        LastVisitTimeOwnerSettlementActionPatch.RunLastVisitTimeOfOwner(settlement, obj.CurrentTime);
+            try
+            {
+                if (objectManager.TryGetObject<Settlement>(data.SettlementID, out var settlement) == false)
+                {
+                    Logger.Error("Unable to find Settlement ({SettlementId})", data.SettlementID);
+                    return;
+                }
+
+                LastVisitTimeOwnerSettlementActionPatch.RunLastVisitTimeOfOwner(settlement, data.CurrentTime);
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to apply ChangeSettlementLastVisitTimeOfOwner");
+            }
+        });
     }
 
     private void HandleHitPointsRatio(MessagePayload<ChangeSettlementWallHitPointsRatio> payload)
@@ -169,66 +180,6 @@ public class SettlementHandler : IHandler
         }
 
         MobilePartyCachePatch.RunMobileParty(settlement, mobileParty, obj.AddMobileParty);
-    }
-
-    private void HandleHeroRemoveWithoutParty(MessagePayload<ChangeSettlementHeroWithoutPartyRemove> payload)
-    {
-        var obj = payload.What;
-        if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
-        {
-            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
-            return;
-        }
-
-        if (objectManager.TryGetObject<Hero>(obj.HeroId, out var hero) == false)
-        {
-            Logger.Error("Unable to find Hero ({HeroStringId})", obj.HeroId);
-            return;
-        }
-        // may not need to run because its cached ~100ms
-        //HeroWithoutPartyPatch.RunRemoveHeroWithoutParty(settlement, hero);
-
-    }
-
-    private void HandleHeroWithoutParty(MessagePayload<ChangeSettlementHeroWithoutParty> payload)
-    {
-        var obj = payload.What;
-        if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
-        {
-            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
-            return;
-        }
-
-        if (objectManager.TryGetObject<Hero>(obj.HeroId, out var hero) == false)
-        {
-            Logger.Error("Unable to find Hero ({HeroStringId})", obj.HeroId);
-            return;
-        }
-        // may not need to run because its cached ~100ms
-        //HeroWithoutPartyPatch.RunAddHeroWithoutParty(settlement, hero);
-    }
-
-    private void HandleCollectNotablesToCache(MessagePayload<ChangeSettlementNotablesCache> payload)
-    {
-        var obj = payload.What;
-
-        MBList<Hero> notablesCache = new();
-        if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
-        {
-            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
-            return;
-        }
-
-        foreach (string heroStringId in obj.NotablesCache ?? Enumerable.Empty<string>()) {
-            if (objectManager.TryGetObject<Hero>(heroStringId, out var hero) == false)
-            {
-                Logger.Error("Unable to find Hero ({HeroStringId})", heroStringId);
-                return;
-            }
-            notablesCache.Add(hero);
-        }
-
-        CollectNotablesToCachePatch.RunNotablesCacheChange(settlement, notablesCache);
     }
 
     private void HandleGarrisonWageLimit(MessagePayload<ChangeSettlementGarrisonWagePaymentLimit> payload)
@@ -333,9 +284,6 @@ public class SettlementHandler : IHandler
         messageBroker.Unsubscribe<ChangeSettlementCurrentSiegeState>(HandleCurrentSiegeState);
         messageBroker.Unsubscribe<ChangeSettlementMilitia>(HandleMilitia);
         messageBroker.Unsubscribe<ChangeSettlementGarrisonWagePaymentLimit>(HandleGarrisonWageLimit);
-        messageBroker.Unsubscribe<ChangeSettlementNotablesCache>(HandleCollectNotablesToCache);
-        messageBroker.Unsubscribe<ChangeSettlementHeroWithoutParty>(HandleHeroWithoutParty);
-        messageBroker.Unsubscribe<ChangeSettlementHeroWithoutPartyRemove>(HandleHeroRemoveWithoutParty);
         messageBroker.Unsubscribe<ChangeSettlementWallHitPointsRatio>(HandleHitPointsRatio);
         messageBroker.Unsubscribe<ChangeSettlementLastVisitTimeOfOwner>(HandleLastVisitTimeOfOwner);
 

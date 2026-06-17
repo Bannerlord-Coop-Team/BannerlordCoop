@@ -1,10 +1,10 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
 using Common.Serialization;
 using Common.Util;
 using LiteNetLib;
-using ProtoBuf.Meta;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,12 +17,15 @@ namespace Coop.Core.Common.Network;
 /// <inheritdoc cref="INetwork"/>
 public abstract class CoopNetworkBase : INetwork, INetEventListener
 {
-    public INetworkConfiguration Configuration { get; }
+    public INetworkConfig Config { get; }
     public abstract int Priority { get; }
 
     protected readonly ICommonSerializer serializer;
 
     private readonly Poller poller;
+
+    // Profiles outbound packets; dumps per-type counts and byte totals every 10 seconds (server only).
+    private readonly PacketProfiler packetProfiler = new PacketProfiler(TimeSpan.FromSeconds(10));
 
     private CancellationTokenSource CancellationTokenSource;
     // Guard against double-dispose: finalizer calls Dispose() after explicit Dispose() on reconnect
@@ -30,21 +33,18 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
 
     protected readonly NetManager netManager;
 
-    protected CoopNetworkBase(INetworkConfiguration configuration, ICommonSerializer serializer)
+    protected CoopNetworkBase(INetworkConfig configuration, ICommonSerializer serializer)
     {
-        Configuration = configuration;
+        Config = configuration;
         this.serializer = serializer;
 
         netManager = new NetManager(this)
         {
-            // DisconnectTimeout = configuration.ConnectionTimeout.Milliseconds
-
-            // Increase disconnect timeout to prevent disconnect during debugging
-            DisconnectTimeout = 300 * 1000
+            DisconnectTimeout = (int)configuration.ConnectionTimeout.TotalMilliseconds
         };
 
         CancellationTokenSource = new CancellationTokenSource();
-        poller = new Poller(Update, Configuration.NetworkPollInterval);
+        poller = new Poller(Update, Config.NetworkPollInterval);
         poller.Start();
     }
 
@@ -60,6 +60,8 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
         _disposed = true;
 
         netManager.Stop();
+
+        packetProfiler.Dispose();
 
         CancellationTokenSource.Cancel();
         CancellationTokenSource.Dispose();
@@ -90,8 +92,32 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
 
     public virtual void Send(NetPeer netPeer, IPacket packet)
     {
+        SendInternal(netPeer, packet);
+    }
+
+    /// <summary>
+    /// Sends straight to the peer, bypassing any per-peer send gating (the server's connection queue).
+    /// For connection-level traffic that must reach a peer regardless of its load state — the transfer
+    /// save and the join handshake — and for the queue's own replay.
+    /// </summary>
+    public void SendImmediate(NetPeer netPeer, IPacket packet)
+    {
+        SendInternal(netPeer, packet);
+    }
+
+    public void SendImmediate(NetPeer netPeer, IMessage message)
+    {
+        SendInternal(netPeer, MessagePacket.Create(message, serializer));
+    }
+
+    private void SendInternal(NetPeer netPeer, IPacket packet)
+    {
         // Serialize data
         byte[] data = serializer.Serialize(packet);
+
+        // Profile every outbound packet (server only). MessagePacket carries its message type, so the
+        // profile breaks message traffic out by message type rather than one opaque MessagePacket bucket.
+        packetProfiler.Record(packet, data.Length);
 
         // Send data
         netPeer.Send(data, packet.DeliveryMethod);
@@ -99,33 +125,17 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
 
     public void Send(NetPeer netPeer, IMessage message)
     {
-        var data = SerializeMessage(message);
-        var eventPacket = new MessagePacket(data);
-        Send(netPeer, eventPacket);
+        Send(netPeer, MessagePacket.Create(message, serializer));
     }
 
     public void SendAll(IMessage message)
     {
-        var data = SerializeMessage(message);
-        var eventPacket = new MessagePacket(data);
-        SendAll(eventPacket);
+        SendAll(MessagePacket.Create(message, serializer));
     }
 
     public void SendAllBut(NetPeer excludedPeer, IMessage message)
     {
-        var data = SerializeMessage(message);
-        var eventPacket = new MessagePacket(data);
-        SendAllBut(excludedPeer, eventPacket);
-    }
-
-    private byte[] SerializeMessage(IMessage message)
-    {
-        if (RuntimeTypeModel.Default.IsDefined(message.GetType()) == false)
-        {
-            throw new ArgumentException($"Type {message.GetType().Name} is not serializable.");
-        }
-
-        return serializer.Serialize(message);
+        SendAllBut(excludedPeer, MessagePacket.Create(message, serializer));
     }
 
     public abstract void Start();

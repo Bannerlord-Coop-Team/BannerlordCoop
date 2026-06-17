@@ -1,90 +1,63 @@
-﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Coop.Core.Client.Messages;
-using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
-using Coop.Core.Server.Services.Time.Messages;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Messages;
-using LiteNetLib;
-using Serilog;
-using System.Linq;
+using System.Threading;
 
-namespace Coop.Core.Server.Services.Connection.Handlers
+namespace Coop.Core.Server.Services.Connection.Handlers;
+
+/// <summary>
+/// Sends player-facing messaging about the loading lock. It tracks the loading count from the
+/// registry's <see cref="LoadingPlayersChanged"/> signal so it never has to query connection
+/// state itself.
+/// </summary>
+public class PlayerConnectionServerMessageHandler : IHandler
 {
-    public class PlayerConnectionServerMessageHandler : IHandler
+    private readonly IMessageBroker messageBroker;
+    private readonly INetwork network;
+
+    private const string UnpauseReadyMessage = "All players connected, game can now be un-paused";
+
+    private int loadingPlayerCount;
+
+    public PlayerConnectionServerMessageHandler(IMessageBroker messageBroker, INetwork network)
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<PlayerConnectionServerMessageHandler>();
+        this.messageBroker = messageBroker;
+        this.network = network;
 
-        private readonly IMessageBroker messageBroker;
-        private readonly IClientRegistry clientRegistry;
-        private readonly INetwork network;
-
-        private string unpauseReadyMessage = "All players connected, game can now be un-paused";
-
-        public PlayerConnectionServerMessageHandler(IMessageBroker messageBroker, IClientRegistry clientRegistry, INetwork network)
-        {
-            this.messageBroker = messageBroker;
-            this.clientRegistry = clientRegistry;
-            this.network = network;
-
-            messageBroker.Subscribe<PlayerCampaignEntered>(PlayerCampaignEnteredHandler);
-            messageBroker.Subscribe<TimeSpeedChangedAttempted>(AttemptedTimeSpeedChanged);
-            messageBroker.Subscribe<PackageGameSaveData>(Handle_NetworkConnected);
-        }
-
-        public void Dispose()
-        {
-            messageBroker.Unsubscribe<PlayerCampaignEntered>(PlayerCampaignEnteredHandler);
-            messageBroker.Unsubscribe<TimeSpeedChangedAttempted>(AttemptedTimeSpeedChanged);
-            messageBroker.Unsubscribe<PackageGameSaveData>(Handle_NetworkConnected);
-        }
-
-        internal void Handle_NetworkConnected(MessagePayload<PackageGameSaveData> obj)
-        {
-            SendLoadingMessage();
-        }
-
-        private void PlayerCampaignEnteredHandler(MessagePayload<PlayerCampaignEntered> obj)
-        {
-            var playerId = obj.What.playerId;
-
-            if (!AnyLoaders())
-            {
-                messageBroker.Publish(this, new SendInformationMessage(unpauseReadyMessage));
-                network.SendAllBut(playerId, new SendInformationMessage(unpauseReadyMessage));
-            }
-        }
-
-        private void AttemptedTimeSpeedChanged(MessagePayload<TimeSpeedChangedAttempted> obj)
-        {
-            SendLoadingMessage();
-        }
-
-        private void SendLoadingMessage()
-        {
-            if (!AnyLoaders()) return;
-
-            int loadingPeers = clientRegistry.LoadingPeers.Count;
-
-            string loadingMessage = "Time controls disabled, " + loadingPeers + " player(s) are currently joining the game";
-            var message = new SendInformationMessage(loadingMessage);
-
-            messageBroker.Publish(this, message);
-            network.SendAll(message);
-        }
-
-        private bool AnyLoaders()
-        {
-            if (clientRegistry.PlayersLoading)
-            {
-                var loadingPeers = clientRegistry.LoadingPeers;
-                Logger.Information($"{string.Join(",", loadingPeers.Select(p => p.Address))} are currently loading, unable to change time");
-                return true;
-            }
-
-            return false;
-        }
+        messageBroker.Subscribe<LoadingPlayersChanged>(Handle_LoadingPlayersChanged);
+        messageBroker.Subscribe<TimeSpeedChangedAttempted>(Handle_TimeSpeedChangeAttempted);
     }
+
+    public void Dispose()
+    {
+        messageBroker.Unsubscribe<LoadingPlayersChanged>(Handle_LoadingPlayersChanged);
+        messageBroker.Unsubscribe<TimeSpeedChangedAttempted>(Handle_TimeSpeedChangeAttempted);
+    }
+
+    internal void Handle_LoadingPlayersChanged(MessagePayload<LoadingPlayersChanged> obj)
+    {
+        Volatile.Write(ref loadingPlayerCount, obj.What.LoadingPlayerCount);
+
+        BroadcastNotification(loadingPlayerCount > 0 ? LoadingMessage(loadingPlayerCount) : UnpauseReadyMessage);
+    }
+
+    internal void Handle_TimeSpeedChangeAttempted(MessagePayload<TimeSpeedChangedAttempted> obj)
+    {
+        // Remind whoever just tried to change the speed why it is locked.
+        if (Volatile.Read(ref loadingPlayerCount) <= 0) return;
+
+        BroadcastNotification(LoadingMessage(loadingPlayerCount));
+    }
+
+    private void BroadcastNotification(string text)
+    {
+        var message = new SendInformationMessage(text);
+        messageBroker.Publish(this, message);
+        network.SendAll(message);
+    }
+
+    private static string LoadingMessage(int loadingPlayers) =>
+        "Time controls disabled, " + loadingPlayers + " player(s) are currently joining the game";
 }

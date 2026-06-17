@@ -10,12 +10,18 @@ public struct ModuleInfo
 {
     public string Id { get; set; }
     public bool IsOfficial { get; set; }
+    /// <summary>
+    /// True if this module is official optional content (DLC). Coop does not support DLC,
+    /// so these must be disabled on both the server and all connecting clients.
+    /// </summary>
+    public bool IsDlc { get; set; }
     public ApplicationVersion Version { get; set; }
 
-    public ModuleInfo(string id, bool isOfficial, ApplicationVersion version)
+    public ModuleInfo(string id, bool isOfficial, bool isDlc, ApplicationVersion version)
     {
         Id = id;
         IsOfficial = isOfficial;
+        IsDlc = isDlc;
         Version = version;
     }
 }
@@ -35,7 +41,8 @@ public class TaleWorldsModuleInfoProvider : IModuleInfoProvider
         {
             if (!moduleInfo.IsSelected)
                 continue;
-            yield return new ModuleInfo(moduleInfo.Id, moduleInfo.IsOfficial, moduleInfo.Version);
+            bool isDlc = moduleInfo.Type == TaleWorlds.ModuleManager.ModuleType.OfficialOptional;
+            yield return new ModuleInfo(moduleInfo.Id, moduleInfo.IsOfficial, isDlc, moduleInfo.Version);
         }
     }
 }

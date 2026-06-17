@@ -29,7 +29,7 @@ namespace GameInterface.Services.MobileParties.Patches
 
         public static void OverrideApplyForParty(MobileParty mobileParty, Settlement settlement)
         {
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 using (new AllowedThread())
                 {

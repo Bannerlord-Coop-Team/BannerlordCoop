@@ -15,9 +15,11 @@ internal class AllowTooltipBaseVM
         AllowedThread.AllowThisThread();
     }
 
+    // Finalizers (not postfixes) so the revoke runs even when the original throws;
+    // a skipped revoke would leave the thread permanently allowed.
     [HarmonyPatch(nameof(TooltipBaseVM.Tick))]
-    [HarmonyPostfix]
-    private static void PostfixTick()
+    [HarmonyFinalizer]
+    private static void FinalizerTick()
     {
         AllowedThread.RevokeThisThread();
     }
@@ -34,8 +36,8 @@ internal class AllowTooltipProperty
     }
 
     [HarmonyPatch(nameof(TooltipProperty.RefreshDefinition))]
-    [HarmonyPostfix]
-    private static void PostfixTick()
+    [HarmonyFinalizer]
+    private static void FinalizerTick()
     {
         AllowedThread.RevokeThisThread();
     }

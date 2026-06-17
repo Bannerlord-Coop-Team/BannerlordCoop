@@ -13,7 +13,7 @@ namespace Missions.Services.Missiles.Message
     public class NetworkAgentShoot : ICommand
     {
         [ProtoMember(1)]
-        public Guid AgentGuid { get; }
+        public string AgentId { get; }
         [ProtoMember(2)]
         public Vec3 Position { get; }
         [ProtoMember(3)]
@@ -38,7 +38,7 @@ namespace Missions.Services.Missiles.Message
         public bool SingleUse { get; }
 
         public NetworkAgentShoot(
-            Guid agentGuid, 
+            string agentId, 
             Vec3 position, 
             Vec3 velocity, 
             Mat3 orientation, 
@@ -51,7 +51,7 @@ namespace Missions.Services.Missiles.Message
             float speed,
             bool singleUse)
         {
-            AgentGuid = agentGuid;
+            AgentId = agentId;
             Position = position;
             Velocity = velocity;
             Orientation = orientation;

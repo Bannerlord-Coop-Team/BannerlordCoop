@@ -27,10 +27,10 @@ internal class SettlementAuditor : IAuditor
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
-    private readonly INetworkConfiguration configuration;
+    private readonly INetworkConfig configuration;
     private TaskCompletionSource<string> tcs;
 
-    public SettlementAuditor(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager, INetworkConfiguration configuration)
+    public SettlementAuditor(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager, INetworkConfig configuration)
     {
         this.messageBroker = messageBroker;
         this.network = network;

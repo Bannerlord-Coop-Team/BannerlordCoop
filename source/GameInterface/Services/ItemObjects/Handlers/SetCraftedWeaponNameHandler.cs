@@ -6,6 +6,7 @@ using GameInterface.Services.ItemObjects.Messages;
 using GameInterface.Services.ItemObjects.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using System;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
@@ -52,15 +53,39 @@ namespace GameInterface.Services.ItemObjects.Handlers
 
         private void Handle(MessagePayload<NetworkSetCraftedWeaponNameServer> obj)
         {
-            // Send from server to all clients
             NetworkSetCraftedWeaponNameClients nameChange = new(obj.What);
-            network.SendAll(nameChange);
-            SetCraftedWeaponName(nameChange);
+
+            GameThread.Run(() =>
+            {
+                try
+                {
+                    SetCraftedWeaponName(nameChange);
+
+                    // Send from server to all clients
+                    network.SendAll(nameChange);
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to apply NetworkSetCraftedWeaponNameServer");
+                }
+            });
         }
 
         private void Handle(MessagePayload<NetworkSetCraftedWeaponNameClients> obj)
         {
-            SetCraftedWeaponName(obj.What);
+            var data = obj.What;
+
+            GameThread.Run(() =>
+            {
+                try
+                {
+                    SetCraftedWeaponName(data);
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to apply NetworkSetCraftedWeaponNameClients");
+                }
+            });
         }
 
         private void SetCraftedWeaponName(NetworkSetCraftedWeaponNameClients obj)

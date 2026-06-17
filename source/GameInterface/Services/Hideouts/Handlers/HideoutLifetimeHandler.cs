@@ -40,7 +40,7 @@ internal class HideoutLifetimeHandler : IHandler
 
     private void Handle_NetworkCreateHideout(MessagePayload<NetworkCreateHideout> payload)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {

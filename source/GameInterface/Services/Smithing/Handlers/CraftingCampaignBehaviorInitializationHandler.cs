@@ -7,6 +7,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Smithing.Interfaces;
 using GameInterface.Services.Smithing.Messages;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -70,7 +71,19 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void Handle(MessagePayload<NetworkInitializeServerCraftingDataKeys> obj)
         {
-            sessionCraftingPlayerDataInterface.AddPlayerKeys(obj.What.PlayerHeroId);
+            var data = obj.What;
+
+            GameThread.Run(() =>
+            {
+                try
+                {
+                    sessionCraftingPlayerDataInterface.AddPlayerKeys(data.PlayerHeroId);
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to apply {Message}", nameof(NetworkInitializeServerCraftingDataKeys));
+                }
+            });
         }
 
         private Dictionary<CraftingTemplate, List<CraftingPiece>> GetOpenedPartsDictionary(string playerHeroId)

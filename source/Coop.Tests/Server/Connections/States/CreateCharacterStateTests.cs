@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Coop.Core.Client.Messages;
 using Coop.Core.Client.Services.Heroes.Messages;
+using Coop.Core.Server;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
@@ -13,6 +14,7 @@ using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Moq;
 using System;
+using System.Linq;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -40,17 +42,17 @@ namespace Coop.Tests.Server.Connections.States
 
             playerPeer = network.CreatePeer();
             differentPeer = network.CreatePeer();
-            connectionLogic = container.Resolve<ConnectionLogic>(new NamedParameter("playerId", playerPeer));
+            connectionLogic = container.Resolve<ConnectionLogic>(new TypedParameter(typeof(NetPeer), playerPeer));
         }
 
         [Fact]
-        public void TransferCharacter_TransitionState_TransferCharacterState()
+        public void TransferSave_TransitionState_LoadingState()
         {
             connectionLogic.SetState<CreateCharacterState>();
 
             connectionLogic.TransferSave();
 
-            Assert.IsType<TransferSaveState>(connectionLogic.State);
+            Assert.IsType<LoadingState>(connectionLogic.State);
         }
 
         [Fact]
@@ -78,10 +80,11 @@ namespace Coop.Tests.Server.Connections.States
                 playerPeer, new NetworkTransferNewHero("MyId", Array.Empty<byte>()));
             currentState.Handle_NetworkTransferNewHero(payload);
 
-            // Assert — the joining peer is sent the server-assigned ids, then we move on to the save transfer
+            // Assert — the joining peer is sent the server-assigned ids, then we send the save and wait
+            // for the client to load (LoadingState).
             var message = Assert.Single(serverComponent.TestNetwork.GetPeerMessages(playerPeer));
             Assert.IsType<NetworkHeroRecieved>(message);
-            Assert.IsType<TransferSaveState>(connectionLogic.State);
+            Assert.IsType<LoadingState>(connectionLogic.State);
         }
 
         [Fact]
@@ -102,7 +105,36 @@ namespace Coop.Tests.Server.Connections.States
             var message = Assert.Single(serverComponent.TestNetwork.GetPeerMessages(differentPeer));
             var created = Assert.IsType<NetworkNewPlayerHeroCreated>(message);
             Assert.Equal(TestCharacterObjectId, created.Player.CharacterObjectId);
-            Assert.IsType<TransferSaveState>(connectionLogic.State);
+            Assert.IsType<LoadingState>(connectionLogic.State);
+        }
+
+        [Fact]
+        public void NetworkTransferNewHero_ReplaysExistingPlayersToJoiner_ExceptItselfAndHost()
+        {
+            // Arrange — a pre-existing client, the host, and the joiner's own player are all in the registry.
+            SetupUnpackedHero();
+            var existingPlayer = new Player("OtherClient", "OtherHero", "OtherParty", "OtherClan", "OtherChar");
+            var hostPlayer = new Player(CoopServer.ServerControllerId, "HostHero", "HostParty", "HostClan", "HostChar");
+            var joinerPlayer = new Player("MyId", "MyHero", "MyParty", "MyClan", "MyChar");
+            serverComponent.Container.Resolve<Mock<IPlayerManager>>()
+                .Setup(p => p.Players)
+                .Returns(new[] { existingPlayer, hostPlayer, joinerPlayer });
+
+            var currentState = connectionLogic.SetState<CreateCharacterState>();
+
+            // Act
+            var payload = new MessagePayload<NetworkTransferNewHero>(
+                playerPeer, new NetworkTransferNewHero("MyId", Array.Empty<byte>()));
+            currentState.Handle_NetworkTransferNewHero(payload);
+
+            // Assert — only the pre-existing client is replayed to the joiner (as a hero-blob-less
+            // NetworkNewPlayerHeroCreated); the joiner's own player and the host are excluded.
+            var replayed = serverComponent.TestNetwork
+                .GetPeerMessagesFromType<NetworkNewPlayerHeroCreated>(playerPeer)
+                .ToList();
+            var message = Assert.Single(replayed);
+            Assert.Equal(existingPlayer, message.Player);
+            Assert.Empty(message.HeroData);
         }
 
         [Fact]

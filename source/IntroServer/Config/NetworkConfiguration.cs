@@ -1,6 +1,8 @@
 ﻿using LiteNetLib;
 using System;
+using System.Linq;
 using System.Net;
+using System.Net.Sockets;
 using IntroServer.Server;
 using Common.Network;
 
@@ -9,16 +11,17 @@ namespace IntroServer.Config
     /// <summary>
     ///     Network settings for both client & server.
     /// </summary>
-    public class NetworkConfiguration : INetworkConfiguration
+    public class NetworkConfiguration : INetworkConfig
     {
+        private string LanAddressText { get; set; } = "127.0.0.1";
         /// <summary>
         ///     ip address of the server in LAN.
         /// </summary>
-        public IPAddress LanAddress { get; } = IPAddress.Parse("127.0.0.1");
+        public IPAddress LanAddress => IPAddress.Parse(LanAddressText);
         /// <summary>
         ///     port of the server in LAN.
         /// </summary>
-        public int LanPort { get; } = 4201;
+        public int LanPort { get; private set; } = 4201;
 
         private string WanAddressText { get; set; } = "144.202.53.18";
         /// <summary>
@@ -28,7 +31,9 @@ namespace IntroServer.Config
         /// <summary>
         ///     port of the server in WAN.
         /// </summary>
-        public int WanPort { get; } = 4200;
+        public int WanPort { get; private set; } = 4200;
+
+
         /// <summary>
         ///     Interval in which the server will send out LAN discovery messages.
         /// </summary>
@@ -81,13 +86,20 @@ namespace IntroServer.Config
 
         public TimeSpan ConnectionTimeout => DisconnectTimeout;
 
-        public int MaxPacketsInQueue => 1000;
+        public int MaxPacketsInQueue => 10000;
+
+        public int ResumePacketsInQueue => 5000;
 
         public TimeSpan AuditTimeout => DisconnectTimeout;
 
         public TimeSpan ObjectCreationTimeout => DisconnectTimeout;
 
         public TimeSpan NetworkPollInterval => UpdateTime;
+
+        public void SetRendezvous(string address, int port)
+        {
+            throw new NotImplementedException();
+        }
         #endregion
     }
 }

@@ -1,9 +1,12 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
+using Common.Util;
 using LiteNetLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Packets
@@ -15,7 +18,7 @@ namespace Missions.Services.Agents.Packets
     {
         private static readonly ILogger Logger = LogManager.GetLogger<AgentGroupController>();
 
-        public IReadOnlyDictionary<Guid, Agent> ControlledAgents => m_ControlledAgents;
+        public IReadOnlyDictionary<string, Agent> ControlledAgents => m_ControlledAgents;
         public NetPeer ControllingPeer { get; }
 
         public AgentGroupController(NetPeer controllingPeer)
@@ -23,28 +26,28 @@ namespace Missions.Services.Agents.Packets
             ControllingPeer = controllingPeer;
         }
 
-        private readonly Dictionary<Guid, Agent> m_ControlledAgents = new Dictionary<Guid, Agent>();
-        
+        private readonly Dictionary<string, Agent> m_ControlledAgents = new Dictionary<string, Agent>();
+
         public bool Contains(Agent agent)
         {
             return m_ControlledAgents.Values.Contains(agent);
         }
 
-        public bool Contains(Guid agentId)
+        public bool Contains(string controllerId)
         {
-            return m_ControlledAgents.ContainsKey(agentId);
+            return m_ControlledAgents.ContainsKey(controllerId);
         }
 
-        public void AddAgent(Guid agentId, Agent agent)
+        public void AddAgent(string controllerId, Agent agent)
         {
-            m_ControlledAgents.Add(agentId, agent);
+            m_ControlledAgents.Add(controllerId, agent);
         }
 
-        public Agent RemoveAgent(Guid agentId)
+        public Agent RemoveAgent(string controllerId)
         {
-            if (m_ControlledAgents.TryGetValue(agentId, out Agent agent))
+            if (m_ControlledAgents.TryGetValue(controllerId, out Agent agent))
             {
-                m_ControlledAgents.Remove(agentId);
+                m_ControlledAgents.Remove(controllerId);
                 return agent;
             }
             return null;
@@ -54,7 +57,20 @@ namespace Missions.Services.Agents.Packets
         {
             if (m_ControlledAgents.TryGetValue(movement.AgentId, out Agent agent))
             {
-                movement.Apply(agent);
+                GameThread.Run(() =>
+                {
+                    // This action is queued from the network thread and runs a frame later. By then the
+                    // local player may have left the instance (mission torn down) or moved to a new one,
+                    // leaving this agent invalid — applying movement to it crashes. Only apply while the
+                    // agent is still active in the current mission.
+                    if (Mission.Current == null || agent.Mission != Mission.Current || agent.IsActive() == false)
+                        return;
+
+                    using (new AllowedThread())
+                    {
+                        movement.Apply(agent);
+                    }
+                });
             }
             else
             {

@@ -22,7 +22,7 @@ public abstract class MockNetworkBase : INetwork
         NetPeer = NetPeerExtensions.CreatePeer(InstanceCount);
     }
 
-    public INetworkConfiguration Configuration => throw new NotImplementedException();
+    public INetworkConfig Config => throw new NotImplementedException();
 
     public int Priority => throw new NotImplementedException();
 
@@ -46,6 +46,10 @@ public abstract class MockNetworkBase : INetwork
 
         networkOrchestrator.Send(NetPeer, netPeer, message);
     }
+
+    public void SendImmediate(NetPeer netPeer, IPacket packet) => Send(netPeer, packet);
+
+    public void SendImmediate(NetPeer netPeer, IMessage message) => Send(netPeer, message);
 
     public void SendAll(IPacket packet)
     {

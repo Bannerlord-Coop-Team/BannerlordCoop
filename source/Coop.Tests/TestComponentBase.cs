@@ -9,6 +9,7 @@ using GameInterface.CoopSessionData;
 using GameInterface.DynamicSync;
 using GameInterface.Registry;
 using GameInterface.Services.Entity;
+using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.MobileParties.Interfaces;
@@ -16,11 +17,13 @@ using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using GameInterface.Services.Time.Interfaces;
 using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.UI.Interfaces;
 using Moq;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using Xunit.Abstractions;
 using IGameInterface = GameInterface.IGameInterface;
@@ -49,7 +52,7 @@ internal abstract class TestComponentBase
     {
         RegisterCommonTypes(builder);
 
-        var container = SetupContainerProvider(builder);
+        var container = builder.Build();
 
         TestMessageBroker = container.Resolve<TestMessageBroker>();
         TestNetwork = container.Resolve<TestNetwork>();
@@ -66,7 +69,6 @@ internal abstract class TestComponentBase
         builder.RegisterType<SerializableTypeMapper>().As<ISerializableTypeMapper>().InstancePerLifetimeScope();
         builder.RegisterType<ProtoBufSerializer>().As<ICommonSerializer>().InstancePerLifetimeScope();
         builder.RegisterType<TestMessageBroker>().AsSelf().As<IMessageBroker>().InstancePerLifetimeScope();
-        builder.RegisterType<ContainerProvider>().As<IContainerProvider>().InstancePerLifetimeScope();
         builder.RegisterType<TestNetwork>().AsSelf().As<INetwork>().InstancePerLifetimeScope();
         builder.RegisterType<ModuleValidator>().As<IModuleValidator>().SingleInstance();
 
@@ -80,7 +82,7 @@ internal abstract class TestComponentBase
         RegisterMock<IHeroInterface>(builder);
         RegisterMock<IModuleInfoProvider>(builder);
         RegisterMock<IRegistryManager>(builder);
-        RegisterMock<IPlayerManager>(builder);
+        RegisterPlayerManagerMock(builder);
         RegisterMock<ITimeControlInterface>(builder);
         RegisterMock<ITroopRosterInterface>(builder);
         RegisterMock<IMapTimeTrackerInterface>(builder);
@@ -88,6 +90,16 @@ internal abstract class TestComponentBase
         RegisterMock<ICoopSessionProvider>(builder);
         RegisterMock<ITroopRosterInterface>(builder);
         RegisterMock<IMobilePartyInterface>(builder);
+        RegisterMock<IGameStateInterface>(builder);
+
+        // ISaveInterface is consumed by TransferSaveState's constructor, which packages a save the
+        // moment the state is entered. Give it a non-null default so simply entering the state does
+        // not NRE; tests that assert on the transferred save re-stub the return value.
+        var saveInterfaceMock = new Mock<ISaveInterface>();
+        saveInterfaceMock.Setup(m => m.SaveCurrentGame())
+            .Returns(new SaveResults(true, Array.Empty<byte>(), "test-campaign"));
+        builder.RegisterInstance(saveInterfaceMock).AsSelf().SingleInstance();
+        builder.RegisterInstance(saveInterfaceMock.Object).As<ISaveInterface>().SingleInstance();
 
         return builder;
     }
@@ -99,11 +111,24 @@ internal abstract class TestComponentBase
         builder.RegisterInstance(mock.Object).As<T>().SingleInstance();
     }
 
+    /// <summary>
+    /// The connection states replay the existing players to a joining peer, iterating
+    /// <see cref="IPlayerManager.Players"/>. Default it to empty so simply entering those states does not
+    /// NRE; tests that exercise the replay re-stub it.
+    /// </summary>
+    private void RegisterPlayerManagerMock(ContainerBuilder builder)
+    {
+        var mock = new Mock<IPlayerManager>();
+        mock.Setup(m => m.Players).Returns(Array.Empty<Player>());
+        builder.RegisterInstance(mock).AsSelf().SingleInstance();
+        builder.RegisterInstance(mock.Object).As<IPlayerManager>().SingleInstance();
+    }
+
     private IContainer SetupContainerProvider(ContainerBuilder builder)
     {
         var container = builder.Build();
 
-        container.Resolve<IContainerProvider>().SetProvider(container);
+        global::GameInterface.ContainerProvider.SetContainer(container);
 
         return container;
     }

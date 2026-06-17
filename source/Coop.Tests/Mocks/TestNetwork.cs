@@ -14,7 +14,7 @@ namespace Coop.Tests.Mocks;
 
 public class TestNetwork : INetwork
 {
-    public INetworkConfiguration Configuration => throw new NotImplementedException();
+    public INetworkConfig Config => throw new NotImplementedException();
 
     public int Priority => throw new NotImplementedException();
 
@@ -82,6 +82,10 @@ public class TestNetwork : INetwork
 
         SentNetworkMessages[netPeer.Id] = messages;
     }
+
+    public void SendImmediate(NetPeer netPeer, IPacket packet) => Send(netPeer, packet);
+
+    public void SendImmediate(NetPeer netPeer, IMessage message) => Send(netPeer, message);
 
     public void SendAll(IMessage message)
     {

@@ -19,7 +19,11 @@ internal class CharacterObjectBuilder : IObjectBuilder
         var battleEquipment = new Equipment(Equipment.EquipmentType.Battle);
         var civilianEquipment = new Equipment(Equipment.EquipmentType.Civilian);
 
-        for (int i = 0; i < 12; i++)
+        // Weapon slots stay empty: these placeholder items have no WeaponComponent, and building
+        // an agent origin (e.g. SimpleAgentOrigin) reads the first battle equipment's weapon slots
+        // and dereferences PrimaryWeapon, which is null on a bare item. Armor and mount slots
+        // (indices 5-11) are still populated.
+        for (int i = (int)EquipmentIndex.NumAllWeaponSlots; i < (int)EquipmentIndex.NumEquipmentSetSlots; i++)
         {
             ItemObject battleItem = new ItemObject($"BattleItem_{i}");
             //battleItem.Effectiveness = i;

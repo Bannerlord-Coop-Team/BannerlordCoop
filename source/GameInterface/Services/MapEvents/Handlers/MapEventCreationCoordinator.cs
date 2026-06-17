@@ -51,14 +51,14 @@ internal class MapEventCreationCoordinator : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
-    private readonly INetworkConfiguration configuration;
+    private readonly INetworkConfig configuration;
     private readonly ConcurrentDictionary<string, PendingRequest> pendingRequests = new ConcurrentDictionary<string, PendingRequest>();
 
     public MapEventCreationCoordinator(
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
-        INetworkConfiguration configuration)
+        INetworkConfig configuration)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -170,7 +170,7 @@ internal class MapEventCreationCoordinator : IHandler
         // MapEvent creation mutates campaign state and must run on the server's main thread. The AllowedThread scope
         // lets the resulting StartBattleInternal/MapEvent construction run through unblocked by the mod's patches,
         // and registers the new MapEvent (broadcasting it to clients) before we read back its id.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             if (attacker.MobileParty?.IsPlayerParty() == true && 
                 defender.MobileParty?.IsCurrentlyEngagingParty == true && 

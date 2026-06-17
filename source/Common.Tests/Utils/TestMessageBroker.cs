@@ -43,44 +43,6 @@ public class TestMessageBroker : MessageBroker
         }
     }
 
-    public override void Respond<T>(object target, T message)
-    {
-        if (message == null)
-            return;
-
-        var payload = new MessagePayload<T>(target, message);
-        Messages.Add(message);
-
-        Type messageType = message.GetType();
-        if (!_subscribers.ContainsKey(messageType))
-        {
-            return;
-        }
-
-        var delegates = _subscribers[messageType];
-        if (delegates == null || delegates.Count == 0) return;
-
-
-        for (int i = 0; i < delegates.Count; i++)
-        {
-            // TODO this might be slow
-            var weakDelegate = delegates[i];
-            if (weakDelegate == null || weakDelegate.IsAlive == false)
-            {
-                // Remove dead delegates
-                delegates.RemoveAt(i--);
-                continue;
-            }
-
-            if (weakDelegate.Instance == target)
-            {
-                weakDelegate.Invoke(new object[] { payload });
-                // Can only respond to one source, no longer need to loop if found
-                return;
-            }
-        }
-    }
-
     public override void Subscribe<T>(Action<MessagePayload<T>> subscription)
     {
         var delegates = _subscribers.ContainsKey(typeof(T)) ?

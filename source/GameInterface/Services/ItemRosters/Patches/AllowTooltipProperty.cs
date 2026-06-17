@@ -16,9 +16,11 @@ internal class AllowTooltipProperty
         AllowedThread.AllowThisThread();
     }
 
+    // Finalizers (not postfixes) so the revoke runs even when the original throws;
+    // a skipped revoke would leave the thread permanently allowed.
     [HarmonyPatch(nameof(TooltipProperty.RefreshValue))]
-    [HarmonyPostfix]
-    private static void PostfixRefreshValue()
+    [HarmonyFinalizer]
+    private static void FinalizerRefreshValue()
     {
         AllowedThread.RevokeThisThread();
     }
@@ -35,8 +37,8 @@ internal class AllowInformationView
     }
 
     [HarmonyPatch("OnShowTooltip")]
-    [HarmonyPostfix]
-    private static void PostfixRefreshValue()
+    [HarmonyFinalizer]
+    private static void FinalizerRefreshValue()
     {
         AllowedThread.RevokeThisThread();
     }
@@ -53,8 +55,8 @@ internal class AllowTooltipRefresher
     }
 
     [HarmonyPatch("RefreshSettlementTooltip")]
-    [HarmonyPostfix]
-    private static void PostfixRefreshValue()
+    [HarmonyFinalizer]
+    private static void FinalizerRefreshValue()
     {
         AllowedThread.RevokeThisThread();
     }

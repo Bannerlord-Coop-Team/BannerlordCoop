@@ -2,8 +2,10 @@ using Common;
 using Common.Logging;
 using Serilog;
 using System;
+using System.Threading;
 using System.Timers;
 using TaleWorlds.CampaignSystem;
+using Timer = System.Timers.Timer;
 
 namespace GameInterface.Services.Time.Interfaces;
 
@@ -60,7 +62,9 @@ internal class MapTimeTrackerInterface : IMapTimeTrackerInterface, IDisposable
         var tracker = Campaign.Current?.MapTimeTracker;
         if (tracker == null) return false;
 
-        ticks = tracker._numTicks;
+        // Read from the publish timer's thread; the field is written on the game thread, so a
+        // volatile read keeps the long read atomic and un-cached without involving the game loop.
+        ticks = Volatile.Read(ref tracker._numTicks);
         return true;
     }
 
@@ -103,7 +107,7 @@ internal class MapTimeTrackerInterface : IMapTimeTrackerInterface, IDisposable
             previousTicks = newTicks;
 
             // Field writes happen on the game thread, the only place MapTimeTracker is ticked.
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 var tracker = Campaign.Current?.MapTimeTracker;
                 if (tracker == null) return;
@@ -122,7 +126,7 @@ internal class MapTimeTrackerInterface : IMapTimeTrackerInterface, IDisposable
     public void AdvanceTime(long ticks)
     {
         // Field write happens on the game thread, the only place MapTimeTracker is ticked.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             var tracker = Campaign.Current?.MapTimeTracker;
             if (tracker == null) return;

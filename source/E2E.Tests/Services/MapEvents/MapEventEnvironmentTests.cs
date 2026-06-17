@@ -172,7 +172,7 @@ public class MapEventEnvironmentTests : MapEventTestBase
     }
 
     [Fact]
-    public void ReleasedHero_IsHealed_NotWounded_SyncAllClients()
+    public void ReleasedHero_StaysWounded_SyncAllClients()
     {
         // Arrange — the player loses a battle and is taken prisoner.
         var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
@@ -195,26 +195,14 @@ public class MapEventEnvironmentTests : MapEventTestBase
         // Act — the captor is defeated and the player is freed.
         ReleasePlayerAfterCaptorDefeated(heroId);
 
-        // Assert — the released hero is restored to full health everywhere, so it is no longer shown wounded
-        // in the party roster (vanilla never re-adds a released hero as wounded).
-        AssertHeroHitPoints(Server, heroId, expectFull: true);
-        AssertNoWoundedInParty(Server, partyId);
+        // Assert — release does not instantly heal the freed captive: the hero stays wounded everywhere
+        // (it recovers gradually through normal healing over time), and that wounded state stays consistent
+        // across the server and every client.
+        AssertHeroHitPoints(Server, heroId, expectFull: false);
         foreach (var client in Clients)
         {
-            AssertHeroHitPoints(client, heroId, expectFull: true);
-            AssertNoWoundedInParty(client, partyId);
+            AssertHeroHitPoints(client, heroId, expectFull: false);
         }
-    }
-
-    private void AssertNoWoundedInParty(EnvironmentInstance instance, string partyId)
-    {
-        instance.Call(() =>
-        {
-            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
-            Assert.True(
-                party.MemberRoster.TotalWoundedHeroes == 0,
-                $"[{instance.GetType().Name}] released party should have no wounded heroes: wounded={party.MemberRoster.TotalWoundedHeroes}");
-        });
     }
 
     private void AssertHeroHitPoints(EnvironmentInstance instance, string heroId, bool expectFull)
@@ -265,6 +253,102 @@ public class MapEventEnvironmentTests : MapEventTestBase
         // ...with the released hero re-added to the party roster on every client too. The release re-adds the
         // hero on the server (AddElementToMemberRoster); without that replicating, the freed party shows 0
         // troops on the client.
+        foreach (var client in Clients)
+        {
+            AssertHeroInPartyRoster(client, heroId, partyId);
+        }
+    }
+
+    [Fact]
+    public void EscapeFromCaptivity_RestoresExactlyOneMan_OnServerAndAllClients()
+    {
+        // Arrange — a player alone in their party (just the hero) loses a battle and is captured.
+        var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
+        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        DefeatPlayerPartyInBattle(heroId, partyId, captorPartyId);
+
+        AssertCaptivity(Server, heroId, captorPartyId);
+
+        // The capture parks the party: the member roster is emptied on the server AND on every
+        // client. The phantom-troop bug: the hero's capture-time removal never replicated, so
+        // clients kept a stale hero element that the release's re-add then doubled.
+        AssertPartyManCount(Server, partyId, 0);
+        foreach (var client in Clients)
+        {
+            AssertPartyManCount(client, partyId, 0);
+        }
+
+        // ...and the captor holds the prisoner exactly once everywhere (a replicated prison-roster
+        // add applied on top of a locally derived one used to double the count on clients).
+        AssertPartyPrisonerCount(Server, captorPartyId, 1);
+        foreach (var client in Clients)
+        {
+            AssertPartyPrisonerCount(client, captorPartyId, 1);
+        }
+
+        // Act — the player escapes ("you were able to get away"): the owning client requests the
+        // release and the server applies it authoritatively.
+        ReleasePlayerByEscapeRequest(Clients.First(), heroId, partyId);
+
+        // Assert — the player is free and the restored party counts exactly one man everywhere,
+        // and no phantom prisoner is left behind in the captor's roster.
+        AssertCaptivity(Server, heroId, null);
+        AssertPlayerPartyRestored(Server, heroId, partyId);
+        AssertPartyPrisonerCount(Server, captorPartyId, 0);
+        foreach (var client in Clients)
+        {
+            AssertCaptivity(client, heroId, null);
+            AssertHeroInPartyRoster(client, heroId, partyId);
+            AssertPartyPrisonerCount(client, captorPartyId, 0);
+        }
+    }
+
+    [Fact]
+    public void CaptureWithTroops_ForfeitsTroopsEverywhere_AndEscapeRestoresOnlyHero()
+    {
+        // Arrange — the player party holds the hero plus a stack of regular troops on every instance.
+        var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
+        var troopCharacterId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        SeedPartyTroopOnAll(partyId, troopCharacterId, 5);
+        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        // Act — capture. Captivity forfeits the party's troops; the parked roster must be empty on
+        // the clients too, not just on the server, or later roster deltas land on misaligned indices.
+        DefeatPlayerPartyInBattle(heroId, partyId, captorPartyId);
+
+        AssertPartyManCount(Server, partyId, 0);
+        foreach (var client in Clients)
+        {
+            AssertPartyManCount(client, partyId, 0);
+        }
+
+        // ...then the player escapes.
+        ReleasePlayerByEscapeRequest(Clients.First(), heroId, partyId);
+
+        // Assert — the freed party holds exactly the hero everywhere; no stale troop stacks or
+        // phantom counts survive on the clients.
+        AssertPlayerPartyRestored(Server, heroId, partyId);
+        foreach (var client in Clients)
+        {
+            AssertHeroInPartyRoster(client, heroId, partyId);
+        }
+    }
+
+    [Fact]
+    public void DuplicateEscapeRequests_ReleaseOnlyOnce()
+    {
+        // Arrange — a troopless player is captured.
+        var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
+        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        DefeatPlayerPartyInBattle(heroId, partyId, captorPartyId);
+
+        // Act — the same escape is requested twice (a duplicated message, or a client request racing
+        // a server-initiated release). The second pass must not re-add the hero.
+        ReleasePlayerByEscapeRequest(Clients.First(), heroId, partyId);
+        ReleasePlayerByEscapeRequest(Clients.First(), heroId, partyId);
+
+        // Assert — exactly one man everywhere.
+        AssertPlayerPartyRestored(Server, heroId, partyId);
         foreach (var client in Clients)
         {
             AssertHeroInPartyRoster(client, heroId, partyId);

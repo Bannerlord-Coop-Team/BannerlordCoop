@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
@@ -6,16 +7,16 @@ using TaleWorlds.Core;
 
 namespace GameInterface.Services.Heroes.Interfaces;
 
-internal interface ISaveInterface : IGameAbstraction
+public interface ISaveInterface : IGameAbstraction
 {
-    byte[] SaveCurrentGame();
+    SaveResults SaveCurrentGame();
 }
 
 internal class SaveInterface : ISaveInterface
 {
     private readonly ILogger Logger = LogManager.GetLogger<SaveInterface>();
 
-    public byte[] SaveCurrentGame()
+    public SaveResults SaveCurrentGame()
     {
         // Validation
         if (Game.Current == null) return ReportSaveFailure(nameof(Game.Current));
@@ -33,7 +34,7 @@ internal class SaveInterface : ISaveInterface
         var saveDriver = new CoopInMemSaveDriver();
         Game.Current.Save(metaData, "TransferSave", saveDriver, (SaveResult) => { });
 
-        return saveDriver.Data;
+        return new SaveResults(true, saveDriver.Data, Campaign.Current?.UniqueGameId);
     }
 
     /// <summary>
@@ -41,9 +42,22 @@ internal class SaveInterface : ISaveInterface
     /// </summary>
     /// <param name="nullObjectName">Name of null object</param>
     /// <returns>Empty byte array</returns>
-    private byte[] ReportSaveFailure(string nullObjectName)
+    private SaveResults ReportSaveFailure(string nullObjectName)
     {
         Logger.Error($"Failed to package game save. {nullObjectName} was Null.");
-        return Array.Empty<byte>();
+        return new SaveResults(false, Array.Empty<byte>(), null);
+    }
+}
+
+public class SaveResults
+{
+    public bool Success { get; }
+    public byte[] Data { get; }
+    public string CampaignId { get; }
+    public SaveResults(bool success, byte[] data, string saveId)
+    {
+        Success = success;
+        Data = data;
+        CampaignId = saveId;
     }
 }

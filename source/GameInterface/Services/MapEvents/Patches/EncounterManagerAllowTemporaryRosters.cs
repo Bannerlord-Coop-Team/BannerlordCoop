@@ -21,7 +21,9 @@ internal class EncounterManagerAllowTemporaryRosters
         AllowedThread.AllowThisThread();
     }
 
-    public static void Postfix()
+    // Finalizer (not postfix) so the revoke runs even when the original throws;
+    // a skipped revoke would leave the thread permanently allowed.
+    public static void Finalizer()
     {
         AllowedThread.RevokeThisThread();
     }

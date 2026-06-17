@@ -32,9 +32,6 @@ internal class ServerSettlementHandler : IHandler
         messageBroker.Subscribe<SettlementChangedCurrentSiegeState>(HandleCurrentSiegeState);
         messageBroker.Subscribe<SettlementChangedMilitia>(HandleMilitia);
         messageBroker.Subscribe<SettlementChangedGarrisonWageLimit>(HandleGarrisonWageLimit);
-        messageBroker.Subscribe<SettlementChangedNotablesCache>(HandleCollectNotablesToCache);
-        messageBroker.Subscribe<SettlementChangedAddHeroWithoutParty>(HandleAddHeroWithoutParty);
-        messageBroker.Subscribe<SettlementChangedRemoveHeroWithoutParty>(HandleRemoveHeroWithoutParty);
 
         messageBroker.Subscribe<SettlementChangedMobileParty>(HandleChangedMobileParty);
 
@@ -126,48 +123,6 @@ internal class ServerSettlementHandler : IHandler
         network.SendAll(message);
     }
 
-    private void HandleRemoveHeroWithoutParty(MessagePayload<SettlementChangedRemoveHeroWithoutParty> payload)
-    {
-        var obj = payload.What;
-
-        if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
-        if (!objectManager.TryGetIdWithLogging(obj.Hero, out var heroId)) return;
-
-        var message = new NetworkChangeSettlementRemoveHeroWithoutParty(settlementId, heroId);
-
-        network.SendAll(message);
-    }
-
-    private void HandleAddHeroWithoutParty(MessagePayload<SettlementChangedAddHeroWithoutParty> payload)
-    {
-        var obj = payload.What;
-
-        if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
-        if (!objectManager.TryGetIdWithLogging(obj.Hero, out var heroId)) return;
-
-        var message = new NetworkChangeSettlementAddHeroWithoutParty(settlementId, heroId);
-
-        network.SendAll(message);
-    }
-
-    private void HandleCollectNotablesToCache(MessagePayload<SettlementChangedNotablesCache> payload)
-    {
-        var obj = payload.What;
-
-        if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
-
-        List<string> notableHeroIds = new();
-        foreach (var notable in obj.NotablesCache)
-        {
-            if (!objectManager.TryGetIdWithLogging(notable, out var heroId)) continue;
-
-            notableHeroIds.Add(heroId);
-        }
-
-        var message = new NetworkChangeSettlementNotablesCache(settlementId, notableHeroIds);
-        network.SendAll(message);
-    }
-
     private void HandleGarrisonWageLimit(MessagePayload<SettlementChangedGarrisonWageLimit> payload)
     {
         var obj = payload.What;
@@ -253,8 +208,6 @@ internal class ServerSettlementHandler : IHandler
         messageBroker.Unsubscribe<SettlementChangedCurrentSiegeState>(HandleCurrentSiegeState);
         messageBroker.Unsubscribe<SettlementChangedMilitia>(HandleMilitia);
         messageBroker.Unsubscribe<SettlementChangedGarrisonWageLimit>(HandleGarrisonWageLimit);
-        messageBroker.Unsubscribe<SettlementChangedNotablesCache>(HandleCollectNotablesToCache);
-        messageBroker.Unsubscribe<SettlementChangedAddHeroWithoutParty>(HandleAddHeroWithoutParty);
 
         messageBroker.Unsubscribe<SettlementChangedMobileParty>(HandleChangedMobileParty);
         messageBroker.Unsubscribe<SettlementWallHitPointsRatioChanged>(HandleWallRatio);

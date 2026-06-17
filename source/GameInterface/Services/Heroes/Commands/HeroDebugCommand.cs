@@ -152,27 +152,37 @@ public class HeroDebugCommand
 
         return hero.Name.Value;
     }
-    [CommandLineArgumentFunction("setGold", "coop.debug.hero")]
+    [CommandLineArgumentFunction("SetGold", "coop.debug.hero")]
     public static string SetGold(List<string> args)
     {
-        if (args.Count != 2)
+        if (args.Count < 2)
         {
-            return "Usage: coop.debug.hero.set_hitpoints <heroId> <hitPoints>";
+            return "Usage: coop.debug.hero.SetGold <heroName> <gold>";
         }
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+
+        if (int.TryParse(args[args.Count - 1], out int gold) == false)
         {
-            return $"Unable to get {nameof(IObjectManager)}";
+            return $"{args[args.Count - 1]} is not a valid integer";
         }
-        if (objectManager.TryGetObject<Hero>(args[0], out var hero) == false)
+
+        // Everything before the gold value is treated as the hero name (supports multi-word names)
+        string heroName = string.Join(" ", args.Take(args.Count - 1));
+
+        var heroes = Campaign.Current.CampaignObjectManager.GetAllHeroes()
+            .Where(h => h.Name?.ToString() == heroName)
+            .ToList();
+
+        if (heroes.Count == 0)
         {
-            return $"Unable to find hero with id: {args[0]}";
+            return $"Unable to find hero with name: {heroName}";
         }
-        if (int.TryParse(args[1], out int gold) == false)
+
+        foreach (var hero in heroes)
         {
-            return $"{args[1]} is not a valid integer";
+            hero.Gold = gold;
         }
-        hero.Gold = gold;
-        return $"Hero Gold changed to{hero.Gold}";
+
+        return $"Set gold to {gold} for {heroes.Count} hero(es) named '{heroName}'";
     }
     // coop.debug.hero.set_hitpoints
     /// <summary>

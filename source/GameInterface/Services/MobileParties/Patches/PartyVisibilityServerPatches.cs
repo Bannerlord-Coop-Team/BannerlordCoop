@@ -11,11 +11,14 @@ namespace GameInterface.Services.MobileParties.Patches;
 [HarmonyPatch(typeof(MobileParty), nameof(MobileParty.IsSpotted))]
 internal class PartyIsSpottedServerPatch
 {
-    private static void Postfix(ref bool __result)
+    internal static void Postfix(MobileParty __instance, ref bool __result)
     {
         if (ModInformation.IsServer || Debugger.IsAttached)
         {
-            __result = true;
+            // Match the IsVisible patch below: only live parties are force-spotted. A destroyed
+            // party must read as unspotted, or the map nameplate machinery keeps re-creating its
+            // banner (with 0 troops) after the destruction replicates.
+            __result = __instance.IsActive;
         }
     }
 }

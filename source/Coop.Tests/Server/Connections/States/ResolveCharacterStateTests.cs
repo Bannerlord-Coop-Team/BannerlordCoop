@@ -39,7 +39,7 @@ namespace Coop.Tests.Server.Connections.States
 
             playerPeer = network.CreatePeer();
             differentPeer = network.CreatePeer();
-            connectionLogic = container.Resolve<ConnectionLogic>(new NamedParameter("playerId", playerPeer));
+            connectionLogic = container.Resolve<ConnectionLogic>(new TypedParameter(typeof(NetPeer), playerPeer));
         }
 
         [Fact]
@@ -56,7 +56,7 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
-        public void TransferSaveMethod_TransitionState_TransferSaveState()
+        public void TransferSaveMethod_TransitionState_LoadingState()
         {
             // Arrange
             connectionLogic.SetState<ResolveCharacterState>();
@@ -64,8 +64,9 @@ namespace Coop.Tests.Server.Connections.States
             // Act
             connectionLogic.TransferSave();
 
-            // Assert
-            Assert.IsType<TransferSaveState>(connectionLogic.State);
+            // Assert — TransferSave sends the save (TransferSaveState) then immediately advances to
+            // LoadingState to await the client entering the campaign.
+            Assert.IsType<LoadingState>(connectionLogic.State);
         }
 
         [Fact]
@@ -89,7 +90,7 @@ namespace Coop.Tests.Server.Connections.States
             // Arrange
             var currentState = connectionLogic.SetState<ResolveCharacterState>();
 
-            var modules = new List<ModuleInfo> { new ModuleInfo("1", true, new ApplicationVersion()) };
+            var modules = new List<ModuleInfo> { new ModuleInfo("1", true, false, new ApplicationVersion()) };
 
             serverComponent.Container
                 .Resolve<Mock<IModuleInfoProvider>>()
@@ -119,12 +120,12 @@ namespace Coop.Tests.Server.Connections.States
                 .Resolve<Mock<IModuleInfoProvider>>()
                 .Setup(mip => mip.GetModuleInfos())
                 .Returns(
-                    new List<ModuleInfo> { new ModuleInfo("1", true, new ApplicationVersion()) }
+                    new List<ModuleInfo> { new ModuleInfo("1", true, false, new ApplicationVersion()) }
                 );
 
             // Act
             var payload = new MessagePayload<NetworkModuleVersionsValidate>(
-                playerPeer, new NetworkModuleVersionsValidate(new List<ModuleInfo> { new ModuleInfo("MismatchedModule", true, new ApplicationVersion())}));
+                playerPeer, new NetworkModuleVersionsValidate(new List<ModuleInfo> { new ModuleInfo("MismatchedModule", true, false, new ApplicationVersion())}));
             currentState.Handle_ModuleVersionsValidate(payload);
 
             // Assert

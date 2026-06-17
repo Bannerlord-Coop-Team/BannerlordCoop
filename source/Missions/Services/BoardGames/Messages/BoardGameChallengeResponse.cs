@@ -1,11 +1,11 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using ProtoBuf;
 using System;
 
 namespace Missions.Services.BoardGames.Messages
 {
     [ProtoContract]
-    public readonly struct BoardGameChallengeResponse : IResponse
+    public readonly struct BoardGameChallengeResponse : IEvent
     {
         public BoardGameChallengeResponse(Guid requestingPlayer, Guid targetPlayer, bool accepted, Guid gameId)
         {

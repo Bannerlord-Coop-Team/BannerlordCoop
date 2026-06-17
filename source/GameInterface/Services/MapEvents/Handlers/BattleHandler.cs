@@ -8,6 +8,8 @@ using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.MapEventParties;
+using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
@@ -16,6 +18,8 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
 using Serilog;
+using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -26,6 +30,7 @@ using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.MapEvents.Handlers;
 
@@ -44,6 +49,16 @@ internal class BattleHandler : IHandler
     // detect when fast-forward becomes (un)available and to keep clients informed.
     private int lastBroadcastPlayersInMapEvent;
 
+    // Exclusive upper bound for the terrain seed, preserving the range of the original
+    // client-side MBRandom.RandomInt(10000) roll this replaces.
+    private const int MaxTerrainSeed = 10000;
+
+    // Server-side: terrain seed chosen once per map event and reused for every client
+    // that opens the same battle, so they all use the same terrain seed. Keyed by
+    // map event id; the entry is evicted when the event finalizes.
+    private readonly ConcurrentDictionary<string, int> mapEventTerrainSeeds = new ConcurrentDictionary<string, int>();
+    private readonly Random terrainSeedRandom = new Random();
+
     public BattleHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
@@ -58,7 +73,6 @@ internal class BattleHandler : IHandler
         this.mapEventLogger = mapEventLogger;
         this.playerRegistry = playerRegistry;
         this.timeControlInterface = timeControlInterface;
-        this.mapEventLogger = mapEventLogger;
         messageBroker.Subscribe<PlayerJoinedBattle>(Handle_PlayerJoinedBattle);
 
         messageBroker.Subscribe<MapEventFinalizeAttempted>(Handle_MapEventFinalizeAttempted);
@@ -112,51 +126,138 @@ internal class BattleHandler : IHandler
 
     private void Handle_NetworkAttackMissionAttempted(MessagePayload<NetworkAttackMissionAttempted> payload)
     {
-        if (!objectManager.TryGetObject(payload.What.MapEventId, out MapEvent mapEvent))
+        if (!objectManager.TryGetObject(payload.What.MapEventId, out MapEvent _))
             return;
 
-        mapEventLogger.DebugMapEvent(mapEvent, "Handling network attack mission attempted for map event. Setting attack mission attempted to true");
+        // Roll the terrain seed once for this map event and reuse it for every client
+        // that opens the battle, so they all use the same terrain seed. The seed is
+        // chosen server-side and carried in the message instead of rolled per machine.
+        var randomTerrainSeed = mapEventTerrainSeeds.GetOrAdd(payload.What.MapEventId, _ => RollTerrainSeed());
+        var requester = payload.Who as NetPeer;
 
-        foreach(var side in mapEvent._sides)
+        // _sides is game state the main-thread tick also touches; mutating it from the
+        // network thread races the tick. Make the sides mission-ready on the main thread.
+        // Re-resolve the event at drain time: it may have finalized between this request
+        // arriving and the queued action running, in which case a captured reference would
+        // point at a torn-down event.
+        GameThread.Run(() =>
         {
-            side.MakeReadyForMission(null);
-        }
+            try
+            {
+                if (!objectManager.TryGetObject(payload.What.MapEventId, out MapEvent mapEvent))
+                    return;
 
-        var message = new NetworkStartAttackMission();
-        network.Send(payload.Who as NetPeer, message);
+                mapEventLogger.DebugMapEvent(mapEvent, "Handling network attack mission attempted for map event. Making sides mission-ready and replying with mission start");
+
+                foreach (var side in mapEvent._sides)
+                {
+                    side.MakeReadyForMission(null);
+                }
+
+                network.Send(requester, new NetworkStartAttackMission(randomTerrainSeed));
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to make map event sides mission-ready for {Message}", nameof(NetworkAttackMissionAttempted));
+            }
+        });
+    }
+
+    private int RollTerrainSeed()
+    {
+        // This runs on the network thread, so it avoids MBRandom, which mutates the
+        // game's shared main-thread RNG state. System.Random is not thread-safe, so
+        // the shared instance is guarded.
+        lock (terrainSeedRandom)
+        {
+            return terrainSeedRandom.Next(MaxTerrainSeed);
+        }
     }
 
     private void Handle_NetworkStartAttackMission(MessagePayload<NetworkStartAttackMission> payload)
     {
-        var battle = PlayerEncounter.Battle;
-        bool isNavalEncounter = PlayerEncounter.IsNavalEncounter();
-        CampaignVec2 position = MobileParty.MainParty.Position;
+        // Opening a mission pushes a screen, and ScreenManager only tolerates screen
+        // changes from the main thread; doing it from the network thread races its
+        // layer lists and crashes the game.
+        var randomTerrainSeed = payload.What.RandomTerrainSeed;
+        GameThread.Run(() => OpenAttackMission(randomTerrainSeed));
+    }
 
-        IMapScene mapSceneWrapper = Campaign.Current.MapSceneWrapper;
-        MapPatchData mapPatchAtPosition = mapSceneWrapper.GetMapPatchAtPosition(position);
+    private static void OpenAttackMission(int randomTerrainSeed)
+    {
+        try
+        {
+            // The encounter can end (or another mission can open) between the server
+            // round-trip and this running, so everything the mission depends on is
+            // re-validated here rather than at message arrival.
+            if (Campaign.Current == null)
+            {
+                Logger.Warning("Received {Message} but the campaign was not loaded, not opening battle mission", nameof(NetworkStartAttackMission));
+                return;
+            }
+
+            var battle = PlayerEncounter.Battle;
+            if (battle == null)
+            {
+                Logger.Warning("Received {Message} but PlayerEncounter.Battle was null, not opening battle mission", nameof(NetworkStartAttackMission));
+                return;
+            }
+
+            // A finalized battle keeps PlayerEncounter.Battle set but releases the
+            // main party from the map event, which the mission setup dereferences.
+            if (MobileParty.MainParty?.MapEvent == null)
+            {
+                Logger.Warning("Received {Message} but the main party is no longer in a map event, not opening battle mission", nameof(NetworkStartAttackMission));
+                return;
+            }
+
+            // Pressing attack again while the request is in flight produces a second
+            // mission start; opening on top of the running mission corrupts the game
+            // state stack. MissionState.Current is set synchronously by the state
+            // push, unlike Mission.Current which is only set on the mission's first
+            // tick, so it also covers two mission starts queued in the same frame.
+            if (MissionState.Current != null)
+            {
+                Logger.Warning("Received {Message} but a mission is already open, not opening battle mission", nameof(NetworkStartAttackMission));
+                return;
+            }
+
+            bool isNavalEncounter = PlayerEncounter.IsNavalEncounter();
+            CampaignVec2 position = MobileParty.MainParty.Position;
+
+            IMapScene mapSceneWrapper = Campaign.Current.MapSceneWrapper;
+            MapPatchData mapPatchAtPosition = mapSceneWrapper.GetMapPatchAtPosition(position);
 
 
-        string battleScene = Campaign.Current.Models.SceneModel.GetBattleSceneForMapPatch(mapPatchAtPosition, isNavalEncounter);
-        MissionInitializerRecord rec2 = new MissionInitializerRecord(battleScene);
-        TerrainType faceTerrainType2 = Campaign.Current.MapSceneWrapper.GetFaceTerrainType(MobileParty.MainParty.CurrentNavigationFace);
-        rec2.TerrainType = (int)faceTerrainType2;
-        rec2.DamageToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier();
-        rec2.DamageFromPlayerToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier();
-        rec2.NeedsRandomTerrain = false;
-        rec2.PlayingInCampaignMode = true;
+            string battleScene = Campaign.Current.Models.SceneModel.GetBattleSceneForMapPatch(mapPatchAtPosition, isNavalEncounter);
+            MissionInitializerRecord rec2 = new MissionInitializerRecord(battleScene);
+            TerrainType faceTerrainType2 = Campaign.Current.MapSceneWrapper.GetFaceTerrainType(MobileParty.MainParty.CurrentNavigationFace);
+            rec2.TerrainType = (int)faceTerrainType2;
+            rec2.DamageToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier();
+            rec2.DamageFromPlayerToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier();
+            rec2.NeedsRandomTerrain = false;
+            rec2.PlayingInCampaignMode = true;
 
-        // TODO make this server side
-        rec2.RandomTerrainSeed = MBRandom.RandomInt(10000);
-        rec2.AtmosphereOnCampaign = Campaign.Current.Models.MapWeatherModel.GetAtmosphereModel(MobileParty.MainParty.Position);
-        rec2.SceneHasMapPatch = true;
-        rec2.DecalAtlasGroup = 2;
-        rec2.PatchCoordinates = mapPatchAtPosition.normalizedCoordinates;
-        position = battle.AttackerSide.LeaderParty.Position;
-        Vec2 v2 = position.ToVec2();
-        position = battle.DefenderSide.LeaderParty.Position;
-        rec2.PatchEncounterDir = (v2 - position.ToVec2()).Normalized();
+            // Seed chosen server-side and carried in NetworkStartAttackMission so every
+            // client uses the same terrain seed for this battle.
+            rec2.RandomTerrainSeed = randomTerrainSeed;
+            rec2.AtmosphereOnCampaign = Campaign.Current.Models.MapWeatherModel.GetAtmosphereModel(MobileParty.MainParty.Position);
+            rec2.SceneHasMapPatch = true;
+            rec2.DecalAtlasGroup = 2;
+            rec2.PatchCoordinates = mapPatchAtPosition.normalizedCoordinates;
+            position = battle.AttackerSide.LeaderParty.Position;
+            Vec2 v2 = position.ToVec2();
+            position = battle.DefenderSide.LeaderParty.Position;
+            rec2.PatchEncounterDir = (v2 - position.ToVec2()).Normalized();
 
-        CampaignMission.OpenBattleMission(rec2);
+            CampaignMission.OpenBattleMission(rec2);
+        }
+        catch (Exception e)
+        {
+            // GameThread runs queued actions unguarded, so a throw from here
+            // would escape into the game's main tick and crash it.
+            Logger.Error(e, "Failed to open the battle mission for {Message}", nameof(NetworkStartAttackMission));
+        }
     }
 
     private void Handle_MapEventFinalizeAttempted(MessagePayload<MapEventFinalizeAttempted> payload)
@@ -179,7 +280,7 @@ internal class BattleHandler : IHandler
         if (MapEventConfig.Debug)
             mapEventLogger.DebugMapEvent(mapEvent, "Handling network map event finalize attempted. Finalizing map event.");
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             mapEvent.FinalizeEventAux();
         }, blocking: true);
@@ -191,7 +292,7 @@ internal class BattleHandler : IHandler
 
     private void Handle_NetworkMapEventFinalized(MessagePayload<NetworkMapEventFinalized> payload)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             if (Campaign.Current == null) return;
 
@@ -229,10 +330,20 @@ internal class BattleHandler : IHandler
 
         foreach (var addedParty in message.AddedParties)
         {
-            if (objectManager.TryGetIdWithLogging(addedParty, out var mapEventPartyId))
-            {
-                partyIds.Add(mapEventPartyId);
-            }
+            if (!objectManager.TryGetIdWithLogging(addedParty, out var mapEventPartyId))
+                continue;
+
+            partyIds.Add(mapEventPartyId);
+
+            // A player just created or joined this map event, so push every involved party's
+            // flattened roster to clients (AI-only battles never reach here). Clients need these to
+            // spawn troops in the mission; in-progress AI parties already have a roster built from
+            // server simulation. Per-troop changes after this are kept in sync incrementally.
+            if (addedParty._roster == null)
+                continue;
+
+            var flattenedTroops = FlattenedTroopSerializer.Serialize(addedParty._roster, objectManager);
+            network.SendAll(new NetworkUpdateMapEventParty(mapEventPartyId, flattenedTroops));
         }
 
         network.SendAll(new NetworkAddInvolvedParties(
@@ -245,22 +356,34 @@ internal class BattleHandler : IHandler
     {
         var message = payload.What;
 
-        if (!objectManager.TryGetObjectWithLogging<MapEvent>(message.MapEventId, out var mapEvent))
-            return;
-
-        mapEventLogger.DebugMapEvent(mapEvent, "Handling network add involved parties. Party count: {MapEventPartyCount}", message.MapEventPartyIds.Length);
-
-        using (new AllowedThread())
+        GameThread.Run(() =>
         {
-            foreach (var mapEventPartyId in message.MapEventPartyIds)
+            try
             {
-                if (!objectManager.TryGetObjectWithLogging<MapEventParty>(mapEventPartyId, out var mapEventParty))
-                    continue;
+                if (!objectManager.TryGetObjectWithLogging<MapEvent>(message.MapEventId, out var mapEvent))
+                    return;
 
-                mapEventLogger.DebugMapEvent(mapEvent, "Adding involved map event party {MapEventPartyId} to troop upgrade tracker", mapEventPartyId);
-                mapEvent.TroopUpgradeTracker.AddParty(mapEventParty);
+                mapEventLogger.DebugMapEvent(mapEvent, "Handling network add involved parties. Party count: {MapEventPartyCount}", message.MapEventPartyIds.Length);
+
+                // Re-applying campaign-collection state replicated from the server; the
+                // DynamicSync TroopUpgradeTracker patches must stand down during the apply.
+                using (new AllowedThread())
+                {
+                    foreach (var mapEventPartyId in message.MapEventPartyIds)
+                    {
+                        if (!objectManager.TryGetObjectWithLogging<MapEventParty>(mapEventPartyId, out var mapEventParty))
+                            continue;
+
+                        mapEventLogger.DebugMapEvent(mapEvent, "Adding involved map event party {MapEventPartyId} to troop upgrade tracker", mapEventPartyId);
+                        mapEvent.TroopUpgradeTracker.AddParty(mapEventParty);
+                    }
+                }
             }
-        }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to apply {Message}", nameof(NetworkAddInvolvedParties));
+            }
+        });
     }
 
     private void Handle_PlayerJoinedBattle(MessagePayload<PlayerJoinedBattle> payload)
@@ -283,6 +406,10 @@ internal class BattleHandler : IHandler
         // A map event ended; its parties have left it, so re-evaluate whether
         // fast-forward should become available again.
         RefreshFastForwardState(finalizedMapEvent: payload.What.MapEvent);
+
+        // The battle is over, so drop its cached terrain seed.
+        if (objectManager.TryGetId(payload.What.MapEvent, out var mapEventId))
+            mapEventTerrainSeeds.TryRemove(mapEventId, out _);
     }
 
     private void Handle_TimeSpeedChangedAttempted(MessagePayload<TimeSpeedChangedAttempted> payload)

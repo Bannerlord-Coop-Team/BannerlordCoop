@@ -2,6 +2,7 @@ using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Messages;
 using GameInterface;
+using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.UI.Interfaces;
 using GameInterface.Services.UI.Messages;
@@ -16,6 +17,7 @@ public class MainMenuState : ClientStateBase
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IGameInterface gameInterface;
+    private readonly IGameStateInterface gameStateInterface;
     private readonly ILoadingInterface loadingInterface;
 
     public MainMenuState(
@@ -23,11 +25,13 @@ public class MainMenuState : ClientStateBase
         IMessageBroker messageBroker,
         INetwork network,
         IGameInterface gameInterface,
+        IGameStateInterface gameStateInterface,
         ILoadingInterface loadingInterface) : base(logic)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.gameInterface = gameInterface;
+        this.gameStateInterface = gameStateInterface;
         this.loadingInterface = loadingInterface;
         loadingInterface.HideLoadingScreen();
         messageBroker.Subscribe<NetworkConnected>(Handle_NetworkConnected);
@@ -57,7 +61,7 @@ public class MainMenuState : ClientStateBase
 
     public override void Disconnect()
     {
-        messageBroker.Publish(this, new EnterMainMenu());
+        gameStateInterface.GoToMainMenu();
     }
 
     public override void EnterMainMenu()

@@ -44,7 +44,7 @@ namespace Missions.Services.Agents.Handlers
         private void Handle(MessagePayload<AgentDied> obj)
         {
             Agent agent = obj.What.Agent;
-            if (agentRegistry.TryGetAgentId(agent, out Guid agentId))
+            if (agentRegistry.TryGetAgentId(agent, out string agentId))
             {
                 agentRegistry.RemoveControlledAgent(agentId);
                 agentRegistry.RemoveNetworkControlledAgent(agentId);

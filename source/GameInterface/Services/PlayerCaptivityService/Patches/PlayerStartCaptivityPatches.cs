@@ -23,9 +23,10 @@ namespace GameInterface.Services.PlayerCaptivityService.Patches;
 
 /// <summary>
 /// Server-authoritative start of player captivity. The server decides a defeated player hero is
-/// captured (<see cref="MapEvent.CaptureDefeatedPartyMembers"/>) and replicates it through
-/// <see cref="TakePrisonerAction"/> (NetworkTakePrisoner + the synced
-/// <see cref="Hero.PartyBelongedToAsPrisoner"/>). Clients only react to the replicated state.
+/// captured (<see cref="MapEvent.CaptureDefeatedPartyMembers"/>) and applies
+/// <see cref="TakePrisonerAction"/> with patches live, so each side effect replicates as its own
+/// message (roster deltas + the auto-synced <see cref="Hero.PartyBelongedToAsPrisoner"/>). Clients
+/// only react to the replicated state.
 /// </summary>
 [HarmonyPatch]
 internal class PlayerStartCaptivityPatches
@@ -70,7 +71,8 @@ internal class PlayerStartCaptivityPatches
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         // Captures are server-authoritative. A client must never run the native scatter/capture loop
-        // locally; it receives every capture as a replicated TakePrisonerAction (NetworkTakePrisoner).
+        // locally; it receives every capture as the server's replicated side effects (roster deltas +
+        // auto-synced captivity state).
         if (ModInformation.IsClient) return false;
 
         if (__instance.RetreatingSide != BattleSideEnum.None)

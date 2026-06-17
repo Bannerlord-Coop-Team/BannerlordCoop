@@ -446,6 +446,63 @@ internal class SettlementCommands
         return $"Successfully set the SettlementComponent ({settlementComponentId}) Owner to '{args[1]}'";
     }
 
+    // coop.debug.settlements.capture_by_siege Danustica
+    // coop.debug.settlements.capture_by_siege town_EN2 lord_1_1
+    // Forcibly transfers a fortification as if captured by siege (ChangeOwnerOfSettlementDetail.BySiege),
+    // which is the only path that destroys the old garrison and creates a new one for the new owner.
+    // Lets the garrison destroy/recreate + governor-removal replication be tested without staging a
+    // real siege. Server only. Settlement is resolved by name or id; the capturer (used as the new
+    // owner and the garrison's destroyer) defaults to an enemy-kingdom clan leader with a party, so
+    // the resulting fief owner is in a kingdom and the post-siege claimant decision is well-formed.
+    [CommandLineArgumentFunction("capture_by_siege", "coop.debug.settlements")]
+    public static string CaptureBySiege(List<string> args)
+    {
+        if (ModInformation.IsClient) return "This function can only be used by the server";
+
+        if (args.Count < 1)
+            return "Usage: coop.debug.settlements.capture_by_siege <Settlement name or id> [CapturerHero id]";
+
+        var settlement = Campaign.Current.CampaignObjectManager.Settlements
+            .FirstOrDefault(s => s.StringId == args[0] || s.Name?.ToString() == args[0]);
+        if (settlement == null)
+            return $"Settlement '{args[0]}' not found";
+        if (!settlement.IsFortification)
+            return $"'{args[0]}' is not a town or castle";
+
+        Hero capturer;
+        if (args.Count >= 2)
+        {
+            capturer = Campaign.Current.CampaignObjectManager.Find<Hero>(args[1]);
+            if (capturer == null)
+                return $"Hero '{args[1]}' not found";
+        }
+        else
+        {
+            // Pick an enemy-kingdom clan leader so the capture mirrors a real siege: the new owner's
+            // clan is in a kingdom, so the kingdom raises a well-formed SettlementClaimantDecision
+            // (a kingdomless owner would produce a malformed one). Prefer one already at war.
+            var candidates = Hero.AllAliveHeroes.Where(h =>
+                !h.IsHumanPlayerCharacter &&
+                h.PartyBelongedTo != null &&
+                h.Clan != null &&
+                h.Clan.Leader == h &&
+                h.Clan.Kingdom != null &&
+                h.Clan.Kingdom != settlement.MapFaction).ToList();
+
+            capturer = candidates.FirstOrDefault(h => h.MapFaction.IsAtWarWith(settlement.MapFaction))
+                       ?? candidates.FirstOrDefault();
+            if (capturer == null)
+                return "No eligible enemy-kingdom clan leader with a party found; pass a hero id as the 2nd arg";
+        }
+
+        if (capturer.PartyBelongedTo == null)
+            return $"Capturer '{capturer.Name}' has no party; BySiege uses the capturer's party as the garrison destroyer";
+
+        ChangeOwnerOfSettlementAction.ApplyBySiege(capturer, capturer, settlement);
+
+        return $"Captured {settlement.Name} by siege; new owner {capturer.Name} ({capturer.MapFaction?.Name})";
+    }
+
     // coop.debug.settlementcomponent.set_gold town_comp_ES3 401021
     // Change Poros component gold
     /// <summary>

@@ -1,5 +1,4 @@
-﻿using Common.Logging.Attributes;
-using Common.Messaging;
+﻿using Common.Messaging;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -9,7 +8,6 @@ namespace GameInterface.Services.Settlements.Messages
     /// <summary>
     /// Let the client know to change <see cref="TaleWorlds.CampaignSystem.Settlements.SettlementComponent.Gold"/>
     /// </summary>
-    [BatchLogMessage]
     public record ChangeSettlementComponentGold : ICommand
     {
         public string SettlementComponentId { get; }

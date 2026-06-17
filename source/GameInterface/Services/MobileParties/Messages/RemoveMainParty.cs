@@ -7,6 +7,6 @@ public record RemoveMainParty : ICommand
 {
 }
 
-public record MainPartyRemoved : IResponse
+public record MainPartyRemoved : IEvent
 {
 }

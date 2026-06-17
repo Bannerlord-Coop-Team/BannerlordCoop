@@ -6,6 +6,7 @@ using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
@@ -75,7 +76,7 @@ internal class PlayerCaptivityClientHandler : IHandler
 
         var captorParty = payload.What.CaptorParty;
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             if (Campaign.Current is null) return;
 
@@ -185,22 +186,37 @@ internal class PlayerCaptivityClientHandler : IHandler
         PlayerCaptivityLogger.Debug("Handle_EndPlayerCaptivityAttempted (client): hero={HeroId} detail={Detail} facilitator={FacilitatorId}",
             data.PlayerHero?.StringId, data.Detail, data.Facilitator?.StringId);
 
-        if (!objectManager.TryGetIdWithLogging(data.PlayerHero, out string heroId)) return;
+        // Reading the captivity state and the main party, then forwarding the request and clearing the
+        // local captivity state, all touch game state the main-thread tick also touches, so defer the
+        // apply to the game loop. Ids are resolved inside the lambda so a deferred create that lands
+        // first is visible, and the forward to the server goes out from the main thread after the read.
+        GameThread.Run(() =>
+        {
+            try
+            {
+                if (!objectManager.TryGetIdWithLogging(data.PlayerHero, out string heroId)) return;
 
-        var playerParty = MobileParty.MainParty;
-        if (!objectManager.TryGetIdWithLogging(playerParty, out string partyId)) return;
+                var playerParty = MobileParty.MainParty;
+                if (!objectManager.TryGetIdWithLogging(playerParty, out string partyId)) return;
 
-        string facilitatorId = null;
-        if (data.Facilitator != null && !objectManager.TryGetIdWithLogging(data.Facilitator, out facilitatorId)) return;
+                string facilitatorId = null;
+                if (data.Facilitator != null && !objectManager.TryGetIdWithLogging(data.Facilitator, out facilitatorId)) return;
+                int ransomAmount = Campaign.Current.PlayerCaptivity.CurrentRansomAmount;
 
-        var message = new NetworkEndPlayerCaptivityAttempted(heroId, partyId, playerParty.Position, data.Detail, facilitatorId);
-        network.SendAll(message);
+                var message = new NetworkEndPlayerCaptivityAttempted(heroId, partyId, playerParty.Position, data.Detail, facilitatorId, ransomAmount);
+                network.SendAll(message);
 
-        var playerCaptivity = Campaign.Current.PlayerCaptivity;
+                var playerCaptivity = Campaign.Current.PlayerCaptivity;
 
-        playerCaptivity._captorParty = null;
-        playerCaptivity.CountOfOffers = 0;
-        playerCaptivity.CurrentRansomAmount = 0;
+                playerCaptivity._captorParty = null;
+                playerCaptivity.CountOfOffers = 0;
+                playerCaptivity.CurrentRansomAmount = 0;
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to apply {Message}", nameof(EndPlayerCaptivityAttempted));
+            }
+        });
     }
 
     /// <summary>
@@ -213,7 +229,7 @@ internal class PlayerCaptivityClientHandler : IHandler
 
         PlayerCaptivityLogger.Debug("Handle_NetworkPlayerCaptivityEnded (client): leaving captivity menus/encounter");
 
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             if (PlayerEncounter.Current != null)
             {

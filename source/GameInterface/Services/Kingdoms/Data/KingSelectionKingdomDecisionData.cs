@@ -26,7 +26,7 @@ namespace GameInterface.Services.Kingdoms.Data
         public override bool TryGetKingdomDecision(IObjectManager objectManager, out KingdomDecision kingdomDecision)
         {
             if (!TryGetProposerClanAndKingdom(objectManager, out Clan proposerClan, out Kingdom kingdom) ||
-                !objectManager.TryGetObject(ClanToExcludeId, out Clan clanToExclude))
+                !TryGetOptionalObject(objectManager, ClanToExcludeId, out Clan clanToExclude))
             {
                 kingdomDecision = null;
                 return false;

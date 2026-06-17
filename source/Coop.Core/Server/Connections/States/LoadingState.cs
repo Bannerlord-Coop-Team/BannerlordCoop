@@ -19,6 +19,8 @@ public class LoadingState : ConnectionStateBase
         messageBroker.Subscribe<NetworkPlayerCampaignEntered>(PlayerCampaignEnteredHandler);
     }
 
+    public override bool IsLoading => true;
+
     public override void Dispose()
     {
         messageBroker.Unsubscribe<NetworkPlayerCampaignEntered>(PlayerCampaignEnteredHandler);

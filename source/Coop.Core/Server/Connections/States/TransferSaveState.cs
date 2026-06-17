@@ -1,11 +1,10 @@
-﻿using Common.Messaging;
+﻿using Common;
 using Common.Network;
-using Coop.Core.Client.Messages;
-using Coop.Core.Server.Services.Time.Messages;
+using Coop.Core.Common.Network.Packets;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
-using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Heroes.Interfaces;
 
 namespace Coop.Core.Server.Connections.States;
 
@@ -15,47 +14,52 @@ namespace Coop.Core.Server.Connections.States;
 /// </summary>
 public class TransferSaveState : ConnectionStateBase
 {
-    private readonly IMessageBroker messageBroker;
-    private readonly INetwork network;
-    private readonly ICoopSessionProvider coopSessionProvider;
-    private readonly ITimeControlInterface timeControlInterface;
-
     public TransferSaveState(
         IConnectionLogic connectionLogic,
-        IMessageBroker messageBroker,
         INetwork network,
         ICoopSessionProvider coopSessionProvider,
-        ITimeControlInterface timeControlInterface)
+        ISaveInterface saveInterface,
+        ITimeControlInterface timeControlInterface,
+        IConnectionMessageQueue connectionMessageQueue)
         : base(connectionLogic)
     {
-        this.network = network;
-        this.messageBroker = messageBroker;
-        this.coopSessionProvider = coopSessionProvider;
-        this.timeControlInterface = timeControlInterface;
-        messageBroker.Subscribe<GameSaveDataPackaged>(Handle_GameSaveDataPackaged);
+        GameThread.Run(() =>
+        {
+            // Pause so the save snapshot is taken from a stationary world. This is local to the
+            // save and runs before the connection has been assigned this state, so it precedes
+            // the registry's loading lock; ConnectionCollection drives the broadcast loading pause once
+            // the transition completes (see IsLoading below).
+            timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
 
-        timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
+            var saveResults = saveInterface.SaveCurrentGame();
 
-        messageBroker.Publish(this, new PackageGameSaveData());
+            var savePacket = new GameSaveDataPacket(
+                saveResults.Data,
+                saveResults.CampaignId,
+                coopSessionProvider.CoopSession?.CraftingPlayerData);
+
+            // Disconnect peer on failure
+            if (!saveResults.Success)
+            {
+                connectionLogic.Peer.Disconnect();
+                return;
+            }
+
+            // Start holding this peer's broadcasts now that the snapshot has been taken. The whole save
+            // runs in a blocking GameThread.Run call issued from the network thread, so the poller is
+            // parked for its duration and cannot broadcast a received delta that races the snapshot;
+            // taking the cut right after the snapshot cleanly separates "in the save" (dropped while
+            // Dropping) from "after the save" (queued for replay).
+            connectionMessageQueue.BeginQueueing(ConnectionLogic.Peer);
+
+            network.SendImmediate(ConnectionLogic.Peer, savePacket);
+        }, blocking: true);
     }
+
+    public override bool IsLoading => true;
 
     public override void Dispose()
     {
-        messageBroker.Unsubscribe<GameSaveDataPackaged>(Handle_GameSaveDataPackaged);
-    }
-    internal void Handle_GameSaveDataPackaged(MessagePayload<GameSaveDataPackaged> obj)
-    {
-        var payload = obj.What;
-        var peer = ConnectionLogic.Peer;
-        var networkEvent = new NetworkGameSaveDataReceived(
-            payload.GameSaveData,
-            payload.CampaignID,
-            null, // TODO manage controlled objects
-            coopSessionProvider.CoopSession?.CraftingPlayerData);
-
-        network.Send(peer, networkEvent);
-
-        ConnectionLogic.Load();
     }
 
     public override void CreateCharacter()

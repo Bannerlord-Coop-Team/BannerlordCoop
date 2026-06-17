@@ -5,6 +5,7 @@ using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages.Conversation;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
 using Serilog;
@@ -130,9 +131,21 @@ internal class PlayerEncounterPatches
         // The server holds the AI party this player was conversing with; tell it the encounter is over.
         MessageBroker.Instance.Publish(null, new ConversationEnded());
 
-        // Don't interfere with battle flow.
-        if (MobileParty.MainParty.MapEvent != null) return;
+        var mainParty = MobileParty.MainParty;
 
-        MobileParty.MainParty.SetMoveModeHold();
+        // Don't interfere with battle flow.
+        if (mainParty.MapEvent != null) return;
+
+        // Stops the party locally, but no further: dynamic sync is server-authoritative (a client-side write
+        // is applied locally and dropped, never sent), so this hold cannot clear the engage order the server
+        // still has from when the player targeted the AI party (DefaultBehavior = EngageParty). Left alone,
+        // the owning client gets pulled back into following that party after the dialog closes while the
+        // server and the other clients show it stationary (issue #1311).
+        mainParty.SetMoveModeHold();
+
+        // So also publish the hold through the gated AI-behavior channel — the one client-initiated path the
+        // server applies and re-broadcasts (with its position snapshot) to every client, including this one.
+        // That makes the hold authoritative everywhere and clears the stale engage order at its source.
+        MessageBroker.Instance.Publish(mainParty.Ai, new PartyBehaviorChangeAttempted(mainParty.Ai, AiBehavior.Hold, null, mainParty.Position));
     }
 }

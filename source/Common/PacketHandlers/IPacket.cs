@@ -16,6 +16,7 @@ namespace Common.PacketHandlers
         UpdatePartyBehavior,
         FieldAutoSync,
         PropertyAutoSync,
+        SaveData,
     }
 
     public interface IPacket
