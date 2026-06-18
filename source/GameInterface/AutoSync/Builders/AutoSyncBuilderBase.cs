@@ -36,7 +36,7 @@ namespace GameInterface.AutoSync.Builders
             return TemplateParser.Parse("Patches.FieldSetTranspilerTemplate",
             new
             {
-                MemberDeclaringType = DynamicSyncUtils.GetSimpleTypeName(fieldInfo.DeclaringType),
+                MemberDeclaringType = AutoSyncUtils.GetSimpleTypeName(fieldInfo.DeclaringType),
                 MemberDeclaringTypeName = fieldInfo.DeclaringType.Name,
                 MemberName = fieldInfo.Name,
                 MemberType = AutoSyncUtils.GetMemberTypeName(fieldInfo.FieldType),

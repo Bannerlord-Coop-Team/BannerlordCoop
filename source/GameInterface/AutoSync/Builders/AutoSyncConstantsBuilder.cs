@@ -37,7 +37,7 @@ namespace GameInterface.AutoSync.Builders
                 Types = items.Select(i => new { Type = i, Index = items.IndexOf(i) }),
                 Libraries = ReadOnlyFields.SelectMany(f => AutoSyncUtils.GetLibraries(f)).Distinct().ToList(),
                 ReadOnlyFields = ReadOnlyFields.Select(f => new {
-                    DeclaringTypeName = DynamicSyncUtils.GetSimpleTypeName(f.DeclaringType),
+                    DeclaringTypeName = AutoSyncUtils.GetSimpleTypeName(f.DeclaringType),
                     Name = f.Name
                 }).ToList()
             });

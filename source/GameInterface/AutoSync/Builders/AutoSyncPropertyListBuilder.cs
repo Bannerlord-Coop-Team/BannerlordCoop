@@ -98,7 +98,7 @@ public class AutoSyncPropertyListBuilder : AutoSyncBuilderBase
         var serializers = GetSerializerMethodNames(GetElementType(propertyInfo.PropertyType));
         return new
         {
-            MemberDeclaringType = DynamicSyncUtils.GetSimpleTypeName(propertyInfo.DeclaringType),
+            MemberDeclaringType = AutoSyncUtils.GetSimpleTypeName(propertyInfo.DeclaringType),
             MemberDeclaringTypeName = propertyInfo.DeclaringType.Name,
             MemberName = propertyInfo.Name,
             MemberType = GetListTypeName(propertyInfo.PropertyType),

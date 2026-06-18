@@ -79,7 +79,7 @@ public class AutoSyncFieldArrayBuilder : AutoSyncBuilderBase
         var serializers = GetSerializerMethodNames(fieldInfo.FieldType.GetElementType());
         return new
         {
-            MemberDeclaringType = DynamicSyncUtils.GetSimpleTypeName(fieldInfo.DeclaringType),
+            MemberDeclaringType = AutoSyncUtils.GetSimpleTypeName(fieldInfo.DeclaringType),
             MemberDeclaringTypeName = fieldInfo.DeclaringType.Name,
             MemberName = fieldInfo.Name,
             MemberType = GetArrayType(fieldInfo.FieldType),

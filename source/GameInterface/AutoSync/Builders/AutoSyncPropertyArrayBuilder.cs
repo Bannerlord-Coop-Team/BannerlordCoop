@@ -22,7 +22,7 @@ public class AutoSyncPropertyArrayBuilder : AutoSyncBuilderBase
         return TemplateParser.Parse("Patches.PropertyArrayChangeTranspilerTemplate",
                 new
                 {
-                    MemberDeclaringType = DynamicSyncUtils.GetSimpleTypeName(propertyInfo.DeclaringType),
+                    MemberDeclaringType = AutoSyncUtils.GetSimpleTypeName(propertyInfo.DeclaringType),
                     MemberDeclaringTypeName = propertyInfo.DeclaringType.Name,
                     MemberName = propertyInfo.Name,
                     MemberType = GetArrayType(propertyInfo.PropertyType),
@@ -93,7 +93,7 @@ public class AutoSyncPropertyArrayBuilder : AutoSyncBuilderBase
         var serializers = GetSerializerMethodNames(propertyInfo.PropertyType.GetElementType());
         return new
         {
-            MemberDeclaringType = DynamicSyncUtils.GetSimpleTypeName(propertyInfo.DeclaringType),
+            MemberDeclaringType = AutoSyncUtils.GetSimpleTypeName(propertyInfo.DeclaringType),
             MemberDeclaringTypeName = propertyInfo.DeclaringType.Name,
             MemberName = propertyInfo.Name,
             MemberType = GetArrayType(propertyInfo.PropertyType),
