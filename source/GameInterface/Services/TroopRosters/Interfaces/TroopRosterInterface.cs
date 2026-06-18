@@ -72,7 +72,7 @@ internal class TroopRosterInterface : ITroopRosterInterface
             TroopRosterElement troopRosterElement;
             if (objectManager.TryGetObjectWithLogging<Hero>(elementData.CharacterId, out var hero))
             {
-                if (hero == mainHero) continue;
+                if (hero == mainHero || hero.IsPlayerCompanion) continue;
                 troopRosterElement = new TroopRosterElement(hero.CharacterObject);
             }
             else if (objectManager.TryGetObjectWithLogging<CharacterObject>(elementData.CharacterId, out var character))
@@ -98,7 +98,7 @@ internal class TroopRosterInterface : ITroopRosterInterface
         // Clear without removing MainHero (causes issues if MainHero is removed)
         for (int i = targetTroopRoster._count - 1; i >= 0; i--)
         {
-            if (targetTroopRoster.data[i].Character?.HeroObject == mainHero) continue;
+            if (targetTroopRoster.data[i].Character?.HeroObject == mainHero || targetTroopRoster.data[i].Character?.HeroObject?.IsPlayerCompanion == true) continue;
             targetTroopRoster.AddToCounts(targetTroopRoster.data[i].Character, -targetTroopRoster.data[i].Number, false, -targetTroopRoster.data[i].WoundedNumber, 0, true);
         }
 
