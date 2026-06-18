@@ -98,6 +98,10 @@ internal class BattleHandler : IHandler
         messageBroker.Subscribe<PlayerJoinBattleAttempted>(Handle_PlayerJoinBattleAttempted);
         messageBroker.Subscribe<NetworkRequestJoinBattle>(Handle_NetworkRequestJoinBattle);
 
+        messageBroker.Subscribe<PlayerLeaveBattleAttempted>(Handle_PlayerLeaveBattleAttempted);
+        messageBroker.Subscribe<NetworkRequestLeaveBattle>(Handle_NetworkRequestLeaveBattle);
+        messageBroker.Subscribe<NetworkPartyLeftBattle>(Handle_NetworkPartyLeftBattle);
+
         timeControlInterface.AddFastForwardPolicy(FastForwardWhilePlayerInMapEventPolicy);
     }
 
@@ -121,6 +125,10 @@ internal class BattleHandler : IHandler
 
         messageBroker.Unsubscribe<PlayerJoinBattleAttempted>(Handle_PlayerJoinBattleAttempted);
         messageBroker.Unsubscribe<NetworkRequestJoinBattle>(Handle_NetworkRequestJoinBattle);
+
+        messageBroker.Unsubscribe<PlayerLeaveBattleAttempted>(Handle_PlayerLeaveBattleAttempted);
+        messageBroker.Unsubscribe<NetworkRequestLeaveBattle>(Handle_NetworkRequestLeaveBattle);
+        messageBroker.Unsubscribe<NetworkPartyLeftBattle>(Handle_NetworkPartyLeftBattle);
 
         timeControlInterface.RemoveFastForwardPolicy(FastForwardWhilePlayerInMapEventPolicy);
     }
@@ -578,6 +586,66 @@ internal class BattleHandler : IHandler
             // AddIntercept publishes the battle-party add and it replicates to every client through the map-event sync.
             party.MapEventSide = mapEvent.GetMapEventSide(data.Side);
         });
+    }
+
+    /// <summary>[Client] Bridge a joiner's leave to a server request; [Server/host] perform it directly.</summary>
+    private void Handle_PlayerLeaveBattleAttempted(MessagePayload<PlayerLeaveBattleAttempted> payload)
+    {
+        if (!objectManager.TryGetIdWithLogging(payload.What.LeavingParty, out var partyId)) return;
+
+        if (ModInformation.IsServer)
+            RemovePartyFromBattleAndBroadcast(partyId);
+        else
+            network.SendAll(new NetworkRequestLeaveBattle(partyId));
+    }
+
+    /// <summary>[Server] A client asked to leave a battle without ending it.</summary>
+    private void Handle_NetworkRequestLeaveBattle(MessagePayload<NetworkRequestLeaveBattle> payload)
+    {
+        if (!ModInformation.IsServer) return;
+
+        RemovePartyFromBattleAndBroadcast(payload.What.PartyId);
+    }
+
+    // Single-party removal does not auto-replicate (RemovePartyInternal uses RemoveAt, bypassing the
+    // collection sync), so remove authoritatively and broadcast the removal explicitly.
+    private void RemovePartyFromBattleAndBroadcast(string partyId)
+    {
+        GameThread.Run(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<PartyBase>(partyId, out var party)) return;
+
+            ApplyLeave(party);
+            network.SendAll(new NetworkPartyLeftBattle(partyId));
+        });
+    }
+
+    /// <summary>[Client] Apply a joiner's removal from its map event side.</summary>
+    private void Handle_NetworkPartyLeftBattle(MessagePayload<NetworkPartyLeftBattle> payload)
+    {
+        var partyId = payload.What.PartyId;
+
+        GameThread.Run(() =>
+        {
+            if (Campaign.Current == null) return;
+            if (!objectManager.TryGetObjectWithLogging<PartyBase>(partyId, out var party)) return;
+
+            ApplyLeave(party);
+        });
+    }
+
+    // Remove the party from its side (idempotent) and, if it is this instance's own party, close its encounter UI.
+    // PlayerEncounter.Finish is safe here: with MapEventSide already cleared, LeaveBattle no longer finalizes.
+    private static void ApplyLeave(PartyBase party)
+    {
+        using (new AllowedThread())
+        {
+            if (party.MapEventSide != null)
+                party.MapEventSide = null;
+
+            if (party == PartyBase.MainParty && PlayerEncounter.Current != null)
+                PlayerEncounter.Finish(false);
+        }
     }
 
     private void Handle_PlayerJoinedBattle(MessagePayload<PlayerJoinedBattle> payload)
