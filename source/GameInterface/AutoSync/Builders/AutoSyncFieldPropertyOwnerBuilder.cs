@@ -49,7 +49,7 @@ public class AutoSyncFieldPropertyOwnerBuilder : AutoSyncBuilderBase
         return new
         {
             MemberDeclaringType = AutoSyncUtils.GetSimpleTypeName(fieldInfo.DeclaringType),
-            MemberDeclaringTypeName = fieldInfo.DeclaringType.Name,
+            MemberDeclaringTypeName = AutoSyncUtils.GetSimpleTypeName(fieldInfo.DeclaringType).Replace(".", "_"),
             MemberName = fieldInfo.Name,
             MemberType = AutoSyncUtils.GetSimpleTypeName(fieldInfo.FieldType),
             ElementType = AutoSyncUtils.GetSimpleTypeName(GetElementType(fieldInfo.FieldType)),

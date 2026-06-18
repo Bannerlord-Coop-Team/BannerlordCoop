@@ -37,7 +37,7 @@ namespace GameInterface.AutoSync.Builders
             new
             {
                 MemberDeclaringType = AutoSyncUtils.GetSimpleTypeName(fieldInfo.DeclaringType),
-                MemberDeclaringTypeName = fieldInfo.DeclaringType.Name,
+                MemberDeclaringTypeName = AutoSyncUtils.GetSimpleTypeName(fieldInfo.DeclaringType).Replace(".", "_"),
                 MemberName = fieldInfo.Name,
                 MemberType = AutoSyncUtils.GetMemberTypeName(fieldInfo.FieldType),
                 ReadOnly = fieldInfo.IsInitOnly,

@@ -23,7 +23,7 @@ public class AutoSyncPropertyArrayBuilder : AutoSyncBuilderBase
                 new
                 {
                     MemberDeclaringType = AutoSyncUtils.GetSimpleTypeName(propertyInfo.DeclaringType),
-                    MemberDeclaringTypeName = propertyInfo.DeclaringType.Name,
+                    MemberDeclaringTypeName = AutoSyncUtils.GetSimpleTypeName(propertyInfo.DeclaringType).Replace(".", "_"),
                     MemberName = propertyInfo.Name,
                     MemberType = GetArrayType(propertyInfo.PropertyType),
                     ElementType = AutoSyncUtils.GetSimpleTypeName(propertyInfo.PropertyType.GetElementType()),
@@ -94,7 +94,7 @@ public class AutoSyncPropertyArrayBuilder : AutoSyncBuilderBase
         return new
         {
             MemberDeclaringType = AutoSyncUtils.GetSimpleTypeName(propertyInfo.DeclaringType),
-            MemberDeclaringTypeName = propertyInfo.DeclaringType.Name,
+            MemberDeclaringTypeName = AutoSyncUtils.GetSimpleTypeName(propertyInfo.DeclaringType).Replace(".", "_"),
             MemberName = propertyInfo.Name,
             MemberType = GetArrayType(propertyInfo.PropertyType),
             ElementType = AutoSyncUtils.GetSimpleTypeName(propertyInfo.PropertyType.GetElementType()),

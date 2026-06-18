@@ -16,7 +16,7 @@ public static class AutoSyncUtils
             new
             {
                 MemberDeclaringType = GetSimpleTypeName(propertyInfo.DeclaringType),
-                MemberDeclaringTypeName = propertyInfo.DeclaringType.Name,
+                MemberDeclaringTypeName = GetSimpleTypeName(propertyInfo.DeclaringType).Replace(".", "_"),
                 MemberName = propertyInfo.Name,
                 MemberType = GetSimpleTypeName(propertyInfo.PropertyType),
                 Debug = propertyItem.Debug
@@ -53,7 +53,7 @@ public static class AutoSyncUtils
             new
             {
                 MemberDeclaringType = GetSimpleTypeName(memberInfo.DeclaringType),
-                MemberDeclaringTypeName = memberInfo.DeclaringType.Name,
+                MemberDeclaringTypeName = GetSimpleTypeName(memberInfo.DeclaringType).Replace(".", "_"),
                 MemberName = memberName,
                 MemberType = GetMemberTypeName(memberType),
                 Libraries = libraries

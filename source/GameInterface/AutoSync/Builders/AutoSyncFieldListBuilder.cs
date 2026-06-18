@@ -94,7 +94,7 @@ public class AutoSyncFieldListBuilder : AutoSyncBuilderBase
         return new
         {
             MemberDeclaringType = AutoSyncUtils.GetSimpleTypeName(fieldInfo.DeclaringType),
-            MemberDeclaringTypeName = fieldInfo.DeclaringType.Name,
+            MemberDeclaringTypeName = AutoSyncUtils.GetSimpleTypeName(fieldInfo.DeclaringType).Replace(".", "_"),
             MemberName = fieldInfo.Name,
             MemberType = GetListTypeName(fieldInfo.FieldType),
             ElementType = GetElementType(fieldInfo.FieldType).Name,

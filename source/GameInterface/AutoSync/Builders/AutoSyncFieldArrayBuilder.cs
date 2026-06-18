@@ -80,7 +80,7 @@ public class AutoSyncFieldArrayBuilder : AutoSyncBuilderBase
         return new
         {
             MemberDeclaringType = AutoSyncUtils.GetSimpleTypeName(fieldInfo.DeclaringType),
-            MemberDeclaringTypeName = fieldInfo.DeclaringType.Name,
+            MemberDeclaringTypeName = AutoSyncUtils.GetSimpleTypeName(fieldInfo.DeclaringType).Replace(".", "_"),
             MemberName = fieldInfo.Name,
             MemberType = GetArrayType(fieldInfo.FieldType),
             ElementType = AutoSyncUtils.GetSimpleTypeName(fieldInfo.FieldType.GetElementType()),

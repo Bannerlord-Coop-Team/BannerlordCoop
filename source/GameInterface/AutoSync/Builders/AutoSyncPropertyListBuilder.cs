@@ -99,7 +99,7 @@ public class AutoSyncPropertyListBuilder : AutoSyncBuilderBase
         return new
         {
             MemberDeclaringType = AutoSyncUtils.GetSimpleTypeName(propertyInfo.DeclaringType),
-            MemberDeclaringTypeName = propertyInfo.DeclaringType.Name,
+            MemberDeclaringTypeName = AutoSyncUtils.GetSimpleTypeName(propertyInfo.DeclaringType).Replace(".", "_"),
             MemberName = propertyInfo.Name,
             MemberType = GetListTypeName(propertyInfo.PropertyType),
             ElementType = AutoSyncUtils.GetSimpleTypeName(GetElementType(propertyInfo.PropertyType)),

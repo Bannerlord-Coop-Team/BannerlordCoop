@@ -93,7 +93,7 @@ namespace GameInterface.AutoSync.Builders
             return new
             {
                 MemberDeclaringType = AutoSyncUtils.GetSimpleTypeName(propertyInfo.DeclaringType),
-                MemberDeclaringTypeName = propertyInfo.DeclaringType.Name,
+                MemberDeclaringTypeName = AutoSyncUtils.GetSimpleTypeName(propertyInfo.DeclaringType).Replace(".", "_"),
                 MemberName = propertyInfo.Name,
                 MemberType = GetMbListTypeName(propertyInfo.PropertyType),
                 ElementType = AutoSyncUtils.GetSimpleTypeName(GetElementType(propertyInfo.PropertyType)),
