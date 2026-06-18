@@ -1,6 +1,6 @@
 using Common.Logging;
 using GameInterface.AutoSync;
-using GameInterface.DynamicSync;
+using GameInterface.AutoSync;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.SiegeStrategies;
 using HarmonyLib;
@@ -15,10 +15,10 @@ namespace GameInterface.Services.SiegeEvents;
 /// <summary>
 /// Configures AutoSync for SiegeEvent
 /// </summary>
-internal class SiegeEventSync : IDynamicSync
+internal class SiegeEventSync : IAutoSync
 {
     static readonly ILogger Logger = LogManager.GetLogger<SiegeEventSync>();
-    public SiegeEventSync(DynamicSyncRegistry autoSyncBuilder)
+    public SiegeEventSync(AutoSyncRegistry autoSyncBuilder)
 	{
         // Fields
         //autoSyncBuilder.AddField(AccessTools.Field(typeof(SiegeEvent), nameof(SiegeEvent.BesiegedSettlement)));// WARNING: BesiegedSettlement is a public field, for AutoSync to work you must also add any methods outside declaring class that change its value

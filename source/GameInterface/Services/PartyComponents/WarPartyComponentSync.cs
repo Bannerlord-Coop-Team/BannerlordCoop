@@ -1,9 +1,9 @@
-﻿using GameInterface.DynamicSync;
+﻿using GameInterface.AutoSync;
 
 namespace GameInterface.Services.PartyComponents;
-internal class WarPartyComponentSync : IDynamicSync
+internal class WarPartyComponentSync : IAutoSync
 {
-    public WarPartyComponentSync(DynamicSyncRegistry autoSyncBuilder)
+    public WarPartyComponentSync(AutoSyncRegistry autoSyncBuilder)
     {
     }
 }

@@ -6,7 +6,7 @@ using Common.Tests.Utils;
 using Coop.Core;
 using Coop.Tests.Mocks;
 using GameInterface.CoopSessionData;
-using GameInterface.DynamicSync;
+using GameInterface.AutoSync;
 using GameInterface.Registry;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameState.Interfaces;
@@ -78,7 +78,7 @@ internal abstract class TestComponentBase
 
         RegisterMock<ILogger>(builder);
         RegisterMock<IGameInterface>(builder);
-        RegisterMock<IDynamicSyncPatchCollector>(builder);
+        RegisterMock<IAutoSyncPatchCollector>(builder);
         RegisterMock<IHeroInterface>(builder);
         RegisterMock<IModuleInfoProvider>(builder);
         RegisterMock<IRegistryManager>(builder);

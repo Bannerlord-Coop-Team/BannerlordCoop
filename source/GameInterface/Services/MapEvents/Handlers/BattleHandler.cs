@@ -366,7 +366,7 @@ internal class BattleHandler : IHandler
                 mapEventLogger.DebugMapEvent(mapEvent, "Handling network add involved parties. Party count: {MapEventPartyCount}", message.MapEventPartyIds.Length);
 
                 // Re-applying campaign-collection state replicated from the server; the
-                // DynamicSync TroopUpgradeTracker patches must stand down during the apply.
+                // AutoSync TroopUpgradeTracker patches must stand down during the apply.
                 using (new AllowedThread())
                 {
                     foreach (var mapEventPartyId in message.MapEventPartyIds)
