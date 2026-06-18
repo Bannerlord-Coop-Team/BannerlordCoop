@@ -59,4 +59,28 @@ public class AllowedThread : IDisposable
     }
 
     public static bool IsThisThreadAllowed() => _allowedCount > 0;
+
+    /// <summary>
+    /// Clears this thread's allowance for the returned scope's lifetime and restores the previous count on
+    /// dispose. Use when running code on this thread that must NOT inherit an ambient allowance the caller
+    /// happens to hold — e.g. draining the game-thread queue, whose unrelated actions must run with the mod's
+    /// patches live, not silenced by a scope the drainer is nested inside.
+    /// </summary>
+    public static IDisposable Suspend() => new SuspendScope();
+
+    private sealed class SuspendScope : IDisposable
+    {
+        private readonly int _restoreCount;
+
+        public SuspendScope()
+        {
+            _restoreCount = _allowedCount;
+            _allowedCount = 0;
+        }
+
+        public void Dispose()
+        {
+            _allowedCount = _restoreCount;
+        }
+    }
 }

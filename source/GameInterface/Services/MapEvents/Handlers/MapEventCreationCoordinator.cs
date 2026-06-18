@@ -110,7 +110,15 @@ internal class MapEventCreationCoordinator : IHandler
             // On a client, SendAll targets the server (its only connected peer).
             network.SendAll(new NetworkRequestCreateMapEvent(requestId, attackerId, defenderId, flags));
 
-            if (!pending.Completed.Wait(timeout))
+            // This runs on the game-loop thread (the StartBattleInternal prefix, during a campaign tick). A
+            // bare blocking wait here stops the thread from pumping GameThread.Update, which the network
+            // thread relies on: it processes messages in order, and a message ahead of the reply (e.g. a
+            // NetworkMapEventFinalizeAttempted, applied through a blocking GameThread.Run) waits for that
+            // pump. The reply — and the AutoRegistry create broadcast that materializes the MapEvent — then
+            // sits behind a handler that can never complete, so the wait always times out under battle load.
+            // GameThread.WaitWhilePumping keeps draining the queue while we wait so the network thread makes
+            // progress (it falls back to a plain poll when not on the game-loop thread).
+            if (!GameThread.WaitWhilePumping(() => pending.Completed.IsSet, deadline))
             {
                 Logger.Error("Timed out after {Timeout} waiting for the server to create the map event. RequestId={RequestId}", timeout, requestId);
                 return null;
@@ -122,26 +130,21 @@ internal class MapEventCreationCoordinator : IHandler
                 return null;
             }
 
-            // The MapEvent object is materialized on this client by the AutoRegistry create broadcast, which is sent
-            // just before this response. Poll briefly in case the response is processed first.
-            while (true)
+            // The MapEvent object is materialized on this client by the AutoRegistry create broadcast, which is
+            // sent just before the reply; keep pumping in case the reply is processed first.
+            MapEvent mapEvent = null;
+            if (!GameThread.WaitWhilePumping(
+                    () => objectManager.TryGetObject(pending.MapEventId, out mapEvent) && mapEvent != null,
+                    deadline))
             {
-                if (objectManager.TryGetObject(pending.MapEventId, out MapEvent mapEvent) && mapEvent != null)
-                {
-                    Logger.Debug("Resolved server-created map event {MapEventId}. RequestId={RequestId}", pending.MapEventId, requestId);
-                    return mapEvent;
-                }
-
-                if (DateTime.UtcNow >= deadline)
-                {
-                    Logger.Error(
-                        "Server created map event {MapEventId} but it was not resolvable on this client before timeout. RequestId={RequestId}",
-                        pending.MapEventId, requestId);
-                    return null;
-                }
-
-                Thread.Sleep(5);
+                Logger.Error(
+                    "Server created map event {MapEventId} but it was not resolvable on this client before timeout. RequestId={RequestId}",
+                    pending.MapEventId, requestId);
+                return null;
             }
+
+            Logger.Debug("Resolved server-created map event {MapEventId}. RequestId={RequestId}", pending.MapEventId, requestId);
+            return mapEvent;
         }
         finally
         {
