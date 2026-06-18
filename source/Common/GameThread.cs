@@ -268,38 +268,38 @@ public class GameThread : IUpdateable
 
     /// <summary>
     /// Blocks until <paramref name="condition"/> returns true or <paramref name="deadline"/> passes, and
-    /// reports which happened. When the caller already owns the game-loop thread it drains <see cref="Update"/>
-    /// each iteration, so the work the condition depends on — and the blocking <see cref="Run"/> handlers the
-    /// network thread is waiting on — keeps making progress; a bare wait on the game-loop thread would stall
-    /// the very queue it is waiting on, a self-inflicted deadlock that only breaks at the deadline. Off the
-    /// game-loop thread another thread owns the pump, so it just polls.
+    /// reports which happened, draining <see cref="Update"/> each iteration so the work the condition depends
+    /// on — and the blocking <see cref="Run"/> handlers the network thread is waiting on — keeps making
+    /// progress; a bare wait on the game-loop thread would stall the very queue it is waiting on, a
+    /// self-inflicted deadlock that only breaks at the deadline. Must be called on the game-loop thread,
+    /// which owns the pump.
     /// </summary>
+    /// <exception cref="InvalidOperationException">Thrown when called off the game-loop thread.</exception>
     public static bool WaitWhilePumping(Func<bool> condition, DateTime deadline)
     {
-        bool ownsPump = Instance.IsGameThread;
+        if (!Instance.IsGameThread)
+            throw new InvalidOperationException(
+                $"{nameof(WaitWhilePumping)} must be called on the game-loop thread; it drains the queue while it waits.");
 
         while (true)
         {
-            if (ownsPump)
+            // Drain with the mod's patches live. The queued actions are ordinary game-loop work and must not
+            // inherit an AllowedThread allowance the caller happens to hold — that would silence the
+            // replication patches the actions rely on. The normal game-loop pump runs them with no allowance,
+            // so suspend any ambient one here to match it.
+            using (AllowedThread.Suspend())
             {
-                // Drain with the mod's patches live. The queued actions are ordinary game-loop work and must
-                // not inherit an AllowedThread allowance the caller happens to hold — that would silence the
-                // replication patches the actions rely on. The normal game-loop pump runs them with no
-                // allowance, so suspend any ambient one here to match it.
-                using (AllowedThread.Suspend())
+                // A single failing queued action must not abort the wait (which would also leave that action's
+                // own blocking caller waiting out its full timeout); log and keep pumping, mirroring RunSafe.
+                // Without this guard the throw would escape into whatever the waiter is doing — e.g. mid
+                // battle-start construction.
+                try
                 {
-                    // A single failing queued action must not abort the wait (which would also leave that
-                    // action's own blocking caller waiting out its full timeout); log and keep pumping,
-                    // mirroring RunSafe. Without this guard the throw would escape into whatever the waiter is
-                    // doing — e.g. mid battle-start construction.
-                    try
-                    {
-                        Instance.Update(TimeSpan.Zero);
-                    }
-                    catch (Exception e)
-                    {
-                        Logger.Error(e, "A queued action threw while pumping the game thread during a blocking wait");
-                    }
+                    Instance.Update(TimeSpan.Zero);
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "A queued action threw while pumping the game thread during a blocking wait");
                 }
             }
 

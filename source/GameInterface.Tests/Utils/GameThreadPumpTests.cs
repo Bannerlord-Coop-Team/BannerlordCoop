@@ -39,9 +39,23 @@ public class GameThreadPumpTests
     }
 
     [Fact]
+    public void WaitWhilePumping_ThrowsWhenCalledOffTheGameLoopThread()
+    {
+        // The xUnit worker thread is not the game-loop thread, so it can't pump; the wait refuses to run.
+        Assert.False(GameThread.Instance.IsGameThread);
+        Assert.Throws<InvalidOperationException>(
+            () => GameThread.WaitWhilePumping(() => true, DateTime.UtcNow + TimeSpan.FromSeconds(1)));
+    }
+
+    [Fact]
     public void WaitWhilePumping_ReturnsTrueImmediately_WhenTheConditionAlreadyHolds()
     {
-        bool result = GameThread.WaitWhilePumping(() => true, DateTime.UtcNow + TimeSpan.FromSeconds(1));
+        bool result = false;
+
+        // Must run on the game-loop thread (it owns the pump).
+        GameThread.Run(
+            () => result = GameThread.WaitWhilePumping(() => true, DateTime.UtcNow + TimeSpan.FromSeconds(1)),
+            blocking: true);
 
         Assert.True(result);
     }
@@ -49,13 +63,19 @@ public class GameThreadPumpTests
     [Fact]
     public void WaitWhilePumping_ReturnsFalse_WhenTheConditionNeverHoldsBeforeTheDeadline()
     {
-        DateTime start = DateTime.UtcNow;
+        bool result = true;
+        TimeSpan elapsed = TimeSpan.Zero;
 
-        bool result = GameThread.WaitWhilePumping(() => false, DateTime.UtcNow + TimeSpan.FromMilliseconds(150));
+        GameThread.Run(() =>
+        {
+            DateTime start = DateTime.UtcNow;
+            result = GameThread.WaitWhilePumping(() => false, DateTime.UtcNow + TimeSpan.FromMilliseconds(150));
+            elapsed = DateTime.UtcNow - start;
+        }, blocking: true);
 
         Assert.False(result);
         // It waited up to the deadline rather than returning early.
-        Assert.True(DateTime.UtcNow - start >= TimeSpan.FromMilliseconds(100));
+        Assert.True(elapsed >= TimeSpan.FromMilliseconds(100));
     }
 
     [Fact]
