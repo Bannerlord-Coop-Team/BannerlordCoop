@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
@@ -31,6 +32,30 @@ internal class MapEventSidePatches
         AccessTools.Method(
             typeof(MapEventSidePatches),
             nameof(AddIntercept));
+
+    // A player joining an existing battle runs PartyBase.MapEventSide setter -> AddPartyInternal on their own client.
+    // That local add is server-only-replicated (see AddIntercept) and would create a divergent, unbroadcast
+    // MapEventParty, so other clients never see the join. Intercept it on the client: ask the server to perform the
+    // join authoritatively (which replicates back to everyone, including this client) and skip the local mutation.
+    // The joining party's PartyBase._mapEventSide back-ref is set by the setter *before* this call, so the local
+    // player still knows it is in the battle while the authoritative add replicates.
+    [HarmonyPatch(nameof(MapEventSide.AddPartyInternal))]
+    [HarmonyPrefix]
+    private static bool Prefix_AddPartyInternal(MapEventSide __instance, PartyBase party)
+    {
+        // Server-approved replicated re-run, or the authoritative server itself: run the native add.
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (ModInformation.IsServer) return true;
+
+        // Client: route a player's join through the server. Non-player client-side adds keep their existing behavior.
+        if (party?.MobileParty?.IsPlayerParty() == true && __instance.MapEvent != null)
+        {
+            MessageBroker.Instance.Publish(__instance, new PlayerJoinBattleAttempted(party, __instance.MapEvent, __instance.MissionSide));
+            return false;
+        }
+
+        return true;
+    }
 
     [HarmonyPatch(nameof(MapEventSide.AddPartyInternal))]
     [HarmonyTranspiler]

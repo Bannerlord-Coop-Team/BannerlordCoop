@@ -14,6 +14,7 @@ using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
@@ -89,6 +90,9 @@ internal class BattleHandler : IHandler
         messageBroker.Subscribe<MapEventFinalized>(Handle_MapEventFinalized);
         messageBroker.Subscribe<TimeSpeedChangedAttempted>(Handle_TimeSpeedChangedAttempted);
 
+        messageBroker.Subscribe<PlayerJoinBattleAttempted>(Handle_PlayerJoinBattleAttempted);
+        messageBroker.Subscribe<NetworkRequestJoinBattle>(Handle_NetworkRequestJoinBattle);
+
         timeControlInterface.AddFastForwardPolicy(FastForwardWhilePlayerInMapEventPolicy);
     }
 
@@ -109,6 +113,9 @@ internal class BattleHandler : IHandler
 
         messageBroker.Unsubscribe<MapEventFinalized>(Handle_MapEventFinalized);
         messageBroker.Unsubscribe<TimeSpeedChangedAttempted>(Handle_TimeSpeedChangedAttempted);
+
+        messageBroker.Unsubscribe<PlayerJoinBattleAttempted>(Handle_PlayerJoinBattleAttempted);
+        messageBroker.Unsubscribe<NetworkRequestJoinBattle>(Handle_NetworkRequestJoinBattle);
 
         timeControlInterface.RemoveFastForwardPolicy(FastForwardWhilePlayerInMapEventPolicy);
     }
@@ -280,14 +287,39 @@ internal class BattleHandler : IHandler
         if (MapEventConfig.Debug)
             mapEventLogger.DebugMapEvent(mapEvent, "Handling network map event finalize attempted. Finalizing map event.");
 
+        // Capture the player parties on both sides before finalize clears them. They get a reliable,
+        // server-addressed close (below) instead of each racing its own local teardown.
+
+        string[] playerPartyIds = null;
+        
         GameThread.Run(() =>
         {
+            playerPartyIds = CollectPlayerPartyIds(mapEvent);
             mapEvent.FinalizeEventAux();
         }, blocking: true);
-        
+
 
         var message = new NetworkMapEventFinalized();
         network.Send(payload.Who as NetPeer, message);
+
+        // PvP (more than one player party): tell every involved player party to close its encounter menu.
+        if (playerPartyIds.Length > 1)
+            network.SendAll(new NetworkClosePvpEncounter(playerPartyIds));
+    }
+
+    /// <summary>[Server] Ids of the player parties on both sides of the event, captured before finalize clears them.</summary>
+    private string[] CollectPlayerPartyIds(MapEvent mapEvent)
+    {
+        var ids = new List<string>();
+        if (mapEvent?.AttackerSide == null || mapEvent.DefenderSide == null) return ids.ToArray();
+
+        foreach (var party in mapEvent.InvolvedParties)
+        {
+            if (party?.MobileParty?.IsPlayerParty() == true && objectManager.TryGetId(party, out var id))
+                ids.Add(id);
+        }
+
+        return ids.ToArray();
     }
 
     private void Handle_NetworkMapEventFinalized(MessagePayload<NetworkMapEventFinalized> payload)
@@ -356,6 +388,25 @@ internal class BattleHandler : IHandler
             partyIds.ToArray(),
             partyPositions.ToArray()
         ));
+
+        // Tell any player parties just added to the battle to drop their "hold on" PvP popup — the battle menu
+        // blocks them now. Server-driven because the client-side MapEventInvolvedPartiesAdded never fires for a
+        // synced add (the client's own add is intercepted and routed to the server).
+        var playerPartyIds = new List<string>();
+        foreach (var addedParty in message.AddedParties)
+        {
+            if (addedParty.Party?.MobileParty?.IsPlayerParty() == true && objectManager.TryGetId(addedParty.Party, out var playerPartyId))
+                playerPartyIds.Add(playerPartyId);
+        }
+
+        if (playerPartyIds.Count > 0)
+            network.SendAll(new NetworkHidePvpPopup(playerPartyIds.ToArray()));
+
+        // The conversation is over once the battle map event forms, so release the PvP interaction block. Holding it
+        // longer re-blocks the parties (and hangs the encounter menu) when they later leave the map event; the map
+        // event itself keeps others out while the battle runs.
+        foreach (var id in playerPartyIds)
+            ConversationPartyTracker.Instance?.EndPvpConversation(id);
     }
 
     private void Handle_NetworkAddInvolvedParties(MessagePayload<NetworkAddInvolvedParties> payload)
@@ -408,6 +459,44 @@ internal class BattleHandler : IHandler
             {
                 Logger.Error(e, "Failed to apply {Message}", nameof(NetworkAddInvolvedParties));
             }
+        });
+    }
+
+    /// <summary>[Client] Bridge the local player's battle join to a server request.</summary>
+    private void Handle_PlayerJoinBattleAttempted(MessagePayload<PlayerJoinBattleAttempted> payload)
+    {
+        var data = payload.What;
+
+        if (!objectManager.TryGetIdWithLogging(data.MapEvent, out var mapEventId)) return;
+        if (!objectManager.TryGetIdWithLogging(data.JoiningParty, out var partyId)) return;
+
+        mapEventLogger.DebugMapEvent(data.MapEvent, "Requesting server to join battle. PartyId={PartyId}, Side={Side}", partyId, data.Side);
+
+        // On a client, SendAll targets the server (its only connected peer).
+        network.SendAll(new NetworkRequestJoinBattle(mapEventId, partyId, data.Side));
+    }
+
+    /// <summary>[Server] Perform the authoritative join; the native add replicates to all clients.</summary>
+    private void Handle_NetworkRequestJoinBattle(MessagePayload<NetworkRequestJoinBattle> payload)
+    {
+        if (!ModInformation.IsServer) return;
+
+        var data = payload.What;
+
+        GameThread.Run(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.MapEventId, out var mapEvent)) return;
+            if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.PartyId, out var party)) return;
+
+            if (party.MapEventSide != null)
+            {
+                Logger.Warning("Ignoring join request: party {PartyId} is already in a map event", data.PartyId);
+                return;
+            }
+
+            // The setter runs the native MapEventSide.AddPartyInternal on the server (NOT under AllowedThread), so the
+            // AddIntercept publishes the battle-party add and it replicates to every client through the map-event sync.
+            party.MapEventSide = mapEvent.GetMapEventSide(data.Side);
         });
     }
 
