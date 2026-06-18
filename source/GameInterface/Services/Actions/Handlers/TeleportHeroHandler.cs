@@ -2,7 +2,9 @@
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Actions.Messages;
+using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.ObjectManager;
+using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -63,5 +65,7 @@ internal class TeleportHeroHandler : IHandler
         if (obj.What.TargetPartyId != null && !objectManager.TryGetObjectWithLogging(obj.What.TargetPartyId, out targetParty)) return;
 
         TeleportHeroAction.ApplyInternal(hero, targetSettlement, targetParty, obj.What.Detail);
+
+        network.Send(obj.Who as NetPeer, new RefreshClanMembersList());
     }
 }

@@ -117,7 +117,7 @@ internal class ClanPartiesVMHandler : IHandler
         }
 
         // Sync GiveGoldAction.ApplyBetweenCharacters in ClanPartiesVM.OnChangeLeaderOver here instead to avoid patching the huge client side function
-        // GiveGoldAction.ApplyInternal now blocked on the client so OnChangeLeaderOver shouldn't manage the gold change clientside
+        // GiveGoldAction.ApplyInternal blocked on the client so OnChangeLeaderOver shouldn't manage the gold change clientside
         var partyGoldLowerThreshold = Campaign.Current.Models.ClanFinanceModel.PartyGoldLowerThreshold;
         if (!isDisbanding && newLeader.Gold < partyGoldLowerThreshold)
         {
@@ -137,5 +137,7 @@ internal class ClanPartiesVMHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.SelectedPartyId, out var selectedParty)) return;
 
         DisbandPartyAction.StartDisband(selectedParty);
+
+        network.Send(obj.Who as NetPeer, new RefreshPartiesList());
     }
 }

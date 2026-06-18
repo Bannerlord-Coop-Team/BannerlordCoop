@@ -24,6 +24,7 @@ internal class ClanManagementRefreshHandler : IHandler
         messageBroker.Subscribe<ClanManagementVMCreated>(Handle_ClanManagementVMCreated);
         messageBroker.Subscribe<RefreshPartiesList>(Handle_RefreshPartiesList);
         messageBroker.Subscribe<RefreshWorkshopsList>(Handle_RefreshWorkshopsList);
+        messageBroker.Subscribe<RefreshClanMembersList>(Handle_RefreshClanMembersList);
 
         currentClanManagementVM = null;
     }
@@ -33,6 +34,7 @@ internal class ClanManagementRefreshHandler : IHandler
         messageBroker.Unsubscribe<ClanManagementVMCreated>(Handle_ClanManagementVMCreated);
         messageBroker.Unsubscribe<RefreshPartiesList>(Handle_RefreshPartiesList);
         messageBroker.Unsubscribe<RefreshWorkshopsList>(Handle_RefreshWorkshopsList);
+        messageBroker.Unsubscribe<RefreshClanMembersList>(Handle_RefreshClanMembersList);
     }
 
     private void Handle_ClanManagementVMCreated(MessagePayload<ClanManagementVMCreated> obj)
@@ -45,6 +47,7 @@ internal class ClanManagementRefreshHandler : IHandler
         GameLoopRunner.RunOnMainThread(() =>
         {
             currentClanManagementVM?.ClanParties?.RefreshPartiesList();
+            currentClanManagementVM?.ClanMembers?.RefreshMembersList(); // Needed to refresh clan members who can be party leaders
         });
     }
 
@@ -53,6 +56,15 @@ internal class ClanManagementRefreshHandler : IHandler
         GameLoopRunner.RunOnMainThread(() =>
         {
             currentClanManagementVM?.ClanIncome?.RefreshList();
+        });
+    }
+
+    private void Handle_RefreshClanMembersList(MessagePayload<RefreshClanMembersList> obj)
+    {
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            currentClanManagementVM?.ClanMembers?.RefreshMembersList();
+            currentClanManagementVM?.ClanFiefs?.RefreshAllLists(); // Needed to refresh governors
         });
     }
 }

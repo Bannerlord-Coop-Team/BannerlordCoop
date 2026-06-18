@@ -2,7 +2,9 @@
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Actions.Messages;
+using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.ObjectManager;
+using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -56,6 +58,8 @@ internal class ChangeGovernorHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.GovernorId, out var governor)) return;
 
         ChangeGovernorAction.ApplyInternal(fortification, governor);
+
+        network.Send(obj.Who as NetPeer, new RefreshClanMembersList());
     }
 
     private void Handle_GovernorRemoved(MessagePayload<GovernorRemoved> obj)
@@ -71,5 +75,7 @@ internal class ChangeGovernorHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.GovernorId, out var governor)) return;
 
         ChangeGovernorAction.ApplyGiveUpInternal(governor);
+
+        network.Send(obj.Who as NetPeer, new RefreshClanMembersList());
     }
 }
