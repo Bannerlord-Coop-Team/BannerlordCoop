@@ -54,6 +54,19 @@ internal class DestroyPartyActionPatch
 
         if (ModInformation.IsClient)
         {
+            // A player destroying a party directly (e.g. recruiting surrendering bandits via
+            // dialogue) only ever happens on the conversing client, and the local destroy alone
+            // leaves the party alive on every other peer (a zombie). Forward it so the server
+            // destroys the party authoritatively and the destruction replicates to the other peers.
+            // The local destroy still runs (the returning broadcast no-ops once this party is
+            // inactive), which keeps a client-local party the server never registered — e.g. a
+            // quest-spawned party — destroyed here as before; the request simply finds no id for it.
+            if (destroyerParty == MobileParty.MainParty?.Party)
+            {
+                MessageBroker.Instance.Publish(null, new DestroyPartyRequested(destroyerParty, destroyedParty));
+                return true;
+            }
+
             Logger.Error("Client attempted to apply DestroyPartyAction for party {partyName}, {StringId}", destroyedParty.Name, destroyedParty.StringId);
             return true;
         }
