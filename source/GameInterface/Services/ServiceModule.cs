@@ -18,6 +18,10 @@ internal class ServiceModule : Module
 
     protected override void Load(ContainerBuilder builder)
     {
+        // One per session, shared between the handler that marks rosters dirty and the main loop that
+        // drives its per-frame flush.
+        builder.RegisterType<TroopRosters.TroopRosterSyncCoalescer>().AsSelf().InstancePerLifetimeScope();
+
         foreach (var type in GetHandlers())
         {
             builder.RegisterType(type).AsSelf().InstancePerLifetimeScope().AutoActivate();
@@ -56,16 +60,16 @@ internal class ServiceModule : Module
         var handlers = InterfaceCollector.GetInterfaces<IHandler>(NAMESPACE);
 
         // When dynamic sync generates its code at runtime, the generated handlers are created by
-        // DynamicSyncPatcher.BindHandlers and must NOT also be activated by the container: the
-        // "DynamicSync" namespace scan covers every loaded assembly, so any container built after
+        // AutoSyncPatcher.BindHandlers and must NOT also be activated by the container: the
+        // "AutoSync" namespace scan covers every loaded assembly, so any container built after
         // the runtime assembly exists (a second test environment, or rejoining coop in the same
         // process) would construct a second handler per type and every synced message would be
         // applied twice. Only when running from the compiled export (generation disabled) is the
         // container the sole owner of the generated handlers.
-        if (DynamicSync.DynamicSyncConfiguration.Enabled)
+        if (AutoSync.AutoSyncConfiguration.Enabled)
             return handlers;
 
-        return handlers.Concat(InterfaceCollector.GetInterfaces<IHandler>("DynamicSync"));
+        return handlers.Concat(InterfaceCollector.GetInterfaces<IHandler>("AutoSync"));
     }
 
     // Namespace is needed to separate client and server handlers being registered with DI

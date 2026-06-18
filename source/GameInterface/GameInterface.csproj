@@ -232,7 +232,7 @@
 	    </AssemblyAttribute>
     </ItemGroup>
 	<ItemGroup>
-		<EmbeddedResource Include="DynamicSync\Templates\**\*.txt" />
+		<EmbeddedResource Include="AutoSync\Templates\**\*.txt" />
 	</ItemGroup>
   <ItemGroup>
     <Publicize Include="SandBox" />

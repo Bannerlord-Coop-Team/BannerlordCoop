@@ -7,6 +7,7 @@ using HarmonyLib;
 using SandBox.GauntletUI.Map;
 using Serilog;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.Services.GuantletMapEventVisuals.Patches;
 
@@ -29,5 +30,41 @@ internal class GauntletMapEventVisualPatches
 
         var message = new GauntletMapEventVisualInitialized(__instance, position, isVisible);
         MessageBroker.Instance.Publish(__instance, message);
+    }
+
+    [HarmonyPatch("GetBattleSizeValue")]
+    [HarmonyPrefix]
+    private static bool PrefixGetBattleSizeValue(GauntletMapEventVisual __instance, ref int __result)
+    {
+        // On the client a map event's sides - and the parties within them - sync in over several
+        // messages, so a replicated visual init can run before the battle-size data is ready. Until
+        // both sides exist and every involved party is resolved, report the smallest size so the
+        // ambient-sound setup still completes instead of dereferencing un-synced state and aborting
+        // the rest of Initialize (the battle icon is set up earlier). Once everything has synced this
+        // is a no-op (always so on the server) and vanilla computes the real size.
+        if (BattleSizeComputable(__instance.MapEvent)) return true;
+
+        __result = 0;
+        return false;
+    }
+
+    // The battle-size calc walks both sides and dereferences each involved party's underlying Party.
+    // On the client those are populated after the map event is created (sides via assignment, each
+    // party's Party via sync), so all must be present before it can run without hitting un-ready state.
+    internal static bool BattleSizeComputable(MapEvent mapEvent)
+    {
+        if (mapEvent?.AttackerSide == null || mapEvent.DefenderSide == null) return false;
+
+        return PartiesResolved(mapEvent.AttackerSide) && PartiesResolved(mapEvent.DefenderSide);
+    }
+
+    private static bool PartiesResolved(MapEventSide side)
+    {
+        foreach (var party in side.Parties)
+        {
+            if (party?.Party == null) return false;
+        }
+
+        return true;
     }
 }

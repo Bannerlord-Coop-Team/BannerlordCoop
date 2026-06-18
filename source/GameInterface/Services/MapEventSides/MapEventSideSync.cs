@@ -1,12 +1,13 @@
-﻿using GameInterface.DynamicSync;
+﻿using GameInterface.AutoSync;
+using GameInterface.AutoSync;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.Services.MapEventSides
 {
-    internal class MapEventSideSync : IDynamicSync
+    internal class MapEventSideSync : IAutoSync
     {
-        public MapEventSideSync(DynamicSyncRegistry autoSyncBuilder)
+        public MapEventSideSync(AutoSyncRegistry autoSyncBuilder)
         {
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEventSide), nameof(MapEventSide.CasualtyStrength)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEventSide), nameof(MapEventSide.LeaderParty)));

@@ -29,7 +29,7 @@ namespace MissionTests
             builder.RegisterModule<GameInterfaceModule>();
             // AsSelf for the Missions P2P client + As<INetworkConfiguration> to stand in for the campaign
             // config (in production that interface comes from the Coop.Core client container).
-            builder.RegisterType<NetworkConfiguration>().As<INetworkConfiguration>().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<NetworkConfiguration>().As<INetworkConfig>().AsSelf().InstancePerLifetimeScope();
             builder.RegisterType<ProtoBufSerializer>().As<ICommonSerializer>().InstancePerLifetimeScope();
             builder.RegisterType<SerializableTypeMapper>().As<ISerializableTypeMapper>().InstancePerLifetimeScope();
             builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
@@ -71,7 +71,7 @@ namespace MissionTests
         /// </summary>
         private sealed class StubNetwork : INetwork
         {
-            public INetworkConfiguration Configuration => throw new NotImplementedException();
+            public INetworkConfig Config => throw new NotImplementedException();
             public void Send(NetPeer netPeer, IPacket packet) => throw new NotImplementedException();
             public void SendImmediate(NetPeer netPeer, IPacket packet) => throw new NotImplementedException();
             public void SendAll(IPacket packet) => throw new NotImplementedException();

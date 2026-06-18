@@ -1,30 +1,31 @@
-﻿using GameInterface.DynamicSync;
+﻿using GameInterface.AutoSync;
+using GameInterface.AutoSync;
 using HarmonyLib;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.BasicCultureObjects
 {
-    internal class BasicCultureObjectSync : IDynamicSync
+    internal class BasicCultureObjectSync : IAutoSync
     {
-        public BasicCultureObjectSync(DynamicSyncRegistry dynamicSyncRegistry)
+        public BasicCultureObjectSync(AutoSyncRegistry AutoSyncRegistry)
         {
             // Fields
 
             // Properties
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.BackgroundColor1)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.BackgroundColor2)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.Banner)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.CanHaveSettlement)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.ClothAlternativeColor)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.ClothAlternativeColor2)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.Color)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.Color2)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.EncounterBackgroundMesh)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.ForegroundColor1)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.ForegroundColor2)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.IsBandit)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.IsMainCulture)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.Name)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.BackgroundColor1)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.BackgroundColor2)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.Banner)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.CanHaveSettlement)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.ClothAlternativeColor)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.ClothAlternativeColor2)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.Color)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.Color2)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.EncounterBackgroundMesh)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.ForegroundColor1)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.ForegroundColor2)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.IsBandit)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.IsMainCulture)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.Name)));
 
             // Targetmethods
         }

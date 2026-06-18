@@ -1,12 +1,13 @@
-﻿using GameInterface.DynamicSync;
+﻿using GameInterface.AutoSync;
+using GameInterface.AutoSync;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.Services.MapEvents;
 
-internal class MapEventSync : IDynamicSync
+internal class MapEventSync : IAutoSync
 {
-    public MapEventSync(DynamicSyncRegistry autoSyncBuilder)
+    public MapEventSync(AutoSyncRegistry autoSyncBuilder)
     {
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.RetreatingSide)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.BattleState)));

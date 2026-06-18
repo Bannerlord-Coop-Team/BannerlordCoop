@@ -38,6 +38,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ServerHeadless", "ServerHea
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MissionTests", "MissionTests\MissionTests.csproj", "{CF42DB52-FD73-46B1-8EC4-6D3F1C912656}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClientDebug3", "ClientDebug 3\ClientDebug3.csproj", "{52680E0F-F98F-4A85-B80B-3AC75C474FAF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -228,6 +230,18 @@ Global
 		{CF42DB52-FD73-46B1-8EC4-6D3F1C912656}.Release|Any CPU.Build.0 = Release|Any CPU
 		{CF42DB52-FD73-46B1-8EC4-6D3F1C912656}.Release|x64.ActiveCfg = Release|Any CPU
 		{CF42DB52-FD73-46B1-8EC4-6D3F1C912656}.Release|x64.Build.0 = Release|Any CPU
+		{52680E0F-F98F-4A85-B80B-3AC75C474FAF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{52680E0F-F98F-4A85-B80B-3AC75C474FAF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{52680E0F-F98F-4A85-B80B-3AC75C474FAF}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{52680E0F-F98F-4A85-B80B-3AC75C474FAF}.Debug|x64.Build.0 = Debug|Any CPU
+		{52680E0F-F98F-4A85-B80B-3AC75C474FAF}.DebugAutoConnect|Any CPU.ActiveCfg = DebugAutoConnect|Any CPU
+		{52680E0F-F98F-4A85-B80B-3AC75C474FAF}.DebugAutoConnect|Any CPU.Build.0 = DebugAutoConnect|Any CPU
+		{52680E0F-F98F-4A85-B80B-3AC75C474FAF}.DebugAutoConnect|x64.ActiveCfg = DebugAutoConnect|Any CPU
+		{52680E0F-F98F-4A85-B80B-3AC75C474FAF}.DebugAutoConnect|x64.Build.0 = DebugAutoConnect|Any CPU
+		{52680E0F-F98F-4A85-B80B-3AC75C474FAF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{52680E0F-F98F-4A85-B80B-3AC75C474FAF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{52680E0F-F98F-4A85-B80B-3AC75C474FAF}.Release|x64.ActiveCfg = Release|Any CPU
+		{52680E0F-F98F-4A85-B80B-3AC75C474FAF}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

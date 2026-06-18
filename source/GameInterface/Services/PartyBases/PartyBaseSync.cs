@@ -1,14 +1,14 @@
-﻿using GameInterface.DynamicSync;
+﻿using GameInterface.AutoSync;
 using HarmonyLib;
 using Serilog;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.PartyBases;
-internal class PartyBaseSync : IDynamicSync
+internal class PartyBaseSync : IAutoSync
 {
     ILogger Logger { get; }
 
-    public PartyBaseSync(DynamicSyncRegistry autoSyncBuilder, ILogger logger)
+    public PartyBaseSync(AutoSyncRegistry autoSyncBuilder, ILogger logger)
     {
         // Property Sync
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(PartyBase), nameof(PartyBase.MobileParty)));

@@ -1,9 +1,11 @@
 ﻿using Autofac;
 using Common;
 using Common.Logging;
-using GameInterface;
-using GameInterface.Surrogates;
 using HarmonyLib;
+using Missions;
+using Missions.Services.Arena;
+using Missions.Services.Taverns;
+using Missions.View;
 using SandBox;
 using Serilog;
 using System;
@@ -117,8 +119,6 @@ namespace MissionTestMod
             builder.RegisterModule<MissionModule>();
 
             container = builder.Build();
-
-            ContainerProvider.SetContainer(container);
         }
 
         protected override void OnSubModuleUnloaded()
@@ -132,7 +132,7 @@ namespace MissionTestMod
             Logger.Verbose("Registering ProtoBuf Surrogates");
 
             // All surrogates live in GameInterface now; register the whole set in one call.
-            new SurrogateCollection();
+            //new SurrogateCollection();
         }
 
         private bool m_IsFirstTick = true;

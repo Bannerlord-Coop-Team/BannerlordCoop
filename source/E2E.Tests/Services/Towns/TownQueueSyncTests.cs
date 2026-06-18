@@ -1,5 +1,5 @@
 using E2E.Tests.Util;
-using GameInterface.DynamicSync;
+using GameInterface.AutoSync;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
@@ -73,10 +73,10 @@ public class TownQueueSyncTests : SyncTestBase
             Assert.Equal(2, clientTown.BuildingsInProgress.Count);
         }
 
-        var dynamicSyncAsm = DynamicSyncConfiguration.Enabled ? DynamicSyncPatcher.Assembly : typeof(DynamicSyncConfiguration).Assembly;
+        var AutoSyncAsm = AutoSyncConfiguration.Enabled ? AutoSyncPatcher.Assembly : typeof(AutoSyncConfiguration).Assembly;
         // Act — clear the queue on the server through the generated queue clear intercept,
         // the same intercept the dynamic sync transpiler routes Queue<T>.Clear() calls into.
-        var patchesType = dynamicSyncAsm.GetType($"DynamicSync.{nameof(Town)}_DynamicPatches");
+        var patchesType = AutoSyncAsm.GetType($"AutoSync.{nameof(Town)}_DynamicPatches");
         Assert.True(patchesType != null, "Generated Town_DynamicPatches type not found in dynamic sync assembly");
 
         var clearIntercept = patchesType.GetMethod($"Intercept_QueueClear_{nameof(Town.BuildingsInProgress)}");

@@ -131,7 +131,7 @@ internal class MilitiaPartyComponentLifetimePatches
     /// Guards against NullReferenceException in <see cref="MilitiaPartyComponent.OnFinalize"/>.
     /// The base game does <c>this.Settlement.MilitiaPartyComponent = null</c>, but on clients
     /// <see cref="MilitiaPartyComponent.Settlement"/> may already be null when the party is
-    /// destroyed, causing the DynamicSync field intercept to crash on a null instance.
+    /// destroyed, causing the AutoSync field intercept to crash on a null instance.
     /// </summary>
     [HarmonyPatch(typeof(MilitiaPartyComponent), "OnFinalize")]
     [HarmonyPrefix]

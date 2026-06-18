@@ -106,12 +106,13 @@ public abstract class MapEventTestBase : IDisposable
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
 
-            // Finish through FinishBattle (not FinalizeEvent): FinishBattle is the method the AutoRegistry
-            // watches as the MapEvent destroy hook (MapEventRegistry.DestroyMethods), and it performs the same
-            // finalization work internally (FinishBattle -> FinalizeEventAux). It must NOT run inside an
-            // AllowedThread: LifetimePatches.DestroyPostfix only broadcasts the removal to clients when the
-            // call is *not* an allowed/original-policy call, so wrapping it would silently skip the sync.
-            mapEvent.FinishBattle();
+            // Finalize the way the live server does — through FinalizeEvent, the public path battles take on
+            // the host. The AutoRegistry watches FinalizeEventAux (MapEventRegistry.DestroyMethods), which
+            // FinalizeEvent funnels into, so this drives the same destroy hook the running game does. It must
+            // NOT run inside an AllowedThread: LifetimePatches.DestroyPostfix only broadcasts the removal to
+            // clients when the call is *not* an allowed/original-policy call, so wrapping it would silently
+            // skip the sync.
+            mapEvent.FinalizeEvent();
         }, MapEventDisabledMethods);
     }
 

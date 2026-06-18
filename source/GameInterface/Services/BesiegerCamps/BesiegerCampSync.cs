@@ -1,21 +1,21 @@
-﻿using GameInterface.DynamicSync;
+﻿using GameInterface.AutoSync;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Siege;
 
 namespace GameInterface.Services.BesiegerCamps
 {
-    internal class BesiegerCampSync : IDynamicSync
+    internal class BesiegerCampSync : IAutoSync
     {
-        public BesiegerCampSync(DynamicSyncRegistry dynamicSyncRegistry)
+        public BesiegerCampSync(AutoSyncRegistry AutoSyncRegistry)
         {
             // Fields
-            dynamicSyncRegistry.AddField(AccessTools.Field(typeof(BesiegerCamp), nameof(BesiegerCamp._leaderParty)));  
+            AutoSyncRegistry.AddField(AccessTools.Field(typeof(BesiegerCamp), nameof(BesiegerCamp._leaderParty)));  
 
             // Properties
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BesiegerCamp), nameof(BesiegerCamp.NumberOfTroopsKilledOnSide)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BesiegerCamp), nameof(BesiegerCamp.SiegeEvent)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BesiegerCamp), nameof(BesiegerCamp.SiegeEngines)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BesiegerCamp), nameof(BesiegerCamp.SiegeStrategy)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BesiegerCamp), nameof(BesiegerCamp.NumberOfTroopsKilledOnSide)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BesiegerCamp), nameof(BesiegerCamp.SiegeEvent)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BesiegerCamp), nameof(BesiegerCamp.SiegeEngines)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BesiegerCamp), nameof(BesiegerCamp.SiegeStrategy)));
 
             // Targetmethods
         }

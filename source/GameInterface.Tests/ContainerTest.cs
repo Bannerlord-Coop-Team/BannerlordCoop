@@ -2,7 +2,7 @@
 using Common.Messaging;
 using Common.Network;
 using Common.Serialization;
-using GameInterface.DynamicSync;
+using GameInterface.AutoSync;
 using HarmonyLib;
 using Moq;
 using Xunit;
@@ -32,7 +32,7 @@ public class ContainerTest
             using var module = containerBuilder.Build();
 
             var gameInterface = module.Resolve<IGameInterface>();
-            var dynamicSyncPatcher = module.Resolve<DynamicSyncPatcher>();
+            var AutoSyncPatcher = module.Resolve<AutoSyncPatcher>();
 
             gameInterface.PatchAll();
             gameInterface.UnpatchAll();

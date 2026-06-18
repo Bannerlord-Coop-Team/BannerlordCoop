@@ -19,7 +19,7 @@ namespace GameInterface.Services.PartyComponents.Patches.Lifetime;
 /// The constructor parameter <c>settlement</c> is bundled into
 /// <see cref="PartyComponentCreated"/> so that <see cref="Handlers.PartyComponentHandler"/>
 /// can restore the <see cref="GarrisonPartyComponent.Settlement"/> link on the client without
-/// depending on DynamicSync field-update ordering. Without it the client receives a garrison
+/// depending on AutoSync field-update ordering. Without it the client receives a garrison
 /// with a null Settlement, and <see cref="GarrisonPartyComponent.PartyOwner"/>
 /// (Settlement.OwnerClan.Leader) throws when the nameplate VM reads it.
 /// </summary>

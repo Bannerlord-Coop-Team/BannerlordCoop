@@ -1,10 +1,13 @@
-﻿using GameInterface.DynamicSync;
+﻿using GameInterface.AutoSync;
+using GameInterface.AutoSync;
+using HarmonyLib;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.ItemModifiers;
 
-class ItemModifierSync : IDynamicSync
+class ItemModifierSync : IAutoSync
 {
-    public ItemModifierSync(DynamicSyncRegistry autoSyncBuilder)
+    public ItemModifierSync(AutoSyncRegistry autoSyncBuilder)
     {
         // TODO: Add remaining fields and properties
     }

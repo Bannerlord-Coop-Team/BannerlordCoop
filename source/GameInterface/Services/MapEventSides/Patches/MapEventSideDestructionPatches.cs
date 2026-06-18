@@ -41,7 +41,15 @@ internal class MapEventSideDestructionPatches
                 __instance.CacheLeaderSimulationModifier();
                 return false;
             }
-            __instance.MapEvent.FinalizeEvent();
+
+            // Skip when the event is already finalizing: FinalizeEventAux empties the sides through
+            // HandleMapEventEnd, so this last-party removal re-enters here mid-finalize. Re-finalizing then
+            // is a no-op vanilla guards with IsFinalized, but it re-runs the finalize side effects. Only
+            // finalize when this removal is what ends the battle.
+            if (!__instance.MapEvent.IsFinalized)
+            {
+                __instance.MapEvent.FinalizeEvent();
+            }
         }
 
         return false;
