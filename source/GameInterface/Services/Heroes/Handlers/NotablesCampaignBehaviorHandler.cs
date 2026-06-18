@@ -8,7 +8,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.Core;
 
-namespace GameInterface.Services.Buildings.Handlers;
+namespace GameInterface.Services.Heroes.Handlers;
 
 internal class NotablesCampaignBehaviorHandler : IHandler
 {

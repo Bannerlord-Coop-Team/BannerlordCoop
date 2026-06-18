@@ -7,7 +7,7 @@ using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 
-namespace GameInterface.Services.Buildings.Handlers;
+namespace GameInterface.Services.Heroes.Handlers;
 
 internal class NotableSupportersCampaignBehaviorHandler : IHandler
 {

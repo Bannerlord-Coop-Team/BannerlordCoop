@@ -61,6 +61,8 @@ internal class SettlementMenuOverlayVMHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.SettlementId, out var settlement)) return;
         if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
 
+        if (obj.What.HeroIds == null) return;
+
         foreach (var heroId in obj.What.HeroIds)
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(heroId, out var hero)) continue;
