@@ -1,6 +1,5 @@
 ﻿using Common.Messaging;
 using GameInterface.Missions.Agents.Messages;
-using GameInterface.Missions.Services.Network;
 using HarmonyLib;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;

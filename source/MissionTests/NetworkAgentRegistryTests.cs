@@ -1,4 +1,4 @@
-﻿using GameInterface.Missions.Services.Network;
+﻿using GameInterface.Missions;
 using LiteNetLib;
 using Missions.Services.Network;
 using System;

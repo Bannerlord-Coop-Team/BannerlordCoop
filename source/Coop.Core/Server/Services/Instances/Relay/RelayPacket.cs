@@ -34,17 +34,17 @@ public readonly struct RelayPacket : IPacket
 
     /// <summary>Controller ids to forward the payload to (multiple for a broadcast).</summary>
     [ProtoMember(3)]
-    public string[] ControllerIds { get; }
+    public string ControllerId { get; }
 
     /// <summary>The already-serialized inner packet, relayed verbatim.</summary>
     [ProtoMember(4)]
     public byte[] Payload { get; }
 
-    public RelayPacket(DeliveryMethod deliveryMethod, string instanceId, string[] controllerIds, byte[] payload)
+    public RelayPacket(DeliveryMethod deliveryMethod, string instanceId, string controllerId, byte[] payload)
     {
         DeliveryMethod = deliveryMethod;
         InstanceId = instanceId;
-        ControllerIds = controllerIds;
+        ControllerId = controllerId;
         Payload = payload;
     }
 }

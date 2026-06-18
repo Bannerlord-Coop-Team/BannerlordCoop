@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Missions.Agents.Handlers;
@@ -27,19 +27,12 @@ namespace GameInterface.Missions.Battles
     /// <summary>
     /// Mission Controller that does all the logic in the Coop Battles
     /// </summary>
-    public class CoopBattlesController : MissionBehavior, IDisposable
+    public class CoopBattlesController : CoopMissionController
     {
         private static readonly ILogger Logger = LogManager.GetLogger<CoopBattlesController>();
 
-        public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
-
-        private readonly IMessageBroker messageBroker;
-        private readonly IObjectManager objectManager;
-        private readonly IBattleNetwork network;
-        private readonly INetworkAgentRegistry agentRegistry;
         private readonly IRandomEquipmentGenerator equipmentGenerator;
         private readonly IBinaryPackageFactory packageFactory;
-        private readonly IDisposable[] handlers;
 
         private List<MatrixFrame> spawnFrames = new List<MatrixFrame>();
         private CharacterObject[] gameCharacters;
@@ -49,7 +42,7 @@ namespace GameInterface.Missions.Battles
             IMessageBroker messageBroker,
             IObjectManager objectManager,
             IBattleNetwork network,
-            INetworkAgentRegistry agentRegistry, 
+            INetworkAgentRegistry agentRegistry,
             IRandomEquipmentGenerator equipmentGenerator,
             IBinaryPackageFactory packageFactory,
             IMissileHandler missileHandler,
@@ -59,15 +52,7 @@ namespace GameInterface.Missions.Battles
             IAgentDamageHandler agentDamageHandler,
             IAgentDeathHandler agentDeathHandler,
             INetworkMissileRegistry networkMissileRegistry)
-        {
-            this.messageBroker = messageBroker;
-            this.objectManager = objectManager;
-            this.network = network;
-            this.agentRegistry = agentRegistry;
-            this.equipmentGenerator = equipmentGenerator;
-            this.packageFactory = packageFactory;
-
-            handlers = new IDisposable[]
+            : base(network, messageBroker, objectManager, agentRegistry, new IDisposable[]
             {
                 missileHandler,
                 weaponDropHandler,
@@ -76,30 +61,17 @@ namespace GameInterface.Missions.Battles
                 agentDamageHandler,
                 agentDeathHandler,
                 networkMissileRegistry,
-            };
+            })
+        {
+            this.equipmentGenerator = equipmentGenerator;
+            this.packageFactory = packageFactory;
 
             playerId = Guid.NewGuid().ToString();
-
-            this.messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
-            this.messageBroker.Subscribe<PeerConnected>(Handle_PeerConnected);
         }
 
         ~CoopBattlesController()
         {
             Dispose();
-        }
-
-        public void Dispose()
-        {
-            agentRegistry.Clear();
-
-            foreach (var handler in handlers)
-            {
-                handler.Dispose();
-            }
-
-            messageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
-            messageBroker.Unsubscribe<PeerConnected>(Handle_PeerConnected);
         }
 
         public override void AfterStart()
@@ -110,12 +82,7 @@ namespace GameInterface.Missions.Battles
             AddPlayerToArena();
         }
 
-        private void Handle_PeerConnected(MessagePayload<PeerConnected> payload)
-        {
-            SendJoinInfo(payload.What.Peer);
-        }
-
-        private void SendJoinInfo(NetPeer peer)
+        protected override void SendJoinInfo(string controllerId)
         {
             CharacterObject characterObject = CharacterObject.PlayerCharacter;
 
@@ -128,9 +95,9 @@ namespace GameInterface.Missions.Battles
                 if (agent == Agent.Main) continue;
 
                 AiAgentData aiAgentData = new AiAgentData(
-                    agentId, 
-                    agent.Position, 
-                    agent.Character.StringId, 
+                    agentId,
+                    agent.Position,
+                    agent.Character.StringId,
                     agent.Health);
 
 
@@ -147,25 +114,22 @@ namespace GameInterface.Missions.Battles
                 return;
 
             NetworkMissionJoinInfo request = new NetworkMissionJoinInfo(
-                characterObjectId, 
-                isPlayerAlive, 
-                playerId, 
-                position, 
-                health, 
+                characterObjectId,
+                isPlayerAlive,
+                playerId,
+                position,
+                health,
                 aiAgentDatas.ToArray());
 
-            network.Send(peer, request);
-            Logger.Information("Sent {AgentType} Join Request for {AgentName}({PlayerID}) to {Peer}",
+            network.Send(controllerId, request);
+            Logger.Information("Sent {AgentType} Join Request for {AgentName}({PlayerID}) to {Controller}",
                 characterObject.IsPlayerCharacter ? "Player" : "Agent",
-                characterObject.Name, request.ControllerId, peer);
+                characterObject.Name, request.ControllerId, controllerId);
         }
 
-        private void Handle_JoinInfo(MessagePayload<NetworkMissionJoinInfo> payload)
+        protected override void HandleJoinInfo(NetPeer netPeer, NetworkMissionJoinInfo joinInfo)
         {
             Logger.Debug("Received join request");
-            NetPeer netPeer = (NetPeer)payload.Who;
-
-            NetworkMissionJoinInfo joinInfo = payload.What;
 
             string newAgentId = joinInfo.ControllerId;
             Vec3 startingPos = joinInfo.StartingPosition;
@@ -308,12 +272,6 @@ namespace GameInterface.Missions.Battles
             }, true);
 
             return agent;
-        }
-
-        public override void OnEndMissionInternal()
-        {
-            base.OnEndMission();
-            Dispose();
         }
     }
 }

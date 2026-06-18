@@ -51,13 +51,7 @@ public class CoopArenaController : MissionBehavior, IDisposable
         INetworkAgentRegistry agentRegistry, 
         IRandomEquipmentGenerator equipmentGenerator,
         IBinaryPackageFactory packageFactory,
-        IMissileHandler missileHandler,
-        IWeaponDropHandler weaponDropHandler,
-        IWeaponPickupHandler weaponPickupHandler,
-        IShieldDamageHandler shieldDamageHandler,
-        IAgentDamageHandler agentDamageHandler,
-        IAgentDeathHandler agentDeathHandler,
-        INetworkMissileRegistry networkMissileRegistry)
+)
     {
         this.network = network;
         this.objectManager = objectManager;

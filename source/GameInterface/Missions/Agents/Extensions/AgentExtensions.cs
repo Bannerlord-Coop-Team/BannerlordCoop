@@ -1,7 +1,6 @@
 ﻿using TaleWorlds.MountAndBlade;
 using System.Runtime.CompilerServices;
 using TaleWorlds.Library;
-using GameInterface.Missions.Services.Network;
 
 namespace GameInterface.Missions.Agents.Extensions
 {

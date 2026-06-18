@@ -20,8 +20,8 @@ public static class LocationInstanceId
         if (objectManager.TryGetIdWithLogging(settlement, out var settlementId) == false) return false;
         if (objectManager.TryGetIdWithLogging(location, out var locationId) == false) return false;
 
-        // '|' separator (NOT '%'): the ConnectionToken splits on '%', so a '%' here would break token parsing.
-        instanceId = $"{settlementId}|{locationId}";
+        // Cannot use '%', used as a delimiter
+        instanceId = $"{settlementId}+{locationId}";
         return true;
     }
 }

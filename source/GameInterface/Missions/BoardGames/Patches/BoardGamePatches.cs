@@ -9,7 +9,6 @@ using SandBox.Source.Missions.AgentBehaviors;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.MountAndBlade;
-using GameInterface.Missions.Services.Network;
 using GameInterface.Missions.BoardGames.Messages;
 
 namespace GameInterface.Missions.BoardGames.Patches

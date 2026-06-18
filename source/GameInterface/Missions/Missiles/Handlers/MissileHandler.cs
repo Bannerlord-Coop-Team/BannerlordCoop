@@ -18,7 +18,7 @@ namespace GameInterface.Missions.Missiles.Handlers;
 /// <summary>
 /// Handler for missiles within a battle
 /// </summary>
-public interface IMissileHandler : IHandler, IDisposable
+public interface IMissileHandler : IHandler
 {
 
 }

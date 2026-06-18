@@ -8,7 +8,7 @@ using Common.Serialization;
 using Common.Util;
 using Coop.Core.Client;
 using Coop.Core.Client.Missions;
-using GameInterface.Missions.Services.Network.Messages;
+using Coop.Core.Server.Services.Instances.Relay;
 using GameInterface.Services.Entity;
 using LiteNetLib;
 using Serilog;
@@ -40,6 +40,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
 
     private readonly NetManager netManager;
     private readonly IPEndPoint serverEndpoint;
+    private readonly ICoopClient directNetwork;
     private readonly IMissionContext missionContext;
     private readonly ICommonSerializer serializer;
     private readonly IMessageBroker messageBroker;
@@ -70,7 +71,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
 
     public LiteNetP2PClient(
         INetworkConfig config,
-        ICoopClient client,
+        ICoopClient directNetwork,
         IMissionContext missionContext,
         ICommonSerializer serializer,
         IMessageBroker messageBroker,
@@ -78,8 +79,9 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         IControllerIdProvider controllerIdProvider)
     {
         Config = config;
+        this.directNetwork = directNetwork;
         this.missionContext = missionContext;
-        serverEndpoint = client.ServerEndpoint;
+        serverEndpoint = directNetwork.ServerEndpoint;
         this.packetManager = packetManager;
         this.serializer = serializer;
         this.messageBroker = messageBroker;
@@ -183,26 +185,6 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         this.instanceId = instanceId;
     }
 
-    public void Send(NetPeer netPeer, IPacket packet)
-    {
-        byte[] data = serializer.Serialize(packet);
-        netPeer.Send(data, packet.DeliveryMethod);
-    }
-
-    public void SendAllBut(NetPeer netPeer, IPacket packet)
-    {
-        foreach (var peer in netManager.ConnectedPeerList.Where(peer => peer != netPeer))
-        {
-            Send(peer, packet);
-        }
-    }
-
-    public void SendAll(IPacket packet)
-    {
-        byte[] data = serializer.Serialize(packet);
-        netManager.SendToAll(data, packet.DeliveryMethod);
-    }
-
     public void OnNatIntroductionRequest(IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token)
     {
         // No requests on client
@@ -276,32 +258,58 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
             peer, netManager.LocalPort, Config.LanAddress, Config.LanPort);
     }
 
-    public void Send(string controllerId, IMessage message)
-    {
-        if (missionContext.TryGetPeer(controllerId, out var peer))
-        {
-            Send(peer, MessagePacket.Create(message, serializer));
-            return;
-        }
-
-        // Otherwise send relay packet
-    }
-
     public void SendAll(IMessage message)
     {
-
-
-        if (controllerRegistry.TryGetPeer(controllerId, out var peer))
+        foreach (var controllerId in missionContext.ControllersInMission)
         {
-            Send(peer, MessagePacket.Create(message, serializer));
-            return;
+            Send(controllerId, message);
         }
-        SendAll(MessagePacket.Create(message, serializer));
     }
 
-    public void SendAllBut(NetPeer excludedPeer, IMessage message)
+    public void SendAll(IPacket packet)
     {
-        SendAllBut(excludedPeer, MessagePacket.Create(message, serializer));
+        foreach (var controllerId in missionContext.ControllersInMission)
+        {
+            Send(controllerId, packet);
+        }
+    }
+
+    public void Send(string controllerId, IMessage message)
+    {
+        Send(controllerId, MessagePacket.Create(message, serializer));
+    }
+
+    public void SendAllBut(string excludedId, IMessage message)
+    {
+        SendAllBut(excludedId, MessagePacket.Create(message, serializer));
+    }
+
+    public void SendAllBut(string excludedId, IPacket packet)
+    {
+        foreach (var controllerId in missionContext.ControllersInMission.Where(id => id != excludedId))
+        {
+            Send(controllerId, packet);
+        }
+    }
+
+    public void Send(string controllerId, IPacket packet)
+    {
+        // Send directly to direct peer
+        if (missionContext.TryGetPeer(controllerId, out var peer))
+        {
+            Send(peer, packet);
+            return;
+        }
+
+        // Otherwise send relay packet to the server
+        var payload = serializer.Serialize(packet);
+        directNetwork.SendAll(new RelayPacket(packet.DeliveryMethod, ControllerId, controllerId, payload));
+    }
+
+    public void Send(NetPeer netPeer, IPacket packet)
+    {
+        byte[] data = serializer.Serialize(packet);
+        netPeer.Send(data, packet.DeliveryMethod);
     }
 
     public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)

@@ -36,8 +36,9 @@ public interface IMissionManager
     /// Record that <paramref name="controllerId"/> has entered <paramref name="instanceId"/>, mapping it to
     /// the connection the announcement arrived on (<paramref name="peer"/>) so the relay fallback can reach
     /// it. Creates the instance if this is its first member. Driven by a client <c>MissionEntered</c>.
+    /// Returns the members already present (excluding the newcomer) so the caller can introduce them to it.
     /// </summary>
-    void EnterMission(NetPeer peer, string controllerId, string instanceId);
+    IReadOnlyList<(string controllerId, NetPeer peer)> EnterMission(NetPeer peer, string controllerId, string instanceId);
 
     /// <summary>
     /// Record that <paramref name="controllerId"/> (on <paramref name="peer"/>) has left
@@ -114,7 +115,7 @@ public class MissionManager : IMissionManager
         }
     }
 
-    public void EnterMission(NetPeer peer, string controllerId, string instanceId)
+    public IReadOnlyList<(string controllerId, NetPeer peer)> EnterMission(NetPeer peer, string controllerId, string instanceId)
     {
         lock (gate)
         {
@@ -129,9 +130,19 @@ public class MissionManager : IMissionManager
                     instanceId, controllerId);
             }
 
+            // Snapshot the members already present BEFORE adding the newcomer, so the caller can introduce
+            // the newcomer and the existing members to each other.
+            var others = instance.Controllers
+                .Where(id => id != controllerId)
+                .Select(id => instance.TryGetPeer(id, out var existingPeer) ? (id, existingPeer) : default)
+                .Where(pair => pair.Item2 != null)
+                .ToList();
+
             instance.MapPeer(controllerId, peer);
             Logger.Information("Controller {Controller} entered instance {Instance} on {Peer}",
                 controllerId, instanceId, peer);
+
+            return others;
         }
     }
 

@@ -33,7 +33,7 @@ public interface INetworkMissileRegistry : IDisposable
 }
 
 /// <inheritdoc />
-internal class NetworkMissileRegistry : INetworkMissileRegistry
+public class NetworkMissileRegistry : INetworkMissileRegistry
 {
     private static readonly ILogger Logger = LogManager.GetLogger<NetworkMissileRegistry>();
 

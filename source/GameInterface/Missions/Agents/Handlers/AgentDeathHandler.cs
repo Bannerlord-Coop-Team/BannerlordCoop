@@ -1,7 +1,6 @@
 ﻿using System;
 using Common.Messaging;
 using GameInterface.Missions.Agents.Messages;
-using GameInterface.Missions.Services.Network;
 using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Missions.Agents.Handlers
@@ -9,7 +8,7 @@ namespace GameInterface.Missions.Agents.Handlers
     /// <summary>
     /// Handler for agent death
     /// </summary>
-    public interface IAgentDeathHandler : IHandler, IDisposable
+    public interface IAgentDeathHandler : IHandler
     {
 
     }

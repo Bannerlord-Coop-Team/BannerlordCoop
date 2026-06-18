@@ -11,7 +11,7 @@ namespace GameInterface.Missions.Agents.Handlers
     /// <summary>
     /// Handler for weapon drops in a battle
     /// </summary>
-    public interface IWeaponDropHandler : IHandler, IDisposable
+    public interface IWeaponDropHandler : IHandler
     {
 
     }

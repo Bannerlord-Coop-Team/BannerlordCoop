@@ -12,7 +12,7 @@ namespace GameInterface.Missions.Agents.Handlers
     /// <summary>
     /// Handler for weapon pickups within a battle
     /// </summary>
-    public interface IWeaponPickupHandler : IHandler, IDisposable
+    public interface IWeaponPickupHandler : IHandler
     {
 
     }

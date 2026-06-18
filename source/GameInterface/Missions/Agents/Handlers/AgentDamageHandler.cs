@@ -16,7 +16,7 @@ namespace GameInterface.Missions.Agents.Handlers
     /// <summary>
     /// Handler for agent damage in a battle
     /// </summary>
-    public interface IAgentDamageHandler : IHandler, IDisposable
+    public interface IAgentDamageHandler : IHandler
     {
 
     }

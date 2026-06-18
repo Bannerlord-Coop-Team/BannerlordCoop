@@ -12,7 +12,7 @@ namespace GameInterface.Missions.Agents.Handlers
     /// <summary>
     /// Handler for shield breaks in a battle
     /// </summary>
-    public interface IShieldDamageHandler : IHandler, IDisposable
+    public interface IShieldDamageHandler : IHandler
     {
 
     }

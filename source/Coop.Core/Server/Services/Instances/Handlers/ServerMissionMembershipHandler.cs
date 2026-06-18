@@ -1,24 +1,29 @@
 using Common.Messaging;
+using Common.Network;
 using Coop.Core.Server.Services.Instances.Messages;
+using GameInterface.Missions.Services.Network.Messages;
 using LiteNetLib;
 
 namespace Coop.Core.Server.Services.Instances.Handlers;
 
 /// <summary>
-/// Server-side relay membership. As clients enter and leave mission instances they announce it with
-/// <see cref="MissionEntered"/> / <see cref="MissionLeft"/>; this maps each announcing controller to the
-/// connection the message arrived on (<c>payload.Who</c>) so the relay fallback can route a RelayPacket to
-/// it. The mapped connection is whichever one the client sends these over — i.e. the one the relay uses.
+/// Server-side relay membership + join-info introduction. When a client announces it entered an instance
+/// (<see cref="MissionEntered"/>) this maps the controller to the connection it arrived on (for the relay
+/// fallback) and then introduces the newcomer and the existing members to each other via
+/// <see cref="MissionPeerEntered"/> — the trigger that replaces a direct PeerConnected, so each side sends
+/// its join info over the mesh. <see cref="MissionLeft"/> drops the controller from the routing table.
 /// </summary>
 public class ServerMissionMembershipHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;
     private readonly IMissionManager missionManager;
+    private readonly INetwork network;
 
-    public ServerMissionMembershipHandler(IMessageBroker messageBroker, IMissionManager missionManager)
+    public ServerMissionMembershipHandler(IMessageBroker messageBroker, IMissionManager missionManager, INetwork network)
     {
         this.messageBroker = messageBroker;
         this.missionManager = missionManager;
+        this.network = network;
 
         messageBroker.Subscribe<MissionEntered>(Handle_MissionEntered);
         messageBroker.Subscribe<MissionLeft>(Handle_MissionLeft);
@@ -35,7 +40,16 @@ public class ServerMissionMembershipHandler : IHandler
         var peer = (NetPeer)payload.Who;
         var message = payload.What;
 
-        missionManager.EnterMission(peer, message.ControllerId, message.InstanceId);
+        var others = missionManager.EnterMission(peer, message.ControllerId, message.InstanceId);
+
+        // Introduce the newcomer and each existing member to each other so BOTH sides send their join info
+        // (replaces the direct PeerConnected trigger). The introduction travels over the campaign/relay
+        // connection; the join info itself still flows over the IBattleNetwork mesh.
+        foreach (var (otherControllerId, otherPeer) in others)
+        {
+            network.Send(otherPeer, new MissionPeerEntered(message.ControllerId, message.InstanceId));
+            network.Send(peer, new MissionPeerEntered(otherControllerId, message.InstanceId));
+        }
     }
 
     private void Handle_MissionLeft(MessagePayload<MissionLeft> payload)

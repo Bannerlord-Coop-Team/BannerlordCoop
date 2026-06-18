@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -24,75 +24,33 @@ using GameInterface.Missions.Missiles.Handlers;
 
 namespace GameInterface.Missions.Services.Taverns
 {
-    public class CoopTavernsController : MissionBehavior, ILocationMissionBehavior, IDisposable
+    public class CoopTavernsController : CoopMissionController, ILocationMissionBehavior
     {
         private static readonly ILogger Logger = LogManager.GetLogger<CoopTavernsController>();
-        public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
 
-        private readonly IBattleNetwork network;
-        private readonly IMessageBroker messageBroker;
-        private readonly INetworkAgentRegistry agentRegistry;
         private readonly IControllerIdProvider controllerIdProvider;
         private readonly BoardGameManager boardGameManager;
-        private readonly IObjectManager objectManager;
 
-        // The sync handlers. Held only to force their construction — they are InstancePerLifetimeScope
-        // singletons in the shared client container, so the container owns their lifetime/disposal; this
-        // controller must NOT dispose them or a re-entered tavern would get already-disposed handlers.
-        // Critically, AgentMovementHandler is the one that both broadcasts movement and cleans up a peer's
-        // agents on disconnect/reconnect; without it a leaver's agent is never removed and a rejoining
-        // player is deduped as "already registered".
-        private readonly IDisposable[] disposables;
-
-        // The campaign network config — the same INetworkConfiguration CoopClient is connected to. Its
-        // Address/Port are the rendezvous server; the P2P client's own config is pointed at it before
-        // connecting so the NAT punch / relay reaches the co-host instead of compiled-in defaults.
-        private readonly INetworkConfig campaignConfiguration;
-
+        // The handler set is passed to the base, which owns disposing them on mission end. AgentMovementHandler
+        // (first) is the one that both broadcasts movement and cleans up a peer's agents on disconnect/reconnect;
+        // without it a leaver's agent is never removed and a rejoining player is deduped as "already registered".
         public CoopTavernsController(
-            Ibatt network,
+            IBattleNetwork network,
             IMessageBroker messageBroker,
-            INetworkAgentRegistry agentRegistry,
             IControllerIdProvider controllerIdProvider,
             BoardGameManager boardGameManager,
             IObjectManager objectManager,
-            INetworkConfig campaignConfiguration,
-            IAgentMovementHandler agentMovementHandler,
-            IMissileHandler missileHandler,
-            IWeaponDropHandler weaponDropHandler,
-            IWeaponPickupHandler weaponPickupHandler,
-            IShieldDamageHandler shieldDamageHandler,
-            IAgentDamageHandler agentDamageHandler,
-            IAgentDeathHandler agentDeathHandler,
-            INetworkMissileRegistry networkMissileRegistry)
+            ICoopMissionComponent coopMissionComponent)
+            : base(network, messageBroker, objectManager, coopMissionComponent)
         {
-            this.network = network;
-            this.messageBroker = messageBroker;
-            this.agentRegistry = agentRegistry;
             this.controllerIdProvider = controllerIdProvider;
             this.boardGameManager = boardGameManager;
-            this.objectManager = objectManager;
-            this.campaignConfiguration = campaignConfiguration;
 
-            disposables = new IDisposable[]
-            {
-                agentMovementHandler,
-                missileHandler,
-                weaponDropHandler,
-                weaponPickupHandler,
-                shieldDamageHandler,
-                agentDamageHandler,
-                agentDeathHandler,
-                networkMissileRegistry,
-            };
-
-            messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
             messageBroker.Subscribe<NetworkLeaveMission>(Handle_LeaveMission);
-            messageBroker.Subscribe<PeerConnected>(Handle_PeerConnected);
             messageBroker.Subscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation);
         }
 
-        // Read on the network thread (Handle_JoinInfo gate) and written on the main thread
+        // Read on the network thread (HandleJoinInfo gate) and written on the main thread
         // (TryRegisterLocalAgent), so volatile to ensure the gate sees the flip promptly.
         private volatile bool _localAgentRegistered;
         private bool _instanceRequested;
@@ -114,7 +72,7 @@ namespace GameInterface.Missions.Services.Taverns
             if (_localAgentRegistered) return;
             if (Agent.Main == null) return;
 
-            if (agentRegistry.RegisterControlledAgent(controllerIdProvider.ControllerId, Agent.Main))
+            if (coopMissionComponent.AgentRegistry.RegisterControlledAgent(controllerIdProvider.ControllerId, Agent.Main))
             {
                 _localAgentRegistered = true;
                 Logger.Information("[LocationSync] Registered local controlled agent {PlayerID}; broadcasting join info", controllerIdProvider.ControllerId);
@@ -184,13 +142,7 @@ namespace GameInterface.Missions.Services.Taverns
             // '|' separator, NOT '%': ConnectionToken serializes as PeerId%InstanceId%NatType and splits
             // on '%', so a '%' inside the instance id would break token parsing on both ends.
             network.ConnectToInstance($"{settlementId}|{locationId}");
-            agentRegistry.Clear();
-        }
-
-        private void Handle_PeerConnected(MessagePayload<PeerConnected> obj)
-        {
-            Logger.Information("[LocationSync] P2P peer connected {Peer}; sending join info {PlayerID}", obj.What.Peer, controllerIdProvider.ControllerId);
-            SendJoinInfo(obj.What.Peer);
+            coopMissionComponent.AgentRegistry.Clear();
         }
 
         private NetworkMissionJoinInfo BuildJoinInfo(string characterObjectId)
@@ -208,13 +160,13 @@ namespace GameInterface.Missions.Services.Taverns
                 null);
         }
 
-        private void SendJoinInfo(NetPeer peer)
+        protected override void SendJoinInfo(string controllerId)
         {
             Logger.Debug("Sending join request");
 
             if (Agent.Main == null)
             {
-                Logger.Information("[LocationSync] Skipping join info to {Peer} — local Agent.Main not ready yet (will re-announce on render)", peer);
+                Logger.Information("[LocationSync] Skipping join info to {Controller} — local Agent.Main not ready yet (will re-announce on render)", controllerId);
                 return;
             }
 
@@ -223,24 +175,11 @@ namespace GameInterface.Missions.Services.Taverns
 
             NetworkMissionJoinInfo request = BuildJoinInfo(characterObjectId);
 
-            network.Send(peer, request);
-            Logger.Information("Sent Join Request for {PlayerID} to {Peer}", request.ControllerId, peer);
+            network.Send(controllerId, request);
+            Logger.Information("Sent Join Request for {PlayerID} to {Controller}", request.ControllerId, controllerId);
         }
 
-        public void Dispose()
-        {
-            foreach (var disposable in disposables)
-            {
-                disposable.Dispose();
-            }
-
-            messageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
-            messageBroker.Unsubscribe<NetworkLeaveMission>(Handle_LeaveMission);
-            messageBroker.Unsubscribe<PeerConnected>(Handle_PeerConnected);
-            messageBroker.Unsubscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation);
-        }
-
-        public override void OnEndMissionInternal()
+        protected override void OnLeaving()
         {
             // Deliberate leave: tell mesh peers to drop our agent NOW, before we drop the P2P connection.
             network.SendAll(new NetworkLeaveMission(controllerIdProvider.ControllerId));
@@ -255,14 +194,14 @@ namespace GameInterface.Missions.Services.Taverns
             // again on this singleton client, rebinding a fresh socket/poller — so a re-entry reconnects
             // from scratch rather than via a kept-alive mapping (which avoids the instant-reconnect races).
             network.Stop();
+        }
 
-            // Clear our stored peers/agents now, while we're leaving and nothing is racing it. Doing this
-            // here (rather than only on the next entry) means re-entry starts from a clean registry without
-            // the network thread concurrently delivering join info during the clear.
-            agentRegistry.Clear();
+        public override void Dispose()
+        {
+            messageBroker.Unsubscribe<NetworkLeaveMission>(Handle_LeaveMission);
+            messageBroker.Unsubscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation);
 
-            base.OnEndMission();
-            Dispose();
+            base.Dispose();
         }
 
         private void Handle_LeaveMission(MessagePayload<NetworkLeaveMission> payload)
@@ -274,7 +213,7 @@ namespace GameInterface.Missions.Services.Taverns
 
             Logger.Information("[LocationSync] Received LeaveMission for {AgentID} — removing remote agent", leftAgentId);
 
-            if (agentRegistry.TryGetAgent(leftAgentId, out Agent agent))
+            if (coopMissionComponent.AgentRegistry.TryGetAgent(leftAgentId, out Agent agent))
             {
                 GameThread.Run(() =>
                 {
@@ -286,15 +225,11 @@ namespace GameInterface.Missions.Services.Taverns
                 });
             }
 
-            agentRegistry.RemoveNetworkControlledAgent(leftAgentId);
+            coopMissionComponent.AgentRegistry.RemoveNetworkControlledAgent(leftAgentId);
         }
 
-        private void Handle_JoinInfo(MessagePayload<NetworkMissionJoinInfo> payload)
+        protected override void HandleJoinInfo(NetPeer netPeer, NetworkMissionJoinInfo joinInfo)
         {
-            NetPeer netPeer = payload.Who as NetPeer ?? throw new InvalidCastException("Payload 'Who' was not of type NetPeer");
-
-            NetworkMissionJoinInfo joinInfo = payload.What;
-
             string newAgentId = joinInfo.ControllerId;
 
             Logger.Information("[LocationSync] Received join info for {AgentID} from {Peer} at pos {Pos}", newAgentId, netPeer, joinInfo.StartingPosition);
@@ -327,7 +262,7 @@ namespace GameInterface.Missions.Services.Taverns
 
             // Dedupe across all peers: NAT punch can yield more than one connection to the same remote
             // client, delivering its join info multiple times. Only spawn one agent per player id.
-            if (agentRegistry.IsAgentRegistered(newAgentId))
+            if (coopMissionComponent.AgentRegistry.IsAgentRegistered(newAgentId))
             {
                 // On a clean rejoin this should NOT fire — if it does, the leaver's agent was left in the
                 // registry on disconnect (stale collection), which blocks the re-spawn.
@@ -350,7 +285,7 @@ namespace GameInterface.Missions.Services.Taverns
                 Logger.Error("[LocationSync] Failed to spawn remote agent {AgentID} — skipping registration.", newAgentId);
                 return;
             }
-            agentRegistry.RegisterNetworkControlledAgent(netPeer, newAgentId, newAgent);
+            coopMissionComponent.AgentRegistry.RegisterNetworkControlledAgent(netPeer, newAgentId, newAgent);
             Logger.Information("[LocationSync] Spawned + registered remote agent {AgentID} at {Pos} (mission '{Scene}')",
                 newAgentId, newAgent.Position, Mission.Current?.SceneName);
         }
@@ -370,7 +305,7 @@ namespace GameInterface.Missions.Services.Taverns
                 return null;
             }
 
-            // Handle_JoinInfo runs on the network thread. AgentBuildData's ctor (and SpawnAgent) touch
+            // HandleJoinInfo runs on the network thread. AgentBuildData's ctor (and SpawnAgent) touch
             // TaleWorlds engine statics (Team.Invalid -> Team.Initialize -> Formation.Reset) that must run
             // on the main thread, so build AND spawn entirely inside the game-loop closure — not just the
             // final SpawnAgent call. Doing the ctor off-thread NREs intermittently (notably on rejoin).
@@ -419,6 +354,5 @@ namespace GameInterface.Missions.Services.Taverns
                 return false;
             }
         }
-
     }
 }

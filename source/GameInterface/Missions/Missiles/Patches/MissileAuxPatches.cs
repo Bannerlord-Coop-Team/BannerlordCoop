@@ -1,6 +1,5 @@
 ﻿using Common.Messaging;
 using GameInterface.Missions.Missiles.Message;
-using GameInterface.Missions.Services.Network;
 using HarmonyLib;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
