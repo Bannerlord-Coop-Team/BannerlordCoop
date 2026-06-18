@@ -19,7 +19,6 @@ public static class DynamicSyncUtils
                 MemberDeclaringTypeName = propertyInfo.DeclaringType.Name,
                 MemberName = propertyInfo.Name,
                 MemberType = GetSimpleTypeName(propertyInfo.PropertyType),
-                MemberTypeName = propertyInfo.PropertyType.Name,
                 Debug = propertyItem.Debug
             });
     }

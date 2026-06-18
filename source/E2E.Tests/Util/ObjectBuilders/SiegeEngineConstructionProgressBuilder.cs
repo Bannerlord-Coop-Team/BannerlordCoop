@@ -13,7 +13,7 @@ namespace E2E.Tests.Util.ObjectBuilders
         public object Build()
         {
             var siegeEngineType = new SiegeEngineType();
-            return new SiegeEngineConstructionProgress(siegeEngineType, 5f, 100f);
+            return new SiegeEngineConstructionProgress(siegeEngineType, 0f, 100f);
         }
     }
 }
