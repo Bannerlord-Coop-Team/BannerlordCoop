@@ -20,7 +20,7 @@ namespace GameInterface.Services.PartyComponents.Patches.Lifetime;
 /// name, so <c>homeSettlement</c> and <c>isNaval</c> are available directly. They are
 /// bundled into <see cref="PartyComponentCreated"/> via <c>SettlementId</c> so that
 /// <see cref="Handlers.PartyComponentHandler"/> can reconstruct the full component state
-/// on the client without any dependency on DynamicSync message ordering.
+/// on the client without any dependency on AutoSync message ordering.
 /// </summary>
 [HarmonyPatch]
 internal class PatrolPartyComponentLifetimePatches

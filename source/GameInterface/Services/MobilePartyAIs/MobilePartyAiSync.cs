@@ -1,11 +1,11 @@
-﻿using GameInterface.DynamicSync;
+﻿using GameInterface.AutoSync;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobilePartyAIs;
-internal class MobilePartyAiSync : IDynamicSync
+internal class MobilePartyAiSync : IAutoSync
 {
-    public MobilePartyAiSync(DynamicSyncRegistry autoSyncBuilder)
+    public MobilePartyAiSync(AutoSyncRegistry autoSyncBuilder)
     {
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobilePartyAi), nameof(MobilePartyAi.AiBehaviorPartyBase)));
 

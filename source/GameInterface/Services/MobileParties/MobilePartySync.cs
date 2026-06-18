@@ -1,13 +1,13 @@
 ﻿using GameInterface.AutoSync;
-using GameInterface.DynamicSync;
+using GameInterface.AutoSync;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties;
-internal class MobilePartySync : IDynamicSync
+internal class MobilePartySync : IAutoSync
 {
-    public MobilePartySync(DynamicSyncRegistry autoSyncBuilder)
+    public MobilePartySync(AutoSyncRegistry autoSyncBuilder)
     {
         // Sync Fields
         //autoSyncBuilder.AddTargetMethod(typeof(MobileParty), AccessTools.Method(typeof(DefaultClanFinanceModel), nameof(DefaultClanFinanceModel.ApplyMoraleEffect)));

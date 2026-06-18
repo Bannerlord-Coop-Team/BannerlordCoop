@@ -2,7 +2,6 @@
 using Common;
 using Common.Logging;
 using HarmonyLib;
-using GameInterface.Surrogates;
 using Missions;
 using Missions.Services.Arena;
 using Missions.Services.Taverns;
@@ -12,9 +11,6 @@ using Serilog;
 using System;
 using System.Diagnostics;
 using System.IO;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.Core;
-using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.View;
@@ -123,8 +119,6 @@ namespace MissionTestMod
             builder.RegisterModule<MissionModule>();
 
             container = builder.Build();
-
-            ContainerProvider.SetContainer(container);
         }
 
         protected override void OnSubModuleUnloaded()
@@ -138,7 +132,7 @@ namespace MissionTestMod
             Logger.Verbose("Registering ProtoBuf Surrogates");
 
             // All surrogates live in GameInterface now; register the whole set in one call.
-            new SurrogateCollection();
+            //new SurrogateCollection();
         }
 
         private bool m_IsFirstTick = true;

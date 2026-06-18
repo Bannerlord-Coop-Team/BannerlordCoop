@@ -1,13 +1,13 @@
 ﻿using GameInterface.AutoSync;
-using GameInterface.DynamicSync;
+using GameInterface.AutoSync;
 using HarmonyLib;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
 namespace GameInterface.Services.SiegeEnginesConstructionProgress
 {
-    internal class SiegeEngineConstructionProgressSync : IDynamicSync
+    internal class SiegeEngineConstructionProgressSync : IAutoSync
     {
-        public SiegeEngineConstructionProgressSync(DynamicSyncRegistry autoSyncBuilder)
+        public SiegeEngineConstructionProgressSync(AutoSyncRegistry autoSyncBuilder)
         {
             // Props
             //autoSyncBuilder.AddProperty(AccessTools.Property(typeof(SiegeEngineConstructionProgress), nameof(SiegeEngineConstructionProgress.Progress)));

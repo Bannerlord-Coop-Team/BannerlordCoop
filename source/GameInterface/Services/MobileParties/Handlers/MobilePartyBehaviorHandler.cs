@@ -104,7 +104,7 @@ internal class MobilePartyBehaviorHandler : IHandler
                 if (!objectManager.TryGetObject(data.MobilePartyId, out MobileParty party))
                     return;
 
-                // The apply drives the Harmony-patched SetAiBehavior path; the DynamicSync
+                // The apply drives the Harmony-patched SetAiBehavior path; the AutoSync
                 // patch must stand down while the replicated behavior is applied.
                 using (new AllowedThread())
                 {
