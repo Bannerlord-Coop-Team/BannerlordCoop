@@ -16,8 +16,16 @@ Mod to enjoy the original Mount & Blade II: Bannerlord campaign with other playe
 
 Very early in development.  [Video created on commit d86c24c](https://youtu.be/Y_htoMXQGqU).
 
-## Contributing
+# Contributing
+
 Get started [here!](https://github.com/Bannerlord-Coop-Team/BannerlordCoop/wiki/Getting-Started-as-a-Contributor) Also join our [Discord](https://discord.gg/VXqGyT8) for direct questions and collaboration.
+
+By submitting a contribution to BannerlordCoop, you agree that your contribution
+may be used, modified, distributed, sublicensed, and relicensed by the
+BannerlordCoop project maintainers as part of the BannerlordCoop project.
+
+You also confirm that you have the right to submit the contribution and that it
+does not knowingly include code copied from another project without permission.
 
 ## FAQ
 Please read through [the #faq channel in our discord server](https://discord.gg/VXqGyT8).

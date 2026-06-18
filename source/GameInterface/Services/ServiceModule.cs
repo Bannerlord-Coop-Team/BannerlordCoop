@@ -19,6 +19,10 @@ internal class ServiceModule : Module
 
     protected override void Load(ContainerBuilder builder)
     {
+        // One per session, shared between the handler that marks rosters dirty and the main loop that
+        // drives its per-frame flush.
+        builder.RegisterType<TroopRosters.TroopRosterSyncCoalescer>().AsSelf().InstancePerLifetimeScope();
+
         foreach (var type in GetHandlers())
         {
             builder.RegisterType(type).AsSelf().InstancePerLifetimeScope().AutoActivate();
