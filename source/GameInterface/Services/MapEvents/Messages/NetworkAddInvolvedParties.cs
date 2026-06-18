@@ -3,6 +3,7 @@ using ProtoBuf;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.MapEvents.Messages;
 
@@ -13,10 +14,19 @@ public readonly struct NetworkAddInvolvedParties : ICommand
     public readonly string MapEventId;
     [ProtoMember(2)]
     public readonly string[] MapEventPartyIds;
+    /// <summary>
+    /// Server-side map positions of the involved parties, index-aligned with
+    /// <see cref="MapEventPartyIds"/>. Clients snap each party to its position so the
+    /// battle and its parties line up. Settlement parties have no map position and
+    /// occupy a default, unused slot.
+    /// </summary>
+    [ProtoMember(3)]
+    public readonly CampaignVec2[] Positions;
 
-    public NetworkAddInvolvedParties(string mapEventId, string[] mapEventPartyIds)
+    public NetworkAddInvolvedParties(string mapEventId, string[] mapEventPartyIds, CampaignVec2[] positions)
     {
         MapEventId = mapEventId;
         MapEventPartyIds = mapEventPartyIds;
+        Positions = positions;
     }
 }

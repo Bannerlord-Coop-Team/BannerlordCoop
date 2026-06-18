@@ -1,13 +1,13 @@
 ﻿using GameInterface.AutoSync;
-using GameInterface.DynamicSync;
+using GameInterface.AutoSync;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 
 namespace GameInterface.Services.PartyComponents
 {
-    internal class VillagerPartyComponentSync : IDynamicSync
+    internal class VillagerPartyComponentSync : IAutoSync
     {
-        public VillagerPartyComponentSync(DynamicSyncRegistry autoSyncBuilder) 
+        public VillagerPartyComponentSync(AutoSyncRegistry autoSyncBuilder) 
         {
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(VillagerPartyComponent), nameof(VillagerPartyComponent.Village)));
         }

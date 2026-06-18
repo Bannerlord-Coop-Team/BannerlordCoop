@@ -62,25 +62,26 @@ public class MapEventLifetimeTests : MapEventTestBase
     }
 
     [Fact]
-    public void ClientDestroy_MapEvent_DoesNothing()
+    public void ClientFinalize_MapEvent_ServerAuthoritativelyDestroys()
     {
         // Arrange
         var mapEventCtx = CreateServerMapEvent();
         var firstClient = Clients.First();
 
-        // Act — a client calling FinalizeEvent must not remove the MapEvent from any peer
+        // Act — a client cannot finalize locally: FinalizeEvent is intercepted and forwarded to the server
+        // as a request, which finalizes the battle authoritatively and replicates the removal to every peer.
         firstClient.Call(() =>
         {
             Assert.True(firstClient.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out var mapEvent));
             mapEvent.FinalizeEvent();
         }, MapEventDisabledMethods);
 
-        // Assert — the event must still be registered everywhere
-        Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out _));
+        // Assert — the server honored the request and the destroy replicated everywhere
+        Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out _));
 
         foreach (var client in Clients)
         {
-            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out _));
+            Assert.False(client.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out _));
         }
     }
 }

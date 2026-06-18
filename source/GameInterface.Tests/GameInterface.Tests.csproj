@@ -125,6 +125,6 @@
     <Publicize Include="TaleWorlds.SaveSystem" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="DynamicSync\Snapshots\" />
+    <Folder Include="AutoSync\Snapshots\" />
   </ItemGroup>
 </Project>

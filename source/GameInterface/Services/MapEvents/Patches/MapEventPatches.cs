@@ -184,11 +184,8 @@ internal class InteractionPatches
         if (ModInformation.IsClient)
             return;
 
-        if (__instance.MobileParty?.IsPlayerParty() == true && mobileParty?.IsPlayerParty() == true)
-        {
-            __result = false;
-            return;
-        }
+        // NOTE: the "both parties are players" block was intentionally removed to re-enable PvP — two player
+        // parties must be able to interact to start/join a battle with each other.
 
         // A party held in a conversation with a player can only be interacted with by that player's party. This is
         // the hard stop that keeps other AI parties from starting an encounter or battle with it, since
@@ -208,14 +205,21 @@ internal class InteractionPatches
         PartyBase party,
         ref bool __result)
     {
-        if (!__result)
+        // Always allow a player party to join, on both client and server. The joining client evaluates this when
+        // building the encounter "join the battle" menu options; native can return false there (e.g. war state /
+        // side expectations not matching on the client), which would hide the join option. Force it true so the
+        // player can always join.
+        if (party.MobileParty?.IsPlayerParty() == true)
+        {
+            __result = true;
             return;
+        }
 
+        // AI gating below is server-authoritative only.
         if (ModInformation.IsClient)
             return;
 
-        // Always allow players to join
-        if (party.MobileParty?.IsPlayerParty() == true)
+        if (!__result)
             return;
 
         // Allow AI to join if no players are involved

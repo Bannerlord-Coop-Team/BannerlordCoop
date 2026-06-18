@@ -1,12 +1,12 @@
-﻿using GameInterface.DynamicSync;
+using GameInterface.AutoSync;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Siege;
 
 namespace GameInterface.Services.SiegeEngineMissiles
 {
-    internal class SiegeEngineMissileSync : IDynamicSync
+    internal class SiegeEngineMissileSync : IAutoSync
     {
-        public SiegeEngineMissileSync(DynamicSyncRegistry autoSyncBuilder)
+        public SiegeEngineMissileSync(AutoSyncRegistry autoSyncBuilder)
         {
             // Fields
             autoSyncBuilder.AddField(AccessTools.Field(typeof(SiegeEvent.SiegeEngineMissile), nameof(SiegeEvent.SiegeEngineMissile.ShooterSiegeEngineType)));

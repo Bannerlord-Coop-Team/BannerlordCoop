@@ -1,4 +1,5 @@
 using Common.Logging;
+using Common.Util;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -35,6 +36,13 @@ public class GameThread : IUpdateable
     }
 
     public bool IsInitialized => m_GameLoopThreadId != 0;
+
+    /// <summary>
+    /// True when the caller is running on the game-loop thread that drains the queue in <see cref="Update"/>.
+    /// A blocking caller already on this thread must pump <see cref="Update"/> itself while it waits, or it
+    /// stalls the very queue its completion depends on.
+    /// </summary>
+    public bool IsGameThread => Thread.CurrentThread.ManagedThreadId == m_GameLoopThreadId;
 
     private GameThread()
     {
@@ -256,6 +264,53 @@ public class GameThread : IUpdateable
                 Logger.Error(e, "Failed to run action on the game thread: {Context}", context ?? "(none)");
             }
         }, blocking, label);
+    }
+
+    /// <summary>
+    /// Blocks until <paramref name="condition"/> returns true or <paramref name="deadline"/> passes, and
+    /// reports which happened, draining <see cref="Update"/> each iteration so the work the condition depends
+    /// on — and the blocking <see cref="Run"/> handlers the network thread is waiting on — keeps making
+    /// progress; a bare wait on the game-loop thread would stall the very queue it is waiting on, a
+    /// self-inflicted deadlock that only breaks at the deadline. Must be called on the game-loop thread,
+    /// which owns the pump.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Thrown when called off the game-loop thread.</exception>
+    public static bool WaitWhilePumping(Func<bool> condition, DateTime deadline)
+    {
+        if (!Instance.IsGameThread)
+            throw new InvalidOperationException(
+                $"{nameof(WaitWhilePumping)} must be called on the game-loop thread; it drains the queue while it waits.");
+
+        while (true)
+        {
+            // Drain with the mod's patches live. The queued actions are ordinary game-loop work and must not
+            // inherit an AllowedThread allowance the caller happens to hold — that would silence the
+            // replication patches the actions rely on. The normal game-loop pump runs them with no allowance,
+            // so suspend any ambient one here to match it.
+            using (AllowedThread.Suspend())
+            {
+                // A single failing queued action must not abort the wait (which would also leave that action's
+                // own blocking caller waiting out its full timeout); log and keep pumping, mirroring RunSafe.
+                // Without this guard the throw would escape into whatever the waiter is doing — e.g. mid
+                // battle-start construction.
+                try
+                {
+                    Instance.Update(TimeSpan.Zero);
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "A queued action threw while pumping the game thread during a blocking wait");
+                }
+            }
+
+            if (condition())
+                return true;
+
+            if (DateTime.UtcNow >= deadline)
+                return false;
+
+            Thread.Sleep(5);
+        }
     }
 
     private static string BuildLabel(string callerFile, string callerMember)

@@ -1,0 +1,29 @@
+﻿using Common.Messaging;
+using GameInterface.Utils.NetworkEvents;
+using ProtoBuf;
+using System.Collections.Generic;
+using System.Reflection;
+{{~ for library in Libraries ~}}
+using {{ library }};
+{{~ end ~}}
+
+namespace AutoSync
+{
+    [ProtoContract(SkipConstructor = true)]
+    public record {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage : GenericNetworkReferenceEvent<{{ MemberDeclaringType}}, {{ ElementType }}>
+    {
+        [ProtoMember(1)]
+        public override string InstanceId { get; set; }
+
+        [ProtoMember(2)]
+        public override string ValueId { get; set; }
+
+        [ProtoMember(3)]
+        public int PropertyValue { get; set; }
+
+        public {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage(string instanceId, string valueId, int propertyValue) : base(instanceId, valueId)
+        {
+            PropertyValue = propertyValue;
+        }
+    }
+}

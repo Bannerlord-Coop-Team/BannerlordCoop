@@ -14,6 +14,7 @@ using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
@@ -23,6 +24,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Map;
@@ -52,6 +54,10 @@ internal class BattleHandler : IHandler
     // Exclusive upper bound for the terrain seed, preserving the range of the original
     // client-side MBRandom.RandomInt(10000) roll this replaces.
     private const int MaxTerrainSeed = 10000;
+
+    // The -10 player-hostility relation penalty vanilla applies against the target faction leader
+    // when an attack first turns a faction hostile (the war block of BeHostileAction).
+    private const int PlayerHostilityRelationPenalty = -10;
 
     // Server-side: terrain seed chosen once per map event and reused for every client
     // that opens the same battle, so they all use the same terrain seed. Keyed by
@@ -89,6 +95,9 @@ internal class BattleHandler : IHandler
         messageBroker.Subscribe<MapEventFinalized>(Handle_MapEventFinalized);
         messageBroker.Subscribe<TimeSpeedChangedAttempted>(Handle_TimeSpeedChangedAttempted);
 
+        messageBroker.Subscribe<PlayerJoinBattleAttempted>(Handle_PlayerJoinBattleAttempted);
+        messageBroker.Subscribe<NetworkRequestJoinBattle>(Handle_NetworkRequestJoinBattle);
+
         timeControlInterface.AddFastForwardPolicy(FastForwardWhilePlayerInMapEventPolicy);
     }
 
@@ -110,6 +119,9 @@ internal class BattleHandler : IHandler
         messageBroker.Unsubscribe<MapEventFinalized>(Handle_MapEventFinalized);
         messageBroker.Unsubscribe<TimeSpeedChangedAttempted>(Handle_TimeSpeedChangedAttempted);
 
+        messageBroker.Unsubscribe<PlayerJoinBattleAttempted>(Handle_PlayerJoinBattleAttempted);
+        messageBroker.Unsubscribe<NetworkRequestJoinBattle>(Handle_NetworkRequestJoinBattle);
+
         timeControlInterface.RemoveFastForwardPolicy(FastForwardWhilePlayerInMapEventPolicy);
     }
 
@@ -120,7 +132,13 @@ internal class BattleHandler : IHandler
 
         mapEventLogger.DebugMapEvent(payload.What.MapEvent, "Handling attack mission attempted for map event");
 
-        var message = new NetworkAttackMissionAttempted(mapEventId);
+        // Carry the attacking party (this client's main party) so the server can apply the
+        // attack's hostile-action consequences against the opposing side; the server has no
+        // main party to derive the attacker from. If it can't be resolved the mission still
+        // proceeds and only the consequences are skipped server-side.
+        objectManager.TryGetIdWithLogging(MobileParty.MainParty, out string attackerPartyId);
+
+        var message = new NetworkAttackMissionAttempted(mapEventId, attackerPartyId);
         network.SendAll(message);
     }
 
@@ -149,6 +167,11 @@ internal class BattleHandler : IHandler
 
                 mapEventLogger.DebugMapEvent(mapEvent, "Handling network attack mission attempted for map event. Making sides mission-ready and replying with mission start");
 
+                // Apply the diplomatic consequences of the client's attack (war / relation)
+                // authoritatively before the mission opens, reproducing the hostile-action head of
+                // vanilla EncounterAttackConsequence that neither the client nor the server runs.
+                ApplyClientAttackHostileConsequences(mapEvent, payload.What.AttackerPartyId);
+
                 foreach (var side in mapEvent._sides)
                 {
                     side.MakeReadyForMission(null);
@@ -161,6 +184,70 @@ internal class BattleHandler : IHandler
                 Logger.Error(e, "Failed to make map event sides mission-ready for {Message}", nameof(NetworkAttackMissionAttempted));
             }
         });
+    }
+
+    /// <summary>
+    /// When a client attacks a not-already-hostile party, declares war on the target faction and
+    /// applies the player-hostility relation penalty against its leader — the war block of vanilla
+    /// MenuHelper.EncounterAttackConsequence (BeHostileAction.ApplyEncounterHostileAction), which
+    /// neither the client (it defers to the server) nor the dedicated server (it never opens the
+    /// encounter menu) runs. Vanilla gates the war declaration on the attacker being the
+    /// single-player main party; the server is never that party, so it is reproduced explicitly for
+    /// the client attacker. Runs with patches live: the war declaration replicates through the
+    /// server-authoritative stance sync, and the relation change is applied server-authoritatively
+    /// like every other co-op relation change. The whole block sits behind the not-already-at-war
+    /// check, so repeated attack requests for the same battle apply it at most once.
+    /// </summary>
+    private void ApplyClientAttackHostileConsequences(MapEvent mapEvent, string attackerPartyId)
+    {
+        try
+        {
+            // GameThread runs queued actions unguarded, so the campaign can have been torn down
+            // between the request arriving and this draining; the sibling OpenAttackMission guards
+            // the same way before dereferencing campaign state.
+            if (Campaign.Current == null)
+                return;
+
+            if (!objectManager.TryGetObject(attackerPartyId, out MobileParty attackerMobileParty))
+            {
+                Logger.Warning("Could not resolve attacker party {AttackerPartyId} for attack hostile-action consequences", attackerPartyId);
+                return;
+            }
+
+            var attackerParty = attackerMobileParty.Party;
+
+            // OpponentSide is only meaningful while the attacker is a side in this event.
+            if (attackerParty.MapEvent != mapEvent)
+                return;
+
+            var defenderParty = mapEvent.GetLeaderParty(attackerParty.OpponentSide);
+            if (defenderParty == null)
+                return;
+
+            var attackerFaction = attackerParty.MapFaction;
+            var defenderFaction = defenderParty.MapFaction;
+            if (attackerFaction == null || defenderFaction == null || attackerFaction == defenderFaction)
+                return;
+
+            if (Campaign.Current.Models.EncounterModel.IsEncounterExemptFromHostileActions(attackerParty, defenderParty))
+                return;
+
+            // Already hostile: nothing to declare, and this is what makes the consequence idempotent
+            // across the duplicate attack requests a client can send during the server round-trip.
+            if (FactionManager.IsAtWarAgainstFaction(attackerFaction, defenderFaction))
+                return;
+
+            if (attackerParty.LeaderHero != null && defenderFaction.Leader != null)
+            {
+                ChangeRelationAction.ApplyRelationChangeBetweenHeroes(attackerParty.LeaderHero, defenderFaction.Leader, PlayerHostilityRelationPenalty);
+            }
+
+            DeclareWarAction.ApplyByPlayerHostility(attackerFaction, defenderFaction);
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Failed to apply attack hostile-action consequences");
+        }
     }
 
     private int RollTerrainSeed()
@@ -280,14 +367,39 @@ internal class BattleHandler : IHandler
         if (MapEventConfig.Debug)
             mapEventLogger.DebugMapEvent(mapEvent, "Handling network map event finalize attempted. Finalizing map event.");
 
+        // Capture the player parties on both sides before finalize clears them. They get a reliable,
+        // server-addressed close (below) instead of each racing its own local teardown.
+
+        string[] playerPartyIds = null;
+        
         GameThread.Run(() =>
         {
+            playerPartyIds = CollectPlayerPartyIds(mapEvent);
             mapEvent.FinalizeEventAux();
         }, blocking: true);
-        
+
 
         var message = new NetworkMapEventFinalized();
         network.Send(payload.Who as NetPeer, message);
+
+        // PvP (more than one player party): tell every involved player party to close its encounter menu.
+        if (playerPartyIds.Length > 1)
+            network.SendAll(new NetworkClosePvpEncounter(playerPartyIds));
+    }
+
+    /// <summary>[Server] Ids of the player parties on both sides of the event, captured before finalize clears them.</summary>
+    private string[] CollectPlayerPartyIds(MapEvent mapEvent)
+    {
+        var ids = new List<string>();
+        if (mapEvent?.AttackerSide == null || mapEvent.DefenderSide == null) return ids.ToArray();
+
+        foreach (var party in mapEvent.InvolvedParties)
+        {
+            if (party?.MobileParty?.IsPlayerParty() == true && objectManager.TryGetId(party, out var id))
+                ids.Add(id);
+        }
+
+        return ids.ToArray();
     }
 
     private void Handle_NetworkMapEventFinalized(MessagePayload<NetworkMapEventFinalized> payload)
@@ -327,6 +439,7 @@ internal class BattleHandler : IHandler
         mapEventLogger.DebugMapEvent(message.MapEvent, "Map event involved parties added. Added party count: {AddedPartyCount}", message.AddedParties.Count());
 
         var partyIds = new List<string>();
+        var partyPositions = new List<CampaignVec2>();
 
         foreach (var addedParty in message.AddedParties)
         {
@@ -334,6 +447,10 @@ internal class BattleHandler : IHandler
                 continue;
 
             partyIds.Add(mapEventPartyId);
+            // Capture the party's authoritative map position, in lockstep with the id and
+            // before the roster check below so the two arrays stay index-aligned. Settlement
+            // parties have no MobileParty; their slot is a default the client never applies.
+            partyPositions.Add(addedParty.Party.MobileParty?.Position ?? default);
 
             // A player just created or joined this map event, so push every involved party's
             // flattened roster to clients (AI-only battles never reach here). Clients need these to
@@ -348,8 +465,28 @@ internal class BattleHandler : IHandler
 
         network.SendAll(new NetworkAddInvolvedParties(
             mapEventSideId,
-            partyIds.ToArray()
+            partyIds.ToArray(),
+            partyPositions.ToArray()
         ));
+
+        // Tell any player parties just added to the battle to drop their "hold on" PvP popup — the battle menu
+        // blocks them now. Server-driven because the client-side MapEventInvolvedPartiesAdded never fires for a
+        // synced add (the client's own add is intercepted and routed to the server).
+        var playerPartyIds = new List<string>();
+        foreach (var addedParty in message.AddedParties)
+        {
+            if (addedParty.Party?.MobileParty?.IsPlayerParty() == true && objectManager.TryGetId(addedParty.Party, out var playerPartyId))
+                playerPartyIds.Add(playerPartyId);
+        }
+
+        if (playerPartyIds.Count > 0)
+            network.SendAll(new NetworkHidePvpPopup(playerPartyIds.ToArray()));
+
+        // The conversation is over once the battle map event forms, so release the PvP interaction block. Holding it
+        // longer re-blocks the parties (and hangs the encounter menu) when they later leave the map event; the map
+        // event itself keeps others out while the battle runs.
+        foreach (var id in playerPartyIds)
+            ConversationPartyTracker.Instance?.EndPvpConversation(id);
     }
 
     private void Handle_NetworkAddInvolvedParties(MessagePayload<NetworkAddInvolvedParties> payload)
@@ -360,22 +497,41 @@ internal class BattleHandler : IHandler
         {
             try
             {
+                // The campaign can tear down (exit to menu, disconnect, save load) between
+                // enqueuing this and the main thread draining it; bail before touching
+                // campaign state (the position snap below dereferences Campaign.Current).
+                if (Campaign.Current == null)
+                    return;
+
                 if (!objectManager.TryGetObjectWithLogging<MapEvent>(message.MapEventId, out var mapEvent))
                     return;
 
                 mapEventLogger.DebugMapEvent(mapEvent, "Handling network add involved parties. Party count: {MapEventPartyCount}", message.MapEventPartyIds.Length);
 
+                var positions = message.Positions;
+
                 // Re-applying campaign-collection state replicated from the server; the
-                // DynamicSync TroopUpgradeTracker patches must stand down during the apply.
+                // AutoSync TroopUpgradeTracker patches must stand down during the apply.
                 using (new AllowedThread())
                 {
-                    foreach (var mapEventPartyId in message.MapEventPartyIds)
+                    for (int i = 0; i < message.MapEventPartyIds.Length; i++)
                     {
+                        var mapEventPartyId = message.MapEventPartyIds[i];
                         if (!objectManager.TryGetObjectWithLogging<MapEventParty>(mapEventPartyId, out var mapEventParty))
                             continue;
 
                         mapEventLogger.DebugMapEvent(mapEvent, "Adding involved map event party {MapEventPartyId} to troop upgrade tracker", mapEventPartyId);
                         mapEvent.TroopUpgradeTracker.AddParty(mapEventParty);
+
+                        // Snap the party to its server-side map position so it lines up with the
+                        // battle. Every involved party is snapped, including this client's own, so
+                        // all clients place the parties where the server has them, lined up with the
+                        // battle center the server is authoritative for.
+                        var mobileParty = mapEventParty.Party.MobileParty;
+                        if (mobileParty != null && positions != null && i < positions.Length)
+                        {
+                            mobileParty.Position = positions[i];
+                        }
                     }
                 }
             }
@@ -383,6 +539,44 @@ internal class BattleHandler : IHandler
             {
                 Logger.Error(e, "Failed to apply {Message}", nameof(NetworkAddInvolvedParties));
             }
+        });
+    }
+
+    /// <summary>[Client] Bridge the local player's battle join to a server request.</summary>
+    private void Handle_PlayerJoinBattleAttempted(MessagePayload<PlayerJoinBattleAttempted> payload)
+    {
+        var data = payload.What;
+
+        if (!objectManager.TryGetIdWithLogging(data.MapEvent, out var mapEventId)) return;
+        if (!objectManager.TryGetIdWithLogging(data.JoiningParty, out var partyId)) return;
+
+        mapEventLogger.DebugMapEvent(data.MapEvent, "Requesting server to join battle. PartyId={PartyId}, Side={Side}", partyId, data.Side);
+
+        // On a client, SendAll targets the server (its only connected peer).
+        network.SendAll(new NetworkRequestJoinBattle(mapEventId, partyId, data.Side));
+    }
+
+    /// <summary>[Server] Perform the authoritative join; the native add replicates to all clients.</summary>
+    private void Handle_NetworkRequestJoinBattle(MessagePayload<NetworkRequestJoinBattle> payload)
+    {
+        if (!ModInformation.IsServer) return;
+
+        var data = payload.What;
+
+        GameThread.Run(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.MapEventId, out var mapEvent)) return;
+            if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.PartyId, out var party)) return;
+
+            if (party.MapEventSide != null)
+            {
+                Logger.Warning("Ignoring join request: party {PartyId} is already in a map event", data.PartyId);
+                return;
+            }
+
+            // The setter runs the native MapEventSide.AddPartyInternal on the server (NOT under AllowedThread), so the
+            // AddIntercept publishes the battle-party add and it replicates to every client through the map-event sync.
+            party.MapEventSide = mapEvent.GetMapEventSide(data.Side);
         });
     }
 

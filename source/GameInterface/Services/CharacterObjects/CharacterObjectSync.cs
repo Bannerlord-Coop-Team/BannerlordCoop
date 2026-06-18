@@ -1,6 +1,6 @@
 ﻿using Common.Logging;
 using GameInterface.AutoSync;
-using GameInterface.DynamicSync;
+using GameInterface.AutoSync;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.CharacterObjects;
 using GameInterface.Services.SiegeEvents;
@@ -12,10 +12,10 @@ using TaleWorlds.CampaignSystem;
 /// </summary>
 namespace GameInterface.Services.CharacterObjects
 {
-    internal class CharacterObjectSync : IDynamicSync
+    internal class CharacterObjectSync : IAutoSync
     {
         static readonly ILogger Logger = LogManager.GetLogger<CharacterObjectSync>();
-        public CharacterObjectSync(DynamicSyncRegistry autoSyncBuilder)
+        public CharacterObjectSync(AutoSyncRegistry autoSyncBuilder)
         {
             //fields
             autoSyncBuilder.AddField(AccessTools.Field(typeof(CharacterObject), nameof(CharacterObject._characterRestrictionFlags)));

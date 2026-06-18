@@ -63,14 +63,25 @@ internal static class BattleSimulationReplay
     private static string mapEventId;
     private static bool finishRequested;
     private static bool skipRequested;
+    private static bool isSpectator;
+
+    /// <summary>True while a playback is active for the given map event (initiator or spectator).</summary>
+    public static bool IsActiveFor(string id) => mapEventId != null && mapEventId == id;
+
+    /// <summary>
+    /// A spectator watches a simulation another player started: it replays the server's streamed rounds but does
+    /// not pace the simulation (only the initiating client requests advances).
+    /// </summary>
+    public static bool IsSpectator => isSpectator;
 
     /// <summary>Begin a fresh playback for the given map event.</summary>
-    public static void Begin(string id)
+    public static void Begin(string id, bool spectator = false)
     {
         arrivedRounds.Clear();
         mapEventId = id;
         finishRequested = false;
         skipRequested = false;
+        isSpectator = spectator;
     }
 
     /// <summary>Queue a round streamed from the server (applied on the next tick).</summary>
@@ -105,8 +116,13 @@ internal static class BattleSimulationReplay
             simulation.IsSimulationFinished = true;
             simulation.BattleObserver?.BattleResultsReady();
             mapEventId = null;
+            isSpectator = false;
             return;
         }
+
+        // A spectator only mirrors the rounds the initiator's pacing produces; it never drives the simulation.
+        if (isSpectator)
+            return;
 
         int state = GetSimulationState(simulation);
         switch (state)

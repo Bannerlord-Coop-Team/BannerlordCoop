@@ -1,12 +1,12 @@
-﻿using GameInterface.DynamicSync;
+﻿using GameInterface.AutoSync;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.Services.MapEventParties
 {
-    internal class MapEventPartySync : IDynamicSync
+    internal class MapEventPartySync : IAutoSync
     {
-        public MapEventPartySync(DynamicSyncRegistry autoSyncBuilder)
+        public MapEventPartySync(AutoSyncRegistry autoSyncBuilder)
         {
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEventParty), nameof(MapEventParty.GainedRenownExplained)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEventParty), nameof(MapEventParty.GainedInfluenceExplained)));
