@@ -4,7 +4,7 @@ using ProtoBuf;
 namespace GameInterface.Services.MobileParties.Messages;
 
 /// <summary>
-/// [Client -&gt; Server] Requests the server apply a tavern mercenary hire: add the mercenary troops
+/// [Client -> Server] Requests the server apply a tavern mercenary hire: add the mercenary troops
 /// to the player's party member roster and deduct the gold cost. The server applies both with
 /// patches live, so the troop add (TroopRoster patches) and gold change (Hero.Gold sync) replicate
 /// to every client. The count and price are computed on the conversing client, since they depend on

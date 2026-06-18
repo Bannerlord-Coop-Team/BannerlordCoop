@@ -17,24 +17,26 @@ namespace GameInterface.Services.MapEvents.Patches;
 [HarmonyPatch(typeof(BanditInteractionsCampaignBehavior))]
 internal static class BanditSurrenderPatch
 {
+    /// <summary>
+    /// True while the conversing client is applying a bandit-surrender dialogue consequence. Static
+    /// because the Harmony patch methods that read and write it are static, and <c>[ThreadStatic]</c>
+    /// so the window cannot bleed onto an unrelated thread.
+    /// </summary>
     [ThreadStatic]
-    private static bool inSurrenderConsequence;
-
-    /// <summary>True while the conversing client is applying a bandit-surrender dialogue consequence.</summary>
-    internal static bool InSurrenderConsequence => inSurrenderConsequence;
+    internal static bool InSurrenderConsequence;
 
     [HarmonyPatch("conversation_bandits_surrender_on_consequence")]
     [HarmonyPrefix]
     private static void Prefix()
     {
         if (ModInformation.IsClient)
-            inSurrenderConsequence = true;
+            InSurrenderConsequence = true;
     }
 
     [HarmonyPatch("conversation_bandits_surrender_on_consequence")]
     [HarmonyFinalizer]
     private static void Finalizer()
     {
-        inSurrenderConsequence = false;
+        InSurrenderConsequence = false;
     }
 }

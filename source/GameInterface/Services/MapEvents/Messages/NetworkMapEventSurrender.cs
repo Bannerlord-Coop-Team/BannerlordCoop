@@ -5,7 +5,7 @@ using TaleWorlds.Core;
 namespace GameInterface.Services.MapEvents.Messages;
 
 /// <summary>
-/// [Client -&gt; Server] Tells the server which side surrendered in a map event so it runs the
+/// [Client -> Server] Tells the server which side surrendered in a map event so it runs the
 /// surrender authoritatively (marking the side as surrendered) before the server-side capture. The
 /// capture then takes the full surrendered prisoner count instead of the reduced battle rate.
 /// </summary>

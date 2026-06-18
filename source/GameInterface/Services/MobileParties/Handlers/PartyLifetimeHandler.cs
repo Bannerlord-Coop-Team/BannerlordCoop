@@ -151,20 +151,21 @@ internal class PartyLifetimeHandler : IHandler
 
         var message = payload.What;
 
-        if (!objectManager.TryGetObjectWithLogging<PartyBase>(message.DestroyerPartyId, out var destroyerParty))
-            return;
-
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(message.DefeatedPartyId, out var defeatedParty))
-            return;
-
-        // Apply with patches LIVE (no AllowedThread): DestroyPartyActionPatch.PrefixApply then
-        // publishes DestroyPartyApplied on the server, and Handle_PartyDestroyed replicates it to
-        // every client. Defer to the game thread since the requesting message arrives on the
-        // network (poller) thread.
+        // Resolve and apply on the game thread with patches LIVE (no AllowedThread): the request
+        // arrives on the network (poller) thread, and the party can be destroyed or unregistered
+        // between resolving it and the queued action draining, so resolve it at drain time. The
+        // server's DestroyPartyActionPatch.PrefixApply then publishes DestroyPartyApplied, and
+        // Handle_PartyDestroyed replicates the destruction to every client.
         GameThread.Run(() =>
         {
             try
             {
+                if (!objectManager.TryGetObjectWithLogging<PartyBase>(message.DestroyerPartyId, out var destroyerParty))
+                    return;
+
+                if (!objectManager.TryGetObjectWithLogging<MobileParty>(message.DefeatedPartyId, out var defeatedParty))
+                    return;
+
                 if (!defeatedParty.IsActive)
                     return;
 
