@@ -13,7 +13,7 @@ using Xunit;
 namespace GameInterface.Tests.Utils;
 
 /// <summary>
-/// Verifies that <see cref="GenericHandler{THandler, TInstance}"/> marshals DynamicSync applies onto
+/// Verifies that <see cref="GenericHandler{THandler, TInstance}"/> marshals AutoSync applies onto
 /// the game-loop thread instead of running them on the network (poller) thread that publishes the
 /// message. Running a vanilla setter on the poller thread races the game loop and is the root cause
 /// behind a class of intermittent "Collection was modified" / AccessViolation crashes.

@@ -105,7 +105,7 @@ internal class PartyComponentHandler : IHandler
                         if (data.HomeSettlementId is null) break;
 
                         // Reconstitute the Settlement link that is normally set in the constructor.
-                        // It is bundled in the creation message to avoid any dependency on DynamicSync
+                        // It is bundled in the creation message to avoid any dependency on AutoSync
                         // field-update ordering — without it GarrisonPartyComponent.PartyOwner
                         // (Settlement.OwnerClan.Leader) throws and crashes the nameplate VM.
                         if (!objectManager.TryGetObject(data.HomeSettlementId, out Settlement garrisonSettlement))
@@ -144,7 +144,7 @@ internal class PartyComponentHandler : IHandler
 
                         // Reconstitute fields that are normally set in the constructor and
                         // InitializePartyComponentProperties. These are bundled in the creation
-                        // message to avoid any dependency on DynamicSync field-update ordering.
+                        // message to avoid any dependency on AutoSync field-update ordering.
                         if (!objectManager.TryGetObject(data.HomeSettlementId, out Settlement homeSettlement))
                         {
                             Logger.Warning(

@@ -1,13 +1,13 @@
 ﻿using GameInterface.AutoSync;
-using GameInterface.DynamicSync;
+using GameInterface.AutoSync;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.ItemRosters
 {
-    class ItemRosterSync : IDynamicSync
+    class ItemRosterSync : IAutoSync
     {
-        public ItemRosterSync(DynamicSyncRegistry autoSyncBuilder)
+        public ItemRosterSync(AutoSyncRegistry autoSyncBuilder)
         {
             // Re-enable this when we sync the actual ItemRoster data. Currently this is event synced.
 

@@ -431,7 +431,7 @@ internal class BattleHandler : IHandler
                 var positions = message.Positions;
 
                 // Re-applying campaign-collection state replicated from the server; the
-                // DynamicSync TroopUpgradeTracker patches must stand down during the apply.
+                // AutoSync TroopUpgradeTracker patches must stand down during the apply.
                 using (new AllowedThread())
                 {
                     for (int i = 0; i < message.MapEventPartyIds.Length; i++)

@@ -1,12 +1,12 @@
-﻿using GameInterface.DynamicSync;
+﻿using GameInterface.AutoSync;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Alleys;
 
-public class AlleySync : IDynamicSync
+public class AlleySync : IAutoSync
 {
-    public AlleySync(DynamicSyncRegistry registry) 
+    public AlleySync(AutoSyncRegistry registry) 
     {
         // Fields
         registry.AddField(AccessTools.Field(typeof(Alley), nameof(Alley._name)));

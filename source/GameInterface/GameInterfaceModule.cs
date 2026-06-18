@@ -45,7 +45,7 @@ public class GameInterfaceModule : Module
         builder.RegisterModule<ServiceModule>();
         builder.RegisterModule<ObjectManagerModule>();
         builder.RegisterModule<RegistryModule>();
-        builder.RegisterModule<DynamicSyncModule>();
+        builder.RegisterModule<AutoSyncModule>();
 
 
         base.Load(builder);

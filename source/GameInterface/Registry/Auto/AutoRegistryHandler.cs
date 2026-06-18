@@ -156,7 +156,7 @@ class AutoRegistryHandler<T> : IHandler where T : class
     {
         // TODO drop on loading clients
 
-        // Resolve and tear down on the game-loop thread, in queue order with the marshaled DynamicSync
+        // Resolve and tear down on the game-loop thread, in queue order with the marshaled AutoSync
         // applies, so a destroy whose object is already gone (e.g. a duplicate) is dropped instead of
         // tearing down twice.
         GameThread.RunSafe(() =>

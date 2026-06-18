@@ -23,8 +23,14 @@ internal class LifetimePatches<T>
         MessageBroker.Instance.Publish(__instance, new InstanceCreated<T>(__instance));
     }
 
-    internal static void DestroyPostfix(ref T __instance)
+    internal static void DestroyPostfix(ref T __instance, bool __runOriginal)
     {
+        // A prefix that blocked the destroy method means the object was not actually destroyed, so there
+        // is nothing to replicate. A coop prefix blocks a client's local finalize and routes it through a
+        // server request instead; without this guard that intercepted call would be logged as a spurious
+        // client destroy.
+        if (!__runOriginal) return;
+
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
 

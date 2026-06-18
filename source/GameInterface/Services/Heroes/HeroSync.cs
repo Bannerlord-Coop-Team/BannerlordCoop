@@ -1,5 +1,5 @@
 ﻿using GameInterface.AutoSync;
-using GameInterface.DynamicSync;
+using GameInterface.AutoSync;
 using GameInterface.Registry.Auto;
 using HarmonyLib;
 using System;
@@ -15,7 +15,7 @@ using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Heroes
 {
-    internal class HeroSync : IDynamicSync
+    internal class HeroSync : IAutoSync
     {
         private IEnumerable<MethodInfo> externalMethods => new MethodInfo[]
         {
@@ -28,7 +28,7 @@ namespace GameInterface.Services.Heroes
             AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.DeliverOffSpring)),
         };
 
-        public HeroSync(DynamicSyncRegistry autoSyncBuilder)
+        public HeroSync(AutoSyncRegistry autoSyncBuilder)
         {
             foreach (var method in externalMethods)
             {

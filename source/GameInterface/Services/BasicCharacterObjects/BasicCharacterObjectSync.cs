@@ -1,39 +1,39 @@
 ﻿using GameInterface.AutoSync;
-using GameInterface.DynamicSync;
+using GameInterface.AutoSync;
 using HarmonyLib;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.BasicCharacterObjects
 {
-    internal class BasicCharacterObjectSync : IDynamicSync
+    internal class BasicCharacterObjectSync : IAutoSync
     {
-        public BasicCharacterObjectSync(DynamicSyncRegistry dynamicSyncRegistry)
+        public BasicCharacterObjectSync(AutoSyncRegistry AutoSyncRegistry)
         {
             // Fields
-            dynamicSyncRegistry.AddField(AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject._isBasicHero)));
-            dynamicSyncRegistry.AddField(AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject._isMounted)));
-            dynamicSyncRegistry.AddField(AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject._isRanged)));
-            dynamicSyncRegistry.AddField(AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject._equipmentRoster)));
-            dynamicSyncRegistry.AddField(AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject.DefaultCharacterSkills)));
-            dynamicSyncRegistry.AddField(AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject._basicName)));
+            AutoSyncRegistry.AddField(AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject._isBasicHero)));
+            AutoSyncRegistry.AddField(AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject._isMounted)));
+            AutoSyncRegistry.AddField(AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject._isRanged)));
+            AutoSyncRegistry.AddField(AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject._equipmentRoster)));
+            AutoSyncRegistry.AddField(AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject.DefaultCharacterSkills)));
+            AutoSyncRegistry.AddField(AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject._basicName)));
 
             // Properties
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.Age)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.Culture)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.DefaultFormationClass)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.DefaultFormationGroup)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.DismountResistance)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.BodyPropertyRange)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.FaceDirtAmount)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.FaceMeshCache)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.FormationPositionPreference)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.IsFemale)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.IsObsolete)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.IsSoldier)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.KnockbackResistance)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.KnockdownResistance)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.Level)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.Race)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.Age)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.Culture)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.DefaultFormationClass)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.DefaultFormationGroup)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.DismountResistance)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.BodyPropertyRange)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.FaceDirtAmount)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.FaceMeshCache)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.FormationPositionPreference)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.IsFemale)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.IsObsolete)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.IsSoldier)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.KnockbackResistance)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.KnockdownResistance)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.Level)));
+            AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.Race)));
 
             // Targetmethods
         }

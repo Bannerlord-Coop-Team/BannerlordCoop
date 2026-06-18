@@ -1,10 +1,10 @@
-﻿using GameInterface.DynamicSync.Builders;
-using GameInterface.DynamicSync.Templates;
+﻿using GameInterface.AutoSync.Builders;
+using GameInterface.AutoSync.Templates;
 using System.Collections.Generic;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace GameInterface.Tests.DynamicSync;
+namespace GameInterface.Tests.AutoSync;
 public class TemplateRenderTests
 {
     private readonly ITestOutputHelper output;

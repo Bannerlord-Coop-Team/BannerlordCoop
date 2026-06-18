@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Common.Serialization;
-using GameInterface.DynamicSync;
+using GameInterface.AutoSync;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using System;
@@ -25,7 +25,7 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
     IRegistryCollection Collection { get; }
     IMessageBroker MessageBroker { get; }
     INetwork Network { get; }
-    IDynamicSyncPatchCollector PatchCollector { get; }
+    IAutoSyncPatchCollector PatchCollector { get; }
     IObjectManager ObjectManager { get; }
     ISerializableTypeMapper TypeMapper { get; }
     List<IDisposable> Disposables { get; } = new List<IDisposable>();
@@ -36,7 +36,7 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
         IRegistryCollection collection,
         IMessageBroker messageBroker,
         INetwork network,
-        IDynamicSyncPatchCollector syncPatchCollector,
+        IAutoSyncPatchCollector syncPatchCollector,
         IObjectManager objectManager,
         ISerializableTypeMapper typeMapper)
     {

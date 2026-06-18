@@ -8,7 +8,7 @@ using Coop.Core.Common.Configuration;
 using Coop.Core.Common.Services.Connection.Messages;
 using Coop.Core.Server;
 using GameInterface;
-using GameInterface.DynamicSync;
+using GameInterface.AutoSync;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.UI.Messages;
 using Missions;
@@ -119,7 +119,7 @@ namespace Coop.Core
 
             // Client process does not own the export directory — only the server writes
             // debug export files. This prevents DebugAutoConnect races on that directory.
-            DynamicSyncConfiguration.ExportFiles = false;
+            AutoSyncConfiguration.ExportFiles = false;
 
 #if DEBUG
             // For debugging faster, normally this is done after connection
