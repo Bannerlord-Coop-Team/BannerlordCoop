@@ -1,5 +1,4 @@
-﻿using Common;
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.GameMenus.Messages;
@@ -9,7 +8,6 @@ using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.UI.Notifications.Messages;
 using LiteNetLib;
 using Serilog;
-using System;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
@@ -58,32 +56,19 @@ internal class SellPrisonersHandler : IHandler
 
     private void Handle_SellPrisoners(MessagePayload<SellPrisoners> obj)
     {
-        var data = obj.What;
-        var peer = obj.Who as NetPeer;
+        if (!objectManager.TryGetObjectWithLogging<PartyBase>(obj.What.SellingPartyId, out var sellingParty)) return;
 
-        GameThread.Run(() =>
-        {
-            try
-            {
-                if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.SellingPartyId, out var sellingParty)) return;
+        TroopRoster leftPrisonerRoster = new();
+        troopRosterInterface.UpdateWithData(leftPrisonerRoster, obj.What.LeftPrisonerRosterData, sellingParty.LeaderHero);
 
-                TroopRoster leftPrisonerRoster = new();
-                troopRosterInterface.UpdateWithData(leftPrisonerRoster, data.LeftPrisonerRosterData, sellingParty.LeaderHero);
+        int initialGold = sellingParty.LeaderHero.Gold;
+        SellPrisonersAction.ApplyForSelectedPrisoners(sellingParty, null, leftPrisonerRoster);
 
-                int initialGold = sellingParty.LeaderHero.Gold;
-                SellPrisonersAction.ApplyForSelectedPrisoners(sellingParty, null, leftPrisonerRoster);
+        // Give client notification of changed gold
+        network.Send(obj.Who as NetPeer, new NotifyGoldChange(sellingParty.LeaderHero.Gold - initialGold));
 
-                // Give client notification of changed gold
-                network.Send(peer, new NotifyGoldChange(sellingParty.LeaderHero.Gold - initialGold));
-
-                // Refresh the menu to show updated menu items
-                if (!objectManager.TryGetIdWithLogging(sellingParty.LeaderHero, out var heroId)) return;
-                network.Send(peer, new RefreshGameMenu(heroId, "town_backstreet"));
-            }
-            catch (Exception e)
-            {
-                logger.Error(e, "Failed to apply {Message}", nameof(SellPrisoners));
-            }
-        });
+        // Refresh the menu to show updated menu items
+        if (!objectManager.TryGetIdWithLogging(sellingParty.LeaderHero, out var heroId)) return;
+        network.Send(obj.Who as NetPeer, new RefreshGameMenu(heroId, "town_backstreet"));
     }
 }

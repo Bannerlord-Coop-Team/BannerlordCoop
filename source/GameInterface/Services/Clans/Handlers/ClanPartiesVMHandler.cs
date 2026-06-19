@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Clans.Messages;
@@ -62,14 +63,17 @@ internal class ClanPartiesVMHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.NewLeaderId, out var newLeader)) return;
         if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.TargetClanId, out var targetClan)) return;
 
-        MobileParty mobileParty = MobilePartyHelper.CreateNewClanMobileParty(newLeader, targetClan);
-        if (newLeader.Gold < obj.What.PartyGoldLowerThreshold)
-        {
-            GiveGoldAction.ApplyBetweenCharacters(mainHero, newLeader, obj.What.PartyGoldLowerThreshold - newLeader.Gold, false);
-        }
-        mobileParty.SetMoveModeHold();
+        //GameThread.Run(() =>
+        //{
+            MobileParty mobileParty = MobilePartyHelper.CreateNewClanMobileParty(newLeader, targetClan);
+            if (newLeader.Gold < obj.What.PartyGoldLowerThreshold)
+            {
+                GiveGoldAction.ApplyBetweenCharacters(mainHero, newLeader, obj.What.PartyGoldLowerThreshold - newLeader.Gold, false);
+            }
+            mobileParty.SetMoveModeHold();
 
-        network.Send(obj.Who as NetPeer, new RefreshPartiesList());
+            network.Send(obj.Who as NetPeer, new RefreshPartiesList());
+        //});
     }
 
     private void Handle_ClanPartyLeaderChanged(MessagePayload<ClanPartyLeaderChanged> obj)
@@ -101,32 +105,35 @@ internal class ClanPartiesVMHandler : IHandler
         
         if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
 
-        var isDisbanding = newLeader == null;
-        var existingOldLeader = selectedParty?.Party?.LeaderHero != null;
-        if (existingOldLeader)
+        GameThread.Run(() =>
         {
-            if (isDisbanding) // Disbanding party
+            var isDisbanding = newLeader == null;
+            var existingOldLeader = selectedParty?.Party?.LeaderHero != null;
+            if (existingOldLeader)
             {
-                selectedParty.RemovePartyLeader();
-                MakeHeroFugitiveAction.Apply(oldLeader, false);
+                if (isDisbanding) // Disbanding party
+                {
+                    selectedParty.RemovePartyLeader();
+                    MakeHeroFugitiveAction.Apply(oldLeader, false);
+                }
+                else // Swapping with new leader
+                {
+                    TeleportHeroAction.ApplyDelayedTeleportToParty(oldLeader, mainParty);
+                }
             }
-            else // Swapping with new leader
+            if (newLeader != null) // Teleport new leader to party
             {
-                TeleportHeroAction.ApplyDelayedTeleportToParty(oldLeader, mainParty);
+                TeleportHeroAction.ApplyDelayedTeleportToPartyAsPartyLeader(newLeader, selectedParty);
             }
-        }
-        if (newLeader != null) // Teleport new leader to party
-        {
-            TeleportHeroAction.ApplyDelayedTeleportToPartyAsPartyLeader(newLeader, selectedParty);
-        }
 
-        // Sync GiveGoldAction.ApplyBetweenCharacters in ClanPartiesVM.OnChangeLeaderOver here instead to avoid patching the huge client side function
-        // GiveGoldAction.ApplyInternal blocked on the client so OnChangeLeaderOver shouldn't manage the gold change clientside
-        var partyGoldLowerThreshold = Campaign.Current.Models.ClanFinanceModel.PartyGoldLowerThreshold;
-        if (!isDisbanding && newLeader.Gold < partyGoldLowerThreshold)
-        {
-            GiveGoldAction.ApplyBetweenCharacters(mainHero, newLeader, partyGoldLowerThreshold - newLeader.Gold, false);
-        }
+            // Sync GiveGoldAction.ApplyBetweenCharacters in ClanPartiesVM.OnChangeLeaderOver here instead to avoid patching the huge client side function
+            // GiveGoldAction.ApplyInternal blocked on the client so OnChangeLeaderOver shouldn't manage the gold change clientside
+            var partyGoldLowerThreshold = Campaign.Current.Models.ClanFinanceModel.PartyGoldLowerThreshold;
+            if (!isDisbanding && newLeader.Gold < partyGoldLowerThreshold)
+            {
+                GiveGoldAction.ApplyBetweenCharacters(mainHero, newLeader, partyGoldLowerThreshold - newLeader.Gold, false);
+            }
+        });
     }
 
     private void Handle_ClanPartyDisbanded(MessagePayload<ClanPartyDisbanded> obj)
@@ -140,8 +147,11 @@ internal class ClanPartiesVMHandler : IHandler
     {
         if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.SelectedPartyId, out var selectedParty)) return;
 
-        DisbandPartyAction.StartDisband(selectedParty);
+        GameThread.Run(() =>
+        {
+            DisbandPartyAction.StartDisband(selectedParty);
 
-        network.Send(obj.Who as NetPeer, new RefreshPartiesList());
+            network.Send(obj.Who as NetPeer, new RefreshPartiesList());
+        });
     }
 }
