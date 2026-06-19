@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using Common;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
 namespace GameInterface.Services.Heroes.Patches.Disable;
@@ -8,5 +9,5 @@ namespace GameInterface.Services.Heroes.Patches.Disable;
 internal class DisableHeroKnownInformationCampaignBehavior
 {
     [HarmonyPatch(nameof(HeroKnownInformationCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix() => ModInformation.IsServer;
 }
