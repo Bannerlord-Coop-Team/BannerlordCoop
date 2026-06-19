@@ -37,7 +37,7 @@ namespace GameInterface.Services.Inventory.Interfaces
 
         void UpdateRosterWithData(ItemRoster targetItemRoster, ItemRosterElement[] itemRosterElements);
 
-        void UpdateEquipmentWithData(MobileParty mobileParty, Dictionary<CharacterObject, Equipment[]> characterEquipments);
+        void UpdateEquipmentWithData(MobileParty mobileParty, Dictionary<CharacterObject, Equipment[]> characterEquipments, Hero initialHero);
     }
 
     internal class InventoryLogicInterface : IInventoryLogicInterface
@@ -182,7 +182,7 @@ namespace GameInterface.Services.Inventory.Interfaces
             targetItemRoster.Add(itemRosterElements);
         }
 
-        public void UpdateEquipmentWithData(MobileParty mobileParty, Dictionary<CharacterObject, Equipment[]> characterEquipments)
+        public void UpdateEquipmentWithData(MobileParty mobileParty, Dictionary<CharacterObject, Equipment[]> characterEquipments, Hero initialHero)
         {
             foreach (KeyValuePair<CharacterObject, Equipment[]> characterEquipment in characterEquipments)
             {
@@ -215,6 +215,9 @@ namespace GameInterface.Services.Inventory.Interfaces
             }
 
             mobileParty.Party.SetVisualAsDirty();
+
+            // When concluding an inventory screen managing a hero not in the main party, need to also update their party's visual
+            initialHero.PartyBelongedTo.Party.SetVisualAsDirty();
         }
     }
 }

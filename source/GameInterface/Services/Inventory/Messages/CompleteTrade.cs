@@ -31,24 +31,26 @@ internal readonly struct CompleteTrade : ICommand
     [ProtoMember(10)]
     public readonly string HeroId;
     [ProtoMember(11)]
-    public readonly int TotalAmount;
+    public readonly string InitialHeroId;
     [ProtoMember(12)]
-    public readonly int MerchantGold;
+    public readonly int TotalAmount;
     [ProtoMember(13)]
-    public readonly string PartyId;
+    public readonly int MerchantGold;
     [ProtoMember(14)]
-    public readonly bool IsSettlementComponentNull;
+    public readonly string PartyId;
     [ProtoMember(15)]
+    public readonly bool IsSettlementComponentNull;
+    [ProtoMember(16)]
     public readonly string CurrentSettlementComponentId;
 
-    [ProtoMember(16)]
-    public readonly (ItemRosterElementData, int)[] BoughtItems;
     [ProtoMember(17)]
+    public readonly (ItemRosterElementData, int)[] BoughtItems;
+    [ProtoMember(18)]
     public readonly (ItemRosterElementData, int)[] SoldItems;
 
-    [ProtoMember(18)]
-    public readonly string TroopRosterId;
     [ProtoMember(19)]
+    public readonly string TroopRosterId;
+    [ProtoMember(20)]
     public readonly TroopRosterData TroopRosterData;
 
     public CompleteTrade(
@@ -62,6 +64,7 @@ internal readonly struct CompleteTrade : ICommand
         bool canGainXpFromDiscarding,
         bool isManagingWarehouse,
         string heroId,
+        string initialHeroId,
         int totalAmount,
         int merchantGold,
         string partyId,
@@ -82,6 +85,7 @@ internal readonly struct CompleteTrade : ICommand
         CanGainXpFromDiscarding = canGainXpFromDiscarding;
         IsManagingWarehouse = isManagingWarehouse;
         HeroId = heroId;
+        InitialHeroId = initialHeroId;
         TotalAmount = totalAmount;
         MerchantGold = merchantGold;
         PartyId = partyId;
