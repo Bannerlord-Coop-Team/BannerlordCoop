@@ -62,20 +62,15 @@ public class TestEnvironment
 
     private EnvironmentInstance CreateClient()
     {
-        var containerProvider = new Core.ContainerProvider();
-
         var builder = new ContainerBuilder();
 
         builder.RegisterModule<ClientModule>();
         builder.RegisterType<MockClient>().AsSelf().As<INetwork>().As<ICoopClient>().InstancePerLifetimeScope();
         builder.RegisterType<ClientInstance>().AsSelf();
-        builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance();
 
         AddSharedDependencies(builder);
 
         var container = builder.Build();
-
-        containerProvider.SetProvider(container);
 
         var instance = container.Resolve<ClientInstance>()!;
 
@@ -86,20 +81,15 @@ public class TestEnvironment
 
     private EnvironmentInstance CreateServer()
     {
-        var containerProvider = new Core.ContainerProvider();
-
         var builder = new ContainerBuilder();
 
         builder.RegisterModule<ServerModule>();
         builder.RegisterType<MockServer>().AsSelf().As<INetwork>().As<ICoopServer>().InstancePerLifetimeScope();
         builder.RegisterType<ServerInstance>().AsSelf();
-        builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance();
 
         AddSharedDependencies(builder);
 
         var container = builder.Build();
-
-        containerProvider.SetProvider(container);
 
         var instance = container.Resolve<ServerInstance>()!;
 

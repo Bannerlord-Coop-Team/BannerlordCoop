@@ -28,6 +28,9 @@ internal class CharacterObjectRegistry : AutoRegistryBase<CharacterObject>
 
     public override void RegisterAllObjects()
     {
+        // Register every CharacterObject (basic troop templates as well as hero characters), not just
+        // hero-owned ones: troops need a network id keyed by their stable StringId so rosters and
+        // recruitment can resolve them on every machine.
         foreach (CharacterObject character in CharacterObject.All)
         {
             RegisterExistingObject(character.StringId, character);

@@ -85,6 +85,10 @@ public class CreateCharacterState : ConnectionStateBase
         network.SendImmediate(netPeer, new NetworkHeroRecieved(player));
 
         ConnectionLogic.TransferSave();
+
+        // TransferSave has taken the save snapshot and begun queueing this peer's broadcasts, so tell the
+        // joiner about every other existing player. These queue and replay once it enters its campaign.
+        JoiningPlayerSync.SendExistingPlayers(network, playerRegistry, netPeer, controllerId);
     }
 
     private bool TryCreatePlayer(string controllerId, Hero hero, out Player player)

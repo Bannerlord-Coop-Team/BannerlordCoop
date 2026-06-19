@@ -16,12 +16,12 @@ namespace MissionTests
         {
             Agent newAgent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
             newAgent.Age = 10;
-            Guid guid = Guid.NewGuid();
+            string guid = Guid.NewGuid().ToString();
 
             networkAgentRegistry.RegisterControlledAgent(guid, newAgent);
 
             networkAgentRegistry.TryGetAgent(guid, out Agent testAgent);
-            networkAgentRegistry.TryGetAgentId(testAgent, out Guid testId);
+            networkAgentRegistry.TryGetAgentId(testAgent, out string testId);
 
             Assert.True(networkAgentRegistry.IsControlled(newAgent));
             Assert.True(networkAgentRegistry.IsControlled(guid));
@@ -37,12 +37,12 @@ namespace MissionTests
         {
             Agent localAgent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
             localAgent.Age = 11;
-            Guid localGuid = Guid.NewGuid();
+            string localGuid = Guid.NewGuid().ToString();
             networkAgentRegistry.RegisterControlledAgent(localGuid, localAgent);
 
             Agent remoteAgent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
             remoteAgent.Age = 10;
-            Guid remoteGuid = Guid.NewGuid();
+            string remoteGuid = Guid.NewGuid().ToString();
             NetPeer netPeer = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
             networkAgentRegistry.RegisterNetworkControlledAgent(netPeer, remoteGuid, remoteAgent);
 

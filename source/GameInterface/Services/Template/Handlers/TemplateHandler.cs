@@ -84,7 +84,7 @@ public class TemplateHandler : IHandler
     private void Handle_TemplateNetworkMessage(MessagePayload<TemplateNetworkMessage> payload)
     {
         // Ensure the logic is executed on the main thread.
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             /// This ensures that the original function is executed correctly within an allowed thread context.
             using (new AllowedThread())

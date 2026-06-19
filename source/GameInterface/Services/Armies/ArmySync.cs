@@ -1,4 +1,4 @@
-﻿using GameInterface.DynamicSync;
+﻿using GameInterface.AutoSync;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 
@@ -7,9 +7,9 @@ namespace GameInterface.Services.Armies;
 /// <summary>
 /// Registry for <see cref="Army"/> type
 /// </summary>
-internal class ArmySync : IDynamicSync
+internal class ArmySync : IAutoSync
 {
-    public ArmySync(DynamicSyncRegistry autoSyncBuilder)
+    public ArmySync(AutoSyncRegistry autoSyncBuilder)
     {
         //fields
 

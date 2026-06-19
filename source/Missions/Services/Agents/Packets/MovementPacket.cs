@@ -16,11 +16,11 @@ namespace Missions.Services.Agents.Packets
         [ProtoMember(1)]
         public AgentData Agent { get; }
         [ProtoMember(2)]
-        public Guid AgentId { get; }
+        public string AgentId { get; }
 
-        public MovementPacket(Guid agentGuid, Agent agent)
+        public MovementPacket(string controllerId, Agent agent)
         {
-            AgentId = agentGuid;
+            AgentId = controllerId;
             Agent = new AgentData(agent);
         }
 

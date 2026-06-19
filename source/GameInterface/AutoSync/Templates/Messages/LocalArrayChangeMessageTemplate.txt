@@ -1,0 +1,14 @@
+﻿using GameInterface.Utils.LocalEvents;
+{{~ for library in Libraries ~}}
+using {{ library }};
+{{~ end ~}}
+
+namespace AutoSync
+{
+    public record {{ MemberDeclaringTypeName}}_{{ MemberName }}_ChangeLocalMessage : GenericArrayChangedEvent<{{ MemberDeclaringType }}, {{ ElementType }}>
+    {
+        public {{ MemberDeclaringTypeName}}_{{ MemberName }}_ChangeLocalMessage({{ MemberDeclaringType }} instance, {{ ElementType }} value, int index) : base(instance, value, index)
+        {
+        }
+    }
+}

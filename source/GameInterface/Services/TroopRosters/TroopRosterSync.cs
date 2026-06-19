@@ -1,12 +1,12 @@
-﻿using GameInterface.DynamicSync;
+﻿using GameInterface.AutoSync;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.TroopRosters;
 
-internal class TroopRosterSync : IDynamicSync
+internal class TroopRosterSync : IAutoSync
 {
-    public TroopRosterSync(DynamicSyncRegistry autoSyncBuilder)
+    public TroopRosterSync(AutoSyncRegistry autoSyncBuilder)
     {
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(TroopRoster), nameof(TroopRoster.OwnerParty)));
         

@@ -4,18 +4,13 @@ using Common.Logging;
 using HarmonyLib;
 using Missions;
 using Missions.Services.Arena;
-using Missions.Services.Network.Surrogates;
 using Missions.Services.Taverns;
 using Missions.View;
-using ProtoBuf.Meta;
 using SandBox;
 using Serilog;
 using System;
 using System.Diagnostics;
 using System.IO;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.Core;
-using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.View;
@@ -53,7 +48,7 @@ namespace MissionTestMod
 
             Logger.Verbose("Building Network Configuration");
 
-            Updateables.Add(GameLoopRunner.Instance);
+            Updateables.Add(GameThread.Instance);
 
             JoinTavern = new InitialStateOption(
               "Join Online Tavern",
@@ -124,8 +119,6 @@ namespace MissionTestMod
             builder.RegisterModule<MissionModule>();
 
             container = builder.Build();
-
-            ContainerProvider.SetContainer(container);
         }
 
         protected override void OnSubModuleUnloaded()
@@ -138,16 +131,8 @@ namespace MissionTestMod
         {
             Logger.Verbose("Registering ProtoBuf Surrogates");
 
-            RuntimeTypeModel.Default.SetSurrogate<Vec3, Vec3Surrogate>();
-            RuntimeTypeModel.Default.SetSurrogate<Vec2, Vec2Surrogate>();
-            RuntimeTypeModel.Default.SetSurrogate<Mat3, Mat3Surrogate>();
-            RuntimeTypeModel.Default.SetSurrogate<Blow, BlowSurrogate>();
-            RuntimeTypeModel.Default.SetSurrogate<AttackCollisionData, AttackCollisionDataSurrogate>();
-            RuntimeTypeModel.Default.SetSurrogate<CharacterObject, CharacterObjectSurrogate>();
-            RuntimeTypeModel.Default.SetSurrogate<Banner, BannerSurrogate>();
-            RuntimeTypeModel.Default.SetSurrogate<ItemObject, ItemObjectSurrogate>();
-            RuntimeTypeModel.Default.SetSurrogate<ItemModifier, ItemModifierSurrogate>();
-            RuntimeTypeModel.Default.SetSurrogate<Equipment, EquipmentSurrogate>();
+            // All surrogates live in GameInterface now; register the whole set in one call.
+            //new SurrogateCollection();
         }
 
         private bool m_IsFirstTick = true;
@@ -155,7 +140,7 @@ namespace MissionTestMod
         {
             if (m_IsFirstTick)
             {
-                GameLoopRunner.Instance.SetGameLoopThread();
+                GameThread.Instance.MarkGameThread();
 
                 m_IsFirstTick = false;
             }

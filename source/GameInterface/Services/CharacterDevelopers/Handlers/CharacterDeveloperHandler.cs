@@ -48,10 +48,26 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
 
         private void Handle(MessagePayload<NetworkApplyChangesServer> obj)
         {
-            // Send to all clients and apply on server
             NetworkApplyChangesClients changes = new(obj.What);
-            network.SendAll(changes);
-            ApplyChanges(changes);
+
+            // AddFocuses overwrites SkillOrgFocusAmounts entry-by-entry during the apply
+            // (it sets each to the new focus level to track remaining points). That list is
+            // shared with the apply payload, so the relay must carry its own copy of the
+            // original deltas; relaying the applied object would send zeroed focus deltas
+            // and clients would never raise their focuses.
+            NetworkApplyChangesClients relay = new(obj.What);
+            if (obj.What.SkillOrgFocusAmounts != null)
+            {
+                relay.SkillOrgFocusAmounts = new List<int>(obj.What.SkillOrgFocusAmounts);
+            }
+
+            ApplyChanges(changes, () =>
+            {
+                if (ModInformation.IsServer)
+                {
+                    network.SendAll(relay);
+                }
+            });
         }
 
         private void Handle(MessagePayload<NetworkApplyChangesClients> obj)
@@ -126,18 +142,30 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
             network.SendAll(message);
         }
 
-        private void ApplyChanges(NetworkApplyChangesClients obj)
+        private void ApplyChanges(NetworkApplyChangesClients obj, Action afterApply = null)
         {
-            string heroId = obj.HeroId;
-            if (!objectManager.TryGetObject(obj.HeroId, out Hero hero))
+            GameThread.Run(() =>
             {
-                Logger.Error("Unable to get object for id {id}", heroId);
-                return;
-            }
+                try
+                {
+                    string heroId = obj.HeroId;
+                    if (!objectManager.TryGetObject(obj.HeroId, out Hero hero))
+                    {
+                        Logger.Error("Unable to get object for id {id}", heroId);
+                        return;
+                    }
 
-            AddPerks(obj.PerkIds, hero.HeroDeveloper);
-            AddAttributes(obj.AttributeIds, obj.AttributeIncreases, hero.HeroDeveloper);
-            AddFocuses(obj.SkillIds, obj.SkillFocusLevels, obj.SkillOrgFocusAmounts, hero.HeroDeveloper);
+                    AddPerks(obj.PerkIds, hero.HeroDeveloper);
+                    AddAttributes(obj.AttributeIds, obj.AttributeIncreases, hero.HeroDeveloper);
+                    AddFocuses(obj.SkillIds, obj.SkillFocusLevels, obj.SkillOrgFocusAmounts, hero.HeroDeveloper);
+
+                    afterApply?.Invoke();
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to apply {Message}", nameof(NetworkApplyChangesClients));
+                }
+            });
         }
 
         private void AddPerks(List<string> perkIds, HeroDeveloper heroDeveloper)

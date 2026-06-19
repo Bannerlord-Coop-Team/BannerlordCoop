@@ -3,6 +3,8 @@ using Common.Logging;
 using Coop.Core;
 using Coop.Lib.NoHarmony;
 using Coop.UI.LoadGameUI;
+using GameInterface;
+using GameInterface.Services.TroopRosters;
 using GameInterface.Services.UI;
 using Serilog;
 using System;
@@ -76,7 +78,7 @@ namespace Coop
                 EnsureSafeExitConfig();
             }
 
-            GameLoopRunner.Instance.SetGameLoopThread();
+            GameThread.Instance.MarkGameThread();
         }
 
         private void SetupLogging()
@@ -166,7 +168,7 @@ namespace Coop
         {
             Coop = new CoopartiveMultiplayerExperience();
 
-            Updateables.Add(GameLoopRunner.Instance);
+            Updateables.Add(GameThread.Instance);
 
 
             // Skip startup splash screen
@@ -251,16 +253,48 @@ namespace Coop
         {
             if(m_IsFirstTick)
             {
-                GameLoopRunner.Instance.SetGameLoopThread();
+                GameThread.Instance.MarkGameThread();
                 
                 m_IsFirstTick = false;
             }    
+            RefreshTroopRosterCoalescer();
+
             TimeSpan frameTime = TimeSpan.FromSeconds(dt);
             Updateables.UpdateAll(frameTime);
 
 #if DEBUG
             TryAutoConnect();
 #endif
+        }
+
+        private TroopRosterSyncCoalescer _troopRosterCoalescer;
+
+        // The TroopRoster snapshot coalescer lives in the active session's container (one per
+        // server/client process), so it cannot be a fixed member of the process-wide Updateables list.
+        // Keep the list in sync with the running session: add the current session's coalescer, swap it
+        // on rejoin, and drop it when the session ends, so it is pumped in priority order with the rest
+        // of the update loop.
+        private void RefreshTroopRosterCoalescer()
+        {
+            TroopRosterSyncCoalescer current = null;
+            if (Coop.Running)
+            {
+                ContainerProvider.TryResolve(out current);
+            }
+
+            if (ReferenceEquals(current, _troopRosterCoalescer)) return;
+
+            if (_troopRosterCoalescer != null)
+            {
+                Updateables.Remove(_troopRosterCoalescer);
+            }
+
+            _troopRosterCoalescer = current;
+
+            if (current != null)
+            {
+                Updateables.Add(current);
+            }
         }
 
         private void TryAutoConnect()

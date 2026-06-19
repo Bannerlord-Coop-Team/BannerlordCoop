@@ -1,0 +1,11 @@
+using GameInterface.Utils.LocalEvents;
+using TaleWorlds.CampaignSystem;
+
+namespace GameInterface.Services.Kingdoms.Messages.Collections;
+
+internal record HeroesCacheRemoved : GenericEvent<Kingdom, Hero>
+{
+    public HeroesCacheRemoved(Kingdom instance, Hero value) : base(instance, value)
+    {
+    }
+}

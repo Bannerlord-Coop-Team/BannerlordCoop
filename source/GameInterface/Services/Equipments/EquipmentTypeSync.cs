@@ -1,13 +1,13 @@
 using GameInterface.AutoSync;
-using GameInterface.DynamicSync;
+using GameInterface.AutoSync;
 using HarmonyLib;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.Equipments;
 
-class EquipmentSync : IDynamicSync
+class EquipmentSync : IAutoSync
 {
-    public EquipmentSync(DynamicSyncRegistry autoSyncBuilder)
+    public EquipmentSync(AutoSyncRegistry autoSyncBuilder)
     {
         autoSyncBuilder.AddField(AccessTools.Field(typeof(Equipment), nameof(Equipment._equipmentType)));
     }

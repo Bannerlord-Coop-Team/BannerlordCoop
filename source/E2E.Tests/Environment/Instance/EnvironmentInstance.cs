@@ -8,6 +8,7 @@ using Common.Util;
 using Coop.Core;
 using E2E.Tests.Environment.Mock;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.TroopRosters;
 using HarmonyLib;
 using LiteNetLib;
 using ProtoBuf.Meta;
@@ -30,25 +31,25 @@ public abstract class EnvironmentInstance : IDisposable
     /// </summary>
     public MessageCollection NetworkSentMessages => mockNetwork.NetworkSentMessages;
 
-    public IContainer Container => containerProvider.GetContainer();
+    public ILifetimeScope Container => container;
     public IObjectManager ObjectManager => Container.Resolve<IObjectManager>();
 
     public GameInstance GameInstance = new GameInstance();
 
     private readonly TestMessageBroker messageBroker;
     private readonly MockNetworkBase mockNetwork;
-    private readonly IContainerProvider containerProvider;
+    private readonly ILifetimeScope container;
 
     private readonly static object _lock = new object();
 
     public EnvironmentInstance(
         TestMessageBroker messageBroker,
         MockNetworkBase mockNetwork,
-        IContainerProvider containerProvider)
+        ILifetimeScope container)
     {
         this.messageBroker = messageBroker;
         this.mockNetwork = mockNetwork;
-        this.containerProvider = containerProvider;
+        this.container = container;
     }
 
     /// <summary>
@@ -61,6 +62,7 @@ public abstract class EnvironmentInstance : IDisposable
         using (new StaticScope(this))
         {
             messageBroker.Publish(source, message);
+            PumpTroopRosterSnapshots();
         }
     }
 
@@ -96,9 +98,25 @@ public abstract class EnvironmentInstance : IDisposable
                 using (new StaticScope(this))
                 {
                     callFunction();
+                    PumpTroopRosterSnapshots();
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Flushes the TroopRoster snapshot coalescer. It defers its sends to a per-frame pump that
+    /// CoopMod drives in the running game; the test harness has no frame loop, so pump it after each
+    /// call and received message, mirroring the game loop, so authoritative roster changes replicate
+    /// to the clients. No-op when no roster changed (or when this instance has no coalescer).
+    /// </summary>
+    private TroopRosterSyncCoalescer troopRosterCoalescer;
+
+    private void PumpTroopRosterSnapshots()
+    {
+        if (troopRosterCoalescer == null && !container.TryResolve(out troopRosterCoalescer)) return;
+
+        troopRosterCoalescer.Update(TimeSpan.Zero);
     }
 
     /// <summary>

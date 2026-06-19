@@ -78,7 +78,7 @@ namespace GameInterface.Services.Settlements.Handlers
             // culling, garrison destruction and creation, governor removal) run on the server
             // with patches live and arrive here as their own replicated messages; replaying the
             // whole action would apply them a second time.
-            GameLoopRunner.RunOnMainThread(() =>
+            GameThread.Run(() =>
             {
                 using (new AllowedThread())
                 {

@@ -6,13 +6,17 @@ using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
+using TaleWorlds.MountAndBlade;
 using static TaleWorlds.CampaignSystem.ExplainedNumber.StatExplainer;
 
 namespace GameInterface.Surrogates;
 
 public interface ISurrogateCollection { }
 
-internal class SurrogateCollection : ISurrogateCollection
+// Public so standalone flows that don't run GameInterfaceModule (the Missions test game managers, the
+// legacy MissionTestMod, the serialization unit tests) can register every surrogate in one call —
+// `new SurrogateCollection()` — instead of hand-listing them and referencing each surrogate type.
+public class SurrogateCollection : ISurrogateCollection
 {
     private static object _lock = new();
     public SurrogateCollection()
@@ -35,6 +39,9 @@ internal class SurrogateCollection : ISurrogateCollection
             AddSurrogate<ExplanationLine, ExplanationLineSurrogate>();
 
             AddSurrogate<Vec3, Vec3Surrogate>();
+            AddSurrogate<Mat3, Mat3Surrogate>();
+            AddSurrogate<Blow, BlowSurrogate>();
+            AddSurrogate<AttackCollisionData, AttackCollisionDataSurrogate>();
             AddSurrogate<SunInformation, SunInformationSurrogate>();
             AddSurrogate<RainInformation, RainInformationSurrogate>();
             AddSurrogate<SnowInformation, SnowInformationSurrogate>();

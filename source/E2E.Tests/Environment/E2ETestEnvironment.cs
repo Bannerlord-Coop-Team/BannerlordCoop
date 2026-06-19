@@ -6,7 +6,7 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface;
 using GameInterface.AutoSync;
-using GameInterface.DynamicSync;
+using GameInterface.AutoSync;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Utils;
 using HarmonyLib;
@@ -46,7 +46,7 @@ internal class E2ETestEnvironment : IDisposable
         // Setup logging for tests
         OutputSinkManager.AddLogCallback(TestOutputCallback);
 
-        GameLoopRunner.Instance.SetGameLoopThread();
+        GameThread.Instance.MarkGameThread();
 
         GameBootStrap.Initialize();
 
@@ -56,9 +56,9 @@ internal class E2ETestEnvironment : IDisposable
 
         Server.Resolve<TestMessageBroker>().SetStaticInstance();
         Server.Resolve<IGameInterface>().PatchAll();
-        Server.Resolve<IDynamicSyncPatchCollector>().PatchAll();
+        Server.Resolve<IAutoSyncPatchCollector>().PatchAll();
 
-        SetupDynamicSync();
+        SetupAutoSync();
 
         foreach (var settlement in Campaign.Current.CampaignObjectManager.Settlements)
         {
@@ -74,12 +74,12 @@ internal class E2ETestEnvironment : IDisposable
             if (disposed) return;
             disposed = true;
 
-            if (DynamicSyncConfiguration.Enabled)
+            if (AutoSyncConfiguration.Enabled)
             {
-                Server.Resolve<DynamicHandler>().Dispose();
+                Server.Resolve<AutoSyncHandler>().Dispose();
                 foreach (var client in Clients)
                 {
-                    client.Resolve<DynamicHandler>().Dispose();
+                    client.Resolve<AutoSyncHandler>().Dispose();
                 }
             }
 
@@ -98,17 +98,17 @@ internal class E2ETestEnvironment : IDisposable
             disposeSemiphore.Release();
         }
     }
-    private void SetupDynamicSync()
+    private void SetupAutoSync()
     {
-        if (!DynamicSyncConfiguration.Enabled) return;
+        if (!AutoSyncConfiguration.Enabled) return;
 
-        var serverPatcher = Server.Resolve<DynamicSyncPatcher>();
+        var serverPatcher = Server.Resolve<AutoSyncPatcher>();
 
         // Required as Harmony patches are not rebound per test so we need to explicitly rebind only the handlers
-        serverPatcher.BindHandlers(DynamicSyncPatcher.Assembly);
+        serverPatcher.BindHandlers(AutoSyncPatcher.Assembly);
         foreach (var client in Clients)
         {
-            client.Resolve<DynamicSyncPatcher>().BindHandlers(DynamicSyncPatcher.Assembly);
+            client.Resolve<AutoSyncPatcher>().BindHandlers(AutoSyncPatcher.Assembly);
         }
     }
 

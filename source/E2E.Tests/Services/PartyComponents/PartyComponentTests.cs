@@ -50,7 +50,7 @@ public class PartyComponentTests : SyncTestBase
         var party2Id = TestEnvironment.CreateRegisteredObject<MobileParty>();
 
         // Force sync of MobileParty to clients: it's set during construction before clients have
-        // the party in their ObjectManager, so the DynamicSync message is dropped on clients.
+        // the party in their ObjectManager, so the AutoSync message is dropped on clients.
         // Re-null the backing field and re-set via property to trigger a fresh sync.
         server.Call(() =>
         {

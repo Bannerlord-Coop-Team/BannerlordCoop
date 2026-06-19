@@ -1,4 +1,4 @@
-﻿using GameInterface.DynamicSync;
+﻿using GameInterface.AutoSync;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Siege;
@@ -7,9 +7,9 @@ using TaleWorlds.Library;
 
 namespace GameInterface.Services.SiegeStrategies
 {
-    internal class SiegeStrategySync : IDynamicSync
+    internal class SiegeStrategySync : IAutoSync
     {
-        public SiegeStrategySync(DynamicSyncRegistry autoSyncBuilder)
+        public SiegeStrategySync(AutoSyncRegistry autoSyncBuilder)
         {
             //Properties
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(SiegeStrategy), nameof(SiegeStrategy.Name)));

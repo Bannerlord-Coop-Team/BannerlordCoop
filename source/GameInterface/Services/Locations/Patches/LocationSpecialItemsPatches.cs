@@ -79,7 +79,7 @@ internal class LocationSpecialItemsPatches
 
     public static void AddSpecialItem(Location location, ItemObject item)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {
@@ -90,7 +90,7 @@ internal class LocationSpecialItemsPatches
 
     public static void RemoveSpecialItem(Location location, ItemObject item)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             using (new AllowedThread())
             {

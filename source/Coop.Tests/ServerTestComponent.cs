@@ -1,6 +1,6 @@
 ﻿using Autofac;
 using Coop.Core.Server;
-using GameInterface.DynamicSync;
+using GameInterface.AutoSync;
 using GameInterface.Registry;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Interfaces;

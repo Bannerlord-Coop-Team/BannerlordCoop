@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
@@ -6,6 +7,7 @@ using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.Services.MapEvents.Handlers;
@@ -52,13 +54,6 @@ internal class MapEventHandler : IHandler
 
     private void Handle_NetworkChangeBattleState(MessagePayload<NetworkChangeBattleState> payload)
     {
-        if (!objectManager.TryGetObjectWithLogging<MapEvent>(payload.What.MapEventId, out var mapEvent))
-            return;
-
-        mapEventLogger.DebugMapEvent(mapEvent,
-            "Applying network battle state change. BattleState={BattleState}",
-            payload.What.BattleState);
-
         // Do NOT wrap in AllowedThread. Setting BattleState to a victory state runs the native setter ->
         // OnBattleWon -> CalculateAndCommitMapEventResults -> CaptureDefeatedPartyMembers, which is the
         // server-authoritative capture path. Under AllowedThread CallOriginalPolicy.IsOriginalAllowed() is
@@ -67,6 +62,25 @@ internal class MapEventHandler : IHandler
         // the client gets no capture UI and the player party is never parked. The server's BattleState
         // setter does not re-broadcast (MapEventPatches.Prefix_BattleState returns without publishing on the
         // server), so no AllowedThread is needed to prevent an echo.
-        mapEvent.BattleState = payload.What.BattleState;
+        var mapEventId = payload.What.MapEventId;
+        var battleState = payload.What.BattleState;
+        GameThread.Run(() =>
+        {
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging<MapEvent>(mapEventId, out var mapEvent))
+                    return;
+
+                mapEventLogger.DebugMapEvent(mapEvent,
+                    "Applying network battle state change. BattleState={BattleState}",
+                    battleState);
+
+                mapEvent.BattleState = battleState;
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to apply {Message}", nameof(NetworkChangeBattleState));
+            }
+        });
     }
 }

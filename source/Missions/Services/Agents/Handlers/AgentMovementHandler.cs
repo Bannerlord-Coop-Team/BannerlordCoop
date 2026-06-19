@@ -3,14 +3,13 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
+using Common.Util;
 using LiteNetLib;
 using Missions.Services.Agents.Packets;
 using Missions.Services.Network;
 using Missions.Services.Network.Messages;
 using Serilog;
 using System;
-using System.Threading;
-using System.Threading.Tasks;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Handlers
@@ -23,15 +22,18 @@ namespace Missions.Services.Agents.Handlers
     {
         private static readonly ILogger Logger = LogManager.GetLogger<LiteNetP2PClient>();
 
-        private readonly CancellationTokenSource agentPollingCancelToken = new CancellationTokenSource();
-        private readonly Task agentPollingTask;
+        // Broadcast every controlled agent's movement on a ~10ms cadence. Poller keeps the loop alive even
+        // if a tick throws (a raw fire-and-forget Task would silently die — see poller-swallows-exceptions).
+        private static readonly TimeSpan PollingInterval = TimeSpan.FromMilliseconds(10);
+
+        private readonly Poller poller;
         private readonly IPacketManager packetManager;
-        private readonly INetwork client;
+        private readonly IMeshNetwork client;
         private readonly IMessageBroker messageBroker;
         private readonly INetworkAgentRegistry agentRegistry;
 
         public AgentMovementHandler(
-            INetwork client,
+            IMeshNetwork client,
             IPacketManager packetManager,
             IMessageBroker messageBroker,
             INetworkAgentRegistry agentRegistry)
@@ -45,10 +47,12 @@ namespace Missions.Services.Agents.Handlers
 
 
             this.messageBroker.Subscribe<PeerDisconnected>(Handle_PeerDisconnect);
+            this.messageBroker.Subscribe<PeerConnected>(Handle_PeerConnected);
 
             this.packetManager.RegisterPacketHandler(this);
 
-            agentPollingTask = Task.Factory.StartNew(PollAgents);
+            poller = new Poller(PollAgents, PollingInterval);
+            poller.Start();
         }
 
         ~AgentMovementHandler()
@@ -62,36 +66,27 @@ namespace Missions.Services.Agents.Handlers
 
             packetManager.RemovePacketHandler(this);
             messageBroker.Unsubscribe<PeerDisconnected>(Handle_PeerDisconnect);
-            agentPollingCancelToken.Cancel();
-            agentPollingTask.Wait();
+            messageBroker.Unsubscribe<PeerConnected>(Handle_PeerConnected);
+            poller.Stop();
         }
 
         public PacketType PacketType => PacketType.Movement;
 
-        private async void PollAgents()
+        private void PollAgents(TimeSpan delta)
         {
-            Logger.Verbose("Starting agent polling");
+            if (Mission.Current == null) return;
 
-            while (agentPollingCancelToken.IsCancellationRequested == false)
+            foreach (string guid in agentRegistry.ControlledAgents.Keys)
             {
-                await Task.Delay(10);
-
-                if (Mission.Current == null) continue;
-
-                foreach (Guid guid in agentRegistry.ControlledAgents.Keys)
+                if (agentRegistry.ControlledAgents.TryGetValue(guid, out var agent))
                 {
-                    if (agentRegistry.ControlledAgents.TryGetValue(guid, out var agent))
+                    if (agent.Mission != null)
                     {
-                        if (agent.Mission != null)
-                        {
-                            MovementPacket packet = new MovementPacket(guid, agent);
-                            client.SendAll(packet);
-                        }
+                        MovementPacket packet = new MovementPacket(guid, agent);
+                        client.SendAll(packet);
                     }
                 }
             }
-
-            Logger.Verbose("Stopping agent polling");
         }
 
         public void HandlePacket(NetPeer peer, IPacket packet)
@@ -105,18 +100,47 @@ namespace Missions.Services.Agents.Handlers
 
         public void Handle_PeerDisconnect(MessagePayload<PeerDisconnected> payload)
         {
-            if (Mission.Current == null) return;
+            CleanupPeerAgents(payload.What.NetPeer, "disconnect");
+        }
 
-            NetPeer peer = payload.What.NetPeer;
+        private void Handle_PeerConnected(MessagePayload<PeerConnected> payload)
+        {
+            // We do NOT reliably receive OnPeerDisconnected when a peer leaves a location: the link is a
+            // NAT-punched P2P connection and DisconnectPeers keeps the socket alive, so the leaver's
+            // disconnect frequently never reaches us (logs show a 30s-old peer reconnecting with no
+            // disconnect in between). A (re)connect for a peer that STILL has agents registered therefore
+            // means we missed its disconnect — clean up the stale session here so its ghost agent is
+            // removed and the rejoining player re-spawns instead of being deduped as "already registered".
+            // A genuinely new peer has no agents yet, so this no-ops for first connections.
+            CleanupPeerAgents(payload.What.Peer, "reconnect (missed disconnect)");
+        }
 
-            Logger.Debug("Handling disconnect for {peer}", peer);
+        private void CleanupPeerAgents(NetPeer peer, string reason)
+        {
+            if (peer == null) return;
 
-            if (agentRegistry.OtherAgents.TryGetValue(peer, out AgentGroupController controller))
+            bool sceneActive = Mission.Current != null;
+
+            if (agentRegistry.OtherAgents.TryGetValue(peer, out AgentGroupController controller) == false)
+            {
+                // Quiet for the common case (fresh connect / duplicate with nothing to clear).
+                Logger.Debug("[LocationSync] {reason} {peer}: no agents registered under this peer", reason, peer);
+                return;
+            }
+
+            int agentCount = controller.ControlledAgents.Count;
+
+            // Fade the visible agents out only when a mission scene is still active — a disconnect on
+            // leave often arrives mid-teardown with Mission.Current already null.
+            if (sceneActive)
             {
                 foreach (var agent in controller.ControlledAgents.Values)
                 {
-                    GameLoopRunner.RunOnMainThread(() =>
+                    GameThread.Run(() =>
                     {
+                        if (Mission.Current == null)
+                            return;
+
                         if (agent.Health > 0)
                         {
                             agent.MakeDead(false, ActionIndexCache.act_none);
@@ -124,9 +148,13 @@ namespace Missions.Services.Agents.Handlers
                         }
                     });
                 }
-
-                agentRegistry.RemovePeer(peer);
             }
+
+            // Always drop the peer's agents from the registry, even mid-teardown. Skipping this leaves a
+            // stale entry so a rejoining player is deduped as "already registered" and never re-spawns.
+            bool removed = agentRegistry.RemovePeer(peer);
+            Logger.Information("[LocationSync] {reason} {peer}: cleared {count} agent(s) from registry (removed={removed}, fadedOut={fadedOut})",
+                reason, peer, agentCount, removed, sceneActive);
         }
     }
 }

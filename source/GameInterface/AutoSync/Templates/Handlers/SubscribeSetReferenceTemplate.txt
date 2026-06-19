@@ -1,0 +1,40 @@
+﻿{{~ if Interface ~}}
+Subscribe<{{MemberType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetLocalMessage>((instanceId, data) => 
+{
+    int index = AutoSync.Constants.TypeMap[data.Value.GetType()];
+    if (!this.objectManager.TryGetId(data.Value.GetType(), data.Value, out string valueId) && data.Value != null) return;
+                
+    network.SendAll(new {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage(instanceId, valueId, index));
+});
+
+SubscribeNetwork<{{MemberType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage>((instance, data) => 
+{
+    var type = AutoSync.Constants.TypeMapReverse[data.ValueTypeIndex];
+    if (!objectManager.TryGetObjectWithLogging(type, data.ValueId, out object value) && data.ValueId != null) return;
+{{~ if ReadOnly ~}}
+	AccessTools.Field(typeof({{MemberDeclaringType}}), "{{MemberName}}").SetValue(instance, value);
+{{~ else ~}}
+	using (new AllowedThread())
+	{
+		instance.{{MemberName}} = ({{MemberType}}) value;
+	}
+{{~ end ~}}
+});
+{{~ else ~}}
+SubscribeGenericReference<{{MemberType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetLocalMessage, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage>();
+
+SubscribeNetworkReference<{{MemberType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage >((instance, value, _) => { 
+{{~ if Debug ~}}
+	Logger.Debug("[Client] Received network set message for {type}", "{{MemberName}}");
+{{~ end ~}}
+
+    {{~ if ReadOnly ~}}
+        AccessTools.Field(typeof({{MemberDeclaringType}}), "{{MemberName}}").SetValue(instance, value);
+    {{~ else ~}}
+        using (new AllowedThread())
+	    {
+	        instance.{{MemberName}} = value;
+        }
+    {{~ end ~}}
+});
+{{~ end ~}}
