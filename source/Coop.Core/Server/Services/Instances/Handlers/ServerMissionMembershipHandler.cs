@@ -8,10 +8,10 @@ using LiteNetLib;
 namespace Coop.Core.Server.Services.Instances.Handlers;
 
 /// <summary>
-/// Server-side relay membership + join/leave introduction. A client's <see cref="MissionEntered"/> maps the
+/// Server-side relay membership + join/leave introduction. A client's <see cref="NetworkMissionEntered"/> maps the
 /// controller to its connection and introduces it and the existing members to each other via
 /// <see cref="MissionPeerEntered"/> (each side then sends its join info over the mesh). Departures are fanned
-/// out to the remaining members so they release the leaver's party: a <see cref="MissionLeft"/> becomes a
+/// out to the remaining members so they release the leaver's party: a <see cref="NetworkMissionLeft"/> becomes a
 /// <see cref="MissionPeerLeft"/> (graceful) and an observed <see cref="PlayerDisconnected"/> becomes a
 /// <see cref="MissionPeerDisconnected"/> (ungraceful — the reliable counterpart to the best-effort mesh path).
 /// </summary>
@@ -27,19 +27,19 @@ public class ServerMissionMembershipHandler : IHandler
         this.missionManager = missionManager;
         this.network = network;
 
-        messageBroker.Subscribe<MissionEntered>(Handle_MissionEntered);
-        messageBroker.Subscribe<MissionLeft>(Handle_MissionLeft);
+        messageBroker.Subscribe<NetworkMissionEntered>(Handle_MissionEntered);
+        messageBroker.Subscribe<NetworkMissionLeft>(Handle_MissionLeft);
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
     }
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<MissionEntered>(Handle_MissionEntered);
-        messageBroker.Unsubscribe<MissionLeft>(Handle_MissionLeft);
+        messageBroker.Unsubscribe<NetworkMissionEntered>(Handle_MissionEntered);
+        messageBroker.Unsubscribe<NetworkMissionLeft>(Handle_MissionLeft);
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
     }
 
-    private void Handle_MissionEntered(MessagePayload<MissionEntered> payload)
+    private void Handle_MissionEntered(MessagePayload<NetworkMissionEntered> payload)
     {
         var peer = (NetPeer)payload.Who;
         var message = payload.What;
@@ -56,7 +56,7 @@ public class ServerMissionMembershipHandler : IHandler
         }
     }
 
-    private void Handle_MissionLeft(MessagePayload<MissionLeft> payload)
+    private void Handle_MissionLeft(MessagePayload<NetworkMissionLeft> payload)
     {
         var peer = (NetPeer)payload.Who;
         var message = payload.What;

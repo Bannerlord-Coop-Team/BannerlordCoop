@@ -15,6 +15,8 @@ public class MockClient : MockNetworkBase, ICoopClient
 
     public Guid ClientId => throw new NotImplementedException();
 
+    public IPEndPoint ServerEndpoint => throw new NotImplementedException();
+
     public void OnConnectionRequest(ConnectionRequest request)
     {
         throw new NotImplementedException();

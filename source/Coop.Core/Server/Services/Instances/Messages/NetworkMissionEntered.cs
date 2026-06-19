@@ -14,7 +14,7 @@ namespace Coop.Core.Server.Services.Instances.Messages;
 /// </para>
 /// </summary>
 [ProtoContract]
-public readonly struct MissionEntered : IEvent
+public readonly struct NetworkMissionEntered : IEvent
 {
     [ProtoMember(1)]
     public readonly string ControllerId;
@@ -22,7 +22,7 @@ public readonly struct MissionEntered : IEvent
     [ProtoMember(2)]
     public readonly string InstanceId;
 
-    public MissionEntered(string controllerId, string instanceId)
+    public NetworkMissionEntered(string controllerId, string instanceId)
     {
         ControllerId = controllerId;
         InstanceId = instanceId;

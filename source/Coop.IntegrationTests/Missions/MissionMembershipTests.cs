@@ -78,11 +78,11 @@ public class MissionMembershipTests
 
     /// <summary>Simulates the server receiving a MissionEntered over the member's connection.</summary>
     private void Join(Member member) =>
-        TestEnvironment.Server.SimulateMessage(member.Instance.NetPeer, new MissionEntered(member.ControllerId, InstanceId));
+        TestEnvironment.Server.SimulateMessage(member.Instance.NetPeer, new NetworkMissionEntered(member.ControllerId, InstanceId));
 
     /// <summary>Simulates the server receiving a MissionLeft over the member's connection.</summary>
     private void Leave(Member member) =>
-        TestEnvironment.Server.SimulateMessage(member.Instance.NetPeer, new MissionLeft(member.ControllerId, InstanceId));
+        TestEnvironment.Server.SimulateMessage(member.Instance.NetPeer, new NetworkMissionLeft(member.ControllerId, InstanceId));
 
     /// <summary>
     /// Asserts the server's instance controllers equal the present members, and each present member's

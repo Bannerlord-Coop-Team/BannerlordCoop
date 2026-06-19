@@ -12,8 +12,8 @@ namespace Coop.Core.Client.Missions.Handlers;
 
 /// <summary>
 /// Client → server relay membership. When the local player enters or leaves a location mission, this
-/// announces it to the server over the campaign connection as <see cref="MissionEntered"/> /
-/// <see cref="MissionLeft"/> so the server can map this controller to its connection for the relay
+/// announces it to the server over the campaign connection as <see cref="NetworkMissionEntered"/> /
+/// <see cref="NetworkMissionLeft"/> so the server can map this controller to its connection for the relay
 /// fallback. The instance id comes from <see cref="LocationInstanceId"/> — the same ObjectManager-id
 /// derivation the P2P punch uses (see CoopTavernsController), so both land in one server-side instance.
 /// </summary>
@@ -62,7 +62,7 @@ public class ClientMissionMembershipHandler : IHandler
         }
 
         currentInstanceId = instanceId;
-        network.SendAll(new MissionEntered(controllerIdProvider.ControllerId, instanceId));
+        network.SendAll(new NetworkMissionEntered(controllerIdProvider.ControllerId, instanceId));
         Logger.Information("[Relay] Announced MissionEntered for instance {Instance}", instanceId);
     }
 
@@ -70,7 +70,7 @@ public class ClientMissionMembershipHandler : IHandler
     {
         if (currentInstanceId == null) return;
 
-        network.SendAll(new MissionLeft(controllerIdProvider.ControllerId, currentInstanceId));
+        network.SendAll(new NetworkMissionLeft(controllerIdProvider.ControllerId, currentInstanceId));
         Logger.Information("[Relay] Announced MissionLeft for instance {Instance}", currentInstanceId);
         currentInstanceId = null;
     }
