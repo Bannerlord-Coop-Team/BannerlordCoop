@@ -1,9 +1,10 @@
-﻿using Common;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
+using GameInterface.Services.Kingdoms;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Interfaces;
@@ -72,6 +73,12 @@ public class ServerSettlementExitEnterHandler : IHandler
         var payload = obj.What;
         var peer = (NetPeer)obj.Who;
 
+        objectManager.TryGetObject<MobileParty>(payload.PartyId, out var mobileParty);
+        if (KingdomCreationSettlementTracker.TryConsumeLeave(mobileParty, payload.PartyId))
+        {
+            return;
+        }
+
         // The sending client is currently in a settlement encounter, this is handled
         // slightly differently from ai or other clients parties
         network.Send(peer, new NetworkEndSettlementEncounter());
@@ -103,6 +110,11 @@ public class ServerSettlementExitEnterHandler : IHandler
         var payload = obj.What;
 
         if (!objectManager.TryGetIdWithLogging(payload.MobileParty, out var mobilePartyId)) return;
+
+        if (KingdomCreationSettlementTracker.TryConsumeLeave(payload.MobileParty, mobilePartyId))
+        {
+            return;
+        }
 
         network.SendAll(new NetworkPartyLeaveSettlement(mobilePartyId));
 

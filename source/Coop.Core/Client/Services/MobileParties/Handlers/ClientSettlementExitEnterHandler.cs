@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Util;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
+using GameInterface.Services.Kingdoms;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Interfaces;
@@ -83,6 +84,11 @@ public class ClientSettlementExitEnterHandler : IHandler
         var payload = obj.What;
 
         if (!objectManager.TryGetIdWithLogging(payload.Party, out var partyId)) return;
+
+        if (KingdomCreationSettlementTracker.TryConsumeLeave(payload.Party, partyId))
+        {
+            return;
+        }
 
         var message = new NetworkRequestEndSettlementEncounter(partyId);
 

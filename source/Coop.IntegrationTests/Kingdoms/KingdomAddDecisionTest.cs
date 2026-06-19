@@ -52,5 +52,30 @@ namespace Coop.IntegrationTests.Kingdoms
                 Assert.Equal(1, client.InternalMessages.GetMessageCount<AddDecision>());
             }
         }
+
+        [Fact]
+        public void ClientKingdom_AddDecision_Publishes_ServerCommand()
+        {
+            // Arrange
+            var client1 = TestEnvironment.Clients.First();
+            var server = TestEnvironment.Server;
+            var kingdom = client1.CreateRegisteredObject<Kingdom>("kingdom1");
+            server.CreateRegisteredObject<Kingdom>("kingdom1");
+
+            var data = new ExpelClanFromKingdomDecisionData(
+                "clan1", "kingdom1", 0, false, false, false, "clan1", "kingdom1");
+
+            var triggerMessage = new DecisionAdded(kingdom, data, false, 0f);
+
+            // Act
+            client1.SimulateMessage(this, triggerMessage);
+
+            // Assert
+            Assert.Equal(1, client1.NetworkSentMessages.GetMessageCount<NetworkAddDecision>());
+            Assert.Equal(1, server.InternalMessages.GetMessageCount<NetworkAddDecision>());
+            Assert.Equal(1, server.InternalMessages.GetMessageCount<AddDecision>());
+            Assert.Equal(0, client1.InternalMessages.GetMessageCount<AddDecision>());
+            Assert.Equal(1, TestEnvironment.Clients.Skip(1).First().InternalMessages.GetMessageCount<AddDecision>());
+        }
     }
 }

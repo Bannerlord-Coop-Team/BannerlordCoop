@@ -133,5 +133,6 @@ namespace Coop.IntegrationTests.MobileParties
                     .Verify(s => s.PartyLeaveSettlement(party), Times.Once);
             }
         }
+
     }
 }

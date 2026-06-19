@@ -6,6 +6,7 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface;
 using GameInterface.AutoSync;
+using GameInterface.Services.Kingdoms;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Utils;
 using HarmonyLib;
@@ -40,6 +41,9 @@ internal class E2ETestEnvironment : IDisposable
 
     public E2ETestEnvironment(ITestOutputHelper output, int numClients = 2)
     {
+        KingdomCreationSettlementTracker.Reset();
+        KingdomDecisionVoteManager.Reset();
+
         TestOutputCallback = (logMessage) => output.WriteLine(logMessage);
 
         // Setup logging for tests
@@ -91,6 +95,8 @@ internal class E2ETestEnvironment : IDisposable
 
             OutputSinkManager.RemoveLogCallback(TestOutputCallback);
             ContainerProvider.Clear();
+            KingdomCreationSettlementTracker.Reset();
+            KingdomDecisionVoteManager.Reset();
         }
         finally
         {

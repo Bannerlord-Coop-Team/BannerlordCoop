@@ -1,10 +1,17 @@
 ﻿using Autofac;
 using Common;
+using Common.Extensions;
+using Common.Logging;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Kingdoms.Handlers;
-using GameInterface.Services.Kingdoms.Messages.Collections;
+using GameInterface.Services.Kingdoms.Data;
+using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -22,6 +29,8 @@ namespace GameInterface.Services.Kingdoms.Commands;
 /// </summary>
 public class KingdomDebugCommand
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<KingdomDebugCommand>();
+
     private enum CollectionTarget
     {
         Armies,
@@ -31,6 +40,7 @@ public class KingdomDebugCommand
         AliveLordsCache,
         DeadLordsCache,
         SettlementsCache,
+        TownsCache,
         VillagesCache,
         WarPartyComponentsCache,
     }
@@ -52,6 +62,10 @@ public class KingdomDebugCommand
     private static readonly string AddSettlementClaimantDecisionUsage = "Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> SettlementClaimantDecision <settlementId> <capturerHeroId> <clanToExcludeId>";
     private static readonly string AddSettlementClaimantPreliminaryDecisionUsage = "Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> SettlementClaimantPreliminaryDecision <SettlementId>";
     private static readonly string AddMakePeaceKingdomDecisionUsage = "Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> MakePeaceKingdomDecision <factionId> <dailyTribute> <applyResults>";
+    private static readonly string AddAcceptCallToWarAgreementDecisionUsage = "Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> AcceptCallToWarAgreementDecision <callingKingdomId> <kingdomToCallToWarAgainstId>";
+    private static readonly string AddProposeCallToWarAgreementDecisionUsage = "Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> ProposeCallToWarAgreementDecision <calledKingdomId> <kingdomToCallToWarAgainstId>";
+    private static readonly string AddStartAllianceDecisionUsage = "Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> StartAllianceDecision <kingdomToStartAllianceWithId>";
+    private static readonly string AddTradeAgreementDecisionUsage = "Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> TradeAgreementDecision <targetKingdomId>";
     private delegate bool KingdomDecisionDelegate(IObjectManager objectManager, List<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message);
     private static readonly Dictionary<string, KingdomDecisionDelegate> TryGetKingdomDecisionFunc = new Dictionary<string, KingdomDecisionDelegate>()
         {
@@ -61,6 +75,10 @@ public class KingdomDebugCommand
             { nameof(KingdomPolicyDecision), TryGetKingdomPolicyDecision },
             { nameof(SettlementClaimantDecision), TryGetSettlementClaimantDecision },
             { nameof(SettlementClaimantPreliminaryDecision), TryGetSettlementClaimantPreliminaryDecision },
+            { nameof(AcceptCallToWarAgreementDecision), TryGetAcceptCallToWarAgreementDecision },
+            { nameof(ProposeCallToWarAgreementDecision), TryGetProposeCallToWarAgreementDecision },
+            { nameof(StartAllianceDecision), TryGetStartAllianceDecision },
+            { nameof(TradeAgreementDecision), TryGetTradeAgreementDecision },
             //{ nameof(MakePeaceKingdomDecision), TryGetMakePeaceKingdomDecision },
         };
 
@@ -76,6 +94,14 @@ public class KingdomDebugCommand
         if (ContainerProvider.TryGetContainer(out var container) == false) return false;
 
         return container.TryResolve(out objectManager);
+    }
+
+    private static bool TryGetPlayerManager(out IPlayerManager playerManager)
+    {
+        playerManager = null;
+        if (ContainerProvider.TryGetContainer(out var container) == false) return false;
+
+        return container.TryResolve(out playerManager);
     }
 
 
@@ -99,6 +125,82 @@ public class KingdomDebugCommand
         return stringBuilder.ToString();
     }
 
+    // coop.debug.kingdom.force_player_join_kingdom
+    /// <summary>
+    /// Forces a registered co-op player's clan to join a kingdom. Server only.
+    /// </summary>
+    /// <param name="args">controller id, kingdom id</param>
+    /// <returns>result message</returns>
+    [CommandLineArgumentFunction("force_player_join_kingdom", "coop.debug.kingdom")]
+    public static string ForcePlayerJoinKingdom(List<string> args)
+    {
+        if (!ModInformation.IsServer)
+        {
+            return "This command can only be run on the server.";
+        }
+
+        if (args.Count < 2)
+        {
+            return "Usage: coop.debug.kingdom.force_player_join_kingdom <controllerId> <kingdomId>";
+        }
+
+        if (TryGetPlayerManager(out var playerManager) == false)
+        {
+            return "Unable to resolve PlayerManager";
+        }
+
+        if (TryGetObjectManager(out var objectManager) == false)
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        string controllerId = args[0];
+        string kingdomId = args[1];
+
+        if (!playerManager.TryGetPlayer(controllerId, out var player))
+        {
+            return $"Player not found with controller id: {controllerId}";
+        }
+
+        if (string.IsNullOrEmpty(player.ClanId))
+        {
+            return $"Player {controllerId} does not have a clan id.";
+        }
+
+        if (!objectManager.TryGetObject(player.ClanId, out Clan clan))
+        {
+            return $"Clan not found for player {controllerId} with clan id: {player.ClanId}";
+        }
+
+        if (!objectManager.TryGetObject(kingdomId, out Kingdom kingdom))
+        {
+            return $"Kingdom not found with id: {kingdomId}";
+        }
+
+        Kingdom previousKingdom = clan.Kingdom;
+        if (previousKingdom == kingdom)
+        {
+            return $"Player {controllerId}'s clan {clan.StringId} is already in kingdom {kingdom.StringId}.";
+        }
+
+        // Server-authoritative apply: run with patches live (no AllowedThread) so membership
+        // and fief collection changes replicate to clients.
+        KingdomMembershipState.MoveClanToKingdom(
+            previousKingdom,
+            kingdom,
+            clan,
+            publishCollectionChanges: true);
+
+        if (clan.Kingdom != kingdom)
+        {
+            string currentKingdomId = clan.Kingdom?.StringId ?? "<none>";
+            return $"Tried to force player {controllerId}'s clan {clan.StringId} to join {kingdom.StringId}, but current kingdom is {currentKingdomId}.";
+        }
+
+        string previousKingdomId = previousKingdom?.StringId ?? "<none>";
+        return $"Forced player {controllerId}'s clan {clan.StringId} to join kingdom {kingdom.StringId}. Previous kingdom: {previousKingdomId}.";
+    }
+
     // coop.debug.kingdom.add_decision_usage
     /// <summary>
     /// Lists all the usages of add_decision command.
@@ -118,6 +220,10 @@ public class KingdomDebugCommand
         stringBuilder.Append($"{AddSettlementClaimantDecisionUsage}\n");
         stringBuilder.Append($"{AddSettlementClaimantPreliminaryDecisionUsage}\n");
         stringBuilder.Append($"{AddMakePeaceKingdomDecisionUsage}\n");
+        stringBuilder.Append($"{AddAcceptCallToWarAgreementDecisionUsage}\n");
+        stringBuilder.Append($"{AddProposeCallToWarAgreementDecisionUsage}\n");
+        stringBuilder.Append($"{AddStartAllianceDecisionUsage}\n");
+        stringBuilder.Append($"{AddTradeAgreementDecisionUsage}\n");
 
         return stringBuilder.ToString();
     }
@@ -173,6 +279,171 @@ public class KingdomDebugCommand
         }
 
         return stringBuilder.ToString();
+    }
+
+    // coop.debug.kingdom.decisions
+    /// <summary>
+    /// Lists active kingdom decisions and registered client vote state.
+    /// </summary>
+    /// <param name="args">first arg : kingdomId</param>
+    /// <returns>strings of all active kingdom decisions with client votes</returns>
+    [CommandLineArgumentFunction("decisions", "coop.debug.kingdom")]
+    public static string ListKingdomDecisionVotes(List<string> args)
+    {
+        if (args.Count < 1)
+        {
+            return "Usage: coop.debug.kingdom.decisions <kingdomId>";
+        }
+
+        if (TryGetObjectManager(out var objectManager) == false)
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        if (TryGetPlayerManager(out var playerManager) == false)
+        {
+            return "Unable to resolve PlayerManager";
+        }
+
+        if (objectManager.TryGetObject(args[0], out Kingdom kingdom) == false)
+        {
+            return $"ID: '{args[0]}' not found";
+        }
+
+        IReadOnlyList<KingdomDecisionVoteManager.KingdomDecisionDebugInfo> decisionInfos =
+            KingdomDecisionVoteManager.GetDecisionDebugInfo(kingdom);
+
+        StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.AppendLine($"Active decisions of Kingdom: {kingdom.Name} ({kingdom.StringId})");
+        stringBuilder.AppendLine($"Registered clients: {playerManager.Players.Count}");
+
+        if (decisionInfos.Count == 0)
+        {
+            stringBuilder.AppendLine("(none)");
+            return stringBuilder.ToString();
+        }
+
+        foreach (KingdomDecisionVoteManager.KingdomDecisionDebugInfo decisionInfo in decisionInfos)
+        {
+            stringBuilder.AppendLine($"{decisionInfo.DecisionIndex + 1}. {decisionInfo.DecisionType}");
+            if (decisionInfo.ClientVotes.Count == 0)
+            {
+                stringBuilder.AppendLine("  Clients: (none registered)");
+                continue;
+            }
+
+            foreach (KingdomDecisionVoteManager.KingdomDecisionClientVoteDebugInfo clientVote in decisionInfo.ClientVotes)
+            {
+                string clanId = string.IsNullOrWhiteSpace(clientVote.ClanId) ? "<none>" : clientVote.ClanId;
+                stringBuilder.Append($"  - {clientVote.ControllerId} | Clan: {clientVote.ClanName} ({clanId}) | {clientVote.Status}");
+
+                if (!string.IsNullOrWhiteSpace(clientVote.SupportWeight))
+                {
+                    stringBuilder.Append($" | Support: {clientVote.SupportWeight}");
+                }
+
+                if (clientVote.HasVote && !clientVote.IsFinal)
+                {
+                    stringBuilder.Append(" | Not Final");
+                }
+
+                stringBuilder.AppendLine();
+            }
+        }
+
+        return stringBuilder.ToString();
+    }
+
+    // coop.debug.kingdom.list_decision_outcomes
+    /// <summary>
+    /// Lists the outcomes for a queued kingdom decision.
+    /// </summary>
+    /// <param name="args">first arg : kingdomId ; second arg : 1-based decision index</param>
+    /// <returns>strings of all outcomes of a decision</returns>
+    [CommandLineArgumentFunction("list_decision_outcomes", "coop.debug.kingdom")]
+    public static string ListKingdomDecisionOutcomes(List<string> args)
+    {
+        if (!TryGetKingdomDecisionByIndex(args, out Kingdom kingdom, out KingdomDecision decision, out int _, out string message))
+        {
+            return message;
+        }
+
+        KingdomElection election = new KingdomElection(decision);
+        election.Setup();
+        election.DetermineSupport(election._possibleOutcomes, false);
+        decision.DetermineSponsors(election._possibleOutcomes);
+        election.UpdateSupport(election._possibleOutcomes);
+
+        StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.Append($"Decision outcomes for {decision.GetType().Name} in {kingdom.Name}:\n");
+        for (int i = 0; i < election._possibleOutcomes.Count; i++)
+        {
+            DecisionOutcome outcome = election._possibleOutcomes[i];
+            string sponsor = outcome.SponsorClan == null ? "<none>" : outcome.SponsorClan.StringId;
+            stringBuilder.Append($"{i + 1}. {outcome.GetDecisionTitle()} Sponsor: {sponsor} Support: {outcome.TotalSupportPoints}\n");
+        }
+        stringBuilder.Append("Use support weights: Choose, StayNeutral, SlightlyFavor, StronglyFavor, FullyPush.\n");
+        return stringBuilder.ToString();
+    }
+
+    // coop.debug.kingdom.vote_decision
+    /// <summary>
+    /// Requests a vote for a queued kingdom decision from the local client.
+    /// </summary>
+    /// <param name="args">kingdomId, 1-based decision index, 1-based outcome index or abstain, support weight</param>
+    /// <returns>result message</returns>
+    [CommandLineArgumentFunction("vote_decision", "coop.debug.kingdom")]
+    public static string VoteKingdomDecision(List<string> args)
+    {
+        if (!TryGetKingdomDecisionByIndex(args, out Kingdom kingdom, out KingdomDecision decision, out int decisionIndex, out string message))
+        {
+            return message;
+        }
+
+        if (args.Count < 4)
+        {
+            return "Usage: coop.debug.kingdom.vote_decision <kingdomId> <decisionIndex> <outcomeIndex|abstain> <supportWeight>";
+        }
+
+        bool isAbstain = args[2].Equals("abstain", StringComparison.OrdinalIgnoreCase);
+        int outcomeIndex = -1;
+        if (!isAbstain)
+        {
+            if (!int.TryParse(args[2], out int parsedOutcomeIndex))
+            {
+                return $"Outcome index is not a number: {args[2]}";
+            }
+            outcomeIndex = parsedOutcomeIndex - 1;
+        }
+
+        if (!TryParseSupportWeight(args[3], out Supporter.SupportWeights supportWeight))
+        {
+            return $"Support weight is invalid: {args[3]}. Use Choose, StayNeutral, SlightlyFavor, StronglyFavor, or FullyPush.";
+        }
+
+        MessageBroker.Instance.Publish(decision, new KingdomDecisionVoteRequested(
+            new KingdomDecisionVoteData(kingdom.StringId, decisionIndex, outcomeIndex, (int)supportWeight, isAbstain)));
+
+        return $"Requested vote for {decision.GetType().Name}: outcome={args[2]}, support={supportWeight}.";
+    }
+
+    // coop.debug.kingdom.resolve_decision
+    /// <summary>
+    /// Forces a queued player kingdom decision to resolve through the coop vote manager.
+    /// </summary>
+    /// <param name="args">kingdomId, 1-based decision index</param>
+    /// <returns>result message</returns>
+    [CommandLineArgumentFunction("resolve_decision", "coop.debug.kingdom")]
+    public static string ResolveKingdomDecision(List<string> args)
+    {
+        if (!TryGetKingdomDecisionByIndex(args, out Kingdom _, out KingdomDecision decision, out int _, out string message))
+        {
+            return message;
+        }
+
+        return KingdomDecisionVoteManager.TryResolveDecision(decision, force: true)
+            ? $"Resolved {decision.GetType().Name} through player vote manager."
+            : $"Could not resolve {decision.GetType().Name} through player vote manager.";
     }
 
     // coop.debug.kingdom.list_policies
@@ -398,10 +669,7 @@ public class KingdomDebugCommand
             return resolveMessage;
         }
 
-        using (new AllowedThread())
-        {
-            ApplyCollectionChange(kingdom, collectionType, operation, value);
-        }
+        ApplyCollectionChange(kingdom, collectionType, operation, value);
 
         return $"{operation} {args[2]} in {args[0]} for kingdom {args[1]}.";
     }
@@ -484,6 +752,9 @@ public class KingdomDebugCommand
             case "settlementscache":
                 collectionType = CollectionTarget.SettlementsCache;
                 return true;
+            case "townscache":
+                collectionType = CollectionTarget.TownsCache;
+                return true;
             case "villagescache":
                 collectionType = CollectionTarget.VillagesCache;
                 return true;
@@ -491,7 +762,7 @@ public class KingdomDebugCommand
                 collectionType = CollectionTarget.WarPartyComponentsCache;
                 return true;
             default:
-                message = "Unknown collection. Valid values: activePolicies, armies, clans, fiefsCache, heroesCache, lordsCache, aliveLordsCache, deadLordsCache, settlementsCache, unresolvedDecisions, villagesCache, warPartyComponentsCache.";
+                message = "Unknown collection. Valid values: activePolicies, armies, clans, fiefsCache, heroesCache, lordsCache, aliveLordsCache, deadLordsCache, settlementsCache, townsCache, unresolvedDecisions, villagesCache, warPartyComponentsCache.";
                 return false;
         }
     }
@@ -512,6 +783,7 @@ public class KingdomDebugCommand
             CollectionTarget.AliveLordsCache => kingdom._aliveLordsCache?.Cast<object>() ?? Enumerable.Empty<object>(),
             CollectionTarget.DeadLordsCache => kingdom._deadLordsCache?.Cast<object>() ?? Enumerable.Empty<object>(),
             CollectionTarget.SettlementsCache => kingdom._settlementsCache?.Cast<object>() ?? Enumerable.Empty<object>(),
+            CollectionTarget.TownsCache => kingdom._townsCache?.Cast<object>() ?? Enumerable.Empty<object>(),
             CollectionTarget.VillagesCache => kingdom._villagesCache?.Cast<object>() ?? Enumerable.Empty<object>(),
             CollectionTarget.WarPartyComponentsCache => kingdom._warPartyComponentsCache?.Cast<object>() ?? Enumerable.Empty<object>(),
             _ => Enumerable.Empty<object>(),
@@ -529,110 +801,105 @@ public class KingdomDebugCommand
             case CollectionTarget.Armies:
                 if (operation == CollectionOperation.Add)
                 {
-                    MessageBroker.Instance.Publish(kingdom, new ArmyListUpdated(kingdom, (Army)value));
-                    KingdomCollectionHandler.ApplyArmyListUpdate(kingdom, (Army)value);
+                    KingdomCollectionSync.AddArmy(kingdom, (Army)value, publish: true);
                 }
                 else
                 {
-                    MessageBroker.Instance.Publish(kingdom, new ArmyListRemoved(kingdom, (Army)value));
-                    KingdomCollectionHandler.ApplyArmyListRemove(kingdom, (Army)value);
+                    KingdomCollectionSync.RemoveArmy(kingdom, (Army)value, publish: true);
                 }
                 break;
             case CollectionTarget.Clans:
                 if (operation == CollectionOperation.Add)
                 {
-                    MessageBroker.Instance.Publish(kingdom, new ClanListUpdated(kingdom, (Clan)value));
-                    KingdomCollectionHandler.ApplyClanListUpdate(kingdom, (Clan)value);
+                    KingdomCollectionSync.AddClan(kingdom, (Clan)value, publish: true);
                 }
                 else
                 {
-                    MessageBroker.Instance.Publish(kingdom, new ClanListRemoved(kingdom, (Clan)value));
-                    KingdomCollectionHandler.ApplyClanListRemove(kingdom, (Clan)value);
+                    KingdomCollectionSync.RemoveClan(kingdom, (Clan)value, publish: true);
                 }
                 break;
             case CollectionTarget.FiefsCache:
                 if (operation == CollectionOperation.Add)
                 {
-                    MessageBroker.Instance.Publish(kingdom, new FiefsCacheUpdated(kingdom, (Town)value));
-                    KingdomCollectionHandler.ApplyFiefsCacheUpdate(kingdom, (Town)value);
+                    KingdomCollectionSync.AddFief(kingdom, (Town)value, publish: true);
                 }
                 else
                 {
-                    MessageBroker.Instance.Publish(kingdom, new FiefsCacheRemoved(kingdom, (Town)value));
-                    KingdomCollectionHandler.ApplyFiefsCacheRemove(kingdom, (Town)value);
+                    KingdomCollectionSync.RemoveFief(kingdom, (Town)value, publish: true);
                 }
                 break;
             case CollectionTarget.HeroesCache:
                 if (operation == CollectionOperation.Add)
                 {
-                    MessageBroker.Instance.Publish(kingdom, new HeroesCacheUpdated(kingdom, (Hero)value));
-                    KingdomCollectionHandler.ApplyHeroesCacheUpdate(kingdom, (Hero)value);
+                    KingdomCollectionSync.AddHero(kingdom, (Hero)value, publish: true);
                 }
                 else
                 {
-                    MessageBroker.Instance.Publish(kingdom, new HeroesCacheRemoved(kingdom, (Hero)value));
-                    KingdomCollectionHandler.ApplyHeroesCacheRemove(kingdom, (Hero)value);
+                    KingdomCollectionSync.RemoveHero(kingdom, (Hero)value, publish: true);
                 }
                 break;
             case CollectionTarget.AliveLordsCache:
                 if (operation == CollectionOperation.Add)
                 {
-                    MessageBroker.Instance.Publish(kingdom, new AliveLordsCacheUpdated(kingdom, (Hero)value));
-                    KingdomCollectionHandler.ApplyAliveLordsCacheUpdate(kingdom, (Hero)value);
+                    KingdomCollectionSync.AddAliveLord(kingdom, (Hero)value, publish: true);
                 }
                 else
                 {
-                    MessageBroker.Instance.Publish(kingdom, new AliveLordsCacheRemoved(kingdom, (Hero)value));
-                    KingdomCollectionHandler.ApplyAliveLordsCacheRemove(kingdom, (Hero)value);
+                    KingdomCollectionSync.RemoveAliveLord(kingdom, (Hero)value, publish: true);
                 }
                 break;
             case CollectionTarget.DeadLordsCache:
                 if (operation == CollectionOperation.Add)
                 {
-                    MessageBroker.Instance.Publish(kingdom, new DeadLordsCacheUpdated(kingdom, (Hero)value));
-                    KingdomCollectionHandler.ApplyDeadLordsCacheUpdate(kingdom, (Hero)value);
+                    KingdomCollectionSync.AddDeadLord(kingdom, (Hero)value, publish: true);
                 }
                 else
                 {
-                    MessageBroker.Instance.Publish(kingdom, new DeadLordsCacheRemoved(kingdom, (Hero)value));
-                    KingdomCollectionHandler.ApplyDeadLordsCacheRemove(kingdom, (Hero)value);
+                    KingdomCollectionSync.RemoveDeadLord(kingdom, (Hero)value, publish: true);
                 }
                 break;
             case CollectionTarget.SettlementsCache:
                 if (operation == CollectionOperation.Add)
                 {
-                    MessageBroker.Instance.Publish(kingdom, new SettlementsCacheUpdated(kingdom, (Settlement)value));
-                    KingdomCollectionHandler.ApplySettlementsCacheUpdate(kingdom, (Settlement)value);
+                    KingdomCollectionSync.AddSettlement(kingdom, (Settlement)value, publish: true);
                 }
                 else
                 {
-                    MessageBroker.Instance.Publish(kingdom, new SettlementsCacheRemoved(kingdom, (Settlement)value));
-                    KingdomCollectionHandler.ApplySettlementsCacheRemove(kingdom, (Settlement)value);
+                    KingdomCollectionSync.RemoveSettlement(kingdom, (Settlement)value, publish: true);
+                }
+                break;
+            case CollectionTarget.TownsCache:
+                if (operation == CollectionOperation.Add)
+                {
+                    KingdomCollectionSync.AddTown(kingdom, (Town)value, publish: true);
+                }
+                else
+                {
+                    KingdomCollectionSync.RemoveTown(kingdom, (Town)value, publish: true);
                 }
                 break;
             case CollectionTarget.VillagesCache:
                 if (operation == CollectionOperation.Add)
                 {
-                    MessageBroker.Instance.Publish(kingdom, new VillagesCacheUpdated(kingdom, (Village)value));
-                    KingdomCollectionHandler.ApplyVillagesCacheUpdate(kingdom, (Village)value);
+                    KingdomCollectionSync.AddVillage(kingdom, (Village)value, publish: true);
                 }
                 else
                 {
-                    MessageBroker.Instance.Publish(kingdom, new VillagesCacheRemoved(kingdom, (Village)value));
-                    KingdomCollectionHandler.ApplyVillagesCacheRemove(kingdom, (Village)value);
+                    KingdomCollectionSync.RemoveVillage(kingdom, (Village)value, publish: true);
                 }
                 break;
             case CollectionTarget.WarPartyComponentsCache:
                 if (operation == CollectionOperation.Add)
                 {
-                    MessageBroker.Instance.Publish(kingdom, new WarPartyComponentsCacheUpdated(kingdom, (WarPartyComponent)value));
-                    KingdomCollectionHandler.ApplyWarPartyComponentsCacheUpdate(kingdom, (WarPartyComponent)value);
+                    KingdomCollectionSync.AddWarPartyComponent(kingdom, (WarPartyComponent)value, publish: true);
                 }
                 else
                 {
-                    MessageBroker.Instance.Publish(kingdom, new WarPartyComponentsCacheRemoved(kingdom, (WarPartyComponent)value));
-                    KingdomCollectionHandler.ApplyWarPartyComponentsCacheRemove(kingdom, (WarPartyComponent)value);
+                    KingdomCollectionSync.RemoveWarPartyComponent(kingdom, (WarPartyComponent)value, publish: true);
                 }
+                break;
+            default:
+                Logger.Error("Unable to apply collection change because {CollectionTarget} does not have a matching handler.", collectionType);
                 break;
         }
     }
@@ -691,6 +958,8 @@ public class KingdomDebugCommand
                 return TryResolve<Hero>(objectManager, valueId, out value, out message);
             case CollectionTarget.SettlementsCache:
                 return TryResolve<Settlement>(objectManager, valueId, out value, out message);
+            case CollectionTarget.TownsCache:
+                return TryResolve<Town>(objectManager, valueId, out value, out message);
             case CollectionTarget.VillagesCache:
                 return TryResolve<Village>(objectManager, valueId, out value, out message);
             case CollectionTarget.WarPartyComponentsCache:
@@ -718,6 +987,57 @@ public class KingdomDebugCommand
         value = resolved;
         message = string.Empty;
         return true;
+    }
+
+    private static bool TryGetKingdomDecisionByIndex(List<string> args, out Kingdom kingdom, out KingdomDecision decision, out int zeroBasedIndex, out string message)
+    {
+        kingdom = null;
+        decision = null;
+        zeroBasedIndex = -1;
+
+        if (args.Count < 2)
+        {
+            message = "Usage: <kingdomId> <decisionIndex>";
+            return false;
+        }
+
+        if (TryGetObjectManager(out var objectManager) == false)
+        {
+            message = "Unable to resolve ObjectManager";
+            return false;
+        }
+
+        if (objectManager.TryGetObject(args[0], out kingdom) == false)
+        {
+            message = $"Kingdom with ID: '{args[0]}' not found";
+            return false;
+        }
+
+        if (!int.TryParse(args[1], out int index))
+        {
+            message = $"Decision index is not a number: {args[1]}";
+            return false;
+        }
+
+        zeroBasedIndex = index - 1;
+        if (zeroBasedIndex < 0 || zeroBasedIndex >= kingdom._unresolvedDecisions.Count)
+        {
+            message = "Decision index is out of bounds.";
+            return false;
+        }
+
+        decision = kingdom._unresolvedDecisions[zeroBasedIndex];
+        message = string.Empty;
+        return true;
+    }
+
+    private static bool TryParseSupportWeight(string value, out Supporter.SupportWeights supportWeight)
+    {
+        if (Enum.TryParse(value, true, out supportWeight)) return true;
+        if (!int.TryParse(value, out int supportWeightValue)) return false;
+
+        supportWeight = (Supporter.SupportWeights)supportWeightValue;
+        return Enum.IsDefined(typeof(Supporter.SupportWeights), supportWeight);
     }
 
     // coop.debug..kingdom.add_decision
@@ -1031,6 +1351,104 @@ public class KingdomDebugCommand
         }
 
         kingdomDecision = new SettlementClaimantPreliminaryDecision(proposerClan, settlement);
+        message = string.Empty;
+        return true;
+    }
+
+    private static bool TryGetAcceptCallToWarAgreementDecision(IObjectManager objectManager, List<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message)
+    {
+        if (args.Count < 6)
+        {
+            kingdomDecision = null;
+            message = AddAcceptCallToWarAgreementDecisionUsage;
+            return false;
+        }
+
+        if (!objectManager.TryGetObject(args[4], out Kingdom callingKingdom))
+        {
+            kingdomDecision = null;
+            message = $"Argument5: Calling kingdom not found by id: {args[4]}";
+            return false;
+        }
+
+        if (!objectManager.TryGetObject(args[5], out Kingdom kingdomToCallToWarAgainst))
+        {
+            kingdomDecision = null;
+            message = $"Argument6: War target kingdom not found by id: {args[5]}";
+            return false;
+        }
+
+        kingdomDecision = new AcceptCallToWarAgreementDecision(proposerClan, callingKingdom, kingdomToCallToWarAgainst);
+        message = string.Empty;
+        return true;
+    }
+
+    private static bool TryGetProposeCallToWarAgreementDecision(IObjectManager objectManager, List<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message)
+    {
+        if (args.Count < 6)
+        {
+            kingdomDecision = null;
+            message = AddProposeCallToWarAgreementDecisionUsage;
+            return false;
+        }
+
+        if (!objectManager.TryGetObject(args[4], out Kingdom calledKingdom))
+        {
+            kingdomDecision = null;
+            message = $"Argument5: Called kingdom not found by id: {args[4]}";
+            return false;
+        }
+
+        if (!objectManager.TryGetObject(args[5], out Kingdom kingdomToCallToWarAgainst))
+        {
+            kingdomDecision = null;
+            message = $"Argument6: War target kingdom not found by id: {args[5]}";
+            return false;
+        }
+
+        kingdomDecision = new ProposeCallToWarAgreementDecision(proposerClan, calledKingdom, kingdomToCallToWarAgainst);
+        message = string.Empty;
+        return true;
+    }
+
+    private static bool TryGetStartAllianceDecision(IObjectManager objectManager, List<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message)
+    {
+        if (args.Count < 5)
+        {
+            kingdomDecision = null;
+            message = AddStartAllianceDecisionUsage;
+            return false;
+        }
+
+        if (!objectManager.TryGetObject(args[4], out Kingdom kingdomToStartAllianceWith))
+        {
+            kingdomDecision = null;
+            message = $"Argument5: Alliance target kingdom not found by id: {args[4]}";
+            return false;
+        }
+
+        kingdomDecision = new StartAllianceDecision(proposerClan, kingdomToStartAllianceWith);
+        message = string.Empty;
+        return true;
+    }
+
+    private static bool TryGetTradeAgreementDecision(IObjectManager objectManager, List<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message)
+    {
+        if (args.Count < 5)
+        {
+            kingdomDecision = null;
+            message = AddTradeAgreementDecisionUsage;
+            return false;
+        }
+
+        if (!objectManager.TryGetObject(args[4], out Kingdom targetKingdom))
+        {
+            kingdomDecision = null;
+            message = $"Argument5: Trade target kingdom not found by id: {args[4]}";
+            return false;
+        }
+
+        kingdomDecision = new TradeAgreementDecision(proposerClan, targetKingdom);
         message = string.Empty;
         return true;
     }

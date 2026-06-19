@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Extentions;
 using GameInterface.Policies;
+using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Kingdoms.Extentions;
 using GameInterface.Services.Kingdoms.Messages;
 using HarmonyLib;
@@ -27,7 +28,14 @@ namespace GameInterface.Services.Kingdoms.Patches
         {
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-            if (ModInformation.IsClient) return false;
+            if (ModInformation.IsClient)
+            {
+                float clientRandomNumber = ModifiedAddDecision(__instance, kingdomDecision, ignoreInfluenceCost);
+                MessageBroker.Instance.Publish(__instance,
+                    new DecisionAdded(__instance, kingdomDecision.ToKingdomDecisionData(), ignoreInfluenceCost, clientRandomNumber));
+                return false;
+            }
+
             float randomNumber = ModifiedAddDecision(__instance, kingdomDecision, ignoreInfluenceCost);
             MessageBroker.Instance.Publish(__instance,
                 new DecisionAdded(__instance, kingdomDecision.ToKingdomDecisionData(), ignoreInfluenceCost, randomNumber));
@@ -47,23 +55,15 @@ namespace GameInterface.Services.Kingdoms.Patches
 
         private static float ModifiedAddDecision(Kingdom __instance, KingdomDecision kingdomDecision, bool ignoreInfluenceCost, float? randomFloat = null)
         {
+            KingdomRegistry.EnsureRuntimeCollections(__instance);
+
             if (!ignoreInfluenceCost)
             {
                 Clan proposerClan = kingdomDecision.ProposerClan;
                 int influenceCost = kingdomDecision.GetInfluenceCost(proposerClan);
                 ChangeClanInfluenceAction.Apply(proposerClan, (float)(-(float)influenceCost));
             }
-            bool flag;
-            if (!kingdomDecision.DetermineChooser().Leader.IsHumanPlayerCharacter)
-            {
-                flag = kingdomDecision.DetermineSupporters().Any((Supporter x) => x.IsPlayer);
-            }
-            else
-            {
-                flag = true;
-            }
-
-            bool isPlayerInvolved = flag;
+            bool isPlayerInvolved = IsCoopPlayerInvolved(kingdomDecision);
             CampaignEventDispatcher.Instance.OnKingdomDecisionAdded(kingdomDecision, isPlayerInvolved);
 
             var playerParties = Campaign.Current.CampaignObjectManager.GetPlayerMobileParties();
@@ -75,7 +75,21 @@ namespace GameInterface.Services.Kingdoms.Patches
             }
 
             __instance._unresolvedDecisions.Add(kingdomDecision);
+            KingdomDecisionVoteManager.RegisterDecision(kingdomDecision);
             return default;
+        }
+
+        private static bool IsCoopPlayerInvolved(KingdomDecision kingdomDecision)
+        {
+            if (KingdomDecisionVoteManager.HasEligiblePlayerClan(kingdomDecision))
+            {
+                return true;
+            }
+
+            var playerParties = Campaign.Current?.CampaignObjectManager?.GetPlayerMobileParties();
+            if (playerParties == null) return false;
+
+            return playerParties.Any(party => party?.ActualClan?.Kingdom == kingdomDecision.Kingdom);
         }
 
         [HarmonyPatch(nameof(Kingdom.RemoveDecision))]
@@ -86,10 +100,14 @@ namespace GameInterface.Services.Kingdoms.Patches
 
             if (ModInformation.IsClient) return false;
 
-            var index = __instance._unresolvedDecisions.FindIndex(decision => decision == kingdomDecision);
+            KingdomRegistry.EnsureRuntimeCollections(__instance);
 
-            MessageBroker.Instance.Publish(__instance,
-                new DecisionRemoved(__instance, index));
+            var index = __instance._unresolvedDecisions?.FindIndex(decision => decision == kingdomDecision) ?? -1;
+            if (index >= 0)
+            {
+                MessageBroker.Instance.Publish(__instance,
+                    new DecisionRemoved(__instance, index));
+            }
 
             return true;
         }
@@ -113,6 +131,8 @@ namespace GameInterface.Services.Kingdoms.Patches
 
             if (ModInformation.IsClient) return false;
 
+            KingdomRegistry.EnsureRuntimeCollections(__instance);
+
             // Vanilla AddPolicy is an idempotent no-op when the policy is already active; only
             // announce a change that will actually take effect.
             if (!__instance.ActivePolicies.Contains(policy))
@@ -130,6 +150,8 @@ namespace GameInterface.Services.Kingdoms.Patches
 
             if (ModInformation.IsClient) return false;
 
+            KingdomRegistry.EnsureRuntimeCollections(__instance);
+
             // Vanilla RemovePolicy is an idempotent no-op when the policy is not active; only
             // announce a change that will actually take effect.
             if (__instance.ActivePolicies.Contains(policy))
@@ -145,6 +167,8 @@ namespace GameInterface.Services.Kingdoms.Patches
             {
                 using (new AllowedThread())
                 {
+                    KingdomRegistry.EnsureRuntimeCollections(kingdom);
+
                     if (isAdd)
                     {
                         kingdom.AddPolicy(policy);

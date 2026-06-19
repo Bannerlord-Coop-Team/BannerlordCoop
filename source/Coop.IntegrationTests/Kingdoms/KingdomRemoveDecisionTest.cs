@@ -2,8 +2,12 @@ using Coop.Core.Server.Services.Kingdoms.Messages;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Kingdoms.Messages;
-
+using GameInterface.Services.Kingdoms.Patches;
+using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Election;
+using TaleWorlds.Library;
+
 namespace Coop.IntegrationTests.Kingdoms
 {
     /// <summary>
@@ -43,6 +47,49 @@ namespace Coop.IntegrationTests.Kingdoms
             {
                 Assert.Equal(1, client.InternalMessages.GetMessageCount<RemoveDecision>());
             }
+        }
+
+        [Fact]
+        public void ServerKingdom_RemoveDecisionAction_PublishesExistingDecisionIndex()
+        {
+            var server = TestEnvironment.Server;
+            var kingdom = server.CreateRegisteredObject<Kingdom>("kingdom1");
+            var decision = CreateDecision();
+            foreach (var client in TestEnvironment.Clients)
+            {
+                client.CreateRegisteredObject<Kingdom>("kingdom1");
+            }
+
+            server.Call(() =>
+            {
+                kingdom._unresolvedDecisions = new MBList<KingdomDecision> { decision };
+                KingdomPatches.RemoveDecisionPrefix(kingdom, decision);
+            });
+
+            Assert.Single(server.NetworkSentMessages.GetMessages<NetworkRemoveDecision>(),
+                message => message.KingdomId == "kingdom1"
+                           && message.Index == 0);
+        }
+
+        [Fact]
+        public void ServerKingdom_RemoveDecisionAction_DoesNotPublishMissingDecision()
+        {
+            var server = TestEnvironment.Server;
+            var kingdom = server.CreateRegisteredObject<Kingdom>("kingdom1");
+            var decision = CreateDecision();
+
+            server.Call(() =>
+            {
+                kingdom._unresolvedDecisions = new MBList<KingdomDecision>();
+                KingdomPatches.RemoveDecisionPrefix(kingdom, decision);
+            });
+
+            Assert.Empty(server.NetworkSentMessages.GetMessages<NetworkRemoveDecision>());
+        }
+
+        private static KingdomDecision CreateDecision()
+        {
+            return (KingdomDecision)FormatterServices.GetUninitializedObject(typeof(ExpelClanFromKingdomDecision));
         }
     }
 }

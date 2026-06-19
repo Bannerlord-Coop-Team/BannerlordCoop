@@ -29,14 +29,9 @@ namespace GameInterface.Services.Kingdoms.Extentions
 
         public void StartElectionCoop()
         {
-            this.Setup();
-            this.DetermineSupport(this._possibleOutcomes, false);
-            this._decision.DetermineSponsors(this._possibleOutcomes);
-            this.UpdateSupport(this._possibleOutcomes);
+            this.SetupPlayerVoteElection();
             if (this._decision.ShouldBeCancelled())
             {
-                Debug.Print("SELIM_DEBUG - " + this._decision.GetSupportTitle() + " has been cancelled", 0, Debug.DebugColor.White, 17592186044416UL);
-                this.IsCancelled = true;
                 return;
             }
             if (!this.IsPlayerSupporter || this._ignorePlayerSupport)
@@ -53,6 +48,73 @@ namespace GameInterface.Services.Kingdoms.Extentions
             }
         }
 
+        public void SetupPlayerVoteElection()
+        {
+            this.Setup();
+            this.DetermineSupport(this._possibleOutcomes, false);
+            this._decision.DetermineSponsors(this._possibleOutcomes);
+            this.UpdateSupport(this._possibleOutcomes);
+            if (this._decision.ShouldBeCancelled())
+            {
+                this.IsCancelled = true;
+            }
+        }
+        
+        // TODO : If there are multiple clients in the same clan, only the leader of the clan should vote on issues
+        // This logic is intended to support that
+        public void ApplyClanVote(Clan clan, int outcomeIndex, Supporter.SupportWeights supportWeight, bool isAbstain)
+        {
+            Supporter supporter = new Supporter(clan);
+            supporter.SupportWeight = supportWeight;
+
+            foreach (DecisionOutcome outcome in this._possibleOutcomes)
+            {
+                outcome.ResetSupport(supporter);
+            }
+
+            if (isAbstain || outcomeIndex < 0 || outcomeIndex >= this._possibleOutcomes.Count)
+            {
+                if (this._chooser == clan)
+                {
+                    this._chosenOutcome = null;
+                }
+                return;
+            }
+
+            DecisionOutcome selectedOutcome = this._possibleOutcomes[outcomeIndex];
+            if (this._chooser == clan && this._decision.IsKingsVoteAllowed)
+            {
+                this._chosenOutcome = selectedOutcome;
+            }
+
+            selectedOutcome.AddSupport(supporter);
+        }
+
+        public DecisionOutcome ResolveWithCurrentVotes()
+        {
+            DecisionOutcome chosenOutcome = this.ChooseOutcomeWithCurrentVotes();
+            this.ApplyChosenOutcomeCoop();
+            return chosenOutcome;
+        }
+
+        public DecisionOutcome ChooseOutcomeWithCurrentVotes()
+        {
+            this.DetermineOfficialSupport();
+            if (this._chosenOutcome == null)
+            {
+                this._chosenOutcome = this.GetAiChoiceCoop(this._possibleOutcomes);
+            }
+            return this._chosenOutcome;
+        }
+
+        public void ApplyChosenOutcomeCoop()
+        {
+            if (this._decision.OnShowDecision())
+            {
+                this.ApplyChosenOutcome();
+            }
+        }
+
         private void ReadyToAiChooseCoop()
         {
             this._chosenOutcome = this.GetAiChoiceCoop(this._possibleOutcomes);
@@ -62,7 +124,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
             }
         }
 
-        private DecisionOutcome GetAiChoiceCoop(MBReadOnlyList<DecisionOutcome> possibleOutcomes)
+        public DecisionOutcome GetAiChoiceCoop(MBReadOnlyList<DecisionOutcome> possibleOutcomes)
         {
             this.DetermineOfficialSupport();
             DecisionOutcome decisionOutcome = possibleOutcomes.MaxBy((DecisionOutcome t) => t.TotalSupportPoints);

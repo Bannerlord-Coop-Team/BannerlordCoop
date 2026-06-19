@@ -2,6 +2,7 @@ using Coop.Core.Server.Services.Stances.Messages;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Stances.Messages;
+using GameInterface.Services.Stances.Patches;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 
@@ -39,6 +40,44 @@ namespace Coop.IntegrationTests.Stances
             foreach (EnvironmentInstance client in TestEnvironment.Clients)
             {
                 Assert.Equal(1, client.InternalMessages.GetMessageCount<MakePeaceChanged>());
+            }
+        }
+
+        [Fact]
+        public void ServerFaction_MakePeaceAction_Publishes_AllClients()
+        {
+            // Arrange
+            var server = TestEnvironment.Server;
+            var kingdom1 = server.CreateRegisteredObject<Kingdom>("kingdom1");
+            var kingdom2 = server.CreateRegisteredObject<Kingdom>("kingdom2");
+
+            // Act
+            server.Call(() =>
+            {
+                MakePeaceActionPatch.Prefix(
+                    kingdom1,
+                    kingdom2,
+                    dailyTributeFrom1To2: 50,
+                    dailyTributeDuration: 30,
+                    detail: MakePeaceAction.MakePeaceDetail.ByKingdomDecision);
+            });
+
+            // Assert
+            Assert.Single(server.NetworkSentMessages.GetMessages<NetworkMakePeace>(),
+                message => message.Faction1Id == "kingdom1"
+                           && message.Faction2Id == "kingdom2"
+                           && message.DailyTribute == 50
+                           && message.DailyTributeDuration == 30
+                           && message.Detail == (int)MakePeaceAction.MakePeaceDetail.ByKingdomDecision);
+
+            foreach (EnvironmentInstance client in TestEnvironment.Clients)
+            {
+                Assert.Single(client.InternalMessages.GetMessages<MakePeaceChanged>(),
+                    message => message.Faction1Id == "kingdom1"
+                               && message.Faction2Id == "kingdom2"
+                               && message.DailyTribute == 50
+                               && message.DailyTributeDuration == 30
+                               && message.Detail == (int)MakePeaceAction.MakePeaceDetail.ByKingdomDecision);
             }
         }
     }
