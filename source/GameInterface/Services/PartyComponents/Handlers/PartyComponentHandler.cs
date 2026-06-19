@@ -215,6 +215,7 @@ internal class PartyComponentHandler : IHandler
                 using (new AllowedThread())
                 {
                     partyComponent.MobileParty = mobileParty;
+                    mobileParty._partyComponent = partyComponent;
                 }
             }
             catch (Exception e)
