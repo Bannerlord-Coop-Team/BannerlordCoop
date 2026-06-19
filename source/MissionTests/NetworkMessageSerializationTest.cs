@@ -7,9 +7,6 @@ using GameInterface.Missions.Services.Network.Messages;
 using GameInterface.Serialization;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Surrogates;
-using Missions.Services.Agents.Messages;
-using Missions.Services.Network.Data;
-using Missions.Services.Network.Messages;
 
 namespace IntroductionServerTests
 {
@@ -44,6 +41,7 @@ namespace IntroductionServerTests
             // not the CharacterObject itself — the receiver resolves it via IObjectManager. So this is a
             // straight string round-trip; no CharacterObject surrogate/registration needed.
             const string characterObjectId = "Test Character";
+            var agentId = Guid.NewGuid();
 
             NetworkMissionJoinInfo missionJoinInfo = new NetworkMissionJoinInfo(
                 characterObjectId,
@@ -51,7 +49,7 @@ namespace IntroductionServerTests
                 default,
                 default,
                 default,
-                Array.Empty<AiAgentData>());
+                Array.Empty<CoopAgentSpawnData>());
 
             byte[] bytes = serializer.Serialize(missionJoinInfo);
 
@@ -60,6 +58,7 @@ namespace IntroductionServerTests
             NetworkMissionJoinInfo newEvent = (NetworkMissionJoinInfo)serializer.Deserialize(bytes);
 
             Assert.Equal(characterObjectId, newEvent.CharacterObjectId);
+            Assert.Equal(agentId, newEvent.AgentId);
         }
 
         [Fact]

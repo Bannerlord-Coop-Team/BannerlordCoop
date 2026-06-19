@@ -4,13 +4,11 @@ using Common.Network;
 using Common.PacketHandlers;
 using Common.Serialization;
 using GameInterface;
+using GameInterface.Missions;
 using GameInterface.Missions.Arena;
 using GameInterface.Missions.Services.Network;
 using IntroServer.Config;
 using LiteNetLib;
-using Missions;
-using Missions.Services;
-using Missions.Services.Network;
 using System;
 using Xunit;
 

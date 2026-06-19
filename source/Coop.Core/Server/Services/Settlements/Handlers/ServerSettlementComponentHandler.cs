@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Coop.Core.Server.Services.Settlements.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Messages;
 using Serilog;

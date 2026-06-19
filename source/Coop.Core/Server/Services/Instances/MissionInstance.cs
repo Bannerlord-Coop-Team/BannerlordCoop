@@ -65,6 +65,10 @@ internal class MissionInstance
     public bool TryGetPeer(string controllerId, out NetPeer peer) =>
         controllerToPeer.TryGetValue(controllerId, out peer);
 
+    /// <summary>Resolve a member's controller id from its connection (e.g. on disconnect).</summary>
+    public bool TryGetController(NetPeer peer, out string controllerId) =>
+        peerToController.TryGetValue(peer, out controllerId);
+
     /// <summary>
     /// Resolve the live connections for a set of controller ids (a RelayPacket's recipients), skipping
     /// any id with no current mapping (e.g. a member that has already dropped).

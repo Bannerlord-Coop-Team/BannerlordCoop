@@ -1,6 +1,4 @@
-﻿using GameInterface.Missions;
-using LiteNetLib;
-using Missions.Services.Network;
+using GameInterface.Missions;
 using System;
 using System.Runtime.Serialization;
 using TaleWorlds.MountAndBlade;
@@ -10,53 +8,67 @@ namespace MissionTests
 {
     public class NetworkAgentRegistryTests
     {
-        NetworkAgentRegistry networkAgentRegistry = new NetworkAgentRegistry();
+        private readonly NetworkAgentRegistry registry = new NetworkAgentRegistry();
 
-        [Fact]
-        public void FullTestLocal()
+        private static Agent NewAgent(int age)
         {
-            Agent newAgent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
-            newAgent.Age = 10;
-            string guid = Guid.NewGuid().ToString();
-
-            networkAgentRegistry.RegisterControlledAgent(guid, newAgent);
-
-            networkAgentRegistry.TryGetAgent(guid, out Agent testAgent);
-            networkAgentRegistry.TryGetAgentId(testAgent, out string testId);
-
-            Assert.True(networkAgentRegistry.IsControlled(newAgent));
-            Assert.True(networkAgentRegistry.IsControlled(guid));
-            Assert.True(networkAgentRegistry.IsAgentRegistered(newAgent));
-            Assert.True(networkAgentRegistry.IsAgentRegistered(guid));
-            Assert.Equal(guid, testId);
-            Assert.Equal(newAgent.Age, testAgent.Age);
-            Assert.Equal(newAgent, testAgent);
+            var agent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
+            agent.Age = age;
+            return agent;
         }
 
         [Fact]
-        public void FullTestRemote()
+        public void RegisterAgent_ResolvesByAgentAndId()
         {
-            Agent localAgent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
-            localAgent.Age = 11;
-            string localGuid = Guid.NewGuid().ToString();
-            networkAgentRegistry.RegisterControlledAgent(localGuid, localAgent);
+            var partyId = Guid.NewGuid();
+            var agentId = Guid.NewGuid();
+            var agent = NewAgent(10);
 
-            Agent remoteAgent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
-            remoteAgent.Age = 10;
-            string remoteGuid = Guid.NewGuid().ToString();
-            NetPeer netPeer = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
-            networkAgentRegistry.RegisterNetworkControlledAgent(netPeer, remoteGuid, remoteAgent);
+            Assert.True(registry.TryRegisterAgent(partyId, agentId, agent));
 
-            networkAgentRegistry.TryGetAgent(remoteGuid, out Agent resolvedAgent);
+            Assert.True(registry.TryGetAgentInfo(agent, out var byAgent));
+            Assert.True(registry.TryGetAgentInfo(agentId, out var byId));
 
-            Assert.Equal(remoteAgent, resolvedAgent);
-            Assert.Equal(remoteAgent.Age, resolvedAgent.Age);
+            Assert.Equal(agent, byAgent.Agent);
+            Assert.Equal(agentId, byAgent.AgentId);
+            Assert.Equal(partyId, byAgent.PartyId);
+            Assert.Equal(byAgent.AgentId, byId.AgentId);
+            Assert.Equal(byAgent.PartyId, byId.PartyId);
+        }
 
-            Assert.True(networkAgentRegistry.TryGetExternalController(remoteAgent, out var resolvedPeer));
-            Assert.Equal(netPeer, resolvedPeer);
+        [Fact]
+        public void RegisterAgent_DuplicateFails()
+        {
+            var partyId = Guid.NewGuid();
+            var agentId = Guid.NewGuid();
+            var agent = NewAgent(10);
 
-            Assert.True(networkAgentRegistry.TryGetExternalController(remoteGuid, out var resolvedPeerWithId));
-            Assert.Equal(netPeer, resolvedPeerWithId);
+            Assert.True(registry.TryRegisterAgent(partyId, agentId, agent));
+            Assert.False(registry.TryRegisterAgent(partyId, agentId, agent));          // same agent + id
+            Assert.False(registry.TryRegisterAgent(partyId, Guid.NewGuid(), agent));   // same agent, new id
+        }
+
+        [Fact]
+        public void RegisterAgent_RejectsEmptyIds()
+        {
+            var agent = NewAgent(10);
+
+            Assert.False(registry.TryRegisterAgent(Guid.Empty, Guid.NewGuid(), agent));
+            Assert.False(registry.TryRegisterAgent(Guid.NewGuid(), Guid.Empty, agent));
+            Assert.False(registry.TryRegisterAgent(Guid.NewGuid(), Guid.NewGuid(), null));
+        }
+
+        [Fact]
+        public void RemoveAgent_ClearsBothIndexes()
+        {
+            var agentId = Guid.NewGuid();
+            var agent = NewAgent(10);
+            registry.TryRegisterAgent(Guid.NewGuid(), agentId, agent);
+
+            Assert.True(registry.RemoveAgent(agentId));
+            Assert.False(registry.TryGetAgentInfo(agent, out _));
+            Assert.False(registry.TryGetAgentInfo(agentId, out _));
+            Assert.False(registry.RemoveAgent(agentId));
         }
     }
 }

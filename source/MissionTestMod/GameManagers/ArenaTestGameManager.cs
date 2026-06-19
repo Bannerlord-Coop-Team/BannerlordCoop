@@ -3,7 +3,6 @@ using Common.Logging;
 using GameInterface.Missions.Arena;
 using GameInterface.Missions.Services.Network;
 using GameInterface.Registry;
-using Missions.Services.Network;
 using SandBox;
 using SandBox.Missions.MissionLogics;
 using SandBox.Missions.MissionLogics.Arena;

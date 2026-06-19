@@ -24,13 +24,7 @@ public interface IMissionManager
     /// </summary>
     void HandleIntroductionRequest(NatPunchModule natPunchModule, IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token);
 
-    /// <summary>
-    /// Resolve the live server connections for <paramref name="controllerIds"/> within
-    /// <paramref name="instanceId"/>, so a <c>RelayPacket</c> can be forwarded to them (the NAT-punch relay
-    /// fallback). Returns an empty list if the instance is unknown. Snapshotted under the instance lock so
-    /// the caller can send without holding it.
-    /// </summary>
-    IReadOnlyList<NetPeer> GetRelayTargets(string instanceId, IEnumerable<string> controllerIds);
+    bool TryGetRelayTarget(string instanceId, string controllerId, out NetPeer peer);
 
     /// <summary>
     /// Record that <paramref name="controllerId"/> has entered <paramref name="instanceId"/>, mapping it to
@@ -43,9 +37,25 @@ public interface IMissionManager
     /// <summary>
     /// Record that <paramref name="controllerId"/> (on <paramref name="peer"/>) has left
     /// <paramref name="instanceId"/>, dropping it from the relay routing table. No-op if the instance is
-    /// unknown. Driven by a client <c>MissionLeft</c>.
+    /// unknown. Driven by a client <c>MissionLeft</c>. Returns the members still present so the caller can
+    /// notify them the controller is gone.
     /// </summary>
-    void LeaveMission(NetPeer peer, string controllerId, string instanceId);
+    IReadOnlyList<(string controllerId, NetPeer peer)> LeaveMission(NetPeer peer, string controllerId, string instanceId);
+
+    /// <summary>
+    /// Drop <paramref name="peer"/> from whichever instance it belongs to after an ungraceful disconnect,
+    /// resolving its <paramref name="controllerId"/> and <paramref name="instanceId"/>. Returns false if the
+    /// peer was in no instance. On success <paramref name="remaining"/> holds the members still present so
+    /// the caller can notify them.
+    /// </summary>
+    bool TryHandleDisconnect(NetPeer peer, out string controllerId, out string instanceId,
+        out IReadOnlyList<(string controllerId, NetPeer peer)> remaining);
+
+    /// <summary>
+    /// The controllers currently routed through <paramref name="instanceId"/> (relay-fallback membership).
+    /// Returns false if the instance is unknown.
+    /// </summary>
+    bool TryGetControllers(string instanceId, out IReadOnlyCollection<string> controllers);
 }
 
 /// <inheritdoc cref="IMissionManager"/>
@@ -99,19 +109,15 @@ public class MissionManager : IMissionManager
         }
     }
 
-    public IReadOnlyList<NetPeer> GetRelayTargets(string instanceId, IEnumerable<string> controllerIds)
+    public bool TryGetRelayTarget(string instanceId, string controllerId, out NetPeer peer)
     {
+        peer = null;
         lock (gate)
         {
-            if (byInstanceId.TryGetValue(instanceId, out var instance) == false)
-            {
-                Logger.Warning("Discarding relay for unknown instance {Instance}", instanceId);
-                return Array.Empty<NetPeer>();
-            }
+            if (!byInstanceId.TryGetValue(instanceId, out var instance))
+                return false;
 
-            // Materialize inside the lock: GetPeers is a lazy iterator over the instance's routing table,
-            // so snapshot it now and let the handler send after releasing the lock.
-            return instance.GetPeers(controllerIds).ToList();
+            return instance.TryGetPeer(controllerId, out peer);
         }
     }
 
@@ -146,7 +152,7 @@ public class MissionManager : IMissionManager
         }
     }
 
-    public void LeaveMission(NetPeer peer, string controllerId, string instanceId)
+    public IReadOnlyList<(string controllerId, NetPeer peer)> LeaveMission(NetPeer peer, string controllerId, string instanceId)
     {
         lock (gate)
         {
@@ -154,13 +160,63 @@ public class MissionManager : IMissionManager
             {
                 Logger.Warning("Mission leave for unknown instance {Instance} from {Controller}",
                     instanceId, controllerId);
-                return;
+                return Array.Empty<(string, NetPeer)>();
             }
 
             instance.RemovePeer(peer);
             Logger.Information("Controller {Controller} left instance {Instance}", controllerId, instanceId);
+
+            return Members(instance);
         }
     }
+
+    public bool TryHandleDisconnect(NetPeer peer, out string controllerId, out string instanceId,
+        out IReadOnlyList<(string controllerId, NetPeer peer)> remaining)
+    {
+        controllerId = null;
+        instanceId = null;
+        remaining = Array.Empty<(string, NetPeer)>();
+
+        lock (gate)
+        {
+            // A peer is in at most one instance; find the one that still lists this connection.
+            foreach (var entry in byInstanceId)
+            {
+                if (entry.Value.TryGetController(peer, out controllerId) == false) continue;
+
+                instanceId = entry.Key;
+                entry.Value.RemovePeer(peer);
+                remaining = Members(entry.Value);
+                Logger.Information("Controller {Controller} disconnected from instance {Instance}", controllerId, instanceId);
+                return true;
+            }
+
+            return false;
+        }
+    }
+
+    public bool TryGetControllers(string instanceId, out IReadOnlyCollection<string> controllers)
+    {
+        lock (gate)
+        {
+            if (byInstanceId.TryGetValue(instanceId, out var instance) == false)
+            {
+                controllers = Array.Empty<string>();
+                return false;
+            }
+
+            // MissionInstance.Controllers already returns a snapshot array — safe to hand out.
+            controllers = instance.Controllers;
+            return true;
+        }
+    }
+
+    // Snapshot the (controllerId, peer) pairs still routed through the instance. Caller holds the lock.
+    private static IReadOnlyList<(string controllerId, NetPeer peer)> Members(MissionInstance instance)
+        => instance.Controllers
+            .Select(id => instance.TryGetPeer(id, out var peer) ? (id, peer) : default)
+            .Where(pair => pair.Item2 != null)
+            .ToList();
 
     // A peer is in at most one instance, so any prior listing for this endpoint is stale on a new punch.
     private void RemoveEndpointEverywhere(IPEndPoint external)

@@ -1,8 +1,6 @@
 ﻿using Autofac;
+using GameInterface.Missions;
 using HarmonyLib;
-using Missions;
-using Missions.Services;
-using Missions.Services.Network;
 using Xunit;
 
 namespace MissionTests

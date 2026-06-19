@@ -1,5 +1,8 @@
+using Common.Logging;
+using Common.Network;
 using Common.PacketHandlers;
 using LiteNetLib;
+using Serilog;
 
 namespace Coop.Core.Server.Services.Instances.Relay;
 
@@ -10,6 +13,7 @@ namespace Coop.Core.Server.Services.Instances.Relay;
 /// </summary>
 internal class RelayPacketHandler : IPacketHandler
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<RelayPacketHandler>();
     private readonly IPacketManager packetManager;
     private readonly IMissionManager missionManager;
 
@@ -32,9 +36,12 @@ internal class RelayPacketHandler : IPacketHandler
     {
         RelayPacket relayPacket = (RelayPacket)packet;
 
-        foreach (var target in missionManager.GetRelayTargets(relayPacket.InstanceId, relayPacket.ControllerIds))
+        if (!missionManager.TryGetRelayTarget(relayPacket.InstanceId, relayPacket.ControllerId, out var target))
         {
-            target.Send(relayPacket.Payload, relayPacket.DeliveryMethod);
+            Logger.Error("Failed to get peer for instance ({InstanceId}) controller ({ControllerId})", relayPacket.InstanceId, relayPacket.ControllerId);
+            return;
         }
+
+        target.Send(relayPacket.Payload, relayPacket.DeliveryMethod);
     }
 }

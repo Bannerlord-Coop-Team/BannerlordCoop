@@ -215,6 +215,10 @@
       <Project>{D22CB8FA-40CC-4F47-986F-1C5A4415980B}</Project>
       <Name>GameInterface</Name>
     </ProjectReference>
+    <ProjectReference Include="..\Missions\Missions.csproj">
+      <Project>{E12F967C-1CC9-4E4D-8D8F-5029E0BA96EE}</Project>
+      <Name>Missions</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- Deploy module into the Bannerlord install (mb2 junction). See Deploy.targets. -->

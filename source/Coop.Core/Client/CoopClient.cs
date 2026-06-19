@@ -21,9 +21,8 @@ namespace Coop.Core.Client;
 /// <summary>
 /// Client used for Coop
 /// </summary>
-public interface ICoopClient : INetwork, IUpdateable, INetEventListener, IDisposable
+public interface ICoopClient : IRelayNetwork, IUpdateable, INetEventListener, IDisposable
 {
-    IPEndPoint ServerEndpoint { get; }
 }
 
 /// <inheritdoc cref="ICoopClient"/>

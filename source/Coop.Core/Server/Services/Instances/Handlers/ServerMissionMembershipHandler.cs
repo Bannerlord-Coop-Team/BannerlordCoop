@@ -1,5 +1,6 @@
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Messages;
 using Coop.Core.Server.Services.Instances.Messages;
 using GameInterface.Missions.Services.Network.Messages;
 using LiteNetLib;
@@ -7,11 +8,12 @@ using LiteNetLib;
 namespace Coop.Core.Server.Services.Instances.Handlers;
 
 /// <summary>
-/// Server-side relay membership + join-info introduction. When a client announces it entered an instance
-/// (<see cref="MissionEntered"/>) this maps the controller to the connection it arrived on (for the relay
-/// fallback) and then introduces the newcomer and the existing members to each other via
-/// <see cref="MissionPeerEntered"/> — the trigger that replaces a direct PeerConnected, so each side sends
-/// its join info over the mesh. <see cref="MissionLeft"/> drops the controller from the routing table.
+/// Server-side relay membership + join/leave introduction. A client's <see cref="MissionEntered"/> maps the
+/// controller to its connection and introduces it and the existing members to each other via
+/// <see cref="MissionPeerEntered"/> (each side then sends its join info over the mesh). Departures are fanned
+/// out to the remaining members so they release the leaver's party: a <see cref="MissionLeft"/> becomes a
+/// <see cref="MissionPeerLeft"/> (graceful) and an observed <see cref="PlayerDisconnected"/> becomes a
+/// <see cref="MissionPeerDisconnected"/> (ungraceful — the reliable counterpart to the best-effort mesh path).
 /// </summary>
 public class ServerMissionMembershipHandler : IHandler
 {
@@ -27,12 +29,14 @@ public class ServerMissionMembershipHandler : IHandler
 
         messageBroker.Subscribe<MissionEntered>(Handle_MissionEntered);
         messageBroker.Subscribe<MissionLeft>(Handle_MissionLeft);
+        messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<MissionEntered>(Handle_MissionEntered);
         messageBroker.Unsubscribe<MissionLeft>(Handle_MissionLeft);
+        messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
     }
 
     private void Handle_MissionEntered(MessagePayload<MissionEntered> payload)
@@ -57,6 +61,25 @@ public class ServerMissionMembershipHandler : IHandler
         var peer = (NetPeer)payload.Who;
         var message = payload.What;
 
-        missionManager.LeaveMission(peer, message.ControllerId, message.InstanceId);
+        var remaining = missionManager.LeaveMission(peer, message.ControllerId, message.InstanceId);
+
+        // Mirror the entry fan-out: tell the members still present that the controller is gone so they
+        // despawn its party.
+        foreach (var (_, otherPeer) in remaining)
+        {
+            network.Send(otherPeer, new MissionPeerLeft(message.ControllerId, message.InstanceId));
+        }
+    }
+
+    private void Handle_PlayerDisconnected(MessagePayload<PlayerDisconnected> payload)
+    {
+        // PlayerDisconnected fires for every disconnect; only act on a peer that was in a mission instance.
+        if (missionManager.TryHandleDisconnect(payload.What.PlayerId, out var controllerId, out var instanceId, out var remaining) == false)
+            return;
+
+        foreach (var (_, otherPeer) in remaining)
+        {
+            network.Send(otherPeer, new MissionPeerDisconnected(controllerId, instanceId));
+        }
     }
 }
