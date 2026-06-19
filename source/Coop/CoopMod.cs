@@ -256,7 +256,7 @@ namespace Coop
                 GameThread.Instance.MarkGameThread();
                 
                 m_IsFirstTick = false;
-            }    
+            }
             RefreshTroopRosterCoalescer();
 
             TimeSpan frameTime = TimeSpan.FromSeconds(dt);
