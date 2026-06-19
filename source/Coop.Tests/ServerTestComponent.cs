@@ -18,6 +18,9 @@ internal class ServerTestComponent : TestComponentBase
         var builder = new ContainerBuilder();
         builder.RegisterModule<ServerModule>();
         builder.RegisterModule<RegistryModule>();
+
+        RegisterMock<ICoopServer>(builder);
+
         Container = BuildContainer(builder);
     }
 }
