@@ -232,6 +232,9 @@
       <Project>{E12F967C-1CC9-4E4D-8D8F-5029E0BA96EE}</Project>
       <Name>Missions</Name>
     </ProjectReference>
+    <ProjectReference Include="..\IntroServer\IntroServer.csproj">
+      <Name>IntroServer</Name>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <Content Include="ILLink\ILLink.Descriptors.LibraryBuild.xml" />
