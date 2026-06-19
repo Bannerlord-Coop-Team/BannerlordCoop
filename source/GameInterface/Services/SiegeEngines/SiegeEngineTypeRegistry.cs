@@ -2,6 +2,7 @@
 using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
+using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -18,7 +19,7 @@ internal class SiegeEngineTypeRegistry : AutoRegistryBase<SiegeEngineType>
     {
     }
 
-    public override IEnumerable<MethodBase> Constructors => Array.Empty<MethodBase>();
+    public override IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(SiegeEngineType));
 
     public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 

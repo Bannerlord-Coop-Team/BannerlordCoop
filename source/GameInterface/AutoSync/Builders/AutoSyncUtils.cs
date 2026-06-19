@@ -15,13 +15,13 @@ public static class AutoSyncUtils
         return TemplateParser.Parse("Patches.PropertySetPrefixTemplate",
             new
             {
-                MemberDeclaringType = propertyInfo.DeclaringType.Name,
+                MemberDeclaringType = GetSimpleTypeName(propertyInfo.DeclaringType),
+                MemberDeclaringTypeName = GetSimpleTypeName(propertyInfo.DeclaringType).Replace(".", "_"),
                 MemberName = propertyInfo.Name,
-                MemberType = propertyInfo.PropertyType.Name,
+                MemberType = GetSimpleTypeName(propertyInfo.PropertyType),
                 Debug = propertyItem.Debug
             });
     }
-
 
     public static string GetLocalSetMessage(MemberInfo memberInfo)
     {
@@ -52,7 +52,8 @@ public static class AutoSyncUtils
         return TemplateParser.Parse("Messages.LocalSetMessageTemplate",
             new
             {
-                MemberDeclaringType = memberInfo.DeclaringType.Name,
+                MemberDeclaringType = GetSimpleTypeName(memberInfo.DeclaringType),
+                MemberDeclaringTypeName = GetSimpleTypeName(memberInfo.DeclaringType).Replace(".", "_"),
                 MemberName = memberName,
                 MemberType = GetMemberTypeName(memberType),
                 Libraries = libraries
@@ -62,33 +63,29 @@ public static class AutoSyncUtils
     public static string GetMemberTypeName(Type type)
     {
         if (type.IsArray)
-        {
-            return $"{type.GetElementType().Name}[]";
-        }
+            return $"{GetSimpleTypeName(type.GetElementType())}[]";
         else if (type.IsGenericType)
         {
-            if (type.Name.ToLower().Contains("mblist"))
-                return $"MBList<{type.GetGenericArguments()[0].Name}>";
-            else if (type.Name.ToLower().Contains("list"))
-                return $"List<{type.GetGenericArguments()[0].Name}>";
-            else if (type.Name.ToLower().Contains("queue"))
-                return $"Queue<{type.GetGenericArguments()[0].Name}>";
-            else
-                throw new NotSupportedException($"CollectionType {type.Name} is not supported by AutoSync");
+            var arg = GetSimpleTypeName(type.GetGenericArguments()[0]);
+            if (type.Name.ToLower().Contains("mblist")) return $"MBList<{arg}>";
+            if (type.Name.ToLower().Contains("list")) return $"List<{arg}>";
+            if (type.Name.ToLower().Contains("queue")) return $"Queue<{arg}>";
+            throw new NotSupportedException($"CollectionType {type.Name} is not supported by AutoSync");
         }
         else
-            return type.Name;
+            return GetSimpleTypeName(type);
+    }
+
+    public static string GetSimpleTypeName(Type type)
+    {
+        if (type.IsNested)
+            return $"{GetSimpleTypeName(type.DeclaringType)}.{type.Name}";
+        return type.Name;
     }
 
     public static string GetNamespace(Type type)
     {
-        string result = null;
-        if (type.DeclaringType != null)
-        {
-            result = $".{GetDeclaringTypeName(type.DeclaringType)}";
-        }
-
-        return $"{(result != null ? "static " : "")}{type.Namespace}{result}";
+        return type.Namespace;
     }
 
     public static IEnumerable<string> GetLibraries(MemberInfo memberInfo)
@@ -114,15 +111,6 @@ public static class AutoSyncUtils
             yield return GetNamespace(GetElementType(memberType));
         }
         yield return GetNamespace(memberType);
-    }
-
-    private static string GetDeclaringTypeName(Type type)
-    {
-        if (type.DeclaringType != null)
-        {
-            return $"{GetDeclaringTypeName(type.DeclaringType)}.{type.Name}";
-        }
-        return type.Name;
     }
 
     private static Type GetElementType(Type type)

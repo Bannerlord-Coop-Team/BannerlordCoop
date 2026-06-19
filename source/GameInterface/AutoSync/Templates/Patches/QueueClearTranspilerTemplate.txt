@@ -68,7 +68,7 @@ public static void Intercept_QueueClear_{{ MemberName }}({{ MemberDeclaringType 
         return;
     }
 
-    var message = new Local_{{ MemberDeclaringType}}_{{ MemberName }}_QueueClear(instance);
+    var message = new Local_{{ MemberDeclaringTypeName}}_{{ MemberName }}_QueueClear(instance);
     MessageBroker.Instance.Publish(instance, message);
 
     queue.Clear();

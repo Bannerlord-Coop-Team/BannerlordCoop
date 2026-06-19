@@ -10,12 +10,12 @@ using {{ library }};
 namespace AutoSync;
 
 [ProtoContract(SkipConstructor = true)]
-public readonly struct Network_{{ MemberDeclaringType}}_{{ MemberName }}_ClearQueue : ICommand
+public readonly struct Network_{{ MemberDeclaringTypeName}}_{{ MemberName }}_ClearQueue : ICommand
 {
     [ProtoMember(1)]
     public readonly string InstanceId;
 
-    public Network_{{ MemberDeclaringType}}_{{ MemberName }}_ClearQueue(string instanceId)
+    public Network_{{ MemberDeclaringTypeName}}_{{ MemberName }}_ClearQueue(string instanceId)
     {
         InstanceId = instanceId;
     }

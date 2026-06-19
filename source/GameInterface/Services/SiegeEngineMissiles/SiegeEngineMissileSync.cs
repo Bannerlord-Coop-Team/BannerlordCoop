@@ -1,7 +1,5 @@
-﻿using GameInterface.AutoSync;
 using GameInterface.AutoSync;
 using HarmonyLib;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 
 namespace GameInterface.Services.SiegeEngineMissiles
@@ -10,8 +8,15 @@ namespace GameInterface.Services.SiegeEngineMissiles
     {
         public SiegeEngineMissileSync(AutoSyncRegistry autoSyncBuilder)
         {
-            //autoSyncBuilder.AddField(AccessTools.Field(typeof(SiegeEvent.SiegeEngineMissile), nameof(SiegeEvent.SiegeEngineMissile.ShooterSiegeEngineType)));
-            //autoSyncBuilder.AddField(AccessTools.Field(typeof(SiegeEvent.SiegeEngineMissile), nameof(SiegeEvent.SiegeEngineMissile.ShooterSlotIndex)));
+            // Fields
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(SiegeEvent.SiegeEngineMissile), nameof(SiegeEvent.SiegeEngineMissile.ShooterSiegeEngineType)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(SiegeEvent.SiegeEngineMissile), nameof(SiegeEvent.SiegeEngineMissile.ShooterSlotIndex)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(SiegeEvent.SiegeEngineMissile), nameof(SiegeEvent.SiegeEngineMissile.TargetType)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(SiegeEvent.SiegeEngineMissile), nameof(SiegeEvent.SiegeEngineMissile.TargetSlotIndex)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(SiegeEvent.SiegeEngineMissile), nameof(SiegeEvent.SiegeEngineMissile.TargetSiegeEngine)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(SiegeEvent.SiegeEngineMissile), nameof(SiegeEvent.SiegeEngineMissile.CollisionTime)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(SiegeEvent.SiegeEngineMissile), nameof(SiegeEvent.SiegeEngineMissile.FireDecisionTime)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(SiegeEvent.SiegeEngineMissile), nameof(SiegeEvent.SiegeEngineMissile.HitSuccessful)));
         }
     }
 }
