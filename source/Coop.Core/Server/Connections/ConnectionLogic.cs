@@ -64,7 +64,7 @@ public class ConnectionLogic : IConnectionLogic
     private IReadOnlyDictionary<Type, Func<IConnectionState>> CreateStateFactories() =>
         new Dictionary<Type, Func<IConnectionState>>
         {
-            [typeof(ResolveCharacterState)] = () => new ResolveCharacterState(this, context.MessageBroker, context.Network, context.ModuleValidator, context.PlayerManager, context.ModuleInfoProvider),
+            [typeof(ResolveCharacterState)] = () => new ResolveCharacterState(this, context.MessageBroker, context.Network, context.ModuleValidator, context.PlayerManager, context.ObjectManager, context.ModuleInfoProvider),
             [typeof(CreateCharacterState)] = () => new CreateCharacterState(this, context.ObjectManager, context.MessageBroker, context.Network, context.HeroInterface, context.PlayerManager, context.GameStateInterface),
             [typeof(TransferSaveState)] = () => new TransferSaveState(this, context.Network, context.CoopSessionProvider, context.SaveInterface, context.TimeControlInterface, context.ConnectionMessageQueue),
             [typeof(LoadingState)] = () => new LoadingState(this, context.MessageBroker),
