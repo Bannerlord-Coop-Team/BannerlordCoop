@@ -75,9 +75,13 @@ internal class ClanPartiesVMHandler : IHandler
     private void Handle_ClanPartyLeaderChanged(MessagePayload<ClanPartyLeaderChanged> obj)
     {
         if (!objectManager.TryGetIdWithLogging(obj.What.MainHero, out var mainHeroId)) return;
-        if (!objectManager.TryGetIdWithLogging(obj.What.NewLeader, out var newLeaderId)) return;
+
+        string newLeaderId = null;
+        if (obj.What.NewLeader != null && !objectManager.TryGetIdWithLogging(obj.What.NewLeader, out newLeaderId)) return;
         if (!objectManager.TryGetIdWithLogging(obj.What.OldLeader, out var oldLeaderId)) return;
-        if (!objectManager.TryGetIdWithLogging(obj.What.SelectedParty, out var selectedPartyId)) return;
+
+        string selectedPartyId = null;
+        if (obj.What.SelectedParty != null && !objectManager.TryGetIdWithLogging(obj.What.SelectedParty, out selectedPartyId)) return;
         if (!objectManager.TryGetIdWithLogging(obj.What.MainParty, out var mainPartyId)) return;
 
         network.SendAll(new ChangeClanPartyLeader(mainHeroId, newLeaderId, oldLeaderId, selectedPartyId, mainPartyId));
