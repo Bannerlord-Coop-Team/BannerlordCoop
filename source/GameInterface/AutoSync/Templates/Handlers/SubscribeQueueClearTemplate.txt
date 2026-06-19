@@ -1,4 +1,4 @@
-﻿SubscribeTracked((MessagePayload<Local_{{ MemberDeclaringType }}_{{ MemberName }}_QueueClear> payload) =>
+﻿SubscribeTracked((MessagePayload<Local_{{ MemberDeclaringTypeName }}_{{ MemberName }}_QueueClear> payload) =>
 {
     var data = payload.What;
 
@@ -8,10 +8,10 @@
     {{~ if Debug ~}}
     Logger.Debug("[Server] Broadcasting clear queue {MemberName}", "{{MemberDeclaringType}}.{{MemberName}}");
     {{~ end ~}}
-    network.SendAll(new Network_{{ MemberDeclaringType }}_{{ MemberName }}_ClearQueue(instanceId));
+    network.SendAll(new Network_{{ MemberDeclaringTypeName }}_{{ MemberName }}_ClearQueue(instanceId));
 });
 
-SubscribeTracked((MessagePayload<Network_{{ MemberDeclaringType}}_{{ MemberName }}_ClearQueue> payload) =>
+SubscribeTracked((MessagePayload<Network_{{ MemberDeclaringTypeName}}_{{ MemberName }}_ClearQueue> payload) =>
 {
     var data = payload.What;
 

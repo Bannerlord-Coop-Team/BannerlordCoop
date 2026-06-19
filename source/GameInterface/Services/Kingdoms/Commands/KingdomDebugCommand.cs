@@ -1,12 +1,23 @@
 ﻿using Autofac;
+using Common;
+using Common.Extensions;
+using Common.Messaging;
+using Common.Util;
+using GameInterface.Services.Kingdoms.Handlers;
+using GameInterface.Services.Kingdoms.Messages.Collections;
 using GameInterface.Services.ObjectManager;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Election;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Library;
+using TaleWorlds.ObjectSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Kingdoms.Commands;
@@ -16,6 +27,27 @@ namespace GameInterface.Services.Kingdoms.Commands;
 /// </summary>
 public class KingdomDebugCommand
 {
+    private enum CollectionTarget
+    {
+        Armies,
+        Clans,
+        FiefsCache,
+        HeroesCache,
+        AliveLordsCache,
+        DeadLordsCache,
+        SettlementsCache,
+        VillagesCache,
+        WarPartyComponentsCache,
+    }
+
+    private enum CollectionOperation
+    {
+        Add,
+        Remove,
+    }
+
+    private static readonly string CollectionAddUsage = "Usage: coop.debug.kingdom.collection_add <collection> <kingdomId> <valueId> | unresolvedDecisions <kingdomId> <proposerClanId> <ignoreInfluenceCost> <decisionType> <decisionTypeArgs>";
+    private static readonly string CollectionRemoveUsage = "Usage: coop.debug.kingdom.collection_remove <collection> <kingdomId> <valueId> | unresolvedDecisions <kingdomId> <index>";
     private static readonly string RemoveUsage = "Usage: coop.debug.kingdom.remove_decision <kingdomId> <Index>";
     private static readonly string AddBasicUsage = "Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> <decisionType> <decisionTypeArgs>";
     private static readonly string AddDeclareWarDecisionUsage = "Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> DeclareWarDecision <factionId>";
@@ -191,6 +223,73 @@ public class KingdomDebugCommand
         return stringBuilder.ToString();
     }
 
+    // coop.debug.kingdom.collection_list clans kingdom_V1
+    /// <summary>
+    /// Lists one of the synced Kingdom collection caches for server/client verification.
+    /// </summary>
+    /// <param name="args">collection name and kingdom id</param>
+    /// <returns>IDs currently present in the selected collection</returns>
+    [CommandLineArgumentFunction("collection_list", "coop.debug.kingdom")]
+    public static string ListKingdomCollection(List<string> args)
+    {
+        if (args.Count != 2)
+        {
+            return "Usage: coop.debug.kingdom.collection_list <collection> <kingdomId>";
+        }
+
+        if (TryGetObjectManager(out var objectManager) == false)
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        if (objectManager.TryGetObject(args[1], out Kingdom kingdom) == false)
+        {
+            return $"Kingdom with ID: '{args[1]}' not found";
+        }
+
+        var collectionName = NormalizeCollectionName(args[0]);
+        if (collectionName == "activepolicies")
+        {
+            return FormatCollection(objectManager, args[0], kingdom.ActivePolicies.Cast<object>());
+        }
+
+        if (collectionName == "unresolveddecisions")
+        {
+            return ListKingdomDecisions(new List<string> { args[1] });
+        }
+
+        if (!TryParseCollectionTarget(args[0], out var collectionType, out var parseMessage))
+        {
+            return parseMessage;
+        }
+
+        return FormatCollection(objectManager, args[0], GetCollectionValues(kingdom, collectionType));
+    }
+
+    // coop.debug.kingdom.collection_add clans kingdom_V1 clan_1
+    /// <summary>
+    /// Adds an item to a synced Kingdom collection on the server and broadcasts the change to clients.
+    /// </summary>
+    /// <param name="args">collection name, kingdom id, and value id</param>
+    /// <returns>Result of the collection add</returns>
+    [CommandLineArgumentFunction("collection_add", "coop.debug.kingdom")]
+    public static string AddKingdomCollectionItem(List<string> args)
+    {
+        return ChangeKingdomCollection(args, CollectionOperation.Add);
+    }
+
+    // coop.debug.kingdom.collection_remove clans kingdom_V1 clan_1
+    /// <summary>
+    /// Removes an item from a synced Kingdom collection on the server and broadcasts the change to clients.
+    /// </summary>
+    /// <param name="args">collection name, kingdom id, and value id</param>
+    /// <returns>Result of the collection remove</returns>
+    [CommandLineArgumentFunction("collection_remove", "coop.debug.kingdom")]
+    public static string RemoveKingdomCollectionItem(List<string> args)
+    {
+        return ChangeKingdomCollection(args, CollectionOperation.Remove);
+    }
+
     // coop.debug.kingdom.declare_war
     /// <summary>
     /// Directly declares war between two factions (run on the server). Deterministic alternative
@@ -258,6 +357,87 @@ public class KingdomDebugCommand
         return $"Made peace between '{faction1.Name}' and '{faction2.Name}'.";
     }
 
+    private static string ChangeKingdomCollection(List<string> args, CollectionOperation operation)
+    {
+        if (ModInformation.IsClient)
+        {
+            return "Command is only available to run on the server";
+        }
+
+        if (args.Count < 3)
+        {
+            return operation == CollectionOperation.Add ? CollectionAddUsage : CollectionRemoveUsage;
+        }
+
+        var collectionName = NormalizeCollectionName(args[0]);
+        if (collectionName == "activepolicies")
+        {
+            return ChangeActivePolicy(args, operation);
+        }
+
+        if (collectionName == "unresolveddecisions")
+        {
+            var forwardedArgs = args.Skip(1).ToList();
+            return operation == CollectionOperation.Add
+                ? AddDecision(forwardedArgs)
+                : RemoveDecision(forwardedArgs);
+        }
+
+        if (!TryParseCollectionTarget(args[0], out var collectionType, out var parseMessage))
+        {
+            return parseMessage;
+        }
+
+        if (TryGetObjectManager(out var objectManager) == false)
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        if (objectManager.TryGetObject(args[1], out Kingdom kingdom) == false)
+        {
+            return $"Kingdom with ID: '{args[1]}' not found";
+        }
+
+        if (!TryResolveCollectionValue(objectManager, collectionType, args[2], out var value, out var resolveMessage))
+        {
+            return resolveMessage;
+        }
+
+        using (new AllowedThread())
+        {
+            ApplyCollectionChange(kingdom, collectionType, operation, value);
+        }
+
+        return $"{operation} {args[2]} in {args[0]} for kingdom {args[1]}.";
+    }
+
+    private static string ChangeActivePolicy(List<string> args, CollectionOperation operation)
+    {
+        if (TryGetObjectManager(out var objectManager) == false)
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        if (objectManager.TryGetObject(args[1], out Kingdom kingdom) == false)
+        {
+            return $"Kingdom with ID: '{args[1]}' not found";
+        }
+
+        if (objectManager.TryGetObject(args[2], out PolicyObject policy) == false)
+        {
+            return $"PolicyObject with ID: '{args[2]}' not found";
+        }
+
+        if (operation == CollectionOperation.Add)
+        {
+            kingdom.AddPolicy(policy);
+            return $"Added policy {args[2]} to kingdom {args[1]}.";
+        }
+
+        kingdom.RemovePolicy(policy);
+        return $"Removed policy {args[2]} from kingdom {args[1]}.";
+    }
+
     /// <summary>
     /// Resolves a faction id to either a Kingdom or a Clan.
     /// </summary>
@@ -275,6 +455,274 @@ public class KingdomDebugCommand
         }
         faction = null;
         return false;
+    }
+
+    private static bool TryParseCollectionTarget(
+        string value,
+        out CollectionTarget collectionType,
+        out string message)
+    {
+        collectionType = default;
+        message = string.Empty;
+
+        switch (NormalizeCollectionName(value))
+        {
+            case "armies":
+                collectionType = CollectionTarget.Armies;
+                return true;
+            case "clans":
+                collectionType = CollectionTarget.Clans;
+                return true;
+            case "fiefscache":
+                collectionType = CollectionTarget.FiefsCache;
+                return true;
+            case "heroescache":
+                collectionType = CollectionTarget.HeroesCache;
+                return true;
+            case "lordscache":
+            case "alivelordscache":
+                collectionType = CollectionTarget.AliveLordsCache;
+                return true;
+            case "deadlordscache":
+                collectionType = CollectionTarget.DeadLordsCache;
+                return true;
+            case "settlementscache":
+                collectionType = CollectionTarget.SettlementsCache;
+                return true;
+            case "villagescache":
+                collectionType = CollectionTarget.VillagesCache;
+                return true;
+            case "warpartycomponentscache":
+                collectionType = CollectionTarget.WarPartyComponentsCache;
+                return true;
+            default:
+                message = "Unknown collection. Valid values: activePolicies, armies, clans, fiefsCache, heroesCache, lordsCache, aliveLordsCache, deadLordsCache, settlementsCache, unresolvedDecisions, villagesCache, warPartyComponentsCache.";
+                return false;
+        }
+    }
+
+    private static string NormalizeCollectionName(string value)
+    {
+        return value.Replace("_", string.Empty).Replace("-", string.Empty).ToLowerInvariant();
+    }
+
+    private static IEnumerable<object> GetCollectionValues(Kingdom kingdom, CollectionTarget collectionType)
+    {
+        return collectionType switch
+        {
+            CollectionTarget.Armies => kingdom._armies?.Cast<object>() ?? Enumerable.Empty<object>(),
+            CollectionTarget.Clans => kingdom._clans?.Cast<object>() ?? Enumerable.Empty<object>(),
+            CollectionTarget.FiefsCache => kingdom._fiefsCache?.Cast<object>() ?? Enumerable.Empty<object>(),
+            CollectionTarget.HeroesCache => kingdom._heroesCache?.Cast<object>() ?? Enumerable.Empty<object>(),
+            CollectionTarget.AliveLordsCache => kingdom._aliveLordsCache?.Cast<object>() ?? Enumerable.Empty<object>(),
+            CollectionTarget.DeadLordsCache => kingdom._deadLordsCache?.Cast<object>() ?? Enumerable.Empty<object>(),
+            CollectionTarget.SettlementsCache => kingdom._settlementsCache?.Cast<object>() ?? Enumerable.Empty<object>(),
+            CollectionTarget.VillagesCache => kingdom._villagesCache?.Cast<object>() ?? Enumerable.Empty<object>(),
+            CollectionTarget.WarPartyComponentsCache => kingdom._warPartyComponentsCache?.Cast<object>() ?? Enumerable.Empty<object>(),
+            _ => Enumerable.Empty<object>(),
+        };
+    }
+
+    private static void ApplyCollectionChange(
+        Kingdom kingdom,
+        CollectionTarget collectionType,
+        CollectionOperation operation,
+        object value)
+    {
+        switch (collectionType)
+        {
+            case CollectionTarget.Armies:
+                if (operation == CollectionOperation.Add)
+                {
+                    MessageBroker.Instance.Publish(kingdom, new ArmyListUpdated(kingdom, (Army)value));
+                    KingdomCollectionHandler.ApplyArmyListUpdate(kingdom, (Army)value);
+                }
+                else
+                {
+                    MessageBroker.Instance.Publish(kingdom, new ArmyListRemoved(kingdom, (Army)value));
+                    KingdomCollectionHandler.ApplyArmyListRemove(kingdom, (Army)value);
+                }
+                break;
+            case CollectionTarget.Clans:
+                if (operation == CollectionOperation.Add)
+                {
+                    MessageBroker.Instance.Publish(kingdom, new ClanListUpdated(kingdom, (Clan)value));
+                    KingdomCollectionHandler.ApplyClanListUpdate(kingdom, (Clan)value);
+                }
+                else
+                {
+                    MessageBroker.Instance.Publish(kingdom, new ClanListRemoved(kingdom, (Clan)value));
+                    KingdomCollectionHandler.ApplyClanListRemove(kingdom, (Clan)value);
+                }
+                break;
+            case CollectionTarget.FiefsCache:
+                if (operation == CollectionOperation.Add)
+                {
+                    MessageBroker.Instance.Publish(kingdom, new FiefsCacheUpdated(kingdom, (Town)value));
+                    KingdomCollectionHandler.ApplyFiefsCacheUpdate(kingdom, (Town)value);
+                }
+                else
+                {
+                    MessageBroker.Instance.Publish(kingdom, new FiefsCacheRemoved(kingdom, (Town)value));
+                    KingdomCollectionHandler.ApplyFiefsCacheRemove(kingdom, (Town)value);
+                }
+                break;
+            case CollectionTarget.HeroesCache:
+                if (operation == CollectionOperation.Add)
+                {
+                    MessageBroker.Instance.Publish(kingdom, new HeroesCacheUpdated(kingdom, (Hero)value));
+                    KingdomCollectionHandler.ApplyHeroesCacheUpdate(kingdom, (Hero)value);
+                }
+                else
+                {
+                    MessageBroker.Instance.Publish(kingdom, new HeroesCacheRemoved(kingdom, (Hero)value));
+                    KingdomCollectionHandler.ApplyHeroesCacheRemove(kingdom, (Hero)value);
+                }
+                break;
+            case CollectionTarget.AliveLordsCache:
+                if (operation == CollectionOperation.Add)
+                {
+                    MessageBroker.Instance.Publish(kingdom, new AliveLordsCacheUpdated(kingdom, (Hero)value));
+                    KingdomCollectionHandler.ApplyAliveLordsCacheUpdate(kingdom, (Hero)value);
+                }
+                else
+                {
+                    MessageBroker.Instance.Publish(kingdom, new AliveLordsCacheRemoved(kingdom, (Hero)value));
+                    KingdomCollectionHandler.ApplyAliveLordsCacheRemove(kingdom, (Hero)value);
+                }
+                break;
+            case CollectionTarget.DeadLordsCache:
+                if (operation == CollectionOperation.Add)
+                {
+                    MessageBroker.Instance.Publish(kingdom, new DeadLordsCacheUpdated(kingdom, (Hero)value));
+                    KingdomCollectionHandler.ApplyDeadLordsCacheUpdate(kingdom, (Hero)value);
+                }
+                else
+                {
+                    MessageBroker.Instance.Publish(kingdom, new DeadLordsCacheRemoved(kingdom, (Hero)value));
+                    KingdomCollectionHandler.ApplyDeadLordsCacheRemove(kingdom, (Hero)value);
+                }
+                break;
+            case CollectionTarget.SettlementsCache:
+                if (operation == CollectionOperation.Add)
+                {
+                    MessageBroker.Instance.Publish(kingdom, new SettlementsCacheUpdated(kingdom, (Settlement)value));
+                    KingdomCollectionHandler.ApplySettlementsCacheUpdate(kingdom, (Settlement)value);
+                }
+                else
+                {
+                    MessageBroker.Instance.Publish(kingdom, new SettlementsCacheRemoved(kingdom, (Settlement)value));
+                    KingdomCollectionHandler.ApplySettlementsCacheRemove(kingdom, (Settlement)value);
+                }
+                break;
+            case CollectionTarget.VillagesCache:
+                if (operation == CollectionOperation.Add)
+                {
+                    MessageBroker.Instance.Publish(kingdom, new VillagesCacheUpdated(kingdom, (Village)value));
+                    KingdomCollectionHandler.ApplyVillagesCacheUpdate(kingdom, (Village)value);
+                }
+                else
+                {
+                    MessageBroker.Instance.Publish(kingdom, new VillagesCacheRemoved(kingdom, (Village)value));
+                    KingdomCollectionHandler.ApplyVillagesCacheRemove(kingdom, (Village)value);
+                }
+                break;
+            case CollectionTarget.WarPartyComponentsCache:
+                if (operation == CollectionOperation.Add)
+                {
+                    MessageBroker.Instance.Publish(kingdom, new WarPartyComponentsCacheUpdated(kingdom, (WarPartyComponent)value));
+                    KingdomCollectionHandler.ApplyWarPartyComponentsCacheUpdate(kingdom, (WarPartyComponent)value);
+                }
+                else
+                {
+                    MessageBroker.Instance.Publish(kingdom, new WarPartyComponentsCacheRemoved(kingdom, (WarPartyComponent)value));
+                    KingdomCollectionHandler.ApplyWarPartyComponentsCacheRemove(kingdom, (WarPartyComponent)value);
+                }
+                break;
+        }
+    }
+
+    private static string FormatCollection(
+        IObjectManager objectManager,
+        string collectionName,
+        IEnumerable<object> values)
+    {
+        var stringBuilder = new StringBuilder();
+        stringBuilder.AppendLine($"{collectionName}:");
+
+        var count = 0;
+        foreach (var value in values)
+        {
+            count++;
+            if (objectManager.TryGetId(value, out var id))
+            {
+                stringBuilder.AppendLine($"{count}. {id}");
+            }
+            else
+            {
+                stringBuilder.AppendLine($"{count}. {value?.GetType().Name ?? "<null>"}");
+            }
+        }
+
+        if (count == 0)
+        {
+            stringBuilder.AppendLine("(none)");
+        }
+
+        return stringBuilder.ToString();
+    }
+
+    private static bool TryResolveCollectionValue(
+        IObjectManager objectManager,
+        CollectionTarget collectionType,
+        string valueId,
+        out object value,
+        out string message)
+    {
+        value = null;
+        message = string.Empty;
+
+        switch (collectionType)
+        {
+            case CollectionTarget.Armies:
+                return TryResolve<Army>(objectManager, valueId, out value, out message);
+            case CollectionTarget.Clans:
+                return TryResolve<Clan>(objectManager, valueId, out value, out message);
+            case CollectionTarget.FiefsCache:
+                return TryResolve<Town>(objectManager, valueId, out value, out message);
+            case CollectionTarget.HeroesCache:
+            case CollectionTarget.AliveLordsCache:
+            case CollectionTarget.DeadLordsCache:
+                return TryResolve<Hero>(objectManager, valueId, out value, out message);
+            case CollectionTarget.SettlementsCache:
+                return TryResolve<Settlement>(objectManager, valueId, out value, out message);
+            case CollectionTarget.VillagesCache:
+                return TryResolve<Village>(objectManager, valueId, out value, out message);
+            case CollectionTarget.WarPartyComponentsCache:
+                return TryResolve<WarPartyComponent>(objectManager, valueId, out value, out message);
+            default:
+                message = $"Unsupported collection {collectionType}.";
+                return false;
+        }
+    }
+
+    private static bool TryResolve<T>(
+        IObjectManager objectManager,
+        string valueId,
+        out object value,
+        out string message)
+    {
+        value = null;
+
+        if (objectManager.TryGetObject(valueId, out T resolved) == false)
+        {
+            message = $"{typeof(T).Name} with ID: '{valueId}' not found";
+            return false;
+        }
+
+        value = resolved;
+        message = string.Empty;
+        return true;
     }
 
     // coop.debug..kingdom.add_decision

@@ -1,5 +1,5 @@
 ﻿[HarmonyPatch(typeof({{ MemberDeclaringType }}))]
-public class {{ MemberDeclaringType }}_{{ MemberName }}_PropertySetPrefix : GenericPatches<{{ MemberDeclaringType }}_{{ MemberName }}_PropertySetPrefix, {{ MemberDeclaringType }}>
+public class {{ MemberDeclaringTypeName }}_{{ MemberName }}_PropertySetPrefix : GenericPatches<{{ MemberDeclaringTypeName }}_{{ MemberName }}_PropertySetPrefix, {{ MemberDeclaringType }}>
 {
     [HarmonyPatch(nameof({{ MemberDeclaringType }}.{{ MemberName }}), MethodType.Setter)]
     [HarmonyPrefix]
@@ -27,7 +27,7 @@ public class {{ MemberDeclaringType }}_{{ MemberName }}_PropertySetPrefix : Gene
         Logger.Debug("[Server] Publishing local set message for {member}", "{{MemberDeclaringType}}.{{MemberName}}");
         {{~ end ~}}
 
-        var message = new {{MemberDeclaringType}}_{{MemberName}}_SetLocalMessage(__instance, value);
+        var message = new {{MemberDeclaringTypeName}}_{{MemberName}}_SetLocalMessage(__instance, value);
         MessageBroker.Instance.Publish(__instance, message);
     }
 }

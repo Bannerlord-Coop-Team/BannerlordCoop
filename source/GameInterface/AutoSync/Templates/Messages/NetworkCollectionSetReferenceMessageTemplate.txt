@@ -10,7 +10,7 @@ using {{ library }};
 namespace AutoSync
 {
     [ProtoContract(SkipConstructor = true)]
-    public record {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage : GenericNetworkEvent<{{ MemberDeclaringType}}, {{ MemberType }}>
+    public record {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage : GenericNetworkEvent<{{ MemberDeclaringType}}, {{ MemberType }}>
     {
         [ProtoMember(1)]
         public override string InstanceId { get; set; }
@@ -18,7 +18,7 @@ namespace AutoSync
         [ProtoMember(2)]
         public List<string> Value { get; set; }
 
-        public {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage(string instanceId, List<string> value) : base(instanceId)
+        public {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage(string instanceId, List<string> value) : base(instanceId)
         {
             Value = value;
         }

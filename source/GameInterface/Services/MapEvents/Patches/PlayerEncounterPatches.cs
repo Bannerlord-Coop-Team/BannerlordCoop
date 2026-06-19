@@ -4,11 +4,14 @@ using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages.Conversation;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
 using Serilog;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -146,5 +149,64 @@ internal class PlayerEncounterPatches
         // server applies and re-broadcasts (with its position snapshot) to every client, including this one.
         // That makes the hold authoritative everywhere and clears the stale engage order at its source.
         MessageBroker.Instance.Publish(mainParty.Ai, new PartyBehaviorChangeAttempted(mainParty.Ai, AiBehavior.Hold, null, mainParty.Position));
+    }
+
+    // Native blocks defender-side parties from leaving; allow a joiner (a non-leader of its side) to leave,
+    // since it is neither the aggressor nor the attacked target.
+    [HarmonyPatch(typeof(EncounterGameMenuBehavior), "game_menu_encounter_leave_on_condition")]
+    [HarmonyPostfix]
+    private static void EncounterLeaveConditionPostfix(MenuCallbackArgs args, ref bool __result)
+    {
+        if (__result) return;
+        if (!IsBattleJoiner()) return;
+
+        args.optionLeaveType = GameMenuOption.LeaveType.Leave;
+        __result = true;
+    }
+
+    // Open-field "encounter" Leave runs local-only on the client (teleport out, local auto-sim, side leave), so the
+    // server keeps the party engaged and pulls it back. A side leader leaving ends the event: route the authoritative
+    // finalize round-trip. A joiner only removes itself (battle continues): replicate the removal, then let native do
+    // the local teardown. Both clear the engage order. Settlements/sieges keep their own synced flows.
+    [HarmonyPatch(typeof(EncounterGameMenuBehavior), "game_menu_encounter_leave_on_consequence")]
+    [HarmonyPrefix]
+    private static bool EncounterLeavePrefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+        var mainParty = MobileParty.MainParty;
+        if (mainParty.CurrentSettlement != null || mainParty.BesiegedSettlement != null)
+            return true;
+
+        var mapEvent = mainParty.MapEvent;
+        if (mapEvent == null) return true;
+
+        if (IsBattleJoiner())
+        {
+            // Block native: its LeaveBattle finalizes the whole event when the side has no NPC parties (an
+            // all-player PvP side). Remove only this party authoritatively; the UI tears down on removal.
+            MessageBroker.Instance.Publish(mainParty, new PlayerLeaveBattleAttempted(mainParty.Party));
+            ClearEngageOrder(mainParty);
+            return false;
+        }
+
+        // Side leader: the server is authoritative for ending the event.
+        if (ModInformation.IsServer) return true;
+
+        MessageBroker.Instance.Publish(mapEvent, new MapEventFinalizeAttempted(mapEvent));
+        ClearEngageOrder(mainParty);
+        return false;
+    }
+
+    private static bool IsBattleJoiner()
+    {
+        var side = MobileParty.MainParty?.Party?.MapEventSide;
+        return side != null && side.LeaderParty != MobileParty.MainParty.Party;
+    }
+
+    private static void ClearEngageOrder(MobileParty party)
+    {
+        party.SetMoveModeHold();
+        MessageBroker.Instance.Publish(party.Ai, new PartyBehaviorChangeAttempted(party.Ai, AiBehavior.Hold, null, party.Position));
     }
 }

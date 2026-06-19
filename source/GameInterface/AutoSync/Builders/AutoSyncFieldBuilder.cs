@@ -56,9 +56,10 @@ public class AutoSyncFieldBuilder : AutoSyncBuilderBase
         var serializerNames = GetSerializerMethodNames(fieldInfo.FieldType);
         return new
         {
-            MemberDeclaringType = fieldInfo.DeclaringType.Name,
+            MemberDeclaringType = AutoSyncUtils.GetSimpleTypeName(fieldInfo.DeclaringType),
+            MemberDeclaringTypeName = AutoSyncUtils.GetSimpleTypeName(fieldInfo.DeclaringType).Replace(".", "_"),
             MemberName = fieldInfo.Name,
-            MemberType = fieldInfo.FieldType.Name,
+            MemberType = AutoSyncUtils.GetSimpleTypeName(fieldInfo.FieldType),
             Libraries = AutoSyncUtils.GetLibraries(fieldInfo),
             SerializeMethod = serializerNames.serialize,
             DeserializeMethod = serializerNames.deserialize,

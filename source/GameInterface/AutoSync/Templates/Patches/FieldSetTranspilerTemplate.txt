@@ -1,7 +1,7 @@
 ﻿[HarmonyTranspiler]
 private static IEnumerable<CodeInstruction> {{MemberName}}_SetTranspiler(IEnumerable<CodeInstruction> instructions)
 {
-    var fieldIntercept = typeof({{MemberDeclaringType}}_DynamicPatches).GetMethod(nameof({{MemberName}}_Intercept));
+    var fieldIntercept = typeof({{MemberDeclaringTypeName}}_DynamicPatches).GetMethod(nameof({{MemberName}}_Intercept));
 
     var fieldInfo = AccessTools.Field(typeof({{MemberDeclaringType}}), nameof({{MemberDeclaringType}}.{{MemberName}}));
 
@@ -63,7 +63,7 @@ public static void {{MemberName}}_Intercept({{MemberDeclaringType}} instance, {{
     Logger.Debug("[Server] Publishing local set message for {type}", "{{MemberName}}");
 {{~ end ~}}
 
-    var message = new {{MemberDeclaringType}}_{{MemberName}}_SetLocalMessage(instance, newValue);
+    var message = new {{MemberDeclaringTypeName}}_{{MemberName}}_SetLocalMessage(instance, newValue);
     MessageBroker.Instance.Publish(instance, message);
 {{~ if ReadOnly ~}}
 	{{MemberName}}FieldInfo.SetValue(instance, newValue);
