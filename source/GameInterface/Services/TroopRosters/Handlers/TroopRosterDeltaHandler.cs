@@ -75,28 +75,28 @@ internal class TroopRosterDeltaHandler : IHandler
     private void Handle_CountsAtIndexAdded(MessagePayload<CountsAtIndexAdded> payload)
     {
         var e = payload.What;
-        if (!TryResolve(e.TroopRoster, e.Index, out var rosterId, out var characterId, out var isHero)) return;
+        if (!TryResolve(e.TroopRoster, e.Character, out var rosterId, out var characterId, out var isHero)) return;
         network.SendAll(new NetworkTroopRosterAddCounts(rosterId, characterId, isHero, e.CountChange, e.WoundedCountChange, e.XpChange, e.RemoveDepleted));
     }
 
     private void Handle_ElementNumberSet(MessagePayload<ElementNumberSet> payload)
     {
         var e = payload.What;
-        if (!TryResolve(e.TroopRoster, e.Index, out var rosterId, out var characterId, out var isHero)) return;
+        if (!TryResolve(e.TroopRoster, e.Character, out var rosterId, out var characterId, out var isHero)) return;
         network.SendAll(new NetworkTroopRosterSetNumber(rosterId, characterId, isHero, e.Number));
     }
 
     private void Handle_ElementWoundedNumberSet(MessagePayload<ElementWoundedNumberSet> payload)
     {
         var e = payload.What;
-        if (!TryResolve(e.TroopRoster, e.Index, out var rosterId, out var characterId, out var isHero)) return;
+        if (!TryResolve(e.TroopRoster, e.Character, out var rosterId, out var characterId, out var isHero)) return;
         network.SendAll(new NetworkTroopRosterSetWoundedNumber(rosterId, characterId, isHero, e.Number));
     }
 
     private void Handle_ElementXpSet(MessagePayload<ElementXpSet> payload)
     {
         var e = payload.What;
-        if (!TryResolve(e.TroopRoster, e.Index, out var rosterId, out var characterId, out var isHero)) return;
+        if (!TryResolve(e.TroopRoster, e.Character, out var rosterId, out var characterId, out var isHero)) return;
         network.SendAll(new NetworkTroopRosterSetXp(rosterId, characterId, isHero, e.Number));
     }
 
@@ -107,20 +107,17 @@ internal class TroopRosterDeltaHandler : IHandler
     }
 
     /// <summary>
-    /// Resolves the roster id and the identity (hero id, or basic-troop CharacterObject id) of the
-    /// element at <paramref name="index"/> on the authority's roster, where the index is always valid.
+    /// Resolves the roster id and the element's network identity: a hero in the roster keys by its Hero id,
+    /// a basic troop by its CharacterObject id. The character is captured by the patch while its index was
+    /// still valid, so this never reads a post-mutation index and a removal still names the right troop.
     /// </summary>
-    private bool TryResolve(TroopRoster roster, int index, out string rosterId, out string characterId, out bool isHero)
+    private bool TryResolve(TroopRoster roster, CharacterObject character, out string rosterId, out string characterId, out bool isHero)
     {
         rosterId = null;
         characterId = null;
         isHero = false;
-        if (roster == null) return false;
+        if (roster == null || character == null) return false;
         if (!objectManager.TryGetIdWithLogging(roster, out rosterId)) return false;
-        if (index < 0 || index >= roster.Count) return false;
-
-        var character = roster.GetElementCopyAtIndex(index).Character;
-        if (character == null) return false;
 
         var hero = character.HeroObject;
         isHero = hero != null;

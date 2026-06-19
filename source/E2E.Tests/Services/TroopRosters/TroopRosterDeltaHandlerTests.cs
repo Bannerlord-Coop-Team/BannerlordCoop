@@ -202,6 +202,35 @@ namespace E2E.Tests.Services.TroopRosters
             }
         }
 
+        [Fact]
+        public void Server_SubtractToZeroInAllowedThread_RemovesOnClient()
+        {
+            // Capture/battle-finalize flows subtract-to-zero with removeDepleted while already inside an
+            // AllowedThread, so only the AddToCounts postfix fires (the lower AddToCountsAtIndex patch
+            // stands down). It must still replicate the removal by the character's identity, not a
+            // now-stale post-removal index.
+            Server.Call(() =>
+            {
+                Resolve(Server, out var roster, out var character, CharacterId1);
+                roster.AddToCounts(character, 5);
+            });
+
+            Server.Call(() =>
+            {
+                Resolve(Server, out var roster, out var character, CharacterId1);
+                using (new AllowedThread())
+                {
+                    roster.AddToCounts(character, -5);
+                }
+            });
+
+            foreach (var client in Clients)
+            {
+                Resolve(client, out var roster, out _, CharacterId1);
+                Assert.Equal(0, roster.Count);
+            }
+        }
+
         private void Resolve(EnvironmentInstance instance, out TroopRoster roster, out CharacterObject character, string characterId)
         {
             Assert.True(instance.ObjectManager.TryGetObject<TroopRoster>(TroopRosterId, out roster));

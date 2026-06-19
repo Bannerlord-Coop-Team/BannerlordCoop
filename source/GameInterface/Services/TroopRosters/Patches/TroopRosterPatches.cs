@@ -6,25 +6,33 @@ using GameInterface.Policies;
 using GameInterface.Services.TroopRosters.Messages;
 using HarmonyLib;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.TroopRosters.Patches;
 
 /// <summary>
-/// Patches required for the TroopRoster
+/// Patches the TroopRoster mutators on the authority so each change is published as an event keyed by the
+/// element's <see cref="CharacterObject"/>, resolved while the index is still valid. TroopRosterDeltaHandler
+/// turns these into per-operation identity-keyed network messages.
 /// </summary>
 [HarmonyPatch(typeof(TroopRoster))]
 internal class TroopRosterPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<TroopRosterPatches>();
 
+    // Set while a TroopRoster.AddToCountsAtIndex call is running. AddToCountsAtIndex sets xp through the
+    // patched SetElementXp internally (only when xpChange != 0), which would publish a redundant
+    // ElementXpSet on top of the CountsAtIndexAdded that already carries the xp change. The flag lets the
+    // SetElementXp patch skip that nested publish while still firing for direct SetElementXp callers.
+    [ThreadStatic]
+    private static bool _inAddToCountsAtIndex;
+
     [HarmonyPatch(nameof(TroopRoster.AddToCountsAtIndex))]
     [HarmonyPrefix]
     private static void PrefixAddToCountsAtIndex(TroopRoster __instance, int index, int countChange,
-        int woundedCountChange, int xpChange, bool removeDepleted, ref bool __state)
+        int woundedCountChange, int xpChange, bool removeDepleted)
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (ModInformation.IsClient)
@@ -33,23 +41,20 @@ internal class TroopRosterPatches
             return;
         }
 
+        // Resolve the element by identity now: the index is valid here (pre-mutation), but a subtract-to-zero
+        // with removeDepleted removes it before a postfix could read it back.
+        var character = __instance.GetElementCopyAtIndex(index).Character;
         MessageBroker.Instance.Publish(__instance,
-            new CountsAtIndexAdded(__instance, index, countChange, woundedCountChange, xpChange, removeDepleted));
+            new CountsAtIndexAdded(__instance, character, countChange, woundedCountChange, xpChange, removeDepleted));
+
+        _inAddToCountsAtIndex = true;
     }
 
-    [HarmonyPatch(nameof(TroopRoster.AddNewElement))]
-    [HarmonyPrefix]
-    private static void PrefixAddNewElement(TroopRoster __instance, CharacterObject character, int insertionIndex)
+    [HarmonyPatch(nameof(TroopRoster.AddToCountsAtIndex))]
+    [HarmonyPostfix]
+    private static void PostfixAddToCountsAtIndex()
     {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return;
-
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client attempted to {methodName} on a managed {type}", nameof(TroopRoster.AddNewElement), typeof(TroopRoster));
-            return;
-        }
-
-        MessageBroker.Instance.Publish(__instance, new NewElementAdded(__instance, character, insertionIndex));
+        _inAddToCountsAtIndex = false;
     }
 
     [HarmonyPatch(nameof(TroopRoster.RemoveZeroCounts))]
@@ -57,7 +62,6 @@ internal class TroopRosterPatches
     private static void PrefixRemoveZeroCounts(TroopRoster __instance)
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
-
         if (ModInformation.IsClient)
         {
             Logger.Error("Client attempted to {methodName} on a managed {type}", nameof(TroopRoster.RemoveZeroCounts), typeof(TroopRoster));
@@ -72,14 +76,14 @@ internal class TroopRosterPatches
     private static void PrefixSetElementNumber(TroopRoster __instance, int index, int number)
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
-
         if (ModInformation.IsClient)
         {
             Logger.Error("Client attempted to {methodName} on a managed {type}", nameof(TroopRoster.SetElementNumber), typeof(TroopRoster));
             return;
         }
 
-        MessageBroker.Instance.Publish(__instance, new ElementNumberSet(__instance, index, number));
+        var character = __instance.GetElementCopyAtIndex(index).Character;
+        MessageBroker.Instance.Publish(__instance, new ElementNumberSet(__instance, character, number));
     }
 
     [HarmonyPatch(nameof(TroopRoster.SetElementWoundedNumber))]
@@ -87,14 +91,14 @@ internal class TroopRosterPatches
     private static void PrefixSetElementWoundedNumber(TroopRoster __instance, int index, int number)
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
-
         if (ModInformation.IsClient)
         {
             Logger.Error("Client attempted to {methodName} on a managed {type}", nameof(TroopRoster.SetElementWoundedNumber), typeof(TroopRoster));
             return;
         }
 
-        MessageBroker.Instance.Publish(__instance, new ElementWoundedNumberSet(__instance, index, number));
+        var character = __instance.GetElementCopyAtIndex(index).Character;
+        MessageBroker.Instance.Publish(__instance, new ElementWoundedNumberSet(__instance, character, number));
     }
 
     [HarmonyPatch(nameof(TroopRoster.SetElementXp))]
@@ -102,77 +106,35 @@ internal class TroopRosterPatches
     private static void PrefixSetElementXp(TroopRoster __instance, int index, int number)
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
-
         if (ModInformation.IsClient)
         {
             Logger.Error("Client attempted to {methodName} on a managed {type}", nameof(TroopRoster.SetElementXp), typeof(TroopRoster));
             return;
         }
 
-        MessageBroker.Instance.Publish(__instance, new ElementXpSet(__instance, index, number));
-    }
+        // The xp change AddToCountsAtIndex makes internally is already carried by its CountsAtIndexAdded.
+        if (_inAddToCountsAtIndex) return;
 
-    [HarmonyPatch(nameof(TroopRoster.ShiftTroopToIndex))]
-    [HarmonyPrefix]
-    private static void PrefixShiftTroopToIndex(TroopRoster __instance, int troopIndex, int targetIndex)
-    {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return;
-
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client attempted to {methodName} on a managed {type}", nameof(TroopRoster.ShiftTroopToIndex), typeof(TroopRoster));
-            return;
-        }
-
-        MessageBroker.Instance.Publish(__instance, new TroopShiftedToIndex(__instance, troopIndex, targetIndex));
-    }
-
-    [HarmonyPatch(nameof(TroopRoster.SwapTroopsAtIndices))]
-    [HarmonyPrefix]
-    private static void PrefixSwapTroopsAtIndices(TroopRoster __instance, int firstIndex, int secondIndex)
-    {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return;
-
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client attempted to {methodName} on a managed {type}", nameof(TroopRoster.SwapTroopsAtIndices), typeof(TroopRoster));
-            return;
-        }
-
-        MessageBroker.Instance.Publish(__instance, new TroopsSwappedAtIndices(__instance, firstIndex, secondIndex));
+        var character = __instance.GetElementCopyAtIndex(index).Character;
+        MessageBroker.Instance.Publish(__instance, new ElementXpSet(__instance, character, number));
     }
 }
-// Some co-op flows commit troops via AddToCounts while already inside an AllowedThread opened for
-// another reason — prisoner/battle capture, for example. Inside an AllowedThread the lower-level
-// AddNewElement and AddToCountsAtIndex patches are suppressed, so this patch publishes the sync
-// messages for that case, using the return value as the final index.
+
+// Some co-op flows commit troops via AddToCounts while already inside an AllowedThread opened for another
+// reason, prisoner/battle capture for example. Inside an AllowedThread the lower-level AddToCountsAtIndex
+// patch stands down, so this patch publishes the change for that case using the character parameter, which
+// stays valid even when removeDepleted has removed the element.
 [HarmonyPatch(typeof(TroopRoster), nameof(TroopRoster.AddToCounts))]
 internal class TroopRosterAddToCountsPatch
 {
-    [HarmonyPrefix]
-    static void Prefix(TroopRoster __instance, CharacterObject character, ref bool __state)
-    {
-        if (!AllowedThread.IsThisThreadAllowed()) return;
-        if (ModInformation.IsClient) return;
-        if (__instance == null || character == null) return;
-
-        // track if this is a new element
-        __state = __instance.FindIndexOfTroop(character) < 0;
-    }
-
     [HarmonyPostfix]
     static void Postfix(TroopRoster __instance, CharacterObject character, int count,
-        bool insertAtFront, int woundedCount, int xpChange, bool removeDepleted, int __result, bool __state)
+        int woundedCount, int xpChange, bool removeDepleted)
     {
         if (!AllowedThread.IsThisThreadAllowed()) return;
         if (ModInformation.IsClient) return;
         if (__instance == null || character == null) return;
 
-        if (__state) // was new element
-        {
-            MessageBroker.Instance.Publish(__instance, new NewElementAdded(__instance, character, insertAtFront ? 0 : -1));
-        }
-
-        MessageBroker.Instance.Publish(__instance, new CountsAtIndexAdded(__instance, __result, count, woundedCount, xpChange, removeDepleted));
+        MessageBroker.Instance.Publish(__instance, new CountsAtIndexAdded(__instance, character, count, woundedCount, xpChange, removeDepleted));
     }
 }
