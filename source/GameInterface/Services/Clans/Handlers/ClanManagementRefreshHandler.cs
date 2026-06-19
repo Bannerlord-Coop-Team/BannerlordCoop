@@ -44,7 +44,7 @@ internal class ClanManagementRefreshHandler : IHandler
 
     private void Handle_RefreshPartiesList(MessagePayload<RefreshPartiesList> obj)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             currentClanManagementVM?.ClanParties?.RefreshPartiesList();
             currentClanManagementVM?.ClanMembers?.RefreshMembersList(); // Needed to refresh clan members who can be party leaders
@@ -53,7 +53,7 @@ internal class ClanManagementRefreshHandler : IHandler
 
     private void Handle_RefreshWorkshopsList(MessagePayload<RefreshWorkshopsList> obj)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             currentClanManagementVM?.ClanIncome?.RefreshList();
         });
@@ -61,7 +61,7 @@ internal class ClanManagementRefreshHandler : IHandler
 
     private void Handle_RefreshClanMembersList(MessagePayload<RefreshClanMembersList> obj)
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameThread.Run(() =>
         {
             currentClanManagementVM?.ClanMembers?.RefreshMembersList();
             currentClanManagementVM?.ClanFiefs?.RefreshAllLists(); // Needed to refresh governors

@@ -82,17 +82,14 @@ internal class TroopRosterInterface : ITroopRosterInterface
         if (troopRosterData.Data == null) return new();
 
         var unpackedData = new List<TroopRosterElement>();
-        foreach (var elementData in troopRosterData.Data)
+        foreach (var troopRosterElementData in troopRosterData.Data)
         {
             TroopRosterElement troopRosterElement;
-            if (objectManager.TryGetObjectWithLogging<Hero>(elementData.CharacterId, out var hero))
+            if (troopRosterElementData.IsHero)
             {
-                if (hero == mainHero || hero.IsPlayerCompanion) continue;
+                if (!objectManager.TryGetObjectWithLogging<Hero>(troopRosterElementData.CharacterId, out var hero)) continue;
+                if (mainHero != null && hero == mainHero) continue;
                 troopRosterElement = new TroopRosterElement(hero.CharacterObject);
-            }
-            else if (objectManager.TryGetObjectWithLogging<CharacterObject>(elementData.CharacterId, out var character))
-            {
-                troopRosterElement = new TroopRosterElement(character);
             }
             else
             {
@@ -100,9 +97,9 @@ internal class TroopRosterInterface : ITroopRosterInterface
                 troopRosterElement = new TroopRosterElement(character);
             }
 
-            troopRosterElement._number = elementData.Number;
-            troopRosterElement._woundedNumber = elementData.WoundedNumber;
-            troopRosterElement._xp = elementData.Xp;
+            troopRosterElement._number = troopRosterElementData.Number;
+            troopRosterElement._woundedNumber = troopRosterElementData.WoundedNumber;
+            troopRosterElement._xp = troopRosterElementData.Xp;
             unpackedData.Add(troopRosterElement);
         }
 
