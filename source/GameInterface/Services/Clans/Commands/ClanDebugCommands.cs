@@ -197,40 +197,5 @@ namespace GameInterface.Services.GameDebug.Commands
 
             return clan.Name.ToString() + " given renown";
         }
-
-        [CommandLineArgumentFunction("add_family_members", "coop.debug.clan")]
-        public static string AddFamilyMembers(List<string> args)
-        {
-            if (ModInformation.IsClient) return "Command can only be run on the server.";
-
-            if (args.Count < 2)
-            {
-                return "Usage: coop.debug.clan.add_family_members <clanId> <settlementId>";
-            }
-
-            if (!TryGetObjectManager(out IObjectManager objectManager))
-            {
-                return "Unable to resolve ObjectManager";
-            }
-
-            string clanId = args[0];
-            string settlementId = args[1];
-
-            if (!objectManager.TryGetObject(clanId, out Clan clan))
-            {
-                return $"Argument1: Clan not found by ID: {clanId}";
-            }
-
-            Hero hero = clan.Leader;
-
-            if (!objectManager.TryGetObject(settlementId, out Settlement settlement))
-            {
-                return $"Argument2: Settlement not found by ID: {settlementId}";
-            }
-
-            Campaign.Current.CampaignBehaviorManager.GetBehavior<CompanionRolesCampaignBehavior>().SpawnNewHeroesForNewCompanionClan(hero, clan, settlement);
-
-            return clan.Name.ToString() + " was given family members residing in " + settlement.Name.ToString();
-        }
     }
 }
