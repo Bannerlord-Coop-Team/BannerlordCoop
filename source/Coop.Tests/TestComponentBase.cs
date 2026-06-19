@@ -104,7 +104,7 @@ internal abstract class TestComponentBase
         return builder;
     }
 
-    private void RegisterMock<T>(ContainerBuilder builder) where T : class
+    protected void RegisterMock<T>(ContainerBuilder builder) where T : class
     {
         var mock = new Mock<T>();
         builder.RegisterInstance(mock).AsSelf().SingleInstance();
