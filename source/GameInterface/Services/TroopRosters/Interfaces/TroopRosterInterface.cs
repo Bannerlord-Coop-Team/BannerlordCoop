@@ -22,9 +22,8 @@ public interface ITroopRosterInterface : IGameAbstraction
 
     /// <summary>
     /// Unpack troop roster data into usable TroopRosterElements.
-    /// Optional mainHero parameter for avoiding retrieving a duplicate of a player hero already in a roster.
     /// </summary>
-    List<TroopRosterElement> UnpackTroopRosterData(TroopRosterData troopRosterData, Hero mainHero = null);
+    List<TroopRosterElement> UnpackTroopRosterData(TroopRosterData troopRosterData);
 
     /// <summary>
     /// Updates target roster with incoming data from the client.
@@ -77,7 +76,7 @@ internal class TroopRosterInterface : ITroopRosterInterface
         return packedData;
     }
 
-    public List<TroopRosterElement> UnpackTroopRosterData(TroopRosterData troopRosterData, Hero mainHero = null)
+    public List<TroopRosterElement> UnpackTroopRosterData(TroopRosterData troopRosterData)
     {
         if (troopRosterData.Data == null) return new();
 
@@ -88,11 +87,6 @@ internal class TroopRosterInterface : ITroopRosterInterface
             if (troopRosterElementData.IsHero)
             {
                 if (!objectManager.TryGetObjectWithLogging<Hero>(troopRosterElementData.CharacterId, out var hero)) continue;
-                // Skip the heroes UpdateWithData's clear-loop preserves (the local main hero and the
-                // player's companions) so a snapshot that also carries them does not add a second copy on
-                // top of the preserved slot. Only when a mainHero is supplied: callers that unpack a fresh
-                // roster with no mainHero (e.g. building a new clan party) must pull every hero.
-                if (mainHero != null && (hero == mainHero || hero.IsPlayerCompanion)) continue;
                 troopRosterElement = new TroopRosterElement(hero.CharacterObject);
             }
             else
@@ -112,22 +106,33 @@ internal class TroopRosterInterface : ITroopRosterInterface
 
     public void UpdateWithData(TroopRoster targetTroopRoster, TroopRosterData packedTroopRosterElements, Hero mainHero)
     {
-        // Clear the roster but keep the heroes that must survive a whole-roster replace: the local main
-        // hero (removing it breaks the player party) and the player's companions (clan equipment/inventory
-        // work relies on them persisting). UnpackTroopRosterData skips this same set on rebuild, so a
-        // preserved hero is never re-added and doubled. The mainHero != null guard stops a null mainHero
-        // from matching a basic troop's null HeroObject and wrongly preserving (then doubling) it.
+        // Preserve the local main hero and the player's companions across a whole-roster replace, but only
+        // when replacing a party's own MEMBER roster: removing the main hero breaks the player party, and clan
+        // equipment/inventory work relies on companions persisting there. Any other roster, a prison roster or
+        // an ownerless prisoner-management roster, must mirror the server exactly, otherwise a companion the
+        // server freed, ransomed, or sold stays stuck as a prisoner on the client. Detecting the member roster
+        // affirmatively (rather than "not the prison roster") also fails safe for an ownerless roster, where
+        // OwnerParty is null. The mainHero != null guard also stops a null mainHero matching a basic troop's
+        // null HeroObject and wrongly preserving it.
+        bool preserveHeroes = mainHero != null && targetTroopRoster.OwnerParty?.MemberRoster == targetTroopRoster;
+
         for (int i = targetTroopRoster._count - 1; i >= 0; i--)
         {
-            if (mainHero != null && (targetTroopRoster.data[i].Character?.HeroObject == mainHero || targetTroopRoster.data[i].Character?.HeroObject?.IsPlayerCompanion == true)) continue;
-            targetTroopRoster.AddToCounts(targetTroopRoster.data[i].Character, -targetTroopRoster.data[i].Number, false, -targetTroopRoster.data[i].WoundedNumber, 0, true);
+            var character = targetTroopRoster.data[i].Character;
+            if (preserveHeroes && (character?.HeroObject == mainHero || character?.HeroObject?.IsPlayerCompanion == true)) continue;
+            targetTroopRoster.AddToCounts(character, -targetTroopRoster.data[i].Number, false, -targetTroopRoster.data[i].WoundedNumber, 0, true);
         }
 
         if (packedTroopRosterElements.Data == null) return;
 
-        // Rebuild roster with new data
-        foreach (var element in UnpackTroopRosterData(packedTroopRosterElements, mainHero))
+        // Rebuild from the snapshot. When preserving, the clear above left only the heroes we kept, so a hero
+        // already present is one of those; skip re-adding it (Add merges by character and would double the
+        // count). A snapshot hero that was NOT preserved locally (a companion the server just moved into this
+        // roster) is absent here, so it is added normally and not lost. When not preserving, the clear emptied
+        // the roster, so nothing is skipped.
+        foreach (var element in UnpackTroopRosterData(packedTroopRosterElements))
         {
+            if (preserveHeroes && targetTroopRoster.Contains(element.Character)) continue;
             targetTroopRoster.Add(element);
         }
     }

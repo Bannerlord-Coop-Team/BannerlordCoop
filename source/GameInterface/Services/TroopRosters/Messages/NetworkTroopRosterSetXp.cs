@@ -4,8 +4,9 @@ using ProtoBuf;
 namespace GameInterface.Services.TroopRosters.Messages;
 
 /// <summary>
-/// Sets the absolute xp of an element in a roster, keyed by element identity. The client finds the
-/// element, creating it first if absent, then sets its xp. <see cref="IsHero"/> as in
+/// Sets the absolute xp of an element in a roster, keyed by element identity. The client sets the xp on
+/// the element if it has it; an absent element is skipped (its create is its own earlier delta), since a
+/// placeholder would corrupt the roster's cached totals. <see cref="IsHero"/> as in
 /// <see cref="NetworkTroopRosterAddCounts"/>.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]

@@ -51,9 +51,11 @@ internal class TroopRosterPatches
     }
 
     [HarmonyPatch(nameof(TroopRoster.AddToCountsAtIndex))]
-    [HarmonyPostfix]
-    private static void PostfixAddToCountsAtIndex()
+    [HarmonyFinalizer]
+    private static void FinalizerAddToCountsAtIndex()
     {
+        // A finalizer (not a postfix) so the flag clears even when the original throws. A skipped clear would
+        // leave it stuck true on this thread and silence every later direct SetElementXp publish.
         _inAddToCountsAtIndex = false;
     }
 
@@ -82,6 +84,10 @@ internal class TroopRosterPatches
             return;
         }
 
+        // Only read the element while the index points at a live slot. data has padding past Count, so an
+        // out-of-range index would publish a change for a stale/null element before the original throws.
+        if (index < 0 || index >= __instance.Count) return;
+
         var character = __instance.GetElementCopyAtIndex(index).Character;
         MessageBroker.Instance.Publish(__instance, new ElementNumberSet(__instance, character, number));
     }
@@ -96,6 +102,8 @@ internal class TroopRosterPatches
             Logger.Error("Client attempted to {methodName} on a managed {type}", nameof(TroopRoster.SetElementWoundedNumber), typeof(TroopRoster));
             return;
         }
+
+        if (index < 0 || index >= __instance.Count) return;
 
         var character = __instance.GetElementCopyAtIndex(index).Character;
         MessageBroker.Instance.Publish(__instance, new ElementWoundedNumberSet(__instance, character, number));
@@ -114,6 +122,8 @@ internal class TroopRosterPatches
 
         // The xp change AddToCountsAtIndex makes internally is already carried by its CountsAtIndexAdded.
         if (_inAddToCountsAtIndex) return;
+
+        if (index < 0 || index >= __instance.Count) return;
 
         var character = __instance.GetElementCopyAtIndex(index).Character;
         MessageBroker.Instance.Publish(__instance, new ElementXpSet(__instance, character, number));

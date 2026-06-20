@@ -15,9 +15,11 @@ namespace E2E.Tests.Services.TroopRosters
     /// <remarks>
     /// Each test drives an authoritative <see cref="TroopRoster"/> mutation on the server. The server
     /// patch publishes a local event carrying the server index; the handler resolves the element's
-    /// identity from the server roster and sends an identity-keyed message, which the client applies by
-    /// finding-or-creating the element by character. The client roster starts empty, so these tests also
-    /// prove the deltas self-heal an under-populated client roster without any whole-roster transfer.
+    /// identity from the server roster and sends an identity-keyed message, which the client applies
+    /// through the same vanilla mutator, found by character. The client roster starts empty, so the
+    /// AddToCounts tests also prove a positive add creates the element (with correct cached totals) on an
+    /// under-populated client; the Set tests seed the element first, since an absolute Set for a troop the
+    /// client does not have is skipped rather than creating a totals-corrupting placeholder.
     /// </remarks>
     public class TroopRosterDeltaHandlerTests : SyncTestBase
     {
@@ -47,6 +49,8 @@ namespace E2E.Tests.Services.TroopRosters
                 Assert.Equal(1, roster.Count);
                 Assert.Same(character, roster.GetElementCopyAtIndex(0).Character);
                 Assert.Equal(5, roster.GetElementCopyAtIndex(0).Number);
+                // The create path must keep the cached totals correct (AddNewElement alone would not).
+                Assert.Equal(5, roster.TotalManCount);
             }
         }
 
@@ -155,6 +159,7 @@ namespace E2E.Tests.Services.TroopRosters
                 Assert.Equal(2, roster.Count);
                 Assert.Equal(3, roster.GetElementCopyAtIndex(roster.FindIndexOfTroop(character1)).Number);
                 Assert.Equal(4, roster.GetElementCopyAtIndex(roster.FindIndexOfTroop(character2)).Number);
+                Assert.Equal(7, roster.TotalManCount);
             }
         }
 
@@ -199,6 +204,8 @@ namespace E2E.Tests.Services.TroopRosters
                 Assert.True(client.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
                 Assert.Equal(1, roster.Count);
                 Assert.True(roster.Contains(hero.CharacterObject));
+                Assert.Equal(1, roster.GetElementCopyAtIndex(roster.FindIndexOfTroop(hero.CharacterObject)).Number);
+                Assert.Equal(1, roster.TotalHeroes);
             }
         }
 
