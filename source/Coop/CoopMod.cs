@@ -4,6 +4,7 @@ using Coop.Core;
 using Coop.Lib.NoHarmony;
 using Coop.UI.LoadGameUI;
 using GameInterface;
+using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.TroopRosters;
 using GameInterface.Services.UI;
 using Serilog;
@@ -11,6 +12,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
@@ -229,6 +231,14 @@ namespace Coop
             Module.CurrentModule.AddInitialStateOption(JoinCoopGame);
 #endif
             #endregion
+        }
+
+        protected override void OnGameStart(Game game, IGameStarter gameStarterObject)
+        {
+            base.OnGameStart(game, gameStarterObject);
+
+            if (gameStarterObject is CampaignGameStarter campaignGameStarter)
+                campaignGameStarter.AddBehavior(new PlayerPartyInteractionCampaignBehavior());
         }
 
         protected override void OnBeforeInitialModuleScreenSetAsRoot()
