@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
@@ -54,6 +55,7 @@ internal class HeroRegistry : AutoRegistryBase<Hero>
             AccessTools.Property(typeof(Hero), nameof(Hero.OwnedAlleys)).SetValue(obj, new MBList<Alley>());
             AccessTools.Property(typeof(Hero), nameof(Hero.OwnedCaravans)).SetValue(obj, new MBList<CaravanPartyComponent>());
             AccessTools.Field(typeof(Hero), nameof(Hero.VolunteerTypes)).SetValue(obj, new CharacterObject[6]);
+            obj._heroDeveloper = new HeroDeveloper(obj);
         }
 
         MBObjectManager.Instance?.RegisterObjectInternalWithoutTypeId(obj, false, out _);

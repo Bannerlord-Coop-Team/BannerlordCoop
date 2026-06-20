@@ -7,6 +7,7 @@ using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
@@ -28,6 +29,11 @@ internal class CharacterObjectRegistry : AutoRegistryBase<CharacterObject>
 
     public override void RegisterAllObjects()
     {
+        var characterObjects = CharacterObject.All
+            .Concat(Hero.AllAliveHeroes.Select(hero => hero.CharacterObject))
+            .Concat(Hero.DeadOrDisabledHeroes.Select(hero => hero.CharacterObject))
+            .DistinctBy(characterObject => characterObject.StringId);
+
         // Register every CharacterObject (basic troop templates as well as hero characters), not just
         // hero-owned ones: troops need a network id keyed by their stable StringId so rosters and
         // recruitment can resolve them on every machine.

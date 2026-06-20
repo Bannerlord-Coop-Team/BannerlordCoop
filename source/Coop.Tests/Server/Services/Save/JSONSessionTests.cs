@@ -4,6 +4,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Data;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Smithing;
+using GameInterface.Services.Workshops;
 using System;
 using System.Collections.Generic;
 using System.Numerics;
@@ -35,7 +36,7 @@ namespace Coop.Tests.Server.Services.Save
                 new Player("MyPlayer", "MyHero", "MyParty", "MyClan", "MyCharacter")
             };
 
-            var sessionData = new CoopSession("TestId", players, new CraftingPlayerData(new(), new(), new()));
+            var sessionData = new CoopSession("TestId", players, new CraftingPlayerData(new(), new(), new()), new WorkshopPlayerData(new()));
 
             string saveFile = SAVE_PATH + sessionData.UniqueGameId + ".json";
 

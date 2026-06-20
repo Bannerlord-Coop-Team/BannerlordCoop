@@ -13,11 +13,16 @@ internal readonly struct UpdateEquipmentClients : ICommand
     [ProtoMember(2)]
     public readonly string MobilePartyId;
 
+    [ProtoMember(3)]
+    public readonly string InitialHeroId;
+
     public UpdateEquipmentClients(
         Dictionary<string, EquipmentData[]> characterIdEquipmentsData,
-        string mobilePartyId)
+        string mobilePartyId,
+        string initialHeroId)
     {
         CharacterIdEquipmentsData = characterIdEquipmentsData;
         MobilePartyId = mobilePartyId;
+        InitialHeroId = initialHeroId;
     }
 }

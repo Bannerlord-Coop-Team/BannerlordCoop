@@ -2,11 +2,9 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Messages;
 using Serilog;
-using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 
@@ -50,21 +48,12 @@ internal class ExecuteTroopHandler : IHandler
 
     private void Handle_ExecuteHero(MessagePayload<ExecuteHero> obj)
     {
-        var data = obj.What;
+        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.ExecutedHeroId, out var executedHero)) return;
+        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.ExecutorId, out var executor)) return;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
-            try
-            {
-                if (!objectManager.TryGetObjectWithLogging<Hero>(data.ExecutedHeroId, out var executedHero)) return;
-                if (!objectManager.TryGetObjectWithLogging<Hero>(data.ExecutorId, out var executor)) return;
-
-                KillCharacterAction.ApplyByExecution(executedHero, executor, true, false);
-            }
-            catch (Exception e)
-            {
-                logger.Error(e, "Failed to apply ExecuteHero");
-            }
+            KillCharacterAction.ApplyByExecution(executedHero, executor, true, false);
         });
     }
 }

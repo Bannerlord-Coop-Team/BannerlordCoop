@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Helpers;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -14,7 +15,9 @@ public readonly struct TradeAttempted : IEvent
     public readonly ItemRoster ToRoster;
     public readonly bool IsTrading;
     public readonly bool CanGainXpFromDiscarding;
+    public readonly InventoryScreenHelper.InventoryMode InventoryMode;
     public readonly Hero Hero;
+    public readonly CharacterObject InitialCharacterEquipment;
     public readonly int TotalAmount;
     public readonly int MerchantGold;
     public readonly MobileParty Party;
@@ -29,8 +32,10 @@ public readonly struct TradeAttempted : IEvent
         ItemRoster toRoster,
         bool isTrading,
         bool canGainXpFromDiscarding,
+        InventoryScreenHelper.InventoryMode inventoryMode,
         Hero hero,
-        int totalAmount,
+        CharacterObject initialCharacterEquipment,
+    int totalAmount,
         int merchantGold,
         MobileParty party,
         MobileParty currentMobileParty,
@@ -43,7 +48,9 @@ public readonly struct TradeAttempted : IEvent
         ToRoster = toRoster;
         IsTrading = isTrading;
         CanGainXpFromDiscarding = canGainXpFromDiscarding;
+        InventoryMode = inventoryMode;
         Hero = hero;
+        InitialCharacterEquipment = initialCharacterEquipment;
         TotalAmount = totalAmount;
         MerchantGold = merchantGold;
         Party = party;

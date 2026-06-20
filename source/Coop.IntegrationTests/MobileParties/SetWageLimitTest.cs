@@ -1,6 +1,4 @@
 ﻿using Common.Util;
-using Coop.Core.Client.Services.MobileParties.Messages;
-using Coop.Core.Server.Services.MobileParties.Messages;
 using Coop.IntegrationTests.Environment;
 using GameInterface.Services.MobileParties.Messages;
 using TaleWorlds.CampaignSystem.Party;
@@ -34,31 +32,19 @@ public class SetWageLimitTest
 
         Assert.True(client1.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var party));
 
-        var triggerMessage = new ChangedWagePaymentLimit(party, newValue);
+        var triggerMessage = new WagePaymentLimitSet(party, newValue);
 
         client1.SimulateMessage(this, triggerMessage);
 
-        // first message sent via game interface
-        Assert.Equal(1, client1.InternalMessages.GetMessageCount<ChangedWagePaymentLimit>());
+        // Verify message sent from GameInterface
+        Assert.Equal(1, client1.InternalMessages.GetMessageCount<WagePaymentLimitSet>());
 
+        // Verify client sent first message and other client didn't send a message
+        Assert.Equal(1, client1.NetworkSentMessages.GetMessageCount<SetWagePaymentLimit>());
+        Assert.Equal(0, client2.NetworkSentMessages.Count);
 
-        // verify client sent first message
-
-        Assert.Equal(1, client1.NetworkSentMessages.GetMessageCount<NetworkChangeWagePaymentLimitRequest>());
-        Assert.Equal(0, client2.NetworkSentMessages.Count); // client 2 should not send any
-
-        // request from client
-        Assert.Equal(1, server.InternalMessages.GetMessageCount<NetworkChangeWagePaymentLimitRequest>());
-
-
-        // all other clients -> NetworkChangeWagePaymentLimit
-        Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkChangeWagePaymentLimit>());
-        Assert.Equal(1, client2.InternalMessages.GetMessageCount<NetworkChangeWagePaymentLimit>());
-        Assert.Equal(1, client2.InternalMessages.GetMessageCount<WagePaymentApprovedOthers>());
-
-
-        // server updates itself via -> ChangeWagePaymentLimit
-        Assert.Equal(1, server.InternalMessages.GetMessageCount<ChangeWagePaymentLimit>());
+        // Verify server received message from client
+        Assert.Equal(1, server.InternalMessages.GetMessageCount<SetWagePaymentLimit>());
     }
 
 }

@@ -10,6 +10,7 @@ namespace GameInterface.Services.Workshops
         {
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Workshop), nameof(Workshop._owner)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Workshop), nameof(Workshop._customName)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(Workshop), nameof(Workshop._productionProgress)));
             //autoSyncBuilder.AddField(AccessTools.Field(typeof(Workshop), nameof(Workshop._settlement)));
             //autoSyncBuilder.AddField(AccessTools.Field(typeof(Workshop), nameof(Workshop._tag)));
         }
