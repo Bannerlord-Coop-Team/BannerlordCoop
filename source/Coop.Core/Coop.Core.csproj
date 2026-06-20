@@ -105,7 +105,7 @@
   </ItemGroup>
   <ItemGroup>
 	  <Reference Include="SandBox.View">
-	    <HintPath>..\Missions\obj\x64\Release\netstandard2.0\PublicizedAssemblies\SandBox.View.D6E4F8483DFBE29785FE2E22277CF29C\SandBox.View.dll</HintPath>
+	    <HintPath>..\..\mb2\Modules\Sandbox\bin\Win64_Shipping_Client\SandBox.View.dll</HintPath>
 	  </Reference>
 	  <Reference Include="TaleWorlds.CampaignSystem">
 	    <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.CampaignSystem.dll</HintPath>
@@ -117,7 +117,7 @@
 	    <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Core.dll</HintPath>
 	  </Reference>
 	  <Reference Include="TaleWorlds.GauntletUI.Data">
-	    <HintPath>..\GameInterface\obj\x64\Release\netstandard2.0\PublicizedAssemblies\TaleWorlds.GauntletUI.Data.EADFA9568C011469B6AD1D7E21237613\TaleWorlds.GauntletUI.Data.dll</HintPath>
+	    <HintPath>..\..\mb2\Modules\Sandbox\bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.Data.dll</HintPath>
 	  </Reference>
 	  <Reference Include="TaleWorlds.Library">
 		  <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Library.dll</HintPath>
@@ -131,8 +131,5 @@
   </ItemGroup>
   <ItemGroup>
     <Publicize Include="TaleWorlds.Library" />
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Server\Services\Instances\Messages\" />
   </ItemGroup>
 </Project>

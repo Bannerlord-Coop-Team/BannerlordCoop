@@ -2,7 +2,7 @@ using GameInterface.Services.ObjectManager;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Locations;
 
-namespace GameInterface.Missions;
+namespace Missions;
 
 /// <summary>
 /// Derives the id of a P2P mission instance for a settlement location. Uses <b>ObjectManager ids</b>

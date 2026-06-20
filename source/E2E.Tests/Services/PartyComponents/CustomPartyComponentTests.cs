@@ -1,8 +1,4 @@
-﻿using E2E.Tests.Environment;
-using E2E.Tests.Util;
-using GameInterface.Services.ObjectManager;
-using GameInterface.Services.PartyComponents.Patches.CustomPartyComponents;
-using GameInterface.Services.WeaponDesigns.Messages;
+﻿using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;

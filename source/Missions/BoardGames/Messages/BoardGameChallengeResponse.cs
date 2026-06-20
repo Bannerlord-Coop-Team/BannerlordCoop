@@ -2,7 +2,7 @@ using Common.Messaging;
 using ProtoBuf;
 using System;
 
-namespace GameInterface.Missions.BoardGames.Messages
+namespace Missions.BoardGames.Messages
 {
     [ProtoContract]
     public readonly struct BoardGameChallengeResponse : IEvent

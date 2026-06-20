@@ -2,8 +2,8 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using GameInterface.Services.Locations.Messages;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.Locations.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;

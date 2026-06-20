@@ -1,13 +1,13 @@
 using Common.Logging;
 using Common.Messaging;
-using GameInterface.Missions.Messages;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
+using Missions.Messages;
 using Serilog;
 using System;
 using TaleWorlds.MountAndBlade;
 
-namespace GameInterface.Missions;
+namespace Missions;
 
 /// <summary>
 /// Shared base for the per-mission P2P controllers (taverns, battles). Owns what every coop mission needs:

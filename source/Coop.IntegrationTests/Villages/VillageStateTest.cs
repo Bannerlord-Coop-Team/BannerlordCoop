@@ -1,7 +1,6 @@
 using Coop.Core.Server.Services.Villages.Messages;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
-using GameInterface.Services.Template.Messages;
 using GameInterface.Services.Villages.Messages;
 
 using TaleWorlds.CampaignSystem.Settlements;

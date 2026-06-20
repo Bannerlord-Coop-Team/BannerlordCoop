@@ -1,12 +1,11 @@
 using Autofac;
-using GameInterface.Missions.Agents.Handlers;
-using GameInterface.Missions.Missiles;
-using GameInterface.Missions.Missiles.Handlers;
-using GameInterface.Missions.Services.Network;
-using GameInterface.Missions.Taverns;
 using GameInterface.Services.Locations;
+using Missions.Agents.Handlers;
+using Missions.Missiles.Handlers;
+using Missions.Services.Network;
+using Missions.Taverns;
 
-namespace GameInterface.Missions;
+namespace Missions;
 
 /// <summary>
 /// Composition root for the mission/P2P stack. Lives in the Missions assembly alongside the services it

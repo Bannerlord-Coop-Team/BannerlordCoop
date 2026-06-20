@@ -6,9 +6,9 @@ using Common.PacketHandlers;
 using Coop.Core.Client.Policies;
 using Coop.Core.Client.States;
 using Coop.Core.Common;
-using GameInterface.Missions;
 using GameInterface.Policies;
 using LiteNetLib;
+using Missions;
 
 namespace Coop.Core.Client;
 

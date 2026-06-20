@@ -1,7 +1,7 @@
 ﻿using HarmonyLib;
 using TaleWorlds.MountAndBlade;
 
-namespace GameInterface.Missions.Patches
+namespace Missions.Patches
 {
     [HarmonyPatch(typeof(GameNetwork), "IsMultiplayer", MethodType.Getter)]
     public class PausePatch

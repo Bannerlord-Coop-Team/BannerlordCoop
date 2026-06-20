@@ -1,7 +1,7 @@
 ﻿using E2E.Tests.Environment;
-using Xunit.Abstractions;
-using TaleWorlds.Core;
 using HarmonyLib;
+using TaleWorlds.Core;
+using Xunit.Abstractions;
 using static TaleWorlds.Core.Equipment;
 
 

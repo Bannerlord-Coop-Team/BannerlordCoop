@@ -1,11 +1,11 @@
 ﻿using Common.Logging;
 using Common.Messaging;
-using GameInterface.Missions.Agents.Messages;
 using GameInterface.Services.Locations;
+using Missions.Agents.Messages;
 using Serilog;
 using TaleWorlds.MountAndBlade;
 
-namespace GameInterface.Missions;
+namespace Missions;
 
 public class CoopMissionNetworkBehavior : MissionBehavior, ILocationMissionBehavior
 {

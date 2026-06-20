@@ -1,8 +1,8 @@
-using System;
 using Common.Network;
 using Coop.Core.Client.Services.Heroes.Messages;
 using GameInterface.Services.Players;
 using LiteNetLib;
+using System;
 
 namespace Coop.Core.Server.Connections;
 

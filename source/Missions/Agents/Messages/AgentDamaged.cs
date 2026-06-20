@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
 using TaleWorlds.MountAndBlade;
 
-namespace GameInterface.Missions.Agents.Messages
+namespace Missions.Agents.Messages
 {
     /// <summary>
     /// Internal event for Agent damage

@@ -1,8 +1,4 @@
 ﻿using E2E.Tests.Util;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Localization;
 using Xunit.Abstractions;

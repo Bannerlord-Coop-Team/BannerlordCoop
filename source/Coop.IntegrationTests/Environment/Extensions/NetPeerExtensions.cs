@@ -2,7 +2,6 @@ using LiteNetLib;
 using System.Net;
 using System.Reflection;
 using System.Runtime.Serialization;
-using System.Threading;
 
 namespace Coop.IntegrationTests.Environment.Extensions;
 

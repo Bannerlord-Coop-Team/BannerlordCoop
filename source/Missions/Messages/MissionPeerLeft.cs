@@ -1,7 +1,7 @@
 using Common.Messaging;
 using ProtoBuf;
 
-namespace GameInterface.Missions.Messages;
+namespace Missions.Messages;
 
 /// <summary>
 /// Server → remaining instance members: a controller has <em>gracefully</em> left the mission instance

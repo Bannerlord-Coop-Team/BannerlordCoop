@@ -1,10 +1,8 @@
 ﻿using Autofac;
 using Common.Messaging;
 using Common.PacketHandlers;
-using Common.Serialization;
 using Coop.IntegrationTests.Environment.Instance;
 using LiteNetLib;
-using Microsoft.VisualStudio.TestPlatform.CommunicationUtilities;
 
 namespace Coop.IntegrationTests.Environment;
 

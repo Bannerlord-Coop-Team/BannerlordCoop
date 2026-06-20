@@ -1,10 +1,9 @@
-﻿using GameInterface.Serialization;
-using Xunit;
-using GameInterface.Serialization.Native;
-using Autofac;
-using GameInterface.Tests.Bootstrap.Modules;
-using GameInterface.Tests.Bootstrap;
+﻿using Autofac;
 using Common.Serialization;
+using GameInterface.Serialization;
+using GameInterface.Serialization.Native;
+using GameInterface.Tests.Bootstrap.Modules;
+using Xunit;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

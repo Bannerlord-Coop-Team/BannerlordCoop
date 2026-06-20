@@ -16,7 +16,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 
-namespace GameInterface.Missions.Services.Network;
+namespace Missions.Services.Network;
 
 public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateable, IDisposable, IBattleNetwork
 {

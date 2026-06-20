@@ -1,5 +1,4 @@
 ﻿using Common.Messaging;
-using Common.Network;
 using Coop.Core.Server.Services.ItemRosters.Messages;
 using GameInterface.Services.ItemRosters.Messages;
 

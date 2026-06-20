@@ -1,6 +1,4 @@
-using System;
 using Common.Util;
-using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.TroopRosters;
 using TaleWorlds.CampaignSystem;

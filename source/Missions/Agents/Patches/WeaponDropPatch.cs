@@ -1,10 +1,10 @@
 ﻿using Common.Messaging;
-using GameInterface.Missions.Agents.Messages;
 using HarmonyLib;
+using Missions.Agents.Messages;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
-namespace GameInterface.Missions.Agents.Patches
+namespace Missions.Agents.Patches
 {
     public class WeaponDropPatch
     {

@@ -1,6 +1,5 @@
 ﻿using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Siege;
-using TaleWorlds.Core;
 
 namespace E2E.Tests.Util.ObjectBuilders
 {

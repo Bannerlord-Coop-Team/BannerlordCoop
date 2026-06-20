@@ -1,10 +1,9 @@
 using Common.Messaging;
-using GameInterface.Missions.Data;
+using Missions.Data;
 using ProtoBuf;
 using System;
-using TaleWorlds.Library;
 
-namespace GameInterface.Missions.Messages;
+namespace Missions.Messages;
 
 /// <summary>
 /// External event for Join Info in Mission

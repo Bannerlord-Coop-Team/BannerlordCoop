@@ -4,7 +4,7 @@ using System;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 
-namespace GameInterface.Missions.Missiles.Message
+namespace Missions.Missiles.Message
 {
     /// <summary>
     /// External event for agent missiles

@@ -1,6 +1,6 @@
 ﻿using System;
-using TaleWorlds.CampaignSystem;
 using System.Collections.Generic;
+using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Serialization.External
 {

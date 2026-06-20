@@ -1,7 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using Common.Util;
+﻿using Common.Util;
 using GameInterface.Services.TroopRosters;
+using System;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.Roster;
 using Xunit;
 

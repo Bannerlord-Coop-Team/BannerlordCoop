@@ -2,8 +2,8 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
-using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEventParties.Messages;
+using GameInterface.Services.MapEvents;
 using HarmonyLib;
 using Serilog;
 using TaleWorlds.CampaignSystem.MapEvents;

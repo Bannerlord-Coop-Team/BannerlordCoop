@@ -3,16 +3,15 @@ using Common.Logging;
 using Common.Messaging;
 using Common.PacketHandlers;
 using Common.Util;
-using GameInterface.Missions.Agents.Packets;
-using GameInterface.Missions.Messages;
 using GameInterface.Services.Entity;
 using LiteNetLib;
+using Missions.Agents.Packets;
+using Missions.Messages;
 using Serilog;
 using System;
-using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
-namespace GameInterface.Missions.Agents.Handlers
+namespace Missions.Agents.Handlers
 {
     public interface IAgentMovementHandler : IPacketHandler, IDisposable
     {

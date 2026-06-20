@@ -1,6 +1,6 @@
 ﻿using Common.Messaging;
-using GameInterface.Missions.Agents.Messages;
-using GameInterface.Missions.BoardGames.Messages;
+using Missions.Agents.Messages;
+using Missions.BoardGames.Messages;
 using SandBox;
 using SandBox.BoardGames;
 using SandBox.BoardGames.MissionLogics;
@@ -13,7 +13,7 @@ using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using static TaleWorlds.CampaignSystem.CultureObject;
 
-namespace GameInterface.Missions.BoardGames
+namespace Missions.BoardGames
 {
     public class BoardGameLogic : IDisposable
     {

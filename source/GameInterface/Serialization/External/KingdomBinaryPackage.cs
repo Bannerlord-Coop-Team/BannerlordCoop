@@ -1,6 +1,6 @@
 ﻿using System;
-using TaleWorlds.CampaignSystem;
 using System.Collections.Generic;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
 

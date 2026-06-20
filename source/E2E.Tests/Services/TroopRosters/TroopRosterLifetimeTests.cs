@@ -1,12 +1,6 @@
 ﻿using E2E.Tests.Environment;
 using E2E.Tests.Util;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem.Roster;
-using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.TroopRosters

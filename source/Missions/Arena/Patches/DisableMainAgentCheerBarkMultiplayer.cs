@@ -5,7 +5,7 @@ using System.Linq;
 using System.Reflection.Emit;
 using TaleWorlds.MountAndBlade.ViewModelCollection.HUD;
 
-namespace GameInterface.Missions.Arena.Patches
+namespace Missions.Arena.Patches
 {
     /// <summary>
     /// GameNetwork.IsMultiplayer breaks the constructor for <see cref="MissionMainAgentCheerBarkControllerVM"/>

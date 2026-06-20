@@ -1,12 +1,12 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Util;
-using GameInterface.Missions.Agents.Extensions;
-using GameInterface.Missions.Agents.Messages;
 using HarmonyLib;
+using Missions.Agents.Extensions;
+using Missions.Agents.Messages;
 using TaleWorlds.MountAndBlade;
 
-namespace GameInterface.Missions.Agents.Patches
+namespace Missions.Agents.Patches
 {
     /// <summary>
     /// Intercept agent damage and determine if a network call is needed

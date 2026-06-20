@@ -1,5 +1,4 @@
-﻿using Common.Util;
-using TaleWorlds.CampaignSystem.MapEvents;
+﻿using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace E2E.Tests.Util.ObjectBuilders;

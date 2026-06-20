@@ -1,8 +1,4 @@
-﻿using Coop.Core.Client.Services.MobileParties.Messages;
-using Coop.IntegrationTests.Environment;
-using Coop.IntegrationTests.Environment.Instance;
-using GameInterface.Services.MobileParties.Messages;
-using GameInterface.Services.MobileParties.Patches;
+﻿using Coop.IntegrationTests.Environment;
 
 namespace Coop.IntegrationTests.MobileParties
 {

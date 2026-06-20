@@ -1,8 +1,6 @@
 ﻿using Common.Messaging;
 using Coop.Core.Server.Connections.Messages;
-using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
-using System;
 
 namespace Coop.Core.Server.Connections.States;
 

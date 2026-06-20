@@ -7,7 +7,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.GauntletUI.Data;
 
-namespace GameInterface.Missions.Patches
+namespace Missions.Patches
 {
     [HarmonyPatch]
     internal class RobustnessPatches

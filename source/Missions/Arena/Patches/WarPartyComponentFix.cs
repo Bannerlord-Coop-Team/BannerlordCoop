@@ -2,7 +2,7 @@
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 
-namespace GameInterface.Missions.Arena.Patches
+namespace Missions.Arena.Patches
 {
     [HarmonyPatch(typeof(WarPartyComponent))]
     internal class WarPartyComponentFix

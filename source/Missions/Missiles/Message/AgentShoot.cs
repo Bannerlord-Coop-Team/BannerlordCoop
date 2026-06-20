@@ -2,7 +2,7 @@
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
-namespace GameInterface.Missions.Missiles.Message
+namespace Missions.Missiles.Message
 {
     /// <summary>
     /// Internal event for agent missiles

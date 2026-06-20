@@ -1,10 +1,8 @@
 ﻿using Autofac;
 using Common.Messaging;
-using Common.Tests.Utils;
 using Coop.Core.Client;
 using Coop.Core.Client.Messages;
 using Coop.Core.Client.States;
-using Coop.Tests.Mocks;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.UI.Interfaces;
 using Moq;

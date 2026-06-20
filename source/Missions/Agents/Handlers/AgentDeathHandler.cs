@@ -1,9 +1,8 @@
-﻿using System;
-using Common.Messaging;
-using GameInterface.Missions.Agents.Messages;
+﻿using Common.Messaging;
+using Missions.Agents.Messages;
 using TaleWorlds.MountAndBlade;
 
-namespace GameInterface.Missions.Agents.Handlers
+namespace Missions.Agents.Handlers
 {
     /// <summary>
     /// Handler for agent death

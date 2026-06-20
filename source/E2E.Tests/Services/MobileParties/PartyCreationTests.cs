@@ -4,7 +4,6 @@ using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
-using TaleWorlds.Library;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.MobileParties;

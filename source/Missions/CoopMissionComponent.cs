@@ -1,9 +1,7 @@
-using GameInterface.Missions.Agents.Handlers;
-using GameInterface.Missions.Missiles;
-using GameInterface.Missions.Missiles.Handlers;
-using TaleWorlds.MountAndBlade;
+using Missions.Agents.Handlers;
+using Missions.Missiles.Handlers;
 
-namespace GameInterface.Missions;
+namespace Missions;
 
 public interface ICoopMissionComponent
 {

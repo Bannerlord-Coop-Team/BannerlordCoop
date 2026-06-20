@@ -1,8 +1,8 @@
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
-using GameInterface.Missions.Messages;
 using LiteNetLib;
+using Missions.Messages;
 
 namespace Coop.Core.Server.Services.Instances.Handlers;
 

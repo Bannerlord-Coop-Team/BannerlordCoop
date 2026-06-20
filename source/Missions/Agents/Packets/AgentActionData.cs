@@ -2,7 +2,7 @@
 using System.Reflection;
 using TaleWorlds.MountAndBlade;
 
-namespace GameInterface.Missions.Agents.Packets
+namespace Missions.Agents.Packets
 {
     [ProtoContract(SkipConstructor = true)]
     public class AgentActionData

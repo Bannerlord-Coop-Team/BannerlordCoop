@@ -4,7 +4,7 @@ using ProtoBuf;
 using System;
 using TaleWorlds.MountAndBlade;
 
-namespace GameInterface.Missions.Agents.Packets
+namespace Missions.Agents.Packets
 {
     [ProtoContract]
     public readonly struct MovementPacket : IPacket

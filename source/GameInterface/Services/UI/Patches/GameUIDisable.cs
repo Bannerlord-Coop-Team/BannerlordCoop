@@ -1,5 +1,5 @@
-﻿using HarmonyLib;
-using Common;
+﻿using Common;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.Core;
 

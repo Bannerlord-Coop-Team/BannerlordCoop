@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using TaleWorlds.Core;
 using ItemTypeEnum = TaleWorlds.Core.ItemObject.ItemTypeEnum;
 
-namespace GameInterface.Missions.Arena
+namespace Missions.Arena
 {
     /// <summary>
     /// Generator for random fighting equipment

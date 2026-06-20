@@ -3,7 +3,7 @@ using ProtoBuf;
 using System;
 using TaleWorlds.Core;
 
-namespace GameInterface.Missions.Agents.Messages
+namespace Missions.Agents.Messages
 {
     /// <summary>
     /// Event for agent shield damage

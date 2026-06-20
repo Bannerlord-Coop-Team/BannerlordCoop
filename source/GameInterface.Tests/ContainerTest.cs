@@ -6,7 +6,6 @@ using GameInterface.AutoSync;
 using HarmonyLib;
 using Moq;
 using Xunit;
-using static TaleWorlds.MountAndBlade.GameNetwork.NetworkMessageHandlerRegisterer;
 
 namespace GameInterface.Tests;
 

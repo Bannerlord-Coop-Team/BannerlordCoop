@@ -6,8 +6,6 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Audit;
 using GameInterface.Services.Settlements.Messages;
 using LiteNetLib;
-using System;
-using System.Collections.Generic;
 
 namespace Coop.Core.Server.Services.Settlements.Handlers;
 

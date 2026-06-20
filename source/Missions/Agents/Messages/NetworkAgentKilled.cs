@@ -2,7 +2,7 @@
 using ProtoBuf;
 using TaleWorlds.MountAndBlade;
 
-namespace GameInterface.Missions.Agents.Messages
+namespace Missions.Agents.Messages
 {
     [ProtoContract]
     public readonly struct NetworkAgentKilled : IEvent

@@ -1,8 +1,9 @@
-﻿using TaleWorlds.MountAndBlade;
+﻿using GameInterface;
 using System.Runtime.CompilerServices;
 using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
 
-namespace GameInterface.Missions.Agents.Extensions;
+namespace Missions.Agents.Extensions;
 
 public static class AgentExtensions
 {

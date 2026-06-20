@@ -2,7 +2,6 @@ using Common.Messaging;
 using Common.Serialization;
 using Coop.Core.Server.Connections.Messages;
 using ProtoBuf;
-using Xunit;
 
 namespace Coop.IntegrationTests.Serialization
 {

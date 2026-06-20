@@ -1,11 +1,11 @@
-﻿using System;
+﻿using Common.Extensions;
+using Common.Logging;
+using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
-using Common.Extensions;
-using Common.Logging;
-using Serilog;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Serialization

@@ -1,13 +1,13 @@
 ﻿using Common;
-using Common.Messaging;
-using System;
-using TaleWorlds.Core;
-using Serilog;
 using Common.Logging;
-using TaleWorlds.CampaignSystem.Roster;
-using GameInterface.Services.ItemRosters.Patches;
+using Common.Messaging;
 using GameInterface.Services.ItemRosters.Messages;
+using GameInterface.Services.ItemRosters.Patches;
 using GameInterface.Services.ObjectManager;
+using Serilog;
+using System;
+using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.ItemRosters.Handlers;
 

@@ -1,18 +1,17 @@
-﻿using System.Collections.Generic;
-using TaleWorlds.CampaignSystem.Party;
+﻿using Common;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.ObjectSystem;
 using TaleWorlds.Core;
-using System.Linq;
-
+using TaleWorlds.ObjectSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
-using System.Security.Cryptography;
-using System;
-using System.Text;
-using System.IO;
-using Common;
 
 namespace GameInterface.Services.ItemRosters.Commands
 {

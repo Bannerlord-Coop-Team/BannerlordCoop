@@ -2,30 +2,23 @@ using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using GameInterface.Missions.Agents.Handlers;
-using GameInterface.Missions.Agents.Messages;
-using GameInterface.Missions.BoardGames;
-using GameInterface.Missions.Data;
-using GameInterface.Missions.Messages;
-using GameInterface.Missions.Missiles;
-using GameInterface.Missions.Missiles.Handlers;
-using GameInterface.Services.Armies;
+using Missions.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Locations;
 using GameInterface.Services.Locations.Messages;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
+using Missions.Data;
 using Serilog;
 using System;
 using System.Collections.Concurrent;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.AgentOrigins;
-using TaleWorlds.CampaignSystem.ViewModelCollection.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
-namespace GameInterface.Missions.Taverns;
+namespace Missions.Taverns;
 
 public class CoopLocationsController : CoopMissionController, ILocationMissionBehavior
 {

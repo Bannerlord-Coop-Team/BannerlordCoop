@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
 
-namespace GameInterface.Missions.BoardGames.Messages
+namespace Missions.BoardGames.Messages
 {
     [ProtoContract]
     public readonly struct BoardGameChallengeRequest : ICommand

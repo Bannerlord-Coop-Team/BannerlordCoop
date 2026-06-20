@@ -1,6 +1,4 @@
 ﻿using E2E.Tests.Util;
-using HarmonyLib;
-using Newtonsoft.Json.Bson;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;

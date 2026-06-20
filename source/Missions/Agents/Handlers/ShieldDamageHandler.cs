@@ -1,13 +1,12 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
-using GameInterface.Missions.Agents.Messages;
+using Missions.Agents.Messages;
 using Serilog;
-using System;
 using System.Reflection;
 using TaleWorlds.MountAndBlade;
 
-namespace GameInterface.Missions.Agents.Handlers
+namespace Missions.Agents.Handlers
 {
     /// <summary>
     /// Handler for shield breaks in a battle

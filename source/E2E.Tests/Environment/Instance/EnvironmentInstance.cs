@@ -5,7 +5,6 @@ using Common.PacketHandlers;
 using Common.Serialization;
 using Common.Tests.Utils;
 using Common.Util;
-using Coop.Core;
 using E2E.Tests.Environment.Mock;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters;

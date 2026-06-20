@@ -1,11 +1,11 @@
 ﻿using Common.Messaging;
-using GameInterface.Missions.Agents.Extensions;
-using GameInterface.Missions.Agents.Messages;
 using HarmonyLib;
+using Missions.Agents.Extensions;
+using Missions.Agents.Messages;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
-namespace GameInterface.Missions.Agents.Patches
+namespace Missions.Agents.Patches
 {
     /// <summary>
     /// Intercept when weapon hitpoints change to send to ShieldDamageHandler (only shields have health)

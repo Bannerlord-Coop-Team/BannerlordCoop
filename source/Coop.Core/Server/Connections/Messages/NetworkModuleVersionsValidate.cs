@@ -1,11 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using Common.Logging;
-using Common.Messaging;
+﻿using Common.Messaging;
 using GameInterface.Services.Modules;
 using ProtoBuf;
-using Serilog;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Coop.Core.Server.Connections.Messages;
 

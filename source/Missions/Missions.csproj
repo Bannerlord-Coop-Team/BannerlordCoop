@@ -5,7 +5,7 @@
     <ProjectGuid>{E12F967C-1CC9-4E4D-8D8F-5029E0BA96EE}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>GameInterface.Missions</RootNamespace>
+    <RootNamespace>Missions</RootNamespace>
     <AssemblyName>Missions</AssemblyName>
     <TargetFramework>netstandard2.0</TargetFramework>
     <FileAlignment>512</FileAlignment>

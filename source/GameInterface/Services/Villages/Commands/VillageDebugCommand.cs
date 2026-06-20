@@ -1,11 +1,11 @@
-﻿using System;
+﻿using Common;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
-using static TaleWorlds.Library.CommandLineFunctionality;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
-using System.Linq;
-using Common;
+using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Villages.Commands;
 

@@ -2,7 +2,6 @@
 using Common.PacketHandlers;
 using LiteNetLib;
 using System;
-using System.Net;
 
 namespace Common.Network;
 

@@ -1,6 +1,5 @@
 ﻿using Common.Messaging;
 using Coop.Core.Client.Messages;
-using GameInterface.CoopSessionData.Save.Data;
 using GameInterface.Services.Smithing.Messages;
 
 namespace Coop.Core.Client.Services.Save.Handler;

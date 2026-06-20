@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
 using SandBox.BoardGames;
 
-namespace GameInterface.Missions.BoardGames.Messages
+namespace Missions.BoardGames.Messages
 {
     public readonly struct BoardGameMoveMessage : IEvent
     {

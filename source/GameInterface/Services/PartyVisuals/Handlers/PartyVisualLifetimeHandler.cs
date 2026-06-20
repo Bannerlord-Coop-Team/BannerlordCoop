@@ -1,5 +1,4 @@
-﻿using System;
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -10,6 +9,7 @@ using GameInterface.Services.PartyVisuals.Messages;
 using SandBox.View.Map.Managers;
 using SandBox.View.Map.Visuals;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.PartyVisuals.Handlers;

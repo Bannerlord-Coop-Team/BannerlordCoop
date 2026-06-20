@@ -1,10 +1,10 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
-using GameInterface.Missions.Agents.Messages;
+using Missions.Agents.Messages;
 using Serilog;
 
-namespace GameInterface.Missions.Agents.Handlers;
+namespace Missions.Agents.Handlers;
 
 /// <summary>
 /// Handler for weapon drops in a battle

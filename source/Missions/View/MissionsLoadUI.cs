@@ -14,7 +14,7 @@ using TaleWorlds.SaveSystem.Load;
 using TaleWorlds.ScreenSystem;
 using TaleWorlds.TwoDimension;
 
-namespace GameInterface.Missions.View
+namespace Missions.View
 {
     /// <summary>
     /// VM for the game selection for missions

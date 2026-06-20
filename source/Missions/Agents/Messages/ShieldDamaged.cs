@@ -2,7 +2,7 @@
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
-namespace GameInterface.Missions.Agents.Messages
+namespace Missions.Agents.Messages
 {
     /// <summary>
     /// Internal event for agent shield damage

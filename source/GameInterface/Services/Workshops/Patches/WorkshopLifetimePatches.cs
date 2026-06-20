@@ -3,13 +3,13 @@ using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Workshops.Data;
+using GameInterface.Services.Workshops.Messages;
 using HarmonyLib;
 using Serilog;
 using System;
-using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.CampaignSystem.Settlements;
-using GameInterface.Services.Workshops.Data;
-using GameInterface.Services.Workshops.Messages;
+using TaleWorlds.CampaignSystem.Settlements.Workshops;
 
 namespace GameInterface.Services.Workshops.Patches;
 

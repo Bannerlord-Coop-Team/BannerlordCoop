@@ -1,9 +1,7 @@
 ﻿using Common.Network;
 using LiteNetLib;
 using System;
-using System.Linq;
 using System.Net;
-using System.Net.Sockets;
 
 namespace Coop.Core.Common.Configuration;
 

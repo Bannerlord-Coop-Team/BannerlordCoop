@@ -1,5 +1,7 @@
 ﻿using Common.Messaging;
 using HarmonyLib;
+using Missions.Agents.Extensions;
+using Missions.BoardGames.Messages;
 using SandBox;
 using SandBox.BoardGames;
 using SandBox.BoardGames.AI;
@@ -9,10 +11,8 @@ using SandBox.Source.Missions.AgentBehaviors;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.MountAndBlade;
-using GameInterface.Missions.BoardGames.Messages;
-using GameInterface.Missions.Agents.Extensions;
 
-namespace GameInterface.Missions.BoardGames.Patches
+namespace Missions.BoardGames.Patches
 {
 
     [HarmonyPatch(typeof(BoardGameAgentBehavior), nameof(BoardGameAgentBehavior.RemoveBoardGameBehaviorOfAgent))]

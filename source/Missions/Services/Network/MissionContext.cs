@@ -1,13 +1,13 @@
 using Common.Messaging;
-using GameInterface.Missions.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Locations.Messages;
 using LiteNetLib;
+using Missions.Messages;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace GameInterface.Missions.Services.Network;
+namespace Missions.Services.Network;
 
 /// <summary>
 /// Lifetime only while in mission

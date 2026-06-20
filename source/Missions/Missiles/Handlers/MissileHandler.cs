@@ -1,14 +1,14 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
-using GameInterface.Missions.Missiles.Message;
+using Missions.Missiles.Message;
 using Serilog;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.Engine;
 using TaleWorlds.MountAndBlade;
 
-namespace GameInterface.Missions.Missiles.Handlers;
+namespace Missions.Missiles.Handlers;
 
 /// <summary>
 /// Handler for missiles within a battle

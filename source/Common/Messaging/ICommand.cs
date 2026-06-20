@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace Common.Messaging
+﻿namespace Common.Messaging
 {
     /// <summary>
     /// A command drives functionality rather than reacting to it like

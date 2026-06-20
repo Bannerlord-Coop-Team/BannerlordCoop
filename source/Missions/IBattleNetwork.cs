@@ -2,7 +2,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
 
-namespace GameInterface.Missions;
+namespace Missions;
 
 /// <summary>
 /// The <see cref="INetwork"/> used inside a mission (battles, arenas, taverns, board games).

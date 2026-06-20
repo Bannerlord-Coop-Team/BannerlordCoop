@@ -5,7 +5,7 @@ using System;
 using System.Collections.Generic;
 using TaleWorlds.MountAndBlade;
 
-namespace GameInterface.Missions;
+namespace Missions;
 
 /// <summary>
 /// Associates mission <see cref="Agent"/>s with their networked id and the party they belong to.

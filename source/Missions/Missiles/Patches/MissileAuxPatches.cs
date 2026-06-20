@@ -1,11 +1,11 @@
 ﻿using Common.Messaging;
-using GameInterface.Missions.Agents.Extensions;
-using GameInterface.Missions.Missiles.Message;
 using HarmonyLib;
+using Missions.Agents.Extensions;
+using Missions.Missiles.Message;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
-namespace GameInterface.Missions.Missiles.Patches
+namespace Missions.Missiles.Patches
 {
     /// <summary>
     /// MissileAuxPatch to send shoot event and returned resulting integer

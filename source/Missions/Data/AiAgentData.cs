@@ -1,7 +1,7 @@
 ﻿using ProtoBuf;
 using TaleWorlds.Library;
 
-namespace GameInterface.Missions.Data
+namespace Missions.Data
 {
     /// <summary>
     /// Data Class for AiAgent

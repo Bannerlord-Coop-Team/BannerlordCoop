@@ -2,7 +2,7 @@
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
-namespace GameInterface.Missions.Agents.Packets
+namespace Missions.Agents.Packets
 {
     [ProtoContract(SkipConstructor = true)]
     public readonly struct AgentEquipmentData

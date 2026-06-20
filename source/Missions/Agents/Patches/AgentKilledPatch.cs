@@ -1,9 +1,9 @@
 ﻿using Common.Messaging;
-using GameInterface.Missions.Agents.Messages;
 using HarmonyLib;
+using Missions.Agents.Messages;
 using TaleWorlds.MountAndBlade;
 
-namespace GameInterface.Missions.Agents.Patches
+namespace Missions.Agents.Patches
 {
     /// <summary>
     /// Patch on OnHealthChanged to publish Agent deaths

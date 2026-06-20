@@ -1,7 +1,7 @@
 using Common.Messaging;
 using ProtoBuf;
 
-namespace GameInterface.Missions.Messages;
+namespace Missions.Messages;
 
 /// <summary>
 /// Sent by a client to the server as it enters a mission instance, so the server can map the client's
