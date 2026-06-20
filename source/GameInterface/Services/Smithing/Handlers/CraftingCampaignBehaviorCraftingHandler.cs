@@ -2,10 +2,8 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Common.Serialization;
 using Common.Util;
 using GameInterface.Serialization;
-using GameInterface.Serialization.External;
 using GameInterface.Services.ItemObjects.Interfaces;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Smithing.Interfaces;

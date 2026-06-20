@@ -1,11 +1,8 @@
 ﻿using E2E.Tests.Util;
-using Microsoft.Win32;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.Settlements.Buildings;
-using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Villages;

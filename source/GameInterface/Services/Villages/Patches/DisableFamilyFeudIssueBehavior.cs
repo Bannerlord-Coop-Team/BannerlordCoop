@@ -1,5 +1,4 @@
 ﻿using HarmonyLib;
-using SandBox.CampaignBehaviors;
 using SandBox.Issues;
 
 namespace GameInterface.Services.Villages.Patches;

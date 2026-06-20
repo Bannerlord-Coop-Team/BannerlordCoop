@@ -1,10 +1,10 @@
-﻿using HarmonyLib;
+﻿using Common;
+using HarmonyLib;
 using System.Collections.Generic;
-using System.Reflection.Emit;
 using System.Reflection;
+using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem.Settlements;
 using static HarmonyLib.Code;
-using Common;
 
 
 [HarmonyPatch(typeof(Town), "DailyTick")]

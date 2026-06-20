@@ -1,10 +1,4 @@
-﻿using Common.Logging;
-using HarmonyLib;
-using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Text;
-using TaleWorlds.CampaignSystem;
+﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Localization;
 

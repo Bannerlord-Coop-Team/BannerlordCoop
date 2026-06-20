@@ -3,10 +3,8 @@ using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Registry.Auto;
-using GameInterface.Services.MobilePartyAIs.Messages;
 using HarmonyLib;
 using Serilog;
-using System;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobilePartyAIs.Patches;

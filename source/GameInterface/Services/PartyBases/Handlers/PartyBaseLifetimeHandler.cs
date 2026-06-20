@@ -1,7 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using GameInterface.Registry.Auto;
-using GameInterface.Services.MobileParties.Messages.Lifetime;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using TaleWorlds.CampaignSystem.Party;

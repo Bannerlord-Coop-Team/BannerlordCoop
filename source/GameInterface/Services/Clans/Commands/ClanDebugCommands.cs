@@ -1,13 +1,10 @@
 ﻿using Autofac;
-using Common;
 using GameInterface.Services.ObjectManager;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
-using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.Settlements;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.GameDebug.Commands

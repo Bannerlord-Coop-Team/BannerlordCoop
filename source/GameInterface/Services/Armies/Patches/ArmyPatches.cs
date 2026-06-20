@@ -3,20 +3,12 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
-using GameInterface.Services.Armies.Extensions;
 using GameInterface.Services.Armies.Messages;
-using GameInterface.Services.ObjectManager;
 using HarmonyLib;
-using SandBox.CampaignBehaviors;
-using SandBox.ViewModelCollection.Nameplate;
 using Serilog;
-using System;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.Localization;
 namespace GameInterface.Services.Armies.Patches;
 
 /// <summary>

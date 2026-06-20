@@ -6,7 +6,6 @@ using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Workshops.Messages;
 using Serilog;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 

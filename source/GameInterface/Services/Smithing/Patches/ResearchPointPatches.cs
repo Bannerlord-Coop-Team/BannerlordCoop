@@ -1,15 +1,11 @@
-﻿using Common;
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
-using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Smithing.Messages;
 using HarmonyLib;
 using Serilog;
-using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.Smithing.Patches

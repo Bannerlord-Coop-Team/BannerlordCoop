@@ -3,7 +3,6 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Library;
 
 namespace GameInterface.Services.GameState.Patches;
 

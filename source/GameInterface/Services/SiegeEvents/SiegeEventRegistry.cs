@@ -1,6 +1,4 @@
-﻿using Common;
-using GameInterface.Registry;
-using GameInterface.Registry.Auto;
+﻿using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
@@ -11,7 +9,6 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
-using TaleWorlds.Library;
 
 namespace GameInterface.Services.SiegeEvents;
 internal class SiegeEventRegistry : AutoRegistryBase<SiegeEvent>

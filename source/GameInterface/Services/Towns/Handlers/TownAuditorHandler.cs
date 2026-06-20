@@ -1,21 +1,14 @@
-using Common.Extensions;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Towns.Commands;
 using GameInterface.Services.Towns.Data;
 using GameInterface.Services.Towns.Messages;
-using GameInterface.Services.Towns.Patches;
 using Serilog;
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
-using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Core;
-using TaleWorlds.Library;
 
 namespace GameInterface.Services.Towns.Handlers.TownAuditorHandler
 {

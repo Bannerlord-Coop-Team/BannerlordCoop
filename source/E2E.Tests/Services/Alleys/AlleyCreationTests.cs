@@ -2,7 +2,6 @@ using E2E.Tests.Environment;
 using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Localization;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Alleys;

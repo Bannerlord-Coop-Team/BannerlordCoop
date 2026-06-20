@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.GameMenus.Messages;
@@ -50,10 +51,13 @@ internal class ExecuteTroopActionHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
         if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
 
-        if (hero.CurrentSettlement != null && hero.CurrentSettlement.Notables?.Contains(hero) == true)
+        GameThread.RunSafe(() =>
         {
-            LeaveSettlementAction.ApplyForCharacterOnly(hero);
-        }
-        AddHeroToPartyAction.Apply(hero, mainParty, true);
+            if (hero.CurrentSettlement != null && hero.CurrentSettlement.Notables?.Contains(hero) == true)
+            {
+                LeaveSettlementAction.ApplyForCharacterOnly(hero);
+            }
+            AddHeroToPartyAction.Apply(hero, mainParty, true);
+        });
     }
 }

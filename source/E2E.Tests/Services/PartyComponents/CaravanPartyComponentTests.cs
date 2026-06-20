@@ -1,5 +1,4 @@
-﻿using E2E.Tests.Environment;
-using E2E.Tests.Util;
+﻿using E2E.Tests.Util;
 using HarmonyLib;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;

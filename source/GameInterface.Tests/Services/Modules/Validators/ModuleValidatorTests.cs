@@ -1,7 +1,6 @@
-using System;
-using System.Collections.Generic;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
+using System.Collections.Generic;
 using TaleWorlds.Library;
 using Xunit;
 

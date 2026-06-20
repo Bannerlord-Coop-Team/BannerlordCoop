@@ -1,7 +1,5 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Heroes.Enum;
-using System;
-using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Heroes.Messages;
 

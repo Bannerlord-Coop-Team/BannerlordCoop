@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Common.Caching;
+﻿namespace Common.Caching;
 
 public sealed class CachedPrimitive<T>
 {

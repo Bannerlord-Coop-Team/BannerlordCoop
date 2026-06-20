@@ -1,9 +1,9 @@
-﻿using HarmonyLib;
+﻿using GameInterface.Services.Equipments.Messages;
+using GameInterface.Utils;
+using HarmonyLib;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.Core;
-using GameInterface.Utils;
-using GameInterface.Services.Equipments.Messages;
 
 namespace GameInterface.Services.Equipments.Patches;
 

@@ -1,24 +1,14 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
-using Common.Util;
 using GameInterface.Policies;
-using GameInterface.Services.Heroes.Patches;
-using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Lifetime;
-using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Reflection;
-using System.Reflection.Emit;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.MobileParties.Patches;
 

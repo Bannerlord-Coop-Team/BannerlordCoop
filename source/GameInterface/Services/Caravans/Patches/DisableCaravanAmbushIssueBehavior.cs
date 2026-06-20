@@ -1,5 +1,4 @@
 ﻿using HarmonyLib;
-using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Caravans.Patches;

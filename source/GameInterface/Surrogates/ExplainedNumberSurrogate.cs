@@ -1,8 +1,6 @@
 ﻿using ProtoBuf;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.Core;
-using TaleWorlds.ObjectSystem;
 using static TaleWorlds.CampaignSystem.ExplainedNumber.StatExplainer;
 
 

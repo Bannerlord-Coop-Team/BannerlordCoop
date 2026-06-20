@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.MobileParties.Messages;
@@ -47,6 +48,9 @@ internal class PartyWageLimitHandler : IHandler
     {
         if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
 
-        mobileParty.SetWagePaymentLimit(obj.What.NewValue);
+        GameThread.RunSafe(() =>
+        {
+            mobileParty.SetWagePaymentLimit(obj.What.NewValue);
+        });
     }
 }

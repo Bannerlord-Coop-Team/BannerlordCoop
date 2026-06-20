@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
@@ -77,10 +78,13 @@ internal class WorkshopDataHandler : IHandler
     {
         if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
 
-        using (new AllowedThread())
+        GameThread.RunSafe(() =>
         {
-            GetWorkshopsBehavior().AddNewWorkshopData(workshop);
-        }
+            using (new AllowedThread())
+            {
+                GetWorkshopsBehavior().AddNewWorkshopData(workshop);
+            }
+        });
     }
 
     private void Handle_WorkshopDataRemoved(MessagePayload<WorkshopDataRemoved> obj)
@@ -94,10 +98,13 @@ internal class WorkshopDataHandler : IHandler
     {
         if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
 
-        using (new AllowedThread())
+        GameThread.RunSafe(() =>
         {
-            GetWorkshopsBehavior().RemoveWorkshopData(workshop);
-        }
+            using (new AllowedThread())
+            {
+                GetWorkshopsBehavior().RemoveWorkshopData(workshop);
+            }
+        });
     }
 
     private void Handle_OutputProgressAddedForWarehouse(MessagePayload<OutputProgressAddedForWarehouse> obj)
@@ -111,10 +118,13 @@ internal class WorkshopDataHandler : IHandler
     {
         if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
 
-        using (new AllowedThread())
+        GameThread.RunSafe(() =>
         {
-            GetWorkshopsBehavior().AddOutputProgressForWarehouse(workshop, obj.What.ProgressToAdd);
-        }
+            using (new AllowedThread())
+            {
+                GetWorkshopsBehavior().AddOutputProgressForWarehouse(workshop, obj.What.ProgressToAdd);
+            }
+        });
     }
 
     private void Handle_OutputProgressForTownAdded(MessagePayload<OutputProgressForTownAdded> obj)
@@ -128,10 +138,13 @@ internal class WorkshopDataHandler : IHandler
     {
         if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
 
-        using (new AllowedThread())
+        GameThread.RunSafe(() =>
         {
-            GetWorkshopsBehavior().AddOutputProgressForTown(workshop, obj.What.ProgressToAdd);
-        }
+            using (new AllowedThread())
+            {
+                GetWorkshopsBehavior().AddOutputProgressForTown(workshop, obj.What.ProgressToAdd);
+            }
+        });
     }
 
     private void Handle_IsGettingInputsFromWarehouseSet(MessagePayload<IsGettingInputsFromWarehouseSet> obj)
@@ -155,10 +168,13 @@ internal class WorkshopDataHandler : IHandler
     {
         if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
 
-        using (new AllowedThread())
+        GameThread.RunSafe(() =>
         {
-            Campaign.Current.GetCampaignBehavior<IWorkshopWarehouseCampaignBehavior>().SetIsGettingInputsFromWarehouse(workshop, obj.What.IsActive);
-        }
+            using (new AllowedThread())
+            {
+                Campaign.Current.GetCampaignBehavior<IWorkshopWarehouseCampaignBehavior>().SetIsGettingInputsFromWarehouse(workshop, obj.What.IsActive);
+            }
+        });
     }
 
     private void Handle_StockProductionInWarehouseRatioSet(MessagePayload<StockProductionInWarehouseRatioSet> obj)
@@ -182,10 +198,13 @@ internal class WorkshopDataHandler : IHandler
     {
         if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
 
-        using (new AllowedThread())
+        GameThread.RunSafe(() =>
         {
-            Campaign.Current.GetCampaignBehavior<IWorkshopWarehouseCampaignBehavior>().SetStockProductionInWarehouseRatio(workshop, obj.What.ProgressToAdd);
-        }
+            using (new AllowedThread())
+            {
+                Campaign.Current.GetCampaignBehavior<IWorkshopWarehouseCampaignBehavior>().SetStockProductionInWarehouseRatio(workshop, obj.What.ProgressToAdd);
+            }
+        });
     }
 
     private WorkshopsCampaignBehavior GetWorkshopsBehavior()

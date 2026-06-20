@@ -8,7 +8,6 @@ using GameInterface.Services.MobileParties.Messages.Lifetime;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;

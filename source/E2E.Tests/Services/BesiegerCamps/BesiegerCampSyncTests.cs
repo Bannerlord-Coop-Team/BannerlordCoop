@@ -1,11 +1,11 @@
 ﻿using E2E.Tests.Util;
+using HarmonyLib;
+using System.Reflection;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using Xunit.Abstractions;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
-using TaleWorlds.CampaignSystem.Party;
-using HarmonyLib;
-using System.Reflection;
-using TaleWorlds.CampaignSystem.Settlements;
 
 namespace E2E.Tests.Services.BesiegerCamps
 {

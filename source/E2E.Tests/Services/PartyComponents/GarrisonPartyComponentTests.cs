@@ -1,6 +1,4 @@
-﻿using E2E.Tests.Environment;
-using E2E.Tests.Util;
-using TaleWorlds.CampaignSystem;
+﻿using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;

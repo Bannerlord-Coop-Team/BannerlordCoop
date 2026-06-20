@@ -1,5 +1,4 @@
 ﻿using Common.Messaging;
-using Common.PacketHandlers;
 using ProtoBuf;
 
 namespace Coop.Core.Client.Services.Heroes.Messages

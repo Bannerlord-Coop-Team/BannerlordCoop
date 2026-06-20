@@ -3,7 +3,6 @@ using Common.Audit;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
 using Serilog;

@@ -38,7 +38,7 @@ internal class WorkshopsCampaignBehaviorInterface : IWorkshopsCampaignBehaviorIn
 
     public void RunTownWorkshop(Town townComponent, Workshop workshop)
     {
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             try
             {
@@ -54,7 +54,7 @@ internal class WorkshopsCampaignBehaviorInterface : IWorkshopsCampaignBehaviorIn
     public bool TickOneProductionCycleForPlayerWorkshop(Production production, Workshop workshop, bool effectCapital)
     {
         var result = false;
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             try
             {

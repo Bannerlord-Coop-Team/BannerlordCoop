@@ -1,6 +1,4 @@
 ﻿using Common.Messaging;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.Core;
 
 namespace GameInterface.Services.ItemRosters.Messages;
 

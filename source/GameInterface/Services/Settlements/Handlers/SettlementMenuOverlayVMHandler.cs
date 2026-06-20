@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.ObjectManager;
@@ -63,15 +64,18 @@ internal class SettlementMenuOverlayVMHandler : IHandler
 
         if (obj.What.HeroIds == null) return;
 
-        foreach (var heroId in obj.What.HeroIds)
+        GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging<Hero>(heroId, out var hero)) continue;
-
-            mainParty.MemberRoster.RemoveTroop(hero.CharacterObject, 1, default, 0);
-            if (!settlement.HeroesWithoutParty.Contains(hero))
+            foreach (var heroId in obj.What.HeroIds)
             {
-                EnterSettlementAction.ApplyForCharacterOnly(hero, settlement);
+                if (!objectManager.TryGetObjectWithLogging<Hero>(heroId, out var hero)) continue;
+
+                mainParty.MemberRoster.RemoveTroop(hero.CharacterObject, 1, default, 0);
+                if (!settlement.HeroesWithoutParty.Contains(hero))
+                {
+                    EnterSettlementAction.ApplyForCharacterOnly(hero, settlement);
+                }
             }
-        }
+        });
     }
 }

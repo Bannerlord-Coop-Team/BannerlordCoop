@@ -1,7 +1,5 @@
 ﻿using Common.Logging.Enrichers;
 using Serilog;
-using Serilog.Core;
-using Serilog.Events;
 using System;
 
 namespace Common.Logging;

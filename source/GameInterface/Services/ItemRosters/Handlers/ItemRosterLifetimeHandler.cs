@@ -5,10 +5,7 @@ using Common.Util;
 using GameInterface.Services.ItemRosters.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using System;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Roster;
-using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.ItemRosters.Handlers
 {

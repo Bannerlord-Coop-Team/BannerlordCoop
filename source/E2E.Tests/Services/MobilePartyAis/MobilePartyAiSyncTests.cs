@@ -1,6 +1,6 @@
 ﻿using E2E.Tests.Util;
-using Xunit.Abstractions;
 using TaleWorlds.CampaignSystem.Party;
+using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.MobilePartyAis
 {

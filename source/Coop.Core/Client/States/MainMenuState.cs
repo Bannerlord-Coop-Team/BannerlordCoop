@@ -3,9 +3,7 @@ using Common.Network;
 using Coop.Core.Client.Messages;
 using GameInterface;
 using GameInterface.Services.GameState.Interfaces;
-using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.UI.Interfaces;
-using GameInterface.Services.UI.Messages;
 
 namespace Coop.Core.Client.States;
 

@@ -1,9 +1,5 @@
 ﻿using GameInterface.Registry;
-using System;
 using System.Threading;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.Settlements.Buildings;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 

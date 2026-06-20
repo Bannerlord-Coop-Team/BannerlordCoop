@@ -3,17 +3,12 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
-using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.ObjectManager;
-using JetBrains.Annotations;
 using Serilog;
 using System;
-using System.Collections.Generic;
-using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
-using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MapEventSides.Handlers;
 internal class MapEventSideDataHandler : IHandler

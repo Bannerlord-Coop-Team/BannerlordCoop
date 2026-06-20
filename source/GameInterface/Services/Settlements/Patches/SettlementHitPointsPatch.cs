@@ -4,7 +4,6 @@ using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Settlements.Messages;
 using HarmonyLib;
-using System.Reflection;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Settlements.Patches;

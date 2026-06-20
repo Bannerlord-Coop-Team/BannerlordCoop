@@ -1,11 +1,15 @@
 ﻿using Common;
+using Common.Logging;
 using GameInterface.Services.Clans.Extensions;
 using HarmonyLib;
+using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.WeaponDesign;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.LinQuick;
@@ -15,6 +19,8 @@ namespace GameInterface.Services.CampaignService.Patches;
 [HarmonyPatch(typeof(TeleportationCampaignBehavior))]
 internal class TeleportationCampaignBehaviorPatches
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<TeleportationCampaignBehaviorPatches>();
+
     [HarmonyPatch(nameof(TeleportationCampaignBehavior.RegisterEvents))]
     static bool RegisterEventsPrefix() => ModInformation.IsServer;
 
@@ -22,8 +28,7 @@ internal class TeleportationCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool RemoveTeleportationDataPrefix(TeleportationCampaignBehavior __instance, TeleportationCampaignBehavior.TeleportationData data, bool isCanceled, bool disbandTargetParty = true)
     {
-        // Needs to run on main thread to avoid massive lag
-        GameThread.Run(() =>
+        try
         {
             __instance._teleportationList.Remove(data);
             if (isCanceled)
@@ -49,8 +54,12 @@ internal class TeleportationCampaignBehaviorPatches
                     }
                 }
             }
-        });
-
+        } 
+        catch (Exception e)
+        {
+            Logger.Error(e, $"Failed to run {nameof(TeleportationCampaignBehavior.RemoveTeleportationData)} Prefix");
+        }
+        
         return false;
     }
 
@@ -58,7 +67,7 @@ internal class TeleportationCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool DailyTickPartyPrefix(TeleportationCampaignBehavior __instance, MobileParty mobileParty)
     {
-        GameThread.Run(() =>
+        try
         {
             // IsPlayerClan() replacement for Clan.PlayerClan
             if (mobileParty.IsActive && mobileParty.Army == null && mobileParty.MapEvent == null && mobileParty.LeaderHero != null && mobileParty.LeaderHero.IsNoncombatant && mobileParty.LeaderHero.DeathMark == KillCharacterAction.KillCharacterActionDetail.None && mobileParty.ActualClan != null && !mobileParty.ActualClan.IsPlayerClan() && mobileParty.ActualClan.Leader != mobileParty.LeaderHero && !mobileParty.IsInRaftState && (!mobileParty.IsCurrentlyAtSea || mobileParty.CurrentSettlement != null))
@@ -72,7 +81,11 @@ internal class TeleportationCampaignBehaviorPatches
                     TeleportHeroAction.ApplyDelayedTeleportToPartyAsPartyLeader(mblist.GetRandomElementInefficiently<Hero>(), mobileParty);
                 }
             }
-        });
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, $"Failed to run {nameof(TeleportationCampaignBehavior.DailyTickParty)} Prefix");
+        }
 
         return false;
     }
@@ -81,7 +94,7 @@ internal class TeleportationCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool OnHeroComesOfAgePrefix(TeleportationCampaignBehavior __instance, Hero hero)
     {
-        GameThread.Run(() =>
+        try
         {
             // IsPlayerClan() replacement for Clan.PlayerClan 
             if (!hero.Clan.IsPlayerClan() && !hero.IsNoncombatant)
@@ -99,7 +112,11 @@ internal class TeleportationCampaignBehaviorPatches
                     }
                 }
             }
-        });
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, $"Failed to run {nameof(TeleportationCampaignBehavior.OnHeroComesOfAge)} Prefix");
+        }
 
         return false;
     }

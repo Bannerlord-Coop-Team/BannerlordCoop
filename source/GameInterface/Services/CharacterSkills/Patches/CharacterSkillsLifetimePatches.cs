@@ -5,7 +5,6 @@ using GameInterface.Policies;
 using GameInterface.Services.CharacterSkills.Messages;
 using HarmonyLib;
 using Serilog;
-using System;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.CharacterSkills.Patches

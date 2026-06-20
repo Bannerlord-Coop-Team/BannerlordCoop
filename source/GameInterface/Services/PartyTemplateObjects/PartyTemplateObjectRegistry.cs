@@ -4,7 +4,6 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Text;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.ObjectSystem;
 

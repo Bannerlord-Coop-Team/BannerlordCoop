@@ -4,7 +4,6 @@ using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Template.Messages;
 using Serilog;
-using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 

@@ -2,7 +2,6 @@
 using Common.Network;
 using Coop.Core.Server.Services.Villages.Messages;
 using GameInterface.Services.Villages.Messages;
-using System;
 
 namespace Coop.Core.Client.Services.Villages.Handlers
 {

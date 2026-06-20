@@ -1,7 +1,8 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.Settlements.Audit;
 using ProtoBuf;
 
-namespace GameInterface.Services.Settlements.Audit;
+namespace Coop.Core.Server.Services.Settlements.Messages;
 
 /// <summary>
 /// Response message for the settlement audit.

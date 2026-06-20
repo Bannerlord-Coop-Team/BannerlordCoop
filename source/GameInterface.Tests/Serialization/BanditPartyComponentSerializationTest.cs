@@ -1,18 +1,16 @@
-﻿using GameInterface.Serialization.External;
+﻿using Autofac;
+using Common.Serialization;
 using GameInterface.Serialization;
-using System.Collections.Generic;
-using Xunit;
-using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using GameInterface.Serialization.External;
+using GameInterface.Tests.Bootstrap;
+using GameInterface.Tests.Bootstrap.Modules;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Settlements;
-using System.Reflection;
 using TaleWorlds.CampaignSystem.Party;
-using GameInterface.Tests.Bootstrap;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
-using Autofac;
-using GameInterface.Tests.Bootstrap.Modules;
-using Common.Serialization;
+using Xunit;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

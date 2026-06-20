@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Clans.Messages;
@@ -62,7 +63,10 @@ internal class ClanCachesHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
         if (!objectManager.TryGetObjectWithLogging<WarPartyComponent>(obj.What.WarPartyComponentId, out var warPartyComponent)) return;
 
-        clan.OnWarPartyAdded(warPartyComponent);
+        GameThread.RunSafe(() =>
+        {
+            clan.OnWarPartyAdded(warPartyComponent);
+        });
     }
 
     private void Handle_WarPartyRemoved(MessagePayload<WarPartyRemoved> obj)
@@ -79,7 +83,10 @@ internal class ClanCachesHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
         if (!objectManager.TryGetObjectWithLogging<WarPartyComponent>(obj.What.WarPartyComponentId, out var warPartyComponent)) return;
 
-        clan.OnWarPartyRemoved(warPartyComponent);
+        GameThread.RunSafe(() =>
+        {
+            clan.OnWarPartyRemoved(warPartyComponent);
+        });
     }
 
     private void Handle_SupporterNotableAdded(MessagePayload<SupporterNotableAdded> obj)
@@ -96,7 +103,10 @@ internal class ClanCachesHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
         if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
 
-        clan.OnSupporterNotableAdded(hero);
+        GameThread.RunSafe(() =>
+        {
+            clan.OnSupporterNotableAdded(hero);
+        });
     }
 
     private void Handle_SupporterNotableRemoved(MessagePayload<SupporterNotableRemoved> obj)
@@ -113,6 +123,9 @@ internal class ClanCachesHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
         if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
 
-        clan.OnSupporterNotableRemoved(hero);
+        GameThread.RunSafe(() =>
+        {
+            clan.OnSupporterNotableRemoved(hero);
+        });
     }
 }

@@ -1,7 +1,6 @@
 ﻿using Autofac;
 using Common.LogicStates;
 using Common.Network;
-using Coop.Core;
 using Coop.Core.Client;
 using Coop.Core.Server;
 using GameInterface;

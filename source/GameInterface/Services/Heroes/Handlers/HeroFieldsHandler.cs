@@ -3,11 +3,9 @@ using Common.Messaging;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using System.Xml.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Localization;
-using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Heroes.Handlers
 {

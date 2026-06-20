@@ -1,12 +1,9 @@
 ﻿using Common;
-using Common.Extensions;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Villages.Messages;
 using HarmonyLib;
-using System;
-using System.Reflection;
 using TaleWorlds.CampaignSystem.Settlements;
 using static TaleWorlds.CampaignSystem.Settlements.Village;
 

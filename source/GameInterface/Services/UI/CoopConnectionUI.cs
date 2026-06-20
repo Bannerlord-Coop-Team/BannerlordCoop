@@ -1,5 +1,4 @@
 ﻿using TaleWorlds.Engine.GauntletUI;
-using TaleWorlds.GauntletUI.Data;
 using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.UI;

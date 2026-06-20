@@ -2,7 +2,6 @@
 using GameInterface.CoopSessionData;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
-using GameInterface.Services.Players.Data;
 using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;

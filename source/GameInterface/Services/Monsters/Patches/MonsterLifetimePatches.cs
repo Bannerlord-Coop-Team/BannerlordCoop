@@ -5,7 +5,6 @@ using GameInterface.Policies;
 using GameInterface.Services.Monsters.Messages;
 using HarmonyLib;
 using Serilog;
-using System;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.Monsters.Patches

@@ -1,8 +1,7 @@
-using Coop.IntegrationTests.Environment;
-using GameInterface.Services.Settlements.Messages;
 using Coop.Core.Server.Services.Settlements.Messages;
+using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
-
+using GameInterface.Services.Settlements.Messages;
 using TaleWorlds.CampaignSystem.Settlements;
 namespace Coop.IntegrationTests.Settlements;
 

@@ -6,7 +6,6 @@ using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Interfaces;
-using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Modules;
 
 namespace Coop.Core.Client.States;

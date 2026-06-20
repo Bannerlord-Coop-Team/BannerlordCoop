@@ -2,10 +2,10 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using System;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Smithing.Messages;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;

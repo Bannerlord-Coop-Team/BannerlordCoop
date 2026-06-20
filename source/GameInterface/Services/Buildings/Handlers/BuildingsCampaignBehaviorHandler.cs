@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Buildings.Messages;
 using GameInterface.Services.Clans.Extensions;
@@ -35,48 +36,54 @@ internal class BuildingsCampaignBehaviorHandler : IHandler
 
     private void Handle_OnSettlementOwnerChanged(MessagePayload<OnSettlementOwnerChanged> obj)
     {
-        if (obj.What.Settlement.Town != null && !obj.What.NewOwner.Clan.IsPlayerClan())
+        GameThread.RunSafe(() =>
         {
-            obj.What.Settlement.Town.BuildingsInProgress.Clear();
-        }
+            if (obj.What.Settlement.Town != null && !obj.What.NewOwner.Clan.IsPlayerClan())
+            {
+                obj.What.Settlement.Town.BuildingsInProgress.Clear();
+            }
+        });
     }
 
     private void Handle_BuildingsDailySettlementTick(MessagePayload<BuildingsDailySettlementTick> obj)
     {
-        if (obj.What.Settlement.IsFortification)
+        GameThread.RunSafe(() =>
         {
-            Town town = obj.What.Settlement.Town;
-            foreach (Building building in town.Buildings)
+            if (obj.What.Settlement.IsFortification)
             {
-                if (town.Owner.Settlement.SiegeEvent == null)
+                Town town = obj.What.Settlement.Town;
+                foreach (Building building in town.Buildings)
                 {
-                    building.HitPointChanged(10f);
+                    if (town.Owner.Settlement.SiegeEvent == null)
+                    {
+                        building.HitPointChanged(10f);
+                    }
+                }
+                if (!town.Owner.Settlement.OwnerClan.IsPlayerClan()) // Replacement for checking if not Clan.PlayerClan
+                {
+                    if (MBRandom.RandomFloat < 0.1f)
+                    {
+                        BuildingsCampaignBehavior.DecideBuildingQueue(town);
+                    }
+                    if (MBRandom.RandomFloat < 0.01f)
+                    {
+                        BuildingsCampaignBehavior.DecideDailyProject(town);
+                    }
+                }
+                if (!town.CurrentBuilding.BuildingType.IsDailyProject)
+                {
+                    obj.What.BuildingsCampaignBehavior.TickCurrentBuildingForTown(town);
+                    return;
+                }
+                if (town.Governor != null && town.Governor.GetPerkValue(DefaultPerks.Charm.Virile) && MBRandom.RandomFloat <= DefaultPerks.Charm.Virile.SecondaryBonus)
+                {
+                    Hero randomElement = obj.What.Settlement.Notables.GetRandomElement<Hero>();
+                    if (randomElement != null)
+                    {
+                        ChangeRelationAction.ApplyRelationChangeBetweenHeroes(town.Governor.Clan.Leader, randomElement, 1, false);
+                    }
                 }
             }
-            if (!town.Owner.Settlement.OwnerClan.IsPlayerClan()) // Replacement for checking if not Clan.PlayerClan
-            {
-                if (MBRandom.RandomFloat < 0.1f)
-                {
-                    BuildingsCampaignBehavior.DecideBuildingQueue(town);
-                }
-                if (MBRandom.RandomFloat < 0.01f)
-                {
-                    BuildingsCampaignBehavior.DecideDailyProject(town);
-                }
-            }
-            if (!town.CurrentBuilding.BuildingType.IsDailyProject)
-            {
-                obj.What.BuildingsCampaignBehavior.TickCurrentBuildingForTown(town);
-                return;
-            }
-            if (town.Governor != null && town.Governor.GetPerkValue(DefaultPerks.Charm.Virile) && MBRandom.RandomFloat <= DefaultPerks.Charm.Virile.SecondaryBonus)
-            {
-                Hero randomElement = obj.What.Settlement.Notables.GetRandomElement<Hero>();
-                if (randomElement != null)
-                {
-                    ChangeRelationAction.ApplyRelationChangeBetweenHeroes(town.Governor.Clan.Leader, randomElement, 1, false);
-                }
-            }
-        }
+        });
     }
 }

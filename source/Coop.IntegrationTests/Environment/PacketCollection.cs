@@ -1,5 +1,4 @@
-﻿using Common.Messaging;
-using Common.PacketHandlers;
+﻿using Common.PacketHandlers;
 
 namespace Coop.IntegrationTests.Environment;
 

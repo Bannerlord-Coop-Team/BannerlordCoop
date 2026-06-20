@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Clans.Messages;
@@ -53,7 +54,10 @@ internal class ClanPartyItemVMHandler : IHandler
     {
         if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
 
-        mobileParty.SetPartyObjective(obj.What.PartyObjective);
+        GameThread.RunSafe(() =>
+        {
+            mobileParty.SetPartyObjective(obj.What.PartyObjective);
+        });
     }
 
     private void Handle_AutoRecruitChangedForSettlement(MessagePayload<AutoRecruitChangedForSettlement> obj)

@@ -1,8 +1,6 @@
 ﻿using Common.Logging;
 using GameInterface.Services.CharacterDevelopers.Handlers;
 using Serilog;
-using Serilog.Core;
-using System;
 using System.Collections.Generic;
 using System.Text;
 using TaleWorlds.CampaignSystem;

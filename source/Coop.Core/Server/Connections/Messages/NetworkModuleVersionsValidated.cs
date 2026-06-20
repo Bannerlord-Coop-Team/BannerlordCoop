@@ -1,7 +1,5 @@
-﻿using Common.Logging;
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
-using Serilog;
 
 namespace Coop.Core.Server.Connections.Messages;
 

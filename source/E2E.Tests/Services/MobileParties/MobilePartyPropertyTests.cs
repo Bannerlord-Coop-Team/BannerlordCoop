@@ -1,12 +1,10 @@
-﻿using System.Reflection;
-using E2E.Tests.Util;
+﻿using E2E.Tests.Util;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Library;
-using TaleWorlds.Localization;
 using Xunit.Abstractions;
 using static TaleWorlds.CampaignSystem.Party.MobileParty;
 

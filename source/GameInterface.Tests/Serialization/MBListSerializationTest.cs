@@ -1,11 +1,11 @@
 ﻿using Autofac;
+using Common.Serialization;
 using GameInterface.Serialization;
 using GameInterface.Serialization.Generics;
 using GameInterface.Tests.Bootstrap.Modules;
 using System.Collections.Generic;
 using TaleWorlds.Library;
 using Xunit;
-using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

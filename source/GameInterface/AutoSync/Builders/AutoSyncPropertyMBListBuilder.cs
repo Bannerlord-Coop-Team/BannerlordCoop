@@ -1,5 +1,4 @@
 ﻿using GameInterface.AutoSync.Templates;
-using GameInterface.Services.ObjectManager;
 using ProtoBuf.Meta;
 using System;
 using System.Collections.Generic;

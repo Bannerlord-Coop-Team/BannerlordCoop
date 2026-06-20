@@ -1,11 +1,10 @@
-﻿using GameInterface.Serialization.External;
-using GameInterface.Serialization;
-using Xunit;
-using TaleWorlds.CampaignSystem.CharacterDevelopment;
-using Autofac;
+﻿using Autofac;
 using Common.Serialization;
+using GameInterface.Serialization;
+using GameInterface.Serialization.External;
 using GameInterface.Tests.Bootstrap.Modules;
-using GameInterface.Tests.Bootstrap;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
+using Xunit;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

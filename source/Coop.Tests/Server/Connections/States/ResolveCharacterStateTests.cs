@@ -4,18 +4,16 @@ using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using Coop.Tests.Mocks;
-using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Modules;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Moq;
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Numerics;
+using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
 using Xunit;
 using Xunit.Abstractions;
@@ -155,6 +153,10 @@ namespace Coop.Tests.Server.Connections.States
                     returnedPlayer = player;
                 })
                 .Returns(true);
+
+            var objectManager = serverComponent.Container.Resolve<IObjectManager>();
+            var hero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
+            Assert.True(objectManager.AddExisting(player.HeroId, hero));
 
             // Act
             var payload = new MessagePayload<NetworkClientValidate>(

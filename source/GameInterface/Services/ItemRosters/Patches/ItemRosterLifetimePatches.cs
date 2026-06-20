@@ -5,7 +5,6 @@ using GameInterface.Policies;
 using GameInterface.Services.ItemRosters.Messages;
 using HarmonyLib;
 using Serilog;
-using System;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 

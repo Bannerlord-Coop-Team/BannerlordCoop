@@ -1,6 +1,4 @@
-﻿using Common.Messaging;
-
-namespace Coop.Core.Server.States;
+﻿namespace Coop.Core.Server.States;
 
 /// <inheritdoc cref="IServerState"/>
 public abstract class ServerStateBase : IServerState

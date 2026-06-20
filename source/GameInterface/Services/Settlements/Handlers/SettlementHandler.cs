@@ -6,11 +6,9 @@ using GameInterface.Services.Settlements.Messages;
 using GameInterface.Services.Settlements.Patches;
 using Serilog;
 using System;
-using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Library;
 using static TaleWorlds.CampaignSystem.Settlements.Settlement;
 
 namespace GameInterface.Services.Settlements.Handlers;

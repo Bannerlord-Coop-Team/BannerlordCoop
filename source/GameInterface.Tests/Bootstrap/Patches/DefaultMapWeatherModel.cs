@@ -1,8 +1,5 @@
 ﻿using HarmonyLib;
 using System;
-using System.Collections.Generic;
-using System.Reflection;
-using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.GameComponents;
 using static TaleWorlds.CampaignSystem.ComponentInterfaces.MapWeatherModel;
 

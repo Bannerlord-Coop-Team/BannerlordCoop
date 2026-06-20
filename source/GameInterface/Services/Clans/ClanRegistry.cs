@@ -1,18 +1,12 @@
-﻿using Common;
-using Common.Util;
-using GameInterface.Registry;
+﻿using Common.Util;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
-using System.Threading;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.Core;
-using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Clans;

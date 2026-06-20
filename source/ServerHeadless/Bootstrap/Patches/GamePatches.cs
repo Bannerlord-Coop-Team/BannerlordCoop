@@ -1,13 +1,10 @@
 using HarmonyLib;
 using System.Collections.Generic;
 using System.Reflection;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
-using TaleWorlds.ModuleManager;
 using TaleWorlds.MountAndBlade;
-using TaleWorlds.ObjectSystem;
 
 namespace ServerHeadless.Bootstrap.Patches
 {

@@ -9,6 +9,7 @@ using GameInterface.Services.Workshops.Interfaces;
 using GameInterface.Services.Workshops.Messages;
 using Serilog;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Roster;
@@ -60,7 +61,7 @@ namespace GameInterface.Services.Workshops.Handlers
 
             WorkshopsCampaignBehavior workshopsCampaignBehavior = Campaign.Current.GetCampaignBehavior<WorkshopsCampaignBehavior>();
 
-            workshopsCampaignBehavior._warehouseRosterPerSettlement = GetWarehouseRosterPerSettlement(playerHeroId);
+            workshopsCampaignBehavior._warehouseRosterPerSettlement = GetWarehouseRosterPerSettlement(playerHeroId).ToArray();
 
             network.SendAll(new NetworkInitializeServerWorkshopDataKeys(playerHeroId));
         }
@@ -70,33 +71,34 @@ namespace GameInterface.Services.Workshops.Handlers
             sessionWorkshopPlayerDataInterface.AddPlayerKeys(obj.What.PlayerHeroId);
         }
 
-        private KeyValuePair<Settlement, ItemRoster>[] GetWarehouseRosterPerSettlement(string playerHeroId)
+        private Dictionary<Settlement, ItemRoster> GetWarehouseRosterPerSettlement(string playerHeroId)
         {
+            Dictionary<Settlement, ItemRoster> warehouseRosterPerSettlement = new();
             int maxWorkshopCount = 0;
-            using (new AllowedThread()) // Run in allowed thread to get original value only for client warehouse rosters
-            {
-                maxWorkshopCount = Campaign.Current.Models.WorkshopModel.MaximumWorkshopsPlayerCanHave;
-            }
-            
-            KeyValuePair<Settlement, ItemRoster>[] warehouseRosterPerSettlement = new KeyValuePair<Settlement, ItemRoster>[maxWorkshopCount];
-            
-            // Null and key check for players without existing workshop data
-            if (workshopPlayerData?.PlayerWarehouseRosterPerSettlement?.ContainsKey(playerHeroId) != true) return warehouseRosterPerSettlement;
 
-            int index = 0;
-            foreach (var settlementRoster in workshopPlayerData.PlayerWarehouseRosterPerSettlement[playerHeroId])
+            GameThread.RunSafe(() =>
             {
-                if (!objectManager.TryGetObjectWithLogging<Settlement>(settlementRoster.Key, out var settlement)) continue;
-
-                var itemRoster = new ItemRoster();
-                foreach (var elementData in settlementRoster.Value)
+                using (new AllowedThread()) // Run in allowed thread to get original value only for client warehouse rosters
                 {
-                    itemRoster.Add(sessionWorkshopPlayerDataInterface.GetItemRosterElementFromData(elementData));
+                    maxWorkshopCount = Campaign.Current.Models.WorkshopModel.MaximumWorkshopsPlayerCanHave;
                 }
 
-                warehouseRosterPerSettlement[index] = new(settlement, itemRoster);
-                index++;
-            }
+                // Null and key check for players without existing workshop data
+                if (workshopPlayerData?.PlayerWarehouseRosterPerSettlement?.ContainsKey(playerHeroId) != true) return;
+
+                foreach (var settlementRoster in workshopPlayerData.PlayerWarehouseRosterPerSettlement[playerHeroId])
+                {
+                    if (!objectManager.TryGetObjectWithLogging<Settlement>(settlementRoster.Key, out var settlement)) continue;
+
+                    var itemRoster = new ItemRoster();
+                    foreach (var elementData in settlementRoster.Value)
+                    {
+                        itemRoster.Add(sessionWorkshopPlayerDataInterface.GetItemRosterElementFromData(elementData));
+                    }
+
+                    warehouseRosterPerSettlement[settlement] = itemRoster;
+                }
+            }, blocking: true);
 
             return warehouseRosterPerSettlement;
         }

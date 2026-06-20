@@ -1,8 +1,6 @@
-﻿using Common.Messaging;
-using Common.Serialization;
+﻿using Common.Serialization;
 using GameInterface.CoopSessionData.Save.Data;
 using System;
-using System.Collections;
 using System.IO;
 
 namespace Coop.Core.Server.Services.Save

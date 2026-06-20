@@ -1,8 +1,6 @@
 ﻿using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
-using HarmonyLib;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;

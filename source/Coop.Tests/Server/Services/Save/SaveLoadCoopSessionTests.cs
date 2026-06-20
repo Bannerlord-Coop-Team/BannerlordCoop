@@ -1,12 +1,8 @@
 ﻿using Autofac;
 using Coop.Core.Server.Services.Save;
 using GameInterface.CoopSessionData.Save.Data;
-using GameInterface.Services.Entity;
-using GameInterface.Services.Heroes.Data;
-using GameInterface.Services.Smithing;
-using System;
-using System.Collections.Generic;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.Smithing;
 using System.IO;
 using Xunit;
 using Xunit.Abstractions;

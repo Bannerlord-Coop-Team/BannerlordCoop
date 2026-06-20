@@ -12,7 +12,6 @@ using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Players;
-using GameInterface.Services.Players.Data;
 using GameInterface.Services.UI.Interfaces;
 
 namespace Coop.Core.Client.States;

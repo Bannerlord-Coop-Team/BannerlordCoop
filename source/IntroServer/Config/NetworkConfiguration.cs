@@ -1,10 +1,7 @@
-﻿using LiteNetLib;
+﻿using Common.Network;
+using LiteNetLib;
 using System;
-using System.Linq;
 using System.Net;
-using System.Net.Sockets;
-using IntroServer.Server;
-using Common.Network;
 
 namespace IntroServer.Config
 {
@@ -95,11 +92,6 @@ namespace IntroServer.Config
         public TimeSpan ObjectCreationTimeout => DisconnectTimeout;
 
         public TimeSpan NetworkPollInterval => UpdateTime;
-
-        public void SetRendezvous(string address, int port)
-        {
-            throw new NotImplementedException();
-        }
         #endregion
     }
 }

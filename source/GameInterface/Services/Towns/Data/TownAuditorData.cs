@@ -2,7 +2,6 @@ using ProtoBuf;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem.Settlements;
-using static TaleWorlds.CampaignSystem.Settlements.Town;
 
 namespace GameInterface.Services.Towns.Data;
 
