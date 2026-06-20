@@ -5,12 +5,10 @@ using Common.Network;
 using GameInterface.Missions.Agents.Handlers;
 using GameInterface.Missions.Agents.Messages;
 using GameInterface.Missions.BoardGames;
+using GameInterface.Missions.Data;
 using GameInterface.Missions.Messages;
 using GameInterface.Missions.Missiles;
 using GameInterface.Missions.Missiles.Handlers;
-using GameInterface.Missions.Services.Network;
-using GameInterface.Missions.Services.Network.Data;
-using GameInterface.Missions.Services.Network.Messages;
 using GameInterface.Services.Armies;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Locations;
@@ -27,7 +25,7 @@ using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
-namespace GameInterface.Missions.Services.Taverns;
+namespace GameInterface.Missions.Taverns;
 
 public class CoopLocationsController : CoopMissionController, ILocationMissionBehavior
 {

@@ -1,7 +1,6 @@
 ﻿using Common.Messaging;
 using GameInterface.Missions.Agents.Messages;
 using GameInterface.Missions.BoardGames.Messages;
-using GameInterface.Missions.Services.Network;
 using SandBox;
 using SandBox.BoardGames;
 using SandBox.BoardGames.MissionLogics;

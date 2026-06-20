@@ -2,7 +2,7 @@ using Common.Messaging;
 using ProtoBuf;
 using System;
 
-namespace GameInterface.Missions.Services.Network.Messages;
+namespace GameInterface.Missions.Messages;
 
 /// <summary>
 /// Host-decided transfer of a party's current authority, broadcast so every node applies the same change to

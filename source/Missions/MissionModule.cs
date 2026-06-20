@@ -3,7 +3,7 @@ using GameInterface.Missions.Agents.Handlers;
 using GameInterface.Missions.Missiles;
 using GameInterface.Missions.Missiles.Handlers;
 using GameInterface.Missions.Services.Network;
-using GameInterface.Missions.Services.Taverns;
+using GameInterface.Missions.Taverns;
 using GameInterface.Services.Locations;
 
 namespace GameInterface.Missions;

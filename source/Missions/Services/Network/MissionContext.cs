@@ -1,5 +1,5 @@
 using Common.Messaging;
-using GameInterface.Missions.Services.Network.Messages;
+using GameInterface.Missions.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Locations.Messages;
 using LiteNetLib;

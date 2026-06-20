@@ -1,7 +1,7 @@
 using Common.Messaging;
 using ProtoBuf;
 
-namespace GameInterface.Missions.Services.Network.Messages;
+namespace GameInterface.Missions.Messages;
 
 /// <summary>
 /// Server → remaining instance members: a controller dropped <em>ungracefully</em> (the server observed its

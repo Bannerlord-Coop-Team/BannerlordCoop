@@ -16,6 +16,17 @@ internal class ServiceModule : Module
 
     private const string NAMESPACE = "GameInterface";
 
+    // The mission/P2P stack lives under GameInterface.Missions but is owned and registered entirely by
+    // MissionModule (client container only). Its handlers depend on services that exist only there
+    // (INetworkAgentRegistry, the mesh IBattleNetwork), so ServiceModule — which runs in BOTH the client
+    // and server containers — must not also scan, register, or auto-activate them. Doing so activated
+    // them where those dependencies are absent (the server, or any container built after Missions.dll
+    // loaded) and double-registered ones MissionModule already owns (e.g. MissionContext).
+    private const string MISSIONS_NAMESPACE = "GameInterface.Missions";
+
+    private static bool IsMissionType(Type type) =>
+        type.Namespace != null && type.Namespace.StartsWith(MISSIONS_NAMESPACE);
+
     protected override void Load(ContainerBuilder builder)
     {
         // One per session, shared between the handler that marks rosters dirty and the main loop that
@@ -57,7 +68,8 @@ internal class ServiceModule : Module
     // Namespace is needed to separate client and server handlers being registered with DI
     private IEnumerable<Type> GetHandlers()
     {
-        var handlers = InterfaceCollector.GetInterfaces<IHandler>(NAMESPACE);
+        var handlers = InterfaceCollector.GetInterfaces<IHandler>(NAMESPACE)
+            .Where(type => !IsMissionType(type));
 
         // When dynamic sync generates its code at runtime, the generated handlers are created by
         // AutoSyncPatcher.BindHandlers and must NOT also be activated by the container: the
@@ -76,7 +88,8 @@ internal class ServiceModule : Module
     private IEnumerable<Type> GetGameAbstractions() => InterfaceCollector.GetInterfaces<IGameAbstraction>(NAMESPACE);
 
     // Namespace is needed to separate client and server handlers being registered with DI
-    private IEnumerable<Type> GetAuditors() => InterfaceCollector.GetInterfaces<IAuditor>(NAMESPACE);
+    private IEnumerable<Type> GetAuditors() =>
+        InterfaceCollector.GetInterfaces<IAuditor>(NAMESPACE).Where(type => !IsMissionType(type));
 
     
 }

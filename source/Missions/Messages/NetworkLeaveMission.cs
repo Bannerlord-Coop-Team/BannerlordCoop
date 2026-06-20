@@ -1,7 +1,7 @@
 using Common.Messaging;
 using ProtoBuf;
 
-namespace GameInterface.Missions.Services.Network.Messages;
+namespace GameInterface.Missions.Messages;
 
 /// <summary>
 /// Broadcast to P2P mesh peers when the local player deliberately leaves the mission/location. Peers

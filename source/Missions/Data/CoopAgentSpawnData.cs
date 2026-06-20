@@ -2,7 +2,7 @@
 using System;
 using TaleWorlds.Library;
 
-namespace GameInterface.Missions.Services.Network.Data;
+namespace GameInterface.Missions.Data;
 
 /// <summary>
 /// Data Class for AiAgent

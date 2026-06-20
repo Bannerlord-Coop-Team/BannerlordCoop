@@ -1,7 +1,7 @@
 using Common.Messaging;
 using ProtoBuf;
 
-namespace GameInterface.Missions.Services.Network.Messages;
+namespace GameInterface.Missions.Messages;
 
 /// <summary>
 /// Server → existing instance members: a controller has entered the mission instance. This replaces the

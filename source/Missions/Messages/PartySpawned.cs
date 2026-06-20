@@ -2,7 +2,7 @@ using Common.Messaging;
 using ProtoBuf;
 using System;
 
-namespace GameInterface.Missions.Services.Network.Messages;
+namespace GameInterface.Missions.Messages;
 
 /// <summary>
 /// Announces a spawned party so every node registers it with the same id and owner. A client broadcasts it

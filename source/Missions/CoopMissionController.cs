@@ -1,7 +1,6 @@
 using Common.Logging;
 using Common.Messaging;
-using GameInterface.Missions.Services.Network;
-using GameInterface.Missions.Services.Network.Messages;
+using GameInterface.Missions.Messages;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
 using Serilog;

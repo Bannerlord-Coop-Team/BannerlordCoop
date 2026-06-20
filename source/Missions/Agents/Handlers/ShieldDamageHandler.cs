@@ -2,7 +2,6 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Missions.Agents.Messages;
-using GameInterface.Missions.Services.Network;
 using Serilog;
 using System;
 using System.Reflection;

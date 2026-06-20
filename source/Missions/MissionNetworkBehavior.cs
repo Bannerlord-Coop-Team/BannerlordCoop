@@ -5,7 +5,7 @@ using GameInterface.Services.Locations;
 using Serilog;
 using TaleWorlds.MountAndBlade;
 
-namespace GameInterface.Missions.Services.Network;
+namespace GameInterface.Missions;
 
 public class CoopMissionNetworkBehavior : MissionBehavior, ILocationMissionBehavior
 {

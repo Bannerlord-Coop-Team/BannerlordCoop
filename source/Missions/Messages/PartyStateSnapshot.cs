@@ -2,7 +2,7 @@ using Common.Messaging;
 using ProtoBuf;
 using System;
 
-namespace GameInterface.Missions.Services.Network.Messages;
+namespace GameInterface.Missions.Messages;
 
 /// <summary>
 /// Sent to a rejoining client just before its party's authority is handed back, so it can reconstruct the
