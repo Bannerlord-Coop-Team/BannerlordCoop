@@ -1,7 +1,7 @@
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
-using Coop.Core.Server.Services.Instances.Messages;
+using GameInterface.Missions.Messages;
 using GameInterface.Missions.Services.Network.Messages;
 using LiteNetLib;
 
@@ -10,7 +10,7 @@ namespace Coop.Core.Server.Services.Instances.Handlers;
 /// <summary>
 /// Server-side relay membership + join/leave introduction. A client's <see cref="NetworkMissionEntered"/> maps the
 /// controller to its connection and introduces it and the existing members to each other via
-/// <see cref="MissionPeerEntered"/> (each side then sends its join info over the mesh). Departures are fanned
+/// <see cref="NetworkMissionPeerEntered"/> (each side then sends its join info over the mesh). Departures are fanned
 /// out to the remaining members so they release the leaver's party: a <see cref="NetworkMissionLeft"/> becomes a
 /// <see cref="MissionPeerLeft"/> (graceful) and an observed <see cref="PlayerDisconnected"/> becomes a
 /// <see cref="MissionPeerDisconnected"/> (ungraceful — the reliable counterpart to the best-effort mesh path).
@@ -51,8 +51,8 @@ public class ServerMissionMembershipHandler : IHandler
         // connection; the join info itself still flows over the IBattleNetwork mesh.
         foreach (var (otherControllerId, otherPeer) in others)
         {
-            network.Send(otherPeer, new MissionPeerEntered(message.ControllerId, message.InstanceId));
-            network.Send(peer, new MissionPeerEntered(otherControllerId, message.InstanceId));
+            network.Send(otherPeer, new NetworkMissionPeerEntered(message.ControllerId, message.InstanceId));
+            network.Send(peer, new NetworkMissionPeerEntered(otherControllerId, message.InstanceId));
         }
     }
 

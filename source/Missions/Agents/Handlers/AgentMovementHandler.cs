@@ -52,7 +52,7 @@ namespace GameInterface.Missions.Agents.Handlers
 
             // Server-mediated membership. A peer entering is the cue to clear any STALE party it left behind
             // on a missed disconnect (so its rejoin re-spawns clean); a leave/disconnect releases its party.
-            this.messageBroker.Subscribe<MissionPeerEntered>(Handle_PeerEntered);
+            this.messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
             this.messageBroker.Subscribe<MissionPeerLeft>(Handle_PeerLeft);
             this.messageBroker.Subscribe<MissionPeerDisconnected>(Handle_PeerDisconnected);
 
@@ -72,7 +72,7 @@ namespace GameInterface.Missions.Agents.Handlers
             Logger.Verbose("Disposing {handlerType}", typeof(AgentMovementHandler));
 
             packetManager.RemovePacketHandler(this);
-            messageBroker.Unsubscribe<MissionPeerEntered>(Handle_PeerEntered);
+            messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
             messageBroker.Unsubscribe<MissionPeerLeft>(Handle_PeerLeft);
             messageBroker.Unsubscribe<MissionPeerDisconnected>(Handle_PeerDisconnected);
             poller.Stop();
@@ -122,7 +122,7 @@ namespace GameInterface.Missions.Agents.Handlers
             });
         }
 
-        private void Handle_PeerEntered(MessagePayload<MissionPeerEntered> payload)
+        private void Handle_PeerEntered(MessagePayload<NetworkMissionPeerEntered> payload)
         {
             // Defensive: if this controller still has a party registered, we missed its earlier departure —
             // clear it so the fresh join re-spawns instead of being deduped as "already registered".

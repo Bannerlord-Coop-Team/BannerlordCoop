@@ -5,7 +5,7 @@ namespace GameInterface.Missions.Services.Network.Messages;
 
 /// <summary>
 /// Server → remaining instance members: a controller has <em>gracefully</em> left the mission instance
-/// (driven by its <c>MissionLeft</c>). The counterpart to <see cref="MissionPeerEntered"/> — on receiving
+/// (driven by its <c>MissionLeft</c>). The counterpart to <see cref="NetworkMissionPeerEntered"/> — on receiving
 /// it a member despawns and deregisters the departed controller's party. This is the reliable,
 /// server-mediated leave signal that complements the best-effort mesh <c>NetworkLeaveMission</c>.
 /// </summary>

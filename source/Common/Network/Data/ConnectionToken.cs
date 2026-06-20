@@ -74,9 +74,9 @@ public class ConnectionToken
     public static implicit operator ConnectionToken(string tokenString)
     {
         string[] data = tokenString.Split('%');
-        if (data.Length != 3)
+        if (data.Length != 2)
         {
-            throw new ArgumentException("Invalid data length, expected 3 but got " + data.Length, nameof(tokenString));
+            throw new ArgumentException("Invalid data length, expected 2 but got " + data.Length, nameof(tokenString));
         }
 
         string peerId = data[0];
@@ -89,11 +89,6 @@ public class ConnectionToken
         if (string.IsNullOrEmpty(instanceName))
         {
             throw new ArgumentException("InstanceName cannot be null or empty", nameof(tokenString));
-        }
-
-        if (Enum.TryParse(data[2], out NatAddressType natType) == false)
-        {
-            throw new ArgumentException("Invalid NatType in token string", nameof(tokenString));
         }
 
         return new ConnectionToken(peerId, instanceName);

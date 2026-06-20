@@ -1,11 +1,10 @@
 using Common.Messaging;
 using GameInterface.Missions.Services.Network.Messages;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Locations.Messages;
 using LiteNetLib;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Linq;
 
 namespace GameInterface.Missions.Services.Network;
@@ -15,7 +14,7 @@ namespace GameInterface.Missions.Services.Network;
 /// </summary>
 public interface IMissionContext : IDisposable
 {
-    public IReadOnlyCollection<string> ControllersInMission { get; }
+    IReadOnlyCollection<string> ControllersInMission { get; }
     void MapPeer(string controllerId, NetPeer peer);
     void RemovePeer(NetPeer peer);
     bool TryGetPeer(string controllerId, out NetPeer netPeer);
@@ -23,7 +22,7 @@ public interface IMissionContext : IDisposable
 
 /// <summary>
 /// Client-side mirror of the server's mission-instance membership. The server announces who is in the
-/// instance over the campaign connection via <see cref="MissionPeerEntered"/> / <see cref="MissionPeerLeft"/>
+/// instance over the campaign connection via <see cref="NetworkMissionPeerEntered"/> / <see cref="MissionPeerLeft"/>
 /// / <see cref="MissionPeerDisconnected"/>; this tracks that set so <see cref="ControllersInMission"/> stays
 /// equivalent to the server's view (minus the local controller).
 /// </summary>
@@ -32,7 +31,8 @@ public class MissionContext : IMissionContext, IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IControllerIdProvider controllerIdProvider;
 
-    private List<string> controllersInMission = new();
+
+    private HashSet<string> controllersInMission = new();
 
     private readonly Dictionary<string, NetPeer> idToPeer = new();
     private readonly Dictionary<NetPeer, string> peerToId = new();
@@ -51,16 +51,31 @@ public class MissionContext : IMissionContext, IHandler
         this.messageBroker = messageBroker;
         this.controllerIdProvider = controllerIdProvider;
 
-        messageBroker.Subscribe<MissionPeerEntered>(Handle_MissionPeerEntered);
+        messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_MissionPeerEntered);
         messageBroker.Subscribe<MissionPeerLeft>(Handle_MissionPeerLeft);
         messageBroker.Subscribe<MissionPeerDisconnected>(Handle_MissionPeerDisconnected);
+
+        messageBroker.Subscribe<PlayerLeftLocation>(Handle_PlayerLeftLocation);
     }
+
+
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<MissionPeerEntered>(Handle_MissionPeerEntered);
+        messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_MissionPeerEntered);
         messageBroker.Unsubscribe<MissionPeerLeft>(Handle_MissionPeerLeft);
         messageBroker.Unsubscribe<MissionPeerDisconnected>(Handle_MissionPeerDisconnected);
+
+        messageBroker.Unsubscribe<PlayerLeftLocation>(Handle_PlayerLeftLocation);
+
+        Clear();
+    }
+
+    private void Clear()
+    {
+        controllersInMission.Clear();
+        idToPeer.Clear();
+        peerToId.Clear();
     }
 
     public void MapPeer(string controllerId, NetPeer peer)
@@ -91,7 +106,7 @@ public class MissionContext : IMissionContext, IHandler
         return idToPeer.TryGetValue(controllerId, out netPeer);
     }
 
-    private void Handle_MissionPeerEntered(MessagePayload<MissionPeerEntered> payload)
+    private void Handle_MissionPeerEntered(MessagePayload<NetworkMissionPeerEntered> payload)
     {
         var controllerId = payload.What.ControllerId;
         lock (gate)
@@ -116,5 +131,10 @@ public class MissionContext : IMissionContext, IHandler
         {
             controllersInMission.Remove(controllerId);
         }
+    }
+
+    private void Handle_PlayerLeftLocation(MessagePayload<PlayerLeftLocation> payload)
+    {
+        Clear();
     }
 }

@@ -1,7 +1,7 @@
 using Common.Messaging;
 using ProtoBuf;
 
-namespace Coop.Core.Server.Services.Instances.Messages;
+namespace GameInterface.Missions.Messages;
 
 /// <summary>
 /// Sent by a client to the server as it leaves a mission instance, so the server drops the client from the

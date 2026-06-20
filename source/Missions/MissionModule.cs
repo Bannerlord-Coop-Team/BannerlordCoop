@@ -3,6 +3,8 @@ using GameInterface.Missions.Agents.Handlers;
 using GameInterface.Missions.Missiles;
 using GameInterface.Missions.Missiles.Handlers;
 using GameInterface.Missions.Services.Network;
+using GameInterface.Missions.Services.Taverns;
+using GameInterface.Services.Locations;
 
 namespace GameInterface.Missions;
 
@@ -36,6 +38,16 @@ public class MissionModule : Module
         // fresh CoopMissionController, which pulls a fresh ICoopMissionComponent and a fresh set of sync
         // handlers — so no agent/registry state from a previous mission leaks into the next.
         builder.RegisterType<CoopMissionComponent>().As<ICoopMissionComponent>().InstancePerDependency();
+
+        // The location P2P controller. Resolved as ILocationMissionBehavior by PlayerLocationEntryPatches
+        // and attached to every opened location mission (tavern/indoor, town centre, castle courtyard,
+        // village). Battles are not location missions and so are intentionally excluded. Transient so each
+        // mission gets a fresh controller that is disposed with that mission — InstancePerLifetimeScope
+        // would hand a disposed instance to the next mission.
+        builder.RegisterType<CoopLocationsController>()
+            .AsSelf()
+            .As<ILocationMissionBehavior>()
+            .InstancePerDependency();
 
         builder.RegisterType<NetworkAgentRegistry>().As<INetworkAgentRegistry>().InstancePerDependency();
         //builder.RegisterType<NetworkMissileRegistry>().As<INetworkMissileRegistry>().InstancePerDependency();

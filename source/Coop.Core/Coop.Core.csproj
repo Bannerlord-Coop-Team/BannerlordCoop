@@ -132,4 +132,7 @@
   <ItemGroup>
     <Publicize Include="TaleWorlds.Library" />
   </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Server\Services\Instances\Messages\" />
+  </ItemGroup>
 </Project>

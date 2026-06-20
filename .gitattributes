@@ -1,6 +1,24 @@
-# Set the default behavior, in case people don't have core.autocrlf set.
-* text eol=crlf
+# Force CRLF line endings for all text files on every platform, regardless of
+# each contributor's core.autocrlf setting. `text=auto` lets Git detect binary
+# files by content and leave them untouched, so an unlisted binary can't be
+# corrupted by line-ending conversion.
+* text=auto eol=crlf
 
-# Override for PNG files: treat as binary and disable line ending conversion
-*.png binary
-*.png -text
+# Binary files: never apply text/line-ending conversion (it would corrupt them).
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.bmp  binary
+*.dds  binary
+*.dll  binary
+*.exe  binary
+*.pdb  binary
+*.zip  binary
+*.7z   binary
+*.tpac binary
+*.ttf  binary
+*.otf  binary
+*.wav  binary
+*.ogg  binary

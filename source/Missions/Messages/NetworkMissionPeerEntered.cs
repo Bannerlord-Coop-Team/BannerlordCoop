@@ -14,7 +14,7 @@ namespace GameInterface.Missions.Services.Network.Messages;
 /// </para>
 /// </summary>
 [ProtoContract]
-public readonly struct MissionPeerEntered : IEvent
+public readonly struct NetworkMissionPeerEntered : IEvent
 {
     [ProtoMember(1)]
     public readonly string ControllerId;
@@ -22,7 +22,7 @@ public readonly struct MissionPeerEntered : IEvent
     [ProtoMember(2)]
     public readonly string InstanceId;
 
-    public MissionPeerEntered(string controllerId, string instanceId)
+    public NetworkMissionPeerEntered(string controllerId, string instanceId)
     {
         ControllerId = controllerId;
         InstanceId = instanceId;

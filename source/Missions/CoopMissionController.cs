@@ -40,17 +40,17 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         this.objectManager = objectManager;
         this.coopMissionComponent = coopMissionComponent;
 
-        messageBroker.Subscribe<MissionPeerEntered>(Handle_MissionPeerEntered);
+        messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_MissionPeerEntered);
         messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
     }
 
     public virtual void Dispose()
     {
-        messageBroker.Unsubscribe<MissionPeerEntered>(Handle_MissionPeerEntered);
+        messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_MissionPeerEntered);
         messageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
     }
 
-    private void Handle_MissionPeerEntered(MessagePayload<MissionPeerEntered> payload)
+    private void Handle_MissionPeerEntered(MessagePayload<NetworkMissionPeerEntered> payload)
     {
         // Server-mediated replacement for PeerConnected: a controller entered our instance (the notification
         // arrived over the campaign/relay connection), so send it our join info over the mesh.
@@ -81,6 +81,4 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         base.OnEndMission();
         Dispose();
     }
-
-
 }

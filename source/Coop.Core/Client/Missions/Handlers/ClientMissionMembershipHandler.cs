@@ -1,8 +1,8 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Coop.Core.Server.Services.Instances.Messages;
 using GameInterface.Missions;
+using GameInterface.Missions.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Locations.Messages;
 using GameInterface.Services.ObjectManager;
@@ -41,8 +41,8 @@ public class ClientMissionMembershipHandler : IHandler
         this.objectManager = objectManager;
         this.controllerIdProvider = controllerIdProvider;
 
-        messageBroker.Subscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation);
-        messageBroker.Subscribe<PlayerLeftLocation>(Handle_PlayerLeftLocation);
+        //messageBroker.Subscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation);
+        //messageBroker.Subscribe<PlayerLeftLocation>(Handle_PlayerLeftLocation);
     }
 
     public void Dispose()

@@ -36,7 +36,6 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     private readonly IPacketManager packetManager;
 
     private readonly NetManager netManager;
-    private readonly IPEndPoint serverEndpoint;
     private readonly IRelayNetwork relayNetwork;
     private readonly IMissionContext missionContext;
     private readonly ICommonSerializer serializer;
@@ -78,7 +77,6 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         Config = config;
         this.relayNetwork = relayNetwork;
         this.missionContext = missionContext;
-        serverEndpoint = relayNetwork.ServerEndpoint;
         this.packetManager = packetManager;
         this.serializer = serializer;
         this.messageBroker = messageBroker;
@@ -177,7 +175,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
 
         ConnectionToken token = new ConnectionToken(ControllerId, instanceId);
 
-        netManager.NatPunchModule.SendNatIntroduceRequest(serverEndpoint, token);
+        netManager.NatPunchModule.SendNatIntroduceRequest(relayNetwork.ServerEndpoint, token);
 
         this.instanceId = instanceId;
     }
@@ -300,7 +298,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
 
         // Otherwise send relay packet to the server
         var payload = serializer.Serialize(packet);
-        relayNetwork.SendAll(new RelayPacket(packet.DeliveryMethod, ControllerId, controllerId, payload));
+        relayNetwork.SendAll(new RelayPacket(packet.DeliveryMethod, instanceId, controllerId, payload));
     }
 
     public void Send(NetPeer netPeer, IPacket packet)
