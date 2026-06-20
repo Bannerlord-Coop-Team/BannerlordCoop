@@ -100,7 +100,7 @@ namespace GameInterface.Missions.Agents.Handlers
         {
             MovementPacket movement = (MovementPacket)packet;
 
-            if (!agentRegistry.IsLocallyControlled(movement.AgentId))
+            if (agentRegistry.IsLocallyControlled(movement.AgentId))
                 return;
 
             if (!agentRegistry.TryGetAgentInfo(movement.AgentId, out var agentInfo))

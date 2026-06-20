@@ -51,13 +51,13 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         this.controllerIdProvider = controllerIdProvider;
         //this.boardGameManager = boardGameManager;
 
-        messageBroker.Subscribe<NetworkLeaveMission>(Handle_LeaveMission);
+        messageBroker.Subscribe<NetworkMissionLeft>(Handle_LeaveMission);
         messageBroker.Subscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation);
     }
 
     public override void Dispose()
     {
-        messageBroker.Unsubscribe<NetworkLeaveMission>(Handle_LeaveMission);
+        messageBroker.Unsubscribe<NetworkMissionLeft>(Handle_LeaveMission);
         messageBroker.Unsubscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation);
 
         base.Dispose();
@@ -211,12 +211,12 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
 
     protected override void OnLeaving()
     {
-        relayNetwork.SendAll(new NetworkLeaveMission(controllerIdProvider.ControllerId));
+        relayNetwork.SendAll(new NetworkMissionLeft(controllerIdProvider.ControllerId, instanceId));
         messageBroker.Publish(this, new PlayerLeftLocation());
         network.Stop();
     }
 
-    private void Handle_LeaveMission(MessagePayload<NetworkLeaveMission> payload)
+    private void Handle_LeaveMission(MessagePayload<NetworkMissionLeft> payload)
     {
         string leftControllerId = payload.What.ControllerId;
 
