@@ -34,7 +34,7 @@ internal class NotablesCampaignBehaviorHandler : IHandler
 
     private void Handle_UpdateNotableSupport(MessagePayload<UpdateNotableSupport> obj)
     {
-        if (obj.What.Notable.SupporterOf != null) return;
+        if (obj.What.Notable.SupporterOf == null) return;
 
         heroRelationsInterface.UpdateNotableSupport(obj.What.Notable);
     }
