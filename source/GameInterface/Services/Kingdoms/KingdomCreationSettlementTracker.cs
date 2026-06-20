@@ -7,54 +7,66 @@ using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Kingdoms;
 
-public static class KingdomCreationSettlementTracker
+public interface IKingdomCreationSettlementTracker
+{
+    void Track(string partyId, string settlementId);
+    void Reset();
+    void Clear(MobileParty party, string partyId);
+    void TrackParty(MobileParty party, string partyId, Settlement settlement, string settlementId);
+    void Complete(string partyId);
+    bool TryConsumeLeave(string partyId);
+    bool TryConsumeLeave(MobileParty party, string partyId);
+    bool TryGetTrackedSettlement(MobileParty party, out Settlement settlement);
+}
+
+public class KingdomCreationSettlementTracker : IKingdomCreationSettlementTracker
 {
     private static readonly TimeSpan LeaveSuppressionWindow = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan CompletedLeaveSuppressionWindow = TimeSpan.FromSeconds(1);
-    private static readonly object Gate = new();
-    private static readonly Dictionary<string, PendingSettlement> PendingSettlements = new();
-    private static ConditionalWeakTable<MobileParty, PendingSettlement> PendingParties = new();
+    private readonly object gate = new();
+    private readonly Dictionary<string, PendingSettlement> pendingSettlements = new();
+    private ConditionalWeakTable<MobileParty, PendingSettlement> pendingParties = new();
 
-    public static void Track(string partyId, string settlementId)
+    public void Track(string partyId, string settlementId)
     {
         if (string.IsNullOrWhiteSpace(partyId) || string.IsNullOrWhiteSpace(settlementId)) return;
 
-        lock (Gate)
+        lock (gate)
         {
             TrackNoLock(partyId, new PendingSettlement(settlementId, settlementId, null, DateTime.UtcNow));
         }
     }
 
-    public static void Reset()
+    public void Reset()
     {
-        lock (Gate)
+        lock (gate)
         {
-            PendingSettlements.Clear();
-            PendingParties = new ConditionalWeakTable<MobileParty, PendingSettlement>();
+            pendingSettlements.Clear();
+            pendingParties = new ConditionalWeakTable<MobileParty, PendingSettlement>();
         }
     }
 
-    public static void Clear(MobileParty party, string partyId)
+    public void Clear(MobileParty party, string partyId)
     {
-        lock (Gate)
+        lock (gate)
         {
             if (party != null)
             {
-                PendingParties.Remove(party);
+                pendingParties.Remove(party);
                 if (!string.IsNullOrWhiteSpace(party.StringId))
                 {
-                    PendingSettlements.Remove(party.StringId);
+                    pendingSettlements.Remove(party.StringId);
                 }
             }
 
             if (!string.IsNullOrWhiteSpace(partyId))
             {
-                PendingSettlements.Remove(partyId);
+                pendingSettlements.Remove(partyId);
             }
         }
     }
 
-    public static void TrackParty(MobileParty party, string partyId, Settlement settlement, string settlementId)
+    public void TrackParty(MobileParty party, string partyId, Settlement settlement, string settlementId)
     {
         if (party == null || settlement == null) return;
 
@@ -64,23 +76,23 @@ public static class KingdomCreationSettlementTracker
 
         var pending = new PendingSettlement(resolvedSettlementId, settlement.StringId, settlement, DateTime.UtcNow);
 
-        lock (Gate)
+        lock (gate)
         {
             TrackNoLock(resolvedPartyId, pending);
             TrackNoLock(party.StringId, pending);
-            PendingParties.Remove(party);
-            PendingParties.Add(party, pending);
+            pendingParties.Remove(party);
+            pendingParties.Add(party, pending);
         }
     }
 
-    public static void Complete(string partyId)
+    public void Complete(string partyId)
     {
         if (string.IsNullOrWhiteSpace(partyId)) return;
 
-        lock (Gate)
+        lock (gate)
         {
             RemoveExpiredNoLock();
-            if (!PendingSettlements.TryGetValue(partyId, out var pending)) return;
+            if (!pendingSettlements.TryGetValue(partyId, out var pending)) return;
 
             pending.IsComplete = true;
             pending.UpdatedAt = DateTime.UtcNow;
@@ -89,31 +101,31 @@ public static class KingdomCreationSettlementTracker
         }
     }
 
-    public static bool TryConsumeLeave(string partyId)
+    public bool TryConsumeLeave(string partyId)
     {
         if (string.IsNullOrWhiteSpace(partyId)) return false;
 
-        lock (Gate)
+        lock (gate)
         {
             RemoveExpiredNoLock();
-            return PendingSettlements.TryGetValue(partyId, out var pending) && TryConsumeLeaveNoLock(pending);
+            return pendingSettlements.TryGetValue(partyId, out var pending) && TryConsumeLeaveNoLock(pending);
         }
     }
 
-    public static bool TryConsumeLeave(MobileParty party, string partyId)
+    public bool TryConsumeLeave(MobileParty party, string partyId)
     {
-        lock (Gate)
+        lock (gate)
         {
             RemoveExpiredNoLock();
             if (party != null &&
-                PendingParties.TryGetValue(party, out var pending) &&
+                pendingParties.TryGetValue(party, out var pending) &&
                 TryConsumeLeaveNoLock(pending))
             {
                 return true;
             }
 
             if (!string.IsNullOrWhiteSpace(partyId) &&
-                PendingSettlements.TryGetValue(partyId, out pending) &&
+                pendingSettlements.TryGetValue(partyId, out pending) &&
                 TryConsumeLeaveNoLock(pending))
             {
                 return true;
@@ -121,7 +133,7 @@ public static class KingdomCreationSettlementTracker
 
             if (party != null &&
                 !string.IsNullOrWhiteSpace(party.StringId) &&
-                PendingSettlements.TryGetValue(party.StringId, out pending) &&
+                pendingSettlements.TryGetValue(party.StringId, out pending) &&
                 TryConsumeLeaveNoLock(pending))
             {
                 return true;
@@ -131,12 +143,12 @@ public static class KingdomCreationSettlementTracker
         }
     }
 
-    public static bool TryGetTrackedSettlement(MobileParty party, out Settlement settlement)
+    public bool TryGetTrackedSettlement(MobileParty party, out Settlement settlement)
     {
         settlement = null;
         if (party == null) return false;
 
-        lock (Gate)
+        lock (gate)
         {
             RemoveExpiredNoLock();
             if (!TryGetPendingNoLock(party, out var pending)) return false;
@@ -146,13 +158,13 @@ public static class KingdomCreationSettlementTracker
             if (settlement == null) return false;
             if (!pending.IsComplete)
             {
-                PendingParties.Remove(party);
+                pendingParties.Remove(party);
                 RemovePendingNoLock(pending);
                 return true;
             }
             if (pending.RemainingCompletedSettlementProtections <= 0)
             {
-                PendingParties.Remove(party);
+                pendingParties.Remove(party);
                 RemovePendingNoLock(pending);
                 return false;
             }
@@ -160,7 +172,7 @@ public static class KingdomCreationSettlementTracker
             pending.RemainingCompletedSettlementProtections--;
             if (pending.RemainingCompletedSettlementProtections <= 0)
             {
-                PendingParties.Remove(party);
+                pendingParties.Remove(party);
                 RemovePendingNoLock(pending);
             }
 
@@ -168,22 +180,22 @@ public static class KingdomCreationSettlementTracker
         }
     }
 
-    private static void TrackNoLock(string partyId, PendingSettlement pending)
+    private void TrackNoLock(string partyId, PendingSettlement pending)
     {
         if (string.IsNullOrWhiteSpace(partyId)) return;
 
-        PendingSettlements[partyId] = pending;
+        pendingSettlements[partyId] = pending;
     }
 
-    private static bool TryGetPendingNoLock(MobileParty party, out PendingSettlement pending)
+    private bool TryGetPendingNoLock(MobileParty party, out PendingSettlement pending)
     {
-        if (PendingParties.TryGetValue(party, out pending))
+        if (pendingParties.TryGetValue(party, out pending))
         {
             return true;
         }
 
         if (!string.IsNullOrWhiteSpace(party.StringId) &&
-            PendingSettlements.TryGetValue(party.StringId, out pending))
+            pendingSettlements.TryGetValue(party.StringId, out pending))
         {
             return true;
         }
@@ -192,7 +204,7 @@ public static class KingdomCreationSettlementTracker
         return false;
     }
 
-    private static bool TryConsumeLeaveNoLock(PendingSettlement pending)
+    private bool TryConsumeLeaveNoLock(PendingSettlement pending)
     {
         if (IsExpired(pending)) return false;
         if (!pending.IsComplete) return true;
@@ -209,14 +221,14 @@ public static class KingdomCreationSettlementTracker
         return true;
     }
 
-    private static void RemovePendingNoLock(PendingSettlement pending)
+    private void RemovePendingNoLock(PendingSettlement pending)
     {
-        foreach (string partyId in PendingSettlements
+        foreach (string partyId in pendingSettlements
                      .Where(pair => ReferenceEquals(pair.Value, pending))
                      .Select(pair => pair.Key)
                      .ToList())
         {
-            PendingSettlements.Remove(partyId);
+            pendingSettlements.Remove(partyId);
         }
     }
 
@@ -235,14 +247,14 @@ public static class KingdomCreationSettlementTracker
              settlement.StringId == pending.SettlementStringId));
     }
 
-    private static void RemoveExpiredNoLock()
+    private void RemoveExpiredNoLock()
     {
-        foreach (string partyId in PendingSettlements
+        foreach (string partyId in pendingSettlements
                      .Where(pair => IsExpired(pair.Value))
                      .Select(pair => pair.Key)
                      .ToList())
         {
-            PendingSettlements.Remove(partyId);
+            pendingSettlements.Remove(partyId);
         }
     }
 

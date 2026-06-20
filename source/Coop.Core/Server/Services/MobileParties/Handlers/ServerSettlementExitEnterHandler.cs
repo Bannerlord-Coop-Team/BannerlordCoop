@@ -24,14 +24,21 @@ public class ServerSettlementExitEnterHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly ISettlementInterface settlementInterface;
+    private readonly IKingdomCreationSettlementTracker settlementTracker;
     private readonly ILogger Logger = LogManager.GetLogger<ServerSettlementExitEnterHandler>();
 
-    public ServerSettlementExitEnterHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager, ISettlementInterface settlementInterface)
+    public ServerSettlementExitEnterHandler(
+        IMessageBroker messageBroker,
+        INetwork network,
+        IObjectManager objectManager,
+        ISettlementInterface settlementInterface,
+        IKingdomCreationSettlementTracker settlementTracker)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.settlementInterface = settlementInterface;
+        this.settlementTracker = settlementTracker;
         messageBroker.Subscribe<NetworkRequestStartSettlementEncounter>(Handle);
         messageBroker.Subscribe<NetworkRequestEndSettlementEncounter>(Handle);
 
@@ -74,7 +81,7 @@ public class ServerSettlementExitEnterHandler : IHandler
         var peer = (NetPeer)obj.Who;
 
         objectManager.TryGetObject<MobileParty>(payload.PartyId, out var mobileParty);
-        if (KingdomCreationSettlementTracker.TryConsumeLeave(mobileParty, payload.PartyId))
+        if (settlementTracker.TryConsumeLeave(mobileParty, payload.PartyId))
         {
             return;
         }
@@ -111,7 +118,7 @@ public class ServerSettlementExitEnterHandler : IHandler
 
         if (!objectManager.TryGetIdWithLogging(payload.MobileParty, out var mobilePartyId)) return;
 
-        if (KingdomCreationSettlementTracker.TryConsumeLeave(payload.MobileParty, mobilePartyId))
+        if (settlementTracker.TryConsumeLeave(payload.MobileParty, mobilePartyId))
         {
             return;
         }

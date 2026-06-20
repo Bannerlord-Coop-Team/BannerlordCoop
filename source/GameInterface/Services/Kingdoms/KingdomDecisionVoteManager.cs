@@ -23,41 +23,77 @@ using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Kingdoms
 {
-    public static class KingdomDecisionVoteManager
+    public interface IKingdomDecisionVoteManager
+    {
+        void Reset();
+        void RegisterDecision(KingdomDecision decision);
+        bool TryCreateVoteData(DecisionOptionVM decisionOption, out KingdomDecisionVoteData voteData, bool isFinal = false);
+        bool TryCreateVoteData(DecisionItemBaseVM decisionItem, out KingdomDecisionVoteData voteData, bool isFinal = false);
+        bool TryPublishVote(DecisionOptionVM decisionOption);
+        bool TryPublishFinalVote(DecisionItemBaseVM decisionItem);
+        void MarkLocalVoteSubmitted(DecisionItemBaseVM decisionItem);
+        bool ShouldSuppressLocalDecision(KingdomDecision decision);
+        bool ShouldDisableResolveDecision(KingdomDecision decision);
+        bool HasLocalPlayerSubmittedVote(KingdomDecision decision);
+        bool ShouldBlockLocalResolution(DecisionItemBaseVM decisionItem);
+        void RegisterDecisionItem(DecisionItemBaseVM decisionItem);
+        void UnregisterDecisionItem(DecisionItemBaseVM decisionItem);
+        bool HandleVoteRequest(string controllerId, KingdomDecisionVoteData voteData);
+        void ApplyRemoteVote(string clanId, KingdomDecisionVoteData voteData);
+        bool TryResolveDecision(KingdomDecision decision, bool force);
+        bool HasEligiblePlayerClan(KingdomDecision decision);
+        IReadOnlyList<KingdomDecisionVoteManager.KingdomDecisionDebugInfo> GetDecisionDebugInfo(Kingdom kingdom);
+        void ApplyResolved(
+            string kingdomId,
+            int decisionIndex,
+            int outcomeIndex,
+            bool isPlayerDecision,
+            string outcomeKey = null,
+            string notificationText = null);
+        void ClearDecisionState(string kingdomId, int decisionIndex);
+    }
+
+    public class KingdomDecisionVoteManager : IKingdomDecisionVoteManager
     {
         private static readonly ILogger Logger = LogManager.GetLogger(typeof(KingdomDecisionVoteManager));
-        private static readonly Dictionary<string, KingdomDecisionVoteState> DecisionStates = new Dictionary<string, KingdomDecisionVoteState>();
-        private static readonly HashSet<string> LocalSubmittedDecisionKeys = new HashSet<string>();
-        private static readonly List<DecisionItemBaseVM> ActiveDecisionItems = new List<DecisionItemBaseVM>();
-        private static readonly List<PendingKingdomDecisionVote> PendingRemoteVotes = new List<PendingKingdomDecisionVote>();
+        private readonly Dictionary<KingdomDecision, KingdomDecisionVoteState> DecisionStates = new Dictionary<KingdomDecision, KingdomDecisionVoteState>();
+        private readonly HashSet<KingdomDecision> LocalSubmittedDecisions = new HashSet<KingdomDecision>();
+        private readonly List<DecisionItemBaseVM> ActiveDecisionItems = new List<DecisionItemBaseVM>();
+        private readonly List<PendingKingdomDecisionVote> PendingRemoteVotes = new List<PendingKingdomDecisionVote>();
 
-        private static IPlayerManager playerManager;
-        private static IObjectManager objectManager;
-        private static IMessageBroker messageBroker;
+        private readonly IPlayerManager playerManager;
+        private readonly IObjectManager objectManager;
+        private readonly IMessageBroker messageBroker;
+        private readonly IKingdomDecisionOutcomeResolver outcomeResolver;
 
-        public static void Configure(IPlayerManager manager, IObjectManager managerObjectManager, IMessageBroker broker)
+        public KingdomDecisionVoteManager(
+            IPlayerManager playerManager,
+            IObjectManager objectManager,
+            IMessageBroker messageBroker,
+            IKingdomDecisionOutcomeResolver outcomeResolver)
         {
-            playerManager = manager;
-            objectManager = managerObjectManager;
-            messageBroker = broker;
+            this.playerManager = playerManager;
+            this.objectManager = objectManager;
+            this.messageBroker = messageBroker;
+            this.outcomeResolver = outcomeResolver;
         }
 
-        public static void Reset()
+        public void Reset()
         {
             DecisionStates.Clear();
-            LocalSubmittedDecisionKeys.Clear();
+            LocalSubmittedDecisions.Clear();
             ActiveDecisionItems.Clear();
             PendingRemoteVotes.Clear();
         }
 
-        public static void RegisterDecision(KingdomDecision decision)
+        public void RegisterDecision(KingdomDecision decision)
         {
-            if (!TryGetDecisionKey(decision, out string decisionKey)) return;
-            KingdomDecisionVoteState state = GetOrCreateState(decisionKey, decision);
+            if (decision == null) return;
+            KingdomDecisionVoteState state = GetOrCreateState(decision);
             ApplyPendingRemoteVotes(state);
         }
 
-        public static bool TryCreateVoteData(DecisionOptionVM decisionOption, out KingdomDecisionVoteData voteData, bool isFinal = false)
+        public bool TryCreateVoteData(DecisionOptionVM decisionOption, out KingdomDecisionVoteData voteData, bool isFinal = false)
         {
             voteData = null;
             if (decisionOption == null || !IsLocalPlayerEligible(decisionOption.Decision)) return false;
@@ -70,7 +106,7 @@ namespace GameInterface.Services.Kingdoms
             string outcomeKey = null;
             if (!decisionOption.IsOptionForAbstain)
             {
-                KingdomDecisionOutcomeResolver.TryGetOutcomeKey(decisionOption.Option, objectManager, out outcomeKey);
+                outcomeResolver.TryGetOutcomeKey(decisionOption.Option, objectManager, out outcomeKey);
             }
 
             voteData = new KingdomDecisionVoteData(
@@ -84,7 +120,7 @@ namespace GameInterface.Services.Kingdoms
             return true;
         }
 
-        public static bool TryCreateVoteData(DecisionItemBaseVM decisionItem, out KingdomDecisionVoteData voteData, bool isFinal = false)
+        public bool TryCreateVoteData(DecisionItemBaseVM decisionItem, out KingdomDecisionVoteData voteData, bool isFinal = false)
         {
             voteData = null;
             if (decisionItem?.KingdomDecisionMaker?._decision == null || decisionItem._currentSelectedOption == null) return false;
@@ -107,7 +143,7 @@ namespace GameInterface.Services.Kingdoms
             string outcomeKey = null;
             if (!selectedOption.IsOptionForAbstain)
             {
-                KingdomDecisionOutcomeResolver.TryGetOutcomeKey(selectedOption.Option, objectManager, out outcomeKey);
+                outcomeResolver.TryGetOutcomeKey(selectedOption.Option, objectManager, out outcomeKey);
             }
 
             voteData = new KingdomDecisionVoteData(
@@ -121,7 +157,7 @@ namespace GameInterface.Services.Kingdoms
             return true;
         }
 
-        public static bool TryPublishVote(DecisionOptionVM decisionOption)
+        public bool TryPublishVote(DecisionOptionVM decisionOption)
         {
             if (!TryCreateVoteData(decisionOption, out KingdomDecisionVoteData voteData)) return false;
 
@@ -130,7 +166,7 @@ namespace GameInterface.Services.Kingdoms
             return true;
         }
 
-        public static bool TryPublishFinalVote(DecisionItemBaseVM decisionItem)
+        public bool TryPublishFinalVote(DecisionItemBaseVM decisionItem)
         {
             if (decisionItem == null || decisionItem._currentSelectedOption == null) return false;
             if (HasLocalPlayerSubmittedVote(decisionItem.KingdomDecisionMaker?._decision))
@@ -147,15 +183,15 @@ namespace GameInterface.Services.Kingdoms
 
             TryApplyLocalVote(decisionItem.KingdomDecisionMaker._decision, voteData);
             MessageBroker.Instance.Publish(decisionItem, new KingdomDecisionVoteRequested(voteData));
-            if (TryGetDecisionKey(decisionItem.KingdomDecisionMaker._decision, out string decisionKey))
+            if (decisionItem.KingdomDecisionMaker?._decision != null)
             {
-                LocalSubmittedDecisionKeys.Add(decisionKey);
+                LocalSubmittedDecisions.Add(decisionItem.KingdomDecisionMaker._decision);
             }
             MarkLocalVoteSubmitted(decisionItem);
             return true;
         }
 
-        public static void MarkLocalVoteSubmitted(DecisionItemBaseVM decisionItem)
+        public void MarkLocalVoteSubmitted(DecisionItemBaseVM decisionItem)
         {
             if (decisionItem == null) return;
 
@@ -166,7 +202,7 @@ namespace GameInterface.Services.Kingdoms
             UnregisterDecisionItem(decisionItem);
         }
 
-        public static bool ShouldSuppressLocalDecision(KingdomDecision decision)
+        public bool ShouldSuppressLocalDecision(KingdomDecision decision)
         {
             if (decision == null || Clan.PlayerClan == null) return false;
             if (Clan.PlayerClan.Kingdom != decision.Kingdom) return false;
@@ -175,20 +211,19 @@ namespace GameInterface.Services.Kingdoms
             return !IsLocalPlayerEligible(decision);
         }
 
-        public static bool ShouldDisableResolveDecision(KingdomDecision decision)
+        public bool ShouldDisableResolveDecision(KingdomDecision decision)
         {
             return HasLocalPlayerSubmittedVote(decision);
         }
 
-        public static bool HasLocalPlayerSubmittedVote(KingdomDecision decision)
+        public bool HasLocalPlayerSubmittedVote(KingdomDecision decision)
         {
             if (decision == null || Clan.PlayerClan == null) return false;
             if (Clan.PlayerClan.Kingdom != decision.Kingdom) return false;
-            if (!TryGetDecisionKey(decision, out string decisionKey)) return false;
-            if (LocalSubmittedDecisionKeys.Contains(decisionKey)) return true;
+            if (LocalSubmittedDecisions.Contains(decision)) return true;
             if (!TryGetClanId(Clan.PlayerClan, out string canonicalClanId)) return false;
 
-            KingdomDecisionVoteState state = GetOrCreateState(decisionKey, decision);
+            KingdomDecisionVoteState state = GetOrCreateState(decision);
             state.RefreshEligibleClanIds(GetEligibleClanIds(decision));
             ApplyPendingRemoteVotes(state);
 
@@ -197,7 +232,7 @@ namespace GameInterface.Services.Kingdoms
                 .Any(candidateClanId => state.FinalVotes.ContainsKey(candidateClanId));
         }
 
-        public static bool ShouldBlockLocalResolution(DecisionItemBaseVM decisionItem)
+        public bool ShouldBlockLocalResolution(DecisionItemBaseVM decisionItem)
         {
             if (decisionItem == null || decisionItem.KingdomDecisionMaker == null) return false;
             KingdomDecision decision = decisionItem.KingdomDecisionMaker._decision;
@@ -206,14 +241,14 @@ namespace GameInterface.Services.Kingdoms
             return IsLocalPlayerEligible(decision);
         }
 
-        public static void RegisterDecisionItem(DecisionItemBaseVM decisionItem)
+        public void RegisterDecisionItem(DecisionItemBaseVM decisionItem)
         {
             if (decisionItem == null || ActiveDecisionItems.Contains(decisionItem)) return;
 
             KingdomDecision decision = decisionItem.KingdomDecisionMaker?._decision;
-            if (decision != null && TryGetDecisionKey(decision, out string decisionKey))
+            if (decision != null)
             {
-                KingdomDecisionVoteState state = GetOrCreateState(decisionKey, decision);
+                KingdomDecisionVoteState state = GetOrCreateState(decision);
                 state.RefreshEligibleClanIds(GetEligibleClanIds(decision));
                 ApplyPendingRemoteVotes(state);
             }
@@ -222,13 +257,13 @@ namespace GameInterface.Services.Kingdoms
             ReplayVotes(decisionItem);
         }
 
-        public static void UnregisterDecisionItem(DecisionItemBaseVM decisionItem)
+        public void UnregisterDecisionItem(DecisionItemBaseVM decisionItem)
         {
             if (decisionItem == null) return;
             ActiveDecisionItems.Remove(decisionItem);
         }
 
-        public static bool HandleVoteRequest(string controllerId, KingdomDecisionVoteData voteData)
+        public bool HandleVoteRequest(string controllerId, KingdomDecisionVoteData voteData)
         {
             if (string.IsNullOrEmpty(controllerId) || voteData == null) return false;
             voteData = NormalizeVoteData(voteData);
@@ -236,8 +271,7 @@ namespace GameInterface.Services.Kingdoms
             if (!TryGetVoterClan(controllerId, decision, out Clan voterClan)) return false;
             if (!TryGetClanId(voterClan, out string voterClanId)) return false;
 
-            if (!TryGetDecisionKey(decision, out string decisionKey)) return false;
-            KingdomDecisionVoteState state = GetOrCreateState(decisionKey, decision);
+            KingdomDecisionVoteState state = GetOrCreateState(decision);
             state.RefreshEligibleClanIds(GetEligibleClanIds(decision));
             if (state.IsResolved || !state.EligibleClanIds.Contains(voterClanId)) return false;
             if (!ApplyVote(state, voterClanId, voterClan, voteData)) return false;
@@ -251,7 +285,7 @@ namespace GameInterface.Services.Kingdoms
             return true;
         }
 
-        public static void ApplyRemoteVote(string clanId, KingdomDecisionVoteData voteData)
+        public void ApplyRemoteVote(string clanId, KingdomDecisionVoteData voteData)
         {
             if (string.IsNullOrEmpty(clanId) || voteData == null) return;
             voteData = NormalizeVoteData(voteData);
@@ -262,18 +296,16 @@ namespace GameInterface.Services.Kingdoms
                 return;
             }
 
-            if (!TryGetDecisionKey(decision, out string decisionKey)) return;
-            KingdomDecisionVoteState state = GetOrCreateState(decisionKey, decision);
+            KingdomDecisionVoteState state = GetOrCreateState(decision);
             state.RefreshEligibleClanIds(GetEligibleClanIds(decision));
             ApplyVote(state, clanId, clan, voteData);
         }
 
-        public static bool TryResolveDecision(KingdomDecision decision, bool force)
+        public bool TryResolveDecision(KingdomDecision decision, bool force)
         {
             if (decision == null) return false;
-            if (!TryGetDecisionKey(decision, out string decisionKey)) return false;
 
-            KingdomDecisionVoteState state = GetOrCreateState(decisionKey, decision);
+            KingdomDecisionVoteState state = GetOrCreateState(decision);
             state.RefreshEligibleClanIds(GetEligibleClanIds(decision));
             if (state.EligibleClanIds.Count == 0) return false;
             if (!force && !state.HasAllVotes) return false;
@@ -282,12 +314,12 @@ namespace GameInterface.Services.Kingdoms
             return true;
         }
 
-        public static bool HasEligiblePlayerClan(KingdomDecision decision)
+        public bool HasEligiblePlayerClan(KingdomDecision decision)
         {
             return GetEligibleClanIds(decision).Count > 0;
         }
 
-        public static IReadOnlyList<KingdomDecisionDebugInfo> GetDecisionDebugInfo(Kingdom kingdom)
+        public IReadOnlyList<KingdomDecisionDebugInfo> GetDecisionDebugInfo(Kingdom kingdom)
         {
             List<KingdomDecisionDebugInfo> decisionInfos = new List<KingdomDecisionDebugInfo>();
             if (kingdom?._unresolvedDecisions == null) return decisionInfos;
@@ -295,9 +327,7 @@ namespace GameInterface.Services.Kingdoms
             foreach (KingdomDecision decision in kingdom._unresolvedDecisions.ToList())
             {
                 if (decision == null) continue;
-                if (!TryGetDecisionKey(decision, out string decisionKey)) continue;
-
-                KingdomDecisionVoteState state = GetOrCreateState(decisionKey, decision);
+                KingdomDecisionVoteState state = GetOrCreateState(decision);
                 state.RefreshEligibleClanIds(GetEligibleClanIds(decision));
                 ApplyPendingRemoteVotes(state);
 
@@ -307,7 +337,7 @@ namespace GameInterface.Services.Kingdoms
             return decisionInfos;
         }
 
-        public static void ApplyResolved(
+        public void ApplyResolved(
             string kingdomId,
             int decisionIndex,
             int outcomeIndex,
@@ -320,12 +350,7 @@ namespace GameInterface.Services.Kingdoms
                 PublishDecisionNotification(notificationText);
                 return;
             }
-            if (!TryGetDecisionKey(decision, out string decisionKey))
-            {
-                PublishDecisionNotification(notificationText);
-                return;
-            }
-            KingdomDecisionVoteState state = GetOrCreateState(decisionKey, decision);
+            KingdomDecisionVoteState state = GetOrCreateState(decision);
             var voteData = new KingdomDecisionVoteData(
                 kingdomId,
                 decisionIndex,
@@ -334,7 +359,7 @@ namespace GameInterface.Services.Kingdoms
                 false,
                 true,
                 outcomeKey);
-            if (!KingdomDecisionOutcomeResolver.TryGetOutcome(voteData, state.Election, objectManager, out DecisionOutcome outcome))
+            if (!outcomeResolver.TryGetOutcome(voteData, state.Election, objectManager, out DecisionOutcome outcome))
             {
                 PublishDecisionNotification(notificationText);
                 return;
@@ -345,22 +370,23 @@ namespace GameInterface.Services.Kingdoms
             ClearDecisionState(kingdomId, decisionIndex);
         }
 
-        public static void ClearDecisionState(string kingdomId, int decisionIndex)
+        public void ClearDecisionState(string kingdomId, int decisionIndex)
         {
             if (string.IsNullOrWhiteSpace(kingdomId) || decisionIndex < 0) return;
 
-            string decisionKeyPrefix = GetDecisionKeyPrefix(kingdomId, decisionIndex);
-            foreach (string decisionKey in DecisionStates.Keys
-                         .Where(key => key == decisionKeyPrefix || key.StartsWith($"{decisionKeyPrefix}:"))
+            if (!TryGetDecision(kingdomId, decisionIndex, out KingdomDecision decision)) return;
+
+            DecisionStates.Remove(decision);
+            LocalSubmittedDecisions.Remove(decision);
+            foreach (KingdomDecision staleDecision in DecisionStates.Keys
+                         .Where(key => key == null || key.Kingdom == null)
                          .ToList())
             {
-                DecisionStates.Remove(decisionKey);
+                DecisionStates.Remove(staleDecision);
             }
-
-            LocalSubmittedDecisionKeys.RemoveWhere(key => key == decisionKeyPrefix || key.StartsWith($"{decisionKeyPrefix}:"));
         }
 
-        private static bool ApplyVote(KingdomDecisionVoteState state, string clanId, Clan clan, KingdomDecisionVoteData voteData)
+        private bool ApplyVote(KingdomDecisionVoteState state, string clanId, Clan clan, KingdomDecisionVoteData voteData)
         {
             if (string.IsNullOrWhiteSpace(clanId)) return false;
             voteData = NormalizeVoteData(voteData);
@@ -381,20 +407,18 @@ namespace GameInterface.Services.Kingdoms
             return true;
         }
 
-        private static bool TryApplyLocalVote(KingdomDecision decision, KingdomDecisionVoteData voteData)
+        private bool TryApplyLocalVote(KingdomDecision decision, KingdomDecisionVoteData voteData)
         {
             if (decision == null || Clan.PlayerClan == null) return false;
             if (!TryGetClanId(Clan.PlayerClan, out string clanId)) return false;
-            if (!TryGetDecisionKey(decision, out string decisionKey)) return false;
-
-            KingdomDecisionVoteState state = GetOrCreateState(decisionKey, decision);
+            KingdomDecisionVoteState state = GetOrCreateState(decision);
             state.RefreshEligibleClanIds(GetEligibleClanIds(decision));
             if (!state.EligibleClanIds.Contains(clanId)) return false;
 
             return ApplyVote(state, clanId, Clan.PlayerClan, voteData);
         }
 
-        private static void QueuePendingRemoteVote(string clanId, KingdomDecisionVoteData voteData)
+        private void QueuePendingRemoteVote(string clanId, KingdomDecisionVoteData voteData)
         {
             if (string.IsNullOrEmpty(clanId) || voteData == null) return;
             voteData = NormalizeVoteData(voteData);
@@ -407,7 +431,7 @@ namespace GameInterface.Services.Kingdoms
             PendingRemoteVotes.Add(new PendingKingdomDecisionVote(clanId, voteData));
         }
 
-        private static void ApplyPendingRemoteVotes(KingdomDecisionVoteState state)
+        private void ApplyPendingRemoteVotes(KingdomDecisionVoteState state)
         {
             foreach (PendingKingdomDecisionVote pendingVote in PendingRemoteVotes
                          .Where(vote => vote.VoteData.KingdomId == state.KingdomId &&
@@ -423,7 +447,7 @@ namespace GameInterface.Services.Kingdoms
             }
         }
 
-        private static KingdomDecisionDebugInfo CreateDecisionDebugInfo(KingdomDecisionVoteState state)
+        private KingdomDecisionDebugInfo CreateDecisionDebugInfo(KingdomDecisionVoteState state)
         {
             List<KingdomDecisionClientVoteDebugInfo> clientVotes = new List<KingdomDecisionClientVoteDebugInfo>();
             if (playerManager != null)
@@ -440,7 +464,7 @@ namespace GameInterface.Services.Kingdoms
                 clientVotes);
         }
 
-        private static KingdomDecisionClientVoteDebugInfo CreateClientVoteDebugInfo(KingdomDecisionVoteState state, Player player)
+        private KingdomDecisionClientVoteDebugInfo CreateClientVoteDebugInfo(KingdomDecisionVoteState state, Player player)
         {
             string clanId = player.ClanId;
             string clanName = "<none>";
@@ -539,7 +563,7 @@ namespace GameInterface.Services.Kingdoms
             if (!string.IsNullOrWhiteSpace(canonicalClanId) && canonicalClanId != clanId) yield return canonicalClanId;
         }
 
-        private static string GetVoteDebugStatus(
+        private string GetVoteDebugStatus(
             KingdomDecisionVoteState state,
             KingdomDecisionVoteData voteData,
             bool isFinal,
@@ -555,9 +579,9 @@ namespace GameInterface.Services.Kingdoms
             return isFinal ? $"Voted {outcome}" : $"Selected {outcome}";
         }
 
-        private static string GetOutcomeDebugText(KingdomElection election, KingdomDecisionVoteData voteData)
+        private string GetOutcomeDebugText(KingdomElection election, KingdomDecisionVoteData voteData)
         {
-            if (KingdomDecisionOutcomeResolver.TryGetOutcome(voteData, election, objectManager, out DecisionOutcome outcome))
+            if (outcomeResolver.TryGetOutcome(voteData, election, objectManager, out DecisionOutcome outcome))
             {
                 if (TryGetBooleanOutcomeText(outcome, out string booleanOutcomeText))
                 {
@@ -576,10 +600,10 @@ namespace GameInterface.Services.Kingdoms
             return voteData.OutcomeIndex >= 0 ? $"Outcome {voteData.OutcomeIndex + 1}" : "Unknown";
         }
 
-        private static bool TryGetBooleanOutcomeText(DecisionOutcome outcome, out string outcomeText)
+        private bool TryGetBooleanOutcomeText(DecisionOutcome outcome, out string outcomeText)
         {
             outcomeText = null;
-            if (!KingdomDecisionOutcomeResolver.TryGetOutcomeKey(outcome, objectManager, out string outcomeKey)) return false;
+            if (!outcomeResolver.TryGetOutcomeKey(outcome, objectManager, out string outcomeKey)) return false;
 
             return TryGetBooleanOutcomeText(outcomeKey, out outcomeText);
         }
@@ -604,14 +628,14 @@ namespace GameInterface.Services.Kingdoms
             return false;
         }
 
-        private static void ResolveDecision(KingdomDecisionVoteState state)
+        private void ResolveDecision(KingdomDecisionVoteState state)
         {
             if (state.IsResolved) return;
 
             state.IsResolved = true;
             DecisionOutcome chosenOutcome = state.Election.ChooseOutcomeWithCurrentVotes();
             int outcomeIndex = GetOutcomeIndex(chosenOutcome, state.Election);
-            KingdomDecisionOutcomeResolver.TryGetOutcomeKey(chosenOutcome, objectManager, out string outcomeKey);
+            outcomeResolver.TryGetOutcomeKey(chosenOutcome, objectManager, out string outcomeKey);
             KingdomDecision.SupportStatus supportStatus = GetSupportStatusOfDecisionOutcome(chosenOutcome);
             state.Decision.SupportStatusOfFinalDecision = supportStatus;
             string notificationText = GetDecisionNotificationText(state.Decision, chosenOutcome, supportStatus);
@@ -635,7 +659,7 @@ namespace GameInterface.Services.Kingdoms
             ClearDecisionState(state.KingdomId, state.DecisionIndex);
         }
 
-        private static string GetDecisionNotificationText(
+        private string GetDecisionNotificationText(
             KingdomDecision decision,
             DecisionOutcome chosenOutcome,
             KingdomDecision.SupportStatus supportStatus)
@@ -655,7 +679,7 @@ namespace GameInterface.Services.Kingdoms
             return GetFallbackDecisionNotificationText(decision, chosenOutcome);
         }
 
-        private static string GetFallbackDecisionNotificationText(KingdomDecision decision, DecisionOutcome chosenOutcome)
+        private string GetFallbackDecisionNotificationText(KingdomDecision decision, DecisionOutcome chosenOutcome)
         {
             if (decision is DeclareWarDecision declareWarDecision &&
                 TryGetBooleanOutcome(chosenOutcome, "ShouldWarBeDeclared", out bool shouldWarBeDeclared))
@@ -714,7 +738,7 @@ namespace GameInterface.Services.Kingdoms
             return KingdomDecision.SupportStatus.Equal;
         }
 
-        private static void PublishDecisionNotification(string notificationText)
+        private void PublishDecisionNotification(string notificationText)
         {
             if (string.IsNullOrWhiteSpace(notificationText)) return;
 
@@ -732,28 +756,26 @@ namespace GameInterface.Services.Kingdoms
             return true;
         }
 
-        private static void ApplyVotesToActiveDecisionItems(KingdomDecisionVoteState state)
+        private void ApplyVotesToActiveDecisionItems(KingdomDecisionVoteState state)
         {
             foreach (DecisionItemBaseVM decisionItem in ActiveDecisionItems.ToList())
             {
                 if (decisionItem?.KingdomDecisionMaker?._decision == null) continue;
-                if (!TryGetDecisionKey(decisionItem.KingdomDecisionMaker._decision, out string itemDecisionKey)) continue;
-                if (itemDecisionKey != state.DecisionKey) continue;
+                if (decisionItem.KingdomDecisionMaker._decision != state.Decision) continue;
 
                 ReplayVotes(decisionItem, state);
             }
         }
 
-        private static void ReplayVotes(DecisionItemBaseVM decisionItem)
+        private void ReplayVotes(DecisionItemBaseVM decisionItem)
         {
             if (decisionItem?.KingdomDecisionMaker?._decision == null) return;
-            if (!TryGetDecisionKey(decisionItem.KingdomDecisionMaker._decision, out string decisionKey)) return;
-            if (!DecisionStates.TryGetValue(decisionKey, out KingdomDecisionVoteState state)) return;
+            if (!DecisionStates.TryGetValue(decisionItem.KingdomDecisionMaker._decision, out KingdomDecisionVoteState state)) return;
 
             ReplayVotes(decisionItem, state);
         }
 
-        private static void ReplayVotes(DecisionItemBaseVM decisionItem, KingdomDecisionVoteState state)
+        private void ReplayVotes(DecisionItemBaseVM decisionItem, KingdomDecisionVoteState state)
         {
             Dictionary<AppliedKingdomDecisionVote, Clan> votes = new Dictionary<AppliedKingdomDecisionVote, Clan>();
 
@@ -785,7 +807,7 @@ namespace GameInterface.Services.Kingdoms
             RefreshDecisionItem(decisionItem);
         }
 
-        private static bool ApplyVoteToElection(KingdomElection election, Clan clan, KingdomDecisionVoteData voteData, bool resetExisting = true)
+        private bool ApplyVoteToElection(KingdomElection election, Clan clan, KingdomDecisionVoteData voteData, bool resetExisting = true)
         {
             if (!TryGetSupportWeight(voteData.SupportWeight, out Supporter.SupportWeights supportWeight)) return false;
 
@@ -806,7 +828,7 @@ namespace GameInterface.Services.Kingdoms
                 return true;
             }
 
-            if (!KingdomDecisionOutcomeResolver.TryGetOutcome(voteData, election, objectManager, out DecisionOutcome selectedOutcome))
+            if (!outcomeResolver.TryGetOutcome(voteData, election, objectManager, out DecisionOutcome selectedOutcome))
             {
                 return false;
             }
@@ -830,7 +852,7 @@ namespace GameInterface.Services.Kingdoms
             }
         }
 
-        private static void RefreshDecisionItem(DecisionItemBaseVM decisionItem)
+        private void RefreshDecisionItem(DecisionItemBaseVM decisionItem)
         {
             decisionItem.RefreshWinPercentages();
             RefreshMultiplayerWinPercentages(decisionItem);
@@ -939,54 +961,31 @@ namespace GameInterface.Services.Kingdoms
             }
         }
 
-        private static KingdomDecisionVoteState GetOrCreateState(string decisionKey, KingdomDecision decision)
+        private KingdomDecisionVoteState GetOrCreateState(KingdomDecision decision)
         {
-            if (DecisionStates.TryGetValue(decisionKey, out KingdomDecisionVoteState state))
+            if (DecisionStates.TryGetValue(decision, out KingdomDecisionVoteState state))
             {
-                if (state.Decision == decision)
-                {
-                    return state;
-                }
-
-                KingdomDecisionVoteState replacementState = CreateState(decisionKey, decision);
-                CopyVotes(state, replacementState);
-                DecisionStates[decisionKey] = replacementState;
-                return replacementState;
+                TryGetKingdomId(decision.Kingdom, out string kingdomId);
+                TryGetDecisionIndex(decision, out int decisionIndex);
+                state.RefreshDecisionIdentity(kingdomId, decisionIndex);
+                return state;
             }
 
-            LocalSubmittedDecisionKeys.Remove(decisionKey);
+            LocalSubmittedDecisions.Remove(decision);
 
-            state = CreateState(decisionKey, decision);
-            DecisionStates[decisionKey] = state;
+            state = CreateState(decision);
+            DecisionStates[decision] = state;
             return state;
         }
 
-        private static KingdomDecisionVoteState CreateState(string decisionKey, KingdomDecision decision)
+        private KingdomDecisionVoteState CreateState(KingdomDecision decision)
         {
             TryGetKingdomId(decision.Kingdom, out string kingdomId);
             TryGetDecisionIndex(decision, out int decisionIndex);
-            return new KingdomDecisionVoteState(decisionKey, kingdomId, decisionIndex, decision, GetEligibleClanIds(decision));
+            return new KingdomDecisionVoteState(kingdomId, decisionIndex, decision, GetEligibleClanIds(decision));
         }
 
-        private static void CopyVotes(KingdomDecisionVoteState sourceState, KingdomDecisionVoteState targetState)
-        {
-            foreach (AppliedKingdomDecisionVote vote in sourceState.Votes.Values)
-            {
-                if (TryGetClan(vote.ClanId, targetState.Decision.Kingdom, out Clan clan) &&
-                    ApplyVote(targetState, vote.ClanId, clan, vote.VoteData))
-                {
-                    continue;
-                }
-
-                targetState.Votes[vote.ClanId] = vote;
-                if (vote.VoteData.IsFinal)
-                {
-                    targetState.FinalVotes[vote.ClanId] = vote;
-                }
-            }
-        }
-
-        private static HashSet<string> GetEligibleClanIds(KingdomDecision decision)
+        private HashSet<string> GetEligibleClanIds(KingdomDecision decision)
         {
             HashSet<string> eligibleClanIds = new HashSet<string>();
             if (playerManager == null || objectManager == null) return eligibleClanIds;
@@ -1005,7 +1004,7 @@ namespace GameInterface.Services.Kingdoms
             return eligibleClanIds;
         }
 
-        private static bool TryGetVoterClan(string controllerId, KingdomDecision decision, out Clan clan)
+        private bool TryGetVoterClan(string controllerId, KingdomDecision decision, out Clan clan)
         {
             clan = null;
             if (playerManager == null || objectManager == null) return false;
@@ -1016,7 +1015,7 @@ namespace GameInterface.Services.Kingdoms
             return true;
         }
 
-        private static bool TryGetClan(string clanId, Kingdom kingdom, out Clan clan)
+        private bool TryGetClan(string clanId, Kingdom kingdom, out Clan clan)
         {
             clan = null;
             if (string.IsNullOrEmpty(clanId)) return false;
@@ -1032,7 +1031,7 @@ namespace GameInterface.Services.Kingdoms
             return clan != null;
         }
 
-        private static bool TryGetClanId(Clan clan, out string clanId)
+        private bool TryGetClanId(Clan clan, out string clanId)
         {
             clanId = null;
             if (clan == null) return false;
@@ -1050,13 +1049,13 @@ namespace GameInterface.Services.Kingdoms
             return true;
         }
 
-        private static bool TryGetDecision(KingdomDecisionVoteData voteData, out KingdomDecision decision)
+        private bool TryGetDecision(KingdomDecisionVoteData voteData, out KingdomDecision decision)
         {
             decision = null;
             return voteData != null && TryGetDecision(voteData.KingdomId, voteData.DecisionIndex, out decision);
         }
 
-        private static bool TryGetDecision(string kingdomId, int decisionIndex, out KingdomDecision decision)
+        private bool TryGetDecision(string kingdomId, int decisionIndex, out KingdomDecision decision)
         {
             decision = null;
             if (objectManager == null) return false;
@@ -1077,17 +1076,7 @@ namespace GameInterface.Services.Kingdoms
             return decisionIndex >= 0;
         }
 
-        private static bool TryGetDecisionKey(KingdomDecision decision, out string decisionKey)
-        {
-            decisionKey = null;
-            if (!TryGetDecisionIndex(decision, out int decisionIndex)) return false;
-            if (!TryGetKingdomId(decision.Kingdom, out string kingdomId)) return false;
-
-            decisionKey = GetDecisionKey(kingdomId, decisionIndex);
-            return true;
-        }
-
-        private static bool TryGetKingdomId(Kingdom kingdom, out string kingdomId)
+        private bool TryGetKingdomId(Kingdom kingdom, out string kingdomId)
         {
             kingdomId = null;
             if (kingdom == null) return false;
@@ -1095,16 +1084,6 @@ namespace GameInterface.Services.Kingdoms
 
             kingdomId = kingdom.StringId;
             return !string.IsNullOrWhiteSpace(kingdomId);
-        }
-
-        private static string GetDecisionKey(string kingdomId, int decisionIndex)
-        {
-            return GetDecisionKeyPrefix(kingdomId, decisionIndex);
-        }
-
-        private static string GetDecisionKeyPrefix(string kingdomId, int decisionIndex)
-        {
-            return $"{kingdomId}:{decisionIndex}";
         }
 
         private static int GetOutcomeIndex(DecisionOutcome decisionOutcome, KingdomElection election)
@@ -1157,11 +1136,10 @@ namespace GameInterface.Services.Kingdoms
 
         private class KingdomDecisionVoteState
         {
-            public string DecisionKey { get; }
-            public string KingdomId { get; }
+            public string KingdomId { get; private set; }
             public KingdomDecision Decision { get; }
             public CoopKingdomElection Election { get; }
-            public int DecisionIndex { get; }
+            public int DecisionIndex { get; private set; }
             public HashSet<string> EligibleClanIds { get; }
             public Dictionary<string, AppliedKingdomDecisionVote> Votes { get; }
             public Dictionary<string, AppliedKingdomDecisionVote> FinalVotes { get; }
@@ -1170,13 +1148,11 @@ namespace GameInterface.Services.Kingdoms
             public bool HasAllVotes => EligibleClanIds.Count > 0 && EligibleClanIds.All(clanId => FinalVotes.ContainsKey(clanId));
 
             public KingdomDecisionVoteState(
-                string decisionKey,
                 string kingdomId,
                 int decisionIndex,
                 KingdomDecision decision,
                 HashSet<string> eligibleClanIds)
             {
-                DecisionKey = decisionKey;
                 KingdomId = kingdomId;
                 Decision = decision;
                 DecisionIndex = decisionIndex;
@@ -1185,6 +1161,12 @@ namespace GameInterface.Services.Kingdoms
                 EligibleClanIds = eligibleClanIds;
                 Votes = new Dictionary<string, AppliedKingdomDecisionVote>();
                 FinalVotes = new Dictionary<string, AppliedKingdomDecisionVote>();
+            }
+
+            public void RefreshDecisionIdentity(string kingdomId, int decisionIndex)
+            {
+                KingdomId = kingdomId;
+                DecisionIndex = decisionIndex;
             }
 
             public void RefreshEligibleClanIds(HashSet<string> eligibleClanIds)

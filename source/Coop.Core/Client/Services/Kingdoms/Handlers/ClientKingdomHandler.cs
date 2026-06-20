@@ -1,5 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using Common;
+using Common.Util;
 using Coop.Core.Server.Services.Kingdoms.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Kingdoms;
@@ -7,6 +9,7 @@ using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -25,6 +28,7 @@ public class ClientKingdomHandler : IHandler
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
+    private readonly IKingdomCreationSettlementTracker settlementTracker;
     private PendingSettlementRestore? pendingKingdomCreationSettlement;
 
     public ClientKingdomHandler(
@@ -32,13 +36,15 @@ public class ClientKingdomHandler : IHandler
         INetwork network,
         IControllerIdProvider controllerIdProvider,
         IObjectManager objectManager,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        IKingdomCreationSettlementTracker settlementTracker)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.controllerIdProvider = controllerIdProvider;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
+        this.settlementTracker = settlementTracker;
         messageBroker.Subscribe<NetworkAddDecision>(HandleNetworkAddDecision);
         messageBroker.Subscribe<NetworkRemoveDecision>(HandleNetworkRemoveDecision);
         messageBroker.Subscribe<NetworkChangeKingdomPolicy>(HandleNetworkChangeKingdomPolicy);
@@ -60,7 +66,7 @@ public class ClientKingdomHandler : IHandler
         {
             partyId = pendingKingdomCreationSettlement.Value.PartyId;
             settlementId = pendingKingdomCreationSettlement.Value.SettlementId;
-            KingdomCreationSettlementTracker.Track(partyId, settlementId);
+            settlementTracker.Track(partyId, settlementId);
             RestoreSettlementContext(pendingKingdomCreationSettlement.Value, notifyServer: false);
         }
 
@@ -80,18 +86,22 @@ public class ClientKingdomHandler : IHandler
             payload.ControllerId,
             payload.KingdomId,
             payload.KingdomName,
-            payload.ClanId);
+            payload.ClanId,
+            payload.CultureId);
         messageBroker.Publish(this, message);
 
-        if (payload.ControllerId == controllerIdProvider.ControllerId)
+        RunSettlementMutation(() =>
         {
-            RestorePendingSettlementAfterKingdomCreation(payload.PartyId, payload.SettlementId);
-        }
-        else if (TryCreatePendingSettlementRestore(payload.PartyId, payload.SettlementId, out var notificationRestore))
-        {
-            RestoreSettlementContext(notificationRestore, notifyServer: false);
-            ClearRemoteSettlementRestore(notificationRestore);
-        }
+            if (payload.ControllerId == controllerIdProvider.ControllerId)
+            {
+                RestorePendingSettlementAfterKingdomCreation(payload.PartyId, payload.SettlementId);
+            }
+            else if (TryCreatePendingSettlementRestore(payload.PartyId, payload.SettlementId, out var notificationRestore))
+            {
+                RestoreSettlementContext(notificationRestore, notifyServer: false);
+                ClearRemoteSettlementRestore(notificationRestore);
+            }
+        });
     }
 
     private void HandleLocalDecisionAdded(MessagePayload<DecisionAdded> obj)
@@ -126,7 +136,7 @@ public class ClientKingdomHandler : IHandler
         if (!TryGetPartyId(party, out var partyId)) return null;
         if (!TryGetSettlementId(settlement, out var settlementId)) return null;
 
-        KingdomCreationSettlementTracker.TrackParty(party, partyId, settlement, settlementId);
+        settlementTracker.TrackParty(party, partyId, settlement, settlementId);
         return new PendingSettlementRestore(partyId, settlementId);
     }
 
@@ -152,7 +162,7 @@ public class ClientKingdomHandler : IHandler
         {
             return party?.CurrentSettlement;
         }
-        catch (global::System.NullReferenceException)
+        catch (NullReferenceException)
         {
             return null;
         }
@@ -164,7 +174,7 @@ public class ClientKingdomHandler : IHandler
         {
             return Settlement.CurrentSettlement;
         }
-        catch (global::System.NullReferenceException)
+        catch (NullReferenceException)
         {
             return null;
         }
@@ -176,7 +186,7 @@ public class ClientKingdomHandler : IHandler
         {
             return PlayerEncounter.EncounterSettlement;
         }
-        catch (global::System.NullReferenceException)
+        catch (NullReferenceException)
         {
             return null;
         }
@@ -194,7 +204,7 @@ public class ClientKingdomHandler : IHandler
         {
             return MobileParty.MainParty;
         }
-        catch (global::System.NullReferenceException)
+        catch (NullReferenceException)
         {
             return null;
         }
@@ -216,8 +226,11 @@ public class ClientKingdomHandler : IHandler
             return;
         }
 
-        RestoreSettlementContext(pending.Value, notifyServer: true);
-        KingdomCreationSettlementTracker.Complete(pending.Value.PartyId);
+        RunSettlementMutation(() =>
+        {
+            RestoreSettlementContext(pending.Value, notifyServer: true);
+            settlementTracker.Complete(pending.Value.PartyId);
+        });
     }
 
     private static bool TryCreatePendingSettlementRestore(
@@ -237,7 +250,7 @@ public class ClientKingdomHandler : IHandler
         if (!objectManager.TryGetObject<MobileParty>(pending.PartyId, out var party)) return;
         if (!TryGetSettlement(pending.SettlementId, out var settlement)) return;
 
-        KingdomCreationSettlementTracker.TrackParty(party, pending.PartyId, settlement, pending.SettlementId);
+        settlementTracker.TrackParty(party, pending.PartyId, settlement, pending.SettlementId);
 
         bool restoredSettlement = party.CurrentSettlement != settlement;
         if (restoredSettlement)
@@ -261,11 +274,11 @@ public class ClientKingdomHandler : IHandler
     {
         if (objectManager.TryGetObject<MobileParty>(pending.PartyId, out var party))
         {
-            KingdomCreationSettlementTracker.Clear(party, pending.PartyId);
+            settlementTracker.Clear(party, pending.PartyId);
             return;
         }
 
-        KingdomCreationSettlementTracker.Clear(null, pending.PartyId);
+        settlementTracker.Clear(null, pending.PartyId);
     }
 
     private bool TryGetSettlement(string settlementId, out Settlement settlement)
@@ -280,13 +293,24 @@ public class ClientKingdomHandler : IHandler
     {
         if (party.CurrentSettlement == settlement) return;
 
-        global::Common.GameThread.Run(() =>
+        RunSettlementMutation(() =>
         {
-            using (new global::Common.Util.AllowedThread())
+            using (new AllowedThread())
             {
                 party.CurrentSettlement = settlement;
             }
-        }, blocking: true);
+        });
+    }
+
+    private static void RunSettlementMutation(Action action)
+    {
+        if (!GameThread.Instance.IsInitialized)
+        {
+            action();
+            return;
+        }
+
+        GameThread.RunSafe(action, blocking: true, context: nameof(ClientKingdomHandler));
     }
 
     private void HandleKingdomDecisionVoteRequested(MessagePayload<KingdomDecisionVoteRequested> obj)

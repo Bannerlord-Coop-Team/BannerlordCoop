@@ -18,9 +18,11 @@ public class NetworkPlayerKingdomCreated : ICommand
     public string PartyId { get; }
     [ProtoMember(6)]
     public string SettlementId { get; }
+    [ProtoMember(7)]
+    public string CultureId { get; }
 
     public NetworkPlayerKingdomCreated(string controllerId, string kingdomId, string kingdomName, string clanId)
-        : this(controllerId, kingdomId, kingdomName, clanId, null, null)
+        : this(controllerId, kingdomId, kingdomName, clanId, null, null, null)
     {
     }
 
@@ -31,6 +33,18 @@ public class NetworkPlayerKingdomCreated : ICommand
         string clanId,
         string partyId,
         string settlementId)
+        : this(controllerId, kingdomId, kingdomName, clanId, partyId, settlementId, null)
+    {
+    }
+
+    public NetworkPlayerKingdomCreated(
+        string controllerId,
+        string kingdomId,
+        string kingdomName,
+        string clanId,
+        string partyId,
+        string settlementId,
+        string cultureId)
     {
         ControllerId = controllerId;
         KingdomId = kingdomId;
@@ -38,5 +52,6 @@ public class NetworkPlayerKingdomCreated : ICommand
         ClanId = clanId;
         PartyId = partyId;
         SettlementId = settlementId;
+        CultureId = cultureId;
     }
 }

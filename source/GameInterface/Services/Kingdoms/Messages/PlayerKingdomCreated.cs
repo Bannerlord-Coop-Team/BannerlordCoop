@@ -8,12 +8,19 @@ public record PlayerKingdomCreated : IEvent
     public string KingdomId { get; }
     public string KingdomName { get; }
     public string ClanId { get; }
+    public string CultureId { get; }
 
-    public PlayerKingdomCreated(string controllerId, string kingdomId, string kingdomName, string clanId)
+    public PlayerKingdomCreated(
+        string controllerId,
+        string kingdomId,
+        string kingdomName,
+        string clanId,
+        string cultureId = null)
     {
         ControllerId = controllerId;
         KingdomId = kingdomId;
         KingdomName = kingdomName;
         ClanId = clanId;
+        CultureId = cultureId;
     }
 }

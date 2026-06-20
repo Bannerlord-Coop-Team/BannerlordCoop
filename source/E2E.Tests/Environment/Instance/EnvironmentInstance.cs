@@ -7,8 +7,6 @@ using Common.Tests.Utils;
 using Common.Util;
 using E2E.Tests.Environment.Mock;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Kingdoms;
-using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters;
 using HarmonyLib;
 using LiteNetLib;
@@ -168,7 +166,6 @@ public abstract class EnvironmentInstance : IDisposable
                 ModInformation.IsServer = instance is ServerInstance;
                 instance.Container.Resolve<TestMessageBroker>().SetStaticInstance();
                 GameInterface.ContainerProvider.SetContainer(instance.Container);
-                ConfigureKingdomDecisionVoteManager(instance.Container);
             }
             catch
             {
@@ -185,7 +182,6 @@ public abstract class EnvironmentInstance : IDisposable
                 ModInformation.IsServer = wasServer;
                 GameInterface.ContainerProvider.SetContainer(previousContainer);
                 previousContainer.Resolve<TestMessageBroker>().SetStaticInstance();
-                ConfigureKingdomDecisionVoteManager(previousContainer);
             }
             finally
             {
@@ -193,14 +189,6 @@ public abstract class EnvironmentInstance : IDisposable
             }
         }
 
-        private static void ConfigureKingdomDecisionVoteManager(ILifetimeScope container)
-        {
-            if (!container.TryResolve<IPlayerManager>(out var playerManager)) return;
-            if (!container.TryResolve<IObjectManager>(out var objectManager)) return;
-            if (!container.TryResolve<IMessageBroker>(out var messageBroker)) return;
-
-            KingdomDecisionVoteManager.Configure(playerManager, objectManager, messageBroker);
-        }
     }
 
     private class PatchScope : IDisposable

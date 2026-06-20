@@ -1,16 +1,18 @@
 using Common.Messaging;
 using Common.Network;
+using Common;
 using Common.Util;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.Kingdoms.Messages;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Kingdoms.Messages;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -26,18 +28,21 @@ public class ServerKingdomHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
+    private readonly IKingdomCreationSettlementTracker settlementTracker;
     private readonly Dictionary<string, PendingSettlementRestore> pendingKingdomCreationSettlements = new();
 
     public ServerKingdomHandler(
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        IKingdomCreationSettlementTracker settlementTracker)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
+        this.settlementTracker = settlementTracker;
         messageBroker.Subscribe<DecisionAdded>(HandleLocalDecisionAdded);
         messageBroker.Subscribe<DecisionRemoved>(HandleLocalDecisionRemoved);
         messageBroker.Subscribe<KingdomPolicyChanged>(HandleLocalKingdomPolicyChanged);
@@ -64,10 +69,13 @@ public class ServerKingdomHandler : IHandler
             if (TryCreatePendingSettlementRestore(partyId, payload.SettlementId, out var pending))
             {
                 pendingKingdomCreationSettlements[payload.ControllerId] = pending;
-                KingdomCreationSettlementTracker.Track(pending.PartyId, pending.SettlementId);
+                settlementTracker.Track(pending.PartyId, pending.SettlementId);
             }
 
-            RestoreCreatingPartySettlement(partyId, payload.SettlementId);
+            RunSettlementMutation(() =>
+            {
+                RestoreCreatingPartySettlement(partyId, payload.SettlementId);
+            });
         }
 
         messageBroker.Publish(this, new CreateKingdom(payload.ControllerId, payload.KingdomName, payload.CultureId));
@@ -86,9 +94,12 @@ public class ServerKingdomHandler : IHandler
             settlementId = pending.SettlementId;
         }
 
-        RestoreCreatingPartySettlement(partyId, settlementId);
-        KingdomCreationSettlementTracker.Complete(partyId);
-        pendingKingdomCreationSettlements.Remove(payload.ControllerId);
+        RunSettlementMutation(() =>
+        {
+            RestoreCreatingPartySettlement(partyId, settlementId);
+            settlementTracker.Complete(partyId);
+            pendingKingdomCreationSettlements.Remove(payload.ControllerId);
+        });
 
         var message = new NetworkPlayerKingdomCreated(
             payload.ControllerId,
@@ -96,7 +107,8 @@ public class ServerKingdomHandler : IHandler
             payload.KingdomName,
             payload.ClanId,
             partyId,
-            settlementId);
+            settlementId,
+            payload.CultureId);
         network.SendAll(message);
     }
 
@@ -117,24 +129,36 @@ public class ServerKingdomHandler : IHandler
         if (string.IsNullOrWhiteSpace(partyId) || string.IsNullOrWhiteSpace(settlementId)) return;
         if (!objectManager.TryGetObject<MobileParty>(partyId, out var party)) return;
         if (!TryGetSettlement(settlementId, out var settlement)) return;
-        KingdomCreationSettlementTracker.TrackParty(party, partyId, settlement, settlementId);
+        settlementTracker.TrackParty(party, partyId, settlement, settlementId);
         if (party.CurrentSettlement == settlement) return;
 
-        using (new AllowedThread())
+        RunSettlementMutation(() =>
         {
-            try
+            using (new AllowedThread())
             {
-                party.CurrentSettlement = settlement;
+                try
+                {
+                    party.CurrentSettlement = settlement;
+                }
+                catch (NullReferenceException)
+                {
+                    party.SetCurrentSettlementDirectly(settlement);
+                }
             }
-            catch (global::System.NullReferenceException)
-            {
-                typeof(MobileParty)
-                    .GetField("_currentSettlement", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
-                    ?.SetValue(party, settlement);
-            }
-        }
+        });
 
         network.SendAll(new NetworkPartyEnterSettlement(settlementId, partyId));
+    }
+
+    private static void RunSettlementMutation(Action action)
+    {
+        if (!GameThread.Instance.IsInitialized)
+        {
+            action();
+            return;
+        }
+
+        GameThread.RunSafe(action, blocking: true, context: nameof(ServerKingdomHandler));
     }
 
     private bool TryGetSettlement(string settlementId, out Settlement settlement)
@@ -260,7 +284,6 @@ public class ServerKingdomHandler : IHandler
         kingdomId = kingdom?.StringId;
         return !string.IsNullOrWhiteSpace(kingdomId);
     }
-
 
     public void Dispose()
     {

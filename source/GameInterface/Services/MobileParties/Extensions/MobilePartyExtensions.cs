@@ -3,6 +3,7 @@ using Common.Logging;
 using GameInterface.Services.Players;
 using Serilog;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.MobileParties.Extensions;
 
@@ -49,5 +50,10 @@ public static class MobilePartyExtensions
         }
 
         return PlayerManager.TryGetControlledObjectInfo(party, out var _);
+    }
+
+    public static void SetCurrentSettlementDirectly(this MobileParty party, Settlement settlement)
+    {
+        party._currentSettlement = settlement;
     }
 }

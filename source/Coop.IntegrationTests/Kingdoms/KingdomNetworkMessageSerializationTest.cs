@@ -35,7 +35,8 @@ public class KingdomNetworkMessageSerializationTest
             "Real Kingdom",
             "Clan_Player",
             "main_party",
-            "town_1");
+            "town_1",
+            "empire");
 
         var copy = RoundTrip(original);
 
@@ -45,6 +46,7 @@ public class KingdomNetworkMessageSerializationTest
         Assert.Equal("Clan_Player", copy.ClanId);
         Assert.Equal("main_party", copy.PartyId);
         Assert.Equal("town_1", copy.SettlementId);
+        Assert.Equal("empire", copy.CultureId);
     }
 
     [Fact]

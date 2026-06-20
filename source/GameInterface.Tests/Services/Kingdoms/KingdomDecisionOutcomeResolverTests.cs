@@ -16,7 +16,7 @@ public class KingdomDecisionOutcomeResolverTests
     [InlineData(typeof(DeclareWarDecision), "DeclareWarDecisionOutcome", "ShouldWarBeDeclared")]
     [InlineData(typeof(MakePeaceKingdomDecision), "MakePeaceDecisionOutcome", "ShouldPeaceBeDeclared")]
     [InlineData(typeof(ExpelClanFromKingdomDecision), "ExpelClanDecisionOutcome", "ShouldBeExpelled")]
-    [InlineData(typeof(KingdomPolicyDecision), "PolicyDecisionOutcome", "<ShouldDecisionBeEnforced>k__BackingField")]
+    [InlineData(typeof(KingdomPolicyDecision), "PolicyDecisionOutcome", "ShouldDecisionBeEnforced")]
     [InlineData(typeof(SettlementClaimantPreliminaryDecision), "SettlementClaimantPreliminaryOutcome", "ShouldSettlementOwnerChange")]
     [InlineData(typeof(AcceptCallToWarAgreementDecision), "AcceptCallToWarAgreementDecisionOutcome", "ShouldAcceptCallToWar")]
     [InlineData(typeof(ProposeCallToWarAgreementDecision), "ProposeCallToWarAgreementDecisionOutcome", "ShouldCallToWar")]
@@ -29,7 +29,9 @@ public class KingdomDecisionOutcomeResolverTests
         var election = ObjectHelper.SkipConstructor<KingdomElection>();
         election._possibleOutcomes = new MBList<DecisionOutcome> { yesOutcome, noOutcome };
 
-        Assert.True(KingdomDecisionOutcomeResolver.TryGetOutcomeKey(noOutcome, null, out string outcomeKey));
+        var resolver = new KingdomDecisionOutcomeResolver();
+
+        Assert.True(resolver.TryGetOutcomeKey(noOutcome, null, out string outcomeKey));
         Assert.Contains($"{fieldName}=False", outcomeKey);
 
         var voteData = new KingdomDecisionVoteData(
@@ -41,7 +43,7 @@ public class KingdomDecisionOutcomeResolverTests
             true,
             outcomeKey);
 
-        Assert.True(KingdomDecisionOutcomeResolver.TryGetOutcome(voteData, election, null, out DecisionOutcome resolvedOutcome));
+        Assert.True(resolver.TryGetOutcome(voteData, election, null, out DecisionOutcome resolvedOutcome));
         Assert.Same(noOutcome, resolvedOutcome);
     }
 

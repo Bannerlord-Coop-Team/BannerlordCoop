@@ -11,7 +11,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
         private float? randomFloat;
 
         public float RandomFloat
-        {   
+        {
             get
             {
                 if (!randomFloat.HasValue)
@@ -19,7 +19,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
                     randomFloat = MBRandom.RandomFloat;
                 }
                 return randomFloat.Value;
-            } 
+            }
         }
 
         public CoopKingdomElection(KingdomDecision decision, float? randomFloat = null) : base(decision)
@@ -59,7 +59,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
                 this.IsCancelled = true;
             }
         }
-        
+
         // TODO : If there are multiple clients in the same clan, only the leader of the clan should vote on issues
         // This logic is intended to support that
         public void ApplyClanVote(Clan clan, int outcomeIndex, Supporter.SupportWeights supportWeight, bool isAbstain)

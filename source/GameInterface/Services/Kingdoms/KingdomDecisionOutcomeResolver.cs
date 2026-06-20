@@ -2,62 +2,57 @@ using GameInterface.Services.Kingdoms.Data;
 using GameInterface.Services.ObjectManager;
 using System;
 using System.Reflection;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Kingdoms
 {
-    internal static class KingdomDecisionOutcomeResolver
+    public interface IKingdomDecisionOutcomeResolver
     {
-        private static readonly string[] BooleanOutcomeFieldNames =
-        {
-            "ShouldWarBeDeclared",
-            "ShouldPeaceBeDeclared",
-            "ShouldBeExpelled",
-            "<ShouldDecisionBeEnforced>k__BackingField",
-            "ShouldSettlementOwnerChange",
-            "ShouldAcceptCallToWar",
-            "ShouldCallToWar",
-            "ShouldAllianceBeStarted",
-            "ShouldTradeAgreementStart",
-        };
+        bool TryGetOutcomeKey(DecisionOutcome outcome, IObjectManager objectManager, out string outcomeKey);
+        bool TryGetOutcome(
+            KingdomDecisionVoteData voteData,
+            KingdomElection election,
+            IObjectManager objectManager,
+            out DecisionOutcome outcome);
+    }
 
+    internal class KingdomDecisionOutcomeResolver : IKingdomDecisionOutcomeResolver
+    {
         private static readonly string[] ObjectOutcomeFieldNames =
         {
             "Clan",
             "King",
         };
 
-        public static bool TryGetOutcomeKey(DecisionOutcome outcome, IObjectManager objectManager, out string outcomeKey)
+        public bool TryGetOutcomeKey(DecisionOutcome outcome, IObjectManager objectManager, out string outcomeKey)
         {
             outcomeKey = null;
             if (outcome == null) return false;
 
             Type outcomeType = outcome.GetType();
-            foreach (string fieldName in BooleanOutcomeFieldNames)
+            if (TryGetBooleanOutcome(outcome, out string fieldName, out bool value))
             {
-                FieldInfo field = outcomeType.GetField(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                if (field?.FieldType != typeof(bool)) continue;
-
-                outcomeKey = $"{outcomeType.FullName}:{fieldName}={field.GetValue(outcome)}";
+                outcomeKey = $"{outcomeType.FullName}:{fieldName}={value}";
                 return true;
             }
 
-            foreach (string fieldName in ObjectOutcomeFieldNames)
+            foreach (string objectFieldName in ObjectOutcomeFieldNames)
             {
-                FieldInfo field = outcomeType.GetField(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                FieldInfo field = outcomeType.GetField(objectFieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
                 if (field == null) continue;
-                object value = field.GetValue(outcome);
-                if (!TryGetObjectId(value, objectManager, out string objectId)) continue;
+                object fieldValue = field.GetValue(outcome);
+                if (!TryGetObjectId(fieldValue, objectManager, out string objectId)) continue;
 
-                outcomeKey = $"{outcomeType.FullName}:{fieldName}={objectId}";
+                outcomeKey = $"{outcomeType.FullName}:{objectFieldName}={objectId}";
                 return true;
             }
 
             return false;
         }
 
-        public static bool TryGetOutcome(
+        public bool TryGetOutcome(
             KingdomDecisionVoteData voteData,
             KingdomElection election,
             IObjectManager objectManager,
@@ -82,6 +77,53 @@ namespace GameInterface.Services.Kingdoms
 
             outcome = election._possibleOutcomes[voteData.OutcomeIndex];
             return true;
+        }
+
+        private static bool TryGetBooleanOutcome(DecisionOutcome outcome, out string fieldName, out bool value)
+        {
+            switch (outcome)
+            {
+                case DeclareWarDecision.DeclareWarDecisionOutcome declareWarOutcome:
+                    fieldName = nameof(DeclareWarDecision.DeclareWarDecisionOutcome.ShouldWarBeDeclared);
+                    value = declareWarOutcome.ShouldWarBeDeclared;
+                    return true;
+                case MakePeaceKingdomDecision.MakePeaceDecisionOutcome makePeaceOutcome:
+                    fieldName = nameof(MakePeaceKingdomDecision.MakePeaceDecisionOutcome.ShouldPeaceBeDeclared);
+                    value = makePeaceOutcome.ShouldPeaceBeDeclared;
+                    return true;
+                case ExpelClanFromKingdomDecision.ExpelClanDecisionOutcome expelClanOutcome:
+                    fieldName = nameof(ExpelClanFromKingdomDecision.ExpelClanDecisionOutcome.ShouldBeExpelled);
+                    value = expelClanOutcome.ShouldBeExpelled;
+                    return true;
+                case KingdomPolicyDecision.PolicyDecisionOutcome policyOutcome:
+                    fieldName = nameof(KingdomPolicyDecision.PolicyDecisionOutcome.ShouldDecisionBeEnforced);
+                    value = policyOutcome.ShouldDecisionBeEnforced;
+                    return true;
+                case SettlementClaimantPreliminaryDecision.SettlementClaimantPreliminaryOutcome settlementClaimantOutcome:
+                    fieldName = nameof(SettlementClaimantPreliminaryDecision.SettlementClaimantPreliminaryOutcome.ShouldSettlementOwnerChange);
+                    value = settlementClaimantOutcome.ShouldSettlementOwnerChange;
+                    return true;
+                case AcceptCallToWarAgreementDecision.AcceptCallToWarAgreementDecisionOutcome acceptCallToWarOutcome:
+                    fieldName = nameof(AcceptCallToWarAgreementDecision.AcceptCallToWarAgreementDecisionOutcome.ShouldAcceptCallToWar);
+                    value = acceptCallToWarOutcome.ShouldAcceptCallToWar;
+                    return true;
+                case ProposeCallToWarAgreementDecision.ProposeCallToWarAgreementDecisionOutcome proposeCallToWarOutcome:
+                    fieldName = nameof(ProposeCallToWarAgreementDecision.ProposeCallToWarAgreementDecisionOutcome.ShouldCallToWar);
+                    value = proposeCallToWarOutcome.ShouldCallToWar;
+                    return true;
+                case StartAllianceDecision.StartAllianceDecisionOutcome startAllianceOutcome:
+                    fieldName = nameof(StartAllianceDecision.StartAllianceDecisionOutcome.ShouldAllianceBeStarted);
+                    value = startAllianceOutcome.ShouldAllianceBeStarted;
+                    return true;
+                case TradeAgreementDecision.TradeAgreementDecisionOutcome tradeAgreementOutcome:
+                    fieldName = nameof(TradeAgreementDecision.TradeAgreementDecisionOutcome.ShouldTradeAgreementStart);
+                    value = tradeAgreementOutcome.ShouldTradeAgreementStart;
+                    return true;
+                default:
+                    fieldName = null;
+                    value = false;
+                    return false;
+            }
         }
 
         private static bool TryGetObjectId(object value, IObjectManager objectManager, out string objectId)

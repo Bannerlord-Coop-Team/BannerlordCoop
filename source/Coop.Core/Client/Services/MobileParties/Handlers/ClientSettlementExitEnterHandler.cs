@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Common;
 using Common.Messaging;
 using Common.Network;
@@ -25,15 +25,22 @@ public class ClientSettlementExitEnterHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly ISettlementInterface settlementInterface;
+    private readonly IKingdomCreationSettlementTracker settlementTracker;
 
     private DateTime lastRequestSentUtc = DateTime.MinValue;
 
-    public ClientSettlementExitEnterHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager, ISettlementInterface settlementInterface)
+    public ClientSettlementExitEnterHandler(
+        IMessageBroker messageBroker,
+        INetwork network,
+        IObjectManager objectManager,
+        ISettlementInterface settlementInterface,
+        IKingdomCreationSettlementTracker settlementTracker)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.settlementInterface = settlementInterface;
+        this.settlementTracker = settlementTracker;
         messageBroker.Subscribe<StartSettlementEncounterAttempted>(Handle);
         messageBroker.Subscribe<EndSettlementEncounterAttempted>(Handle);
         messageBroker.Subscribe<NetworkEndSettlementEncounter>(Handle);
@@ -42,8 +49,6 @@ public class ClientSettlementExitEnterHandler : IHandler
         messageBroker.Subscribe<NetworkPartyEnterSettlement>(Handle);
         messageBroker.Subscribe<NetworkPartyLeaveSettlement>(Handle);
     }
-
-
 
     public void Dispose()
     {
@@ -55,7 +60,6 @@ public class ClientSettlementExitEnterHandler : IHandler
         messageBroker.Unsubscribe<NetworkPartyEnterSettlement>(Handle);
         messageBroker.Unsubscribe<NetworkPartyLeaveSettlement>(Handle);
     }
-
 
     private void Handle(MessagePayload<StartSettlementEncounterAttempted> obj)
     {
@@ -85,7 +89,9 @@ public class ClientSettlementExitEnterHandler : IHandler
 
         if (!objectManager.TryGetIdWithLogging(payload.Party, out var partyId)) return;
 
-        if (KingdomCreationSettlementTracker.TryConsumeLeave(payload.Party, partyId))
+        // Kingdom creation briefly restores settlement context after native UI churn; that synthetic leave
+        // must not be echoed back to the server as a real encounter exit.
+        if (settlementTracker.TryConsumeLeave(payload.Party, partyId))
         {
             return;
         }
@@ -119,6 +125,13 @@ public class ClientSettlementExitEnterHandler : IHandler
         {
             using (new AllowedThread())
             {
+                var mainParty = MobileParty.MainParty;
+                objectManager.TryGetId(mainParty, out var partyId);
+                if (settlementTracker.TryConsumeLeave(mainParty, partyId))
+                {
+                    return;
+                }
+
                 settlementInterface.EndSettlementEncounter();
             }
         });

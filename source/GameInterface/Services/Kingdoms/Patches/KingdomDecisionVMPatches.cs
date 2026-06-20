@@ -1,3 +1,4 @@
+using GameInterface;
 using GameInterface.Services.Kingdoms;
 using HarmonyLib;
 using System;
@@ -21,7 +22,8 @@ namespace GameInterface.Services.Kingdoms.Patches
         [HarmonyPrefix]
         private static bool HandleDecisionPrefix(KingdomDecisionsVM __instance, KingdomDecision __0)
         {
-            if (!KingdomDecisionVoteManager.ShouldSuppressLocalDecision(__0)) return true;
+            if (!TryGetVoteManager(out var voteManager)) return true;
+            if (!voteManager.ShouldSuppressLocalDecision(__0)) return true;
 
             __instance._examinedDecisionsSinceInit.Add(__0);
             return false;
@@ -31,14 +33,23 @@ namespace GameInterface.Services.Kingdoms.Patches
         [HarmonyPostfix]
         private static void HandleDecisionPostfix(KingdomDecisionsVM __instance)
         {
-            KingdomDecisionVoteManager.RegisterDecisionItem(__instance.CurrentDecision);
+            if (!TryGetVoteManager(out var voteManager)) return;
+
+            voteManager.RegisterDecisionItem(__instance.CurrentDecision);
         }
 
         [HarmonyPatch(nameof(KingdomDecisionsVM.RefreshWith))]
         [HarmonyPostfix]
         private static void RefreshWithPostfix(KingdomDecisionsVM __instance)
         {
-            KingdomDecisionVoteManager.RegisterDecisionItem(__instance.CurrentDecision);
+            if (!TryGetVoteManager(out var voteManager)) return;
+
+            voteManager.RegisterDecisionItem(__instance.CurrentDecision);
+        }
+
+        internal static bool TryGetVoteManager(out IKingdomDecisionVoteManager voteManager)
+        {
+            return ContainerProvider.TryResolve(out voteManager);
         }
     }
 
@@ -49,16 +60,19 @@ namespace GameInterface.Services.Kingdoms.Patches
         [HarmonyPostfix]
         private static void OnChangeVotePostfix(DecisionOptionVM __0)
         {
-            KingdomDecisionVoteManager.TryPublishVote(__0);
+            if (!KingdomDecisionsVMPatches.TryGetVoteManager(out var voteManager)) return;
+
+            voteManager.TryPublishVote(__0);
         }
 
         [HarmonyPatch(nameof(DecisionItemBaseVM.ExecuteFinalSelection))]
         [HarmonyPrefix]
         private static bool ExecuteFinalSelectionPrefix(DecisionItemBaseVM __instance)
         {
-            if (!KingdomDecisionVoteManager.ShouldBlockLocalResolution(__instance)) return true;
+            if (!KingdomDecisionsVMPatches.TryGetVoteManager(out var voteManager)) return true;
+            if (!voteManager.ShouldBlockLocalResolution(__instance)) return true;
 
-            KingdomDecisionVoteManager.TryPublishFinalVote(__instance);
+            voteManager.TryPublishFinalVote(__instance);
             return false;
         }
 
@@ -66,7 +80,9 @@ namespace GameInterface.Services.Kingdoms.Patches
         [HarmonyPostfix]
         private static void OnFinalizePostfix(DecisionItemBaseVM __instance)
         {
-            KingdomDecisionVoteManager.UnregisterDecisionItem(__instance);
+            if (!KingdomDecisionsVMPatches.TryGetVoteManager(out var voteManager)) return;
+
+            voteManager.UnregisterDecisionItem(__instance);
         }
     }
 
@@ -77,7 +93,9 @@ namespace GameInterface.Services.Kingdoms.Patches
         [HarmonyPostfix]
         private static void OnSupportStrengthChangePostfix(DecisionOptionVM __instance)
         {
-            KingdomDecisionVoteManager.TryPublishVote(__instance);
+            if (!KingdomDecisionsVMPatches.TryGetVoteManager(out var voteManager)) return;
+
+            voteManager.TryPublishVote(__instance);
         }
     }
 
@@ -102,13 +120,15 @@ namespace GameInterface.Services.Kingdoms.Patches
         [HarmonyPrefix]
         internal static bool ExecuteProposeOrDisavowPrefix(KingdomPoliciesVM __instance)
         {
-            return !KingdomDecisionVoteManager.ShouldDisableResolveDecision(__instance?._currentItemsUnresolvedDecision);
+            return !KingdomDecisionsVMPatches.TryGetVoteManager(out var voteManager) ||
+                   !voteManager.ShouldDisableResolveDecision(__instance?._currentItemsUnresolvedDecision);
         }
 
         internal static void DisablePolicyResolveIfAlreadyVoted(KingdomPoliciesVM policiesVm)
         {
             if (policiesVm == null) return;
-            if (!KingdomDecisionVoteManager.ShouldDisableResolveDecision(policiesVm._currentItemsUnresolvedDecision)) return;
+            if (!KingdomDecisionsVMPatches.TryGetVoteManager(out var voteManager)) return;
+            if (!voteManager.ShouldDisableResolveDecision(policiesVm._currentItemsUnresolvedDecision)) return;
 
             policiesVm.CanProposeOrDisavowPolicy = false;
             if (policiesVm.DoneHint != null)
@@ -160,7 +180,8 @@ namespace GameInterface.Services.Kingdoms.Patches
                 if (resolveDecisionIndex >= resolveDecisions.Count) return;
 
                 KingdomDecision resolveDecision = resolveDecisions[resolveDecisionIndex++];
-                if (!KingdomDecisionVoteManager.ShouldDisableResolveDecision(resolveDecision)) continue;
+                if (!KingdomDecisionsVMPatches.TryGetVoteManager(out var voteManager)) return;
+                if (!voteManager.ShouldDisableResolveDecision(resolveDecision)) continue;
 
                 KingdomTabResolveDecisionPatches.DisableAction(action);
             }

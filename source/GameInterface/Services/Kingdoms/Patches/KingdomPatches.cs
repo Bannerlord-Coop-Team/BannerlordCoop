@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Util;
+using GameInterface;
 using GameInterface.Extentions;
 using GameInterface.Policies;
 using GameInterface.Services.Kingdoms;
@@ -30,13 +31,13 @@ namespace GameInterface.Services.Kingdoms.Patches
 
             if (ModInformation.IsClient)
             {
-                float clientRandomNumber = ModifiedAddDecision(__instance, kingdomDecision, ignoreInfluenceCost);
+                float clientRandomNumber = ModifiedAddDecision(__instance, kingdomDecision, ignoreInfluenceCost, applyInfluenceCost: false);
                 MessageBroker.Instance.Publish(__instance,
                     new DecisionAdded(__instance, kingdomDecision.ToKingdomDecisionData(), ignoreInfluenceCost, clientRandomNumber));
                 return false;
             }
 
-            float randomNumber = ModifiedAddDecision(__instance, kingdomDecision, ignoreInfluenceCost);
+            float randomNumber = ModifiedAddDecision(__instance, kingdomDecision, ignoreInfluenceCost, applyInfluenceCost: true);
             MessageBroker.Instance.Publish(__instance,
                 new DecisionAdded(__instance, kingdomDecision.ToKingdomDecisionData(), ignoreInfluenceCost, randomNumber));
             return false;
@@ -46,18 +47,20 @@ namespace GameInterface.Services.Kingdoms.Patches
         {
             GameThread.Run(() =>
             {
-                using (new AllowedThread())
-                {
-                    ModifiedAddDecision(kingdom, kingdomDecision, ignoreInfluenceCost, randomFloat);
-                }
+                ModifiedAddDecision(kingdom, kingdomDecision, ignoreInfluenceCost, randomFloat, ModInformation.IsServer);
             }, true); 
         }
 
-        private static float ModifiedAddDecision(Kingdom __instance, KingdomDecision kingdomDecision, bool ignoreInfluenceCost, float? randomFloat = null)
+        private static float ModifiedAddDecision(
+            Kingdom __instance,
+            KingdomDecision kingdomDecision,
+            bool ignoreInfluenceCost,
+            float? randomFloat = null,
+            bool applyInfluenceCost = true)
         {
             KingdomRegistry.EnsureRuntimeCollections(__instance);
 
-            if (!ignoreInfluenceCost)
+            if (applyInfluenceCost && !ignoreInfluenceCost)
             {
                 Clan proposerClan = kingdomDecision.ProposerClan;
                 int influenceCost = kingdomDecision.GetInfluenceCost(proposerClan);
@@ -75,13 +78,17 @@ namespace GameInterface.Services.Kingdoms.Patches
             }
 
             __instance._unresolvedDecisions.Add(kingdomDecision);
-            KingdomDecisionVoteManager.RegisterDecision(kingdomDecision);
+            if (ContainerProvider.TryResolve<IKingdomDecisionVoteManager>(out var decisionVoteManager))
+            {
+                decisionVoteManager.RegisterDecision(kingdomDecision);
+            }
             return default;
         }
 
         private static bool IsCoopPlayerInvolved(KingdomDecision kingdomDecision)
         {
-            if (KingdomDecisionVoteManager.HasEligiblePlayerClan(kingdomDecision))
+            if (ContainerProvider.TryResolve<IKingdomDecisionVoteManager>(out var decisionVoteManager) &&
+                decisionVoteManager.HasEligiblePlayerClan(kingdomDecision))
             {
                 return true;
             }
@@ -135,7 +142,7 @@ namespace GameInterface.Services.Kingdoms.Patches
 
             // Vanilla AddPolicy is an idempotent no-op when the policy is already active; only
             // announce a change that will actually take effect.
-            if (!__instance.ActivePolicies.Contains(policy))
+            if (!__instance._activePolicies.Contains(policy))
             {
                 MessageBroker.Instance.Publish(__instance, new KingdomPolicyChanged(__instance, policy, isAdd: true));
             }
@@ -154,7 +161,7 @@ namespace GameInterface.Services.Kingdoms.Patches
 
             // Vanilla RemovePolicy is an idempotent no-op when the policy is not active; only
             // announce a change that will actually take effect.
-            if (__instance.ActivePolicies.Contains(policy))
+            if (__instance._activePolicies.Contains(policy))
             {
                 MessageBroker.Instance.Publish(__instance, new KingdomPolicyChanged(__instance, policy, isAdd: false));
             }

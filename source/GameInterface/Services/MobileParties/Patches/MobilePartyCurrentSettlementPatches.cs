@@ -1,3 +1,4 @@
+using GameInterface;
 using GameInterface.Services.Kingdoms;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Party;
@@ -13,7 +14,8 @@ internal static class MobilePartyCurrentSettlementPatches
     private static bool CurrentSettlementPrefix(MobileParty __instance, ref Settlement value)
     {
         if (value != null) return true;
-        if (!KingdomCreationSettlementTracker.TryGetTrackedSettlement(__instance, out _)) return true;
+        if (!ContainerProvider.TryResolve<IKingdomCreationSettlementTracker>(out var settlementTracker)) return true;
+        if (!settlementTracker.TryGetTrackedSettlement(__instance, out _)) return true;
 
         return false;
     }

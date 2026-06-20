@@ -104,7 +104,21 @@ public class KingdomDebugCommand
         return container.TryResolve(out playerManager);
     }
 
+    private static bool TryGetKingdomMembershipState(out IKingdomMembershipState kingdomMembershipState)
+    {
+        kingdomMembershipState = null;
+        if (ContainerProvider.TryGetContainer(out var container) == false) return false;
 
+        return container.TryResolve(out kingdomMembershipState);
+    }
+
+    private static bool TryGetKingdomDecisionVoteManager(out IKingdomDecisionVoteManager voteManager)
+    {
+        voteManager = null;
+        if (ContainerProvider.TryGetContainer(out var container) == false) return false;
+
+        return container.TryResolve(out voteManager);
+    }
 
     // coop.debug.kingdom.list
     /// <summary>
@@ -154,6 +168,11 @@ public class KingdomDebugCommand
             return "Unable to resolve ObjectManager";
         }
 
+        if (TryGetKingdomMembershipState(out var kingdomMembershipState) == false)
+        {
+            return "Unable to resolve KingdomMembershipState";
+        }
+
         string controllerId = args[0];
         string kingdomId = args[1];
 
@@ -185,7 +204,7 @@ public class KingdomDebugCommand
 
         // Server-authoritative apply: run with patches live (no AllowedThread) so membership
         // and fief collection changes replicate to clients.
-        KingdomMembershipState.MoveClanToKingdom(
+        kingdomMembershipState.MoveClanToKingdom(
             previousKingdom,
             kingdom,
             clan,
@@ -305,13 +324,18 @@ public class KingdomDebugCommand
             return "Unable to resolve PlayerManager";
         }
 
+        if (TryGetKingdomDecisionVoteManager(out var voteManager) == false)
+        {
+            return "Unable to resolve KingdomDecisionVoteManager";
+        }
+
         if (objectManager.TryGetObject(args[0], out Kingdom kingdom) == false)
         {
             return $"ID: '{args[0]}' not found";
         }
 
         IReadOnlyList<KingdomDecisionVoteManager.KingdomDecisionDebugInfo> decisionInfos =
-            KingdomDecisionVoteManager.GetDecisionDebugInfo(kingdom);
+            voteManager.GetDecisionDebugInfo(kingdom);
 
         StringBuilder stringBuilder = new StringBuilder();
         stringBuilder.AppendLine($"Active decisions of Kingdom: {kingdom.Name} ({kingdom.StringId})");
@@ -441,7 +465,12 @@ public class KingdomDebugCommand
             return message;
         }
 
-        return KingdomDecisionVoteManager.TryResolveDecision(decision, force: true)
+        if (TryGetKingdomDecisionVoteManager(out var voteManager) == false)
+        {
+            return "Unable to resolve KingdomDecisionVoteManager";
+        }
+
+        return voteManager.TryResolveDecision(decision, force: true)
             ? $"Resolved {decision.GetType().Name} through player vote manager."
             : $"Could not resolve {decision.GetType().Name} through player vote manager.";
     }

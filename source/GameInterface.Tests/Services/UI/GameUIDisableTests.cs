@@ -9,7 +9,7 @@ namespace GameInterface.Tests.Services.UI;
 public class GameUIDisableTests
 {
     [Fact]
-    public void KingdomState_IsAllowedOnClientAndServer()
+    public void KingdomState_IsAllowedOnClientOnly()
     {
         var kingdomState = ObjectHelper.SkipConstructor<KingdomState>();
         bool originalIsServer = ModInformation.IsServer;
@@ -20,7 +20,7 @@ public class GameUIDisableTests
             Assert.True(GameUIDisable.PushStatePatch(kingdomState));
 
             ModInformation.IsServer = true;
-            Assert.True(GameUIDisable.PushStatePatch(kingdomState));
+            Assert.False(GameUIDisable.PushStatePatch(kingdomState));
         }
         finally
         {

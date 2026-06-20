@@ -6,14 +6,20 @@ using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Kingdoms;
 
-internal static class KingdomMembershipState
+public interface IKingdomMembershipState
 {
-    public static void EnsureClanInKingdom(Kingdom kingdom, Clan clan, bool publishCollectionChanges)
+    void EnsureClanInKingdom(Kingdom kingdom, Clan clan, bool publishCollectionChanges);
+    void MoveClanToKingdom(Kingdom previousKingdom, Kingdom kingdom, Clan clan, bool publishCollectionChanges);
+}
+
+internal class KingdomMembershipState : IKingdomMembershipState
+{
+    public void EnsureClanInKingdom(Kingdom kingdom, Clan clan, bool publishCollectionChanges)
     {
         MoveClanToKingdom(clan?.Kingdom, kingdom, clan, publishCollectionChanges);
     }
 
-    public static void MoveClanToKingdom(
+    public void MoveClanToKingdom(
         Kingdom previousKingdom,
         Kingdom kingdom,
         Clan clan,

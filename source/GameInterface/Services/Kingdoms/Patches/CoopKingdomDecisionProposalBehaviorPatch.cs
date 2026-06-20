@@ -1,5 +1,6 @@
 using Common;
 using Common.Logging;
+using GameInterface;
 using GameInterface.Extentions;
 using HarmonyLib;
 using Serilog;
@@ -161,7 +162,8 @@ namespace GameInterface.Services.Kingdoms.Patches
                         }
                         else if (decision.TriggerTime.IsPast)
                         {
-                            if (KingdomDecisionVoteManager.TryResolveDecision(decision, force: true))
+                            if (ContainerProvider.TryResolve<IKingdomDecisionVoteManager>(out var voteManager) &&
+                                voteManager.TryResolveDecision(decision, force: true))
                             {
                                 continue;
                             }
