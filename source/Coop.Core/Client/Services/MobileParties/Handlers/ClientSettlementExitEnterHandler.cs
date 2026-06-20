@@ -89,8 +89,7 @@ public class ClientSettlementExitEnterHandler : IHandler
 
         if (!objectManager.TryGetIdWithLogging(payload.Party, out var partyId)) return;
 
-        // Kingdom creation briefly restores settlement context after native UI churn; that synthetic leave
-        // must not be echoed back to the server as a real encounter exit.
+        // Ignore the synthetic leave caused by kingdom creation UI cleanup.
         if (settlementTracker.TryConsumeLeave(payload.Party, partyId))
         {
             return;
