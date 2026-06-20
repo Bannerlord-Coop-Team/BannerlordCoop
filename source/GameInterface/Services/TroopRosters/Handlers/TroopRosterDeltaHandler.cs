@@ -13,21 +13,21 @@ using TaleWorlds.CampaignSystem.Roster;
 namespace GameInterface.Services.TroopRosters.Handlers;
 
 /// <summary>
-/// Replicates TroopRoster changes as identity-keyed per-operation deltas (the ItemRoster pattern) — the
-/// alternative to the whole-roster snapshot. On the authority each roster mutation publishes a local
-/// event carrying the SERVER index; this handler resolves the element's identity from the server's
-/// (always-aligned) roster and sends a message keyed by that identity, never by array index. The client
-/// applies it through the same vanilla mutators, found by identity, so it stays correct regardless of the
-/// client roster's layout. A positive AddCounts creates the element if it is missing (vanilla AddToCounts
-/// find-or-creates and keeps the cached totals correct); the absolute Set deltas require the element to
-/// already exist (its create is its own earlier, reliably-ordered delta) and are skipped otherwise, since
-/// minting a placeholder here would corrupt the roster's cached totals and be wiped by RemoveZeroCounts.
+/// Replicates TroopRoster changes as identity-keyed per-operation deltas (the ItemRoster pattern). On the
+/// authority each roster mutation publishes a local event carrying the SERVER index; this handler resolves
+/// the element's identity from the server's (always-aligned) roster and sends a message keyed by that
+/// identity, never by array index. The client applies it through the same vanilla mutators, found by
+/// identity, so it stays correct regardless of the client roster's layout. A positive AddCounts creates the
+/// element if it is missing (vanilla AddToCounts find-or-creates and keeps the cached totals correct); the
+/// absolute Set deltas require the element to already exist (its create is its own earlier, reliably-ordered
+/// delta) and are skipped otherwise, since minting a placeholder here would corrupt the roster's cached
+/// totals and be wiped by RemoveZeroCounts.
 /// </summary>
 /// <remarks>
-/// No array index crosses the wire, so the index-out-of-range storm the per-index sync caused cannot
-/// recur. Messages send immediately on the authority's own patches (no per-frame coalescer pump), so
-/// unlike the snapshot this also replicates on a headless host. Positional reorders
-/// (ShiftTroopToIndex/SwapTroopsAtIndices) are display ordering and are intentionally not synced.
+/// No array index crosses the wire, so it cannot land out of range on an under-populated client roster.
+/// Messages send immediately on the authority's own patches, so it replicates on a headless host.
+/// Positional reorders (ShiftTroopToIndex/SwapTroopsAtIndices) are display ordering and are intentionally
+/// not synced.
 /// </remarks>
 internal class TroopRosterDeltaHandler : IHandler
 {

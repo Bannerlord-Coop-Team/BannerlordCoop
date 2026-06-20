@@ -12,8 +12,7 @@ namespace GameInterface.Services.TroopRosters.Messages;
 /// </summary>
 /// <remarks>
 /// <see cref="IsHero"/> is true when <see cref="CharacterId"/> is a Hero id (a hero serving in the
-/// roster), false when it is a basic troop's CharacterObject id, mirroring how the whole-roster snapshot
-/// resolved elements (a hero's CharacterObject is not reliably id-registered).
+/// roster), false when it is a basic troop's CharacterObject id.
 /// </remarks>
 [ProtoContract(SkipConstructor = true)]
 internal readonly struct NetworkTroopRosterAddCounts : ICommand
