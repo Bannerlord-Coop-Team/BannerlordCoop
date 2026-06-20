@@ -188,7 +188,6 @@ public abstract class EnvironmentInstance : IDisposable
                 Monitor.Exit(GameInstance.@lock);
             }
         }
-
     }
 
     private class PatchScope : IDisposable

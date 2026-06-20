@@ -118,7 +118,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Assert.Equal(created.KingdomName, notification.KingdomName);
         Assert.Equal(created.ClanId, notification.ClanId);
         Assert.Equal(created.CultureId, notification.CultureId);
-
     }
 
     [Fact]
@@ -164,7 +163,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                 AssertKingdomContainsFief(client.ObjectManager, kingdom, fiefId);
             });
         }
-
     }
 
     [Fact]
@@ -214,7 +212,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.Contains(clan, newKingdom.Clans);
             Assert.Contains(fief, newKingdom.Fiefs);
         });
-
     }
 
     [Fact]
@@ -1206,7 +1203,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
             Assert.Same(settlement, party.CurrentSettlement);
         });
-
     }
 
     [Fact]
