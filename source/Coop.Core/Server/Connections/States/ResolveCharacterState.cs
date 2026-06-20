@@ -4,10 +4,12 @@ using Common.Network;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
 using Serilog;
 using System.Linq;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 
 namespace Coop.Core.Server.Connections.States;
@@ -24,6 +26,7 @@ public class ResolveCharacterState : ConnectionStateBase
     private readonly INetwork network;
     private readonly IModuleValidator moduleValidator;
     private readonly IPlayerManager playerManager;
+    private readonly IObjectManager objectManager;
     private readonly IModuleInfoProvider moduleInfoProvider;
 
     public ResolveCharacterState(IConnectionLogic connectionLogic,
@@ -31,6 +34,7 @@ public class ResolveCharacterState : ConnectionStateBase
         INetwork network,
         IModuleValidator moduleValidator,
         IPlayerManager playerManager,
+        IObjectManager objectManager,
         IModuleInfoProvider moduleInfoProvider)
         : base(connectionLogic)
     {
@@ -38,6 +42,7 @@ public class ResolveCharacterState : ConnectionStateBase
         this.network = network;
         this.moduleValidator = moduleValidator;
         this.playerManager = playerManager;
+        this.objectManager = objectManager;
         this.moduleInfoProvider = moduleInfoProvider;
 
         messageBroker.Subscribe<NetworkClientValidate>(Handle_ClientValidate);
@@ -67,7 +72,8 @@ public class ResolveCharacterState : ConnectionStateBase
         var peer = obj.Who as NetPeer;
         if (peer != ConnectionLogic.Peer) return;
 
-        if (playerManager.TryGetPlayer(obj.What.PlayerId, out var player))
+        if (playerManager.TryGetPlayer(obj.What.PlayerId, out var player) &&
+            objectManager.TryGetObjectWithLogging(player.HeroId, out Hero _)) // If new save, player hero will not exist
         {
             network.SendImmediate(peer, new NetworkClientValidated(true, player));
             ConnectionLogic.TransferSave();
