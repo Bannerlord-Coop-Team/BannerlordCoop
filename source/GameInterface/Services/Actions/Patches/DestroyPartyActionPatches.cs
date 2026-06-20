@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.MobileParties.Extensions;
+﻿using Common;
+using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -14,16 +15,19 @@ internal class DestroyPartyActionPatches
     [HarmonyPrefix]
     public static bool ApplyInternalPrefix(PartyBase destroyerParty, MobileParty destroyedParty)
     {
-        if (!destroyedParty.IsPlayerParty())
+        GameThread.RunSafe(() =>
         {
-            if (destroyedParty.IsCaravan && destroyedParty.Party.Owner != null && destroyedParty.Party.Owner.GetPerkValue(DefaultPerks.Trade.InsurancePlans))
+            if (!destroyedParty.IsPlayerParty())
             {
-                GiveGoldAction.ApplyBetweenCharacters(null, destroyedParty.Party.Owner, (int)DefaultPerks.Trade.InsurancePlans.PrimaryBonus, false);
+                if (destroyedParty.IsCaravan && destroyedParty.Party.Owner != null && destroyedParty.Party.Owner.GetPerkValue(DefaultPerks.Trade.InsurancePlans))
+                {
+                    GiveGoldAction.ApplyBetweenCharacters(null, destroyedParty.Party.Owner, (int)DefaultPerks.Trade.InsurancePlans.PrimaryBonus, false);
+                }
+                CampaignEventDispatcher.Instance.OnMobilePartyDestroyed(destroyedParty, destroyerParty);
+                CampaignEventDispatcher.Instance.OnMapInteractableDestroyed(destroyedParty.Party);
+                destroyedParty.RemoveParty();
             }
-            CampaignEventDispatcher.Instance.OnMobilePartyDestroyed(destroyedParty, destroyerParty);
-            CampaignEventDispatcher.Instance.OnMapInteractableDestroyed(destroyedParty.Party);
-            destroyedParty.RemoveParty();
-        }
+        });
 
         return false;
     }

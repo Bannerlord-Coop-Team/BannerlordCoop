@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Clans.Messages;
@@ -86,27 +87,30 @@ internal class PartyScreenHelperHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
         if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.NewLeaderHeroId, out var newLeaderHero)) return;
 
-        int partyGoldLowerThreshold = Campaign.Current.Models.ClanFinanceModel.PartyGoldLowerThreshold;
-        if (newLeaderHero.Gold < partyGoldLowerThreshold)
+        GameThread.RunSafe(() =>
         {
-            GiveGoldAction.ApplyBetweenCharacters(mainHero, newLeaderHero, partyGoldLowerThreshold - newLeaderHero.Gold, false);
-        }
-        MobileParty mobileParty = MobilePartyHelper.CreateNewClanMobileParty(newLeaderHero, newLeaderHero.Clan);
-        foreach (var troopRosterElement in troopRosterInterface.UnpackTroopRosterData(obj.What.LeftMemberRosterData))
-        {
-            if (troopRosterElement.Character != newLeaderHero.CharacterObject)
+            int partyGoldLowerThreshold = Campaign.Current.Models.ClanFinanceModel.PartyGoldLowerThreshold;
+            if (newLeaderHero.Gold < partyGoldLowerThreshold)
             {
-                mobileParty.MemberRoster.Add(troopRosterElement);
-                //rightOwnerParty.MemberRoster.AddToCounts(troopRosterElement.Character, -troopRosterElement.Number, false, -troopRosterElement.WoundedNumber, -troopRosterElement.Xp, true, -1);
+                GiveGoldAction.ApplyBetweenCharacters(mainHero, newLeaderHero, partyGoldLowerThreshold - newLeaderHero.Gold, false);
             }
-        }
-        foreach (var troopRosterElement in troopRosterInterface.UnpackTroopRosterData(obj.What.LeftPrisonRosterData))
-        {
-            mobileParty.PrisonRoster.Add(troopRosterElement);
-            //rightOwnerParty.PrisonRoster.AddToCounts(troopRosterElement2.Character, -troopRosterElement2.Number, false, -troopRosterElement2.WoundedNumber, -troopRosterElement2.Xp, true, -1);
-        }
+            MobileParty mobileParty = MobilePartyHelper.CreateNewClanMobileParty(newLeaderHero, newLeaderHero.Clan);
+            foreach (var troopRosterElement in troopRosterInterface.UnpackTroopRosterData(obj.What.LeftMemberRosterData))
+            {
+                if (troopRosterElement.Character != newLeaderHero.CharacterObject)
+                {
+                    mobileParty.MemberRoster.Add(troopRosterElement);
+                    //rightOwnerParty.MemberRoster.AddToCounts(troopRosterElement.Character, -troopRosterElement.Number, false, -troopRosterElement.WoundedNumber, -troopRosterElement.Xp, true, -1);
+                }
+            }
+            foreach (var troopRosterElement in troopRosterInterface.UnpackTroopRosterData(obj.What.LeftPrisonRosterData))
+            {
+                mobileParty.PrisonRoster.Add(troopRosterElement);
+                //rightOwnerParty.PrisonRoster.AddToCounts(troopRosterElement2.Character, -troopRosterElement2.Number, false, -troopRosterElement2.WoundedNumber, -troopRosterElement2.Xp, true, -1);
+            }
 
-        network.Send(obj.Who as NetPeer, new RefreshPartiesList());
+            network.Send(obj.Who as NetPeer, new RefreshPartiesList());
+        });
     }
 
     private void Handle_GarrisonDonated(MessagePayload<GarrisonDonated> obj)
@@ -123,21 +127,24 @@ internal class PartyScreenHelperHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.CurrentSettlementId, out var currentSettlement)) return;
         if (!objectManager.TryGetObjectWithLogging<TroopRoster>(obj.What.LeftMemberRosterId, out var leftMemberRoster)) return;
 
-        MobileParty garrisonParty = currentSettlement.Town.GarrisonParty;
-        if (garrisonParty == null)
+        GameThread.RunSafe(() =>
         {
-            currentSettlement.AddGarrisonParty();
-            garrisonParty = currentSettlement.Town.GarrisonParty;
-        }
-        for (int i = 0; i < leftMemberRoster.Count; i++)
-        {
-            TroopRosterElement elementCopyAtIndex = leftMemberRoster.GetElementCopyAtIndex(i);
-            garrisonParty.AddElementToMemberRoster(elementCopyAtIndex.Character, elementCopyAtIndex.Number, false);
-            if (elementCopyAtIndex.Character.IsHero)
+            MobileParty garrisonParty = currentSettlement.Town.GarrisonParty;
+            if (garrisonParty == null)
             {
-                EnterSettlementAction.ApplyForCharacterOnly(elementCopyAtIndex.Character.HeroObject, currentSettlement);
+                currentSettlement.AddGarrisonParty();
+                garrisonParty = currentSettlement.Town.GarrisonParty;
             }
-        }
+            for (int i = 0; i < leftMemberRoster.Count; i++)
+            {
+                TroopRosterElement elementCopyAtIndex = leftMemberRoster.GetElementCopyAtIndex(i);
+                garrisonParty.AddElementToMemberRoster(elementCopyAtIndex.Character, elementCopyAtIndex.Number, false);
+                if (elementCopyAtIndex.Character.IsHero)
+                {
+                    EnterSettlementAction.ApplyForCharacterOnly(elementCopyAtIndex.Character.HeroObject, currentSettlement);
+                }
+            }
+        });
     }
 
     private void Handle_PrisonersDonated(MessagePayload<PrisonersDonated> obj)
@@ -156,14 +163,17 @@ internal class PartyScreenHelperHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.CurrentSettlementId, out var currentSettlement)) return;
         if (!objectManager.TryGetObjectWithLogging<PartyBase>(obj.What.RightPartyId, out var rightParty)) return;
 
-        foreach (CharacterObject characterObject in rightSidePrisonerRoster.Troops)
+        GameThread.RunSafe(() =>
         {
-            if (characterObject.IsHero)
+            foreach (CharacterObject characterObject in rightSidePrisonerRoster.Troops)
             {
-                EnterSettlementAction.ApplyForPrisoner(characterObject.HeroObject, currentSettlement);
+                if (characterObject.IsHero)
+                {
+                    EnterSettlementAction.ApplyForPrisoner(characterObject.HeroObject, currentSettlement);
+                }
             }
-        }
-        CampaignEventDispatcher.Instance.OnPrisonerDonatedToSettlement(rightParty.MobileParty, rightSidePrisonerRoster, currentSettlement);
+            CampaignEventDispatcher.Instance.OnPrisonerDonatedToSettlement(rightParty.MobileParty, rightSidePrisonerRoster, currentSettlement);
+        });
     }
 
     private void Handle_GarrisonManaged(MessagePayload<GarrisonManaged> obj)
@@ -182,22 +192,25 @@ internal class PartyScreenHelperHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<TroopRoster>(obj.What.LeftMemberRosterId, out var leftMemberRoster)) return;
         if (!objectManager.TryGetObjectWithLogging<TroopRoster>(obj.What.LeftPrisonerRosterId, out var leftPrisonerRoster)) return;
 
-        for (int i = 0; i < leftMemberRoster.Count; i++)
+        GameThread.RunSafe(() =>
         {
-            TroopRosterElement elementCopyAtIndex = leftMemberRoster.GetElementCopyAtIndex(i);
-            if (elementCopyAtIndex.Character.IsHero)
+            for (int i = 0; i < leftMemberRoster.Count; i++)
             {
-                EnterSettlementAction.ApplyForCharacterOnly(elementCopyAtIndex.Character.HeroObject, currentSettlement);
+                TroopRosterElement elementCopyAtIndex = leftMemberRoster.GetElementCopyAtIndex(i);
+                if (elementCopyAtIndex.Character.IsHero)
+                {
+                    EnterSettlementAction.ApplyForCharacterOnly(elementCopyAtIndex.Character.HeroObject, currentSettlement);
+                }
             }
-        }
-        for (int j = 0; j < leftPrisonerRoster.Count; j++)
-        {
-            TroopRosterElement elementCopyAtIndex2 = leftPrisonerRoster.GetElementCopyAtIndex(j);
-            if (elementCopyAtIndex2.Character.IsHero)
+            for (int j = 0; j < leftPrisonerRoster.Count; j++)
             {
-                EnterSettlementAction.ApplyForPrisoner(elementCopyAtIndex2.Character.HeroObject, currentSettlement);
+                TroopRosterElement elementCopyAtIndex2 = leftPrisonerRoster.GetElementCopyAtIndex(j);
+                if (elementCopyAtIndex2.Character.IsHero)
+                {
+                    EnterSettlementAction.ApplyForPrisoner(elementCopyAtIndex2.Character.HeroObject, currentSettlement);
+                }
             }
-        }
+        });
     }
 
     private void Handle_PrisonersReleasedAndTaken(MessagePayload<PrisonersReleasedAndTaken> obj)
@@ -214,13 +227,16 @@ internal class PartyScreenHelperHandler : IHandler
         FlattenedTroopRoster takenPrisonerRoster = FlattenedTroopSerializer.Deserialize(obj.What.TakenPrisonerRoster, objectManager);
         FlattenedTroopRoster releasedPrisonerRoster = FlattenedTroopSerializer.Deserialize(obj.What.ReleasedPrisonerRoster, objectManager);
 
-        if (!releasedPrisonerRoster.IsEmpty<FlattenedTroopRosterElement>())
+        GameThread.RunSafe(() =>
         {
-            EndCaptivityAction.ApplyByReleasedByChoice(releasedPrisonerRoster);
-        }
-        if (!takenPrisonerRoster.IsEmpty<FlattenedTroopRosterElement>())
-        {
-            TakePrisonerAction.ApplyByTakenFromPartyScreen(takenPrisonerRoster);
-        }
+            if (!releasedPrisonerRoster.IsEmpty<FlattenedTroopRosterElement>())
+            {
+                EndCaptivityAction.ApplyByReleasedByChoice(releasedPrisonerRoster);
+            }
+            if (!takenPrisonerRoster.IsEmpty<FlattenedTroopRosterElement>())
+            {
+                TakePrisonerAction.ApplyByTakenFromPartyScreen(takenPrisonerRoster);
+            }
+        });
     }
 }

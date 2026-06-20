@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -70,10 +71,13 @@ namespace GameInterface.Services.TroopRosters.Handlers
                 Xp = data.Xp,
             };
 
-            troopRoster.data[data.Index] = newElement;
-            troopRoster.UpdateVersion();
-            troopRoster.ValidateTroopListCache();
-            troopRoster._count = troopRoster.data.Length;
+            GameThread.RunSafe(() =>
+            {
+                troopRoster.data[data.Index] = newElement;
+                troopRoster.UpdateVersion();
+                troopRoster.ValidateTroopListCache();
+                troopRoster._count = troopRoster.data.Length;
+            });
         }
     }
 }

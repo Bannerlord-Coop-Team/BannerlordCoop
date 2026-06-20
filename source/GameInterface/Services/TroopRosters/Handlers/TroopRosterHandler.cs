@@ -127,16 +127,6 @@ public class TroopRosterHandler : IHandler
 
         if (!objectManager.TryGetObjectWithLogging(obj.TroopRosterId, out TroopRoster troopRoster)) return;
 
-        using (new AllowedThread())
-        {
-            try
-            {
-                troopRoster.AddToCountsAtIndex(obj.Index, obj.CountChange, obj.WoundedCountChange, obj.XpChange, obj.RemoveDepleted);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to AddToCountsAtIndex. TroopRosterId: {TroopRosterId}", obj.TroopRosterId);
-            }
         GameThread.RunSafe(() =>
         {
             using (new AllowedThread())

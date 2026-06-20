@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
@@ -112,24 +113,27 @@ internal class WorkshopWarehouseHandler : IHandler
 
         WorkshopsCampaignBehavior workshopsBehavior = GetWorkshopsBehavior();
         Hero owner = workshop.Owner;
-        
-        // Only update roster for target client. Warehouse data is client specific
-        if (owner == Hero.MainHero)
+
+        GameThread.RunSafe(() =>
         {
-            workshopsBehavior.AddNewWarehouseDataIfNeeded(workshop.Settlement);
-            return;
-        }
-        if (oldOwner == Hero.MainHero && !owner.IsPlayerHero())
-        {
-            if (oldOwner.OwnedWorkshops.All((Workshop x) => x.Settlement != workshop.Settlement))
+            // Only update roster for target client. Warehouse data is client specific
+            if (owner == Hero.MainHero)
             {
-                if (oldOwner.CurrentSettlement != null && oldOwner.CurrentSettlement == workshop.Settlement)
-                {
-                    workshopsBehavior.RemoveWarehouseData(oldOwner.CurrentSettlement);
-                }
-                workshopsBehavior.RemoveWarehouseData(workshop.Settlement);
+                workshopsBehavior.AddNewWarehouseDataIfNeeded(workshop.Settlement);
+                return;
             }
-        }
+            if (oldOwner == Hero.MainHero && !owner.IsPlayerHero())
+            {
+                if (oldOwner.OwnedWorkshops.All((Workshop x) => x.Settlement != workshop.Settlement))
+                {
+                    if (oldOwner.CurrentSettlement != null && oldOwner.CurrentSettlement == workshop.Settlement)
+                    {
+                        workshopsBehavior.RemoveWarehouseData(oldOwner.CurrentSettlement);
+                    }
+                    workshopsBehavior.RemoveWarehouseData(workshop.Settlement);
+                }
+            }
+        });
     }
 
     private void Handle_OutputProducedToWarehouse(MessagePayload<OutputProducedToWarehouse> obj)
@@ -153,10 +157,13 @@ internal class WorkshopWarehouseHandler : IHandler
         // Only update roster for target client. Warehouse data is client specific
         if (workshop.Owner == Hero.MainHero)
         {
-            using (new AllowedThread()) // Uses ItemRoster.AddToCounts
+            GameThread.RunSafe(() =>
             {
-                GetWorkshopsBehavior().ProduceAnOutputToWarehouse(obj.What.OutputItem, workshop);
-            }
+                using (new AllowedThread()) // Uses ItemRoster.AddToCounts
+                {
+                    GetWorkshopsBehavior().ProduceAnOutputToWarehouse(obj.What.OutputItem, workshop);
+                }
+            });
         }
     }
 
@@ -166,33 +173,36 @@ internal class WorkshopWarehouseHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(obj.What.Workshop.Owner, out var ownerId)) return;
         if (!objectManager.TryGetIdWithLogging(obj.What.Workshop.Settlement, out var settlementId)) return;
 
-        List<ItemRosterElement> warehouseRosterData = sessionWorkshopPlayerDataInterface.GetWarehouseRoster(ownerId, settlementId);
-        int num = obj.What.InputCount;
-        for (int i = 0; i < warehouseRosterData.Count; i++)
+        GameThread.RunSafe(() =>
         {
-            if (num == 0)
+            List<ItemRosterElement> warehouseRosterData = sessionWorkshopPlayerDataInterface.GetWarehouseRoster(ownerId, settlementId);
+            int num = obj.What.InputCount;
+            for (int i = 0; i < warehouseRosterData.Count; i++)
             {
-                return;
-            }
-            ItemObject itemAtIndex = warehouseRosterData[i].EquipmentElement.Item;
-            if (itemAtIndex.ItemCategory == obj.What.ProductionInput)
-            {
-                if (!objectManager.TryGetIdWithLogging(itemAtIndex, out var itemId)) continue;
-
-                int elementNumber = warehouseRosterData[i].Amount;
-                int num2 = MathF.Min(num, elementNumber);
-                num -= num2;
-
-                // Update on server CoopSession and for specific client who owns the workshop
-                if (obj.What.Workshop.Owner.IsPlayerHero())
+                if (num == 0)
                 {
-                    sessionWorkshopPlayerDataInterface.RemoveFromWarehouse(ownerId, settlementId, itemAtIndex, obj.What.InputCount);
-                    network.SendAll(new ConsumeInputFromWarehouse(workshopId, obj.What.InputCount, itemId));
+                    return;
                 }
+                ItemObject itemAtIndex = warehouseRosterData[i].EquipmentElement.Item;
+                if (itemAtIndex.ItemCategory == obj.What.ProductionInput)
+                {
+                    if (!objectManager.TryGetIdWithLogging(itemAtIndex, out var itemId)) continue;
 
-                CampaignEventDispatcher.Instance.OnItemConsumed(itemAtIndex, obj.What.Workshop.Settlement, obj.What.InputCount);
+                    int elementNumber = warehouseRosterData[i].Amount;
+                    int num2 = MathF.Min(num, elementNumber);
+                    num -= num2;
+
+                    // Update on server CoopSession and for specific client who owns the workshop
+                    if (obj.What.Workshop.Owner.IsPlayerHero())
+                    {
+                        sessionWorkshopPlayerDataInterface.RemoveFromWarehouse(ownerId, settlementId, itemAtIndex, obj.What.InputCount);
+                        network.SendAll(new ConsumeInputFromWarehouse(workshopId, obj.What.InputCount, itemId));
+                    }
+
+                    CampaignEventDispatcher.Instance.OnItemConsumed(itemAtIndex, obj.What.Workshop.Settlement, obj.What.InputCount);
+                }
             }
-        }
+        });
     }
 
     private void Handle_ConsumeInputFromWarehouse(MessagePayload<ConsumeInputFromWarehouse> obj)
@@ -203,10 +213,13 @@ internal class WorkshopWarehouseHandler : IHandler
         // Only update roster for target client. Warehouse data is client specific
         if (workshop.Owner == Hero.MainHero)
         {
-            using (new AllowedThread())
+            GameThread.RunSafe(() =>
             {
-                GetWorkshopsBehavior().GetWarehouseRoster(workshop.Settlement).AddToCounts(item, -obj.What.InputCount);
-            }
+                using (new AllowedThread())
+                {
+                    GetWorkshopsBehavior().GetWarehouseRoster(workshop.Settlement).AddToCounts(item, -obj.What.InputCount);
+                }
+            });
         }
     }
 
@@ -224,18 +237,21 @@ internal class WorkshopWarehouseHandler : IHandler
     {
         if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.SettlementId, out var settlement)) return;
 
-        using (new AllowedThread())
+        GameThread.RunSafe(() =>
         {
-            var warehouseRosters = GetWorkshopsBehavior()._warehouseRosterPerSettlement;
-            for (int i = 0; i < warehouseRosters.Length; i++)
+            using (new AllowedThread())
             {
-                if (warehouseRosters[i].Key == settlement)
+                var warehouseRosters = GetWorkshopsBehavior()._warehouseRosterPerSettlement;
+                for (int i = 0; i < warehouseRosters.Length; i++)
                 {
-                    warehouseRosters[i].Value.Clear();
-                    warehouseRosters[i].Value.Add(obj.What.NewWarehouseRosterData);
+                    if (warehouseRosters[i].Key == settlement)
+                    {
+                        warehouseRosters[i].Value.Clear();
+                        warehouseRosters[i].Value.Add(obj.What.NewWarehouseRosterData);
+                    }
                 }
             }
-        }
+        });
     }
 
     private void Handle_TownWorkshopRun(MessagePayload<TownWorkshopRun> obj)

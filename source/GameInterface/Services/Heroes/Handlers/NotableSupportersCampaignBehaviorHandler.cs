@@ -1,11 +1,12 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 
 namespace GameInterface.Services.Heroes.Handlers;
 
@@ -16,16 +17,18 @@ internal class NotableSupportersCampaignBehaviorHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IHeroRelationsInterface heroRelationsInterface;
 
     public NotableSupportersCampaignBehaviorHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        IHeroRelationsInterface heroRelationsInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
-
+        this.heroRelationsInterface = heroRelationsInterface;
         messageBroker.Subscribe<NotableSupportAccepted>(Handle_NotableSupportAccepted);
         messageBroker.Subscribe<AcceptNotableSupport>(Handle_AcceptNotableSupport);
         messageBroker.Subscribe<NotableSupportEndedByAgreement>(Handle_NotableSupportEndedByAgreement);
@@ -56,12 +59,7 @@ internal class NotableSupportersCampaignBehaviorHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.NotableId, out var notable)) return;
         if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.PlayerClanId, out var playerClan)) return;
 
-        notable.SupporterOf = playerClan;
-        GiveGoldAction.ApplyBetweenCharacters(mainHero, notable, obj.What.Cost, false);
-        //TODO notify player of changed gold
-
-        ChangeRelationAction.ApplyRelationChangeBetweenHeroes(mainHero, notable, 5, false);
-        // TODO notify player of changed relation
+        heroRelationsInterface.AcceptNotableSupport(mainHero, notable, playerClan, obj.What.Cost);
     }
 
     private void Handle_NotableSupportEndedByAgreement(MessagePayload<NotableSupportEndedByAgreement> obj)
@@ -76,6 +74,6 @@ internal class NotableSupportersCampaignBehaviorHandler : IHandler
     {
         if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.NotableId, out var notable)) return;
 
-        notable.SupporterOf = null;
+        heroRelationsInterface.EndNotableSupportByAgreement(notable);
     }
 }

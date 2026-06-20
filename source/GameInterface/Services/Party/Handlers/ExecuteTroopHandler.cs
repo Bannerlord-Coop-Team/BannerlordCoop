@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.ObjectManager;
@@ -50,6 +51,9 @@ internal class ExecuteTroopHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.ExecutedHeroId, out var executedHero)) return;
         if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.ExecutorId, out var executor)) return;
 
-        KillCharacterAction.ApplyByExecution(executedHero, executor, true, false);
+        GameThread.RunSafe(() =>
+        {
+            KillCharacterAction.ApplyByExecution(executedHero, executor, true, false);
+        });
     }
 }

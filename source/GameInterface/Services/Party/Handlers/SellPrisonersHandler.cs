@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.GameMenus.Messages;
@@ -58,17 +59,20 @@ internal class SellPrisonersHandler : IHandler
     {
         if (!objectManager.TryGetObjectWithLogging<PartyBase>(obj.What.SellingPartyId, out var sellingParty)) return;
 
-        TroopRoster leftPrisonerRoster = new();
-        troopRosterInterface.UpdateWithData(leftPrisonerRoster, obj.What.LeftPrisonerRosterData, sellingParty.LeaderHero);
+        GameThread.RunSafe(() =>
+        {
+            TroopRoster leftPrisonerRoster = new();
+            troopRosterInterface.UpdateWithData(leftPrisonerRoster, obj.What.LeftPrisonerRosterData, sellingParty.LeaderHero);
 
-        int initialGold = sellingParty.LeaderHero.Gold;
-        SellPrisonersAction.ApplyForSelectedPrisoners(sellingParty, null, leftPrisonerRoster);
+            int initialGold = sellingParty.LeaderHero.Gold;
+            SellPrisonersAction.ApplyForSelectedPrisoners(sellingParty, null, leftPrisonerRoster);
 
-        // Give client notification of changed gold
-        network.Send(obj.Who as NetPeer, new NotifyGoldChange(sellingParty.LeaderHero.Gold - initialGold));
+            // Give client notification of changed gold
+            network.Send(obj.Who as NetPeer, new NotifyGoldChange(sellingParty.LeaderHero.Gold - initialGold));
 
-        // Refresh the menu to show updated menu items
-        if (!objectManager.TryGetIdWithLogging(sellingParty.LeaderHero, out var heroId)) return;
-        network.Send(obj.Who as NetPeer, new RefreshGameMenu(heroId, "town_backstreet"));
+            // Refresh the menu to show updated menu items
+            if (!objectManager.TryGetIdWithLogging(sellingParty.LeaderHero, out var heroId)) return;
+            network.Send(obj.Who as NetPeer, new RefreshGameMenu(heroId, "town_backstreet"));
+        });
     }
 }

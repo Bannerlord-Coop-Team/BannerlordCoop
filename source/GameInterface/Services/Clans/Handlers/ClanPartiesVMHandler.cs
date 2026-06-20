@@ -147,7 +147,7 @@ internal class ClanPartiesVMHandler : IHandler
     {
         if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.SelectedPartyId, out var selectedParty)) return;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             DisbandPartyAction.StartDisband(selectedParty);
 

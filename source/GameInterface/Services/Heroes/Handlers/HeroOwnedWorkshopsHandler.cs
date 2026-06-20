@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
@@ -54,11 +55,14 @@ internal class HeroOwnedWorkshopsHandler : IHandler
     {
         if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
         if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
-        
-        using (new AllowedThread())
+
+        GameThread.RunSafe(() =>
         {
-            hero.AddOwnedWorkshop(workshop);
-        }
+            using (new AllowedThread())
+            {
+                hero.AddOwnedWorkshop(workshop);
+            }
+        });
     }
 
     private void Handle_OwnedWorkshopRemoved(MessagePayload<OwnedWorkshopRemoved> obj)
@@ -75,9 +79,12 @@ internal class HeroOwnedWorkshopsHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
         if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
 
-        using (new AllowedThread())
+        GameThread.RunSafe(() =>
         {
-            hero.RemoveOwnedWorkshop(workshop);
-        }
+            using (new AllowedThread())
+            {
+                hero.RemoveOwnedWorkshop(workshop);
+            }
+        });
     }
 }

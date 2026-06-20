@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.MapEventParties;
@@ -103,86 +104,89 @@ internal class PartyDoneLogicHandler : IHandler
     {
         if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
 
-        PartyBase leftParty = null;
-        if (obj.What.LeftPartyId != null && !objectManager.TryGetObjectWithLogging<PartyBase>(obj.What.LeftPartyId, out leftParty)) return;
-
-        TroopRoster leftPrisonerRoster = null;
-        if (obj.What.LeftPrisonerRosterId != null && !objectManager.TryGetObjectWithLogging<TroopRoster>(obj.What.LeftPrisonerRosterId, out leftPrisonerRoster)) return;
-
-        List<Tuple<CharacterObject, CharacterObject, int>> upgradedTroopHistory = new();
-        if (obj.What.UpgradedTroopHistoryIds.Data != null)
+        GameThread.RunSafe(() =>
         {
-            foreach (var elementData in obj.What.UpgradedTroopHistoryIds.Data)
+            PartyBase leftParty = null;
+            if (obj.What.LeftPartyId != null && !objectManager.TryGetObjectWithLogging<PartyBase>(obj.What.LeftPartyId, out leftParty)) return;
+
+            TroopRoster leftPrisonerRoster = null;
+            if (obj.What.LeftPrisonerRosterId != null && !objectManager.TryGetObjectWithLogging<TroopRoster>(obj.What.LeftPrisonerRosterId, out leftPrisonerRoster)) return;
+
+            List<Tuple<CharacterObject, CharacterObject, int>> upgradedTroopHistory = new();
+            if (obj.What.UpgradedTroopHistoryIds.Data != null)
             {
-                if (!objectManager.TryGetObjectWithLogging<CharacterObject>(elementData.Character1Id, out var character1)) continue;
-                if (!objectManager.TryGetObjectWithLogging<CharacterObject>(elementData.Character2Id, out var character2)) continue;
+                foreach (var elementData in obj.What.UpgradedTroopHistoryIds.Data)
+                {
+                    if (!objectManager.TryGetObjectWithLogging<CharacterObject>(elementData.Character1Id, out var character1)) continue;
+                    if (!objectManager.TryGetObjectWithLogging<CharacterObject>(elementData.Character2Id, out var character2)) continue;
 
-                upgradedTroopHistory.Add(new(character1, character2, elementData.Number));
+                    upgradedTroopHistory.Add(new(character1, character2, elementData.Number));
+                }
             }
-        }
 
-        var donatedPrisonersRoster = FlattenedTroopSerializer.Deserialize(obj.What.DonatedPrisonersRoster, objectManager);
+            var donatedPrisonersRoster = FlattenedTroopSerializer.Deserialize(obj.What.DonatedPrisonersRoster, objectManager);
 
-        if (leftParty != null)
-        {
-            troopRosterInterface.UpdateWithData(leftParty.MemberRoster, obj.What.LeftMemberRosterData, mainHero);
-            troopRosterInterface.UpdateWithData(leftParty.PrisonRoster, obj.What.LeftPrisonerRosterData, mainHero);
-        }
-        else if (leftPrisonerRoster != null) // Prisoner management doesn't have a set party
-        {
-            troopRosterInterface.UpdateWithData(leftPrisonerRoster, obj.What.LeftPrisonerRosterData, mainHero);
-        }
-
-        troopRosterInterface.UpdateWithData(mainHero.PartyBelongedTo.MemberRoster, obj.What.RightMemberRosterData, mainHero);
-        troopRosterInterface.UpdateWithData(mainHero.PartyBelongedTo.PrisonRoster, obj.What.RightPrisonerRosterData, mainHero);
-
-        mainHero.PartyBelongedTo.ItemRoster.Clear();
-        foreach (var itemRosterElement in obj.What.RightOwnerPartyItemRosterData ?? Enumerable.Empty<ItemRosterElement>())
-        {
-            mainHero.PartyBelongedTo.ItemRoster.Add(itemRosterElement);
-        }
-
-        if (Settlement.CurrentSettlement != null && !donatedPrisonersRoster.IsEmpty<FlattenedTroopRosterElement>())
-        {
-            CampaignEventDispatcher.Instance.OnPrisonersChangeInSettlement(Settlement.CurrentSettlement, donatedPrisonersRoster, null, true);
-        }
-        if (!obj.What.DoNotApplyGoldTransactions)
-        {
-            GiveGoldAction.ApplyBetweenCharacters(null, mainHero, obj.What.PartyGoldChangeAmount, false);
-            network.Send(obj.Who as NetPeer, new NotifyGoldChange(obj.What.PartyGoldChangeAmount));
-        }
-        if (obj.What.PartyInfluenceChangeAmount != 0)
-        {
-            // TODO
-            GainKingdomInfluenceAction.ApplyForLeavingTroopToGarrison(Hero.MainHero, (float)obj.What.PartyInfluenceChangeAmount);
-        }
-
-        //Replacement for CampaignEventDispatcher.Instance.OnPlayerUpgradedTroops(tuple.Item1, tuple.Item2, tuple.Item3) without MainParty
-        foreach (Tuple<CharacterObject, CharacterObject, int> tuple in upgradedTroopHistory)
-        {
-            SkillLevelingManager.OnUpgradeTroops(mainHero.PartyBelongedTo.Party, tuple.Item1, tuple.Item2, tuple.Item3);
-        }
-
-        if (obj.What.RecruitedPrisonersRoster != null && !donatedPrisonersRoster.IsEmpty<FlattenedTroopRosterElement>())
-        {
-            // Replacement for CampaignEventDispatcher.Instance.OnMainPartyPrisonerRecruited(obj.What.RecruitedPrisonersRoster);
-            foreach (CharacterObject characterObject in donatedPrisonersRoster.Troops)
+            if (leftParty != null)
             {
-                // Replace CampaignEventDispatcher.Instance.OnUnitRecruited(characterObject, 1);
-                if (mainHero.GetPerkValue(DefaultPerks.Leadership.FamousCommander))
-                {
-                    mainHero.PartyBelongedTo.MemberRoster.AddXpToTroop(characterObject, (int)DefaultPerks.Leadership.FamousCommander.SecondaryBonus * 1);
-                }
-                SkillLevelingManager.OnTroopRecruited(mainHero, 1, characterObject.Tier);
-                if (characterObject.Occupation == Occupation.Bandit)
-                {
-                    SkillLevelingManager.OnBanditsRecruited(mainHero.PartyBelongedTo, characterObject, 1);
-                }
-
-                // Replace ApplyPrisonerRecruitmentEffects
-                int prisonerRecruitmentMoraleEffect = Campaign.Current.Models.PrisonerRecruitmentCalculationModel.GetPrisonerRecruitmentMoraleEffect(mainHero.PartyBelongedTo.Party, characterObject, 1);
-                mainHero.PartyBelongedTo.RecentEventsMorale += (float)prisonerRecruitmentMoraleEffect;
+                troopRosterInterface.UpdateWithData(leftParty.MemberRoster, obj.What.LeftMemberRosterData, mainHero);
+                troopRosterInterface.UpdateWithData(leftParty.PrisonRoster, obj.What.LeftPrisonerRosterData, mainHero);
             }
-        }
+            else if (leftPrisonerRoster != null) // Prisoner management doesn't have a set party
+            {
+                troopRosterInterface.UpdateWithData(leftPrisonerRoster, obj.What.LeftPrisonerRosterData, mainHero);
+            }
+
+            troopRosterInterface.UpdateWithData(mainHero.PartyBelongedTo.MemberRoster, obj.What.RightMemberRosterData, mainHero);
+            troopRosterInterface.UpdateWithData(mainHero.PartyBelongedTo.PrisonRoster, obj.What.RightPrisonerRosterData, mainHero);
+
+            mainHero.PartyBelongedTo.ItemRoster.Clear();
+            foreach (var itemRosterElement in obj.What.RightOwnerPartyItemRosterData ?? Enumerable.Empty<ItemRosterElement>())
+            {
+                mainHero.PartyBelongedTo.ItemRoster.Add(itemRosterElement);
+            }
+
+            if (Settlement.CurrentSettlement != null && !donatedPrisonersRoster.IsEmpty<FlattenedTroopRosterElement>())
+            {
+                CampaignEventDispatcher.Instance.OnPrisonersChangeInSettlement(Settlement.CurrentSettlement, donatedPrisonersRoster, null, true);
+            }
+            if (!obj.What.DoNotApplyGoldTransactions)
+            {
+                GiveGoldAction.ApplyBetweenCharacters(null, mainHero, obj.What.PartyGoldChangeAmount, false);
+                network.Send(obj.Who as NetPeer, new NotifyGoldChange(obj.What.PartyGoldChangeAmount));
+            }
+            if (obj.What.PartyInfluenceChangeAmount != 0)
+            {
+                // TODO
+                GainKingdomInfluenceAction.ApplyForLeavingTroopToGarrison(Hero.MainHero, (float)obj.What.PartyInfluenceChangeAmount);
+            }
+
+            //Replacement for CampaignEventDispatcher.Instance.OnPlayerUpgradedTroops(tuple.Item1, tuple.Item2, tuple.Item3) without MainParty
+            foreach (Tuple<CharacterObject, CharacterObject, int> tuple in upgradedTroopHistory)
+            {
+                SkillLevelingManager.OnUpgradeTroops(mainHero.PartyBelongedTo.Party, tuple.Item1, tuple.Item2, tuple.Item3);
+            }
+
+            if (obj.What.RecruitedPrisonersRoster != null && !donatedPrisonersRoster.IsEmpty<FlattenedTroopRosterElement>())
+            {
+                // Replacement for CampaignEventDispatcher.Instance.OnMainPartyPrisonerRecruited(obj.What.RecruitedPrisonersRoster);
+                foreach (CharacterObject characterObject in donatedPrisonersRoster.Troops)
+                {
+                    // Replace CampaignEventDispatcher.Instance.OnUnitRecruited(characterObject, 1);
+                    if (mainHero.GetPerkValue(DefaultPerks.Leadership.FamousCommander))
+                    {
+                        mainHero.PartyBelongedTo.MemberRoster.AddXpToTroop(characterObject, (int)DefaultPerks.Leadership.FamousCommander.SecondaryBonus * 1);
+                    }
+                    SkillLevelingManager.OnTroopRecruited(mainHero, 1, characterObject.Tier);
+                    if (characterObject.Occupation == Occupation.Bandit)
+                    {
+                        SkillLevelingManager.OnBanditsRecruited(mainHero.PartyBelongedTo, characterObject, 1);
+                    }
+
+                    // Replace ApplyPrisonerRecruitmentEffects
+                    int prisonerRecruitmentMoraleEffect = Campaign.Current.Models.PrisonerRecruitmentCalculationModel.GetPrisonerRecruitmentMoraleEffect(mainHero.PartyBelongedTo.Party, characterObject, 1);
+                    mainHero.PartyBelongedTo.RecentEventsMorale += (float)prisonerRecruitmentMoraleEffect;
+                }
+            }
+        });
     }
 }

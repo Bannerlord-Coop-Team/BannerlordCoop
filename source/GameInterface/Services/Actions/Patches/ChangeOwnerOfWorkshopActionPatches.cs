@@ -37,16 +37,19 @@ internal class ChangeOwnerOfWorkshopActionPatches
 
     public static void ApplyInternalOverride(Workshop workshop, Hero newOwner, WorkshopType workshopType, int capital, int cost)
     {
-        Hero owner = workshop.Owner;
-        workshop.ChangeOwnerOfWorkshop(newOwner, workshopType, capital);
-        if (newOwner.IsPlayerHero())
+        GameThread.RunSafe(() =>
         {
-            GiveGoldAction.ApplyBetweenCharacters(newOwner, owner, cost, false);
-        }
-        if (owner.IsPlayerHero())
-        {
-            GiveGoldAction.ApplyBetweenCharacters(null, owner, cost, false);
-        }
-        CampaignEventDispatcher.Instance.OnWorkshopOwnerChanged(workshop, owner);
+            Hero owner = workshop.Owner;
+            workshop.ChangeOwnerOfWorkshop(newOwner, workshopType, capital);
+            if (newOwner.IsPlayerHero())
+            {
+                GiveGoldAction.ApplyBetweenCharacters(newOwner, owner, cost, false);
+            }
+            if (owner.IsPlayerHero())
+            {
+                GiveGoldAction.ApplyBetweenCharacters(null, owner, cost, false);
+            }
+            CampaignEventDispatcher.Instance.OnWorkshopOwnerChanged(workshop, owner);
+        });
     }
 }

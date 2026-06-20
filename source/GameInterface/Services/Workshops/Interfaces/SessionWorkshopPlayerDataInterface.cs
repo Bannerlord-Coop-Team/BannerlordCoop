@@ -1,9 +1,8 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
-using HarmonyLib;
 using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -51,16 +50,18 @@ public class SessionWorkshopPlayerDataInterface : ISessionWorkshopPlayerDataInte
         }
         if (!existingData)
         {
-            for (int j = 0; j < WorkshopPlayerData.PlayerWarehouseRosterPerSettlement[ownerId].Length; j++)
+            GameThread.RunSafe(() =>
             {
-                var settlementWarehouseRoster = WorkshopPlayerData.PlayerWarehouseRosterPerSettlement[ownerId][j];
-                if (settlementWarehouseRoster.Value == null)
+                for (int j = 0; j < WorkshopPlayerData.PlayerWarehouseRosterPerSettlement[ownerId].Length; j++)
                 {
-                    WorkshopPlayerData.PlayerWarehouseRosterPerSettlement[ownerId][j] = new KeyValuePair<string, List<ItemRosterElementData>>(settlementId, new List<ItemRosterElementData>());
-                    return;
+                    var settlementWarehouseRoster = WorkshopPlayerData.PlayerWarehouseRosterPerSettlement[ownerId][j];
+                    if (settlementWarehouseRoster.Value == null)
+                    {
+                        WorkshopPlayerData.PlayerWarehouseRosterPerSettlement[ownerId][j] = new KeyValuePair<string, List<ItemRosterElementData>>(settlementId, new List<ItemRosterElementData>());
+                        return;
+                    }
                 }
-
-            }
+            });
         }
     }
 
@@ -68,14 +69,17 @@ public class SessionWorkshopPlayerDataInterface : ISessionWorkshopPlayerDataInte
     {
         if (!IsPlayerHeroIdValid(ownerId)) return;
 
-        for (int i = 0; i < WorkshopPlayerData.PlayerWarehouseRosterPerSettlement[ownerId].Length; i++)
+        GameThread.RunSafe(() =>
         {
-            if (WorkshopPlayerData.PlayerWarehouseRosterPerSettlement[ownerId][i].Key == settlementId)
+            for (int i = 0; i < WorkshopPlayerData.PlayerWarehouseRosterPerSettlement[ownerId].Length; i++)
             {
-                WorkshopPlayerData.PlayerWarehouseRosterPerSettlement[ownerId][i] = new KeyValuePair<string, List<ItemRosterElementData>>(null, null);
-                return;
+                if (WorkshopPlayerData.PlayerWarehouseRosterPerSettlement[ownerId][i].Key == settlementId)
+                {
+                    WorkshopPlayerData.PlayerWarehouseRosterPerSettlement[ownerId][i] = new KeyValuePair<string, List<ItemRosterElementData>>(null, null);
+                    return;
+                }
             }
-        }
+        });
     }
 
     public void AddToWarehouse(string ownerId, string settlementId, EquipmentElement outputItem)
@@ -87,50 +91,56 @@ public class SessionWorkshopPlayerDataInterface : ISessionWorkshopPlayerDataInte
         string itemModifierId = null;
         if (outputItem.ItemModifier != null && !objectManager.TryGetIdWithLogging(outputItem.ItemModifier, out itemModifierId)) return;
 
-        foreach (var settlementWarehouseRoster in WorkshopPlayerData.PlayerWarehouseRosterPerSettlement[ownerId])
+        GameThread.RunSafe(() =>
         {
-            if (settlementWarehouseRoster.Key != settlementId) continue;
-
-            for (int i = 0; i < settlementWarehouseRoster.Value.Count; i++)
+            foreach (var settlementWarehouseRoster in WorkshopPlayerData.PlayerWarehouseRosterPerSettlement[ownerId])
             {
-                var elementData = settlementWarehouseRoster.Value[i];
+                if (settlementWarehouseRoster.Key != settlementId) continue;
 
-                if (elementData.ItemObjectData.ItemObjectId == outputItemId)
+                for (int i = 0; i < settlementWarehouseRoster.Value.Count; i++)
                 {
-                    // Update existing stored item roster element
-                    elementData.Amount += 1;
-                    settlementWarehouseRoster.Value[i] = elementData;
-                    return;
-                }
-            }
+                    var elementData = settlementWarehouseRoster.Value[i];
 
-            // No existing item roster element was found, add a new one
-            settlementWarehouseRoster.Value.Add(new ItemRosterElementData(new(outputItemId, itemModifierId, itemModifierId == null), 1));
-        }
+                    if (elementData.ItemObjectData.ItemObjectId == outputItemId)
+                    {
+                        // Update existing stored item roster element
+                        elementData.Amount += 1;
+                        settlementWarehouseRoster.Value[i] = elementData;
+                        return;
+                    }
+                }
+
+                // No existing item roster element was found, add a new one
+                settlementWarehouseRoster.Value.Add(new ItemRosterElementData(new(outputItemId, itemModifierId, itemModifierId == null), 1));
+            }
+        });
     }
 
     public void RemoveFromWarehouse(string ownerId, string settlementId, ItemObject itemAtIndex, int inputCount)
     {
         if (!IsPlayerHeroIdValid(ownerId)) return;
 
-        foreach (var settlementWarehouseRoster in WorkshopPlayerData.PlayerWarehouseRosterPerSettlement[ownerId])
+        GameThread.RunSafe(() =>
         {
-            if (settlementWarehouseRoster.Key != settlementId) continue;
-
-            for (int i = 0; i < settlementWarehouseRoster.Value.Count; i++)
+            foreach (var settlementWarehouseRoster in WorkshopPlayerData.PlayerWarehouseRosterPerSettlement[ownerId])
             {
-                var elementData = settlementWarehouseRoster.Value[i];
-                if (!objectManager.TryGetIdWithLogging(itemAtIndex, out var itemAtIndexId)) continue;
+                if (settlementWarehouseRoster.Key != settlementId) continue;
 
-                if (elementData.ItemObjectData.ItemObjectId == itemAtIndexId)
+                for (int i = 0; i < settlementWarehouseRoster.Value.Count; i++)
                 {
-                    // Update existing stored item roster element
-                    elementData.Amount -= inputCount;
-                    settlementWarehouseRoster.Value[i] = elementData;
-                    return;
+                    var elementData = settlementWarehouseRoster.Value[i];
+                    if (!objectManager.TryGetIdWithLogging(itemAtIndex, out var itemAtIndexId)) continue;
+
+                    if (elementData.ItemObjectData.ItemObjectId == itemAtIndexId)
+                    {
+                        // Update existing stored item roster element
+                        elementData.Amount -= inputCount;
+                        settlementWarehouseRoster.Value[i] = elementData;
+                        return;
+                    }
                 }
             }
-        }
+        });
     }
 
     public List<ItemRosterElement> GetWarehouseRoster(string ownerId, string settlementId)
@@ -152,19 +162,22 @@ public class SessionWorkshopPlayerDataInterface : ISessionWorkshopPlayerDataInte
     {
         if (!IsPlayerHeroIdValid(ownerId)) return;
 
-        var playerWarehouseRosters = WorkshopPlayerData.PlayerWarehouseRosterPerSettlement[ownerId];
-        for (int i = 0; i < playerWarehouseRosters.Length; i++)
+        GameThread.RunSafe(() =>
         {
-            if (playerWarehouseRosters[i].Key == settlementId)
+            var playerWarehouseRosters = WorkshopPlayerData.PlayerWarehouseRosterPerSettlement[ownerId];
+            for (int i = 0; i < playerWarehouseRosters.Length; i++)
             {
-                playerWarehouseRosters[i].Value.Clear();
-                foreach (var item in newWarehouseData)
+                if (playerWarehouseRosters[i].Key == settlementId)
                 {
-                    if (!TryResolveWarehouseElementIds(item, out var elementData)) continue;
-                    playerWarehouseRosters[i].Value.Add(elementData);
+                    playerWarehouseRosters[i].Value.Clear();
+                    foreach (var item in newWarehouseData)
+                    {
+                        if (!TryResolveWarehouseElementIds(item, out var elementData)) continue;
+                        playerWarehouseRosters[i].Value.Add(elementData);
+                    }
                 }
             }
-        }
+        });
     }
 
     public void AddPlayerKeys(string playerHeroId)
