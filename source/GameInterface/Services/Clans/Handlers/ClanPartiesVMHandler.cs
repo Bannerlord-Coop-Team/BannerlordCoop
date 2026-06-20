@@ -63,8 +63,8 @@ internal class ClanPartiesVMHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.NewLeaderId, out var newLeader)) return;
         if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.TargetClanId, out var targetClan)) return;
 
-        //GameThread.Run(() =>
-        //{
+        GameThread.RunSafe(() =>
+        {
             MobileParty mobileParty = MobilePartyHelper.CreateNewClanMobileParty(newLeader, targetClan);
             if (newLeader.Gold < obj.What.PartyGoldLowerThreshold)
             {
@@ -73,7 +73,7 @@ internal class ClanPartiesVMHandler : IHandler
             mobileParty.SetMoveModeHold();
 
             network.Send(obj.Who as NetPeer, new RefreshPartiesList());
-        //});
+        });
     }
 
     private void Handle_ClanPartyLeaderChanged(MessagePayload<ClanPartyLeaderChanged> obj)
@@ -105,7 +105,7 @@ internal class ClanPartiesVMHandler : IHandler
         
         if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             var isDisbanding = newLeader == null;
             var existingOldLeader = selectedParty?.Party?.LeaderHero != null;

@@ -212,7 +212,7 @@ internal class TradeHandler : IHandler
 
     private void Handle_UpdateEquipmentClients(MessagePayload<UpdateEquipmentClients> obj)
     {
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             using (new AllowedThread())
             {

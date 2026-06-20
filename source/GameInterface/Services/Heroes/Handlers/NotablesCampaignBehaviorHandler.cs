@@ -59,27 +59,32 @@ internal class NotablesCampaignBehaviorHandler : IHandler
 
     private void Handle_UpdateNotableSupport(MessagePayload<UpdateNotableSupport> obj)
     {
-        if (obj.What.Notable.SupporterOf == null)
+        if (obj.What.Notable.SupporterOf != null)
+            return;
         {
-            using (IEnumerator<Clan> enumerator = Clan.NonBanditFactions.GetEnumerator())
+        foreach (var clan in Clan.NonBanditFactions)
+        {
+            ApplySupporter(...)
+        }
+        
+...
+private void ApplySupporter(...)
+{
+    GameThread.RunSafe(() => {
+        if (clan.Leader != null && !clan.IsPlayerClan()) // Instead of Clan.PlayerClan
             {
-                while (enumerator.MoveNext())
+                int relation = obj.What.Notable.GetRelation(clan.Leader);
+                if (relation > 50)
                 {
-                    Clan clan = enumerator.Current;
-                    if (clan.Leader != null && !clan.IsPlayerClan()) // Instead of Clan.PlayerClan
+                    float num = (float)(relation - 50) / 2000f;
+                    if (MBRandom.RandomFloat < num)
                     {
-                        int relation = obj.What.Notable.GetRelation(clan.Leader);
-                        if (relation > 50)
-                        {
-                            float num = (float)(relation - 50) / 2000f;
-                            if (MBRandom.RandomFloat < num)
-                            {
-                                obj.What.Notable.SupporterOf = clan;
-                            }
-                        }
+                        obj.What.Notable.SupporterOf = clan;
                     }
                 }
-                return;
+            }
+    });
+}
             }
         }
         int relation2 = obj.What.Notable.GetRelation(obj.What.Notable.SupporterOf.Leader);

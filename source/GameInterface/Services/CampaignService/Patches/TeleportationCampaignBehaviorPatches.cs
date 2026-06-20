@@ -23,7 +23,7 @@ internal class TeleportationCampaignBehaviorPatches
     public static bool RemoveTeleportationDataPrefix(TeleportationCampaignBehavior __instance, TeleportationCampaignBehavior.TeleportationData data, bool isCanceled, bool disbandTargetParty = true)
     {
         // Needs to run on main thread to avoid massive lag
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             __instance._teleportationList.Remove(data);
             if (isCanceled)
@@ -58,7 +58,7 @@ internal class TeleportationCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool DailyTickPartyPrefix(TeleportationCampaignBehavior __instance, MobileParty mobileParty)
     {
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             // IsPlayerClan() replacement for Clan.PlayerClan
             if (mobileParty.IsActive && mobileParty.Army == null && mobileParty.MapEvent == null && mobileParty.LeaderHero != null && mobileParty.LeaderHero.IsNoncombatant && mobileParty.LeaderHero.DeathMark == KillCharacterAction.KillCharacterActionDetail.None && mobileParty.ActualClan != null && !mobileParty.ActualClan.IsPlayerClan() && mobileParty.ActualClan.Leader != mobileParty.LeaderHero && !mobileParty.IsInRaftState && (!mobileParty.IsCurrentlyAtSea || mobileParty.CurrentSettlement != null))
@@ -81,7 +81,7 @@ internal class TeleportationCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool OnHeroComesOfAgePrefix(TeleportationCampaignBehavior __instance, Hero hero)
     {
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             // IsPlayerClan() replacement for Clan.PlayerClan 
             if (!hero.Clan.IsPlayerClan() && !hero.IsNoncombatant)

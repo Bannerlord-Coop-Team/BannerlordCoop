@@ -137,7 +137,20 @@ public class TroopRosterHandler : IHandler
             {
                 Logger.Error(ex, "Failed to AddToCountsAtIndex. TroopRosterId: {TroopRosterId}", obj.TroopRosterId);
             }
-        }
+        GameThread.RunSafe(() =>
+        {
+            using (new AllowedThread())
+            {
+                try
+                {
+                    troopRoster.AddToCountsAtIndex(obj.Index, obj.CountChange, obj.WoundedCountChange, obj.XpChange, obj.RemoveDepleted);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to AddToCountsAtIndex. TroopRosterId: {TroopRosterId}", obj.TroopRosterId);
+                }
+            }
+        });
     }
     #endregion
 
@@ -159,17 +172,20 @@ public class TroopRosterHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging(obj.TroopRosterId, out TroopRoster troopRoster)) return;
         if (!TryResolveCharacterObject(obj.ObjectId, obj.IsHero, out var characterObject)) return;
 
-        using (new AllowedThread())
+        GameThread.RunSafe(() =>
         {
-            try
+            using (new AllowedThread())
             {
-                troopRoster.AddNewElement(characterObject, obj.InsertionIndex);
+                try
+                {
+                    troopRoster.AddNewElement(characterObject, obj.InsertionIndex);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to AddNewElement. TroopRosterId: {TroopRosterId}", obj.TroopRosterId);
+                }
             }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to AddNewElement. TroopRosterId: {TroopRosterId}", obj.TroopRosterId);
-            }
-        }
+        });
     }
     #endregion
 
@@ -185,17 +201,20 @@ public class TroopRosterHandler : IHandler
     {
         if (!objectManager.TryGetObjectWithLogging<TroopRoster>(payload.What.TroopRosterId, out var troopRoster)) return;
 
-        using (new AllowedThread())
+        GameThread.RunSafe(() =>
         {
-            try
+            using (new AllowedThread())
             {
-                troopRoster.RemoveZeroCounts();
+                try
+                {
+                    troopRoster.RemoveZeroCounts();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to RemoveZeroCounts. TroopRosterId: {TroopRosterId}", payload.What.TroopRosterId);
+                }
             }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to RemoveZeroCounts. TroopRosterId: {TroopRosterId}", payload.What.TroopRosterId);
-            }
-        }
+        });
     }
     #endregion
 
@@ -215,17 +234,20 @@ public class TroopRosterHandler : IHandler
 
         if (!objectManager.TryGetObjectWithLogging<TroopRoster>(obj.TroopRosterId, out var troopRoster)) return;
 
-        using (new AllowedThread())
+        GameThread.RunSafe(() =>
         {
-            try
+            using (new AllowedThread())
             {
-                troopRoster.SetElementNumber(obj.Index, obj.Number);
+                try
+                {
+                    troopRoster.SetElementNumber(obj.Index, obj.Number);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to SetElementNumber. TroopRosterId: {TroopRosterId}", obj.TroopRosterId);
+                }
             }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to SetElementNumber. TroopRosterId: {TroopRosterId}", obj.TroopRosterId);
-            }
-        }
+        });
     }
     #endregion
 
@@ -245,17 +267,20 @@ public class TroopRosterHandler : IHandler
 
         if (!objectManager.TryGetObjectWithLogging<TroopRoster>(obj.TroopRosterId, out var troopRoster)) return;
 
-        using (new AllowedThread())
+        GameThread.RunSafe(() =>
         {
-            try
+            using (new AllowedThread())
             {
-                troopRoster.SetElementWoundedNumber(obj.Index, obj.Number);
+                try
+                {
+                    troopRoster.SetElementWoundedNumber(obj.Index, obj.Number);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to SetElementWoundedNumber. TroopRosterId: {TroopRosterId}", obj.TroopRosterId);
+                }
             }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to SetElementWoundedNumber. TroopRosterId: {TroopRosterId}", obj.TroopRosterId);
-            }
-        }
+        });
     }
     #endregion
 
@@ -275,17 +300,20 @@ public class TroopRosterHandler : IHandler
 
         if (!objectManager.TryGetObjectWithLogging<TroopRoster>(obj.TroopRosterId, out var troopRoster)) return;
 
-        using (new AllowedThread())
+        GameThread.RunSafe(() =>
         {
-            try
+            using (new AllowedThread())
             {
-                troopRoster.SetElementXp(obj.Index, obj.Number);
+                try
+                {
+                    troopRoster.SetElementXp(obj.Index, obj.Number);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to SetElementXp. TroopRosterId: {TroopRosterId}", obj.TroopRosterId);
+                }
             }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to SetElementXp. TroopRosterId: {TroopRosterId}", obj.TroopRosterId);
-            }
-        }
+        });
     }
     #endregion
 
@@ -305,17 +333,20 @@ public class TroopRosterHandler : IHandler
 
         if (!objectManager.TryGetObjectWithLogging<TroopRoster>(obj.TroopRosterId, out var troopRoster)) return;
 
-        using (new AllowedThread())
+        GameThread.RunSafe(() =>
         {
-            try
+            using (new AllowedThread())
             {
-                troopRoster.ShiftTroopToIndex(obj.TroopIndex, obj.TargetIndex);
+                try
+                {
+                    troopRoster.ShiftTroopToIndex(obj.TroopIndex, obj.TargetIndex);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to ShiftTroopToIndex. TroopRosterId: {TroopRosterId}", obj.TroopRosterId);
+                }
             }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to ShiftTroopToIndex. TroopRosterId: {TroopRosterId}", obj.TroopRosterId);
-            }
-        }
+        });
     }
     #endregion
 
@@ -335,17 +366,20 @@ public class TroopRosterHandler : IHandler
 
         if (!objectManager.TryGetObjectWithLogging<TroopRoster>(obj.TroopRosterId, out var troopRoster)) return;
 
-        using (new AllowedThread())
+        GameThread.RunSafe(() =>
         {
-            try
+            using (new AllowedThread())
             {
-                troopRoster.SwapTroopsAtIndices(obj.FirstIndex, obj.SecondIndex);
+                try
+                {
+                    troopRoster.SwapTroopsAtIndices(obj.FirstIndex, obj.SecondIndex);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to SwapTroopsAtIndices. TroopRosterId: {TroopRosterId}", obj.TroopRosterId);
+                }
             }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to SwapTroopsAtIndices. TroopRosterId: {TroopRosterId}", obj.TroopRosterId);
-            }
-        }
+        });
     }
     #endregion
 }
