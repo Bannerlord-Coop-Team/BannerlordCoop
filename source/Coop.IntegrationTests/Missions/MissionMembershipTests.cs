@@ -1,7 +1,7 @@
 using Coop.Core.Server.Services.Instances;
-using Coop.Core.Server.Services.Instances.Messages;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
+using GameInterface.Missions.Messages;
 using GameInterface.Missions.Services.Network;
 using GameInterface.Services.Entity;
 
