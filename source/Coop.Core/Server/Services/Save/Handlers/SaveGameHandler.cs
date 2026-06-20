@@ -6,6 +6,7 @@ using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Smithing;
+using GameInterface.Services.Workshops;
 using System.Linq;
 
 namespace Coop.Core.Server.Services.Save.Handlers;
@@ -52,7 +53,10 @@ internal class SaveGameHandler : IHandler
         CraftingPlayerData craftingPlayerData = coopSessionProvider.CoopSession.CraftingPlayerData;
         craftingPlayerData ??= new(new(), new(), new());
 
-        CoopSession session = new CoopSession(saveName, playerRegistry.Players.ToArray(), craftingPlayerData);
+        WorkshopPlayerData workshopPlayerData = coopSessionProvider.CoopSession.WorkshopPlayerData;
+        workshopPlayerData ??= new(new());
+
+        CoopSession session = new CoopSession(saveName, playerRegistry.Players.ToArray(), craftingPlayerData, workshopPlayerData);
         coopSessionProvider.CoopSession = session;
 
         saveManager.SaveCoopSession(saveName, session);
@@ -64,7 +68,7 @@ internal class SaveGameHandler : IHandler
         savedSession = saveManager.LoadCoopSession(obj.What.SaveName);
         if(savedSession == null)
         {
-            savedSession = new CoopSession(obj.What.SaveName, new Player[0], new CraftingPlayerData(new(), new(), new()));
+            savedSession = new CoopSession(obj.What.SaveName, new Player[0], new CraftingPlayerData(new(), new(), new()), new WorkshopPlayerData(new()));
         }
         coopSessionProvider.CoopSession = savedSession;
     }

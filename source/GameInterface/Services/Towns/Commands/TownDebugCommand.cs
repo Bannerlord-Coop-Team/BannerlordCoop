@@ -569,7 +569,7 @@ public class TownDebugCommand
     /// <summary>
     /// View town management data of a specified town
     /// </summary>
-    [CommandLineArgumentFunction("managementdata", "coop.debug.towns")]
+    [CommandLineArgumentFunction("managementdata", "coop.debug.town")]
     public static string ViewManagementData(List<string> strings)
     {
         if (strings.Count == 0) return "Town name argument required.";

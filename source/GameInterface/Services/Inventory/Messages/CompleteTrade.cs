@@ -27,26 +27,30 @@ internal readonly struct CompleteTrade : ICommand
     [ProtoMember(8)]
     public readonly bool CanGainXpFromDiscarding;
     [ProtoMember(9)]
-    public readonly string HeroId;
+    public readonly bool IsManagingWarehouse;
     [ProtoMember(10)]
-    public readonly int TotalAmount;
+    public readonly string HeroId;
     [ProtoMember(11)]
-    public readonly int MerchantGold;
+    public readonly string InitialHeroId;
     [ProtoMember(12)]
-    public readonly string PartyId;
+    public readonly int TotalAmount;
     [ProtoMember(13)]
-    public readonly bool IsSettlementComponentNull;
+    public readonly int MerchantGold;
     [ProtoMember(14)]
+    public readonly string PartyId;
+    [ProtoMember(15)]
+    public readonly bool IsSettlementComponentNull;
+    [ProtoMember(16)]
     public readonly string CurrentSettlementComponentId;
 
-    [ProtoMember(15)]
+    [ProtoMember(17)]
     public readonly (ItemRosterElementData, int)[] BoughtItems;
-    [ProtoMember(16)]
+    [ProtoMember(18)]
     public readonly (ItemRosterElementData, int)[] SoldItems;
 
-    [ProtoMember(17)]
+    [ProtoMember(19)]
     public readonly string TroopRosterId;
-    [ProtoMember(18)]
+    [ProtoMember(20)]
     public readonly TroopRosterData TroopRosterData;
 
     public CompleteTrade(
@@ -58,7 +62,9 @@ internal readonly struct CompleteTrade : ICommand
         Dictionary<string, EquipmentData[]> characterIdEquipmentsData,
         bool isTrading,
         bool canGainXpFromDiscarding,
+        bool isManagingWarehouse,
         string heroId,
+        string initialHeroId,
         int totalAmount,
         int merchantGold,
         string partyId,
@@ -77,7 +83,9 @@ internal readonly struct CompleteTrade : ICommand
         CharacterIdEquipmentsData = characterIdEquipmentsData;
         IsTrading = isTrading;
         CanGainXpFromDiscarding = canGainXpFromDiscarding;
+        IsManagingWarehouse = isManagingWarehouse;
         HeroId = heroId;
+        InitialHeroId = initialHeroId;
         TotalAmount = totalAmount;
         MerchantGold = merchantGold;
         PartyId = partyId;

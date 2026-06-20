@@ -2,6 +2,7 @@
 
 using Common.Messaging;
 using GameInterface.Services.Smithing;
+using GameInterface.Services.Workshops;
 using ProtoBuf;
 
 namespace Coop.Core.Client.Messages;
@@ -18,14 +19,18 @@ public record NetworkGameSaveDataReceived : IEvent
     public string CampaignID { get; }
     [ProtoMember(3)]
     public CraftingPlayerData CraftingPlayerData { get; }
+    [ProtoMember(4)]
+    public WorkshopPlayerData WorkshopPlayerData { get; }
 
     public NetworkGameSaveDataReceived(
         byte[] gameSaveData,
         string campaignID,
-        CraftingPlayerData craftingPlayerData)
+        CraftingPlayerData craftingPlayerData,
+        WorkshopPlayerData workshopPlayerData)
     {
         GameSaveData = gameSaveData;
         CampaignID = campaignID;
         CraftingPlayerData = craftingPlayerData;
+        WorkshopPlayerData = workshopPlayerData;
     }
 }

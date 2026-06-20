@@ -34,7 +34,7 @@ namespace GameInterface.Services.Inventory.Interfaces
 
         void UpdateRosterWithData(ItemRoster targetItemRoster, ItemRosterElement[] itemRosterElements);
 
-        void UpdateEquipmentWithData(MobileParty mobileParty, Dictionary<CharacterObject, Equipment[]> characterEquipments);
+        void UpdateEquipmentWithData(MobileParty mobileParty, Dictionary<CharacterObject, Equipment[]> characterEquipments, Hero initialHero);
     }
 
     internal class InventoryLogicInterface : IInventoryLogicInterface
@@ -179,39 +179,45 @@ namespace GameInterface.Services.Inventory.Interfaces
             targetItemRoster.Add(itemRosterElements);
         }
 
-        public void UpdateEquipmentWithData(MobileParty mobileParty, Dictionary<CharacterObject, Equipment[]> characterEquipments)
+        public void UpdateEquipmentWithData(MobileParty mobileParty, Dictionary<CharacterObject, Equipment[]> characterEquipments, Hero initialHero)
         {
-            foreach (KeyValuePair<CharacterObject, Equipment[]> characterEquipment in characterEquipments)
+            GameThread.RunSafe(() =>
             {
-                CharacterObject character = characterEquipment.Key;
-
-                foreach (Equipment equipment in characterEquipment.Value)
+                foreach (KeyValuePair<CharacterObject, Equipment[]> characterEquipment in characterEquipments)
                 {
-                    Equipment targetEquipment = null;
-                    if (equipment._equipmentType == EquipmentType.Battle)
-                    {
-                        targetEquipment = character.FirstBattleEquipment;
-                    }
-                    else if (equipment._equipmentType == EquipmentType.Civilian)
-                    {
-                        targetEquipment = character.FirstCivilianEquipment;
-                    }
-                    else if (equipment._equipmentType == EquipmentType.Stealth)
-                    {
-                        targetEquipment = character.FirstStealthEquipment;
-                    }
+                    CharacterObject character = characterEquipment.Key;
 
-                    if (targetEquipment != null)
+                    foreach (Equipment equipment in characterEquipment.Value)
                     {
-                        for (int i = 0; i < EquipmentSlotLength; i++)
+                        Equipment targetEquipment = null;
+                        if (equipment._equipmentType == EquipmentType.Battle)
                         {
-                            targetEquipment._itemSlots[i] = equipment._itemSlots[i];
+                            targetEquipment = character.FirstBattleEquipment;
+                        }
+                        else if (equipment._equipmentType == EquipmentType.Civilian)
+                        {
+                            targetEquipment = character.FirstCivilianEquipment;
+                        }
+                        else if (equipment._equipmentType == EquipmentType.Stealth)
+                        {
+                            targetEquipment = character.FirstStealthEquipment;
+                        }
+
+                        if (targetEquipment != null)
+                        {
+                            for (int i = 0; i < EquipmentSlotLength; i++)
+                            {
+                                targetEquipment._itemSlots[i] = equipment._itemSlots[i];
+                            }
                         }
                     }
                 }
-            }
 
-            mobileParty.Party.SetVisualAsDirty();
+                mobileParty.Party.SetVisualAsDirty();
+
+                // When concluding an inventory screen managing a hero not in the main party, need to also update their party's visual
+                initialHero.PartyBelongedTo.Party.SetVisualAsDirty();
+            });
         }
     }
 }
