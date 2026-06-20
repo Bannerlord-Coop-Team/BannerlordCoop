@@ -17,6 +17,11 @@ public abstract class ConnectionStateBase : IConnectionState
     /// </summary>
     public virtual bool IsLoading => false;
 
+    /// <summary>
+    /// Connections have not finished joining by default; the in-game states override this.
+    /// </summary>
+    public virtual bool HasJoinedGame => false;
+
     public abstract void CreateCharacter();
     public abstract void TransferSave();
     public abstract void Load();

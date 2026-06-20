@@ -128,5 +128,52 @@ namespace Coop.Tests.Server.Connections.States
             var clearedMessage = Assert.Single(serverComponent.TestMessageBroker.GetMessagesFromType<LoadingPlayersChanged>());
             Assert.Equal(0, clearedMessage.LoadingPlayerCount);
         }
+
+        [Fact]
+        public void AllPlayersJoined_OnlyTrueOnceConnectionReachesCampaign()
+        {
+            // Arrange
+            var connectPayload = new MessagePayload<PlayerConnected>(this, new PlayerConnected(playerPeer));
+
+            // No connections yet, so there is nobody to be "all connected".
+            Assert.False(connectionCollection.AllPlayersJoined);
+
+            connectionCollection.PlayerJoiningHandler(connectPayload);
+            var connectionLogic = connectionCollection.ConnectionStates[playerPeer];
+
+            // Resolving, creating a character, transferring and loading all count as still joining.
+            Assert.False(connectionCollection.AllPlayersJoined);
+            connectionLogic.SetState<CreateCharacterState>();
+            Assert.False(connectionCollection.AllPlayersJoined);
+            connectionLogic.SetState<TransferSaveState>();
+            Assert.False(connectionCollection.AllPlayersJoined);
+            connectionLogic.SetState<LoadingState>();
+            Assert.False(connectionCollection.AllPlayersJoined);
+
+            // Reaching the campaign means the player has finished joining.
+            connectionLogic.SetState<CampaignState>();
+            Assert.True(connectionCollection.AllPlayersJoined);
+        }
+
+        [Fact]
+        public void AllPlayersJoined_FalseWhileAnotherPeerIsStillJoining()
+        {
+            // Arrange: peer A finishes joining while peer B is still creating its character.
+            var network = serverComponent.Container.Resolve<TestNetwork>();
+            var otherPeer = network.CreatePeer();
+
+            connectionCollection.PlayerJoiningHandler(new MessagePayload<PlayerConnected>(this, new PlayerConnected(playerPeer)));
+            connectionCollection.PlayerJoiningHandler(new MessagePayload<PlayerConnected>(this, new PlayerConnected(otherPeer)));
+
+            connectionCollection.ConnectionStates[playerPeer].SetState<CampaignState>();
+            connectionCollection.ConnectionStates[otherPeer].SetState<CreateCharacterState>();
+
+            // Assert: one peer is in the game but the other has not finished joining.
+            Assert.False(connectionCollection.AllPlayersJoined);
+
+            // Once the other peer also reaches the campaign, everyone has joined.
+            connectionCollection.ConnectionStates[otherPeer].SetState<CampaignState>();
+            Assert.True(connectionCollection.AllPlayersJoined);
+        }
     }
 }

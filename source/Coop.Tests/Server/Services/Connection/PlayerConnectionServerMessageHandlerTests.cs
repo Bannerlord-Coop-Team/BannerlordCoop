@@ -24,7 +24,7 @@ public class PlayerConnectionServerMessageHandlerTests
         var network = new TestNetwork();
         var connectedPeer = network.CreatePeer();
         var handler = new PlayerConnectionServerMessageHandler(broker, network);
-        var payload = new MessagePayload<LoadingPlayersChanged>(this, new LoadingPlayersChanged(2));
+        var payload = new MessagePayload<LoadingPlayersChanged>(this, new LoadingPlayersChanged(2, allPlayersJoined: false));
 
         // Act
         handler.Handle_LoadingPlayersChanged(payload);
@@ -45,7 +45,7 @@ public class PlayerConnectionServerMessageHandlerTests
         var network = new TestNetwork();
         var connectedPeer = network.CreatePeer();
         var handler = new PlayerConnectionServerMessageHandler(broker, network);
-        var payload = new MessagePayload<LoadingPlayersChanged>(this, new LoadingPlayersChanged(0));
+        var payload = new MessagePayload<LoadingPlayersChanged>(this, new LoadingPlayersChanged(0, allPlayersJoined: true));
 
         // Act
         handler.Handle_LoadingPlayersChanged(payload);
@@ -59,6 +59,24 @@ public class PlayerConnectionServerMessageHandlerTests
     }
 
     [Fact]
+    public void LoadingPlayersChanged_WhenNoPlayersLoadingButSomeoneStillJoining_SendsNothing()
+    {
+        // Arrange
+        var broker = new TestMessageBroker();
+        var network = new TestNetwork();
+        var connectedPeer = network.CreatePeer();
+        var handler = new PlayerConnectionServerMessageHandler(broker, network);
+        var payload = new MessagePayload<LoadingPlayersChanged>(this, new LoadingPlayersChanged(0, allPlayersJoined: false));
+
+        // Act
+        handler.Handle_LoadingPlayersChanged(payload);
+
+        // Assert
+        Assert.Empty(broker.GetMessagesFromType<SendInformationMessage>());
+        Assert.False(network.SentNetworkMessages.ContainsKey(connectedPeer.Id));
+    }
+
+    [Fact]
     public void TimeSpeedChangeAttempted_WhilePlayersLoading_RemindsControlsAreDisabled()
     {
         // Arrange
@@ -66,7 +84,7 @@ public class PlayerConnectionServerMessageHandlerTests
         var network = new TestNetwork();
         var handler = new PlayerConnectionServerMessageHandler(broker, network);
         handler.Handle_LoadingPlayersChanged(
-            new MessagePayload<LoadingPlayersChanged>(this, new LoadingPlayersChanged(2)));
+            new MessagePayload<LoadingPlayersChanged>(this, new LoadingPlayersChanged(2, allPlayersJoined: false)));
 
         // Act
         handler.Handle_TimeSpeedChangeAttempted(

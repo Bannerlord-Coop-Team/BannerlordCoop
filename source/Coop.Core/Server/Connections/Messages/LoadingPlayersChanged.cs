@@ -14,8 +14,15 @@ internal record LoadingPlayersChanged : IEvent
     /// </summary>
     public int LoadingPlayerCount { get; }
 
-    public LoadingPlayersChanged(int loadingPlayerCount)
+    /// <summary>
+    /// Whether every connection has finished joining and is now in the game. Lets consumers tell a
+    /// genuine "everyone is in" moment from a connection still resolving or creating its character.
+    /// </summary>
+    public bool AllPlayersJoined { get; }
+
+    public LoadingPlayersChanged(int loadingPlayerCount, bool allPlayersJoined)
     {
         LoadingPlayerCount = loadingPlayerCount;
+        AllPlayersJoined = allPlayersJoined;
     }
 }

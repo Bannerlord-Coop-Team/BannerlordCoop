@@ -53,6 +53,8 @@ public class ConnectionLogic : IConnectionLogic
 
     public bool IsLoading => State.IsLoading;
 
+    public bool HasJoinedGame => State.HasJoinedGame;
+
     public TState SetState<TState>() where TState : IConnectionState
     {
         TState newState = (TState)stateFactories[typeof(TState)]();

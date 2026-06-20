@@ -14,6 +14,11 @@ public interface IConnectionState : IState, IDisposable
     bool IsLoading { get; }
 
     /// <summary>
+    /// Whether this connection has finished joining and is now in the game (campaign or mission).
+    /// </summary>
+    bool HasJoinedGame { get; }
+
+    /// <summary>
     /// Player is in the process of creating a character
     /// </summary>
     void CreateCharacter();

@@ -46,7 +46,7 @@ public class TimeHandlerTests
         var connections = new Mock<IConnectionCollection>();
         var handler = new TimeHandler(broker, network, timeControlInterface.Object, connections.Object);
         var peer = network.CreatePeer();
-        var payload = new MessagePayload<LoadingPlayersChanged>(this, new LoadingPlayersChanged(2));
+        var payload = new MessagePayload<LoadingPlayersChanged>(this, new LoadingPlayersChanged(2, allPlayersJoined: false));
 
         // Act
         handler.Handle_LoadingPlayersChanged(payload);
@@ -68,7 +68,7 @@ public class TimeHandlerTests
         var connections = new Mock<IConnectionCollection>();
         var handler = new TimeHandler(broker, network, timeControlInterface.Object, connections.Object);
         var peer = network.CreatePeer();
-        var payload = new MessagePayload<LoadingPlayersChanged>(this, new LoadingPlayersChanged(0));
+        var payload = new MessagePayload<LoadingPlayersChanged>(this, new LoadingPlayersChanged(0, allPlayersJoined: true));
 
         // Act
         handler.Handle_LoadingPlayersChanged(payload);

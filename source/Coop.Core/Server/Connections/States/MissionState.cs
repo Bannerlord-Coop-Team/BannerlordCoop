@@ -18,6 +18,8 @@ public class MissionState : ConnectionStateBase
         messageBroker.Subscribe<NetworkPlayerCampaignEntered>(PlayerTransitionsCampaignHandler);
     }
 
+    public override bool HasJoinedGame => true;
+
     public override void Dispose()
     {
         messageBroker.Unsubscribe<NetworkPlayerCampaignEntered>(PlayerTransitionsCampaignHandler);

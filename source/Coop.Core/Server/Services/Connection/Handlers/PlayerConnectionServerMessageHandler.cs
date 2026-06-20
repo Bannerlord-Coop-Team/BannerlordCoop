@@ -38,9 +38,19 @@ public class PlayerConnectionServerMessageHandler : IHandler
 
     internal void Handle_LoadingPlayersChanged(MessagePayload<LoadingPlayersChanged> obj)
     {
-        Volatile.Write(ref loadingPlayerCount, obj.What.LoadingPlayerCount);
+        var count = obj.What.LoadingPlayerCount;
+        Volatile.Write(ref loadingPlayerCount, count);
 
-        BroadcastNotification(loadingPlayerCount > 0 ? LoadingMessage(loadingPlayerCount) : UnpauseReadyMessage);
+        if (count > 0)
+        {
+            BroadcastNotification(LoadingMessage(count));
+        }
+        else if (obj.What.AllPlayersJoined)
+        {
+            BroadcastNotification(UnpauseReadyMessage);
+        }
+        // Otherwise no one is loading but a player is still joining (resolving or creating a
+        // character), so stay quiet rather than falsely announce that everyone is connected.
     }
 
     internal void Handle_TimeSpeedChangeAttempted(MessagePayload<TimeSpeedChangedAttempted> obj)

@@ -29,6 +29,14 @@ public class ConnectionCollection : IConnectionCollection
         .Select(conn => conn.Value)
         .Where(conn => conn.IsLoading);
 
+    /// <summary>
+    /// True only when there is at least one connection and every connection has finished joining
+    /// (reached the campaign or a mission). A peer can be connected but still resolving or creating
+    /// its character without counting as loading, so this is what tells whether announcing that all
+    /// players are connected is actually accurate.
+    /// </summary>
+    public bool AllPlayersJoined => !ConnectionStates.IsEmpty && ConnectionStates.Values.All(conn => conn.HasJoinedGame);
+
     private readonly IMessageBroker messageBroker;
     private readonly ConnectionContext connectionContext;
 
@@ -86,7 +94,10 @@ public class ConnectionCollection : IConnectionCollection
         if (loadingCount == lastBroadcastLoadingCount) return;
 
         lastBroadcastLoadingCount = loadingCount;
-        messageBroker.Publish(this, new LoadingPlayersChanged(loadingCount));
+        // A loading peer is never joined, so AllPlayersJoined can only be true once the count hits
+        // zero; gate on that to skip the scan while players are still loading.
+        var allPlayersJoined = loadingCount == 0 && AllPlayersJoined;
+        messageBroker.Publish(this, new LoadingPlayersChanged(loadingCount, allPlayersJoined));
     }
 
     public IEnumerator<IConnectionLogic> GetEnumerator() => ConnectionStates.Values.GetEnumerator();
