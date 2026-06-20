@@ -2,8 +2,10 @@
 using Common;
 using Common.Logging;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.TroopRosters.Interfaces;
 using Serilog;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
@@ -231,5 +233,69 @@ internal class PartyCommands
             return result;
         }
         return "Hero not found.";
+    }
+
+    /// <summary>
+    /// Put a hero (e.g. a player companion) into a hero's party prison roster, to set up the
+    /// companion-preserve test. Args: captor hero name, prisoner hero name.
+    /// </summary>
+    [CommandLineArgumentFunction("imprison_companion", "coop.debug.mobileparty")]
+    public static string ImprisonCompanionCommand(List<string> strings)
+    {
+        if (ModInformation.IsClient) return "Command can only be run on the server.";
+
+        if (strings.Count != 2) return "Captor hero name and prisoner hero name required.";
+
+        var captor = Hero.AllAliveHeroes.FirstOrDefault(h => h.Name.ToString() == strings[0]);
+        if (captor?.PartyBelongedTo == null) return "Captor hero not found or has no party.";
+
+        var prisoner = Hero.AllAliveHeroes.FirstOrDefault(h => h.Name.ToString() == strings[1]);
+        if (prisoner == null) return "Prisoner hero not found.";
+
+        // The preserve only fires for a player companion, so a non-companion would be removed by both the
+        // fixed and the old code and prove nothing. Require a companion so the test actually exercises it.
+        if (!prisoner.IsPlayerCompanion) return prisoner.Name + " is not a player companion; this test needs one.";
+
+        captor.PartyBelongedTo.PrisonRoster.AddToCounts(prisoner.CharacterObject, 1);
+        return prisoner.Name + " (a player companion) added to " + captor.Name + "'s prison roster.";
+    }
+
+    /// <summary>
+    /// Apply a whole-roster snapshot to a hero's party prison roster with the hero prisoners stripped out, as
+    /// if the server freed them. Drives TroopRosterInterface.UpdateWithData on a prison roster: hero prisoners
+    /// (player companions included) must be removed, not preserved, and the removal replicates to clients.
+    /// </summary>
+    [CommandLineArgumentFunction("snapshot_prison", "coop.debug.mobileparty")]
+    public static string SnapshotPrisonCommand(List<string> strings)
+    {
+        if (ModInformation.IsClient) return "Command can only be run on the server.";
+
+        if (strings.Count == 0) return "Hero name required";
+
+        if (TryGetObjectManager(out var objectManager) == false) return "Unable to resolve ObjectManager.";
+
+        var hero = Hero.AllAliveHeroes.FirstOrDefault(h => h.Name.ToString() == strings[0]);
+        if (hero?.PartyBelongedTo == null) return "Hero not found or has no party.";
+
+        var prisonRoster = hero.PartyBelongedTo.PrisonRoster;
+        var troopRosterInterface = new TroopRosterInterface(objectManager);
+
+        // Pack the prison roster, then drop the hero elements so the snapshot no longer carries them.
+        var snapshot = troopRosterInterface.PackTroopRosterData(prisonRoster);
+        snapshot.Data.RemoveAll(e => e.IsHero);
+
+        // Pass a non-null mainHero so the preserve decision turns on the prison-vs-member roster check (the
+        // thing under test), not on a null mainHero short-circuit.
+        troopRosterInterface.UpdateWithData(prisonRoster, snapshot, hero);
+
+        int heroesLeft = 0;
+        for (int i = 0; i < prisonRoster.Count; i++)
+        {
+            if (prisonRoster.GetElementCopyAtIndex(i).Character?.IsHero == true) heroesLeft++;
+        }
+
+        return heroesLeft == 0
+            ? "Applied prison snapshot to " + hero.Name + "; all hero prisoners removed (companion-preserve correctly off for prison rosters)."
+            : "Applied prison snapshot to " + hero.Name + "; " + heroesLeft + " hero prisoner(s) still present (companion-preserve wrongly kept them).";
     }
 }
