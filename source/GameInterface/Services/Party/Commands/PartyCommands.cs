@@ -195,4 +195,41 @@ internal class PartyCommands
         }
         return "Hero not found.";
     }
+
+    /// <summary>
+    /// Remove all prisoners from a hero's party
+    /// </summary>
+    [CommandLineArgumentFunction("removeprisoners", "coop.debug.mobileparty")]
+    public static string RemovePrisonersCommand(List<string> strings)
+    {
+        if (ModInformation.IsClient) return "Command can only be run on the server.";
+
+        if (strings.Count == 0) return "Hero name required";
+
+        StringBuilder stringBuilder = new StringBuilder();
+        foreach (var hero in Hero.AllAliveHeroes)
+        {
+            if (hero.Name.ToString() == strings[0])
+            {
+                var prisonerRoster = hero.PartyBelongedTo.PrisonRoster;
+
+                // Walk from the end so removing the current element leaves the lower indices valid. Each
+                // subtract-to-zero with removeDepleted runs with patches live, so it replicates to clients.
+                for (int i = prisonerRoster.Count - 1; i >= 0; i--)
+                {
+                    var element = prisonerRoster.GetElementCopyAtIndex(i);
+                    prisonerRoster.AddToCounts(element.Character, -element.Number, false, -element.WoundedNumber, 0, true);
+                }
+
+                stringBuilder.AppendLine(strings[0] + " had their prisoners removed.");
+            }
+        }
+
+        string result = stringBuilder.ToString();
+        if (result.Length > 0)
+        {
+            return result;
+        }
+        return "Hero not found.";
+    }
 }
