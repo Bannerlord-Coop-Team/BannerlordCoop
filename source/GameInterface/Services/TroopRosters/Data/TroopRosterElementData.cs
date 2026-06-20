@@ -17,11 +17,15 @@ public readonly struct TroopRosterElementData
     [ProtoMember(4)]
     public readonly int Xp;
 
-    public TroopRosterElementData(string characterId, int number, int woundedNumber, int xp)
+    [ProtoMember(5)]
+    public readonly bool IsHero;
+
+    public TroopRosterElementData(string characterId, int number, int woundedNumber, int xp, bool isHero = false)
     {
         CharacterId = characterId;
         Number = number;
         WoundedNumber = woundedNumber;
         Xp = xp;
+        IsHero = isHero;
     }
 }
