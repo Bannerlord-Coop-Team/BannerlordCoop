@@ -1,5 +1,4 @@
 ﻿using Common.Messaging;
-using SandBox.View.Map;
 using SandBox.View.Map.Visuals;
 
 namespace GameInterface.Services.PartyVisuals.Messages

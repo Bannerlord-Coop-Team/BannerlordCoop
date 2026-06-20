@@ -1,6 +1,3 @@
-using Common.Messaging;
-using Common.Network;
-
 namespace Coop.Core.Server.Connections.States;
 
 /// <summary>

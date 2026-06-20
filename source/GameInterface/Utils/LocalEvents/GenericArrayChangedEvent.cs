@@ -1,6 +1,4 @@
-﻿using Common.Messaging;
-
-namespace GameInterface.Utils.LocalEvents
+﻿namespace GameInterface.Utils.LocalEvents
 {
     public abstract record GenericArrayChangedEvent<TInstance, TValue> : GenericEvent<TInstance, TValue>
     {

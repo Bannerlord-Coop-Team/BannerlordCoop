@@ -3,7 +3,6 @@ using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes;
-using GameInterface.Services.UI.Interfaces;
 using SandBox;
 using Serilog;
 using System;

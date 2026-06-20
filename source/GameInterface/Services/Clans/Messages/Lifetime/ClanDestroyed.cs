@@ -1,5 +1,4 @@
 ﻿using Common.Messaging;
-using ProtoBuf;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Clans.Messages.Lifetime;

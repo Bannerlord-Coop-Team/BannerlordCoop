@@ -1,6 +1,5 @@
 ﻿using Common.Messaging;
 using Coop.Core.Common;
-using GameInterface;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
 

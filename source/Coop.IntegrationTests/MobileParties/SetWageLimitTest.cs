@@ -1,5 +1,4 @@
-﻿using Common.Util;
-using Coop.IntegrationTests.Environment;
+﻿using Coop.IntegrationTests.Environment;
 using GameInterface.Services.MobileParties.Messages;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -20,7 +19,7 @@ public class SetWageLimitTest
         var mobilePartyId = "MyParty";
 
         var client1 = TestEnvironment.Clients.First();
-        var client2 = TestEnvironment.Clients.Last();   
+        var client2 = TestEnvironment.Clients.Last();
         var server = TestEnvironment.Server;
 
         server.CreateRegisteredObject<MobileParty>(mobilePartyId);
@@ -46,5 +45,4 @@ public class SetWageLimitTest
         // Verify server received message from client
         Assert.Equal(1, server.InternalMessages.GetMessageCount<SetWagePaymentLimit>());
     }
-
 }

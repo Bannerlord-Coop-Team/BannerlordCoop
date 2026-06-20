@@ -1,5 +1,4 @@
-﻿using Common.Logging;
-using GameInterface.Services.ObjectManager;
+﻿using GameInterface.Services.ObjectManager;
 using Serilog;
 using System.Collections.Generic;
 using System.Reflection;

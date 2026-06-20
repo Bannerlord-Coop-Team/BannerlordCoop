@@ -1,8 +1,5 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.MapEvents.Messages;

@@ -3,14 +3,12 @@ using Common.Messaging;
 using Common.Network;
 using Common.Serialization;
 using Common.Tests.Utils;
-using Coop.Core;
 using Coop.Core.Client;
 using Coop.Core.Server;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.Mock;
 using GameInterface;
 using GameInterface.Policies;
-using GameInterface.Surrogates;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Environment;

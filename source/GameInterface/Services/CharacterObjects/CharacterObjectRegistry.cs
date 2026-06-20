@@ -1,6 +1,4 @@
-﻿using Common;
-using Common.Util;
-using GameInterface.Registry;
+﻿using Common.Util;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
@@ -30,14 +28,11 @@ internal class CharacterObjectRegistry : AutoRegistryBase<CharacterObject>
     public override void RegisterAllObjects()
     {
         var characterObjects = CharacterObject.All
-            .Concat(Hero.AllAliveHeroes.Select(hero => hero.CharacterObject))
-            .Concat(Hero.DeadOrDisabledHeroes.Select(hero => hero.CharacterObject))
-            .DistinctBy(characterObject => characterObject.StringId);
+             .Concat(Hero.AllAliveHeroes.Select(hero => hero.CharacterObject))
+             .Concat(Hero.DeadOrDisabledHeroes.Select(hero => hero.CharacterObject))
+             .DistinctBy(characterObject => characterObject.StringId);
 
-        // Register every CharacterObject (basic troop templates as well as hero characters), not just
-        // hero-owned ones: troops need a network id keyed by their stable StringId so rosters and
-        // recruitment can resolve them on every machine.
-        foreach (CharacterObject character in CharacterObject.All)
+        foreach (CharacterObject character in characterObjects)
         {
             RegisterExistingObject(character.StringId, character);
         }

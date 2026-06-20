@@ -1,14 +1,9 @@
-﻿using E2E.Tests.Environment;
-using E2E.Tests.Environment.Instance;
-using E2E.Tests.Util;
-using HarmonyLib;
+﻿using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.Siege;
-using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using Xunit.Abstractions;

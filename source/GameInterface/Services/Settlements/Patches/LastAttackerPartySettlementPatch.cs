@@ -6,8 +6,6 @@ using GameInterface.Policies;
 using GameInterface.Services.Settlements.Messages;
 using HarmonyLib;
 using Serilog;
-using System;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 

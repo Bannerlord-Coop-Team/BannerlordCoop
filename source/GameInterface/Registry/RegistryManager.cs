@@ -2,7 +2,6 @@
 using GameInterface.AutoSync;
 using GameInterface.Registry.Auto;
 using GameInterface.Registry.Messages;
-using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
 
 namespace GameInterface.Registry;

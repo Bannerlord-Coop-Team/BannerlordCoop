@@ -1,7 +1,5 @@
 using E2E.Tests.Environment;
 using E2E.Tests.Util;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using Xunit.Abstractions;

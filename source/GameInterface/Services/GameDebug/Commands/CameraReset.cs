@@ -1,6 +1,5 @@
 ﻿using SandBox.View.Map;
 using System.Collections.Generic;
-using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.Core;
 using static TaleWorlds.Library.CommandLineFunctionality;
 

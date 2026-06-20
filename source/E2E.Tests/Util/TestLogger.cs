@@ -1,5 +1,4 @@
 ﻿using Serilog;
-using Serilog.Core;
 using Serilog.Events;
 using Xunit.Abstractions;
 

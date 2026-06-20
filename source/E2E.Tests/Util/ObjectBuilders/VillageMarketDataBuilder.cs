@@ -1,5 +1,4 @@
-﻿using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
+﻿using TaleWorlds.CampaignSystem.Settlements;
 
 namespace E2E.Tests.Util.ObjectBuilders;
 internal class VillageMarketDataBuilder : IObjectBuilder

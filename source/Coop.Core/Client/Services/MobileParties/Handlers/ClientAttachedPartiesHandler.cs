@@ -1,10 +1,6 @@
 ﻿using Common.Messaging;
-using Common.Network;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Messages;
-using GameInterface.Services.ObjectManager;
-using System.Runtime.Serialization;
-using TaleWorlds.CampaignSystem.Party;
 
 namespace Coop.Core.Client.Services.MobileParties.Handlers;
 

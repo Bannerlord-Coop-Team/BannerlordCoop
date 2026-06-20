@@ -1,5 +1,4 @@
-﻿using GameInterface.AutoSync.Builders;
-using GameInterface.AutoSync.Templates;
+﻿using GameInterface.AutoSync.Templates;
 using System.Collections.Generic;
 using Xunit;
 using Xunit.Abstractions;

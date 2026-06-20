@@ -1,8 +1,6 @@
-﻿using Common;
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Common.Util;
 using Coop.Core.Client.Messages;
 using Coop.Core.Client.Services.Heroes.Messages;
 using Coop.Core.Server.Connections.Messages;

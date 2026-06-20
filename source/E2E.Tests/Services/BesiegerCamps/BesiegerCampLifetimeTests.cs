@@ -5,7 +5,6 @@ using HarmonyLib;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using Xunit.Abstractions;
 

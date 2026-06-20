@@ -1,8 +1,8 @@
 ﻿using Autofac;
+using Common.Serialization;
 using GameInterface.Serialization;
 using GameInterface.Tests.Bootstrap.Modules;
 using Xunit;
-using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests.ProofOfConcept
 {

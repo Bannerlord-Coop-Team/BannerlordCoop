@@ -3,8 +3,6 @@ using GameInterface.Services.MapEventParties;
 using GameInterface.Services.Party.Data;
 using GameInterface.Services.TroopRosters.Data;
 using ProtoBuf;
-using System;
-using System.Collections.Generic;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.Party.Messages;

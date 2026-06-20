@@ -5,10 +5,8 @@ using GameInterface.Policies;
 using GameInterface.Services.PartyComponents.Messages;
 using HarmonyLib;
 using Serilog;
-using System;
 using System.Collections.Generic;
 using System.Reflection;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 
 namespace GameInterface.Services.PartyComponents.Patches.Lifetime;

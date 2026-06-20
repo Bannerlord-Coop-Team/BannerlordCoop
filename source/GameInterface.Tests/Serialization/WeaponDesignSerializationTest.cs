@@ -1,14 +1,13 @@
 ﻿using Autofac;
+using Common.Serialization;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Tests.Bootstrap.Modules;
-using System.Reflection;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
 using Xunit;
-using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

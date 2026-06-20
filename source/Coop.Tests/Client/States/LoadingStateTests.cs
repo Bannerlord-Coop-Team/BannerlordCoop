@@ -1,9 +1,7 @@
 ﻿using Autofac;
 using Common.Messaging;
-using Common.Tests.Utils;
 using Coop.Core.Client;
 using Coop.Core.Client.States;
-using GameInterface.Registry.Messages;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.UI.Interfaces;

@@ -1,6 +1,4 @@
-﻿using Common.Logging;
-using HarmonyLib;
-using Serilog;
+﻿using HarmonyLib;
 using TaleWorlds.Engine;
 
 namespace GameInterface.Services.GameDebug.Patches

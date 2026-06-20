@@ -1,13 +1,10 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Coop.Core.Server.Services.Settlements.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Messages;
 using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Runtime.Serialization;
-using System.Text;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace Coop.Core.Server.Services.Settlements.Handlers

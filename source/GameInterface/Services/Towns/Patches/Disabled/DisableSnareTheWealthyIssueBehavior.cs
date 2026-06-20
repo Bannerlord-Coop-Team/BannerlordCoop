@@ -1,6 +1,5 @@
 ﻿using HarmonyLib;
 using SandBox.Issues;
-using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Towns.Patches.Disabled;
 

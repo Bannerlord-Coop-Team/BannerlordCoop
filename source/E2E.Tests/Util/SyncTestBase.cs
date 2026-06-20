@@ -1,6 +1,6 @@
 ﻿using E2E.Tests.Environment;
-using Xunit.Abstractions;
 using E2E.Tests.Environment.Instance;
+using Xunit.Abstractions;
 
 namespace E2E.Tests.Util
 {

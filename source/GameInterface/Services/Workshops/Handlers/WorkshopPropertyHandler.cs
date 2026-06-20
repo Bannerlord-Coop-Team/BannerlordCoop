@@ -3,7 +3,6 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
-using GameInterface.Services.MobileParties.Handlers;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Workshops.Messages;
 using GameInterface.Services.Workshops.Patches;

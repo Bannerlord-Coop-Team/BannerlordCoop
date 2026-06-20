@@ -1,5 +1,4 @@
 ﻿using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Roster;
 
 namespace E2E.Tests.Util.ObjectBuilders
 {

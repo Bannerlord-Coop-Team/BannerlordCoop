@@ -1,5 +1,4 @@
-﻿using Common.Messaging;
-using GameInterface.Utils.LocalEvents;
+﻿using GameInterface.Utils.LocalEvents;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Heroes.Messages.Collections;

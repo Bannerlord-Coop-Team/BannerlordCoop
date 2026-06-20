@@ -1,5 +1,4 @@
 using E2E.Tests.Environment;
-using System.Security.Claims;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using Xunit.Abstractions;

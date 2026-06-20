@@ -5,7 +5,6 @@ using GameInterface.Policies;
 using GameInterface.Services.SiegeEnginesContainers.Messages;
 using HarmonyLib;
 using Serilog;
-using System;
 using System.Collections.Generic;
 using System.Reflection;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;

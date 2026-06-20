@@ -1,16 +1,9 @@
-using Autofac;
-using Common.Messaging;
-using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Util;
-using GameInterface.Services.Armies.Extensions;
 using HarmonyLib;
-using System.Diagnostics;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Library;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Armies;

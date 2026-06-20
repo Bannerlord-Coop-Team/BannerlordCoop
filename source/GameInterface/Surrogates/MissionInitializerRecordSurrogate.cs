@@ -1,6 +1,5 @@
 using ProtoBuf;
 using TaleWorlds.Core;
-using TaleWorlds.Library;
 
 namespace GameInterface.Surrogates;
 

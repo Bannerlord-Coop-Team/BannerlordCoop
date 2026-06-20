@@ -1,12 +1,5 @@
 ﻿using E2E.Tests.Environment;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Security.Claims;
-using System.Text;
-using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.CharacterObjects

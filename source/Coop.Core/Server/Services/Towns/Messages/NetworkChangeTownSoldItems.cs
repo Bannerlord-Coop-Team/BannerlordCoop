@@ -1,7 +1,6 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Towns.Data;
 using ProtoBuf;
-using System.Collections.Generic;
 
 namespace Coop.Core.Server.Services.Towns.Messages
 {

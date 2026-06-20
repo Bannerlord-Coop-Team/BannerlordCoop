@@ -1,6 +1,6 @@
 ﻿using Common.Messaging;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Settlements.Messages;
 

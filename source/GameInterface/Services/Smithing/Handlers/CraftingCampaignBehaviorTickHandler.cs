@@ -14,7 +14,6 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
-using TaleWorlds.Library;
 using static TaleWorlds.CampaignSystem.CampaignBehaviors.CraftingCampaignBehavior;
 
 namespace GameInterface.Services.Smithing.Handlers

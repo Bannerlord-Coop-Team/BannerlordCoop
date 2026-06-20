@@ -1,11 +1,8 @@
 ﻿using Common.Logging;
 using HarmonyLib;
-using SandBox.ViewModelCollection.Map;
 using Serilog;
 using System;
-using System.Collections.Generic;
 using System.Reflection;
-using System.Text;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.PlayerCaptivityService.Patches;

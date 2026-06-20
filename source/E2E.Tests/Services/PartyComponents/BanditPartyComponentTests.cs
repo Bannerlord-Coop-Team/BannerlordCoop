@@ -1,11 +1,10 @@
 ﻿using E2E.Tests.Util;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
-using Xunit.Abstractions;
-using TaleWorlds.Localization;
 using TaleWorlds.Library;
+using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.PartyComponents;
 public class BanditPartyComponentTests : SyncTestBase

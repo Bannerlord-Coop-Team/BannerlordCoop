@@ -18,7 +18,6 @@ using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
-using TaleWorlds.Library;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.MapEvents;

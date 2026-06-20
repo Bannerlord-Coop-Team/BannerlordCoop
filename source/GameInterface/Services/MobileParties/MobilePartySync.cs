@@ -1,7 +1,5 @@
 ﻿using GameInterface.AutoSync;
-using GameInterface.AutoSync;
 using HarmonyLib;
-using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties;

@@ -1,9 +1,5 @@
 ﻿using ProtoBuf;
-using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Settlements.Audit;

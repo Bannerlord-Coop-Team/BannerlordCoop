@@ -1,5 +1,4 @@
 ﻿using Autofac;
-using Common.Messaging;
 using Common.Tests.Utils;
 using Coop.IntegrationTests.Environment.Mock;
 

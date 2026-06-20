@@ -1,10 +1,7 @@
-﻿using GameInterface.Registry;
-using Serilog;
+﻿using Serilog;
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using System.Xml.Linq;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.ObjectManager;

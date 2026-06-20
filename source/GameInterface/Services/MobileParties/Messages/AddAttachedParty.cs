@@ -1,5 +1,4 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.MobileParties.Messages.Data;
 
 namespace GameInterface.Services.MobileParties.Messages;
 

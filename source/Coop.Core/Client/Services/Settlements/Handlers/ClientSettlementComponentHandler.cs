@@ -1,9 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using Coop.Core.Server.Services.Settlements.Messages;
 using GameInterface.Services.Settlements.Messages;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Coop.Core.Client.Services.Settlements.Handlers
 {

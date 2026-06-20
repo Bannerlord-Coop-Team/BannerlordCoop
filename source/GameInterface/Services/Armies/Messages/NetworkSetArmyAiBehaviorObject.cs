@@ -1,8 +1,5 @@
-﻿using ProtoBuf;
-using System;
-using System.Collections.Generic;
-using System.Text;
-using Common.Messaging;
+﻿using Common.Messaging;
+using ProtoBuf;
 
 namespace GameInterface.Services.Armies.Messages;
 

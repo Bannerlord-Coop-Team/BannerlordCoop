@@ -1,5 +1,4 @@
 ﻿using Common.Messaging;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.Services.MapEventParties.Messages;

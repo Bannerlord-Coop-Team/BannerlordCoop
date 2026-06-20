@@ -3,11 +3,6 @@ using Coop.Core.Server.Services.Settlements.Messages;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Settlements.Messages;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace Coop.IntegrationTests.Settlements

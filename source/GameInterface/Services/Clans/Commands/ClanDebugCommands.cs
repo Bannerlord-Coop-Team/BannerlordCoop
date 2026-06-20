@@ -5,7 +5,6 @@ using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
-using TaleWorlds.CampaignSystem.Settlements;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.GameDebug.Commands

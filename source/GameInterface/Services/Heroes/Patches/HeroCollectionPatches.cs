@@ -1,15 +1,15 @@
-﻿using HarmonyLib;
+﻿using GameInterface.Services.Heroes.Messages.Collections;
+using GameInterface.Utils;
+using HarmonyLib;
 using System.Collections.Generic;
-using System.Reflection.Emit;
 using System.Reflection;
+using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.ViewModelCollection.GameMenu.Recruitment;
-using TaleWorlds.CampaignSystem.Settlements;
-using GameInterface.Services.Heroes.Messages.Collections;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
-using GameInterface.Utils;
+using TaleWorlds.CampaignSystem.ViewModelCollection.GameMenu.Recruitment;
 
 namespace GameInterface.Services.Heroes.Patches;
 

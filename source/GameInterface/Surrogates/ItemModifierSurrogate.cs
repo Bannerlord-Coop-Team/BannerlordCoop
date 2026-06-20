@@ -1,5 +1,4 @@
 ﻿using ProtoBuf;
-using System.Collections.Generic;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 

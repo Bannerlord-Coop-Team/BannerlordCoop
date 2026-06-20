@@ -1,14 +1,9 @@
 ﻿using Common.Util;
 using LiteNetLib;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
-using TaleWorlds.Library.NewsManager;
 
 namespace Coop.Tests.Extensions
 {

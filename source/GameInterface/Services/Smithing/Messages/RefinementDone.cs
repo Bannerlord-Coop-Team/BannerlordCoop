@@ -1,5 +1,4 @@
 ﻿using Common.Messaging;
-using ProtoBuf;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using static TaleWorlds.Core.Crafting;

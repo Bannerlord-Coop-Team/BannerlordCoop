@@ -1,7 +1,4 @@
 ﻿using Common.Messaging;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace GameInterface.Services.Heroes.Messages
 {

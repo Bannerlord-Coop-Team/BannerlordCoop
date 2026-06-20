@@ -8,6 +8,7 @@ using Coop.Core.Client.States;
 using Coop.Core.Common;
 using GameInterface.Policies;
 using LiteNetLib;
+using Missions;
 
 namespace Coop.Core.Client;
 
@@ -20,9 +21,11 @@ public class ClientModule : CommonModule
     {
         base.Load(builder);
 
+        builder.RegisterModule<MissionModule>();
+
         builder.RegisterType<ClientContext>().AsSelf().InstancePerLifetimeScope();
         builder.RegisterType<ClientLogic>().As<ILogic>().As<IClientLogic>().InstancePerLifetimeScope();
-        builder.RegisterType<CoopClient>().As<ICoopClient>().As<INetwork>().As<INetEventListener>().InstancePerLifetimeScope();
+        builder.RegisterType<CoopClient>().As<ICoopClient>().As<INetwork>().As<IRelayNetwork>().As<INetEventListener>().InstancePerLifetimeScope();
 
         // Policies
         builder.RegisterType<ClientSyncPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();
