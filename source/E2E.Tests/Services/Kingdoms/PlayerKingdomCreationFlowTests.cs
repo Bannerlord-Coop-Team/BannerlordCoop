@@ -478,6 +478,64 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Fact]
+    public void KingdomDecisionVoteState_RemainsWithNextDecisionWhenEarlierDecisionResolves()
+    {
+        var player1 = CreateSyncedPlayerContext();
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var firstTargetKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var secondTargetKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+
+        ConfigureClanInKingdom(player1.ClanId, kingdomId);
+        EnsureKingdomRegisteredEverywhere(kingdomId);
+        EnsureKingdomRegisteredEverywhere(firstTargetKingdomId);
+        EnsureKingdomRegisteredEverywhere(secondTargetKingdomId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(firstTargetKingdomId, out var firstTargetKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(secondTargetKingdomId, out var secondTargetKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player1.ClanId, out var proposerClan));
+
+            using (new AllowedThread())
+            {
+                kingdom._unresolvedDecisions ??= new MBList<KingdomDecision>();
+                kingdom._unresolvedDecisions.Add(new DeclareWarDecision(proposerClan, firstTargetKingdom));
+                kingdom._unresolvedDecisions.Add(new DeclareWarDecision(proposerClan, secondTargetKingdom));
+            }
+
+            var firstDecision = Assert.IsType<DeclareWarDecision>(kingdom.UnresolvedDecisions[0]);
+            var secondDecision = Assert.IsType<DeclareWarDecision>(kingdom.UnresolvedDecisions[1]);
+            var voteManager = GetVoteManager(Server);
+            voteManager.RegisterDecision(firstDecision);
+            voteManager.RegisterDecision(secondDecision);
+
+            var firstDecisionVote = CreateDeclareWarVote(kingdomId, isFinal: true);
+            var secondDecisionVote = new KingdomDecisionVoteData(
+                kingdomId,
+                decisionIndex: 1,
+                outcomeIndex: 0,
+                supportWeight: (int)Supporter.SupportWeights.FullyPush,
+                isAbstain: false,
+                isFinal: true);
+            voteManager.ApplyRemoteVote(player1.ClanId, firstDecisionVote);
+            voteManager.ApplyRemoteVote(player1.ClanId, secondDecisionVote);
+            Assert.True(voteManager.HasLocalPlayerSubmittedVote(secondDecision));
+
+            Assert.True(voteManager.TryResolveDecision(firstDecision, force: true));
+
+            var remainingDecision = Assert.Single(kingdom.UnresolvedDecisions);
+            Assert.Same(secondDecision, remainingDecision);
+            var debugInfo = Assert.Single(voteManager.GetDecisionDebugInfo(kingdom));
+            Assert.Equal(0, debugInfo.DecisionIndex);
+            Assert.Contains(debugInfo.ClientVotes, vote =>
+                vote.ClanId == player1.ClanId &&
+                vote.HasVote &&
+                vote.IsFinal);
+        });
+    }
+
+    [Fact]
     public void KingdomDecisionPreview_DoesNotShowUnvotedPlayerClanAsSupporter()
     {
         var client1 = Clients.First();

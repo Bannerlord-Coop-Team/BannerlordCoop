@@ -376,6 +376,13 @@ namespace GameInterface.Services.Kingdoms
 
             if (!TryGetDecision(kingdomId, decisionIndex, out KingdomDecision decision)) return;
 
+            RemoveDecisionState(decision);
+        }
+
+        private void RemoveDecisionState(KingdomDecision decision)
+        {
+            if (decision == null) return;
+
             DecisionStates.Remove(decision);
             LocalSubmittedDecisions.Remove(decision);
             foreach (KingdomDecision staleDecision in DecisionStates.Keys
@@ -656,7 +663,7 @@ namespace GameInterface.Services.Kingdoms
             {
                 state.Decision.Kingdom.RemoveDecision(state.Decision);
             }
-            ClearDecisionState(state.KingdomId, state.DecisionIndex);
+            RemoveDecisionState(state.Decision);
         }
 
         private string GetDecisionNotificationText(
