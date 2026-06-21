@@ -78,29 +78,29 @@ internal class TroopRosterDeltaHandler : IHandler
     private void Handle_CountsAtIndexAdded(MessagePayload<CountsAtIndexAdded> payload)
     {
         var e = payload.What;
-        if (!TryResolve(e.TroopRoster, e.Character, out var rosterId, out var characterId, out var isHero)) return;
-        network.SendAll(new NetworkTroopRosterAddCounts(rosterId, characterId, isHero, e.CountChange, e.WoundedCountChange, e.XpChange, e.RemoveDepleted));
+        if (!TryResolve(e.TroopRoster, e.Character, out var rosterId, out var characterId)) return;
+        network.SendAll(new NetworkTroopRosterAddCounts(rosterId, characterId, e.CountChange, e.WoundedCountChange, e.XpChange, e.RemoveDepleted));
     }
 
     private void Handle_ElementNumberSet(MessagePayload<ElementNumberSet> payload)
     {
         var e = payload.What;
-        if (!TryResolve(e.TroopRoster, e.Character, out var rosterId, out var characterId, out var isHero)) return;
-        network.SendAll(new NetworkTroopRosterSetNumber(rosterId, characterId, isHero, e.Number));
+        if (!TryResolve(e.TroopRoster, e.Character, out var rosterId, out var characterId)) return;
+        network.SendAll(new NetworkTroopRosterSetNumber(rosterId, characterId, e.Number));
     }
 
     private void Handle_ElementWoundedNumberSet(MessagePayload<ElementWoundedNumberSet> payload)
     {
         var e = payload.What;
-        if (!TryResolve(e.TroopRoster, e.Character, out var rosterId, out var characterId, out var isHero)) return;
-        network.SendAll(new NetworkTroopRosterSetWoundedNumber(rosterId, characterId, isHero, e.Number));
+        if (!TryResolve(e.TroopRoster, e.Character, out var rosterId, out var characterId)) return;
+        network.SendAll(new NetworkTroopRosterSetWoundedNumber(rosterId, characterId, e.Number));
     }
 
     private void Handle_ElementXpSet(MessagePayload<ElementXpSet> payload)
     {
         var e = payload.What;
-        if (!TryResolve(e.TroopRoster, e.Character, out var rosterId, out var characterId, out var isHero)) return;
-        network.SendAll(new NetworkTroopRosterSetXp(rosterId, characterId, isHero, e.Number));
+        if (!TryResolve(e.TroopRoster, e.Character, out var rosterId, out var characterId)) return;
+        network.SendAll(new NetworkTroopRosterSetXp(rosterId, characterId, e.Number));
     }
 
     private void Handle_ZeroCountsRemoved(MessagePayload<ZeroCountsRemoved> payload)
@@ -110,23 +110,18 @@ internal class TroopRosterDeltaHandler : IHandler
     }
 
     /// <summary>
-    /// Resolves the roster id and the element's network identity: a hero in the roster keys by its Hero id,
-    /// a basic troop by its CharacterObject id. The character is captured by the patch while its index was
-    /// still valid, so this never reads a post-mutation index and a removal still names the right troop.
+    /// Resolves the roster id and the element's CharacterObject id. Every character, hero or basic troop, is
+    /// registered by its CharacterObject, so one lookup keys both. The character is captured by the patch while
+    /// its index was still valid, so this never reads a post-mutation index and a removal still names the right
+    /// troop.
     /// </summary>
-    private bool TryResolve(TroopRoster roster, CharacterObject character, out string rosterId, out string characterId, out bool isHero)
+    private bool TryResolve(TroopRoster roster, CharacterObject character, out string rosterId, out string characterId)
     {
         rosterId = null;
         characterId = null;
-        isHero = false;
         if (roster == null || character == null) return false;
         if (!objectManager.TryGetIdWithLogging(roster, out rosterId)) return false;
-
-        var hero = character.HeroObject;
-        isHero = hero != null;
-        return isHero
-            ? objectManager.TryGetIdWithLogging(hero, out characterId)
-            : objectManager.TryGetIdWithLogging(character, out characterId);
+        return objectManager.TryGetIdWithLogging(character, out characterId);
     }
 
     #endregion
@@ -136,7 +131,7 @@ internal class TroopRosterDeltaHandler : IHandler
     private void Handle_NetworkAddCounts(MessagePayload<NetworkTroopRosterAddCounts> payload)
     {
         var m = payload.What;
-        Apply(m.RosterId, m.CharacterId, m.IsHero, nameof(NetworkTroopRosterAddCounts), (roster, character) =>
+        Apply(m.RosterId, m.CharacterId, nameof(NetworkTroopRosterAddCounts), (roster, character) =>
         {
             // A subtract for a troop this client doesn't have yet can't apply: vanilla AddToCounts asserts and
             // does nothing when the element is absent and the net change is <= 0. The add that creates the
@@ -153,21 +148,21 @@ internal class TroopRosterDeltaHandler : IHandler
     private void Handle_NetworkSetNumber(MessagePayload<NetworkTroopRosterSetNumber> payload)
     {
         var m = payload.What;
-        ApplyToExisting(m.RosterId, m.CharacterId, m.IsHero, nameof(NetworkTroopRosterSetNumber),
+        ApplyToExisting(m.RosterId, m.CharacterId, nameof(NetworkTroopRosterSetNumber),
             (roster, index) => roster.SetElementNumber(index, m.Number));
     }
 
     private void Handle_NetworkSetWoundedNumber(MessagePayload<NetworkTroopRosterSetWoundedNumber> payload)
     {
         var m = payload.What;
-        ApplyToExisting(m.RosterId, m.CharacterId, m.IsHero, nameof(NetworkTroopRosterSetWoundedNumber),
+        ApplyToExisting(m.RosterId, m.CharacterId, nameof(NetworkTroopRosterSetWoundedNumber),
             (roster, index) => roster.SetElementWoundedNumber(index, m.Number));
     }
 
     private void Handle_NetworkSetXp(MessagePayload<NetworkTroopRosterSetXp> payload)
     {
         var m = payload.What;
-        ApplyToExisting(m.RosterId, m.CharacterId, m.IsHero, nameof(NetworkTroopRosterSetXp),
+        ApplyToExisting(m.RosterId, m.CharacterId, nameof(NetworkTroopRosterSetXp),
             (roster, index) => roster.SetElementXp(index, m.Xp));
     }
 
@@ -190,24 +185,14 @@ internal class TroopRosterDeltaHandler : IHandler
     /// re-trigger the authority patches. Resolution runs inside the game loop too, so it stays ordered
     /// behind any deferred create of the roster or character.
     /// </summary>
-    private void Apply(string rosterId, string characterId, bool isHero, string messageName, Action<TroopRoster, CharacterObject> apply)
+    private void Apply(string rosterId, string characterId, string messageName, Action<TroopRoster, CharacterObject> apply)
     {
         GameThread.RunSafe(() =>
         {
             using (new AllowedThread())
             {
                 if (!objectManager.TryGetObjectWithLogging<TroopRoster>(rosterId, out var roster)) return;
-
-                CharacterObject character;
-                if (isHero)
-                {
-                    if (!objectManager.TryGetObjectWithLogging<Hero>(characterId, out var hero)) return;
-                    character = hero.CharacterObject;
-                }
-                else if (!objectManager.TryGetObjectWithLogging<CharacterObject>(characterId, out character))
-                {
-                    return;
-                }
+                if (!objectManager.TryGetObjectWithLogging<CharacterObject>(characterId, out var character)) return;
 
                 apply(roster, character);
             }
@@ -222,9 +207,9 @@ internal class TroopRosterDeltaHandler : IHandler
     /// roster's cached totals (only AddToCounts does), so a placeholder would under-count TotalManCount and be
     /// wiped by the next RemoveZeroCounts. Skipping keeps the client consistent until the create arrives.
     /// </summary>
-    private void ApplyToExisting(string rosterId, string characterId, bool isHero, string messageName, Action<TroopRoster, int> apply)
+    private void ApplyToExisting(string rosterId, string characterId, string messageName, Action<TroopRoster, int> apply)
     {
-        Apply(rosterId, characterId, isHero, messageName, (roster, character) =>
+        Apply(rosterId, characterId, messageName, (roster, character) =>
         {
             int index = roster.FindIndexOfTroop(character);
             if (index < 0)

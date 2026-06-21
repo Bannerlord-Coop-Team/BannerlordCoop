@@ -10,10 +10,6 @@ namespace GameInterface.Services.TroopRosters.Messages;
 /// totals correct, so a positive add creates the element if the client is missing it. A subtract for an
 /// element the client does not have is skipped, since vanilla cannot create one from a non-positive add.
 /// </summary>
-/// <remarks>
-/// <see cref="IsHero"/> is true when <see cref="CharacterId"/> is a Hero id (a hero serving in the
-/// roster), false when it is a basic troop's CharacterObject id.
-/// </remarks>
 [ProtoContract(SkipConstructor = true)]
 internal readonly struct NetworkTroopRosterAddCounts : ICommand
 {
@@ -22,21 +18,18 @@ internal readonly struct NetworkTroopRosterAddCounts : ICommand
     [ProtoMember(2)]
     public readonly string CharacterId;
     [ProtoMember(3)]
-    public readonly bool IsHero;
-    [ProtoMember(4)]
     public readonly int Count;
-    [ProtoMember(5)]
+    [ProtoMember(4)]
     public readonly int WoundedCount;
-    [ProtoMember(6)]
+    [ProtoMember(5)]
     public readonly int XpChange;
-    [ProtoMember(7)]
+    [ProtoMember(6)]
     public readonly bool RemoveDepleted;
 
-    public NetworkTroopRosterAddCounts(string rosterId, string characterId, bool isHero, int count, int woundedCount, int xpChange, bool removeDepleted)
+    public NetworkTroopRosterAddCounts(string rosterId, string characterId, int count, int woundedCount, int xpChange, bool removeDepleted)
     {
         RosterId = rosterId;
         CharacterId = characterId;
-        IsHero = isHero;
         Count = count;
         WoundedCount = woundedCount;
         XpChange = xpChange;
