@@ -184,19 +184,19 @@ internal class BattleSimulationRunHandler : IHandler
         if (side?.MapEvent == null || joiningParty == null)
             return;
 
-        if (!objectManager.TryGetId(side.MapEvent, out var mapEventId))
-            return;
-
-        lock (simLock)
-        {
-            if (!activeSimulations.ContainsKey(mapEventId))
-                return;
-        }
-
         // Publishing happens during the native AddPartyInternal, which already runs on the game thread; this
         // only touches the simulation pool via the party object, so it is safe here. GameThread.Run runs inline
         // when already on that thread.
-        GameThread.Run(() => AddPartyToActiveSimulation(side, joiningParty));
+        GameThread.Run(() => {
+
+            if (!objectManager.TryGetId(side.MapEvent, out var mapEventId))
+                return;
+
+            if (!activeSimulations.ContainsKey(mapEventId))
+                return;
+
+            AddPartyToActiveSimulation(side, joiningParty);
+        });
     }
 
     /// <summary>[Server, main thread] Allocate a late-joining party's troops into the live simulation pool.</summary>
