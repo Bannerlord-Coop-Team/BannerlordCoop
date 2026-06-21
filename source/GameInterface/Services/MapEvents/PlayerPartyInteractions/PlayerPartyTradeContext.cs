@@ -359,11 +359,10 @@ internal static class PlayerPartyTradeContext
 
         foreach (var offeredTroop in offeredTroops)
         {
-            var key = GetCharacterKey(offeredTroop.CharacterId, offeredTroop.IsHero);
-            if (result.TryGetValue(key, out var currentAmount))
-                result[key] = currentAmount + offeredTroop.Number;
+            if (result.TryGetValue(offeredTroop.CharacterId, out var currentAmount))
+                result[offeredTroop.CharacterId] = currentAmount + offeredTroop.Number;
             else
-                result[key] = offeredTroop.Number;
+                result[offeredTroop.CharacterId] = offeredTroop.Number;
         }
 
         return result;
