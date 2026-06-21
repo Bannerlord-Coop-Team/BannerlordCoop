@@ -126,18 +126,13 @@ namespace Coop.Core
             return true;
         }
 
-        // Applies the Harmony patches (the long part of host start: hundreds of patches plus the one-time
-        // sync-patch compile), then starts the server logic and runs afterStart (which loads the save).
-        // The patches MUST be live before the save is loaded (the save-load Harmony patches publish
-        // GameLoaded, which the load flow depends on), so they run BEFORE the bring-up here, not inside the
-        // load. The loading screen only paints when the main thread returns to the engine each frame, so
-        // running the ~tens-of-seconds patch work on it freezes the screen. On a graphical host the patches
-        // therefore run OFF the main thread, so the engine keeps painting and animating the coop loading
-        // screen (this is how the client shows its loading screen too). Only the pure-CPU patch apply runs
-        // off-thread; the bring-up (server logic + load), which creates objects and publishes messages, is
-        // marshaled BACK onto the game thread so it stays single-threaded and ordered. On the headless
-        // server (no loading window) it all runs synchronously, so the load state is pushed before this
-        // returns, as the launcher relies on.
+        // Applies the patches, then starts the server logic and loads the save (afterStart). Patches must
+        // be live before the save loads (the save-load patches publish GameLoaded, which the load flow
+        // needs), so they run before the bring-up, not inside it. The patch work takes tens of seconds and
+        // would freeze the loading screen on the main thread, so a graphical host runs it OFF the main
+        // thread (the engine keeps painting) and marshals the bring-up (which creates objects and publishes
+        // messages) BACK to the game thread to keep it ordered. Headless has no loading window, so it runs
+        // synchronously (the launcher relies on the load state being pushed before this returns).
         private void StartServer(Action afterStart)
         {
             var startedContainer = container;
