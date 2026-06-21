@@ -27,25 +27,63 @@ public class LordPartyComponentTranspilers
 {
     private static readonly ILogger Logger = LogManager.GetLogger<LordPartyComponentTranspilers>();
 
-    public static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredConstructors(typeof(LordPartyComponent));
+    public static IEnumerable<MethodBase> TargetMethods()
+    {
+        foreach (var ctor in AccessTools.GetDeclaredConstructors(typeof(LordPartyComponent)))
+            yield return ctor;
+
+        // ChangePartyOwner also assigns Owner (runtime ownership/leader changes).
+        yield return AccessTools.Method(typeof(LordPartyComponent), nameof(LordPartyComponent.ChangePartyOwner));
+    }
 
     [HarmonyTranspiler]
-    private static IEnumerable<CodeInstruction> InitializationArgsTranspiler(IEnumerable<CodeInstruction> instructions)
+    private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
     {
-        var field = AccessTools.Field(typeof(LordPartyComponent), nameof(LordPartyComponent._initializationArgs));
-        var fieldIntercept = AccessTools.Method(typeof(LordPartyComponentTranspilers), nameof(InitializationArgsIntercept));
+        var initArgsField = AccessTools.Field(typeof(LordPartyComponent), nameof(LordPartyComponent._initializationArgs));
+        var initArgsIntercept = AccessTools.Method(typeof(LordPartyComponentTranspilers), nameof(InitializationArgsIntercept));
+
+        // Owner is a { get; private set; } auto-property; its 8-byte setter gets JIT-inlined into the
+        // ctor, so a prefix on set_Owner never fires. Intercept the call site here instead so the change
+        // is reliably replicated. (Field-syncing the backing store wouldn't help — the stfld lives in
+        // set_Owner, which is the method that gets inlined away.)
+        var ownerSetter = AccessTools.PropertySetter(typeof(LordPartyComponent), nameof(LordPartyComponent.Owner));
+        var ownerIntercept = AccessTools.Method(typeof(LordPartyComponentTranspilers), nameof(OwnerSetIntercept));
 
         foreach (var instruction in instructions)
         {
-            if (instruction.StoresField(field))
+            if (instruction.StoresField(initArgsField))
             {
-                yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+                yield return new CodeInstruction(OpCodes.Call, initArgsIntercept);
+            }
+            else if (instruction.Calls(ownerSetter))
+            {
+                yield return new CodeInstruction(OpCodes.Call, ownerIntercept);
             }
             else
             {
                 yield return instruction;
             }
         }
+    }
+
+    public static void OwnerSetIntercept(LordPartyComponent instance, Hero owner)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed())
+        {
+            instance.Owner = owner;
+            return;
+        }
+
+        if (ModInformation.IsClient)
+        {
+            Logger.Error("Client updated managed {type}", "LordPartyComponent.Owner");
+            instance.Owner = owner;
+            return;
+        }
+
+        MessageBroker.Instance.Publish(instance, new LordPartyOwnerChanged(instance, owner));
+
+        instance.Owner = owner;
     }
 
     public static void InitializationArgsIntercept(LordPartyComponent instance, LordPartyComponent.InitializationArgs initArgs)
@@ -59,6 +97,7 @@ public class LordPartyComponentTranspilers
         if (ModInformation.IsClient)
         {
             Logger.Error("Client updated managed {type}", nameof(instance._initializationArgs));
+            instance._initializationArgs = initArgs;
             return;
         }
 
