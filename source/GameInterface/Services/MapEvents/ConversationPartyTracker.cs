@@ -1,7 +1,6 @@
 using Common.Messaging;
 using GameInterface.Services.ObjectManager;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 
 namespace GameInterface.Services.MapEvents;
 
@@ -29,7 +28,7 @@ internal sealed class ConversationPartyTracker : IHandler
 
     private readonly object stateLock = new object();
     private readonly Dictionary<string, Engagement> engagementsByPartyId = new Dictionary<string, Engagement>();
-    private readonly Dictionary<object, string> partyIdsByEngager = new Dictionary<object, string>(ReferenceObjectComparer.Instance);
+    private readonly Dictionary<object, string> partyIdsByEngager = new Dictionary<object, string>();
 
     // Player-vs-player conversations: both player parties' ids -> the partner's id. Unlike an AI engagement no party
     // is held/AI-disabled; this just marks the two players unattackable by anyone but each other until the battle
@@ -39,7 +38,7 @@ internal sealed class ConversationPartyTracker : IHandler
     // Defender party id <-> the defender client's peer, learned from NetworkPvpDefenderShown. The attacker peer is
     // tracked elsewhere (it sent the request); this lets a disconnecting defender be mapped back to its conversation.
     private readonly Dictionary<string, object> pvpPeerByPartyId = new Dictionary<string, object>();
-    private readonly Dictionary<object, string> pvpPartyIdByPeer = new Dictionary<object, string>(ReferenceObjectComparer.Instance);
+    private readonly Dictionary<object, string> pvpPartyIdByPeer = new Dictionary<object, string>();
 
     private volatile bool isEmpty = true;
     private volatile bool pvpIsEmpty = true;
@@ -116,7 +115,7 @@ internal sealed class ConversationPartyTracker : IHandler
 
         lock (stateLock)
         {
-            if (engagementsByPartyId.TryGetValue(partyId, out var existing) && !ReferenceEquals(existing.EngagerKey, engagerKey))
+            if (engagementsByPartyId.TryGetValue(partyId, out var existing) && !Equals(existing.EngagerKey, engagerKey))
                 return false;
 
             if (partyIdsByEngager.TryGetValue(engagerKey, out var currentPartyId))
@@ -175,7 +174,7 @@ internal sealed class ConversationPartyTracker : IHandler
 
         lock (stateLock)
         {
-            return engagementsByPartyId.TryGetValue(partyId, out var engagement) && !ReferenceEquals(engagement.EngagerKey, engagerKey);
+            return engagementsByPartyId.TryGetValue(partyId, out var engagement) && !Equals(engagement.EngagerKey, engagerKey);
         }
     }
 
@@ -255,14 +254,5 @@ internal sealed class ConversationPartyTracker : IHandler
             pvpPeerByPartyId.Remove(partyId);
             pvpPartyIdByPeer.Remove(peer);
         }
-    }
-
-    private sealed class ReferenceObjectComparer : IEqualityComparer<object>
-    {
-        public static readonly ReferenceObjectComparer Instance = new ReferenceObjectComparer();
-
-        public new bool Equals(object x, object y) => ReferenceEquals(x, y);
-
-        public int GetHashCode(object obj) => RuntimeHelpers.GetHashCode(obj);
     }
 }
