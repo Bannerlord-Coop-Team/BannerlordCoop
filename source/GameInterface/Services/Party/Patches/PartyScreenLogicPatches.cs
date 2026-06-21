@@ -122,6 +122,7 @@ internal class PartyScreenLogicPatches
     [HarmonyPrefix]
     public static bool IsExecutablePrefix(PartyScreenLogic.TroopType troopType, CharacterObject character, PartyScreenLogic.PartyRosterSide side)
     {
-        return !(character.IsHero && character.HeroObject.IsPlayerHero());
+        // Executable if NOT player hero
+        return character.HeroObject?.IsPlayerHero() != true;
     }
 }
