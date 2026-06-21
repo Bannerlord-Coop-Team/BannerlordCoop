@@ -1,5 +1,7 @@
 ﻿using Common.Util;
 using HarmonyLib;
+using TaleWorlds.CampaignSystem.GameComponents;
+using TaleWorlds.CampaignSystem.ViewModelCollection;
 using TaleWorlds.Core.ViewModelCollection.Information;
 using TaleWorlds.Library;
 
@@ -34,6 +36,24 @@ internal class AllowTooltipProperty
     }
 
     [HarmonyPatch(nameof(TooltipProperty.RefreshDefinition))]
+    [HarmonyFinalizer]
+    private static void Finalizer_Tick()
+    {
+        AllowedThread.RevokeThisThread();
+    }
+}
+
+[HarmonyPatch(typeof(TooltipRefresherCollection))]
+internal class AllowTooltipRefresherCollection
+{
+    [HarmonyPatch(nameof(TooltipRefresherCollection.RefreshMapEventTooltip))]
+    [HarmonyPrefix]
+    private static void PrefixTick()
+    {
+        AllowedThread.AllowThisThread();
+    }
+
+    [HarmonyPatch(nameof(TooltipRefresherCollection.RefreshMapEventTooltip))]
     [HarmonyFinalizer]
     private static void Finalizer_Tick()
     {

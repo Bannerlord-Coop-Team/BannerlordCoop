@@ -1096,16 +1096,9 @@ internal class PlayerPartyInteractionHandler : IHandler
         {
             if (character == null || count <= 0) continue;
 
-            var hero = character.HeroObject;
-            var isHero = hero != null;
-            string characterId;
-            if (isHero)
-            {
-                if (!objectManager.TryGetId(hero, out characterId)) continue;
-            }
-            else if (!objectManager.TryGetId(character, out characterId)) continue;
+            if (!objectManager.TryGetIdWithLogging(character, out var characterId)) continue;
 
-            result.Add(new TroopRosterElementData(characterId, count, 0, 0, isHero));
+            result.Add(new TroopRosterElementData(characterId, count, 0, 0));
         }
 
         return result.ToArray();
@@ -1120,16 +1113,10 @@ internal class PlayerPartyInteractionHandler : IHandler
             var character = troop.Character;
             if (character == null || count <= 0) continue;
 
-            var hero = character.HeroObject;
-            var isHero = hero != null;
-            string characterId;
-            if (isHero)
-            {
-                if (!objectManager.TryGetId(hero, out characterId)) continue;
-            }
-            else if (!objectManager.TryGetId(character, out characterId)) continue;
+            if (!objectManager.TryGetIdWithLogging(character, out var characterId))
+                continue;
 
-            result.Add(new TroopRosterElementData(characterId, count, troop.WoundedNumber, troop.Xp, isHero));
+            result.Add(new TroopRosterElementData(characterId, count, troop.WoundedNumber, troop.Xp));
         }
 
         return result.ToArray();

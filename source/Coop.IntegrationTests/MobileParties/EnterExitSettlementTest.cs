@@ -1,3 +1,4 @@
+using Coop.Core.Server.Services.MobileParties.Messages;
 using Coop.IntegrationTests.Environment;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 
@@ -40,6 +41,36 @@ namespace Coop.IntegrationTests.MobileParties
             client1.SimulateMessage(this, message);
 
             // Assert
+            foreach (var client in TestEnvironment.Clients.Where(c => c != client1))
+            {
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<PartyEnterSettlement>());
+            }
+        }
+
+        /// <summary>
+        /// While the first settlement-encounter request is still in flight, the controlled party re-attempts the
+        /// encounter every campaign tick. Verify those rapid retries are rate-limited to a single network request
+        /// instead of flooding the server.
+        /// </summary>
+        [Fact]
+        public void RapidEnterAttempts_RateLimited_ToOneRequest()
+        {
+            // Arrange
+            var client1 = TestEnvironment.Clients.First();
+
+            var party = client1.CreateRegisteredObject<MobileParty>("party1");
+            var settlement = client1.CreateRegisteredObject<Settlement>("settlement1");
+
+            var message = new StartSettlementEncounterAttempted(party, settlement);
+
+            // Act - two attempts in immediate succession, well within the request cooldown
+            client1.SimulateMessage(this, message);
+            client1.SimulateMessage(this, message);
+
+            // Assert - only the first attempt reaches the server; the second is dropped by the rate limiter
+            Assert.Equal(1, client1.NetworkSentMessages.GetMessageCount<NetworkRequestStartSettlementEncounter>());
+
+            // And the enter is applied on the other clients exactly once
             foreach (var client in TestEnvironment.Clients.Where(c => c != client1))
             {
                 Assert.Equal(1, client.InternalMessages.GetMessageCount<PartyEnterSettlement>());
