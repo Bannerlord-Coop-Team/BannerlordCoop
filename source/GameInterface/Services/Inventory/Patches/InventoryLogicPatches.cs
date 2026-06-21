@@ -21,12 +21,12 @@ internal class InventoryLogicPatches
     [HarmonyPrefix]
     static bool DoneLogicPrefix(InventoryLogic __instance, ref bool __result)
     {
-        if (PlayerPartyTradeContext.IsActive)
-        {
-            PlayerPartyTradeContext.PublishAccept(true);
-            __result = true;
-            return false;
-        }
+        //if (PlayerPartyTradeContext.IsActive)
+        //{
+        //    PlayerPartyTradeContext.PublishAccept(true);
+        //    __result = true;
+        //    return false;
+        //}
 
         if (__instance.IsPreviewingItem)
         {
@@ -82,20 +82,20 @@ internal class InventoryLogicPatches
         return false;
     }
 
-    [HarmonyPatch(nameof(InventoryLogic.TransferItem))]
-    [HarmonyPrefix]
-    static bool TransferItemPrefix(ref TransferCommand transferCommand, ref List<TransferCommandResult> __result)
-    {
-        if (PlayerPartyTradeContext.CanTransfer(transferCommand)) return true;
+    //[HarmonyPatch(nameof(InventoryLogic.TransferItem))]
+    //[HarmonyPrefix]
+    //static bool TransferItemPrefix(ref TransferCommand transferCommand, ref List<TransferCommandResult> __result)
+    //{
+    //    if (PlayerPartyTradeContext.CanTransfer(transferCommand)) return true;
 
-        __result = new List<TransferCommandResult>();
-        return false;
-    }
+    //    __result = new List<TransferCommandResult>();
+    //    return false;
+    //}
 
-    [HarmonyPatch(nameof(InventoryLogic.TransferItem))]
-    [HarmonyPostfix]
-    static void TransferItemPostfix(InventoryLogic __instance)
-    {
-        PlayerPartyTradeContext.PublishOfferChanged(__instance);
-    }
+    //[HarmonyPatch(nameof(InventoryLogic.TransferItem))]
+    //[HarmonyPostfix]
+    //static void TransferItemPostfix(InventoryLogic __instance)
+    //{
+    //    PlayerPartyTradeContext.PublishOfferChanged(__instance);
+    //}
 }

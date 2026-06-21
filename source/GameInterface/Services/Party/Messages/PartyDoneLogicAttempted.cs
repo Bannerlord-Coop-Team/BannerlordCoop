@@ -7,7 +7,7 @@ using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.Party.Messages;
 
-public readonly struct AttemptPartyDoneLogic : IEvent
+public readonly struct PartyDoneLogicAttempted : IEvent
 {
     public readonly Hero MainHero;
     public readonly FlattenedTroopRoster TakenPrisonersRoster;
@@ -25,7 +25,7 @@ public readonly struct AttemptPartyDoneLogic : IEvent
     public readonly int PartyMoraleChangeAmount;
     public readonly bool DoNotApplyGoldTransactions;
 
-    public AttemptPartyDoneLogic(
+    public PartyDoneLogicAttempted(
         Hero mainHero,
         FlattenedTroopRoster takenPrisonersRoster,
         FlattenedTroopRoster donatedPrisonersRoster,

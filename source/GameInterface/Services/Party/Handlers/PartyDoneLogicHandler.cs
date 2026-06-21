@@ -43,26 +43,28 @@ internal class PartyDoneLogicHandler : IHandler
         this.network = network;
         this.troopRosterInterface = troopRosterInterface;
 
-        messageBroker.Subscribe<AttemptPartyDoneLogic>(Handle_AttemptPartyDoneLogic);
-        messageBroker.Subscribe<CompletePartyDoneLogic>(Handle_CompletePartyDoneLogic);
+        messageBroker.Subscribe<PartyDoneLogicAttempted>(Handle_PartyDoneLogicAttempted);
+        messageBroker.Subscribe<NetworkCompleteDoneLogic>(Handle_CompletePartyDoneLogic);
     }
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<AttemptPartyDoneLogic>(Handle_AttemptPartyDoneLogic);
-        messageBroker.Unsubscribe<CompletePartyDoneLogic>(Handle_CompletePartyDoneLogic);
+        messageBroker.Unsubscribe<PartyDoneLogicAttempted>(Handle_PartyDoneLogicAttempted);
+        messageBroker.Unsubscribe<NetworkCompleteDoneLogic>(Handle_CompletePartyDoneLogic);
     }
 
-    private void Handle_AttemptPartyDoneLogic(MessagePayload<AttemptPartyDoneLogic> obj)
+    // Client
+    private void Handle_PartyDoneLogicAttempted(MessagePayload<PartyDoneLogicAttempted> obj)
     {
         if (!objectManager.TryGetIdWithLogging(obj.What.MainHero, out var mainHeroId)) return;
 
         string leftPartyId = null;
-        if (obj.What.LeftParty != null && !objectManager.TryGetIdWithLogging(obj.What.LeftParty, out leftPartyId)) return;
+        if (obj.What.LeftParty != null && 
+            !objectManager.TryGetIdWithLogging(obj.What.LeftParty, out leftPartyId))
+            return;
 
-        // Don't need to check if it resolved or not, not all left prisoner rosters are managed
-        // Examples being discarding prisoners or taking prisoners after a battle
-        objectManager.TryGetIdWithLogging(obj.What.LeftPrisonerRoster, out var leftPrisonerRosterId);
+        // Not registered when donating
+        objectManager.TryGetId(obj.What.LeftPrisonerRoster, out var leftPrisonerRosterId);
 
         var upgradedTroopHistory = new UpgradedTroopHistoryData(new());
         foreach (Tuple<CharacterObject, CharacterObject, int> tuple in obj.What.UpgradedTroopHistory)
@@ -78,7 +80,7 @@ internal class PartyDoneLogicHandler : IHandler
         var rightMemberRosterData = troopRosterInterface.PackTroopRosterData(obj.What.RightMemberRoster);
         var rightPrisonerRosterData = troopRosterInterface.PackTroopRosterData(obj.What.RightPrisonerRoster);
 
-        var message = new CompletePartyDoneLogic(
+        var message = new NetworkCompleteDoneLogic(
             mainHeroId,
             FlattenedTroopSerializer.Serialize(obj.What.TakenPrisonersRoster, objectManager),
             FlattenedTroopSerializer.Serialize(obj.What.DonatedPrisonersRoster, objectManager),
@@ -100,7 +102,8 @@ internal class PartyDoneLogicHandler : IHandler
         network.SendAll(message);
     }
 
-    private void Handle_CompletePartyDoneLogic(MessagePayload<CompletePartyDoneLogic> obj)
+    // Server
+    private void Handle_CompletePartyDoneLogic(MessagePayload<NetworkCompleteDoneLogic> obj)
     {
         if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
 
