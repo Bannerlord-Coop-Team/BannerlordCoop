@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Party.Messages;
 using HarmonyLib;
 using Serilog;
@@ -115,5 +116,12 @@ internal class PartyScreenLogicPatches
         // Send message to server to run KillCharacterAction.ApplyByExecution
         var message = new HeroExecuted(command.Character.HeroObject, Hero.MainHero);
         MessageBroker.Instance.Publish(__instance, message);
+    }
+
+    [HarmonyPatch(nameof(PartyScreenLogic.IsExecutable))]
+    [HarmonyPrefix]
+    public static bool IsExecutablePrefix(PartyScreenLogic.TroopType troopType, CharacterObject character, PartyScreenLogic.PartyRosterSide side)
+    {
+        return !(character.IsHero && character.HeroObject.IsPlayerHero());
     }
 }
