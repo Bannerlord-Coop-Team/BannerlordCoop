@@ -11,6 +11,8 @@ using Coop.IntegrationTests.Environment.Mock;
 using GameInterface;
 using GameInterface.Policies;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Settlements.Interfaces;
+using Moq;
 using Serilog;
 
 namespace Coop.IntegrationTests.Environment;
@@ -29,10 +31,8 @@ public class TestEnvironment
     /// Constructor for TestEnvironment
     /// </summary>
     /// <param name="numClients">Number of clients to create, defaults to 2 clients</param>
-    public TestEnvironment(int numClients = 2, bool registerGameInterface = false)
+    public TestEnvironment(int numClients = 2)
     {
-        this.registerGameInterface = registerGameInterface;
-
         // Setup test network
         networkOrchestrator = new TestNetworkRouter();
 
@@ -52,9 +52,6 @@ public class TestEnvironment
 
     public IEnumerable<EnvironmentInstance> Clients { get; }
     public EnvironmentInstance Server { get; }
-
-    
-    private readonly bool registerGameInterface;
 
     private EnvironmentInstance CreateClient()
     {
@@ -105,7 +102,16 @@ public class TestEnvironment
         builder.RegisterType<TestPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();
         builder.RegisterType<SerializableTypeMapper>().As<ISerializableTypeMapper>().SingleInstance();
 
+        RegisterMock<ISettlementInterface>(builder);
+
         return builder;
+    }
+
+    private void RegisterMock<T>(ContainerBuilder builder) where T : class
+    {
+        var mock = new Mock<T>();
+        builder.RegisterInstance(mock).AsSelf().SingleInstance();
+        builder.RegisterInstance(mock.Object).As<T>().SingleInstance();
     }
 
     public void RegisterObjectInNetwork<T>(T obj, string? stringId = null)
