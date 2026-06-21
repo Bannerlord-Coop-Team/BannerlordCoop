@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
@@ -28,25 +29,25 @@ internal class ClanCachesHandler : IHandler
         this.network = network;
 
         messageBroker.Subscribe<WarPartyAdded>(Handle_WarPartyAdded);
-        messageBroker.Subscribe<AddWarParty>(Handle_AddWarParty);
+        messageBroker.Subscribe<NetworkAddWarParty>(Handle_AddWarParty);
         messageBroker.Subscribe<WarPartyRemoved>(Handle_WarPartyRemoved);
-        messageBroker.Subscribe<RemoveWarParty>(Handle_RemoveWarParty);
+        messageBroker.Subscribe<NetworkRemoveWarParty>(Handle_RemoveWarParty);
         messageBroker.Subscribe<SupporterNotableAdded>(Handle_SupporterNotableAdded);
-        messageBroker.Subscribe<AddSupporterNotable>(Handle_AddSupporterNotable);
+        messageBroker.Subscribe<NetworkAddSupporterNotable>(Handle_AddSupporterNotable);
         messageBroker.Subscribe<SupporterNotableRemoved>(Handle_SupporterNotableRemoved);
-        messageBroker.Subscribe<RemoveSupporterNotable>(Handle_RemoveSupporterNotable);
+        messageBroker.Subscribe<NetworkRemoveSupporterNotable>(Handle_RemoveSupporterNotable);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<WarPartyAdded>(Handle_WarPartyAdded);
-        messageBroker.Unsubscribe<AddWarParty>(Handle_AddWarParty);
+        messageBroker.Unsubscribe<NetworkAddWarParty>(Handle_AddWarParty);
         messageBroker.Unsubscribe<WarPartyRemoved>(Handle_WarPartyRemoved);
-        messageBroker.Unsubscribe<RemoveWarParty>(Handle_RemoveWarParty);
+        messageBroker.Unsubscribe<NetworkRemoveWarParty>(Handle_RemoveWarParty);
         messageBroker.Unsubscribe<SupporterNotableAdded>(Handle_SupporterNotableAdded);
-        messageBroker.Unsubscribe<AddSupporterNotable>(Handle_AddSupporterNotable);
+        messageBroker.Unsubscribe<NetworkAddSupporterNotable>(Handle_AddSupporterNotable);
         messageBroker.Unsubscribe<SupporterNotableRemoved>(Handle_SupporterNotableRemoved);
-        messageBroker.Unsubscribe<RemoveSupporterNotable>(Handle_RemoveSupporterNotable);
+        messageBroker.Unsubscribe<NetworkRemoveSupporterNotable>(Handle_RemoveSupporterNotable);
     }
 
     private void Handle_WarPartyAdded(MessagePayload<WarPartyAdded> obj)
@@ -55,17 +56,20 @@ internal class ClanCachesHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(obj.What.WarPartyComponent, out var warPartyComponentId)) return;
         
         // Update changed cache on all clients
-        network.SendAll(new AddWarParty(clanId, warPartyComponentId));
+        network.SendAll(new NetworkAddWarParty(clanId, warPartyComponentId));
     }
 
-    private void Handle_AddWarParty(MessagePayload<AddWarParty> obj)
+    private void Handle_AddWarParty(MessagePayload<NetworkAddWarParty> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
-        if (!objectManager.TryGetObjectWithLogging<WarPartyComponent>(obj.What.WarPartyComponentId, out var warPartyComponent)) return;
-
         GameThread.RunSafe(() =>
         {
-            clan.OnWarPartyAdded(warPartyComponent);
+            if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
+            if (!objectManager.TryGetObjectWithLogging<WarPartyComponent>(obj.What.WarPartyComponentId, out var warPartyComponent)) return;
+
+            using (new AllowedThread())
+            {
+                clan.OnWarPartyAdded(warPartyComponent);
+            }
         });
     }
 
@@ -75,17 +79,21 @@ internal class ClanCachesHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(obj.What.WarPartyComponent, out var warPartyComponentId)) return;
 
         // Update changed cache on all clients
-        network.SendAll(new RemoveWarParty(clanId, warPartyComponentId));
+        network.SendAll(new NetworkRemoveWarParty(clanId, warPartyComponentId));
     }
 
-    private void Handle_RemoveWarParty(MessagePayload<RemoveWarParty> obj)
+    private void Handle_RemoveWarParty(MessagePayload<NetworkRemoveWarParty> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
-        if (!objectManager.TryGetObjectWithLogging<WarPartyComponent>(obj.What.WarPartyComponentId, out var warPartyComponent)) return;
-
+        // Resolve on the game-loop thread, in queue order with deferred component lifecycle applies.
         GameThread.RunSafe(() =>
         {
-            clan.OnWarPartyRemoved(warPartyComponent);
+            if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
+            if (!objectManager.TryGetObjectWithLogging<WarPartyComponent>(obj.What.WarPartyComponentId, out var warPartyComponent)) return;
+
+            using (new AllowedThread())
+            {
+                clan.OnWarPartyRemoved(warPartyComponent);
+            }
         });
     }
 
@@ -95,17 +103,21 @@ internal class ClanCachesHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(obj.What.Hero, out var heroId)) return;
 
         // Update changed cache on all clients
-        network.SendAll(new AddSupporterNotable(clanId, heroId));
+        network.SendAll(new NetworkAddSupporterNotable(clanId, heroId));
     }
 
-    private void Handle_AddSupporterNotable(MessagePayload<AddSupporterNotable> obj)
+    private void Handle_AddSupporterNotable(MessagePayload<NetworkAddSupporterNotable> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
-
+        // Resolve on the game-loop thread, in queue order with deferred object-creation applies.
         GameThread.RunSafe(() =>
         {
-            clan.OnSupporterNotableAdded(hero);
+            if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
+
+            using (new AllowedThread())
+            {
+                clan.OnSupporterNotableAdded(hero);
+            }
         });
     }
 
@@ -115,17 +127,21 @@ internal class ClanCachesHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(obj.What.Hero, out var heroId)) return;
 
         // Update changed cache on all clients
-        network.SendAll(new RemoveSupporterNotable(clanId, heroId));
+        network.SendAll(new NetworkRemoveSupporterNotable(clanId, heroId));
     }
 
-    private void Handle_RemoveSupporterNotable(MessagePayload<RemoveSupporterNotable> obj)
+    private void Handle_RemoveSupporterNotable(MessagePayload<NetworkRemoveSupporterNotable> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
-
+        // Resolve on the game-loop thread, in queue order with deferred object-creation applies.
         GameThread.RunSafe(() =>
         {
-            clan.OnSupporterNotableRemoved(hero);
+            if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
+
+            using (new AllowedThread())
+            {
+                clan.OnSupporterNotableRemoved(hero);
+            }
         });
     }
 }

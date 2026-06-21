@@ -115,10 +115,10 @@ public class NetworkPlayerPartyInteractionSerializationTest
             "session-1",
             "party-1",
             new[] { new ItemRosterElementData(new ItemObjectData("item-1", null, itemModifierNull: true), 2) },
-            new[] { new TroopRosterElementData("troop-1", 3, 1, 4, isHero: false) },
+            new[] { new TroopRosterElementData("troop-1", 3, 1, 4) },
             offeredGold: 25,
             offeredFiefs: new[] { "fief-1" },
-            offeredPrisoners: new[] { new TroopRosterElementData("prisoner-1", 1, 0, 0, isHero: true) });
+            offeredPrisoners: new[] { new TroopRosterElementData("prisoner-1", 1, 0, 0) });
 
         var result = RoundTrip(original);
 

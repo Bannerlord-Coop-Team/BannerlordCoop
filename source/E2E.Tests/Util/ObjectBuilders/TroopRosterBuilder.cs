@@ -6,7 +6,7 @@ namespace E2E.Tests.Util.ObjectBuilders
     {
         public object Build()
         {
-            return new TroopRoster();
+            return TroopRoster.CreateDummyTroopRoster();
         }
     }
 }
