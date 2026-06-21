@@ -246,8 +246,8 @@
     <!--<Publicize Include="TaleWorlds.ActivitySystem"/>-->
     <Publicize Include="TaleWorlds.CampaignSystem" />
     <Publicize Include="TaleWorlds.CampaignSystem.CampaignBehaviors" />
-    <Publicize Include="TaleWorlds.CampaignSystem.ViewModelCollection" />                                                     
-    <Publicize Include="TaleWorlds.Core" />                                                                                   
+    <Publicize Include="TaleWorlds.CampaignSystem.ViewModelCollection" />
+	<Publicize Include="TaleWorlds.Core" />                                                                                   
     <!--<Publicize Include="TaleWorlds.Core.ViewModelCollection"/>                                                               -->
     <!--<Publicize Include="TaleWorlds.Diamond"/>                                                                                -->
     <!--<Publicize Include="TaleWorlds.Diamond.AccessProvider.Epic"/>                                                            -->

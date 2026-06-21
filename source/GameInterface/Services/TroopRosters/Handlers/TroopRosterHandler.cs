@@ -96,6 +96,22 @@ public class TroopRosterHandler : IHandler
         return objectManager.TryGetObjectWithLogging(objectId, out characterObject);
     }
 
+    /// <summary>
+    /// Resolves a roster id for broadcasting a local mutation. Unregistered rosters are not synced:
+    /// dummy/UI scratch rosters (<see cref="TroopRoster.CreateDummyTroopRoster"/>, e.g. the map tooltip
+    /// refreshers) have no <see cref="TroopRoster.OwnerParty"/> and are skipped silently, while a real
+    /// party roster (has an owner) that is unexpectedly missing from the registry is still logged.
+    /// </summary>
+    private bool TryGetBroadcastRosterId(TroopRoster troopRoster, out string troopRosterId)
+    {
+        if (objectManager.TryGetId(troopRoster, out troopRosterId)) return true;
+
+        if (troopRoster?.OwnerParty != null)
+            Logger.Error("Could not find {Roster} in registry", troopRoster);
+
+        return false;
+    }
+
     private bool TryGetCharacterId(CharacterObject character, out string objectId, out bool isHero)
     {
         objectId = null;
@@ -110,7 +126,7 @@ public class TroopRosterHandler : IHandler
     {
         var obj = payload.What;
 
-        if (!objectManager.TryGetIdWithLogging(obj.TroopRoster, out var troopRosterId)) return;
+        if (!TryGetBroadcastRosterId(obj.TroopRoster, out var troopRosterId)) return;
 
         network.SendAll(new NetworkAddToCountsAtIndex(
             troopRosterId,
@@ -149,7 +165,7 @@ public class TroopRosterHandler : IHandler
     {
         var obj = payload.What;
 
-        if (!objectManager.TryGetIdWithLogging(obj.TroopRoster, out var troopRosterId)) return;
+        if (!TryGetBroadcastRosterId(obj.TroopRoster, out var troopRosterId)) return;
         if (!TryGetCharacterId(obj.Character, out var objectId, out var isHero)) return;
 
         network.SendAll(new NetworkAddNewElement(troopRosterId, objectId, isHero, obj.InsertionIndex));
@@ -182,7 +198,7 @@ public class TroopRosterHandler : IHandler
     #region RemoveZeroCounts
     private void Handle_ZeroCountsRemoved(MessagePayload<ZeroCountsRemoved> payload)
     {
-        if (!objectManager.TryGetIdWithLogging(payload.What.TroopRoster, out var troopRosterId)) return;
+        if (!TryGetBroadcastRosterId(payload.What.TroopRoster, out var troopRosterId)) return;
 
         network.SendAll(new NetworkRemoveZeroCounts(troopRosterId));
     }
@@ -213,7 +229,7 @@ public class TroopRosterHandler : IHandler
     {
         var obj = payload.What;
 
-        if (!objectManager.TryGetIdWithLogging(obj.TroopRoster, out var troopRosterId)) return;
+        if (!TryGetBroadcastRosterId(obj.TroopRoster, out var troopRosterId)) return;
 
         network.SendAll(new NetworkSetElementNumber(troopRosterId, obj.Index, obj.Number));
     }
@@ -246,7 +262,7 @@ public class TroopRosterHandler : IHandler
     {
         var obj = payload.What;
 
-        if (!objectManager.TryGetIdWithLogging(obj.TroopRoster, out var troopRosterId)) return;
+        if (!TryGetBroadcastRosterId(obj.TroopRoster, out var troopRosterId)) return;
 
         network.SendAll(new NetworkSetElementWoundedNumber(troopRosterId, obj.Index, obj.Number));
     }
@@ -279,7 +295,7 @@ public class TroopRosterHandler : IHandler
     {
         var obj = payload.What;
 
-        if (!objectManager.TryGetIdWithLogging(obj.TroopRoster, out var troopRosterId)) return;
+        if (!TryGetBroadcastRosterId(obj.TroopRoster, out var troopRosterId)) return;
 
         network.SendAll(new NetworkSetElementXp(troopRosterId, obj.Index, obj.Number));
     }
@@ -312,7 +328,7 @@ public class TroopRosterHandler : IHandler
     {
         var obj = payload.What;
 
-        if (!objectManager.TryGetIdWithLogging(obj.TroopRoster, out var troopRosterId)) return;
+        if (!TryGetBroadcastRosterId(obj.TroopRoster, out var troopRosterId)) return;
 
         network.SendAll(new NetworkShiftTroopToIndex(troopRosterId, obj.TroopIndex, obj.TargetIndex));
     }
@@ -345,7 +361,7 @@ public class TroopRosterHandler : IHandler
     {
         var obj = payload.What;
 
-        if (!objectManager.TryGetIdWithLogging(obj.TroopRoster, out var troopRosterId)) return;
+        if (!TryGetBroadcastRosterId(obj.TroopRoster, out var troopRosterId)) return;
 
         network.SendAll(new NetworkSwapTroopsAtIndices(troopRosterId, obj.FirstIndex, obj.SecondIndex));
     }

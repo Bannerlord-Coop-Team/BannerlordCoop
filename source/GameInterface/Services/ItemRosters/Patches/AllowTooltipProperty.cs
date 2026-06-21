@@ -6,10 +6,10 @@ using TaleWorlds.MountAndBlade.GauntletUI;
 
 namespace GameInterface.Services.ItemRosters.Patches;
 
-[HarmonyPatch(typeof(TooltipProperty))]
+[HarmonyPatch(typeof(PropertyBasedTooltipVM))]
 internal class AllowTooltipProperty
 {
-    [HarmonyPatch(nameof(TooltipProperty.RefreshValue))]
+    [HarmonyPatch("OnPeriodicRefresh")]
     [HarmonyPrefix]
     private static void PrefixRefreshValue()
     {
@@ -18,7 +18,7 @@ internal class AllowTooltipProperty
 
     // Finalizers (not postfixes) so the revoke runs even when the original throws;
     // a skipped revoke would leave the thread permanently allowed.
-    [HarmonyPatch(nameof(TooltipProperty.RefreshValue))]
+    [HarmonyPatch("OnPeriodicRefresh")]
     [HarmonyFinalizer]
     private static void FinalizerRefreshValue()
     {
