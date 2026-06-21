@@ -62,7 +62,12 @@ public class InitialServerState : ServerStateBase
         messageBroker.Publish(this, new RemoveMainParty());
 
         // Register all objects after main party is removed to keep order
+        loadingInterface.SetLoadingMessage(
+            "Hosting Coop Server", "Registering campaign objects...");
         registryManager.RegisterAllGameObjects();
+
+        loadingInterface.SetLoadingMessage(
+            "Hosting Coop Server", "Applying synced object lifetimes...");
         registryManager.PatchLifetimes();
 
         Logic.SetState<ServerRunningState>();
@@ -71,7 +76,8 @@ public class InitialServerState : ServerStateBase
     public override void Start()
     {
 #if DEBUG
-        loadingInterface.ShowLoadingScreen();
+        loadingInterface.SetLoadingMessage(
+            "Hosting Coop Server", "Loading campaign save...");
         gameStateInterface.LoadGame("MP");
 #endif
     }
