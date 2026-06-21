@@ -187,8 +187,8 @@ internal class BattleSimulationRunHandler : IHandler
         // Publishing happens during the native AddPartyInternal, which already runs on the game thread; this
         // only touches the simulation pool via the party object, so it is safe here. GameThread.Run runs inline
         // when already on that thread.
-        GameThread.Run(() => {
-
+        GameThread.Run(() => 
+        {
             if (!objectManager.TryGetId(side.MapEvent, out var mapEventId))
                 return;
 
