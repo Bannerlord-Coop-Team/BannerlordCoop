@@ -27,13 +27,7 @@ internal sealed class CoopTextLoadingScreen : GlobalLayer
         // reusing one across host sessions, so a re-host always gets a clean, correctly rendered screen.
         if (gauntletLayer == null)
         {
-            viewModel = new CoopTextLoadingWindowVM
-            {
-                Enabled = false,
-                // The generic single-player loading backdrop. If its sprite is not loaded the widget
-                // just shows the black background, which is still a loading screen, not a frozen menu.
-                LoadingImageName = "loading_03",
-            };
+            viewModel = new CoopTextLoadingWindowVM();
 
             // shouldClear paints the backdrop so the menu underneath is not visible through it.
             gauntletLayer = new GauntletLayer("GauntletLayer", LayerOrder, shouldClear: true);
@@ -43,9 +37,7 @@ internal sealed class CoopTextLoadingScreen : GlobalLayer
             ScreenManager.AddGlobalLayer(this, false);
         }
 
-        viewModel.TitleText = titleText ?? string.Empty;
-        viewModel.DescriptionText = descriptionText ?? string.Empty;
-        viewModel.GameModeText = gameModeText ?? string.Empty;
+        SetText(titleText, descriptionText, gameModeText);
         viewModel.Enabled = true;
     }
 
@@ -82,9 +74,6 @@ public sealed class CoopTextLoadingWindowVM : ViewModel
     private string titleText = string.Empty;
     private string descriptionText = string.Empty;
     private string gameModeText = string.Empty;
-    private string loadingImageName = string.Empty;
-    private bool isMultiplayer;
-    private bool isDevelopmentMode;
 
     [DataSourceProperty]
     public bool Enabled
@@ -114,24 +103,16 @@ public sealed class CoopTextLoadingWindowVM : ViewModel
         set { if (gameModeText != value) { gameModeText = value; OnPropertyChangedWithValue(value, nameof(GameModeText)); } }
     }
 
+    // Fixed for this text-only layer. LoadingImageName is the generic loading backdrop; if its sprite
+    // isn't loaded the widget just shows the black background, which is still a loading screen, not a
+    // frozen menu. IsMultiplayer/IsDevelopmentMode stay false so the prefab's multiplayer/dev widgets
+    // (including the spinner) stay hidden.
     [DataSourceProperty]
-    public string LoadingImageName
-    {
-        get => loadingImageName;
-        set { if (loadingImageName != value) { loadingImageName = value; OnPropertyChangedWithValue(value, nameof(LoadingImageName)); } }
-    }
+    public string LoadingImageName => "loading_03";
 
     [DataSourceProperty]
-    public bool IsMultiplayer
-    {
-        get => isMultiplayer;
-        set { if (isMultiplayer != value) { isMultiplayer = value; OnPropertyChangedWithValue(value, nameof(IsMultiplayer)); } }
-    }
+    public bool IsMultiplayer => false;
 
     [DataSourceProperty]
-    public bool IsDevelopmentMode
-    {
-        get => isDevelopmentMode;
-        set { if (isDevelopmentMode != value) { isDevelopmentMode = value; OnPropertyChangedWithValue(value, nameof(IsDevelopmentMode)); } }
-    }
+    public bool IsDevelopmentMode => false;
 }

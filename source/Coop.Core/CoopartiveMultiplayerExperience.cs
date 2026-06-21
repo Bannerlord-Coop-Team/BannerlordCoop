@@ -29,12 +29,7 @@ namespace Coop.Core
         private INetworkConfig configuration;
         private IContainer container;
 
-        // True while a server host start is in flight. The graphical host applies its patches off the
-        // main thread (so the engine keeps painting the loading screen), which returns control to the
-        // host menu immediately; this guard drops a second "Host" click during that window, which would
-        // otherwise race two server bring-ups and reorder the load events (a null-savedSession NRE).
-        // Cleared when the bring-up finishes, on teardown, and on failure. Written from the off-thread
-        // failure path, so volatile.
+        // True while a server host start is in flight.
         private volatile bool serverStarting;
 
         public CoopartiveMultiplayerExperience()
@@ -75,14 +70,9 @@ namespace Coop.Core
 
         private void Handle(MessagePayload<HostSaveGame> obj)
         {
-            if (!TryBeginServerStart()) return;
-
             string saveName = obj.What.SaveName;
 
-            // Build the container and show the loading screen now, so the engine paints it before the
-            // blocking patch work runs.
-            PrepareServerContainer();
-            StartServer(() =>
+            StartAsServer(() =>
             {
                 container.Resolve<ILoadingInterface>().SetLoadingMessage(
                     ServerLoadingTitle, "Loading campaign save...");
@@ -100,20 +90,7 @@ namespace Coop.Core
 
         public int Priority => 0;
 
-        public void StartAsServer()
-        {
-            if (!TryBeginServerStart()) return;
-
-            // Build the container and show the loading screen now, so the engine paints it before the
-            // blocking patch work runs. DEBUG "Host Co-op Campaign" / autoconnect path; the save itself
-            // is loaded from InitialServerState once the server logic starts.
-            PrepareServerContainer();
-            StartServer(() => { });
-        }
-
-        // Drops a host start when one is already in flight. The graphical host applies its patches off
-        // the main thread and so returns to the host menu immediately; without this, a second "Host"
-        // click would race a second server bring-up and reorder the load events (a null-savedSession NRE).
+        // Debounces host starts (e.g. if the user clicks "Host Co-op Campaign" twice).
         private bool TryBeginServerStart()
         {
             if (serverStarting)
@@ -126,27 +103,20 @@ namespace Coop.Core
             return true;
         }
 
-        // Applies the patches, then starts the server logic and loads the save (afterStart). Patches must
-        // be live before the save loads (the save-load patches publish GameLoaded, which the load flow
-        // needs), so they run before the bring-up, not inside it. The patch work takes tens of seconds and
-        // would freeze the loading screen on the main thread, so a graphical host runs it OFF the main
-        // thread (the engine keeps painting) and marshals the bring-up (which creates objects and publishes
-        // messages) BACK to the game thread to keep it ordered. Headless has no loading window, so it runs
-        // synchronously (the launcher relies on the load state being pushed before this returns).
-        private void StartServer(Action afterStart)
+        public void StartAsServer(Action afterStart = null)
         {
+            if (!TryBeginServerStart()) return;
+            PrepareServerContainer();
+
             var startedContainer = container;
             var loadingInterface = container.Resolve<ILoadingInterface>();
 
-            // Runs on the game thread. Self-contained: clears the guard in a finally so a failure can't
-            // wedge it (a stuck guard would silently drop every later host attempt), and never lets an
-            // exception escape into the game-loop pump.
             void BringUp()
             {
                 try
                 {
                     container.Resolve<ILogic>().Start();
-                    afterStart();
+                    afterStart?.Invoke();
                 }
                 catch (Exception e)
                 {
@@ -191,18 +161,19 @@ namespace Coop.Core
             else
             {
                 Logger.Information("Host start: no loading screen, applying patches synchronously.");
-                // PatchAll is outside BringUp's try, so clear the guard here too if it throws; let the
-                // exception propagate to the headless launcher.
+                // BringUp clears the guard in its own finally; only PatchAll (outside it) needs the guard
+                // cleared on a throw, which is then let propagate to the headless launcher.
                 try
                 {
                     container.Resolve<IGameInterface>().PatchAll();
-                    BringUp();
                 }
                 catch
                 {
                     serverStarting = false;
                     throw;
                 }
+
+                BringUp();
             }
         }
 
