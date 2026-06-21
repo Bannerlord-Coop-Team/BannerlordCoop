@@ -75,12 +75,12 @@ internal class SettlementPopulationTracker : IHandler
         if (ModInformation.IsServer == false) return;
         if (settlement == null || party == null) return;
 
-        if (objectManager.TryGetIdWithLogging(settlement, out var settlementId) == false) return;
-        if (objectManager.TryGetIdWithLogging(party, out var partyId) == false) return;
-        if (settlement.LocationComplex == null) return;
-
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
+            if (objectManager.TryGetIdWithLogging(settlement, out var settlementId) == false) return;
+            if (objectManager.TryGetIdWithLogging(party, out var partyId) == false) return;
+            if (settlement.LocationComplex == null) return;
+
             if (party.IsPlayerParty())
             {
                 playerPartySettlements[partyId] = settlementId;
@@ -111,10 +111,10 @@ internal class SettlementPopulationTracker : IHandler
         if (ModInformation.IsServer == false) return;
         if (party == null) return;
 
-        if (objectManager.TryGetIdWithLogging(party, out var partyId) == false) return;
-
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
+            if (objectManager.TryGetIdWithLogging(party, out var partyId) == false) return;
+
             if (playerPartySettlements.TryGetValue(partyId, out var settlementId) == false)
             {
                 RemoveAiLeaderPlacement(partyId);
@@ -146,7 +146,7 @@ internal class SettlementPopulationTracker : IHandler
         var heroes = payload.What.Heroes;
         if (settlement == null || heroes == null) return;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             if (!populatedSettlements.ContainsKey(settlement.StringId)) return;
             if (settlement.LocationComplex == null) return;

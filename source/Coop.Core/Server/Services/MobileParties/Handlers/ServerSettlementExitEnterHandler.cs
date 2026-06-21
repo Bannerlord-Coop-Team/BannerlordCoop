@@ -58,10 +58,13 @@ public class ServerSettlementExitEnterHandler : IHandler
         // on the game-loop pump (the server's own apply below is marshalled onto the game thread).
         network.SendAllBut(peer, new NetworkPartyEnterSettlement(payload.SettlementId, payload.PartyId));
 
-        if (!objectManager.TryGetObjectWithLogging(payload.PartyId, out MobileParty mobileParty)) return;
-        if (!objectManager.TryGetObjectWithLogging(payload.SettlementId, out Settlement settlement)) return;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging(payload.PartyId, out MobileParty mobileParty)) return;
+            if (!objectManager.TryGetObjectWithLogging(payload.SettlementId, out Settlement settlement)) return;
 
-        GameThread.RunSafe(() => settlementInterface.PartyEnterSettlement(mobileParty, settlement));
+            settlementInterface.PartyEnterSettlement(mobileParty, settlement);
+        });
     }
 
     private void Handle(MessagePayload<NetworkRequestEndSettlementEncounter> obj)
@@ -75,9 +78,12 @@ public class ServerSettlementExitEnterHandler : IHandler
 
         network.SendAllBut(peer, new NetworkPartyLeaveSettlement(payload.PartyId));
 
-        if (!objectManager.TryGetObjectWithLogging(payload.PartyId, out MobileParty mobileParty)) return;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging(payload.PartyId, out MobileParty mobileParty)) return;
 
-        GameThread.RunSafe(() => settlementInterface.PartyLeaveSettlement(mobileParty));
+            settlementInterface.PartyLeaveSettlement(mobileParty);
+        });
     }
 
     private void Handle(MessagePayload<PartyEnterSettlementAttempted> obj)
@@ -89,7 +95,6 @@ public class ServerSettlementExitEnterHandler : IHandler
 
         network.SendAll(new NetworkPartyEnterSettlement(settlementId, mobilePartyId));
 
-        // Server-side hero/companion placement. The Harmony prefix already applied the entry.
         settlementInterface.OnPartyEnteredSettlement(payload.Settlement, payload.MobileParty);
     }
 

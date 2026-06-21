@@ -93,13 +93,13 @@ public class ClientSettlementExitEnterHandler : IHandler
     {
         var payload = obj.What;
 
-        if (!objectManager.TryGetObjectWithLogging(payload.PartyId, out MobileParty party)) return;
-        if (!objectManager.TryGetObjectWithLogging(payload.SettlementId, out Settlement settlement)) return;
-
         // Client applies a replicated change: run it on the game thread inside an AllowedThread so the
         // patched action proceeds without being re-intercepted/re-broadcast.
         GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging(payload.PartyId, out MobileParty party)) return;
+            if (!objectManager.TryGetObjectWithLogging(payload.SettlementId, out Settlement settlement)) return;
+
             using (new AllowedThread())
             {
                 settlementInterface.StartSettlementEncounter(party, settlement);
@@ -122,11 +122,11 @@ public class ClientSettlementExitEnterHandler : IHandler
     {
         var payload = obj.What;
 
-        if (!objectManager.TryGetObjectWithLogging(payload.PartyId, out MobileParty party)) return;
-        if (!objectManager.TryGetObjectWithLogging(payload.SettlementId, out Settlement settlement)) return;
-
         GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging(payload.PartyId, out MobileParty party)) return;
+            if (!objectManager.TryGetObjectWithLogging(payload.SettlementId, out Settlement settlement)) return;
+
             using (new AllowedThread())
             {
                 settlementInterface.PartyEnterSettlement(party, settlement);
@@ -138,10 +138,10 @@ public class ClientSettlementExitEnterHandler : IHandler
     {
         var payload = obj.What;
 
-        if (!objectManager.TryGetObjectWithLogging(payload.PartyId, out MobileParty party)) return;
-
         GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging(payload.PartyId, out MobileParty party)) return;
+
             using (new AllowedThread())
             {
                 settlementInterface.PartyLeaveSettlement(party);
