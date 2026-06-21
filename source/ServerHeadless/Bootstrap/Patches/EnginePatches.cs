@@ -29,5 +29,15 @@ namespace ServerHeadless.Bootstrap.Patches
             __result = 0;
             return false;
         }
+
+        // The game tells the engine which scene to render error reports against (the campaign map
+        // screen does this every frame; SandBoxGameManager.OnGameEnd clears it). The call goes
+        // straight into the native engine with no managed guard, so headless — where that engine was
+        // never initialised — it dereferences a dead subsystem and takes the whole process down.
+        // There is no error-report scene to set headless; skip it. The error that drove the game here
+        // is surfaced instead by the HeadlessDebugManager installed in HeadlessBootstrap.
+        [HarmonyPatch(typeof(MBDebug), nameof(MBDebug.SetErrorReportScene))]
+        [HarmonyPrefix]
+        static bool SetErrorReportScenePrefix() => false;
     }
 }

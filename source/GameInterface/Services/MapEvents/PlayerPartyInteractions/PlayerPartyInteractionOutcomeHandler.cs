@@ -222,8 +222,10 @@ internal class PlayerPartyInteractionOutcomeHandler
         var requestedTroops = BuildTroopRequests(offeredTroops);
         foreach (var request in requestedTroops.Values)
         {
-            if (!TryResolveCharacter(request.Data, out var character)) continue;
-            if (character == sourceParty.LeaderHero?.CharacterObject) continue;
+            if (!objectManager.TryGetObjectWithLogging(request.Data.CharacterId, out CharacterObject character))
+                continue;
+            if (character == sourceParty.LeaderHero?.CharacterObject)
+                continue;
 
             var index = sourceParty.MemberRoster.FindIndexOfTroop(character);
             if (index < 0) continue;
@@ -261,7 +263,8 @@ internal class PlayerPartyInteractionOutcomeHandler
         var requestedPrisoners = BuildTroopRequests(offeredPrisoners);
         foreach (var request in requestedPrisoners.Values)
         {
-            if (!TryResolveCharacter(request.Data, out var character)) continue;
+            if (!objectManager.TryGetObjectWithLogging(request.Data.CharacterId, out CharacterObject character))
+                continue;
 
             var amount = Math.Min(request.Number, sourceParty.PrisonRoster.GetElementNumber(character));
             if (amount <= 0) continue;
@@ -368,10 +371,9 @@ internal class PlayerPartyInteractionOutcomeHandler
         {
             if (offeredTroop.Number <= 0) continue;
 
-            var key = GetCharacterKey(offeredTroop.CharacterId, offeredTroop.IsHero);
-            if (result.TryGetValue(key, out var request))
+            if (result.TryGetValue(offeredTroop.CharacterId, out var request))
             {
-                result[key] = new TroopRequest(
+                result[offeredTroop.CharacterId] = new TroopRequest(
                     offeredTroop,
                     request.Number + offeredTroop.Number,
                     request.WoundedNumber + offeredTroop.WoundedNumber,
@@ -379,7 +381,7 @@ internal class PlayerPartyInteractionOutcomeHandler
             }
             else
             {
-                result[key] = new TroopRequest(
+                result[offeredTroop.CharacterId] = new TroopRequest(
                     offeredTroop,
                     offeredTroop.Number,
                     offeredTroop.WoundedNumber,
@@ -406,21 +408,6 @@ internal class PlayerPartyInteractionOutcomeHandler
         return true;
     }
 
-    private bool TryResolveCharacter(TroopRosterElementData troopData, out CharacterObject character)
-    {
-        character = null;
-
-        if (troopData.IsHero)
-        {
-            if (!objectManager.TryGetObject(troopData.CharacterId, out Hero hero)) return false;
-
-            character = hero.CharacterObject;
-            return character != null;
-        }
-
-        return objectManager.TryGetObject(troopData.CharacterId, out character);
-    }
-
     private static int GetItemAmount(ItemRoster itemRoster, EquipmentElement equipmentElement)
     {
         if (itemRoster == null) return 0;
@@ -436,9 +423,6 @@ internal class PlayerPartyInteractionOutcomeHandler
 
     private static string GetItemKey(ItemObjectData itemObjectData)
         => $"{itemObjectData.ItemObjectId}|{itemObjectData.ItemModifierId}|{itemObjectData.ItemModifierNull}";
-
-    private static string GetCharacterKey(string characterId, bool isHero)
-        => $"{characterId}|{isHero}";
 
     private static void RunOnGameThread(Action action, string context)
     {

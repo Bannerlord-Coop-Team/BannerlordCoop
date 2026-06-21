@@ -533,6 +533,12 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         var initiatorTownId = TestEnvironment.CreateRegisteredObject<Town>();
         var responderTownId = TestEnvironment.CreateRegisteredObject<Town>();
 
+        // Prisoners are Heroes, but the prison roster (and the trade resolution) works on the Hero's
+        // unique CharacterObject. The offer must reference the prisoner by that CharacterObject's id,
+        // not the Hero's id - resolved below.
+        string initiatorPrisonerCharacterId = null;
+        string responderPrisonerCharacterId = null;
+
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
@@ -556,6 +562,12 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             responderParty.MemberRoster.AddToCounts(responderTroop, 8);
             initiatorParty.PrisonRoster.AddToCounts(initiatorPrisoner.CharacterObject, 1);
             responderParty.PrisonRoster.AddToCounts(responderPrisoner.CharacterObject, 1);
+            // The CharacterObject is already registered (its own id); reference it by that id. Fall
+            // back to registering it if not.
+            if (!Server.ObjectManager.TryGetId(initiatorPrisoner.CharacterObject, out initiatorPrisonerCharacterId))
+                Assert.True(Server.ObjectManager.AddExisting(initiatorPrisonerCharacterId = "InitiatorPrisonerCharacter", initiatorPrisoner.CharacterObject));
+            if (!Server.ObjectManager.TryGetId(responderPrisoner.CharacterObject, out responderPrisonerCharacterId))
+                Assert.True(Server.ObjectManager.AddExisting(responderPrisonerCharacterId = "ResponderPrisonerCharacter", responderPrisoner.CharacterObject));
             SetupFief(initiatorSettlement, initiatorTown, initiatorParty);
             SetupFief(responderSettlement, responderTown, responderParty);
         });
@@ -569,10 +581,10 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             {
                 new ItemRosterElementData(new ItemObjectData(initiatorItemId, null, itemModifierNull: true), 2)
             },
-            new[] { new TroopRosterElementData(initiatorTroopId, 4, 0, 0, isHero: false) },
+            new[] { new TroopRosterElementData(initiatorTroopId, 4, 0, 0) },
             offeredGold: 25,
             offeredFiefs: new[] { initiatorSettlementId },
-            offeredPrisoners: new[] { new TroopRosterElementData(initiatorPrisonerId, 1, 0, 0, isHero: true) })));
+            offeredPrisoners: new[] { new TroopRosterElementData(initiatorPrisonerCharacterId, 1, 0, 0) })));
         client2.Call(() => client2.Resolve<INetwork>().SendAll(new NetworkPlayerPartyTradeOfferUpdated(
             sessionId,
             responderPartyId,
@@ -580,10 +592,10 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             {
                 new ItemRosterElementData(new ItemObjectData(responderItemId, null, itemModifierNull: true), 3)
             },
-            new[] { new TroopRosterElementData(responderTroopId, 5, 0, 0, isHero: false) },
+            new[] { new TroopRosterElementData(responderTroopId, 5, 0, 0) },
             offeredGold: 10,
             offeredFiefs: new[] { responderSettlementId },
-            offeredPrisoners: new[] { new TroopRosterElementData(responderPrisonerId, 1, 0, 0, isHero: true) })));
+            offeredPrisoners: new[] { new TroopRosterElementData(responderPrisonerCharacterId, 1, 0, 0) })));
 
         Server.NetworkSentMessages.Clear();
         client1.Call(() => client1.Resolve<INetwork>().SendAll(new NetworkPlayerPartyTradeAcceptChanged(sessionId, accepted: true)));
@@ -674,10 +686,10 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             {
                 new ItemRosterElementData(new ItemObjectData("item-1", null, itemModifierNull: true), 2)
             },
-            new[] { new TroopRosterElementData("troop-1", 3, 0, 7, isHero: false) },
+            new[] { new TroopRosterElementData("troop-1", 3, 0, 7) },
             offeredGold: 25,
             offeredFiefs: new[] { "fief-1" },
-            offeredPrisoners: new[] { new TroopRosterElementData("prisoner-1", 1, 0, 0, isHero: true) })));
+            offeredPrisoners: new[] { new TroopRosterElementData("prisoner-1", 1, 0, 0) })));
 
         var relayedOffer = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>().Single();
         Assert.Equal(sessionId, relayedOffer.SessionId);
