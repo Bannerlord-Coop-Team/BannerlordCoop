@@ -4,7 +4,7 @@ using ProtoBuf;
 namespace GameInterface.Services.Clans.Messages;
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct AddWarParty : ICommand
+internal readonly struct NetworkAddWarParty : ICommand
 {
     [ProtoMember(1)]
     public readonly string ClanId;
@@ -12,7 +12,7 @@ internal readonly struct AddWarParty : ICommand
     [ProtoMember(2)]
     public readonly string WarPartyComponentId;
 
-    public AddWarParty(string clanId, string warPartyComponentId)
+    public NetworkAddWarParty(string clanId, string warPartyComponentId)
     {
         ClanId = clanId;
         WarPartyComponentId = warPartyComponentId;
@@ -20,7 +20,7 @@ internal readonly struct AddWarParty : ICommand
 }
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct RemoveWarParty : ICommand
+internal readonly struct NetworkRemoveWarParty : ICommand
 {
     [ProtoMember(1)]
     public readonly string ClanId;
@@ -28,7 +28,7 @@ internal readonly struct RemoveWarParty : ICommand
     [ProtoMember(2)]
     public readonly string WarPartyComponentId;
 
-    public RemoveWarParty(string clanId, string warPartyComponentId)
+    public NetworkRemoveWarParty(string clanId, string warPartyComponentId)
     {
         ClanId = clanId;
         WarPartyComponentId = warPartyComponentId;
@@ -36,7 +36,7 @@ internal readonly struct RemoveWarParty : ICommand
 }
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct AddSupporterNotable : ICommand
+internal readonly struct NetworkAddSupporterNotable : ICommand
 {
     [ProtoMember(1)]
     public readonly string ClanId;
@@ -44,7 +44,7 @@ internal readonly struct AddSupporterNotable : ICommand
     [ProtoMember(2)]
     public readonly string HeroId;
 
-    public AddSupporterNotable(string clanId, string heroId)
+    public NetworkAddSupporterNotable(string clanId, string heroId)
     {
         ClanId = clanId;
         HeroId = heroId;
@@ -52,7 +52,7 @@ internal readonly struct AddSupporterNotable : ICommand
 }
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct RemoveSupporterNotable : ICommand
+internal readonly struct NetworkRemoveSupporterNotable : ICommand
 {
     [ProtoMember(1)]
     public readonly string ClanId;
@@ -60,7 +60,7 @@ internal readonly struct RemoveSupporterNotable : ICommand
     [ProtoMember(2)]
     public readonly string HeroId;
 
-    public RemoveSupporterNotable(string clanId, string heroId)
+    public NetworkRemoveSupporterNotable(string clanId, string heroId)
     {
         ClanId = clanId;
         HeroId = heroId;
