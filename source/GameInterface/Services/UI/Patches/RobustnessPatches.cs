@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using HarmonyLib;
 using SandBox.View.Missions;
+using SandBox.ViewModelCollection.Nameplate;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -18,6 +19,7 @@ internal class RobustnessPatches
     {
         AccessTools.Method(typeof(GauntletMovie), nameof(GauntletMovie.LoadMovie)),
         AccessTools.Method(typeof(MissionAudienceHandler), nameof(MissionAudienceHandler.SpawnAudienceAgents)),
+        AccessTools.Method(typeof(PartyNameplateVM), nameof(PartyNameplateVM.RefreshDynamicProperties))
     };
 
     [HarmonyFinalizer]

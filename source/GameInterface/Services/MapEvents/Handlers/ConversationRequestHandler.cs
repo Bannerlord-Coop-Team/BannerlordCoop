@@ -6,6 +6,7 @@ using Common.Network.Messages;
 using Common.Util;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
+using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
@@ -42,6 +43,7 @@ internal class ConversationRequestHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly ConversationPartyTracker conversationPartyTracker;
+    private readonly PlayerPartyInteractionHandler playerPartyInteractionHandler;
 
     private DateTime lastRequestSentUtc = DateTime.MinValue;
 
@@ -54,12 +56,14 @@ internal class ConversationRequestHandler : IHandler
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
-        ConversationPartyTracker conversationPartyTracker)
+        ConversationPartyTracker conversationPartyTracker,
+        PlayerPartyInteractionHandler playerPartyInteractionHandler)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.conversationPartyTracker = conversationPartyTracker;
+        this.playerPartyInteractionHandler = playerPartyInteractionHandler;
 
         messageBroker.Subscribe<ConversationRequested>(Handle_ConversationRequested);
         messageBroker.Subscribe<NetworkRequestConversation>(Handle_NetworkRequestConversation);
@@ -194,11 +198,11 @@ internal class ConversationRequestHandler : IHandler
                 return false;
             }
 
-            isPlayerVsPlayer = true;
             Logger.Debug(
-                "Allowing conversation: both parties are players (PvP). AttackerId={AttackerId}, DefenderId={DefenderId}",
+                "Starting custom player-party interaction. AttackerId={AttackerId}, DefenderId={DefenderId}",
                 request.AttackerId, request.DefenderId);
-            return true;
+            playerPartyInteractionHandler.TryStartSession(requestingPeer, request, attacker, defender);
+            return false;
         }
 
         // Reject: both parties are already in (separate) battles; do not (re)open an encounter conversation.

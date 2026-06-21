@@ -20,7 +20,7 @@ internal class MapEventRobustnessPatches
     {
         if (__result is null)
         {
-            Logger.Error("{Property} was not set propertly for MapEvent {MapEventId}", nameof(MapEvent.TroopUpgradeTracker), __instance.StringId);
+            Logger.Error("{Property} was not properly set for MapEvent {MapEventId}", nameof(MapEvent.TroopUpgradeTracker), __instance.StringId);
             __instance.TroopUpgradeTracker = new TroopUpgradeTracker();
             __result = __instance.TroopUpgradeTracker;
         }
