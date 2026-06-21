@@ -33,12 +33,8 @@ namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision
         {
             FieldInfo? fieldInfo = typeof(StartAllianceDecisionData).GetField("KingdomToStartAllianceWithField", BindingFlags.Static | BindingFlags.NonPublic);
             Assert.NotNull(fieldInfo);
-            FieldInfo? fieldInfo2 = typeof(StartAllianceDecisionData).GetField("AllianceCampaignBehaviorField", BindingFlags.Static | BindingFlags.NonPublic);
-            Assert.NotNull(fieldInfo2);
             object? obj = fieldInfo?.GetValue(null);
             Assert.NotNull(obj);
-            object? obj2 = fieldInfo2?.GetValue(null);
-            Assert.NotNull(obj2);
         }
     }
 }

@@ -114,18 +114,15 @@ public class KingdomHandler : IHandler
 
             try
             {
-                using (new AllowedThread())
-                {
-                    kingdomManager.CreateKingdom(
-                        kingdomName,
-                        kingdomName,
-                        culture,
-                        clan,
-                        culture.DefaultPolicyList,
-                        TextObject.GetEmpty(),
-                        kingdomName,
-                        TextObject.GetEmpty());
-                }
+                kingdomManager.CreateKingdom(
+                    kingdomName,
+                    kingdomName,
+                    culture,
+                    clan,
+                    culture.DefaultPolicyList,
+                    TextObject.GetEmpty(),
+                    kingdomName,
+                    TextObject.GetEmpty());
             }
             catch (Exception e)
             {

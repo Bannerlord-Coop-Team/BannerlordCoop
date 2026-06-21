@@ -32,9 +32,9 @@ namespace GameInterface.Services.Kingdoms.Data
 
         public MakePeaceKingdomDecisionData(string proposedClanId, string kingdomId, long triggerTime, bool isEnforced, bool notifyPlayer, bool playerExamined, string factionToMakePeaceWithId, int dailyTributeToBePaid, bool applyResults, int dailyTributeDurationInDays, bool isProposedByOpponent) : base(proposedClanId, kingdomId, triggerTime, isEnforced, notifyPlayer, playerExamined)
         {
-            FactionToMakePeaceWithId= factionToMakePeaceWithId;
-            DailyTributeToBePaid= dailyTributeToBePaid;
-            ApplyResults= applyResults;
+            FactionToMakePeaceWithId = factionToMakePeaceWithId;
+            DailyTributeToBePaid = dailyTributeToBePaid;
+            ApplyResults = applyResults;
             DailyTributeDurationInDays = dailyTributeDurationInDays;
             IsProposedByOpponent = isProposedByOpponent;
         }

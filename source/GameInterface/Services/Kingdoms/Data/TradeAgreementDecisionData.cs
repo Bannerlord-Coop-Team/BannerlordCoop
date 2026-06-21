@@ -15,7 +15,6 @@ namespace GameInterface.Services.Kingdoms.Data
     public class TradeAgreementDecisionData : KingdomDecisionData
     {
         private static readonly FieldInfo TargetKingdomField = typeof(TradeAgreementDecision).GetField(nameof(TradeAgreementDecision.TargetKingdom), BindingFlags.Instance | BindingFlags.Public);
-        private static readonly FieldInfo TradeAgreementsCampaignBehaviorField = typeof(TradeAgreementDecision).GetField("_tradeAgreementsCampaignBehavior", BindingFlags.Instance | BindingFlags.NonPublic);
 
         [ProtoMember(1)]
         public string TargetKingdomId { get; }
@@ -45,7 +44,7 @@ namespace GameInterface.Services.Kingdoms.Data
             TradeAgreementDecision tradeAgreementDecision = (TradeAgreementDecision)FormatterServices.GetUninitializedObject(typeof(TradeAgreementDecision));
             SetKingdomDecisionProperties(tradeAgreementDecision, proposerClan, kingdom);
             TargetKingdomField.SetValue(tradeAgreementDecision, targetKingdom);
-            TradeAgreementsCampaignBehaviorField.SetValue(tradeAgreementDecision, tradeAgreementsCampaignBehavior);
+            tradeAgreementDecision._tradeAgreementsCampaignBehavior = tradeAgreementsCampaignBehavior;
             kingdomDecision = tradeAgreementDecision;
             return true;
         }

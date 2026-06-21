@@ -15,7 +15,6 @@ namespace GameInterface.Services.Kingdoms.Data
     public class StartAllianceDecisionData : KingdomDecisionData
     {
         private static readonly FieldInfo KingdomToStartAllianceWithField = typeof(StartAllianceDecision).GetField(nameof(StartAllianceDecision.KingdomToStartAllianceWith), BindingFlags.Instance | BindingFlags.Public);
-        private static readonly FieldInfo AllianceCampaignBehaviorField = typeof(StartAllianceDecision).GetField("_allianceCampaignBehavior", BindingFlags.Instance | BindingFlags.NonPublic);
 
         [ProtoMember(1)]
         public string KingdomToStartAllianceWithId { get; }
@@ -45,7 +44,7 @@ namespace GameInterface.Services.Kingdoms.Data
             StartAllianceDecision startAllianceDecision = (StartAllianceDecision)FormatterServices.GetUninitializedObject(typeof(StartAllianceDecision));
             SetKingdomDecisionProperties(startAllianceDecision, proposerClan, kingdom);
             KingdomToStartAllianceWithField.SetValue(startAllianceDecision, kingdomToStartAllianceWith);
-            AllianceCampaignBehaviorField.SetValue(startAllianceDecision, allianceCampaignBehavior);
+            startAllianceDecision._allianceCampaignBehavior = allianceCampaignBehavior;
             kingdomDecision = startAllianceDecision;
             return true;
         }

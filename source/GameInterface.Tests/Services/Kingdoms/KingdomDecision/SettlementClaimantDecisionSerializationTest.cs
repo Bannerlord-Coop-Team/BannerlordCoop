@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.Kingdoms.Data;
+﻿using Autofac;
+using GameInterface.Services.Kingdoms.Data;
 using GameInterface.Services.Kingdoms.Extentions;
 using GameInterface.Services.ObjectManager;
 using ProtoBuf;
@@ -69,6 +70,9 @@ namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision
             objectManager.AddExisting(proposerClan.StringId, proposerClan);
             objectManager.AddExisting(kingdom.StringId, kingdom);
             objectManager.AddExisting(settlement.StringId, settlement);
+            ContainerBuilder builder = new ContainerBuilder();
+            builder.RegisterInstance(objectManager).As<IObjectManager>();
+            using IContainer container = builder.Build();
 
             SettlementClaimantDecisionData data = new SettlementClaimantDecisionData(
                 proposerClan.StringId, kingdom.StringId, 10, true, true, true, settlement.StringId, null, null);
@@ -82,12 +86,20 @@ namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision
             Assert.Same(settlement, decision.Settlement);
 
             // Serialization: converting back must not throw on the null fields and must keep them null.
-            KingdomDecisionData roundTrippedData = decision.ToKingdomDecisionData();
-            Assert.True(roundTrippedData is SettlementClaimantDecisionData);
-            SettlementClaimantDecisionData roundTripped = (SettlementClaimantDecisionData)roundTrippedData;
-            Assert.Null(roundTripped.CapturerHeroId);
-            Assert.Null(roundTripped.ClanToExcludeId);
-            Assert.Equal(settlement.StringId, roundTripped.SettlementId);
+            try
+            {
+                ContainerProvider.SetContainer(container);
+                KingdomDecisionData roundTrippedData = decision.ToKingdomDecisionData();
+                Assert.True(roundTrippedData is SettlementClaimantDecisionData);
+                SettlementClaimantDecisionData roundTripped = (SettlementClaimantDecisionData)roundTrippedData;
+                Assert.Null(roundTripped.CapturerHeroId);
+                Assert.Null(roundTripped.ClanToExcludeId);
+                Assert.Equal(settlement.StringId, roundTripped.SettlementId);
+            }
+            finally
+            {
+                ContainerProvider.Clear();
+            }
         }
     }
 }

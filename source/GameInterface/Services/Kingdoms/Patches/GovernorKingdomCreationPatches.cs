@@ -5,7 +5,6 @@ using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.Localization;
@@ -17,10 +16,6 @@ internal class GovernorKingdomCreationPatches
 {
     private const string FinalizationMethodName = "governor_talk_kingdom_creation_finalization_on_consequence";
     private static readonly ILogger Logger = LogManager.GetLogger<GovernorKingdomCreationPatches>();
-    private static readonly FieldInfo ChosenNameField =
-        AccessTools.Field(typeof(GovernorCampaignBehavior), "_kingdomCreationChosenName");
-    private static readonly FieldInfo ChosenCultureField =
-        AccessTools.Field(typeof(GovernorCampaignBehavior), "_kingdomCreationChosenCulture");
 
     [HarmonyPatch(FinalizationMethodName)]
     [HarmonyPrefix]
@@ -53,14 +48,8 @@ internal class GovernorKingdomCreationPatches
             return false;
         }
 
-        if (ChosenNameField == null || ChosenCultureField == null)
-        {
-            Logger.Error("Unable to request kingdom creation because governor creation fields could not be found.");
-            return false;
-        }
-
-        var chosenName = ChosenNameField.GetValue(behavior) as TextObject;
-        var chosenCulture = ChosenCultureField.GetValue(behavior) as CultureObject;
+        var chosenName = behavior._kingdomCreationChosenName;
+        var chosenCulture = behavior._kingdomCreationChosenCulture;
         string kingdomName = chosenName?.ToString();
         if (!TryGetCultureId(chosenCulture, out string cultureId))
         {

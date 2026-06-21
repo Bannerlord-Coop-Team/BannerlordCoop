@@ -33,12 +33,8 @@ namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision
         {
             FieldInfo? fieldInfo = typeof(TradeAgreementDecisionData).GetField("TargetKingdomField", BindingFlags.Static | BindingFlags.NonPublic);
             Assert.NotNull(fieldInfo);
-            FieldInfo? fieldInfo2 = typeof(TradeAgreementDecisionData).GetField("TradeAgreementsCampaignBehaviorField", BindingFlags.Static | BindingFlags.NonPublic);
-            Assert.NotNull(fieldInfo2);
             object? obj = fieldInfo?.GetValue(null);
             Assert.NotNull(obj);
-            object? obj2 = fieldInfo2?.GetValue(null);
-            Assert.NotNull(obj2);
         }
     }
 }

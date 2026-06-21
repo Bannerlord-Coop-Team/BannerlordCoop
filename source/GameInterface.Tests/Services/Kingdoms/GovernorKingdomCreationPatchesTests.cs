@@ -6,7 +6,6 @@ using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Kingdoms.Patches;
 using GameInterface.Tests.Bootstrap;
-using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -29,10 +28,8 @@ public class GovernorKingdomCreationPatchesTests
         culture = ObjectHelper.SkipConstructor<CultureObject>();
         culture.StringId = cultureId;
 
-        AccessTools.Field(typeof(GovernorCampaignBehavior), "_kingdomCreationChosenName")
-            .SetValue(behavior, new TextObject(kingdomName));
-        AccessTools.Field(typeof(GovernorCampaignBehavior), "_kingdomCreationChosenCulture")
-            .SetValue(behavior, culture);
+        behavior._kingdomCreationChosenName = new TextObject(kingdomName);
+        behavior._kingdomCreationChosenCulture = culture;
 
         return behavior;
     }

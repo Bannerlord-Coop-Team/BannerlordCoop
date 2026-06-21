@@ -17,7 +17,6 @@ namespace GameInterface.Services.Kingdoms.Data
         private static readonly FieldInfo CallingKingdomField = typeof(AcceptCallToWarAgreementDecision).GetField(nameof(AcceptCallToWarAgreementDecision.CallingKingdom), BindingFlags.Instance | BindingFlags.Public);
         private static readonly FieldInfo KingdomToCallToWarAgainstField = typeof(AcceptCallToWarAgreementDecision).GetField(nameof(AcceptCallToWarAgreementDecision.KingdomToCallToWarAgainst), BindingFlags.Instance | BindingFlags.Public);
         private static readonly FieldInfo CallToWarCostField = typeof(AcceptCallToWarAgreementDecision).GetField(nameof(AcceptCallToWarAgreementDecision.CallToWarCost), BindingFlags.Instance | BindingFlags.Public);
-        private static readonly FieldInfo AllianceCampaignBehaviorField = typeof(AcceptCallToWarAgreementDecision).GetField("_allianceCampaignBehavior", BindingFlags.Instance | BindingFlags.NonPublic);
 
         [ProtoMember(1)]
         public string CallingKingdomId { get; }
@@ -56,7 +55,7 @@ namespace GameInterface.Services.Kingdoms.Data
             CallingKingdomField.SetValue(acceptCallToWarAgreementDecision, callingKingdom);
             KingdomToCallToWarAgainstField.SetValue(acceptCallToWarAgreementDecision, kingdomToCallToWarAgainst);
             CallToWarCostField.SetValue(acceptCallToWarAgreementDecision, CallToWarCost);
-            AllianceCampaignBehaviorField.SetValue(acceptCallToWarAgreementDecision, allianceCampaignBehavior);
+            acceptCallToWarAgreementDecision._allianceCampaignBehavior = allianceCampaignBehavior;
             kingdomDecision = acceptCallToWarAgreementDecision;
             return true;
         }
