@@ -7,5 +7,5 @@ namespace GameInterface.Services.Towns.Patches.Disabled;
 internal class DisableTradersCampaignBehavior
 {
     [HarmonyPatch(nameof(TradersCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix() => true;
 }
