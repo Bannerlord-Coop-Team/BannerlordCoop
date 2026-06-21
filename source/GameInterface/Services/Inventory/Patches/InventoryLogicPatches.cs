@@ -2,8 +2,10 @@
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Inventory.Messages;
+using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using HarmonyLib;
 using Serilog;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.Inventory;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -19,6 +21,13 @@ internal class InventoryLogicPatches
     [HarmonyPrefix]
     static bool DoneLogicPrefix(InventoryLogic __instance, ref bool __result)
     {
+        if (PlayerPartyTradeContext.IsActive)
+        {
+            PlayerPartyTradeContext.PublishAccept(true);
+            __result = true;
+            return false;
+        }
+
         if (__instance.IsPreviewingItem)
         {
             __result = false;
@@ -71,5 +80,22 @@ internal class InventoryLogicPatches
 
         __result = true;
         return false;
+    }
+
+    [HarmonyPatch(nameof(InventoryLogic.TransferItem))]
+    [HarmonyPrefix]
+    static bool TransferItemPrefix(ref TransferCommand transferCommand, ref List<TransferCommandResult> __result)
+    {
+        if (PlayerPartyTradeContext.CanTransfer(transferCommand)) return true;
+
+        __result = new List<TransferCommandResult>();
+        return false;
+    }
+
+    [HarmonyPatch(nameof(InventoryLogic.TransferItem))]
+    [HarmonyPostfix]
+    static void TransferItemPostfix(InventoryLogic __instance)
+    {
+        PlayerPartyTradeContext.PublishOfferChanged(__instance);
     }
 }

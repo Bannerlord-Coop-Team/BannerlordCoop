@@ -1,0 +1,14 @@
+<Prefab>
+  <Window>
+    <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" DoNotAcceptEvents="true">
+      <Children>
+        <TextWidget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="360" SuggestedHeight="42"
+                    HorizontalAlignment="Left" VerticalAlignment="Bottom" MarginLeft="520" MarginBottom="72"
+                    Brush="Clan.TabControl.Text" Brush.FontSize="24" Text="@RemoteAcceptedText"/>
+        <TextWidget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="360" SuggestedHeight="42"
+                    HorizontalAlignment="Right" VerticalAlignment="Bottom" MarginRight="520" MarginBottom="72"
+                    Brush="Clan.TabControl.Text" Brush.FontSize="24" Text="@LocalAcceptedText"/>
+      </Children>
+    </Widget>
+  </Window>
+</Prefab>
