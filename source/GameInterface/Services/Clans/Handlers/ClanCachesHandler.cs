@@ -60,11 +60,11 @@ internal class ClanCachesHandler : IHandler
 
     private void Handle_AddWarParty(MessagePayload<AddWarParty> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
-        if (!objectManager.TryGetObjectWithLogging<WarPartyComponent>(obj.What.WarPartyComponentId, out var warPartyComponent)) return;
-
         GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
+            if (!objectManager.TryGetObjectWithLogging<WarPartyComponent>(obj.What.WarPartyComponentId, out var warPartyComponent)) return;
+
             clan.OnWarPartyAdded(warPartyComponent);
         });
     }
@@ -80,11 +80,12 @@ internal class ClanCachesHandler : IHandler
 
     private void Handle_RemoveWarParty(MessagePayload<RemoveWarParty> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
-        if (!objectManager.TryGetObjectWithLogging<WarPartyComponent>(obj.What.WarPartyComponentId, out var warPartyComponent)) return;
-
+        // Resolve on the game-loop thread, in queue order with deferred component lifecycle applies.
         GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
+            if (!objectManager.TryGetObjectWithLogging<WarPartyComponent>(obj.What.WarPartyComponentId, out var warPartyComponent)) return;
+
             clan.OnWarPartyRemoved(warPartyComponent);
         });
     }
@@ -100,11 +101,12 @@ internal class ClanCachesHandler : IHandler
 
     private void Handle_AddSupporterNotable(MessagePayload<AddSupporterNotable> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
-
+        // Resolve on the game-loop thread, in queue order with deferred object-creation applies.
         GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
+
             clan.OnSupporterNotableAdded(hero);
         });
     }
@@ -120,11 +122,12 @@ internal class ClanCachesHandler : IHandler
 
     private void Handle_RemoveSupporterNotable(MessagePayload<RemoveSupporterNotable> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
-
+        // Resolve on the game-loop thread, in queue order with deferred object-creation applies.
         GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
+
             clan.OnSupporterNotableRemoved(hero);
         });
     }
