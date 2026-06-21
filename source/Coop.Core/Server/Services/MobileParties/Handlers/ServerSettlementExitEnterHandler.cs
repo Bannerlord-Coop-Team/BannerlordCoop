@@ -78,13 +78,14 @@ public class ServerSettlementExitEnterHandler : IHandler
     private void Handle(MessagePayload<NetworkRequestEndSettlementEncounter> obj)
     {
         var payload = obj.What;
-        var peer = (NetPeer)obj.Who;
 
         objectManager.TryGetObject<MobileParty>(payload.PartyId, out var mobileParty);
         if (settlementTracker.TryConsumeLeave(mobileParty, payload.PartyId))
         {
             return;
         }
+
+        var peer = (NetPeer)obj.Who;
 
         // The sending client is currently in a settlement encounter, this is handled
         // slightly differently from ai or other clients parties

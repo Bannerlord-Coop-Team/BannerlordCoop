@@ -253,11 +253,6 @@ public class ClientKingdomHandler : IHandler
         {
             messageBroker.Publish(this, new StartSettlementEncounterAttempted(party, settlement));
         }
-
-        if (notifyServer && needsEncounter)
-        {
-            messageBroker.Publish(this, new StartSettlementEncounter(pending.PartyId, pending.SettlementId));
-        }
     }
 
     private void ClearRemoteSettlementRestore(PendingSettlementRestore pending)

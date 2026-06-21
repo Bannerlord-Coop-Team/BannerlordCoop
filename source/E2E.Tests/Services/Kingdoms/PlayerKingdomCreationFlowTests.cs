@@ -1348,7 +1348,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                        && ReferenceEquals(message.Settlement, GetObject<Settlement>(client, settlementId)));
 
         Assert.Contains(
-            Server.InternalMessages.GetMessages<PartyEnterSettlement>(),
+            client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>(),
             message => message.PartyId == player.PartyId && message.SettlementId == settlementId);
 
         client.Call(() =>
@@ -1412,16 +1412,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Assert.DoesNotContain(
             Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>(),
             message => message.PartyId == player.PartyId);
-        Assert.DoesNotContain(
-            Server.InternalMessages.GetMessages<PartyLeaveSettlement>(),
-            message => message.PartyId == player.PartyId);
-
-        foreach (var environmentClient in Clients)
-        {
-            Assert.DoesNotContain(
-                environmentClient.InternalMessages.GetMessages<PartyLeaveSettlement>(),
-                message => message.PartyId == player.PartyId);
-        }
 
         client.Call(() =>
         {
@@ -1471,7 +1461,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.Same(settlement, party.CurrentSettlement);
         });
 
-        client.SimulateMessage(this, new PartyEnterSettlement(settlementId, player.PartyId));
+        client.SimulateMessage(this, new NetworkPartyEnterSettlement(settlementId, player.PartyId));
 
         client.Call(() =>
         {
@@ -1514,9 +1504,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Assert.DoesNotContain(
             Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>(),
             message => message.PartyId == player.PartyId);
-        Assert.DoesNotContain(
-            Server.InternalMessages.GetMessages<PartyLeaveSettlement>(),
-            message => message.PartyId == player.PartyId);
 
         client.Call(() =>
         {
@@ -1544,9 +1531,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             message => true);
         Assert.DoesNotContain(
             Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>(),
-            message => message.PartyId == player.PartyId);
-        Assert.DoesNotContain(
-            Server.InternalMessages.GetMessages<PartyLeaveSettlement>(),
             message => message.PartyId == player.PartyId);
 
         Server.Call(() =>
@@ -1591,7 +1575,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         client.SimulateMessage(
             this,
             new NetworkPlayerKingdomCreated(ControllerId, kingdomId, KingdomName, player.ClanId, player.PartyId, settlementId));
-        client.SimulateMessage(this, new GameInterface.Services.MobileParties.Patches.EndSettlementEncounter());
+        client.SimulateMessage(this, new NetworkEndSettlementEncounter());
 
         client.Call(() =>
         {
