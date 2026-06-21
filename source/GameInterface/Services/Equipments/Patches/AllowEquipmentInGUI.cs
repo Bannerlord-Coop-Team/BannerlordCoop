@@ -9,6 +9,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.ViewModelCollection;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.MountAndBlade.View.Scripts;
 
 namespace GameInterface.Services.Equipments.Patches;
 
@@ -19,7 +20,8 @@ internal class AllowEquipmentInGUI
     {
         AccessTools.Method(typeof(CampaignUIHelper), nameof(CampaignUIHelper.GetCharacterCode)),
         AccessTools.Method(typeof(SandBoxUIHelper), nameof(SandBoxUIHelper.GetCharacterCode)),
-        AccessTools.Method(typeof(Mission), nameof(Mission.SpawnAgent))
+        AccessTools.Method(typeof(Mission), nameof(Mission.SpawnAgent)),
+        AccessTools.Method(typeof(CharacterSpawner), nameof(CharacterSpawner.InitWithCharacter))
     };
 
     [HarmonyPrefix]
