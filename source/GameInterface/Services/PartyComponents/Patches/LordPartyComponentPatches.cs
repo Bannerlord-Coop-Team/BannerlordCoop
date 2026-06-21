@@ -29,7 +29,6 @@ public class LordPartyComponentTranspilers
 
     public static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredConstructors(typeof(LordPartyComponent));
 
-
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> InitializationArgsTranspiler(IEnumerable<CodeInstruction> instructions)
     {
