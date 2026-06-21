@@ -1,5 +1,6 @@
 ﻿using Common.Util;
 using HarmonyLib;
+using SandBox.ViewModelCollection;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -15,7 +16,8 @@ internal class AllowEquipmentInGUI
 {
     private static IEnumerable<MethodBase> TargetMethods() => new MethodBase[]
     {
-        AccessTools.Method(typeof(CampaignUIHelper), nameof(CampaignUIHelper.GetCharacterCode))
+        AccessTools.Method(typeof(CampaignUIHelper), nameof(CampaignUIHelper.GetCharacterCode)),
+        AccessTools.Method(typeof(SandBoxUIHelper), nameof(SandBoxUIHelper.GetCharacterCode))
     };
 
     [HarmonyPrefix]
