@@ -1,3 +1,4 @@
+using Common;
 using Common.Util;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.Kingdoms.Messages;
@@ -13,9 +14,27 @@ using TaleWorlds.Library;
 
 namespace Coop.IntegrationTests.Kingdoms;
 
+[Collection(KingdomSyncGameThreadCollection.Name)]
 public class KingdomCreationRequestSyncTest
 {
     internal TestEnvironment TestEnvironment { get; } = new TestEnvironment();
+
+    private static void RunOnGameThread(Action act)
+    {
+        Exception? captured = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                GameThread.Instance.MarkGameThread();
+                act();
+            }
+            catch (Exception e) { captured = e; }
+        });
+        thread.Start();
+        thread.Join();
+        if (captured != null) throw captured;
+    }
 
     [Fact]
     public void ClientKingdomCreationRequested_Publishes_ServerCommand()
@@ -24,7 +43,8 @@ public class KingdomCreationRequestSyncTest
         var server = TestEnvironment.Server;
         client1.Resolve<IControllerIdProvider>().SetControllerId("player1");
 
-        client1.SimulateMessage(this, new KingdomCreationRequested("Real Kingdom", "empire"));
+        RunOnGameThread(() =>
+            client1.SimulateMessage(this, new KingdomCreationRequested("Real Kingdom", "empire")));
 
         Assert.Equal(1, client1.NetworkSentMessages.GetMessageCount<NetworkRequestCreateKingdom>());
         Assert.Equal(1, server.InternalMessages.GetMessageCount<NetworkRequestCreateKingdom>());
@@ -56,9 +76,10 @@ public class KingdomCreationRequestSyncTest
 
         Assert.Null(party.CurrentSettlement);
 
-        server.SimulateMessage(
-            this,
-            new NetworkRequestCreateKingdom("player1", "Real Kingdom", "empire", "party1", "settlement1"));
+        RunOnGameThread(() =>
+            server.SimulateMessage(
+                this,
+                new NetworkRequestCreateKingdom("player1", "Real Kingdom", "empire", "party1", "settlement1")));
 
         Assert.Same(settlement, party.CurrentSettlement);
         Assert.Single(
@@ -71,7 +92,8 @@ public class KingdomCreationRequestSyncTest
     {
         var server = TestEnvironment.Server;
 
-        server.SimulateMessage(this, new NetworkRequestCreateKingdom("player1", "Real Kingdom", "empire"));
+        RunOnGameThread(() =>
+            server.SimulateMessage(this, new NetworkRequestCreateKingdom("player1", "Real Kingdom", "empire")));
 
         var serverCommand = Assert.Single(server.InternalMessages.GetMessages<CreateKingdom>());
         Assert.Equal("player1", serverCommand.ControllerId);
@@ -84,9 +106,10 @@ public class KingdomCreationRequestSyncTest
     {
         var server = TestEnvironment.Server;
 
-        server.SimulateMessage(
-            this,
-            new PlayerKingdomCreated("player1", "Kingdom_Created_1", "Real Kingdom", "Clan_Player"));
+        RunOnGameThread(() =>
+            server.SimulateMessage(
+                this,
+                new PlayerKingdomCreated("player1", "Kingdom_Created_1", "Real Kingdom", "Clan_Player")));
 
         var networkMessage = Assert.Single(server.NetworkSentMessages.GetMessages<NetworkPlayerKingdomCreated>());
         Assert.Equal("player1", networkMessage.ControllerId);
@@ -117,9 +140,10 @@ public class KingdomCreationRequestSyncTest
         settlement._partiesCache = new MBList<MobileParty>();
         playerManager.AddPlayer(new Player("player1", "hero1", "party1", "clan1", "character1"));
 
-        server.SimulateMessage(
-            this,
-            new NetworkRequestCreateKingdom("player1", "Real Kingdom", "empire", "party1", "settlement1"));
+        RunOnGameThread(() =>
+            server.SimulateMessage(
+                this,
+                new NetworkRequestCreateKingdom("player1", "Real Kingdom", "empire", "party1", "settlement1")));
 
         using (new AllowedThread())
         {
@@ -128,13 +152,20 @@ public class KingdomCreationRequestSyncTest
                 ?.SetValue(party, null);
         }
 
-        server.SimulateMessage(
-            this,
-            new PlayerKingdomCreated("player1", "Kingdom_Created_1", "Real Kingdom", "clan1"));
+        RunOnGameThread(() =>
+            server.SimulateMessage(
+                this,
+                new PlayerKingdomCreated("player1", "Kingdom_Created_1", "Real Kingdom", "clan1")));
 
         var networkMessage = Assert.Single(server.NetworkSentMessages.GetMessages<NetworkPlayerKingdomCreated>());
         Assert.Equal("party1", networkMessage.PartyId);
         Assert.Equal("settlement1", networkMessage.SettlementId);
         Assert.Same(settlement, party.CurrentSettlement);
     }
+}
+
+[CollectionDefinition("Kingdom sync game thread", DisableParallelization = true)]
+public class KingdomSyncGameThreadCollection
+{
+    public const string Name = "Kingdom sync game thread";
 }
