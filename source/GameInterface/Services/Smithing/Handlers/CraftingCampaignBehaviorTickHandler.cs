@@ -122,7 +122,7 @@ namespace GameInterface.Services.Smithing.Handlers
                 foreach (Hero hero in list)
                 {
                     // Prevents adding town orders with player hero order owners
-                    if (hero != Hero.MainHero && !hero.IsPlayerHero() && MBRandom.RandomFloat <= 0.05f)
+                    if (!hero.IsPlayerHero() && MBRandom.RandomFloat <= 0.05f)
                     {
                         int availableSlot = obj.CraftingCampaignBehavior.CraftingOrders[obj.Settlement.Town].GetAvailableSlot();
                         if (availableSlot <= -1)
