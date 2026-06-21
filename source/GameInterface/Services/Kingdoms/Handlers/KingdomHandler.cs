@@ -219,10 +219,7 @@ public class KingdomHandler : IHandler
 
     private bool TryGetCulture(string cultureId, out CultureObject culture)
     {
-        if (objectManager.TryGetObject(cultureId, out culture)) return true;
-
-        culture = Campaign.Current?.ObjectManager?.GetObject<CultureObject>(cultureId);
-        return culture != null;
+        return objectManager.TryGetObject(cultureId, out culture);
     }
 
     internal static bool CanCreateKingdomForClan(Clan clan, string kingdomName, out string reason)

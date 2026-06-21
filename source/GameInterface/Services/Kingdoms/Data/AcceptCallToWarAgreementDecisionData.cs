@@ -1,7 +1,6 @@
 using GameInterface.Services.ObjectManager;
 using ProtoBuf;
 using System.Reflection;
-using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Election;
@@ -14,8 +13,6 @@ namespace GameInterface.Services.Kingdoms.Data
     [ProtoContract(SkipConstructor = true)]
     public class AcceptCallToWarAgreementDecisionData : KingdomDecisionData
     {
-        private static readonly FieldInfo CallingKingdomField = typeof(AcceptCallToWarAgreementDecision).GetField(nameof(AcceptCallToWarAgreementDecision.CallingKingdom), BindingFlags.Instance | BindingFlags.Public);
-        private static readonly FieldInfo KingdomToCallToWarAgainstField = typeof(AcceptCallToWarAgreementDecision).GetField(nameof(AcceptCallToWarAgreementDecision.KingdomToCallToWarAgainst), BindingFlags.Instance | BindingFlags.Public);
         private static readonly FieldInfo CallToWarCostField = typeof(AcceptCallToWarAgreementDecision).GetField(nameof(AcceptCallToWarAgreementDecision.CallToWarCost), BindingFlags.Instance | BindingFlags.Public);
 
         [ProtoMember(1)]
@@ -50,10 +47,8 @@ namespace GameInterface.Services.Kingdoms.Data
                 return false;
             }
 
-            AcceptCallToWarAgreementDecision acceptCallToWarAgreementDecision = (AcceptCallToWarAgreementDecision)FormatterServices.GetUninitializedObject(typeof(AcceptCallToWarAgreementDecision));
+            AcceptCallToWarAgreementDecision acceptCallToWarAgreementDecision = new AcceptCallToWarAgreementDecision(proposerClan, callingKingdom, kingdomToCallToWarAgainst);
             SetKingdomDecisionProperties(acceptCallToWarAgreementDecision, proposerClan, kingdom);
-            CallingKingdomField.SetValue(acceptCallToWarAgreementDecision, callingKingdom);
-            KingdomToCallToWarAgainstField.SetValue(acceptCallToWarAgreementDecision, kingdomToCallToWarAgainst);
             CallToWarCostField.SetValue(acceptCallToWarAgreementDecision, CallToWarCost);
             acceptCallToWarAgreementDecision._allianceCampaignBehavior = allianceCampaignBehavior;
             kingdomDecision = acceptCallToWarAgreementDecision;
