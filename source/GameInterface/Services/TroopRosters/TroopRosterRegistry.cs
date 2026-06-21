@@ -20,9 +20,11 @@ internal class TroopRosterRegistry : AutoRegistryBase<TroopRoster>
     {
     }
 
-    public override IEnumerable<MethodBase> Constructors => new MethodBase[] {
-        AccessTools.Constructor(typeof(TroopRoster))
-    };
+    // No constructor hooks: the TroopRoster(PartyBase) ctor is 14 bytes of IL and gets JIT-inlined
+    // into its callers, so a Harmony lifetime prefix on it never runs. Party rosters are registered
+    // via the (non-inlined) set_OwnerParty patch (TroopRosterOwnerPartyRegistrationPatch); dummy
+    // rosters via TroopRosterCreateDummyPatch; load-time rosters via RegisterAllObjects below.
+    public override IEnumerable<MethodBase> Constructors => Array.Empty<MethodBase>();
 
     public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
