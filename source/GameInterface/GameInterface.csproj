@@ -49,9 +49,6 @@
     <Reference Include="SandBox.ViewModelCollection">
       <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.ViewModelCollection.dll</HintPath>
     </Reference>
-    <Reference Include="StoryMode">
-      <HintPath>..\..\mb2\Modules\StoryMode\bin\Win64_Shipping_Client\StoryMode.dll</HintPath>
-    </Reference>
     <Reference Include="TaleWorlds.AchievementSystem">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.AchievementSystem.dll</HintPath>
     </Reference>
