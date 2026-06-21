@@ -1,8 +1,11 @@
+using Autofac;
 using Common;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Kingdoms.Messages;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Kingdoms.Patches;
+using GameInterface.Tests.Bootstrap;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
@@ -17,8 +20,13 @@ public class GovernorKingdomCreationPatchesTests
 {
     private static GovernorCampaignBehavior CreateGovernorBehavior(string kingdomName, string cultureId)
     {
+        return CreateGovernorBehavior(kingdomName, cultureId, out var _);
+    }
+
+    private static GovernorCampaignBehavior CreateGovernorBehavior(string kingdomName, string cultureId, out CultureObject culture)
+    {
         var behavior = ObjectHelper.SkipConstructor<GovernorCampaignBehavior>();
-        var culture = ObjectHelper.SkipConstructor<CultureObject>();
+        culture = ObjectHelper.SkipConstructor<CultureObject>();
         culture.StringId = cultureId;
 
         AccessTools.Field(typeof(GovernorCampaignBehavior), "_kingdomCreationChosenName")
@@ -27,6 +35,11 @@ public class GovernorKingdomCreationPatchesTests
             .SetValue(behavior, culture);
 
         return behavior;
+    }
+
+    private static void RegisterCultureId(PatchBootstrap bootstrap, CultureObject culture, string cultureId)
+    {
+        Assert.True(bootstrap.Container.Resolve<IObjectManager>().AddExisting(cultureId, culture));
     }
 
     [Fact]
@@ -38,7 +51,9 @@ public class GovernorKingdomCreationPatchesTests
     [Fact]
     public void ClientFinalization_PublishesKingdomCreationRequestAndSkipsOriginal()
     {
-        var behavior = CreateGovernorBehavior("Real Kingdom", "empire");
+        using var bootstrap = new PatchBootstrap();
+        var behavior = CreateGovernorBehavior("Real Kingdom", "native_empire", out var culture);
+        RegisterCultureId(bootstrap, culture, "empire");
         var published = new List<KingdomCreationRequested>();
         Action<MessagePayload<KingdomCreationRequested>> capture = payload => published.Add(payload.What);
         bool originalIsServer = ModInformation.IsServer;
@@ -92,7 +107,9 @@ public class GovernorKingdomCreationPatchesTests
     [InlineData("   ")]
     public void EmptyKingdomName_DoesNotCreateClientRequest(string kingdomName)
     {
-        var behavior = CreateGovernorBehavior(kingdomName, "empire");
+        using var bootstrap = new PatchBootstrap();
+        var behavior = CreateGovernorBehavior(kingdomName, "native_empire", out var culture);
+        RegisterCultureId(bootstrap, culture, "empire");
 
         bool created = GovernorKingdomCreationPatches.TryCreateKingdomCreationRequest(behavior, out var request);
 

@@ -445,8 +445,17 @@ public class KingdomDebugCommand
             return $"Support weight is invalid: {args[3]}. Use Choose, StayNeutral, SlightlyFavor, StronglyFavor, or FullyPush.";
         }
 
+        if (TryGetObjectManager(out var objectManager) == false)
+        {
+            return "Unable to resolve ObjectManager";
+        }
+        if (!objectManager.TryGetIdWithLogging(kingdom, out string kingdomId))
+        {
+            return "Unable to resolve kingdom id.";
+        }
+
         MessageBroker.Instance.Publish(decision, new KingdomDecisionVoteRequested(
-            new KingdomDecisionVoteData(kingdom.StringId, decisionIndex, outcomeIndex, (int)supportWeight, isAbstain)));
+            new KingdomDecisionVoteData(kingdomId, decisionIndex, outcomeIndex, (int)supportWeight, isAbstain)));
 
         return $"Requested vote for {decision.GetType().Name}: outcome={args[2]}, support={supportWeight}.";
     }

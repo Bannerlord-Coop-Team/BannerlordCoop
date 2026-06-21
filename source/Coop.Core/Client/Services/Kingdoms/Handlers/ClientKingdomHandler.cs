@@ -10,7 +10,6 @@ using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using System;
-using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
@@ -119,10 +118,7 @@ public class ClientKingdomHandler : IHandler
 
     private bool TryGetKingdomId(Kingdom kingdom, out string kingdomId)
     {
-        if (objectManager.TryGetId(kingdom, out kingdomId)) return true;
-
-        kingdomId = kingdom?.StringId;
-        return !string.IsNullOrWhiteSpace(kingdomId);
+        return objectManager.TryGetIdWithLogging(kingdom, out kingdomId);
     }
 
     private PendingSettlementRestore? CapturePendingSettlementRestore()
@@ -142,18 +138,12 @@ public class ClientKingdomHandler : IHandler
 
     private bool TryGetPartyId(MobileParty party, out string partyId)
     {
-        if (objectManager.TryGetId(party, out partyId)) return true;
-
-        partyId = party.StringId;
-        return !string.IsNullOrWhiteSpace(partyId);
+        return objectManager.TryGetIdWithLogging(party, out partyId);
     }
 
     private bool TryGetSettlementId(Settlement settlement, out string settlementId)
     {
-        if (objectManager.TryGetId(settlement, out settlementId)) return true;
-
-        settlementId = settlement.StringId;
-        return !string.IsNullOrWhiteSpace(settlementId);
+        return objectManager.TryGetIdWithLogging(settlement, out settlementId);
     }
 
     private static Settlement? GetPartyCurrentSettlement(MobileParty? party)
@@ -283,10 +273,7 @@ public class ClientKingdomHandler : IHandler
 
     private bool TryGetSettlement(string settlementId, out Settlement settlement)
     {
-        if (objectManager.TryGetObject(settlementId, out settlement)) return true;
-
-        settlement = Settlement.All?.FirstOrDefault(existingSettlement => existingSettlement.StringId == settlementId);
-        return settlement != null;
+        return objectManager.TryGetObjectWithLogging(settlementId, out settlement);
     }
 
     private static void EnsurePartySettlement(MobileParty party, Settlement settlement)

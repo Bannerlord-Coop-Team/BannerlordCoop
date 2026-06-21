@@ -12,7 +12,6 @@ using GameInterface.Services.Players;
 using LiteNetLib;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -163,10 +162,7 @@ public class ServerKingdomHandler : IHandler
 
     private bool TryGetSettlement(string settlementId, out Settlement settlement)
     {
-        if (objectManager.TryGetObject(settlementId, out settlement)) return true;
-
-        settlement = Settlement.All?.FirstOrDefault(existingSettlement => existingSettlement.StringId == settlementId);
-        return settlement != null;
+        return objectManager.TryGetObjectWithLogging(settlementId, out settlement);
     }
 
     private bool TryGetPlayerSettlementContext(
@@ -188,10 +184,7 @@ public class ServerKingdomHandler : IHandler
 
     private bool TryGetSettlementId(Settlement settlement, out string settlementId)
     {
-        if (objectManager.TryGetId(settlement, out settlementId)) return true;
-
-        settlementId = settlement.StringId;
-        return !string.IsNullOrWhiteSpace(settlementId);
+        return objectManager.TryGetIdWithLogging(settlement, out settlementId);
     }
 
     private void HandleLocalKingdomDecisionResolved(MessagePayload<KingdomDecisionResolved> obj)
@@ -279,10 +272,7 @@ public class ServerKingdomHandler : IHandler
 
     private bool TryGetKingdomId(Kingdom kingdom, out string kingdomId)
     {
-        if (objectManager.TryGetId(kingdom, out kingdomId)) return true;
-
-        kingdomId = kingdom?.StringId;
-        return !string.IsNullOrWhiteSpace(kingdomId);
+        return objectManager.TryGetIdWithLogging(kingdom, out kingdomId);
     }
 
     public void Dispose()

@@ -4,7 +4,6 @@ using System;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
-using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Kingdoms
 {
@@ -131,15 +130,7 @@ namespace GameInterface.Services.Kingdoms
             objectId = null;
             if (value == null) return false;
 
-            if (objectManager != null && objectManager.TryGetId(value, out objectId)) return true;
-
-            if (value is MBObjectBase mbObject && !string.IsNullOrWhiteSpace(mbObject.StringId))
-            {
-                objectId = mbObject.StringId;
-                return true;
-            }
-
-            return false;
+            return objectManager != null && objectManager.TryGetId(value, out objectId);
         }
     }
 }

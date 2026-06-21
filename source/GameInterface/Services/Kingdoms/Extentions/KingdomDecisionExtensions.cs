@@ -1,11 +1,10 @@
-﻿using GameInterface.Services.Kingdoms.Data;
+using GameInterface.Services.Kingdoms.Data;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using GameInterface;
 using GameInterface.Services.ObjectManager;
 using TaleWorlds.CampaignSystem.Election;
-using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Kingdoms.Extentions
 {
@@ -211,11 +210,6 @@ namespace GameInterface.Services.Kingdoms.Extentions
                 objectManager.TryGetId(obj, out string id))
             {
                 return id;
-            }
-
-            if (obj is MBObjectBase mbObject)
-            {
-                return mbObject.StringId;
             }
 
             return null;

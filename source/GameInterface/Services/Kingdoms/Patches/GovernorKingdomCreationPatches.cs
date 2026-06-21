@@ -2,6 +2,7 @@ using Common;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Kingdoms.Messages;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System.Reflection;
@@ -61,7 +62,11 @@ internal class GovernorKingdomCreationPatches
         var chosenName = ChosenNameField.GetValue(behavior) as TextObject;
         var chosenCulture = ChosenCultureField.GetValue(behavior) as CultureObject;
         string kingdomName = chosenName?.ToString();
-        string cultureId = chosenCulture?.StringId;
+        if (!TryGetCultureId(chosenCulture, out string cultureId))
+        {
+            Logger.Warning("Unable to request kingdom creation because the culture id could not be resolved.");
+            return false;
+        }
 
         if (string.IsNullOrWhiteSpace(kingdomName) || string.IsNullOrWhiteSpace(cultureId))
         {
@@ -74,5 +79,14 @@ internal class GovernorKingdomCreationPatches
 
         request = new KingdomCreationRequested(kingdomName, cultureId);
         return true;
+    }
+
+    private static bool TryGetCultureId(CultureObject culture, out string cultureId)
+    {
+        cultureId = null;
+        if (culture == null) return false;
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return false;
+
+        return objectManager.TryGetIdWithLogging(culture, out cultureId);
     }
 }

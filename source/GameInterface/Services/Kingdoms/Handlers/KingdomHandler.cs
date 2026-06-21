@@ -157,13 +157,6 @@ public class KingdomHandler : IHandler
 
             if (!objectManager.TryGetId(createdKingdom, out kingdomId))
             {
-                kingdomId = string.IsNullOrWhiteSpace(createdKingdom.StringId)
-                    ? null
-                    : $"{typeof(Kingdom).Name}_{createdKingdom.StringId}";
-            }
-
-            if (string.IsNullOrWhiteSpace(kingdomId))
-            {
                 FailCreateKingdomRequest(payload, "created kingdom could not be registered with the coop object manager");
                 return;
             }

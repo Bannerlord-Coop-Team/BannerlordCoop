@@ -1264,14 +1264,12 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Fact]
-    public void ClientKingdomCreationRequest_UsesSettlementStringIdWhenReverseLookupIsMissing()
+    public void ClientKingdomCreationRequest_DoesNotUseSettlementStringIdWhenReverseLookupIsMissing()
     {
         var player = CreateSyncedPlayerContext();
         var client = Clients.First();
         var settlementId = CreateSyncedSettlement();
         client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
-        SetSettlementStringIdEverywhere(settlementId);
-        string settlementStringId = null;
 
         client.Call(() =>
         {
@@ -1288,23 +1286,14 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.False(client.ObjectManager.TryGetId(settlement, out _));
             Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId, out var _));
             Assert.Same(settlement, party.CurrentSettlement);
-            settlementStringId = settlement.StringId;
         });
 
         client.SimulateMessage(this, new KingdomCreationRequested(KingdomName, player.CultureId));
 
         var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestCreateKingdom>());
         Assert.Equal(ControllerId, request.ControllerId);
-        Assert.Equal(player.PartyId, request.PartyId);
-        Assert.Equal(settlementStringId, request.SettlementId);
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(player.PartyId, out var party));
-            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(request.SettlementId, out var settlement));
-
-            Assert.Same(settlement, party.CurrentSettlement);
-        });
+        Assert.Null(request.PartyId);
+        Assert.Null(request.SettlementId);
     }
 
     [Fact]
@@ -1669,24 +1658,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             {
                 settlement.Party = new PartyBase(party, settlement);
             }
-        });
-    }
-
-    private void SetSettlementStringIdEverywhere(string settlementId)
-    {
-        SetSettlementStringId(Server, settlementId);
-        foreach (var client in Clients)
-        {
-            SetSettlementStringId(client, settlementId);
-        }
-    }
-
-    private static void SetSettlementStringId(EnvironmentInstance instance, string settlementId)
-    {
-        instance.Call(() =>
-        {
-            Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
-            settlement.StringId = settlementId;
         });
     }
 

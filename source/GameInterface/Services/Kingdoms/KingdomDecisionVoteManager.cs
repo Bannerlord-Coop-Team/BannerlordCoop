@@ -227,9 +227,7 @@ namespace GameInterface.Services.Kingdoms
             state.RefreshEligibleClanIds(GetEligibleClanIds(decision));
             ApplyPendingRemoteVotes(state);
 
-            string clanId = Clan.PlayerClan.StringId;
-            return GetCandidateClanIds(clanId, canonicalClanId)
-                .Any(candidateClanId => state.FinalVotes.ContainsKey(candidateClanId));
+            return state.FinalVotes.ContainsKey(canonicalClanId);
         }
 
         public bool ShouldBlockLocalResolution(DecisionItemBaseVM decisionItem)
@@ -1026,26 +1024,16 @@ namespace GameInterface.Services.Kingdoms
         {
             clan = null;
             if (string.IsNullOrEmpty(clanId)) return false;
-            if (objectManager != null && objectManager.TryGetObject(clanId, out clan)) return true;
 
-            clan = kingdom?.Clans?.FirstOrDefault(existingClan =>
-                existingClan != null &&
-                (existingClan.StringId == clanId ||
-                 (objectManager != null &&
-                  objectManager.TryGetId(existingClan, out string existingClanId) &&
-                  existingClanId == clanId)));
-
-            return clan != null;
+            return objectManager != null && objectManager.TryGetObject(clanId, out clan);
         }
 
         private bool TryGetClanId(Clan clan, out string clanId)
         {
             clanId = null;
             if (clan == null) return false;
-            if (objectManager != null && objectManager.TryGetId(clan, out clanId)) return true;
 
-            clanId = clan.StringId;
-            return !string.IsNullOrWhiteSpace(clanId);
+            return objectManager != null && objectManager.TryGetId(clan, out clanId);
         }
 
         private static bool IsLocalPlayerEligible(KingdomDecision decision)
@@ -1087,10 +1075,8 @@ namespace GameInterface.Services.Kingdoms
         {
             kingdomId = null;
             if (kingdom == null) return false;
-            if (objectManager != null && objectManager.TryGetId(kingdom, out kingdomId)) return true;
 
-            kingdomId = kingdom.StringId;
-            return !string.IsNullOrWhiteSpace(kingdomId);
+            return objectManager != null && objectManager.TryGetId(kingdom, out kingdomId);
         }
 
         private static int GetOutcomeIndex(DecisionOutcome decisionOutcome, KingdomElection election)

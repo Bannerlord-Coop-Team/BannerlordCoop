@@ -33,7 +33,7 @@ public class KingdomCreationSettlementTracker : IKingdomCreationSettlementTracke
 
         lock (gate)
         {
-            TrackNoLock(partyId, new PendingSettlement(settlementId, settlementId, null, DateTime.UtcNow));
+            TrackNoLock(partyId, new PendingSettlement(settlementId, null, DateTime.UtcNow));
         }
     }
 
@@ -53,10 +53,6 @@ public class KingdomCreationSettlementTracker : IKingdomCreationSettlementTracke
             if (party != null)
             {
                 pendingParties.Remove(party);
-                if (!string.IsNullOrWhiteSpace(party.StringId))
-                {
-                    pendingSettlements.Remove(party.StringId);
-                }
             }
 
             if (!string.IsNullOrWhiteSpace(partyId))
@@ -69,17 +65,12 @@ public class KingdomCreationSettlementTracker : IKingdomCreationSettlementTracke
     public void TrackParty(MobileParty party, string partyId, Settlement settlement, string settlementId)
     {
         if (party == null || settlement == null) return;
+        if (string.IsNullOrWhiteSpace(partyId) || string.IsNullOrWhiteSpace(settlementId)) return;
 
-        string resolvedPartyId = string.IsNullOrWhiteSpace(partyId) ? party.StringId : partyId;
-        string resolvedSettlementId = string.IsNullOrWhiteSpace(settlementId) ? settlement.StringId : settlementId;
-        if (string.IsNullOrWhiteSpace(resolvedPartyId) || string.IsNullOrWhiteSpace(resolvedSettlementId)) return;
-
-        var pending = new PendingSettlement(resolvedSettlementId, settlement.StringId, settlement, DateTime.UtcNow);
-
+        var pending = new PendingSettlement(settlementId, settlement, DateTime.UtcNow);
         lock (gate)
         {
-            TrackNoLock(resolvedPartyId, pending);
-            TrackNoLock(party.StringId, pending);
+            TrackNoLock(partyId, pending);
             pendingParties.Remove(party);
             pendingParties.Add(party, pending);
         }
@@ -126,14 +117,6 @@ public class KingdomCreationSettlementTracker : IKingdomCreationSettlementTracke
 
             if (!string.IsNullOrWhiteSpace(partyId) &&
                 pendingSettlements.TryGetValue(partyId, out pending) &&
-                TryConsumeLeaveNoLock(pending))
-            {
-                return true;
-            }
-
-            if (party != null &&
-                !string.IsNullOrWhiteSpace(party.StringId) &&
-                pendingSettlements.TryGetValue(party.StringId, out pending) &&
                 TryConsumeLeaveNoLock(pending))
             {
                 return true;
@@ -194,12 +177,6 @@ public class KingdomCreationSettlementTracker : IKingdomCreationSettlementTracke
             return true;
         }
 
-        if (!string.IsNullOrWhiteSpace(party.StringId) &&
-            pendingSettlements.TryGetValue(party.StringId, out pending))
-        {
-            return true;
-        }
-
         pending = default;
         return false;
     }
@@ -238,13 +215,7 @@ public class KingdomCreationSettlementTracker : IKingdomCreationSettlementTracke
         {
             return pending.Settlement;
         }
-
-        if (Settlement.All == null) return null;
-
-        return Settlement.All.FirstOrDefault(settlement =>
-            settlement != null &&
-            (settlement.StringId == pending.SettlementId ||
-             settlement.StringId == pending.SettlementStringId));
+        return null;
     }
 
     private void RemoveExpiredNoLock()
@@ -269,17 +240,15 @@ public class KingdomCreationSettlementTracker : IKingdomCreationSettlementTracke
     private class PendingSettlement
     {
         public readonly string SettlementId;
-        public readonly string SettlementStringId;
         public readonly Settlement Settlement;
         public DateTime UpdatedAt;
         public bool IsComplete;
         public int RemainingCompletedLeaveSuppressions;
         public int RemainingCompletedSettlementProtections;
 
-        public PendingSettlement(string settlementId, string settlementStringId, Settlement settlement, DateTime updatedAt)
+        public PendingSettlement(string settlementId, Settlement settlement, DateTime updatedAt)
         {
             SettlementId = settlementId;
-            SettlementStringId = settlementStringId;
             Settlement = settlement;
             UpdatedAt = updatedAt;
         }
