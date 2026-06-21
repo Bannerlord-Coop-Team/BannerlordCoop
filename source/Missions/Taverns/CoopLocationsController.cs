@@ -342,6 +342,8 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
                 agentBuildData.Equipment(character.FirstCivilianEquipment);
                 agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
                 agentBuildData.Controller(AgentControllerType.None);
+                agentBuildData.ClothingColor1(character.HeroObject.MapFaction.Color);
+                agentBuildData.ClothingColor2(character.HeroObject.MapFaction.Color2);
 
                 agent = Mission.Current.SpawnAgent(agentBuildData);
                 agent.FadeIn();
