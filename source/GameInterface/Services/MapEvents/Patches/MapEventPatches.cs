@@ -128,7 +128,7 @@ internal class MapEventPatches
         // morale, and surviving troops' xp above the server. (Hero gold and prisoner capture are already blocked
         // on the client by the GiveGoldAction/TakePrisonerAction patches.) Skip the commit on the client so the
         // economy stays the server's; the loot-staging steps that run before it are left intact.
-        return !ModInformation.IsClient;
+        return ModInformation.IsServer;
     }
 
     [HarmonyPatch(nameof(MapEvent.Update))]

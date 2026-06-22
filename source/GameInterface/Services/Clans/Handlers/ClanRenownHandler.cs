@@ -1,11 +1,9 @@
 ﻿using Common;
-using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.ObjectManager;
-using Serilog;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Clans.Handlers
@@ -20,7 +18,6 @@ namespace GameInterface.Services.Clans.Handlers
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
         private readonly INetwork network;
-        private readonly ILogger Logger = LogManager.GetLogger<ClanRenownHandler>();
 
         public ClanRenownHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
         {
@@ -49,11 +46,8 @@ namespace GameInterface.Services.Clans.Handlers
 
             GameThread.RunSafe(() =>
             {
-                if (!objectManager.TryGetObject<Clan>(payload.ClanId, out var clan))
-                {
-                    Logger.Error("Unable to find clan ({clanId}) for renown change", payload.ClanId);
+                if (!objectManager.TryGetObjectWithLogging<Clan>(payload.ClanId, out var clan))
                     return;
-                }
 
                 // Apply the server's absolute value (not a delta) so clients converge. AllowedThread keeps any
                 // patches on the write path standing down on the receive side.
