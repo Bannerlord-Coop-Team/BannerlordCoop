@@ -24,11 +24,9 @@ internal class ClanRenownPatch
 
     private static void PublishRenown(Clan clan)
     {
-        // Applying a replicated change re-runs the writer under an AllowedThread; don't re-announce it.
-        if (CallOriginalPolicy.IsOriginalAllowed()) return;
-
-        // The server owns renown; clients receive it.
         if (!ModInformation.IsServer) return;
+
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
         if (string.IsNullOrEmpty(clan?.StringId)) return;
 
