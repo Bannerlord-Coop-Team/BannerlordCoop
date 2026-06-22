@@ -7,6 +7,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyComponents.Messages;
 using Serilog;
 using System;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -28,12 +29,58 @@ internal class LordPartyComponentHandler : IHandler
 
         messageBroker.Subscribe<LordPartyComponentInitArgsUpdated>(Handle_LordPartyComponentInitArgsUpdated);
         messageBroker.Subscribe<NetworkUpdateLordPartyComponentInitArgs>(Handle_NetworkUpdateLordPartyComponentInitArgs);
+
+        messageBroker.Subscribe<LordPartyOwnerChanged>(Handle_LordPartyOwnerChanged);
+        messageBroker.Subscribe<NetworkLordPartyOwnerChanged>(Handle_NetworkLordPartyOwnerChanged);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<LordPartyComponentInitArgsUpdated>(Handle_LordPartyComponentInitArgsUpdated);
         messageBroker.Unsubscribe<NetworkUpdateLordPartyComponentInitArgs>(Handle_NetworkUpdateLordPartyComponentInitArgs);
+
+        messageBroker.Unsubscribe<LordPartyOwnerChanged>(Handle_LordPartyOwnerChanged);
+        messageBroker.Unsubscribe<NetworkLordPartyOwnerChanged>(Handle_NetworkLordPartyOwnerChanged);
+    }
+
+    private void Handle_LordPartyOwnerChanged(MessagePayload<LordPartyOwnerChanged> payload)
+    {
+        var instance = payload.What.Instance;
+        var owner = payload.What.Owner;
+
+        if (!objectManager.TryGetIdWithLogging(instance, out var lordPartyComponentId)) return;
+
+        // Owner may legitimately be null.
+        string ownerId = null;
+        if (owner != null && !objectManager.TryGetIdWithLogging(owner, out ownerId)) return;
+
+        network.SendAll(new NetworkLordPartyOwnerChanged(lordPartyComponentId, ownerId));
+    }
+
+    private void Handle_NetworkLordPartyOwnerChanged(MessagePayload<NetworkLordPartyOwnerChanged> payload)
+    {
+        var message = payload.What;
+
+        GameThread.Run(() =>
+        {
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging<LordPartyComponent>(message.LordPartyComponentId, out var instance)) return;
+
+                Hero owner = null;
+                if (message.OwnerId != null &&
+                    !objectManager.TryGetObjectWithLogging(message.OwnerId, out owner)) return;
+
+                using (new AllowedThread())
+                {
+                    instance.Owner = owner;
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to apply NetworkLordPartyOwnerChanged");
+            }
+        });
     }
 
     private void Handle_LordPartyComponentInitArgsUpdated(MessagePayload<LordPartyComponentInitArgsUpdated> payload)

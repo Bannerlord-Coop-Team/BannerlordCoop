@@ -1,5 +1,6 @@
 ﻿using ProtoBuf;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace GameInterface.Services.TroopRosters.Data;
 
@@ -7,10 +8,10 @@ namespace GameInterface.Services.TroopRosters.Data;
 public readonly struct TroopRosterData
 {
     [ProtoMember(1)]
-    public readonly List<TroopRosterElementData> Data;
+    public readonly TroopRosterElementData[] Data;
 
-    public TroopRosterData(List<TroopRosterElementData> data)
+    public TroopRosterData(IEnumerable<TroopRosterElementData> data)
     {
-        Data = data;
+        Data = data.ToArray();
     }
 }

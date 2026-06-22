@@ -10,6 +10,7 @@ using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.ViewModelCollection;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.View.Scripts;
+using TaleWorlds.MountAndBlade.View.Tableaus.Thumbnails;
 
 namespace GameInterface.Services.Equipments.Patches;
 
@@ -21,7 +22,8 @@ internal class AllowEquipmentInGUI
         AccessTools.Method(typeof(CampaignUIHelper), nameof(CampaignUIHelper.GetCharacterCode)),
         AccessTools.Method(typeof(SandBoxUIHelper), nameof(SandBoxUIHelper.GetCharacterCode)),
         AccessTools.Method(typeof(Mission), nameof(Mission.SpawnAgent)),
-        AccessTools.Method(typeof(CharacterSpawner), nameof(CharacterSpawner.InitWithCharacter))
+        AccessTools.Method(typeof(CharacterSpawner), nameof(CharacterSpawner.InitWithCharacter)),
+        AccessTools.Method(typeof(CharacterThumbnailCache), "GetPoseParamsFromCharacterCode")
     };
 
     [HarmonyPrefix]

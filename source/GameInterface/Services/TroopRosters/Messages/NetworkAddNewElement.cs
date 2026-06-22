@@ -13,16 +13,12 @@ internal readonly struct NetworkAddNewElement : ICommand
     public readonly string ObjectId;
 
     [ProtoMember(3)]
-    public readonly bool IsHero;
-
-    [ProtoMember(4)]
     public readonly int InsertionIndex;
 
-    public NetworkAddNewElement(string troopRosterId, string objectId, bool isHero, int insertionIndex)
+    public NetworkAddNewElement(string troopRosterId, string objectId, int insertionIndex)
     {
         TroopRosterId = troopRosterId;
         ObjectId = objectId;
-        IsHero = isHero;
         InsertionIndex = insertionIndex;
     }
 }

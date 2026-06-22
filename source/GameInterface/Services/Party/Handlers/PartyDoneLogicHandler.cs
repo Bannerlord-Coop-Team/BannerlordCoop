@@ -6,6 +6,7 @@ using GameInterface.Services.MapEventParties;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Data;
 using GameInterface.Services.Party.Messages;
+using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.UI.Notifications.Messages;
 using LiteNetLib;
@@ -43,26 +44,28 @@ internal class PartyDoneLogicHandler : IHandler
         this.network = network;
         this.troopRosterInterface = troopRosterInterface;
 
-        messageBroker.Subscribe<AttemptPartyDoneLogic>(Handle_AttemptPartyDoneLogic);
-        messageBroker.Subscribe<CompletePartyDoneLogic>(Handle_CompletePartyDoneLogic);
+        messageBroker.Subscribe<PartyDoneLogicAttempted>(Handle_PartyDoneLogicAttempted);
+        messageBroker.Subscribe<NetworkCompleteDoneLogic>(Handle_CompletePartyDoneLogic);
     }
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<AttemptPartyDoneLogic>(Handle_AttemptPartyDoneLogic);
-        messageBroker.Unsubscribe<CompletePartyDoneLogic>(Handle_CompletePartyDoneLogic);
+        messageBroker.Unsubscribe<PartyDoneLogicAttempted>(Handle_PartyDoneLogicAttempted);
+        messageBroker.Unsubscribe<NetworkCompleteDoneLogic>(Handle_CompletePartyDoneLogic);
     }
 
-    private void Handle_AttemptPartyDoneLogic(MessagePayload<AttemptPartyDoneLogic> obj)
+    // Client
+    private void Handle_PartyDoneLogicAttempted(MessagePayload<PartyDoneLogicAttempted> obj)
     {
         if (!objectManager.TryGetIdWithLogging(obj.What.MainHero, out var mainHeroId)) return;
 
         string leftPartyId = null;
-        if (obj.What.LeftParty != null && !objectManager.TryGetIdWithLogging(obj.What.LeftParty, out leftPartyId)) return;
+        if (obj.What.LeftParty != null && 
+            !objectManager.TryGetIdWithLogging(obj.What.LeftParty, out leftPartyId))
+            return;
 
-        // Don't need to check if it resolved or not, not all left prisoner rosters are managed
-        // Examples being discarding prisoners or taking prisoners after a battle
-        objectManager.TryGetIdWithLogging(obj.What.LeftPrisonerRoster, out var leftPrisonerRosterId);
+        // Not registered when donating
+        objectManager.TryGetId(obj.What.LeftPrisonerRoster, out var leftPrisonerRosterId);
 
         var upgradedTroopHistory = new UpgradedTroopHistoryData(new());
         foreach (Tuple<CharacterObject, CharacterObject, int> tuple in obj.What.UpgradedTroopHistory)
@@ -73,12 +76,15 @@ internal class PartyDoneLogicHandler : IHandler
             upgradedTroopHistory.Data.Add(new(character1Id, character2Id, tuple.Item3));
         }
 
-        var leftMemberRosterData = troopRosterInterface.PackTroopRosterData(obj.What.LeftMemberRoster);
-        var leftPrisonerRosterData = troopRosterInterface.PackTroopRosterData(obj.What.LeftPrisonerRoster);
-        var rightMemberRosterData = troopRosterInterface.PackTroopRosterData(obj.What.RightMemberRoster);
-        var rightPrisonerRosterData = troopRosterInterface.PackTroopRosterData(obj.What.RightPrisonerRoster);
+        // Send only the per-troop change the player made (current minus the screen-open snapshot). Heroes and
+        // companions that did not change net to zero and are omitted, so the server needs no special handling
+        // for them when re-applying the delta.
+        var leftMemberRosterData = troopRosterInterface.PackTroopRosterDelta(obj.What.LeftMemberRoster, obj.What.InitialLeftMemberRoster);
+        var leftPrisonerRosterData = troopRosterInterface.PackTroopRosterDelta(obj.What.LeftPrisonerRoster, obj.What.InitialLeftPrisonerRoster);
+        var rightMemberRosterData = troopRosterInterface.PackTroopRosterDelta(obj.What.RightMemberRoster, obj.What.InitialRightMemberRoster);
+        var rightPrisonerRosterData = troopRosterInterface.PackTroopRosterDelta(obj.What.RightPrisonerRoster, obj.What.InitialRightPrisonerRoster);
 
-        var message = new CompletePartyDoneLogic(
+        var message = new NetworkCompleteDoneLogic(
             mainHeroId,
             FlattenedTroopSerializer.Serialize(obj.What.TakenPrisonersRoster, objectManager),
             FlattenedTroopSerializer.Serialize(obj.What.DonatedPrisonersRoster, objectManager),
@@ -100,7 +106,8 @@ internal class PartyDoneLogicHandler : IHandler
         network.SendAll(message);
     }
 
-    private void Handle_CompletePartyDoneLogic(MessagePayload<CompletePartyDoneLogic> obj)
+    // Server
+    private void Handle_CompletePartyDoneLogic(MessagePayload<NetworkCompleteDoneLogic> obj)
     {
         if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
 
@@ -126,18 +133,24 @@ internal class PartyDoneLogicHandler : IHandler
 
             var donatedPrisonersRoster = FlattenedTroopSerializer.Deserialize(obj.What.DonatedPrisonersRoster, objectManager);
 
+            // Collect every roster delta and apply them together: ApplyTroopRosterDeltas removes before it
+            // adds across all rosters, so a hero/prisoner moved between parties keeps its party linkage
+            // (the destination addition is the last AddToCounts on that hero).
+            var rosterDeltas = new List<(TroopRoster roster, TroopRosterData delta)>();
             if (leftParty != null)
             {
-                troopRosterInterface.UpdateWithData(leftParty.MemberRoster, obj.What.LeftMemberRosterData, mainHero);
-                troopRosterInterface.UpdateWithData(leftParty.PrisonRoster, obj.What.LeftPrisonerRosterData, mainHero);
+                rosterDeltas.Add((leftParty.MemberRoster, obj.What.LeftMemberRosterData));
+                rosterDeltas.Add((leftParty.PrisonRoster, obj.What.LeftPrisonerRosterData));
             }
             else if (leftPrisonerRoster != null) // Prisoner management doesn't have a set party
             {
-                troopRosterInterface.UpdateWithData(leftPrisonerRoster, obj.What.LeftPrisonerRosterData, mainHero);
+                rosterDeltas.Add((leftPrisonerRoster, obj.What.LeftPrisonerRosterData));
             }
 
-            troopRosterInterface.UpdateWithData(mainHero.PartyBelongedTo.MemberRoster, obj.What.RightMemberRosterData, mainHero);
-            troopRosterInterface.UpdateWithData(mainHero.PartyBelongedTo.PrisonRoster, obj.What.RightPrisonerRosterData, mainHero);
+            rosterDeltas.Add((mainHero.PartyBelongedTo.MemberRoster, obj.What.RightMemberRosterData));
+            rosterDeltas.Add((mainHero.PartyBelongedTo.PrisonRoster, obj.What.RightPrisonerRosterData));
+
+            troopRosterInterface.ApplyTroopRosterDeltas(rosterDeltas);
 
             mainHero.PartyBelongedTo.ItemRoster.Clear();
             foreach (var itemRosterElement in obj.What.RightOwnerPartyItemRosterData ?? Enumerable.Empty<ItemRosterElement>())
