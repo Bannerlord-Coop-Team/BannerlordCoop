@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.Heroes.Messages.Collections;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.TroopRosters.Logging;
 using GameInterface.Services.TroopRosters.Messages;
 using Serilog;
 using System;
@@ -15,18 +16,20 @@ using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.TroopRosters.Handlers;
 
-public class TroopRosterHandler : IHandler
+internal class TroopRosterHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<TroopRosterHandler>();
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly ITroopRosterLogger troopRosterLogger;
 
-    public TroopRosterHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
+    public TroopRosterHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network, ITroopRosterLogger troopRosterLogger)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.troopRosterLogger = troopRosterLogger;
 
         messageBroker.Subscribe<CountsAtIndexAdded>(Handle_CountsAtIndexAdded);
         messageBroker.Subscribe<NetworkAddToCountsAtIndex>(Handle_NetworkAddToCountsAtIndex);
@@ -87,6 +90,9 @@ public class TroopRosterHandler : IHandler
 
         if (!objectManager.TryGetIdWithLogging(obj.TroopRoster, out var troopRosterId)) return;
 
+        troopRosterLogger.Debug(troopRosterId, "SEND AddToCountsAtIndex index={Index} countChange={CountChange} woundedChange={WoundedChange} xpChange={XpChange} removeDepleted={RemoveDepleted} total={Total}",
+            obj.Index, obj.CountChange, obj.WoundedCountChange, obj.XpChange, obj.RemoveDepleted, obj.TroopRoster.TotalManCount);
+
         network.SendAll(new NetworkAddToCountsAtIndex(
             troopRosterId,
             obj.Index,
@@ -108,7 +114,10 @@ public class TroopRosterHandler : IHandler
             {
                 try
                 {
+                    var before = troopRoster.TotalManCount;
                     troopRoster.AddToCountsAtIndex(obj.Index, obj.CountChange, obj.WoundedCountChange, obj.XpChange, obj.RemoveDepleted);
+                    troopRosterLogger.Debug(obj.TroopRosterId, "APPLY AddToCountsAtIndex index={Index} countChange={CountChange} before={Before} after={After}",
+                        obj.Index, obj.CountChange, before, troopRoster.TotalManCount);
                 }
                 catch (Exception ex)
                 {
@@ -129,6 +138,9 @@ public class TroopRosterHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(obj.Character, out var characterObjectId))
             return;
 
+        troopRosterLogger.Debug(troopRosterId, "SEND AddNewElement character={CharacterId} insertionIndex={InsertionIndex} total={Total}",
+            characterObjectId, obj.InsertionIndex, obj.TroopRoster.TotalManCount);
+
         network.SendAll(new NetworkAddNewElement(troopRosterId, characterObjectId, obj.InsertionIndex));
     }
 
@@ -148,6 +160,8 @@ public class TroopRosterHandler : IHandler
                 try
                 {
                     troopRoster.AddNewElement(characterObject, obj.InsertionIndex);
+                    troopRosterLogger.Debug(obj.TroopRosterId, "APPLY AddNewElement character={CharacterId} insertionIndex={InsertionIndex} total={Total}",
+                        obj.ObjectId, obj.InsertionIndex, troopRoster.TotalManCount);
                 }
                 catch (Exception ex)
                 {
@@ -164,6 +178,8 @@ public class TroopRosterHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(payload.What.TroopRoster, out var troopRosterId))
             return;
 
+        troopRosterLogger.Debug(troopRosterId, "SEND RemoveZeroCounts total={Total}", payload.What.TroopRoster.TotalManCount);
+
         network.SendAll(new NetworkRemoveZeroCounts(troopRosterId));
     }
 
@@ -178,7 +194,10 @@ public class TroopRosterHandler : IHandler
             {
                 try
                 {
+                    var before = troopRoster.TotalManCount;
                     troopRoster.RemoveZeroCounts();
+                    troopRosterLogger.Debug(payload.What.TroopRosterId, "APPLY RemoveZeroCounts before={Before} after={After}",
+                        before, troopRoster.TotalManCount);
                 }
                 catch (Exception ex)
                 {
@@ -197,6 +216,9 @@ public class TroopRosterHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(obj.TroopRoster, out var troopRosterId))
             return;
 
+        troopRosterLogger.Debug(troopRosterId, "SEND SetElementNumber index={Index} number={Number} total={Total}",
+            obj.Index, obj.Number, obj.TroopRoster.TotalManCount);
+
         network.SendAll(new NetworkSetElementNumber(troopRosterId, obj.Index, obj.Number));
     }
 
@@ -212,7 +234,10 @@ public class TroopRosterHandler : IHandler
             {
                 try
                 {
+                    var before = troopRoster.TotalManCount;
                     troopRoster.SetElementNumber(obj.Index, obj.Number);
+                    troopRosterLogger.Debug(obj.TroopRosterId, "APPLY SetElementNumber index={Index} number={Number} before={Before} after={After}",
+                        obj.Index, obj.Number, before, troopRoster.TotalManCount);
                 }
                 catch (Exception ex)
                 {
@@ -231,6 +256,9 @@ public class TroopRosterHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(obj.TroopRoster, out var troopRosterId))
             return;
 
+        troopRosterLogger.Debug(troopRosterId, "SEND SetElementWoundedNumber index={Index} number={Number} total={Total}",
+            obj.Index, obj.Number, obj.TroopRoster.TotalManCount);
+
         network.SendAll(new NetworkSetElementWoundedNumber(troopRosterId, obj.Index, obj.Number));
     }
 
@@ -248,6 +276,8 @@ public class TroopRosterHandler : IHandler
                 try
                 {
                     troopRoster.SetElementWoundedNumber(obj.Index, obj.Number);
+                    troopRosterLogger.Debug(obj.TroopRosterId, "APPLY SetElementWoundedNumber index={Index} number={Number} total={Total}",
+                        obj.Index, obj.Number, troopRoster.TotalManCount);
                 }
                 catch (Exception ex)
                 {
@@ -266,6 +296,9 @@ public class TroopRosterHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(obj.TroopRoster, out var troopRosterId))
             return;
 
+        troopRosterLogger.Debug(troopRosterId, "SEND SetElementXp index={Index} xp={Xp} total={Total}",
+            obj.Index, obj.Number, obj.TroopRoster.TotalManCount);
+
         network.SendAll(new NetworkSetElementXp(troopRosterId, obj.Index, obj.Number));
     }
 
@@ -283,6 +316,8 @@ public class TroopRosterHandler : IHandler
                 try
                 {
                     troopRoster.SetElementXp(obj.Index, obj.Number);
+                    troopRosterLogger.Debug(obj.TroopRosterId, "APPLY SetElementXp index={Index} xp={Xp} total={Total}",
+                        obj.Index, obj.Number, troopRoster.TotalManCount);
                 }
                 catch (Exception ex)
                 {
@@ -301,6 +336,9 @@ public class TroopRosterHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(obj.TroopRoster, out var troopRosterId))
             return;
 
+        troopRosterLogger.Debug(troopRosterId, "SEND ShiftTroopToIndex troopIndex={TroopIndex} targetIndex={TargetIndex} total={Total}",
+            obj.TroopIndex, obj.TargetIndex, obj.TroopRoster.TotalManCount);
+
         network.SendAll(new NetworkShiftTroopToIndex(troopRosterId, obj.TroopIndex, obj.TargetIndex));
     }
 
@@ -318,6 +356,8 @@ public class TroopRosterHandler : IHandler
                 try
                 {
                     troopRoster.ShiftTroopToIndex(obj.TroopIndex, obj.TargetIndex);
+                    troopRosterLogger.Debug(obj.TroopRosterId, "APPLY ShiftTroopToIndex troopIndex={TroopIndex} targetIndex={TargetIndex} total={Total}",
+                        obj.TroopIndex, obj.TargetIndex, troopRoster.TotalManCount);
                 }
                 catch (Exception ex)
                 {
@@ -336,6 +376,9 @@ public class TroopRosterHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(obj.TroopRoster, out var troopRosterId))
             return;
 
+        troopRosterLogger.Debug(troopRosterId, "SEND SwapTroopsAtIndices firstIndex={FirstIndex} secondIndex={SecondIndex} total={Total}",
+            obj.FirstIndex, obj.SecondIndex, obj.TroopRoster.TotalManCount);
+
         network.SendAll(new NetworkSwapTroopsAtIndices(troopRosterId, obj.FirstIndex, obj.SecondIndex));
     }
 
@@ -353,6 +396,8 @@ public class TroopRosterHandler : IHandler
                 try
                 {
                     troopRoster.SwapTroopsAtIndices(obj.FirstIndex, obj.SecondIndex);
+                    troopRosterLogger.Debug(obj.TroopRosterId, "APPLY SwapTroopsAtIndices firstIndex={FirstIndex} secondIndex={SecondIndex} total={Total}",
+                        obj.FirstIndex, obj.SecondIndex, troopRoster.TotalManCount);
                 }
                 catch (Exception ex)
                 {

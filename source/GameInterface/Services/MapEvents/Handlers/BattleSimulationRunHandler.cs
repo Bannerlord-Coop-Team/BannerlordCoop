@@ -3,8 +3,10 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
+using Common.Util;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
@@ -17,6 +19,7 @@ using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.MapEvents.Handlers;
@@ -73,6 +76,7 @@ internal class BattleSimulationRunHandler : IHandler
         messageBroker.Subscribe<NetworkRequestRunBattleSimulation>(Handle_NetworkRequestRunBattleSimulation);
         messageBroker.Subscribe<NetworkAdvanceBattleSimulation>(Handle_NetworkAdvanceBattleSimulation);
         messageBroker.Subscribe<NetworkBattleSimulationRound>(Handle_NetworkBattleSimulationRound);
+        messageBroker.Subscribe<NetworkBattleSimulationLoot>(Handle_NetworkBattleSimulationLoot);
         messageBroker.Subscribe<NetworkBattleSimulationFinished>(Handle_NetworkBattleSimulationFinished);
         messageBroker.Subscribe<NetworkOpenBattleSimulation>(Handle_NetworkOpenBattleSimulation);
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
@@ -86,6 +90,7 @@ internal class BattleSimulationRunHandler : IHandler
         messageBroker.Unsubscribe<NetworkRequestRunBattleSimulation>(Handle_NetworkRequestRunBattleSimulation);
         messageBroker.Unsubscribe<NetworkAdvanceBattleSimulation>(Handle_NetworkAdvanceBattleSimulation);
         messageBroker.Unsubscribe<NetworkBattleSimulationRound>(Handle_NetworkBattleSimulationRound);
+        messageBroker.Unsubscribe<NetworkBattleSimulationLoot>(Handle_NetworkBattleSimulationLoot);
         messageBroker.Unsubscribe<NetworkBattleSimulationFinished>(Handle_NetworkBattleSimulationFinished);
         messageBroker.Unsubscribe<NetworkOpenBattleSimulation>(Handle_NetworkOpenBattleSimulation);
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
@@ -269,6 +274,8 @@ internal class BattleSimulationRunHandler : IHandler
 
         var maxRounds = payload.What.MaxRounds;
         var finished = false;
+        NetworkBattleSimulationLoot lootMessage = default;
+        var hasLoot = false;
 
         GameThread.Run(() =>
         {
@@ -296,6 +303,18 @@ internal class BattleSimulationRunHandler : IHandler
 
             if (sim.MapEvent.HasWinner)
             {
+                // Capture the casualties and winner contributions before tearing the simulation down so the
+                // winning client can re-run the native loot flow locally and open its loot screen.
+                if (PlayerWonSimulation(sim.MapEvent))
+                {
+                    lootMessage = new NetworkBattleSimulationLoot(
+                        mapEventId,
+                        sim.MapEvent.BattleState,
+                        CollectDefeatedCasualties(sim.MapEvent),
+                        CollectWinnerContributions(sim.MapEvent));
+                    hasLoot = true;
+                }
+
                 EndSimulationSession(sim);
                 finished = true;
             }
@@ -309,6 +328,11 @@ internal class BattleSimulationRunHandler : IHandler
             }
 
             mapEventLogger.DebugMapEvent(sim.MapEvent, "Server-side battle simulation finished. BattleState={BattleState}", sim.MapEvent.BattleState);
+
+            // Loot first so the client applies it before the finish closes the playback.
+            if (hasLoot)
+                network.Send(sim.Peer, lootMessage);
+
             network.SendAll(new NetworkBattleSimulationFinished(mapEventId));
         }
     }
@@ -353,6 +377,144 @@ internal class BattleSimulationRunHandler : IHandler
             if (resolved.Count > 0)
                 BattleSimulationReplay.EnqueueRound(resolved.ToArray());
         });
+    }
+
+    /// <summary>[Server] True when a player party is on the winning side, so a client needs the loot screen.</summary>
+    private static bool PlayerWonSimulation(MapEvent mapEvent)
+    {
+        if (mapEvent.WinningSide == BattleSideEnum.None)
+            return false;
+
+        return mapEvent.GetMapEventSide(mapEvent.WinningSide).Parties
+            .Any(p => p.Party.MobileParty?.IsPlayerParty() == true);
+    }
+
+    /// <summary>[Server] Serialize each defeated party's simulation casualties for the client to replay.</summary>
+    private BattleSimDefeatedParty[] CollectDefeatedCasualties(MapEvent mapEvent)
+    {
+        var parties = new List<BattleSimDefeatedParty>();
+
+        foreach (var defeated in mapEvent.GetMapEventSide(mapEvent.DefeatedSide).Parties)
+        {
+            if (!objectManager.TryGetId(defeated.Party, out var partyId))
+                continue;
+
+            var died = SerializeCasualties(defeated.DiedInBattle);
+            var wounded = SerializeCasualties(defeated.WoundedInBattle);
+            if (died.Length == 0 && wounded.Length == 0)
+                continue;
+
+            parties.Add(new BattleSimDefeatedParty(partyId, died, wounded));
+        }
+
+        return parties.ToArray();
+    }
+
+    /// <summary>[Server] Serialize each winning party's battle contribution; the loot chance models need it &gt; 0.</summary>
+    private BattleSimWinner[] CollectWinnerContributions(MapEvent mapEvent)
+    {
+        var winners = new List<BattleSimWinner>();
+
+        foreach (var winner in mapEvent.GetMapEventSide(mapEvent.WinningSide).Parties)
+        {
+            if (!objectManager.TryGetId(winner.Party, out var partyId))
+                continue;
+
+            winners.Add(new BattleSimWinner(partyId, winner.ContributionToBattle));
+        }
+
+        return winners.ToArray();
+    }
+
+    private BattleSimCasualty[] SerializeCasualties(TroopRoster roster)
+    {
+        var casualties = new List<BattleSimCasualty>();
+
+        foreach (var element in roster.GetTroopRoster())
+        {
+            var character = element.Character;
+            if (character == null)
+                continue;
+
+            var isHero = character.IsHero;
+            var objectToResolve = isHero ? (object)character.HeroObject : character;
+            if (objectToResolve == null || !objectManager.TryGetId(objectToResolve, out var characterId))
+                continue;
+
+            casualties.Add(new BattleSimCasualty(characterId, isHero, element.Number, element.WoundedNumber));
+        }
+
+        return casualties.ToArray();
+    }
+
+    /// <summary>
+    /// [Client] Replay the simulation casualties and apply the winning <c>BattleState</c> so the native
+    /// PlayerEncounter result flow rolls the loot and opens the loot screen on the next tick.
+    /// </summary>
+    private void Handle_NetworkBattleSimulationLoot(MessagePayload<NetworkBattleSimulationLoot> payload)
+    {
+        var message = payload.What;
+
+        GameThread.Run(() =>
+        {
+            if (!BattleSimulationReplay.IsActiveFor(message.MapEventId))
+                return;
+
+            if (!objectManager.TryGetObject<MapEvent>(message.MapEventId, out var mapEvent))
+                return;
+
+            // Re-applying server-authoritative results; the roster patches must stand down during the apply.
+            using (new AllowedThread())
+            {
+                // The loot/capture chance models drop any winner with ContributionToBattle == 0, which is the
+                // case on the client (its simulation engine never ran). Restore the server's values first.
+                foreach (var winner in message.Winners)
+                {
+                    if (!objectManager.TryGetObject<PartyBase>(winner.PartyId, out var winnerParty))
+                        continue;
+
+                    var winnerMapEventParty = FindMapEventParty(mapEvent, winnerParty);
+                    if (winnerMapEventParty != null)
+                        winnerMapEventParty._contributionToBattle = winner.ContributionToBattle;
+                }
+
+                foreach (var defeated in message.DefeatedParties)
+                {
+                    if (!objectManager.TryGetObject<PartyBase>(defeated.PartyId, out var party))
+                        continue;
+
+                    var mapEventParty = FindMapEventParty(mapEvent, party);
+                    if (mapEventParty == null)
+                        continue;
+
+                    ApplyCasualties(mapEventParty.DiedInBattle, defeated.Died);
+                    ApplyCasualties(mapEventParty.WoundedInBattle, defeated.Wounded);
+                }
+
+                mapEvent.BattleState = message.WinningState;
+            }
+        });
+    }
+
+    private void ApplyCasualties(TroopRoster roster, BattleSimCasualty[] casualties)
+    {
+        foreach (var casualty in casualties)
+        {
+            if (!TryResolveCharacterObject(casualty.CharacterId, casualty.IsHero, out var character))
+                continue;
+
+            roster.AddToCounts(character, casualty.Number, insertAtFront: false, casualty.WoundedNumber);
+        }
+    }
+
+    private static MapEventParty FindMapEventParty(MapEvent mapEvent, PartyBase party)
+    {
+        foreach (var side in mapEvent._sides)
+            foreach (var mapEventParty in side.Parties)
+                if (mapEventParty.Party == party)
+                    return mapEventParty;
+
+        return null;
     }
 
     /// <summary>[Client] Server finished simulating: end playback once the queued rounds drain.</summary>

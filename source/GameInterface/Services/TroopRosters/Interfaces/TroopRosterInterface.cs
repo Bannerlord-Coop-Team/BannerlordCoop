@@ -3,6 +3,7 @@ using Common.Messaging;
 using GameInterface.Services.Heroes.Messages.Collections;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Data;
+using GameInterface.Services.TroopRosters.Logging;
 using GameInterface.Services.TroopRosters.Messages;
 using Serilog;
 using System.Collections.Generic;
@@ -59,11 +60,14 @@ internal class TroopRosterInterface : ITroopRosterInterface
 {
     private static readonly ILogger Logger = LogManager.GetLogger<TroopRosterInterface>();
     private readonly IObjectManager objectManager;
+    private readonly ITroopRosterLogger troopRosterLogger;
 
     public TroopRosterInterface(
-        IObjectManager objectManager)
+        IObjectManager objectManager,
+        ITroopRosterLogger troopRosterLogger)
     {
         this.objectManager = objectManager;
+        this.troopRosterLogger = troopRosterLogger;
     }
 
     public TroopRosterData PackTroopRosterData(TroopRoster troopRoster)
@@ -172,6 +176,9 @@ internal class TroopRosterInterface : ITroopRosterInterface
 
                 if (!objectManager.TryGetObjectWithLogging<CharacterObject>(elementData.CharacterId, out var character))
                     continue;
+
+                troopRosterLogger.Debug(roster, "APPLY-DELTA pass={Pass} character={CharacterId} numberDelta={Number} woundedDelta={Wounded} xpDelta={Xp}",
+                    applyAdditions ? "add" : "remove", elementData.CharacterId, elementData.Number, elementData.WoundedNumber, elementData.Xp);
 
                 roster.AddToCounts(character, elementData.Number, false, elementData.WoundedNumber, elementData.Xp, true);
             }
