@@ -34,6 +34,22 @@ public interface ITroopRosterInterface : IGameAbstraction
     void UpdateWithData(TroopRoster targetTroopRoster, TroopRosterData packedTroopRosterElements, Hero mainHero);
 
     /// <summary>
+    /// Packs the per-character difference between <paramref name="current"/> and <paramref name="initial"/>
+    /// (current minus initial). Only changed characters are included; an unchanged troop - including a hero -
+    /// nets to zero and is omitted, so the change can be re-applied as a delta on the server with no special
+    /// handling for heroes or companions.
+    /// </summary>
+    TroopRosterData PackTroopRosterDelta(TroopRoster current, TroopRoster initial);
+
+    /// <summary>
+    /// Applies a set of packed deltas (produced by <see cref="PackTroopRosterDelta"/>) to their rosters.
+    /// All count reductions are applied before any additions across every roster, so that when a hero is
+    /// moved between rosters the addition is the last AddToCounts on that hero - otherwise the trailing
+    /// removal nulls the hero's PartyBelongedTo / PartyBelongedToAsPrisoner.
+    /// </summary>
+    void ApplyTroopRosterDeltas(IReadOnlyList<(TroopRoster roster, TroopRosterData delta)> deltas);
+
+    /// <summary>
     /// Runs troop recruitment logic for client requests.
     /// </summary>
     void HandleOnRecruitmentDone(string mobilePartyId, TroopInfo[] troopsInCart, out int changedGold);
@@ -102,6 +118,78 @@ internal class TroopRosterInterface : ITroopRosterInterface
         {
             targetTroopRoster.Add(element);
         }
+    }
+
+    public TroopRosterData PackTroopRosterDelta(TroopRoster current, TroopRoster initial)
+    {
+        // Diffed via per-character totals (not raw slots), so any quirk present in both snapshots cancels.
+        var currentCounts = SumByCharacter(current);
+        var initialCounts = SumByCharacter(initial);
+
+        var elements = new List<TroopRosterElementData>();
+        foreach (var character in currentCounts.Keys.Union(initialCounts.Keys))
+        {
+            currentCounts.TryGetValue(character, out var cur);
+            initialCounts.TryGetValue(character, out var init);
+
+            int numberDelta = cur.number - init.number;
+            int woundedDelta = cur.wounded - init.wounded;
+            int xpDelta = cur.xp - init.xp;
+            if (numberDelta == 0 && woundedDelta == 0 && xpDelta == 0)
+                continue;
+
+            if (!objectManager.TryGetIdWithLogging(character, out var characterId))
+                continue;
+
+            elements.Add(new TroopRosterElementData(characterId, numberDelta, woundedDelta, xpDelta));
+        }
+
+        return new TroopRosterData(elements);
+    }
+
+    public void ApplyTroopRosterDeltas(IReadOnlyList<(TroopRoster roster, TroopRosterData delta)> deltas)
+    {
+        // Two passes so that a hero moved from one roster to another is removed from the source before it is
+        // added to the destination. AddToCounts(hero, -n) fires OnHeroRemoved which unconditionally nulls the
+        // hero's party linkage, so the addition must be the last AddToCounts to win - regardless of the order
+        // the rosters are listed in.
+        ApplyDeltaElements(deltas, applyAdditions: false);
+        ApplyDeltaElements(deltas, applyAdditions: true);
+    }
+
+    private void ApplyDeltaElements(IReadOnlyList<(TroopRoster roster, TroopRosterData delta)> deltas, bool applyAdditions)
+    {
+        foreach (var (roster, delta) in deltas)
+        {
+            if (delta.Data == null) continue;
+
+            foreach (var elementData in delta.Data)
+            {
+                // Reductions (Number < 0) go in the removal pass; additions and pure wounded/xp changes
+                // (Number >= 0) go in the addition pass. Each element is applied exactly once.
+                bool isAddition = elementData.Number >= 0;
+                if (isAddition != applyAdditions) continue;
+
+                if (!objectManager.TryGetObjectWithLogging<CharacterObject>(elementData.CharacterId, out var character))
+                    continue;
+
+                roster.AddToCounts(character, elementData.Number, false, elementData.WoundedNumber, elementData.Xp, true);
+            }
+        }
+    }
+
+    private static Dictionary<CharacterObject, (int number, int wounded, int xp)> SumByCharacter(TroopRoster roster)
+    {
+        var counts = new Dictionary<CharacterObject, (int number, int wounded, int xp)>();
+        if (roster == null) return counts;
+
+        foreach (TroopRosterElement element in roster.data)
+        {
+            if (element.Character == null) continue;
+            counts.TryGetValue(element.Character, out var existing);
+            counts[element.Character] = (existing.number + element.Number, existing.wounded + element.WoundedNumber, existing.xp + element.Xp);
+        }
+        return counts;
     }
 
     public void HandleOnRecruitmentDone(string mobilePartyId, TroopInfo[] troopsInCart, out int changedGold)
