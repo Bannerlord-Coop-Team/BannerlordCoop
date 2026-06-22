@@ -1,6 +1,7 @@
 ﻿using Common;
 using GameInterface.Services.Clans.Extensions;
 using HarmonyLib;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -13,7 +14,14 @@ namespace GameInterface.Services.MobileParties.Patches.Disable;
 internal class DisbandPartyCampaignBehaviorPatches
 {
     [HarmonyPatch(nameof(DisbandPartyCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => ModInformation.IsServer;
+    public static bool RegisterEventsPrefix(ref DisbandPartyCampaignBehavior __instance)
+    {
+        if (ModInformation.IsServer) return true;
+
+        // Load dialogue for disbanding parties on client
+        CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(__instance, new Action<CampaignGameStarter>(__instance.OnSessionLaunched));
+        return false;
+    }
 
     /// <summary>
     /// Replaces several Clan.PlayerClan checks with IsPlayerClan() extension method
