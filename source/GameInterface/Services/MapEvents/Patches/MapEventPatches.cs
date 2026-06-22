@@ -114,6 +114,23 @@ internal class MapEventPatches
         return true;
     }
 
+    [HarmonyPatch("CommitCalculatedMapEventResults")]
+    [HarmonyPrefix]
+    private static bool Prefix_CommitCalculatedMapEventResults()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed())
+            return true;
+
+        // The server commits the battle economy (troop xp, renown, influence, morale, gold) during OnBattleWon
+        // and replicates it. The client's encounter result path reaches this commit locally too (both when a
+        // battle ends and when a multi-round battle continues) and re-applies it on top of the server's
+        // already-received values with no later resync, drifting the player's clan renown/influence, the party's
+        // morale, and surviving troops' xp above the server. (Hero gold and prisoner capture are already blocked
+        // on the client by the GiveGoldAction/TakePrisonerAction patches.) Skip the commit on the client so the
+        // economy stays the server's; the loot-staging steps that run before it are left intact.
+        return !ModInformation.IsClient;
+    }
+
     [HarmonyPatch(nameof(MapEvent.Update))]
     [HarmonyPrefix]
     private static bool PrefixUpdate(MapEvent __instance)

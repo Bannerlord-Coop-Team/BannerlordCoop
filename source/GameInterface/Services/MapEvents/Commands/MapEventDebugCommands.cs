@@ -64,6 +64,30 @@ public class MapEventDebugCommands
         return $"MapEvent Started";
     }
 
+    // coop.debug.mapevent.win_player_battle
+    /// <summary>
+    /// Forces the local player's current encounter to a victory so the encounter result path runs and the
+    /// client commits the battle result, without having to fight a mission. Run on the client after
+    /// starting a battle (e.g. coop.debug.mapevent.start_looter); click through any results screens.
+    /// </summary>
+    [CommandLineArgumentFunction("win_player_battle", "coop.debug.mapevent")]
+    public static string WinPlayerBattle(List<string> args)
+    {
+        if (PlayerEncounter.Current == null)
+        {
+            return "No active player encounter";
+        }
+
+        if (MobileParty.MainParty?.MapEvent == null)
+        {
+            return "Not in a battle yet; attack the enemy first so a map event exists";
+        }
+
+        PlayerEncounter.SetPlayerVictorious();
+
+        return "Forced player victory; the encounter result commits on the next tick";
+    }
+
     /// <summary>
     /// Kills a random troop from the enemy side of the current map event.
     /// </summary>
