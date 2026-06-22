@@ -108,7 +108,6 @@ namespace Coop.Core
             if (!TryBeginServerStart()) return;
             PrepareServerContainer();
 
-            var startedContainer = container;
             var loadingInterface = container.Resolve<ILoadingInterface>();
 
             void BringUp()
@@ -136,25 +135,14 @@ namespace Coop.Core
                 {
                     try
                     {
-                        // A teardown (EndCoopMode / a client join) between scheduling and running
-                        // rebuilds/disposes the container; this stale work must not run against it. Those
-                        // paths clear serverStarting themselves, so the stale early-return below is safe.
-                        if (container != startedContainer) return;
                         container.Resolve<IGameInterface>().PatchAll();
-
                         // RunSafe so a throw in the bring-up can't escape into the game-loop pump.
-                        GameThread.RunSafe(() =>
-                        {
-                            if (container != startedContainer) return;
-                            BringUp();
-                        }, context: "server host bring-up");
+                        GameThread.RunSafe(BringUp, context: "server host bring-up");
                     }
                     catch (Exception e)
                     {
                         Logger.Error(e, "Failed to apply patches off the main thread; aborting host start.");
                         serverStarting = false;
-                        GameThread.RunSafe(() => loadingInterface.HideLoadingScreen(),
-                            context: "hide loading screen after failed host start");
                     }
                 });
             }
