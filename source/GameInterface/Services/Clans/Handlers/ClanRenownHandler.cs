@@ -47,10 +47,6 @@ namespace GameInterface.Services.Clans.Handlers
         {
             var payload = obj.What;
 
-            // Resolve and apply on the game thread. The object registry is mutated on the game thread, so a
-            // lookup on the poll thread can race a registration and miss the clan; doing it inside the queued
-            // action serializes it with that work. RunSafe logs a thrown apply instead of letting it kill the
-            // game-thread pump.
             GameThread.RunSafe(() =>
             {
                 if (!objectManager.TryGetObject<Clan>(payload.ClanId, out var clan))
