@@ -6,7 +6,6 @@ using Common.Util;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using System;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Clans.Handlers
@@ -48,28 +47,25 @@ namespace GameInterface.Services.Clans.Handlers
         {
             var payload = obj.What;
 
-            if (!objectManager.TryGetObject<Clan>(payload.ClanId, out var clan))
+            // Resolve and apply on the game thread. The object registry is mutated on the game thread, so a
+            // lookup on the poll thread can race a registration and miss the clan; doing it inside the queued
+            // action serializes it with that work. RunSafe logs a thrown apply instead of letting it kill the
+            // game-thread pump.
+            GameThread.RunSafe(() =>
             {
-                Logger.Error("Unable to find clan ({clanId}) for renown change", payload.ClanId);
-                return;
-            }
+                if (!objectManager.TryGetObject<Clan>(payload.ClanId, out var clan))
+                {
+                    Logger.Error("Unable to find clan ({clanId}) for renown change", payload.ClanId);
+                    return;
+                }
 
-            GameThread.Run(() =>
-            {
-                try
+                // Apply the server's absolute value (not a delta) so clients converge. AllowedThread keeps any
+                // patches on the write path standing down on the receive side.
+                using (new AllowedThread())
                 {
-                    // Apply the server's absolute value (not a delta) so clients converge. AllowedThread keeps any
-                    // patches on the write path standing down on the receive side.
-                    using (new AllowedThread())
-                    {
-                        clan.Renown = payload.Renown;
-                    }
+                    clan.Renown = payload.Renown;
                 }
-                catch (Exception e)
-                {
-                    Logger.Error(e, "Failed to apply clan renown change for clan ({clanId})", payload.ClanId);
-                }
-            });
+            }, context: $"apply clan renown for {payload.ClanId}");
         }
     }
 }
