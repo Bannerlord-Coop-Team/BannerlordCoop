@@ -2,6 +2,7 @@
 using GameInterface.CoopSessionData;
 using GameInterface.CoopSessionData.Save.Data;
 using GameInterface.Registry.Messages;
+using GameInterface.Services.Caravans;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
@@ -56,7 +57,10 @@ internal class SaveGameHandler : IHandler
         WorkshopPlayerData workshopPlayerData = coopSessionProvider.CoopSession.WorkshopPlayerData;
         workshopPlayerData ??= new(new());
 
-        CoopSession session = new CoopSession(saveName, playerRegistry.Players.ToArray(), craftingPlayerData, workshopPlayerData);
+        CaravansPlayerData caravansPlayerData = coopSessionProvider.CoopSession.CaravansPlayerData;
+        caravansPlayerData ??= new(new(), new());
+
+        CoopSession session = new CoopSession(saveName, playerRegistry.Players.ToArray(), craftingPlayerData, workshopPlayerData, caravansPlayerData);
         coopSessionProvider.CoopSession = session;
 
         saveManager.SaveCoopSession(saveName, session);
@@ -68,7 +72,12 @@ internal class SaveGameHandler : IHandler
         savedSession = saveManager.LoadCoopSession(obj.What.SaveName);
         if(savedSession == null)
         {
-            savedSession = new CoopSession(obj.What.SaveName, new Player[0], new CraftingPlayerData(new(), new(), new()), new WorkshopPlayerData(new()));
+            savedSession = new CoopSession(
+                obj.What.SaveName,
+                new Player[0],
+                new CraftingPlayerData(new(), new(), new()),
+                new WorkshopPlayerData(new()),
+                new CaravansPlayerData(new(), new()));
         }
         coopSessionProvider.CoopSession = savedSession;
     }

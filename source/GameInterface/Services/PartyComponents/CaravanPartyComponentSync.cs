@@ -12,6 +12,7 @@ namespace GameInterface.Services.PartyComponents
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(CaravanPartyComponent), nameof(CaravanPartyComponent.Owner)));
 
             autoSyncBuilder.AddField(AccessTools.Field(typeof(CaravanPartyComponent), nameof(CaravanPartyComponent._leader)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(CaravanPartyComponent), nameof(CaravanPartyComponent._isElite)));
         }
     }
 }
