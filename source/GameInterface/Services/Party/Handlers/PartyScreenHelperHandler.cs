@@ -84,11 +84,11 @@ internal class PartyScreenHelperHandler : IHandler
 
     private void Handle_CreateClanPartyAfterScreenClose(MessagePayload<CreateClanPartyAfterScreenClose> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.NewLeaderHeroId, out var newLeaderHero)) return;
-
         GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.NewLeaderHeroId, out var newLeaderHero)) return;
+
             int partyGoldLowerThreshold = Campaign.Current.Models.ClanFinanceModel.PartyGoldLowerThreshold;
             if (newLeaderHero.Gold < partyGoldLowerThreshold)
             {

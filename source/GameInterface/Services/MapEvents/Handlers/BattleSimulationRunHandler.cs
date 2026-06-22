@@ -7,9 +7,11 @@ using Common.Util;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -78,6 +80,7 @@ internal class BattleSimulationRunHandler : IHandler
         messageBroker.Subscribe<NetworkBattleSimulationFinished>(Handle_NetworkBattleSimulationFinished);
         messageBroker.Subscribe<NetworkOpenBattleSimulation>(Handle_NetworkOpenBattleSimulation);
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
+        messageBroker.Subscribe<MapEventPartyBattlePartyAdded>(Handle_MapEventPartyBattlePartyAdded);
     }
 
     public void Dispose()
@@ -91,6 +94,7 @@ internal class BattleSimulationRunHandler : IHandler
         messageBroker.Unsubscribe<NetworkBattleSimulationFinished>(Handle_NetworkBattleSimulationFinished);
         messageBroker.Unsubscribe<NetworkOpenBattleSimulation>(Handle_NetworkOpenBattleSimulation);
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
+        messageBroker.Unsubscribe<MapEventPartyBattlePartyAdded>(Handle_MapEventPartyBattlePartyAdded);
     }
 
     /// <summary>[Client] Begin local playback and ask the server to set the simulation up.</summary>
@@ -166,6 +170,91 @@ internal class BattleSimulationRunHandler : IHandler
         network.SendAll(new NetworkOpenBattleSimulation(mapEventId));
 
         mapEventLogger.DebugMapEvent(mapEvent, "Battle simulation set up; awaiting client-paced advances");
+    }
+
+    /// <summary>
+    /// [Server] A party was added to a side that has an active simulation (a player joining the battle, or an
+    /// AI reinforcement). The simulation's troop pool was allocated once at setup and never re-reads the side's
+    /// parties, so without this the joiner never fights and never appears on any scoreboard. Fold its troops
+    /// into the live pool; the +1s fired here are captured by the attached observer and stream out with the
+    /// next advance, so every client with the window open gets the new rows through the normal round pipeline.
+    /// </summary>
+    private void Handle_MapEventPartyBattlePartyAdded(MessagePayload<MapEventPartyBattlePartyAdded> payload)
+    {
+        if (!ModInformation.IsServer)
+            return;
+
+        var side = payload.What.MapEventSide;
+        var joiningParty = payload.What.MapEventParty;
+        if (side?.MapEvent == null || joiningParty == null)
+            return;
+
+        // Publishing happens during the native AddPartyInternal, which already runs on the game thread; this
+        // only touches the simulation pool via the party object, so it is safe here. GameThread.Run runs inline
+        // when already on that thread.
+        GameThread.Run(() => 
+        {
+            if (!objectManager.TryGetId(side.MapEvent, out var mapEventId))
+                return;
+
+            if (!activeSimulations.ContainsKey(mapEventId))
+                return;
+
+            AddPartyToActiveSimulation(side, joiningParty);
+        });
+    }
+
+    /// <summary>[Server, main thread] Allocate a late-joining party's troops into the live simulation pool.</summary>
+    private void AddPartyToActiveSimulation(MapEventSide side, MapEventParty joiningParty)
+    {
+        try
+        {
+            // A troop-limited battle (hideout, lord's hall) trims and locks its rosters at setup; vanilla
+            // refuses to re-ready a locked side, so a late joiner cannot be folded in safely there.
+            if (side._troopAllocationsLocked)
+                return;
+
+            if (side._simulationTroopList == null || side._allocatedTroops == null || side._readyTroopsPriorityList == null)
+                return;
+
+            var sizeOfParty = joiningParty.Party.NumberOfHealthyMembers;
+            if (sizeOfParty <= 0)
+                return;
+
+            // Build the joiner's ready-troop entries and allocate them, mirroring MapEventSide.MakeReadyParty +
+            // AllocateTroops but only for this one party so the existing parties' allocations stay untouched.
+            int startIndex = side._readyTroopsPriorityList.Count;
+            joiningParty.SetParticipatingTroopCount(sizeOfParty);
+            joiningParty.Update();
+            Campaign.Current.Models.TroopSupplierProbabilityModel
+                .EnqueueTroopSpawnProbabilitiesAccordingToUnitSpawnPrioritization(
+                    joiningParty, null, false, sizeOfParty, false, side._readyTroopsPriorityList);
+
+            var observer = side.MapEvent.BattleObserver;
+            int allocated = 0;
+            for (int i = startIndex; i < side._readyTroopsPriorityList.Count; i++)
+            {
+                var (element, party, _) = side._readyTroopsPriorityList[i];
+                var descriptor = element.Descriptor;
+                if (side._allocatedTroops.ContainsKey(descriptor))
+                    continue;
+
+                side._simulationTroopList.Add(descriptor);
+                side._allocatedTroops.Add(descriptor, party);
+                observer?.TroopNumberChanged(side.MissionSide, party.Party, element.Troop, 1);
+                allocated++;
+            }
+
+            side._readyTroopsPriorityList.RemoveRange(startIndex, side._readyTroopsPriorityList.Count - startIndex);
+
+            mapEventLogger.DebugMapEvent(side.MapEvent,
+                "Folded joining party {PartyId} into the active simulation ({TroopCount} troops)",
+                joiningParty.Party.Id, allocated);
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Failed to add joining party to active battle simulation");
+        }
     }
 
     /// <summary>[Server] Resolve the requested number of rounds, streaming each round back.</summary>
@@ -269,6 +358,12 @@ internal class BattleSimulationRunHandler : IHandler
             foreach (var change in message.Changes)
             {
                 if (!objectManager.TryGetObject<PartyBase>(change.PartyId, out var party))
+                    continue;
+
+                // A client builds its own party's troops from its local scoreboard setup when it opens, so it must
+                // never re-add them from the stream. The only positive change for the local party is the server's
+                // fold-in +1 fired when this client joined an in-progress simulation, which would double its count.
+                if (party == PartyBase.MainParty && change.Number > 0)
                     continue;
 
                 if (!TryResolveCharacterObject(change.CharacterId, change.IsHero, out var character))
