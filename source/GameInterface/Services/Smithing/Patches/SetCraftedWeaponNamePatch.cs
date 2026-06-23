@@ -1,11 +1,9 @@
-﻿using Common;
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Smithing.Messages;
 using HarmonyLib;
 using Serilog;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;

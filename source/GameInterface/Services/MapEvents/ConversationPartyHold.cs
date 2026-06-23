@@ -85,14 +85,20 @@ internal static class ConversationPartyHold
         var objectManager = tracker.ObjectManager;
         if (objectManager == null) return false;
         if (!objectManager.TryGetId(targetParty, out var targetPartyId)) return false;
-        if (!tracker.TryGetEngagement(targetPartyId, out var engagement)) return false;
 
-        if (interactor?.Party != null
-            && objectManager.TryGetId(interactor.Party, out var interactorId)
-            && interactorId == engagement.EngagerPartyId)
-            return false;
+        string interactorId = null;
+        if (interactor?.Party != null)
+            objectManager.TryGetId(interactor.Party, out interactorId);
 
-        return true;
+        // AI party held in a conversation: only the engaging player's party may interact.
+        if (tracker.TryGetEngagement(targetPartyId, out var engagement))
+            return interactorId != engagement.EngagerPartyId;
+
+        // PvP conversation: only the partner (the other player in the conversation) may interact.
+        if (tracker.TryGetPvpPartner(targetPartyId, out var partnerId))
+            return interactorId != partnerId;
+
+        return false;
     }
 
     /// <summary>True when the party is held in a player's conversation (and not already in a battle).</summary>
@@ -107,7 +113,7 @@ internal static class ConversationPartyHold
         if (objectManager == null) return false;
         if (!objectManager.TryGetId(party.Party, out var partyId)) return false;
 
-        return tracker.TryGetEngagement(partyId, out _);
+        return tracker.TryGetEngagement(partyId, out _) || tracker.TryGetPvpPartner(partyId, out _);
     }
 
     /// <summary>

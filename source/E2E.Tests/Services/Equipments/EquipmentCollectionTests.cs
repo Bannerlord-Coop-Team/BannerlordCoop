@@ -1,14 +1,8 @@
 ﻿using E2E.Tests.Environment;
-using Xunit.Abstractions;
-using TaleWorlds.Core;
-using HarmonyLib;
-using E2E.Tests.Environment.Instance;
-using GameInterface.Services.Equipments.Patches;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Siege;
-using System.Xml.Linq;
-using TaleWorlds.ObjectSystem;
 using GameInterface.Services.Equipments.Messages;
+using GameInterface.Services.Equipments.Patches;
+using TaleWorlds.Core;
+using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Equipments;
 

@@ -1,7 +1,5 @@
 ﻿using GameInterface.Services.Heroes.Enum;
 using System;
-using System.Collections.Generic;
-using System.Text;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Time

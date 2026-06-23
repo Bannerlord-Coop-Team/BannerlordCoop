@@ -2,11 +2,9 @@
 using GameInterface.Services.ObjectManager;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using ProtoBuf.Meta;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 
 namespace GameInterface.AutoSync.Builders
 {
@@ -166,7 +164,8 @@ namespace GameInterface.AutoSync.Builders
             var patchTemplate = TemplateParser.Parse("Patches.DynamicPatchTemplate", new
             {
                 Libraries = usings.Distinct(),
-                DeclaringType = declaringType.Name,
+                DeclaringType = AutoSyncUtils.GetSimpleTypeName(declaringType),
+                DeclaringTypeName = AutoSyncUtils.GetSimpleTypeName(declaringType).Replace(".", "_"),
                 TargetMethods = dynamicRegistryItem.TargetMethods,
                 Prefixes = prefixes,
                 Transpilers = transpilers,
@@ -177,7 +176,8 @@ namespace GameInterface.AutoSync.Builders
             var handlerTemplate = TemplateParser.Parse("Handlers.DynamicHandlerTemplate", new
             {
                 Libraries = usings.Distinct(),
-                DeclaringType = declaringType.Name,
+                DeclaringType = AutoSyncUtils.GetSimpleTypeName(declaringType),
+                DeclaringTypeName = declaringType.Name,
                 Subscriptions = messageHandlers
             });
 

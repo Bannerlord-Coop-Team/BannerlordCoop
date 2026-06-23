@@ -5,7 +5,6 @@ using GameInterface.Policies;
 using GameInterface.Services.WeaponDesigns.Messages;
 using HarmonyLib;
 using Serilog;
-using System;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 

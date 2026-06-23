@@ -1,14 +1,11 @@
-﻿using GameInterface.Registry;
-using GameInterface.Registry.Auto;
+﻿using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.PartyBases.Extensions;
 using SandBox.View.Map.Managers;
 using SandBox.View.Map.Visuals;
 using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.PartyVisuals;
 

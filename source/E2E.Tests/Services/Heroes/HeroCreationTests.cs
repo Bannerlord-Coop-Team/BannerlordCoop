@@ -4,7 +4,6 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
-using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Heroes;

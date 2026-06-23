@@ -1,13 +1,7 @@
-﻿using Common.Extensions;
-using Common.Logging;
+﻿using Common.Logging;
 using GameInterface.Services.ObjectManager;
-using HarmonyLib;
 using Serilog;
-using System;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.Library;
 
 namespace GameInterface.Services.Armies.Extensions;
 

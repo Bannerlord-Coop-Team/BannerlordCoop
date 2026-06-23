@@ -1,9 +1,7 @@
 ﻿using GameInterface.AutoSync;
-using GameInterface.AutoSync;
 using HarmonyLib;
 using Helpers;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
 
 namespace GameInterface.Services.Buildings

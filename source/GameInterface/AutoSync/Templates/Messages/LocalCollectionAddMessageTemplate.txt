@@ -5,9 +5,9 @@ using {{ library }};
 
 namespace AutoSync
 {
-    public record {{ MemberDeclaringType}}_{{ MemberName }}_AddLocalMessage : GenericEvent<{{ MemberDeclaringType }}, {{ ElementType }}>
+    public record {{ MemberDeclaringTypeName}}_{{ MemberName }}_AddLocalMessage : GenericEvent<{{ MemberDeclaringType }}, {{ ElementType }}>
     {
-        public {{ MemberDeclaringType}}_{{ MemberName }}_AddLocalMessage({{ MemberDeclaringType }} instance, {{ ElementType }} value) : base(instance, value)
+        public {{ MemberDeclaringTypeName}}_{{ MemberName }}_AddLocalMessage({{ MemberDeclaringType }} instance, {{ ElementType }} value) : base(instance, value)
         {
         }
     }

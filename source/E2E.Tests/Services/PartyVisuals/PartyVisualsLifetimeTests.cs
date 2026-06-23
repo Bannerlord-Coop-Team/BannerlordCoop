@@ -1,5 +1,4 @@
 ﻿using E2E.Tests.Environment;
-using SandBox.View.Map;
 using SandBox.View.Map.Visuals;
 using TaleWorlds.CampaignSystem.Party;
 using Xunit.Abstractions;

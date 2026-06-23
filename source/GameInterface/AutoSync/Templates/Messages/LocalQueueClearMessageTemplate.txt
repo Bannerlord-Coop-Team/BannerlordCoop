@@ -4,11 +4,11 @@ using GameInterface.Utils.LocalEvents;
 using {{ library }};
 {{~ end ~}}
     
-public readonly struct Local_{{ MemberDeclaringType}}_{{ MemberName }}_QueueClear : IEvent
+public readonly struct Local_{{ MemberDeclaringTypeName}}_{{ MemberName }}_QueueClear : IEvent
 {
     public readonly {{ MemberDeclaringType }} Instance;
 
-    public Local_{{ MemberDeclaringType}}_{{ MemberName }}_QueueClear({{ MemberDeclaringType }} instance)
+    public Local_{{ MemberDeclaringTypeName}}_{{ MemberName }}_QueueClear({{ MemberDeclaringType }} instance)
     {
         Instance = instance;
     }

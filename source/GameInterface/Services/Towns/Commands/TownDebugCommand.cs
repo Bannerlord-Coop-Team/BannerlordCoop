@@ -1,22 +1,13 @@
 ﻿using Autofac;
-using Autofac.Features.OwnedInstances;
-using Common.Extensions;
-using GameInterface.Services.GameDebug.Commands;
-using GameInterface.Services.Heroes.Commands;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Towns.Patches;
 using Helpers;
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
-using System.Runtime.Serialization;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.Settlements.Buildings;
 using TaleWorlds.Core;
-using TaleWorlds.ObjectSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Villages.Commands;
@@ -578,7 +569,7 @@ public class TownDebugCommand
     /// <summary>
     /// View town management data of a specified town
     /// </summary>
-    [CommandLineArgumentFunction("managementdata", "coop.debug.towns")]
+    [CommandLineArgumentFunction("managementdata", "coop.debug.town")]
     public static string ViewManagementData(List<string> strings)
     {
         if (strings.Count == 0) return "Town name argument required.";

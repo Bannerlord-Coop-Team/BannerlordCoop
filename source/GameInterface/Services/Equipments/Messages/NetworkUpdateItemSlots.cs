@@ -1,6 +1,5 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
-using TaleWorlds.Core;
 
 namespace GameInterface.Services.Equipments.Messages
 {

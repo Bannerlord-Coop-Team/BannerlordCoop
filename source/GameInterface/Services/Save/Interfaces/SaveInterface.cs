@@ -1,5 +1,4 @@
-﻿using Common;
-using Common.Logging;
+﻿using Common.Logging;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;

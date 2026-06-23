@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.Players.Data;
 using GameInterface.Services.Smithing;
+using GameInterface.Services.Workshops;
 using ProtoBuf;
 
 namespace GameInterface.CoopSessionData.Save.Data;
@@ -13,6 +14,7 @@ public interface ICoopSession
     string UniqueGameId { get; }
     Player[] Players { get; }
     CraftingPlayerData CraftingPlayerData { get; }
+    WorkshopPlayerData WorkshopPlayerData { get; }
 }
 
 /// <inheritdoc cref="ICoopSession"/>
@@ -25,11 +27,14 @@ public class CoopSession : ICoopSession
     public Player[] Players { get; }
     [ProtoMember(3)]
     public CraftingPlayerData CraftingPlayerData { get; }
+    [ProtoMember(4)]
+    public WorkshopPlayerData WorkshopPlayerData { get; }
 
-    public CoopSession(string uniqueGameId, Player[] players, CraftingPlayerData craftingPlayerData)
+    public CoopSession(string uniqueGameId, Player[] players, CraftingPlayerData craftingPlayerData, WorkshopPlayerData workshopPlayerData)
     {
         UniqueGameId = uniqueGameId;
         Players = players;
         CraftingPlayerData = craftingPlayerData;
+        WorkshopPlayerData = workshopPlayerData;
     }
 }

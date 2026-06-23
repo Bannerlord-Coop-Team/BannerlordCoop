@@ -1,13 +1,10 @@
 ﻿using Common;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.Armies.Messages;
 using HarmonyLib;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Map;
-using GameInterface.Services.Armies.Messages;
 
 namespace GameInterface.Services.Armies.Patches;
 

@@ -1,6 +1,5 @@
 ﻿using Common.Messaging;
 using TaleWorlds.Core;
-using TaleWorlds.Library;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.ItemObjects.Messages;

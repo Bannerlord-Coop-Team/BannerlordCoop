@@ -1,15 +1,12 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
-using Common;
+using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Settlements.Messages;
 using HarmonyLib;
 using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using TaleWorlds.CampaignSystem.Settlements;
-using Common.Util;
 
 namespace GameInterface.Services.Settlements.Patches
 {

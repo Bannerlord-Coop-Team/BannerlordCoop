@@ -1,15 +1,12 @@
 ﻿using GameInterface.Services.Heroes.Patches;
 using HarmonyLib;
+using SandBox.View.Map;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection.Emit;
 using System.Reflection;
-using TaleWorlds.CampaignSystem.GameMenus;
+using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.GameState;
-using TaleWorlds.Core;
-using SandBox;
-using SandBox.View.Map;
+using TaleWorlds.CampaignSystem.GameMenus;
 
 namespace GameInterface.Services.Time.Patches;
 

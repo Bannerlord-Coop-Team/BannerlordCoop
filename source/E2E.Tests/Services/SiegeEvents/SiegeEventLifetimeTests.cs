@@ -1,14 +1,13 @@
-using TaleWorlds.CampaignSystem.Siege;
+using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using HarmonyLib;
-using Common.Util;
 using System.Reflection;
-using Xunit.Abstractions;
-using static Common.Extensions.ReflectionExtensions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Siege;
+using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.SiegeEvents;
 

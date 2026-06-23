@@ -9,7 +9,9 @@ using GameInterface.Services.Inventory.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.UI.Notifications.Messages;
+using GameInterface.Services.Workshops.Messages;
 using HarmonyLib;
+using Helpers;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -62,12 +64,17 @@ internal class TradeHandler : IHandler
     {
         var what = payload.What;
 
+        var isManagingWarehouse = what.InventoryMode == InventoryScreenHelper.InventoryMode.Warehouse;
+        var manageLeftRoster = what.InventoryMode != InventoryScreenHelper.InventoryMode.Default && !what.CanGainXpFromDiscarding && !isManagingWarehouse;
+
         string fromRosterId = null;
-        if (!what.CanGainXpFromDiscarding && !objectManager.TryGetIdWithLogging(what.FromRoster, out fromRosterId)) return;
+        if (manageLeftRoster && !objectManager.TryGetIdWithLogging(what.FromRoster, out fromRosterId)) return;
 
         if (!objectManager.TryGetIdWithLogging(what.ToRoster, out var toRosterId)) return;
         if (!objectManager.TryGetIdWithLogging(what.Hero, out var heroId)) return;
         if (!objectManager.TryGetIdWithLogging(what.TroopRoster, out var troopRosterId)) return;
+        if (!objectManager.TryGetIdWithLogging(what.InitialCharacterEquipment.HeroObject, out var initialHeroId)) return;
+
         string mobilePartyId = null;
         if (what.Party is not null && !objectManager.TryGetIdWithLogging(what.Party, out mobilePartyId)) return;
 
@@ -78,7 +85,7 @@ internal class TradeHandler : IHandler
         var boughtItems = ResolveTradeItemIds(what.BoughtItems);
         var soldItems = ResolveTradeItemIds(what.SoldItems);
 
-        var characterIdEquipmentsData = ResolveCharacterIdEquipmentsData(what.Party);
+        var characterIdEquipmentsData = ResolveCharacterIdEquipmentsData(what.Party, what.InitialCharacterEquipment);
 
         var troopRosterData = troopRosterInterface.PackTroopRosterData(what.TroopRoster);
 
@@ -91,7 +98,9 @@ internal class TradeHandler : IHandler
             characterIdEquipmentsData,
             what.IsTrading,
             what.CanGainXpFromDiscarding,
+            isManagingWarehouse,
             heroId,
+            initialHeroId,
             what.TotalAmount,
             what.MerchantGold,
             mobilePartyId,
@@ -122,6 +131,7 @@ internal class TradeHandler : IHandler
                 if (!objectManager.TryGetObjectWithLogging<Hero>(message.HeroId, out var hero)) return;
                 if (!objectManager.TryGetObjectWithLogging<MobileParty>(message.PartyId, out var mobileParty)) return;
                 if (!objectManager.TryGetObjectWithLogging<TroopRoster>(message.TroopRosterId, out var troopRoster)) return;
+                if (!objectManager.TryGetObjectWithLogging<Hero>(message.InitialHeroId, out var initialHero)) return;
 
                 SettlementComponent currentSettlementComponent = null;
                 if (!message.IsSettlementComponentNull &&
@@ -159,12 +169,17 @@ internal class TradeHandler : IHandler
                 }
 
                 // Update rosters with new data
-                if (fromRoster != null) inventoryLogicInterface.UpdateRosterWithData(fromRoster, fromItemRosterData);
                 if (toRoster != null) inventoryLogicInterface.UpdateRosterWithData(toRoster, toItemRosterData);
-
+                if (fromRoster != null) inventoryLogicInterface.UpdateRosterWithData(fromRoster, fromItemRosterData);
+                else if (message.IsManagingWarehouse)
+                {
+                    // Manage warehouse rosters separately as they involve more complicated logic
+                    MessageBroker.Instance.Publish(this, new WarehouseRosterManaged(payload.Who as NetPeer, hero, currentSettlementComponent.Settlement, fromItemRosterData));
+                }
+        
                 // Update hero equipment with new data
-                inventoryLogicInterface.UpdateEquipmentWithData(mobileParty, characterEquipmentsData);
-                network.SendAll(new UpdateEquipmentClients(message.CharacterIdEquipmentsData, message.PartyId));
+                inventoryLogicInterface.UpdateEquipmentWithData(mobileParty, characterEquipmentsData, initialHero);
+                network.SendAll(new UpdateEquipmentClients(message.CharacterIdEquipmentsData, message.PartyId, message.InitialHeroId));
 
                 // Update troop roster for if items were donated
                 troopRosterInterface.UpdateWithData(troopRoster, message.TroopRosterData, hero);
@@ -197,18 +212,17 @@ internal class TradeHandler : IHandler
 
     private void Handle_UpdateEquipmentClients(MessagePayload<UpdateEquipmentClients> obj)
     {
-        var message = obj.What;
-
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             using (new AllowedThread())
             {
                 try
                 {
-                    if (!objectManager.TryGetObjectWithLogging<MobileParty>(message.MobilePartyId, out var mobileParty)) return;
+                    if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
+                    if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.InitialHeroId, out var initialHero)) return;
 
-                    ResolveCharacterEquipmentsData(message.CharacterIdEquipmentsData, out var characterEquipmentsData);
-                    inventoryLogicInterface.UpdateEquipmentWithData(mobileParty, characterEquipmentsData);
+                    ResolveCharacterEquipmentsData(obj.What.CharacterIdEquipmentsData, out var characterEquipmentsData);
+                    inventoryLogicInterface.UpdateEquipmentWithData(mobileParty, characterEquipmentsData, initialHero);
                 }
                 catch (Exception e)
                 {
@@ -307,25 +321,43 @@ internal class TradeHandler : IHandler
         return true;
     }
 
-    private Dictionary<string, EquipmentData[]> ResolveCharacterIdEquipmentsData(MobileParty party)
+    private Dictionary<string, EquipmentData[]> ResolveCharacterIdEquipmentsData(MobileParty party, CharacterObject initialCharacter)
     {
         var characterIdEquipmentsData = new Dictionary<string, EquipmentData[]>();
+        bool initialCharacterInParty = false;
+
         for (int i = 0; i < party.MemberRoster.Count; i++)
         {
-            CharacterObject character = party.MemberRoster.GetElementCopyAtIndex(i).Character;
-            if (character.IsHero)
-            {
-                if (!objectManager.TryGetIdWithLogging(character.HeroObject, out var heroId)) continue;
+            var character = party.MemberRoster.GetElementCopyAtIndex(i).Character;
 
-                characterIdEquipmentsData.Add(heroId, new EquipmentData[]
-                {
-                    new EquipmentData(character.FirstBattleEquipment._equipmentType, character.FirstBattleEquipment._itemSlots),
-                    new EquipmentData(character.FirstCivilianEquipment._equipmentType, character.FirstCivilianEquipment._itemSlots),
-                    new EquipmentData(character.FirstStealthEquipment._equipmentType, character.FirstStealthEquipment._itemSlots)
-                });
+            AddHeroEquipmentData(characterIdEquipmentsData, character);
+
+            if (character == initialCharacter)
+            {
+                initialCharacterInParty = true;
             }
         }
+
+        if (!initialCharacterInParty)
+        {
+            AddHeroEquipmentData(characterIdEquipmentsData, initialCharacter);
+        }
+
         return characterIdEquipmentsData;
+    }
+
+    private void AddHeroEquipmentData(Dictionary<string, EquipmentData[]> characterIdEquipmentsData, CharacterObject character)
+    {
+        if (!character.IsHero) return;
+
+        if (!objectManager.TryGetIdWithLogging(character.HeroObject, out var heroId)) return;
+
+        characterIdEquipmentsData[heroId] = new EquipmentData[]
+        {
+            new EquipmentData(character.FirstBattleEquipment._equipmentType, character.FirstBattleEquipment._itemSlots),
+            new EquipmentData(character.FirstCivilianEquipment._equipmentType, character.FirstCivilianEquipment._itemSlots),
+            new EquipmentData(character.FirstStealthEquipment._equipmentType, character.FirstStealthEquipment._itemSlots)
+        };
     }
 
     private void ResolveCharacterEquipmentsData(Dictionary<string, EquipmentData[]> characterIdEquipmentsData, out Dictionary<CharacterObject, Equipment[]> characterEquipmentsData)

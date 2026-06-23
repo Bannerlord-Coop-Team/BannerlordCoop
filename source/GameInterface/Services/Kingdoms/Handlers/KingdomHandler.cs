@@ -4,12 +4,8 @@ using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.Kingdoms.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using System.Reflection;
-using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
-using TaleWorlds.Library;
-using Common.Extensions;
 
 namespace GameInterface.Services.Kingdoms.Handlers;
 

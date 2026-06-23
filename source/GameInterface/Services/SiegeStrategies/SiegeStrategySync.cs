@@ -1,9 +1,6 @@
 ﻿using GameInterface.AutoSync;
 using HarmonyLib;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Siege;
-using TaleWorlds.Core;
-using TaleWorlds.Library;
 
 namespace GameInterface.Services.SiegeStrategies
 {

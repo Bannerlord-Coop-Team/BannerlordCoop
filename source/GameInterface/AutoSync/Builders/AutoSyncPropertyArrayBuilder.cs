@@ -22,10 +22,11 @@ public class AutoSyncPropertyArrayBuilder : AutoSyncBuilderBase
         return TemplateParser.Parse("Patches.PropertyArrayChangeTranspilerTemplate",
                 new
                 {
-                    MemberDeclaringType = propertyInfo.DeclaringType.Name,
+                    MemberDeclaringType = AutoSyncUtils.GetSimpleTypeName(propertyInfo.DeclaringType),
+                    MemberDeclaringTypeName = AutoSyncUtils.GetSimpleTypeName(propertyInfo.DeclaringType).Replace(".", "_"),
                     MemberName = propertyInfo.Name,
                     MemberType = GetArrayType(propertyInfo.PropertyType),
-                    ElementType = propertyInfo.PropertyType.GetElementType().Name,
+                    ElementType = AutoSyncUtils.GetSimpleTypeName(propertyInfo.PropertyType.GetElementType()),
                     Libraries = AutoSyncUtils.GetLibraries(propertyInfo),
                     Debug = propertyitem.Debug
                 });
@@ -92,10 +93,11 @@ public class AutoSyncPropertyArrayBuilder : AutoSyncBuilderBase
         var serializers = GetSerializerMethodNames(propertyInfo.PropertyType.GetElementType());
         return new
         {
-            MemberDeclaringType = propertyInfo.DeclaringType.Name,
+            MemberDeclaringType = AutoSyncUtils.GetSimpleTypeName(propertyInfo.DeclaringType),
+            MemberDeclaringTypeName = AutoSyncUtils.GetSimpleTypeName(propertyInfo.DeclaringType).Replace(".", "_"),
             MemberName = propertyInfo.Name,
             MemberType = GetArrayType(propertyInfo.PropertyType),
-            ElementType = propertyInfo.PropertyType.GetElementType().Name,
+            ElementType = AutoSyncUtils.GetSimpleTypeName(propertyInfo.PropertyType.GetElementType()),
             Libraries = AutoSyncUtils.GetLibraries(propertyInfo),
             NotReadOnly = propertyInfo.SetMethod != null,
             SerializeMethod = serializers.serialize,

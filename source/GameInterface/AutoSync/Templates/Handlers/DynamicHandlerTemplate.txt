@@ -16,11 +16,11 @@ using {{ library }};
 
 namespace AutoSync;
 
-public class {{DeclaringType}}_Handler : GenericHandler<{{DeclaringType}}_Handler, {{DeclaringType}}>
+public class {{DeclaringTypeName}}_Handler : GenericHandler<{{DeclaringTypeName}}_Handler, {{DeclaringType}}>
 {
-    private readonly static ILogger Logger = LogManager.GetLogger<{{DeclaringType}}_Handler>();
+    private readonly static ILogger Logger = LogManager.GetLogger<{{DeclaringTypeName}}_Handler>();
 
-    public {{DeclaringType}}_Handler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network, AutoSyncRegistry AutoSyncRegistry) : base(messageBroker, objectManager, network)
+    public {{DeclaringTypeName}}_Handler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network, AutoSyncRegistry AutoSyncRegistry) : base(messageBroker, objectManager, network)
     {
         {{~ for subscription in Subscriptions ~}}
         {{ subscription }}

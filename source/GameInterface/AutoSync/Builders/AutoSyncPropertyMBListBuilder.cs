@@ -1,5 +1,4 @@
 ﻿using GameInterface.AutoSync.Templates;
-using GameInterface.Services.ObjectManager;
 using ProtoBuf.Meta;
 using System;
 using System.Collections.Generic;
@@ -92,10 +91,11 @@ namespace GameInterface.AutoSync.Builders
             var serializers = GetSerializerMethodNames(GetElementType(propertyInfo.PropertyType));
             return new
             {
-                MemberDeclaringType = propertyInfo.DeclaringType.Name,
+                MemberDeclaringType = AutoSyncUtils.GetSimpleTypeName(propertyInfo.DeclaringType),
+                MemberDeclaringTypeName = AutoSyncUtils.GetSimpleTypeName(propertyInfo.DeclaringType).Replace(".", "_"),
                 MemberName = propertyInfo.Name,
                 MemberType = GetMbListTypeName(propertyInfo.PropertyType),
-                ElementType = GetElementType(propertyInfo.PropertyType).Name,
+                ElementType = AutoSyncUtils.GetSimpleTypeName(GetElementType(propertyInfo.PropertyType)),
                 Libraries = AutoSyncUtils.GetLibraries(propertyInfo),
                 NotReadOnly = propertyInfo.SetMethod != null,
                 SerializeMethod = serializers.serialize,

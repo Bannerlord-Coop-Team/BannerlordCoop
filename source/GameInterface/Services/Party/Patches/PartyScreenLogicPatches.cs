@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Party.Messages;
 using HarmonyLib;
 using Serilog;
@@ -10,7 +11,6 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
-using TaleWorlds.Library;
 using MathF = TaleWorlds.Library.MathF;
 
 namespace GameInterface.Services.Party.Patches;
@@ -55,7 +55,7 @@ internal class PartyScreenLogicPatches
                 recruitedPrisonersRoster.Add(tuple.Item1, tuple.Item2, 0);
             }
 
-            var message = new AttemptPartyDoneLogic(
+            var message = new PartyDoneLogicAttempted(
                 Hero.MainHero,
                 takenPrisonersRoster,
                 donatedPrisonersRoster,
@@ -64,6 +64,10 @@ internal class PartyScreenLogicPatches
                 __instance.PrisonerRosters[0],
                 __instance.MemberRosters[1],
                 __instance.PrisonerRosters[1],
+                __instance._initialData.LeftMemberRoster,
+                __instance._initialData.LeftPrisonerRoster,
+                __instance._initialData.RightMemberRoster,
+                __instance._initialData.RightPrisonerRoster,
                 __instance.RightOwnerParty.ItemRoster,
                 __instance.CurrentData.UpgradedTroopsHistory,
                 __instance.CurrentData.LeftParty,
@@ -74,24 +78,31 @@ internal class PartyScreenLogicPatches
             );
 
             MessageBroker.Instance.Publish(__instance, message);
-
             // Manage changing rosters on the server
-            __instance.CurrentData.ResetUsing(__instance._initialData);
             using (new AllowedThread())
             {
-                __instance.Reset(true);
-            }
+                TroopRoster duplicateLeftMemberRoster = __instance.MemberRosters[0].CloneRosterData();
+                TroopRoster duplicateLeftPrisonerRoster = __instance.PrisonerRosters[0].CloneRosterData();
 
-            //__instance.FireCampaignRelatedEvents(); // Managed on server
-            __instance.SetPartyGoldChangeAmount(0);
-            __instance.SetHorseChangeAmount(0);
-            __instance.SetInfluenceChangeAmount(0, 0, 0);
-            __instance.SetMoraleChangeAmount(0);
-            __instance.CurrentData.UpgradedTroopsHistory = new List<Tuple<CharacterObject, CharacterObject, int>>();
-            __instance.CurrentData.TransferredPrisonersHistory = new List<Tuple<CharacterObject, int>>();
-            __instance.CurrentData.RecruitedPrisonersHistory = new List<Tuple<CharacterObject, int>>();
-            __instance.CurrentData.UsedUpgradeHorsesHistory = new List<Tuple<EquipmentElement, int>>();
-            __instance._initialData.CopyFromScreenData(__instance.CurrentData);
+                __instance.Reset(true);
+            
+                //__instance.FireCampaignRelatedEvents(); // Managed on server
+                __instance.SetPartyGoldChangeAmount(0);
+                __instance.SetHorseChangeAmount(0);
+                __instance.SetInfluenceChangeAmount(0, 0, 0);
+                __instance.SetMoraleChangeAmount(0);
+                __instance.CurrentData.UpgradedTroopsHistory = new List<Tuple<CharacterObject, CharacterObject, int>>();
+                __instance.CurrentData.TransferredPrisonersHistory = new List<Tuple<CharacterObject, int>>();
+                __instance.CurrentData.RecruitedPrisonersHistory = new List<Tuple<CharacterObject, int>>();
+                __instance.CurrentData.UsedUpgradeHorsesHistory = new List<Tuple<EquipmentElement, int>>();
+                __instance._initialData.CopyFromScreenData(__instance.CurrentData);
+
+                // In vanilla, the rosters would already be updated but with this patch the rosters are reset on the client to be managed by the server.
+                // This assigns a duplicate version of the left rosters needed in extra logic handled by the PartyScreenHelper when closing the party screen.
+                // For example, the left member roster when creating a new clan party is not managed on the server but the server does need this data.
+                __instance.MemberRosters[0] = duplicateLeftMemberRoster;
+                __instance.PrisonerRosters[1] = duplicateLeftPrisonerRoster;
+            }
         }
 
         __result = flag;
@@ -107,5 +118,13 @@ internal class PartyScreenLogicPatches
         // Send message to server to run KillCharacterAction.ApplyByExecution
         var message = new HeroExecuted(command.Character.HeroObject, Hero.MainHero);
         MessageBroker.Instance.Publish(__instance, message);
+    }
+
+    [HarmonyPatch(nameof(PartyScreenLogic.IsExecutable))]
+    [HarmonyPrefix]
+    public static bool IsExecutablePrefix(PartyScreenLogic.TroopType troopType, CharacterObject character, PartyScreenLogic.PartyRosterSide side)
+    {
+        // Executable if NOT player hero
+        return character.HeroObject?.IsPlayerHero() != true;
     }
 }

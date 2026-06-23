@@ -2,7 +2,6 @@ using HarmonyLib;
 using System;
 using System.Reflection;
 using TaleWorlds.Core;
-using TaleWorlds.Library;
 using TaleWorlds.ModuleManager;
 using TaleWorlds.ObjectSystem;
 using TaleWorlds.SaveSystem;
@@ -30,6 +29,12 @@ namespace ServerHeadless.Bootstrap
         {
             if (_initialized) return;
             _initialized = true;
+
+            // Capture engine/campaign errors, failed asserts and warnings on the console. Without this
+            // Debug.DebugManager is null headless (the native engine never installs one), so every such
+            // signal is silently dropped and a server fault leaves no trace. Installed first so even
+            // bootstrap-time diagnostics are surfaced.
+            TaleWorlds.Library.Debug.DebugManager = new HeadlessDebugManager();
 
             // The native engine normally installs the platform file helper; provide a managed one so
             // the save system can map virtual paths (User -> Documents\...) to real files.

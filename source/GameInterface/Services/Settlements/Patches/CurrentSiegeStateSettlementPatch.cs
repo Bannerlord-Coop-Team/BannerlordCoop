@@ -1,16 +1,13 @@
-﻿using HarmonyLib;
-using TaleWorlds.CampaignSystem.Settlements;
-using static TaleWorlds.CampaignSystem.Settlements.Settlement;
+﻿using Common;
+using Common.Logging;
+using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Settlements.Messages;
-using Common.Messaging;
-using Common;
-using System.Reflection;
-using System;
-using Common.Logging;
+using HarmonyLib;
 using Serilog;
-using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Settlements;
+using static TaleWorlds.CampaignSystem.Settlements.Settlement;
 
 namespace GameInterface.Services.Settlements.Patches;
 

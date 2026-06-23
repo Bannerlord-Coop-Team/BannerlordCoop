@@ -2,7 +2,6 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Common.Util;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.ObjectManager;

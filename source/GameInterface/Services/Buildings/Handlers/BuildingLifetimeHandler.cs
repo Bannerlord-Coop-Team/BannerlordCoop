@@ -5,7 +5,6 @@ using Common.Util;
 using GameInterface.Services.Armies.Messages.Lifetime;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using System;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
 
 namespace GameInterface.Services.Buildings.Handlers

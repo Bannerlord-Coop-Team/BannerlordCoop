@@ -1,8 +1,6 @@
 ﻿using HarmonyLib;
 using System;
-using System.Collections.Generic;
 using System.Reflection;
-using System.Text;
 using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.Services.MapEventComponents.Patches;

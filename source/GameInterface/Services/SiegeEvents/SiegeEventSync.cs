@@ -1,13 +1,8 @@
 using Common.Logging;
 using GameInterface.AutoSync;
-using GameInterface.AutoSync;
-using GameInterface.Registry.Auto;
-using GameInterface.Services.SiegeStrategies;
 using HarmonyLib;
 using Serilog;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Siege;
-using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.SiegeEvents;
 

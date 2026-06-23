@@ -4,9 +4,7 @@ using Common.Messaging;
 using GameInterface.Services.GameDebug.Messages;
 using Serilog;
 using System;
-using TaleWorlds.Core;
 using TaleWorlds.Library;
-using TaleWorlds.Localization;
 
 namespace GameInterface.Services.GameDebug.Handlers;
 

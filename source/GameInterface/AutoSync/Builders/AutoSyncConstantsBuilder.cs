@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Text;
 
 namespace GameInterface.AutoSync.Builders
 {
@@ -36,7 +35,10 @@ namespace GameInterface.AutoSync.Builders
             {
                 Types = items.Select(i => new { Type = i, Index = items.IndexOf(i) }),
                 Libraries = ReadOnlyFields.SelectMany(f => AutoSyncUtils.GetLibraries(f)).Distinct().ToList(),
-                ReadOnlyFields = ReadOnlyFields
+                ReadOnlyFields = ReadOnlyFields.Select(f => new {
+                    DeclaringTypeName = AutoSyncUtils.GetSimpleTypeName(f.DeclaringType),
+                    Name = f.Name
+                }).ToList()
             });
 
             AutoSyncConfiguration.ExportFile("Constants.cs", constantsTemplate);

@@ -6,7 +6,6 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Workshops.Messages;
 using HarmonyLib;
 using Serilog;
-using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 

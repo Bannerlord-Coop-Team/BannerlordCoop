@@ -2,10 +2,9 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using GameInterface.Services.Locations.Messages;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.Locations.Messages;
 using GameInterface.Services.MobileParties.Extensions;
-using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Serilog;
@@ -60,31 +59,28 @@ internal class SettlementPopulationTracker : IHandler
         this.network = network;
         this.objectManager = objectManager;
 
-        messageBroker.Subscribe<PartyEnterSettlement>(Handle_PartyEnterSettlement);
-        messageBroker.Subscribe<PartyLeaveSettlement>(Handle_PartyLeaveSettlement);
         messageBroker.Subscribe<SettlementRosterHeroesChanged>(Handle_SettlementRosterHeroesChanged);
     }
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<PartyEnterSettlement>(Handle_PartyEnterSettlement);
-        messageBroker.Unsubscribe<PartyLeaveSettlement>(Handle_PartyLeaveSettlement);
         messageBroker.Unsubscribe<SettlementRosterHeroesChanged>(Handle_SettlementRosterHeroesChanged);
     }
 
-    private void Handle_PartyEnterSettlement(MessagePayload<PartyEnterSettlement> payload)
+    /// <summary>
+    /// Invoked by <c>SettlementInterface.PartyEnterSettlement</c> after a party's settlement entry is applied.
+    /// </summary>
+    public void OnPartyEnteredSettlement(Settlement settlement, MobileParty party)
     {
         if (ModInformation.IsServer == false) return;
+        if (settlement == null || party == null) return;
 
-        var settlementId = payload.What.SettlementId;
-        var partyId = payload.What.PartyId;
-
-        if (objectManager.TryGetObjectWithLogging(settlementId, out Settlement settlement) == false) return;
-        if (objectManager.TryGetObjectWithLogging(partyId, out MobileParty party) == false) return;
-        if (settlement.LocationComplex == null) return;
-
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
+            if (objectManager.TryGetIdWithLogging(settlement, out var settlementId) == false) return;
+            if (objectManager.TryGetIdWithLogging(party, out var partyId) == false) return;
+            if (settlement.LocationComplex == null) return;
+
             if (party.IsPlayerParty())
             {
                 playerPartySettlements[partyId] = settlementId;
@@ -107,14 +103,18 @@ internal class SettlementPopulationTracker : IHandler
         });
     }
 
-    private void Handle_PartyLeaveSettlement(MessagePayload<PartyLeaveSettlement> payload)
+    /// <summary>
+    /// Invoked by <c>SettlementInterface.PartyLeaveSettlement</c> after a party's settlement exit is applied.
+    /// </summary>
+    public void OnPartyLeftSettlement(MobileParty party)
     {
         if (ModInformation.IsServer == false) return;
+        if (party == null) return;
 
-        var partyId = payload.What.PartyId;
-
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
+            if (objectManager.TryGetIdWithLogging(party, out var partyId) == false) return;
+
             if (playerPartySettlements.TryGetValue(partyId, out var settlementId) == false)
             {
                 RemoveAiLeaderPlacement(partyId);
@@ -146,7 +146,7 @@ internal class SettlementPopulationTracker : IHandler
         var heroes = payload.What.Heroes;
         if (settlement == null || heroes == null) return;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             if (!populatedSettlements.ContainsKey(settlement.StringId)) return;
             if (settlement.LocationComplex == null) return;

@@ -1,9 +1,6 @@
 ﻿using GameInterface.AutoSync.Templates;
 using System;
-using System.Collections.Generic;
 using System.Reflection;
-using System.Reflection.Emit;
-using System.Text;
 
 namespace GameInterface.AutoSync.Builders
 {
@@ -36,7 +33,8 @@ namespace GameInterface.AutoSync.Builders
             return TemplateParser.Parse("Patches.FieldSetTranspilerTemplate",
             new
             {
-                MemberDeclaringType = fieldInfo.DeclaringType.Name,
+                MemberDeclaringType = AutoSyncUtils.GetSimpleTypeName(fieldInfo.DeclaringType),
+                MemberDeclaringTypeName = AutoSyncUtils.GetSimpleTypeName(fieldInfo.DeclaringType).Replace(".", "_"),
                 MemberName = fieldInfo.Name,
                 MemberType = AutoSyncUtils.GetMemberTypeName(fieldInfo.FieldType),
                 ReadOnly = fieldInfo.IsInitOnly,

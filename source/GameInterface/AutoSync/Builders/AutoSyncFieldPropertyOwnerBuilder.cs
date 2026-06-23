@@ -48,10 +48,11 @@ public class AutoSyncFieldPropertyOwnerBuilder : AutoSyncBuilderBase
         var fieldInfo = fieldItem.Value;
         return new
         {
-            MemberDeclaringType = fieldInfo.DeclaringType.Name,
+            MemberDeclaringType = AutoSyncUtils.GetSimpleTypeName(fieldInfo.DeclaringType),
+            MemberDeclaringTypeName = AutoSyncUtils.GetSimpleTypeName(fieldInfo.DeclaringType).Replace(".", "_"),
             MemberName = fieldInfo.Name,
-            MemberType = fieldInfo.FieldType.Name,
-            ElementType = GetElementType(fieldInfo.FieldType).Name,
+            MemberType = AutoSyncUtils.GetSimpleTypeName(fieldInfo.FieldType),
+            ElementType = AutoSyncUtils.GetSimpleTypeName(GetElementType(fieldInfo.FieldType)),
             Libraries = AutoSyncUtils.GetLibraries(fieldInfo),
             ReadOnly = fieldInfo.IsInitOnly,
             Debug = fieldItem.Debug

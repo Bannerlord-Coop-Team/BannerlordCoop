@@ -1,8 +1,6 @@
 ﻿using Common.Util;
-using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.TroopRosters.Patches;
 using HarmonyLib;
 using Serilog;
 using System;

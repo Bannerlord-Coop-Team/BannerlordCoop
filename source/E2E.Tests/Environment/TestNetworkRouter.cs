@@ -3,7 +3,6 @@ using Common.Messaging;
 using Common.PacketHandlers;
 using E2E.Tests.Environment.Instance;
 using LiteNetLib;
-using ProtoBuf.Meta;
 
 namespace E2E.Tests.Environment;
 

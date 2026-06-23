@@ -3,7 +3,6 @@ using HarmonyLib;
 using SandBox.View.Map;
 using System;
 using System.Collections.Generic;
-using TaleWorlds.Core;
 using TaleWorlds.Engine.GauntletUI;
 using TaleWorlds.GauntletUI;
 using TaleWorlds.GauntletUI.BaseTypes;

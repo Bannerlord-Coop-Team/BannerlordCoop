@@ -12,6 +12,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.TroopRosters.Logging;
 using GameInterface.Services.Time;
 using GameInterface.Surrogates;
 using HarmonyLib;
@@ -39,6 +40,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<TimeControlModeConverter>().As<ITimeControlModeConverter>().InstancePerLifetimeScope();
         builder.RegisterType<PlayerManager>().As<IPlayerManager>().InstancePerLifetimeScope();
         builder.RegisterType<MapEventLogger>().As<IMapEventLogger>().InstancePerLifetimeScope();
+        builder.RegisterType<TroopRosterLogger>().As<ITroopRosterLogger>().InstancePerLifetimeScope();
 
         builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
 

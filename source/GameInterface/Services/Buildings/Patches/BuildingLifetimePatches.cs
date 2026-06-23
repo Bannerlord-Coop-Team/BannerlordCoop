@@ -5,7 +5,6 @@ using GameInterface.Policies;
 using GameInterface.Services.Armies.Messages.Lifetime;
 using HarmonyLib;
 using Serilog;
-using System;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
 

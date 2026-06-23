@@ -1,10 +1,7 @@
 ﻿using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
-using TaleWorlds.Core;
-using TaleWorlds.Localization;
 using Xunit.Abstractions;
-using static E2E.Tests.Environment.E2ETestEnvironment;
 
 namespace E2E.Tests.Services.CharacterObjects
 {

@@ -58,9 +58,10 @@ public class AutoSyncPropertyBuilder : AutoSyncBuilderBase
         var serializerNames = GetSerializerMethodNames(propertyInfo.PropertyType);
         return new
         {
-            MemberDeclaringType = propertyInfo.DeclaringType.Name,
+            MemberDeclaringType = AutoSyncUtils.GetSimpleTypeName(propertyInfo.DeclaringType),
+            MemberDeclaringTypeName = AutoSyncUtils.GetSimpleTypeName(propertyInfo.DeclaringType).Replace(".", "_"),
             MemberName = propertyInfo.Name,
-            MemberType = propertyInfo.PropertyType.Name,
+            MemberType = AutoSyncUtils.GetSimpleTypeName(propertyInfo.PropertyType),
             Libraries = AutoSyncUtils.GetLibraries(propertyInfo),
             SerializeMethod = serializerNames.serialize,
             DeserializeMethod = serializerNames.deserialize,

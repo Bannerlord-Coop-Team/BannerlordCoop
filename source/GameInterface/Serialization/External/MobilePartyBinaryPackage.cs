@@ -4,7 +4,6 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
-using static TaleWorlds.CampaignSystem.CharacterDevelopment.DefaultPerks;
 
 namespace GameInterface.Serialization.External
 {

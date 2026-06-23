@@ -1,11 +1,11 @@
 ﻿using Autofac;
 using Common;
 using Common.Logging;
+using GameInterface.Missions;
+using GameInterface.Missions.Arena;
+using GameInterface.Missions.Services.Taverns;
+using GameInterface.Missions.View;
 using HarmonyLib;
-using Missions;
-using Missions.Services.Arena;
-using Missions.Services.Taverns;
-using Missions.View;
 using SandBox;
 using Serilog;
 using System;

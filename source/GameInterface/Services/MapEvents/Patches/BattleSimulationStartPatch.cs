@@ -2,7 +2,6 @@ using Common;
 using Common.Messaging;
 using GameInterface.Services.MapEvents.Messages.Start;
 using HarmonyLib;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameState;
 
@@ -25,6 +24,11 @@ internal class BattleSimulationStartPatch
 
         var simulation = PlayerEncounter.CurrentBattleSimulation;
         if (simulation?.MapEvent == null)
+            return;
+
+        // A spectator opens this same screen in response to the server's NetworkOpenBattleSimulation; it must not
+        // ask the server to run a second simulation. Only the initiating player requests the authoritative run.
+        if (BattleSimulationReplay.IsSpectator)
             return;
 
         MessageBroker.Instance.Publish(simulation, new BattleSimulationStarted(simulation.MapEvent));

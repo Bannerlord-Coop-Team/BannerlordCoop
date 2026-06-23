@@ -2,10 +2,7 @@
 using Common.Messaging;
 using Common.Network;
 using Common.Tests.Utils;
-using Coop.Core;
 using Coop.Core.Common.Configuration;
-using Coop.Tests.Stubs;
-using LiteNetLib;
 
 namespace Coop.Tests.Autofac
 {

@@ -1,11 +1,9 @@
 ﻿using ProtoBuf.Meta;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
-using TaleWorlds.CampaignSystem.Issues;
-using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.MountAndBlade;
 using static TaleWorlds.CampaignSystem.ExplainedNumber.StatExplainer;
 

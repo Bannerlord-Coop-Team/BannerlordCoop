@@ -95,7 +95,8 @@ public class AutoSyncFieldMBListBuilder : AutoSyncBuilderBase
         var serializers = GetSerializerMethodNames(GetElementType(fieldInfo.FieldType));
         return new
         {
-            MemberDeclaringType = fieldInfo.DeclaringType.Name,
+            MemberDeclaringType = AutoSyncUtils.GetSimpleTypeName(fieldInfo.DeclaringType),
+            MemberDeclaringTypeName = AutoSyncUtils.GetSimpleTypeName(fieldInfo.DeclaringType).Replace(".", "_"),
             MemberName = fieldInfo.Name,
             MemberType = GetMbListTypeName(fieldInfo.FieldType),
             ElementType = GetElementType(fieldInfo.FieldType).Name,

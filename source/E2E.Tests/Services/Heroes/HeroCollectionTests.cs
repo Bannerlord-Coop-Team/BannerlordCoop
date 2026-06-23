@@ -1,13 +1,12 @@
 ﻿using E2E.Tests.Environment;
-using Xunit.Abstractions;
-using TaleWorlds.CampaignSystem;
-using GameInterface.Services.Heroes.Patches;
-using TaleWorlds.CampaignSystem.Settlements.Workshops;
-using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using E2E.Tests.Util.ObjectBuilders;
 using GameInterface.Services.Heroes.Messages.Collections;
-using GameInterface.Utils;
+using GameInterface.Services.Heroes.Patches;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Settlements.Workshops;
+using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Heroes;
 

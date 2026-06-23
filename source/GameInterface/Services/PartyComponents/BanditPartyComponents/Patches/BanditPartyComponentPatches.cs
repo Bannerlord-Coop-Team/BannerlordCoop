@@ -4,7 +4,6 @@ using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyComponents.BanditPartyComponents.Messages;
-using GameInterface.Services.PartyComponents.Patches.CustomPartyComponents;
 using HarmonyLib;
 using Serilog;
 using System.Collections.Generic;

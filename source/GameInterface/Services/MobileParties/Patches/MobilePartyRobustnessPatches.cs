@@ -3,7 +3,6 @@ using HarmonyLib;
 using Serilog;
 using System;
 using System.Reflection;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;

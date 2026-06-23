@@ -1,7 +1,4 @@
-﻿using Moq;
-using SandBox.GauntletUI.Map;
-
-namespace E2E.Tests.Services.MapEvents;
+﻿namespace E2E.Tests.Services.MapEvents;
 
 public class MapEventContext
 {

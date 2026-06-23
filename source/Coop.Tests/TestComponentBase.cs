@@ -3,12 +3,10 @@ using Common.Messaging;
 using Common.Network;
 using Common.Serialization;
 using Common.Tests.Utils;
-using Coop.Core;
 using Coop.Tests.Mocks;
-using GameInterface.CoopSessionData;
 using GameInterface.AutoSync;
+using GameInterface.CoopSessionData;
 using GameInterface.Registry;
-using GameInterface.Services.Entity;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
@@ -17,6 +15,7 @@ using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Time.Interfaces;
 using GameInterface.Services.TroopRosters.Interfaces;
@@ -24,7 +23,6 @@ using GameInterface.Services.UI.Interfaces;
 using Moq;
 using Serilog;
 using System;
-using System.Collections.Generic;
 using Xunit.Abstractions;
 using IGameInterface = GameInterface.IGameInterface;
 
@@ -91,6 +89,7 @@ internal abstract class TestComponentBase
         RegisterMock<ITroopRosterInterface>(builder);
         RegisterMock<IMobilePartyInterface>(builder);
         RegisterMock<IGameStateInterface>(builder);
+        RegisterMock<ISettlementInterface>(builder);
 
         // ISaveInterface is consumed by TransferSaveState's constructor, which packages a save the
         // moment the state is entered. Give it a non-null default so simply entering the state does
@@ -104,7 +103,7 @@ internal abstract class TestComponentBase
         return builder;
     }
 
-    private void RegisterMock<T>(ContainerBuilder builder) where T : class
+    protected void RegisterMock<T>(ContainerBuilder builder) where T : class
     {
         var mock = new Mock<T>();
         builder.RegisterInstance(mock).AsSelf().SingleInstance();

@@ -6,7 +6,6 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface;
 using GameInterface.AutoSync;
-using GameInterface.AutoSync;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Utils;
 using HarmonyLib;

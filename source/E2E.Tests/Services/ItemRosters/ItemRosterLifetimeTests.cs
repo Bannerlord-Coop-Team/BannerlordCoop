@@ -1,8 +1,5 @@
 ﻿using E2E.Tests.Environment;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Roster;
-using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.Settlements.Buildings;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.ItemRosters

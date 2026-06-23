@@ -3,14 +3,14 @@
 namespace GameInterface.Services.Inventory.Data;
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct ItemObjectData
+public struct ItemObjectData
 {
     [ProtoMember(1)]
-    public readonly string ItemObjectId;
+    public string ItemObjectId { get; set; }
     [ProtoMember(2)]
-    public readonly string ItemModifierId;
+    public string ItemModifierId { get; set; }
     [ProtoMember(3)]
-    public readonly bool ItemModifierNull;
+    public bool ItemModifierNull { get; set; }
 
     public ItemObjectData(string itemObjectId, string itemModifierId, bool itemModifierNull = false)
     {
@@ -21,12 +21,12 @@ internal readonly struct ItemObjectData
 }
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct ItemRosterElementData
+public struct ItemRosterElementData
 {
     [ProtoMember(1)]
-    public readonly ItemObjectData ItemObjectData;
+    public ItemObjectData ItemObjectData { get; set; }
     [ProtoMember(2)]
-    public readonly int Amount;
+    public int Amount { get; set; }
 
     public ItemRosterElementData(ItemObjectData itemObjectData, int amount)
     {

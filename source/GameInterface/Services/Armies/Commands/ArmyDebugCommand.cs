@@ -1,28 +1,14 @@
 ﻿using Common;
 using Common.Extensions;
-using Common.Messaging;
-using Common.Util;
-using GameInterface.Registry;
-using GameInterface.Registry.Auto;
-using GameInterface.Services.Armies.Messages;
-using GameInterface.Services.Armies.Messages.Lifetime;
-using GameInterface.Services.Armies.Patches;
 using GameInterface.Services.ObjectManager;
-using Helpers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net;
-using System.Runtime.Serialization;
 using System.Text;
-using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Core;
-using TaleWorlds.Localization;
-using static HarmonyLib.Code;
 using static TaleWorlds.CampaignSystem.Army;
 using static TaleWorlds.Library.CommandLineFunctionality;
 

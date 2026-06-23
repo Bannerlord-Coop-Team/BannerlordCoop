@@ -8,7 +8,6 @@ using GameInterface.Services.ObjectManager;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
-using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Clans.Handlers;
 

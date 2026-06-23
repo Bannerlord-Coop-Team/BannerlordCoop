@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common.Serialization;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Services.ObjectManager;
@@ -7,10 +8,8 @@ using GameInterface.Tests.Bootstrap.Modules;
 using System.Runtime.Serialization;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
-using TaleWorlds.ObjectSystem;
 using Xunit;
 using static TaleWorlds.Core.WeaponComponentData;
-using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

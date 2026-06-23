@@ -1,5 +1,4 @@
-﻿using GameInterface.Services.MobileParties.Messages.Data;
-using GameInterface.Utils.LocalEvents;
+﻿using GameInterface.Utils.LocalEvents;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Messages;

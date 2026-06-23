@@ -2,8 +2,8 @@
 using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Heroes.Enum;
-using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Heroes.Interaces;
+using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Time;
 using HarmonyLib;
 using SandBox.View.Map;

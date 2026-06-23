@@ -2,7 +2,6 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Common.Serialization;
 using Common.Util;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ItemObjects.Interfaces;
@@ -106,7 +105,6 @@ namespace GameInterface.Services.Smithing.Handlers
                     string nextTownOrderId = obj.CraftingCampaignBehavior.GetNextTownOrderId();
 
                     WeaponDesign weaponDesignTemplate = new WeaponDesign(randomElement, TextObject.GetEmpty(), obj.CraftingCampaignBehavior.GetWeaponPieces(randomElement, pieceTier), nextTownOrderId);
-                    objectManager.AddNewObject(weaponDesignTemplate, out var weaponDesignId);
 
                     CraftingOrder order;
                     order = new CraftingOrder(obj.OrderOwner, townOrderDifficulty, weaponDesignTemplate, randomElement, obj.OrderSlot, nextTownOrderId);
@@ -132,8 +130,7 @@ namespace GameInterface.Services.Smithing.Handlers
             if (!objectManager.TryGetIdWithLogging(obj.OrderOwner, out var orderOwnerId)) return;
             if (!objectManager.TryGetIdWithLogging(randomElement, out var randomElementId)) return;
 
-            if (!objectManager.AddNewObject(craftingOrder, out var craftingOrderId) &&
-                !objectManager.TryGetIdWithLogging(craftingOrder, out craftingOrderId)) return;
+            if (!objectManager.TryGetIdWithLogging(craftingOrder, out var craftingOrderId)) return;
 
             // Send to clients from server
             NetworkCreateTownOrder message = new(
@@ -255,6 +252,7 @@ namespace GameInterface.Services.Smithing.Handlers
                     GiveGoldAction.ApplyBetweenCharacters(null, mainHero, amount, false);
 
                     Hero orderOwner = craftingOrder.OrderOwner;
+                    CraftingOrder previousOrder = null;
                     if (craftingCampaignBehavior._craftingOrders[town].CustomOrders.Contains(craftingOrder))
                     {
                         craftingCampaignBehavior._craftingOrders[town].RemoveCustomOrder(craftingOrder);
@@ -286,20 +284,22 @@ namespace GameInterface.Services.Smithing.Handlers
                                 ChangeRelationAction.ApplyRelationChangeBetweenHeroes(completerHero, orderOwner, (int)DefaultPerks.Crafting.ExperiencedSmith.SecondaryBonus, true);
                             }
                         }
-                        CraftingOrder previousOrder = craftingCampaignBehavior._craftingOrders[town].Slots[craftingOrder.DifficultyLevel];
+                        previousOrder = craftingCampaignBehavior._craftingOrders[town].Slots[craftingOrder.DifficultyLevel];
 
                         craftingCampaignBehavior._craftingOrders[town].RemoveTownOrder(craftingOrder);
-
-                        // Remove previous order from objectManager
-                        if (previousOrder is not null)
-                        {
-                            MessageBroker.Instance.Publish(null, new InstanceDestroyed<CraftingOrder>(previousOrder));
-                        }
                     }
 
                     CampaignEventDispatcher.Instance.OnCraftingOrderCompleted(town, craftingOrder, craftedItem, completerHero);
 
                     network.SendAll(new NetworkCompleteOrderClients(obj));
+
+                    // Remove previous order from objectManager
+                    // Queue destroying the instance after sending NetworkCompleteOrderClients message
+                    // Destroying the instance before sending client message prevents clients from being able to resolve the removed crafting order by network id
+                    if (previousOrder is not null)
+                    {
+                        MessageBroker.Instance.Publish(null, new InstanceDestroyed<CraftingOrder>(previousOrder));
+                    }
                 }
                 catch (Exception e)
                 {

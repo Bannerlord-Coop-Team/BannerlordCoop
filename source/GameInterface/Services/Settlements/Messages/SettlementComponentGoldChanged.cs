@@ -1,7 +1,4 @@
 ﻿using Common.Messaging;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Settlements.Messages

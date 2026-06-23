@@ -1,6 +1,5 @@
 ﻿using System;
 using TaleWorlds.Core;
-using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Serialization.External
 {

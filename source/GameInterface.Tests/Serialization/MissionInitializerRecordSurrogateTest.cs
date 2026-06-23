@@ -1,5 +1,4 @@
 using GameInterface.Surrogates;
-using ProtoBuf;
 using ProtoBuf.Meta;
 using System.IO;
 using TaleWorlds.Core;

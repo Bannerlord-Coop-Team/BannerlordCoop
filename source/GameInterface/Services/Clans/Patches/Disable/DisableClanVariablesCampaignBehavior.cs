@@ -1,12 +1,8 @@
 ﻿using Common;
-using GameInterface.Services.Heroes.Messages;
 using HarmonyLib;
-using System;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Text;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.GameComponents;
 
 namespace GameInterface.Services.Clans.Patches.Disable;
 

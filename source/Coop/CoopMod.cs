@@ -4,6 +4,7 @@ using Coop.Core;
 using Coop.Lib.NoHarmony;
 using Coop.UI.LoadGameUI;
 using GameInterface;
+using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.TroopRosters;
 using GameInterface.Services.UI;
 using Serilog;
@@ -11,6 +12,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
@@ -231,6 +233,14 @@ namespace Coop
             #endregion
         }
 
+        protected override void OnGameStart(Game game, IGameStarter gameStarterObject)
+        {
+            base.OnGameStart(game, gameStarterObject);
+
+            if (gameStarterObject is CampaignGameStarter campaignGameStarter)
+                campaignGameStarter.AddBehavior(new PlayerPartyInteractionCampaignBehavior());
+        }
+
         protected override void OnBeforeInitialModuleScreenSetAsRoot()
         {
             base.OnBeforeInitialModuleScreenSetAsRoot();
@@ -256,8 +266,7 @@ namespace Coop
                 GameThread.Instance.MarkGameThread();
                 
                 m_IsFirstTick = false;
-            }    
-            RefreshTroopRosterCoalescer();
+            }
 
             TimeSpan frameTime = TimeSpan.FromSeconds(dt);
             Updateables.UpdateAll(frameTime);
@@ -265,36 +274,6 @@ namespace Coop
 #if DEBUG
             TryAutoConnect();
 #endif
-        }
-
-        private TroopRosterSyncCoalescer _troopRosterCoalescer;
-
-        // The TroopRoster snapshot coalescer lives in the active session's container (one per
-        // server/client process), so it cannot be a fixed member of the process-wide Updateables list.
-        // Keep the list in sync with the running session: add the current session's coalescer, swap it
-        // on rejoin, and drop it when the session ends, so it is pumped in priority order with the rest
-        // of the update loop.
-        private void RefreshTroopRosterCoalescer()
-        {
-            TroopRosterSyncCoalescer current = null;
-            if (Coop.Running)
-            {
-                ContainerProvider.TryResolve(out current);
-            }
-
-            if (ReferenceEquals(current, _troopRosterCoalescer)) return;
-
-            if (_troopRosterCoalescer != null)
-            {
-                Updateables.Remove(_troopRosterCoalescer);
-            }
-
-            _troopRosterCoalescer = current;
-
-            if (current != null)
-            {
-                Updateables.Add(current);
-            }
         }
 
         private void TryAutoConnect()

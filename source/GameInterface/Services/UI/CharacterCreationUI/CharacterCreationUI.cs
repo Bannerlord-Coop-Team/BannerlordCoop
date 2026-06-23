@@ -1,10 +1,4 @@
-﻿using System;
-using TaleWorlds.Localization;
-using TaleWorlds.Core.ViewModelCollection;
-using TaleWorlds.CampaignSystem.ViewModelCollection.CharacterCreation;
-using TaleWorlds.CampaignSystem.CharacterCreationContent;
-using SandBox.GauntletUI.CharacterCreation;
-using TaleWorlds.MountAndBlade.View.Screens;
+﻿using TaleWorlds.CampaignSystem.CharacterCreationContent;
 
 namespace GameInterface.Services.UI.CharacterCreationUI
 {

@@ -1,16 +1,9 @@
 ﻿using Common;
-using Common.Logging;
-using GameInterface.Services.GameDebug.Handlers;
-using GameInterface.Services.MobileParties.Handlers;
 using SandBox;
 using SandBox.GauntletUI.CharacterCreation;
-using Serilog;
-using System;
 using System.Linq;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterCreationContent;
-using TaleWorlds.CampaignSystem.ViewModelCollection.CharacterCreation;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;

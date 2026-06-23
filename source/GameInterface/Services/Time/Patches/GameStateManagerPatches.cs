@@ -1,8 +1,5 @@
 ﻿using HarmonyLib;
 using SandBox.View.Map;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.Core;
 using TaleWorlds.Library;

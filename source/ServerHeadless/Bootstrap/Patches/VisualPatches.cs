@@ -2,7 +2,6 @@ using HarmonyLib;
 using SandBox.View.Map.Managers;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
-using TaleWorlds.CampaignSystem.Party;
 
 namespace ServerHeadless.Bootstrap.Patches
 {

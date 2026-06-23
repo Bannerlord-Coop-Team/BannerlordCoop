@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
 using Coop.Core.Client.Messages;
-using GameInterface.CoopSessionData.Save.Data;
 using GameInterface.Services.Smithing.Messages;
+using GameInterface.Services.Workshops.Messages;
 
 namespace Coop.Core.Client.Services.Save.Handler;
 
@@ -33,11 +33,7 @@ internal class SaveDataHandler : IHandler
         saveDataMessage = obj.What;
 
         messageBroker.Publish(this, new InitializeClientCraftingData(saveDataMessage.CraftingPlayerData));
-        // Expand this in the future to handle other CoopSession data types if needed to look something like:
-        /*
-        ICoopSession CoopSession = saveDataMessage.CoopSession;
-        messageBroker.Publish(this, new InitializeCraftingCampaignBehavior(CoopSession.CraftingPlayerData));
-        // Add any other CoopSession data initialisations for clients
-        */
+        messageBroker.Publish(this, new InitializeClientWorkshopData(saveDataMessage.WorkshopPlayerData));
+        // Add any other CoopSession data initialisations for clients here
     }
 }

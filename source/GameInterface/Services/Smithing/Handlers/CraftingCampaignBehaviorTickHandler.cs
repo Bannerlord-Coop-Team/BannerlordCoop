@@ -14,7 +14,6 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
-using TaleWorlds.Library;
 using static TaleWorlds.CampaignSystem.CampaignBehaviors.CraftingCampaignBehavior;
 
 namespace GameInterface.Services.Smithing.Handlers
@@ -123,7 +122,7 @@ namespace GameInterface.Services.Smithing.Handlers
                 foreach (Hero hero in list)
                 {
                     // Prevents adding town orders with player hero order owners
-                    if (hero != Hero.MainHero && !hero.IsPlayerHero() && MBRandom.RandomFloat <= 0.05f)
+                    if (!hero.IsPlayerHero() && MBRandom.RandomFloat <= 0.05f)
                     {
                         int availableSlot = obj.CraftingCampaignBehavior.CraftingOrders[obj.Settlement.Town].GetAvailableSlot();
                         if (availableSlot <= -1)

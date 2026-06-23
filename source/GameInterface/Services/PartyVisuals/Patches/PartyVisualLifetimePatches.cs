@@ -4,11 +4,8 @@ using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.PartyVisuals.Messages;
 using HarmonyLib;
-using SandBox.View;
-using SandBox.View.Map;
 using SandBox.View.Map.Visuals;
 using Serilog;
-using System;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.PartyVisuals.Patches;

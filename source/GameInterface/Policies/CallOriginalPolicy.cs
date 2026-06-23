@@ -1,8 +1,6 @@
-﻿using Autofac;
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Util;
 using Serilog;
-using System.Linq;
 
 namespace GameInterface.Policies;
 

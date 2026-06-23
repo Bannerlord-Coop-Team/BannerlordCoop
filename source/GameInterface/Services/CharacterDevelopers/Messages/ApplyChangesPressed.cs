@@ -1,8 +1,4 @@
 ﻿using Common.Messaging;
-using System;
-using System.Collections.Generic;
-using System.Text;
-using System.Windows.Input;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.ViewModelCollection.CharacterDeveloper;
 using TaleWorlds.CampaignSystem.ViewModelCollection.CharacterDeveloper.PerkSelection;

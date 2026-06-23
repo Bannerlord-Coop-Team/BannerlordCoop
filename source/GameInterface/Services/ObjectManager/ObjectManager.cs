@@ -1,10 +1,7 @@
-﻿using GameInterface.Registry;
-using Serilog;
+﻿using Serilog;
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using System.Xml.Linq;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.ObjectManager;
@@ -32,7 +29,7 @@ public interface IObjectManager
     /// <param name="id">Out parameter for string id (null if not found)</param>
     /// <returns>True if successful, false if failed</returns>
     bool TryGetId(object obj, out string id);
-    bool TryGetIdWithLogging(object obj, out string id);
+    bool TryGetIdWithLogging<T>(T obj, out string id);
 
     /// <summary>
     /// Attempts to get an object using a StringId and object type
@@ -264,15 +261,16 @@ public class ObjectManager : IObjectManager
     }
 
     #region LogHelpers
-    public bool TryGetIdWithLogging(object obj, out string id)
+    public bool TryGetIdWithLogging<T>(T obj, out string id)
     {
         id = null;
 
         if (obj == null)
         {
             logger.Error(
-                "[{ClassName}] Failed to get id because object was null",
-                nameof(ObjectManager));
+                "[{ClassName}] Failed to get id because object was null ({ObjectType})",
+                nameof(ObjectManager),
+                typeof(T));
 
             return false;
         }

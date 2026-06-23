@@ -1,5 +1,4 @@
 ﻿using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Core;
 
 namespace E2E.Tests.Util.ObjectBuilders;
 internal class AlleyBuilder : IObjectBuilder

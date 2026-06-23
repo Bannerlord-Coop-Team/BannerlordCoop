@@ -6,11 +6,11 @@ using {{ library }};
 
 namespace AutoSync
 {
-    public record {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage : GenericEvent<{{ MemberDeclaringType }}, {{ ElementType }}>
+    public record {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetLocalMessage : GenericEvent<{{ MemberDeclaringType }}, {{ ElementType }}>
     {
         public int PropertyValue { get; }
 
-        public {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage({{ MemberDeclaringType }} instance, {{ ElementType }} attribute, int value) : base(instance, attribute)
+        public {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetLocalMessage({{ MemberDeclaringType }} instance, {{ ElementType }} attribute, int value) : base(instance, attribute)
         {
             PropertyValue = value;
         }

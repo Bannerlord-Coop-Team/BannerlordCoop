@@ -1,18 +1,11 @@
-﻿using E2E.Tests.Environment;
-using E2E.Tests.Environment.Instance;
-using E2E.Tests.Util;
-using System.Runtime.InteropServices;
+﻿using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Settlements.Buildings;
-using TaleWorlds.CampaignSystem.Settlements;
-using Xunit.Abstractions;
-using TaleWorlds.Core;
-using Autofac.Features.OwnedInstances;
-using TaleWorlds.Localization;
-using TaleWorlds.CampaignSystem.Issues;
-using static TaleWorlds.CampaignSystem.Issues.BettingFraudIssueBehavior;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
+using TaleWorlds.Localization;
+using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Heroes
 {

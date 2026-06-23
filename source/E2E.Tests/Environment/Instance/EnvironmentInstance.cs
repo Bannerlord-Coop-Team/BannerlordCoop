@@ -5,7 +5,6 @@ using Common.PacketHandlers;
 using Common.Serialization;
 using Common.Tests.Utils;
 using Common.Util;
-using Coop.Core;
 using E2E.Tests.Environment.Mock;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters;
@@ -62,7 +61,6 @@ public abstract class EnvironmentInstance : IDisposable
         using (new StaticScope(this))
         {
             messageBroker.Publish(source, message);
-            PumpTroopRosterSnapshots();
         }
     }
 
@@ -98,25 +96,9 @@ public abstract class EnvironmentInstance : IDisposable
                 using (new StaticScope(this))
                 {
                     callFunction();
-                    PumpTroopRosterSnapshots();
                 }
             }
         }
-    }
-
-    /// <summary>
-    /// Flushes the TroopRoster snapshot coalescer. It defers its sends to a per-frame pump that
-    /// CoopMod drives in the running game; the test harness has no frame loop, so pump it after each
-    /// call and received message, mirroring the game loop, so authoritative roster changes replicate
-    /// to the clients. No-op when no roster changed (or when this instance has no coalescer).
-    /// </summary>
-    private TroopRosterSyncCoalescer troopRosterCoalescer;
-
-    private void PumpTroopRosterSnapshots()
-    {
-        if (troopRosterCoalescer == null && !container.TryResolve(out troopRosterCoalescer)) return;
-
-        troopRosterCoalescer.Update(TimeSpan.Zero);
     }
 
     /// <summary>

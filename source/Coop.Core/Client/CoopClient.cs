@@ -6,7 +6,6 @@ using Common.PacketHandlers;
 using Common.Serialization;
 using Coop.Core.Client.Messages;
 using Coop.Core.Common.Network;
-using GameInterface;
 using GameInterface.Services.GameDebug.Messages;
 using LiteNetLib;
 using Serilog;
@@ -20,7 +19,7 @@ namespace Coop.Core.Client;
 /// <summary>
 /// Client used for Coop
 /// </summary>
-public interface ICoopClient : INetwork, IUpdateable, INetEventListener, IDisposable
+public interface ICoopClient : IRelayNetwork, IUpdateable, INetEventListener, IDisposable
 {
 }
 
@@ -28,7 +27,8 @@ public interface ICoopClient : INetwork, IUpdateable, INetEventListener, IDispos
 public class CoopClient : CoopNetworkBase, ICoopClient
 {
     public override int Priority => 0;
-    
+    public IPEndPoint ServerEndpoint { get; private set; }
+
     private static readonly ILogger Logger = LogManager.GetLogger<CoopClient>();
 
     private readonly IMessageBroker messageBroker;
@@ -36,8 +36,6 @@ public class CoopClient : CoopNetworkBase, ICoopClient
     private bool isConnected = false;
     private bool reconnectPending = false;
     private DateTime reconnectAfter = DateTime.MinValue;
-
-    private IPEndPoint connectEndPoint;
 
     public CoopClient(
         INetworkConfig config,
@@ -128,10 +126,10 @@ public class CoopClient : CoopNetworkBase, ICoopClient
         netManager.Start();
 
         var ip = ResolveConnectAddress(Config.Address, preferIPv6: false);
-        connectEndPoint = new IPEndPoint(ip, Config.Port);
+        ServerEndpoint = new IPEndPoint(ip, Config.Port);
 
-        Logger.Information("Attempting connection to {Endpoint}...", connectEndPoint);
-        netManager.Connect(connectEndPoint, Config.Token);
+        Logger.Information("Attempting connection to {Endpoint}...", ServerEndpoint);
+        netManager.Connect(ServerEndpoint, Config.Token);
     }
 
     private static IPAddress ResolveConnectAddress(string address, bool preferIPv6)
@@ -179,9 +177,9 @@ public class CoopClient : CoopNetworkBase, ICoopClient
         {
             reconnectPending = false;
 
-            messageBroker.Publish(this, new SendInformationMessage($"Retrying connection to {connectEndPoint}..."));
-            Logger.Information("Retrying connection to {Endpoint}...", connectEndPoint);
-            netManager.Connect(connectEndPoint, Config.Token);
+            messageBroker.Publish(this, new SendInformationMessage($"Retrying connection to {ServerEndpoint}..."));
+            Logger.Information("Retrying connection to {Endpoint}...", ServerEndpoint);
+            netManager.Connect(ServerEndpoint, Config.Token);
         }
     }
 

@@ -8,7 +8,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.Threading;
-using TaleWorlds.Library;
 
 namespace Coop.Tests.Mocks;
 

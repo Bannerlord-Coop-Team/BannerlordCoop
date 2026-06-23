@@ -1,5 +1,4 @@
-﻿using Common;
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Smithing.Messages;

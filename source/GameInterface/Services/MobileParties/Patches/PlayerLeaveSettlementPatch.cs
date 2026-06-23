@@ -1,12 +1,9 @@
 ﻿using Common.Messaging;
-using Common.Util;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
 using System.Collections.Generic;
 using System.Reflection;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Patches;

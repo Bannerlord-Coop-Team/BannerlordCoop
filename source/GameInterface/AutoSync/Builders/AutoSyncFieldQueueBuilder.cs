@@ -1,5 +1,4 @@
 ﻿using GameInterface.AutoSync.Templates;
-using GameInterface.Services.ObjectManager;
 using ProtoBuf.Meta;
 using System;
 using System.Collections.Generic;
@@ -112,7 +111,8 @@ public class AutoSyncFieldQueueBuilder : AutoSyncBuilderBase
         var serializers = GetSerializerMethodNames(GetElementType(fieldInfo.FieldType));
         return new
         {
-            MemberDeclaringType = fieldInfo.DeclaringType.Name,
+            MemberDeclaringType = AutoSyncUtils.GetSimpleTypeName(fieldInfo.DeclaringType),
+            MemberDeclaringTypeName = AutoSyncUtils.GetSimpleTypeName(fieldInfo.DeclaringType).Replace(".", "_"),
             MemberName = fieldInfo.Name,
             MemberType = GetQueueTypeNames(fieldInfo.FieldType),
             ElementType = GetElementType(fieldInfo.FieldType).Name,

@@ -1,7 +1,6 @@
-using Coop.IntegrationTests.Environment.Instance;
 using Coop.IntegrationTests.Environment;
+using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.ItemRosters.Messages;
-
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 namespace Coop.IntegrationTests.ItemRosters

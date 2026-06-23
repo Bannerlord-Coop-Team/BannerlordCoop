@@ -1,12 +1,11 @@
 ﻿using Autofac;
+using Common.Serialization;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Tests.Bootstrap.Modules;
-using GameInterface.Tests.Bootstrap;
 using System;
 using Xunit;
 using static TaleWorlds.Core.HorseComponent;
-using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

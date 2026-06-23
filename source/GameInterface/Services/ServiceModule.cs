@@ -1,6 +1,5 @@
 ﻿using Autofac;
 using Common.Audit;
-using Common.Extensions;
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
@@ -19,10 +18,6 @@ internal class ServiceModule : Module
 
     protected override void Load(ContainerBuilder builder)
     {
-        // One per session, shared between the handler that marks rosters dirty and the main loop that
-        // drives its per-frame flush.
-        builder.RegisterType<TroopRosters.TroopRosterSyncCoalescer>().AsSelf().InstancePerLifetimeScope();
-
         foreach (var type in GetHandlers())
         {
             builder.RegisterType(type).AsSelf().InstancePerLifetimeScope().AutoActivate();
@@ -77,7 +72,8 @@ internal class ServiceModule : Module
     private IEnumerable<Type> GetGameAbstractions() => InterfaceCollector.GetInterfaces<IGameAbstraction>(NAMESPACE);
 
     // Namespace is needed to separate client and server handlers being registered with DI
-    private IEnumerable<Type> GetAuditors() => InterfaceCollector.GetInterfaces<IAuditor>(NAMESPACE);
+    private IEnumerable<Type> GetAuditors() =>
+        InterfaceCollector.GetInterfaces<IAuditor>(NAMESPACE);
 
     
 }

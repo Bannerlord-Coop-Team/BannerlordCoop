@@ -1,6 +1,5 @@
 ﻿using System;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Serialization.External
 {

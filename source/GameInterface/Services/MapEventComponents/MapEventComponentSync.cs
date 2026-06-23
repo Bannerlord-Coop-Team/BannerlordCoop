@@ -1,8 +1,5 @@
 ﻿using GameInterface.AutoSync;
 using HarmonyLib;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.Services.MapEventComponents;

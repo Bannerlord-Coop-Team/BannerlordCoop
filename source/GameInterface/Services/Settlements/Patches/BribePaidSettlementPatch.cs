@@ -6,9 +6,6 @@ using GameInterface.Policies;
 using GameInterface.Services.Settlements.Messages;
 using HarmonyLib;
 using Serilog;
-using Serilog.Core;
-using System;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Settlements.Patches;

@@ -6,7 +6,6 @@ using Common.Util;
 using GameInterface.Services.MobilePartyAIs.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using Serilog.Core;
 using System;
 using TaleWorlds.CampaignSystem.Party;
 

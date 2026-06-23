@@ -1,9 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Network;
-using Coop.Core.Client.Services.MobileParties.Messages;
-using Coop.Core.Server.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Packets;
-using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 
@@ -26,47 +23,16 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers
             this.network = network;
             this.objectManager = objectManager;
             messageBroker.Subscribe<ControlledPartyBehaviorUpdated>(Handle);
-
-            // client who requests it
-            messageBroker.Subscribe<ChangedWagePaymentLimit>(HandleChangedWagePaymentLimit);
-            // other clients
-            messageBroker.Subscribe<NetworkChangeWagePaymentLimit>(HandleChangeWageOtherClients);
         }
-
-        private void HandleChangeWageOtherClients(MessagePayload<NetworkChangeWagePaymentLimit> payload)
-        {
-            var obj = payload.What;
-
-            var message = new WagePaymentApprovedOthers(obj.MobilePartyId, obj.WageAmount);
-
-            messageBroker.Publish(this, message);
-        }
-
 
         internal void Handle(MessagePayload<ControlledPartyBehaviorUpdated> obj)
         {
             network.SendAll(new RequestMobilePartyBehaviorPacket(obj.What.BehaviorUpdateData));
         }
 
-        private void HandleChangedWagePaymentLimit(MessagePayload<ChangedWagePaymentLimit> payload)
-        {
-            var obj = payload.What;
-
-            if (!objectManager.TryGetIdWithLogging(obj.MobileParty, out var mobilePartyId)) return;
-
-            var message = new NetworkChangeWagePaymentLimitRequest(mobilePartyId, obj.WageAmount);
-            network.SendAll(message);
-        }
-
         public void Dispose()
         {
             messageBroker.Unsubscribe<ControlledPartyBehaviorUpdated>(Handle);
-
-            messageBroker.Unsubscribe<ChangedWagePaymentLimit>(HandleChangedWagePaymentLimit);
-
-            //Transpiler
-            // other clients
-            messageBroker.Unsubscribe<NetworkChangeWagePaymentLimit>(HandleChangeWageOtherClients);
         }
     }
 }

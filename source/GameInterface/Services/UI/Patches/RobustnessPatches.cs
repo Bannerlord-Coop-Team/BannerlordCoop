@@ -1,15 +1,11 @@
 ﻿using Common.Logging;
-using Common.Util;
-using GameInterface.Services.Inventory.Handlers;
 using HarmonyLib;
-using Helpers;
 using SandBox.View.Missions;
-using SandBox.ViewModelCollection.Map;
+using SandBox.ViewModelCollection.Nameplate;
 using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Text;
 using TaleWorlds.GauntletUI.Data;
 
 namespace GameInterface.Services.UI.Patches;
@@ -23,6 +19,7 @@ internal class RobustnessPatches
     {
         AccessTools.Method(typeof(GauntletMovie), nameof(GauntletMovie.LoadMovie)),
         AccessTools.Method(typeof(MissionAudienceHandler), nameof(MissionAudienceHandler.SpawnAudienceAgents)),
+        AccessTools.Method(typeof(PartyNameplateVM), nameof(PartyNameplateVM.RefreshDynamicProperties))
     };
 
     [HarmonyFinalizer]

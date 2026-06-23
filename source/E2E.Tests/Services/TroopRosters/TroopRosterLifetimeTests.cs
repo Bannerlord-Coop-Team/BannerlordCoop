@@ -1,12 +1,6 @@
 ﻿using E2E.Tests.Environment;
 using E2E.Tests.Util;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem.Roster;
-using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.TroopRosters
@@ -35,8 +29,7 @@ namespace E2E.Tests.Services.TroopRosters
             server.Call(() =>
             {
                 TroopRoster troopRoster = GameObjectCreator.CreateInitializedObject<TroopRoster>();
-                var TroopRoster = new TroopRoster();
-                Assert.True(server.ObjectManager.TryGetId(TroopRoster, out RosterId));
+                Assert.True(server.ObjectManager.TryGetId(troopRoster, out RosterId));
             });
 
             // Assert
@@ -58,9 +51,8 @@ namespace E2E.Tests.Services.TroopRosters
             string? TroopRosterId = null;
             client1.Call(() =>
             {
-                TroopRoster settlement = GameObjectCreator.CreateInitializedObject<TroopRoster>();
-                var Roster = new TroopRoster();
-                Assert.False(client1.ObjectManager.TryGetId(Roster, out TroopRosterId));
+                TroopRoster roster = GameObjectCreator.CreateInitializedObject<TroopRoster>();
+                Assert.False(client1.ObjectManager.TryGetId(roster, out TroopRosterId));
             });
 
             // Assert

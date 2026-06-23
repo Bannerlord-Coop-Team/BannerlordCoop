@@ -2,15 +2,11 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Common.Util;
-using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Equipments.Messages;
+using GameInterface.Services.ObjectManager;
 using Serilog;
-using TaleWorlds.Core;
 using System;
-using HarmonyLib;
-using System.Reflection;
-using System.Diagnostics;
+using TaleWorlds.Core;
 
 
 namespace GameInterface.Services.Equipments.Handlers

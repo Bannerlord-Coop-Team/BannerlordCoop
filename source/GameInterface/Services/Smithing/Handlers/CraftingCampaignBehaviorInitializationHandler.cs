@@ -12,7 +12,6 @@ using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.Core;
-using TaleWorlds.Library;
 
 namespace GameInterface.Services.Smithing.Handlers
 {

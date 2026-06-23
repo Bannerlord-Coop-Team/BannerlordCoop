@@ -1,12 +1,9 @@
 ﻿using Common;
 using Common.Util;
-using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
-using SandBox.GauntletUI.Map;
 using Serilog;
-using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -36,6 +33,8 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
     // inlines into MapEvent.Update, so a postfix on it never runs and the destroy is never replicated.
     public override IEnumerable<MethodBase> DestroyMethods => new MethodBase[]
     {
+        AccessTools.Method(typeof(MapEvent), nameof(MapEvent.FinishBattle)),
+        AccessTools.Method(typeof(MapEvent), nameof(MapEvent.FinalizeEvent)),
         AccessTools.Method(typeof(MapEvent), nameof(MapEvent.FinalizeEventAux))
     };
 
@@ -75,6 +74,9 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
     {
         GameThread.Run(() =>
         {
+            // Captured before FinishBattle clears it; kept for the debug log only — the PvP encounter close is now
+            // driven server-side via NetworkClosePvpEncounter, not from this teardown.
+            bool localPartyWasInvolved = MobileParty.MainParty?.MapEvent == obj;
             // The action is deferred, so the campaign can be torn down (disconnect, save-load) before it runs.
             if (Campaign.Current == null) return;
 
@@ -112,6 +114,13 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
                 // Drop the finalized event from the manager's tick list.
                 Campaign.Current.MapEventManager.Tick();
             }
+
+            Logger.Debug("[MapEvent] {Who}: OnClientDestroyed {Id}: involved={Involved} mainPartyMapEvent={Me} menu={Menu}",
+                Hero.MainHero?.Name?.ToString() ?? "?",
+                id,
+                localPartyWasInvolved,
+                MobileParty.MainParty?.MapEvent != null,
+                Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "<none>");
         });
     }
 
