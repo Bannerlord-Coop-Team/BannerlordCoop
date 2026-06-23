@@ -5,6 +5,9 @@ using Xunit;
 
 namespace GameInterface.Tests.Serialization;
 
+/// <summary>
+/// Verifies <see cref="NetworkCreatePartyVisual"/> survives a ProtoBuf round-trip with both ids intact.
+/// </summary>
 public class NetworkCreatePartyVisualSerializationTest
 {
     [Fact]
