@@ -6,10 +6,16 @@ using GameInterface.Policies;
 using GameInterface.Services.Kingdoms.Extentions;
 using GameInterface.Services.Kingdoms.Messages;
 using HarmonyLib;
+using Serilog.Core;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Election;
+using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.Kingdoms.Patches
 {
@@ -155,6 +161,41 @@ namespace GameInterface.Services.Kingdoms.Patches
                     }
                 }
             }, true);
+        }
+        [HarmonyPatch(nameof(Kingdom.CreateArmy))]
+        [HarmonyPrefix]
+        public static bool CreateArmyPrefix(Kingdom __instance, Hero armyLeader, Settlement targetSettlement, Army.ArmyTypes selectedArmyType, MBReadOnlyList<MobileParty> partiesToCallToArmy)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+            if (ModInformation.IsClient)
+            {
+                return false; 
+            }
+
+            if (!armyLeader.IsActive)
+            {
+                return false;
+            }
+
+            if (((armyLeader != null) ? armyLeader.PartyBelongedTo.LeaderHero : null) != null)
+            {
+                Army army = new Army(__instance, armyLeader.PartyBelongedTo, selectedArmyType);
+                army.Gather(targetSettlement, partiesToCallToArmy);
+                CampaignEventDispatcher.Instance.OnArmyCreated(army);
+            }
+
+            if (armyLeader == Hero.MainHero)
+            {
+                MapState mapState = Game.Current.GameStateManager.GameStates.Single((TaleWorlds.Core.GameState S) => S is MapState) as MapState;
+                if (mapState == null)
+                {
+                    return false;
+                }
+                mapState.OnArmyCreated(MobileParty.MainParty);
+            }
+
+            return false;
         }
     }
 }

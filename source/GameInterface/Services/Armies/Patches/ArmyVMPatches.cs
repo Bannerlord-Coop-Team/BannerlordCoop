@@ -17,28 +17,59 @@ namespace GameInterface.Services.Armies.Patches;
 [HarmonyPatch(typeof(ArmyManagementVM), nameof(ArmyManagementVM.ExecuteDone))]
 internal class ArmyManagementVMExecuteDonePatch
 {
-    private static ILogger Logger = LogManager.GetLogger<ArmyManagementVM>();
     [HarmonyPrefix]
     static bool Prefix(ArmyManagementVM __instance)
     {
-        if (!MobileParty.MainParty.MapFaction.IsKingdomFaction) return true;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (!ModInformation.IsClient) return true; 
 
-        var parties = __instance.PartiesInCart
-            .Where(p => p.Party != MobileParty.MainParty)
-            .Select(p => p.Party)
-            .ToList();
+        if (!__instance.CanAffordInfluenceCost) return false;
 
-        var message = new PlayerCreatedArmy(
-            (Kingdom)MobileParty.MainParty.MapFaction,
-            Hero.MainHero,
-            Hero.MainHero.HomeSettlement,
-            Army.ArmyTypes.Defender,
-            parties
-        );
+        if (__instance.PartiesInCart.Count == 1 && __instance.PartiesInCart[0].IsMainHero)
+        {
+            __instance.ExecuteDisbandArmy();
+            return false;
+        }
 
-        MessageBroker.Instance.Publish(__instance, message);
+        if (__instance.NewCohesion > __instance.Cohesion)
+        {
+            __instance.ApplyCohesionChange();
+        }
 
-        ChangeClanInfluenceAction.Apply(Clan.PlayerClan, (float)(-__instance.TotalCost));
+        if (__instance.PartiesInCart.Count > 1 && MobileParty.MainParty.MapFaction.IsKingdomFaction)
+        {
+            var parties = __instance.PartiesInCart
+                .Where(p => p.Party != MobileParty.MainParty)
+                .Select(p => p.Party)
+                .ToList();
+
+            if (MobileParty.MainParty.Army == null)
+            {
+                MessageBroker.Instance.Publish(__instance, new PlayerCreatedArmy(
+                    (Kingdom)MobileParty.MainParty.MapFaction,
+                    Hero.MainHero,
+                    Hero.MainHero.HomeSettlement,
+                    Army.ArmyTypes.Defender,
+                    parties));
+            }
+            else
+            {
+                MessageBroker.Instance.Publish(__instance, new PlayerAddedPartiesToArmy(
+                    MobileParty.MainParty.Army,
+                    parties));
+            }
+
+            ChangeClanInfluenceAction.Apply(Clan.PlayerClan, (float)(-(float)(__instance.TotalCost - __instance._influenceSpentForCohesionBoosting)));
+        }
+
+        if (__instance._partiesToRemove.Count > 0)
+        {
+            var removeIds = __instance._partiesToRemove.Select(p => p.Party).ToList();
+
+            MessageBroker.Instance.Publish(__instance, new PlayerRemovedPartiesFromArmy(removeIds));
+
+            __instance._partiesToRemove.Clear();
+        }
 
         __instance._onClose();
         CampaignEventDispatcher.Instance.OnArmyOverlaySetDirty();

@@ -41,6 +41,10 @@ public class ArmyHandler : IHandler
         messageBroker.Subscribe<NetworkSetArmyAiBehaviorObject>(HandleNetworkSetArmyAiBehaviorObject);
         messageBroker.Subscribe<PlayerCreatedArmy>(HandlePlayerCreatedArmy);
         messageBroker.Subscribe<NetworkPlayerCreatedArmy>(HandleNetworkPlayerCreatedArmy);
+        messageBroker.Subscribe<PlayerAddedPartiesToArmy>(HandlePlayerAddedPartiesToArmy);
+        messageBroker.Subscribe<NetworkPlayerAddedPartiesToArmy>(HandleNetworkPlayerAddedPartiesToArmy);
+        messageBroker.Subscribe<PlayerRemovedPartiesFromArmy>(HandlePlayerRemovedPartiesFromArmy);
+        messageBroker.Subscribe<NetworkPlayerRemovedPartiesFromArmy>(HandleNetworkPlayerRemovedPartiesFromArmy);
     }
 
     public void Dispose()
@@ -53,6 +57,10 @@ public class ArmyHandler : IHandler
         messageBroker.Unsubscribe<NetworkSetArmyAiBehaviorObject>(HandleNetworkSetArmyAiBehaviorObject);
         messageBroker.Unsubscribe<PlayerCreatedArmy>(HandlePlayerCreatedArmy);
         messageBroker.Unsubscribe<NetworkPlayerCreatedArmy>(HandleNetworkPlayerCreatedArmy);
+        messageBroker.Unsubscribe<PlayerAddedPartiesToArmy>(HandlePlayerAddedPartiesToArmy);
+        messageBroker.Unsubscribe<NetworkPlayerAddedPartiesToArmy>(HandleNetworkPlayerAddedPartiesToArmy);
+        messageBroker.Unsubscribe<PlayerRemovedPartiesFromArmy>(HandlePlayerRemovedPartiesFromArmy);
+        messageBroker.Unsubscribe<NetworkPlayerRemovedPartiesFromArmy>(HandleNetworkPlayerRemovedPartiesFromArmy);
     }
 
     private void HandleAddMobilePartyInArmy(MessagePayload<MobilePartyInArmyAdded> obj)
@@ -183,6 +191,88 @@ public class ArmyHandler : IHandler
             catch (Exception ex)
             {
                 Logger.Error(ex, "CreateArmy failed");
+            }
+        });
+    }
+    private void HandlePlayerAddedPartiesToArmy(MessagePayload<PlayerAddedPartiesToArmy> payload)
+    {
+        var obj = payload.What;
+        if (!objectManager.TryGetIdWithLogging(obj.Army, out var armyId)) return;
+
+        var partyIds = new List<string>();
+        foreach (var party in obj.Parties)
+        {
+            if (!objectManager.TryGetIdWithLogging(party, out var partyId)) return;
+            partyIds.Add(partyId);
+        }
+
+        network.SendAll(new NetworkPlayerAddedPartiesToArmy(armyId, partyIds));
+    }
+
+    private void HandleNetworkPlayerAddedPartiesToArmy(MessagePayload<NetworkPlayerAddedPartiesToArmy> payload)
+    {
+        var obj = payload.What;
+        if (!objectManager.TryGetObjectWithLogging<Army>(obj.ArmyId, out var army)) return;
+
+        var parties = new List<MobileParty>();
+        foreach (var partyId in obj.PartyIds)
+        {
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(partyId, out var party)) return;
+            parties.Add(party);
+        }
+
+        GameThread.RunSafe(() =>
+        {
+            try
+            {
+                foreach (var party in parties)
+                {
+                    party.Army = army;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Failed to add parties to army");
+            }
+        });
+    }
+    private void HandlePlayerRemovedPartiesFromArmy(MessagePayload<PlayerRemovedPartiesFromArmy> payload)
+    {
+        var obj = payload.What;
+
+        var partyIds = new List<string>();
+        foreach (var party in obj.Parties)
+        {
+            if (!objectManager.TryGetIdWithLogging(party, out var partyId)) return;
+            partyIds.Add(partyId);
+        }
+
+        network.SendAll(new NetworkPlayerRemovedPartiesFromArmy(partyIds));
+    }
+
+    private void HandleNetworkPlayerRemovedPartiesFromArmy(MessagePayload<NetworkPlayerRemovedPartiesFromArmy> payload)
+    {
+        var obj = payload.What;
+
+        var parties = new List<MobileParty>();
+        foreach (var partyId in obj.PartyIds)
+        {
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(partyId, out var party)) return;
+            parties.Add(party);
+        }
+
+        GameThread.RunSafe(() =>
+        {
+            try
+            {
+                foreach (var party in parties)
+                {
+                    party.Army = null;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Failed to remove parties from army");
             }
         });
     }
