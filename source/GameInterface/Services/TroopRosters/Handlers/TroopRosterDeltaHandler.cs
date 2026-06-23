@@ -73,8 +73,6 @@ internal class TroopRosterDeltaHandler : IHandler
         messageBroker.Unsubscribe<NetworkTroopRosterRemoveZeroCounts>(Handle_NetworkRemoveZeroCounts);
     }
 
-    #region Authority send path
-
     private void Handle_CountsAtIndexAdded(MessagePayload<CountsAtIndexAdded> payload)
     {
         var e = payload.What;
@@ -123,10 +121,6 @@ internal class TroopRosterDeltaHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(roster, out rosterId)) return false;
         return objectManager.TryGetIdWithLogging(character, out characterId);
     }
-
-    #endregion
-
-    #region Client apply path
 
     private void Handle_NetworkAddCounts(MessagePayload<NetworkTroopRosterAddCounts> payload)
     {
@@ -220,6 +214,4 @@ internal class TroopRosterDeltaHandler : IHandler
             apply(roster, index);
         });
     }
-
-    #endregion
 }
