@@ -11,7 +11,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
 
-namespace GameInterface.Services.Caravans;
+namespace GameInterface.Services.Caravans.Handlers;
 
 internal class CaravansCampaignBehaviorInitializationHandler
 {
@@ -59,6 +59,7 @@ internal class CaravansCampaignBehaviorInitializationHandler
 
         caravansCampaignBehavior._prohibitedKingdomsForPlayerCaravans = GetProhibitedKingdoms(playerHeroId);
         caravansCampaignBehavior._interactedCaravans = GetInteractedCaravans(playerHeroId);
+        caravansCampaignBehavior._tradeRumorTakenCaravans = GetTradeRumorTakenCaravans(playerHeroId);
 
         network.SendAll(new NetworkInitializeServerCaravansDataKeys(playerHeroId));
     }
@@ -100,5 +101,22 @@ internal class CaravansCampaignBehaviorInitializationHandler
         }
 
         return interactedCaravans;
+    }
+
+    private Dictionary<MobileParty, CampaignTime> GetTradeRumorTakenCaravans(string playerHeroId)
+    {
+        var tradeRumorTakenCaravans = new Dictionary<MobileParty, CampaignTime>();
+
+        // Null and key check for players without existing caravans data
+        if (caravansPlayerData?.PlayerTradeRumorTakenCaravans?.ContainsKey(playerHeroId) != true) return tradeRumorTakenCaravans;
+
+        foreach (KeyValuePair<string, CampaignTime> tradeRumorTakenCaravan in caravansPlayerData.PlayerTradeRumorTakenCaravans[playerHeroId])
+        {
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(tradeRumorTakenCaravan.Key, out var caravan)) continue;
+
+            tradeRumorTakenCaravans[caravan] = tradeRumorTakenCaravan.Value;
+        }
+
+        return tradeRumorTakenCaravans;
     }
 }

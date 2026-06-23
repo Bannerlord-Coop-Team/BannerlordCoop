@@ -5,7 +5,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Caravans.Messages;
 
-public readonly struct PlayerClanCaravanFormed : IEvent
+public readonly struct FormPlayerClanCaravan : IEvent
 {
     public readonly Hero MainHero;
     public readonly Hero CaravanLeader;
@@ -14,7 +14,7 @@ public readonly struct PlayerClanCaravanFormed : IEvent
     public readonly bool ShouldCreateConvoy;
     public readonly int GoldCost;
 
-    public PlayerClanCaravanFormed(
+    public FormPlayerClanCaravan(
         Hero mainHero,
         Hero caravanLeader,
         Settlement currentSettlement,
@@ -32,7 +32,7 @@ public readonly struct PlayerClanCaravanFormed : IEvent
 }
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct FormPlayerClanCaravan : ICommand
+internal readonly struct NetworkFormPlayerClanCaravan : ICommand
 {
     [ProtoMember(1)]
     public readonly string MainHeroId;
@@ -52,7 +52,7 @@ internal readonly struct FormPlayerClanCaravan : ICommand
     [ProtoMember(6)]
     public readonly int GoldCost;
 
-    public FormPlayerClanCaravan(
+    public NetworkFormPlayerClanCaravan(
         string mainHeroId,
         string caravanLeaderId,
         string currentSettlementId,
@@ -66,5 +66,17 @@ internal readonly struct FormPlayerClanCaravan : ICommand
         IsElite = isElite;
         ShouldCreateConvoy = shouldCreateConvoy;
         GoldCost = goldCost;
+    }
+}
+
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct NetworkFadeOutNewCaravanLeader : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string CaravanLeaderId;
+
+    public NetworkFadeOutNewCaravanLeader(string caravanLeaderId)
+    {
+        CaravanLeaderId = caravanLeaderId;
     }
 }
