@@ -58,7 +58,7 @@ internal class SaveGameHandler : IHandler
         workshopPlayerData ??= new(new());
 
         CaravansPlayerData caravansPlayerData = coopSessionProvider.CoopSession.CaravansPlayerData;
-        caravansPlayerData ??= new(new(), new());
+        caravansPlayerData ??= new(new(), new(), new());
 
         CoopSession session = new CoopSession(saveName, playerRegistry.Players.ToArray(), craftingPlayerData, workshopPlayerData, caravansPlayerData);
         coopSessionProvider.CoopSession = session;
@@ -77,7 +77,7 @@ internal class SaveGameHandler : IHandler
                 new Player[0],
                 new CraftingPlayerData(new(), new(), new()),
                 new WorkshopPlayerData(new()),
-                new CaravansPlayerData(new(), new()));
+                new CaravansPlayerData(new(), new(), new()));
         }
         coopSessionProvider.CoopSession = savedSession;
     }

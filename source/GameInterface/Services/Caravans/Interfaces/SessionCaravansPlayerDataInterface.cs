@@ -1,11 +1,14 @@
 ﻿using Common.Logging;
 using GameInterface.CoopSessionData;
+using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Serilog;
+using System.Collections;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Caravans.Interfaces;
 
@@ -17,7 +20,8 @@ public interface ISessionCaravansPlayerDataInterface : IGameAbstraction
     void SetPlayerInteraction(string playerHeroId, string mobilePartyId, CaravansCampaignBehavior.PlayerInteraction interaction);
     void RemoveInteractedCaravanForAllPlayers(string mobilePartyId);
     void UpdateTradeRumorTakenCaravansForPlayer(string playerHeroId, Dictionary<string, CampaignTime> tradeRumorTakenCaravansIds);
-    bool CanTradeWith(IFaction caravanFaction, IFaction targetFaction);
+    void DeleteExpiredTradeRumorTakenCaravans(out Dictionary<string, List<string>> playerExpiredCaravansRemovalLists);
+    bool CanTradeWith(IFaction caravanFaction, IFaction targetFaction, MobileParty mobileParty);
     void AddPlayerKeys(string playerHeroId);
 }
 
@@ -98,22 +102,48 @@ public class SessionCaravansPlayerDataInterface : ISessionCaravansPlayerDataInte
         CaravansPlayerData.PlayerTradeRumorTakenCaravans[playerHeroId] = tradeRumorTakenCaravansIds;
     }
 
-    public bool CanTradeWith(IFaction caravanFaction, IFaction targetFaction)
+    public void DeleteExpiredTradeRumorTakenCaravans(out Dictionary<string, List<string>> playerExpiredCaravansRemovalLists)
     {
-        // TODO: Implement this properly
-
-        /*
-        bool isPlayerFaction = false;
-        foreach (var player in playerManager.Players)
+        playerExpiredCaravansRemovalLists = new();
+        foreach (var playerTradeRumourTakenCaravan in CaravansPlayerData.PlayerTradeRumorTakenCaravans)
         {
-            
-        }
+            var removalList = new List<string>();
+            foreach (var tradeRumorTakenCaravan in playerTradeRumourTakenCaravan.Value)
+            {
+                if (CampaignTime.Now - tradeRumorTakenCaravan.Value >= CampaignTime.Days(1f))
+                {
+                    removalList.Add(tradeRumorTakenCaravan.Key);
+                }
+            }
 
-        Kingdom item;
-        return !caravanFaction.IsAtWarWith(targetFaction)
-            && (caravanFaction != Hero.MainHero.MapFaction || (item = (targetFaction as Kingdom)) == null || !this._prohibitedKingdomsForPlayerCaravans.Contains(item));
-        */
-        return false;
+            playerExpiredCaravansRemovalLists.Add(playerTradeRumourTakenCaravan.Key, removalList);
+
+            foreach (string mobilePartyId in removalList)
+            {
+                CaravansPlayerData.PlayerTradeRumorTakenCaravans[playerTradeRumourTakenCaravan.Key].Remove(mobilePartyId);
+            }
+        }
+    }
+
+    public bool CanTradeWith(IFaction caravanFaction, IFaction targetFaction, MobileParty mobileParty)
+    {
+        if (mobileParty == null || caravanFaction.IsAtWarWith(targetFaction))
+            return false;
+        
+        // Allow AI caravans to trade as long as they are not at war with the target faction
+        bool isPlayerCaravan = mobileParty.ActualClan.IsPlayerClan();
+        if (!isPlayerCaravan)
+            return true;
+
+        // Allow player caravans to trade with non-kingdom factions (e.g. independent clans who own settlements)
+        if (targetFaction is not Kingdom kingdom)
+            return true;
+
+        if (!objectManager.TryGetIdWithLogging(mobileParty.ActualClan.Leader, out var playerHeroId) || !IsPlayerHeroIdValid(playerHeroId)) return false;
+        if (!objectManager.TryGetIdWithLogging(kingdom, out var kingdomId)) return false;
+
+        // Prevent trading if the caravan's player owner has prohibited trading with this kingdom
+        return !CaravansPlayerData.PlayerProhibitedKingdomsForPlayerCaravans[playerHeroId].Contains(kingdomId);
     }
 
     public void AddPlayerKeys(string playerHeroId)

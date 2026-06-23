@@ -45,7 +45,7 @@ namespace Coop.Tests.Server.Services.Save
                 players,
                 new CraftingPlayerData(new(), new(), new()),
                 new WorkshopPlayerData(new()),
-                new CaravansPlayerData(new(), new()));
+                new CaravansPlayerData(new(), new(), new()));
 
             string saveFile = sessionData.UniqueGameId;
 
@@ -83,7 +83,7 @@ namespace Coop.Tests.Server.Services.Save
                 players,
                 new CraftingPlayerData(new(), new(), new()),
                 new WorkshopPlayerData(new()),
-                new CaravansPlayerData(new(), new()));
+                new CaravansPlayerData(new(), new(), new()));
 
             string saveFile = SAVE_PATH + sessionData.UniqueGameId;
 

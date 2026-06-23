@@ -235,6 +235,9 @@ internal class CaravansConversationsHandler : IHandler
             BeHostileAction.ApplyMinorCoercionHostileAction(mainParty.Party, conversationParty.Party);
             GetCaravansBehavior()._lootedCaravans.Add(conversationParty, CampaignTime.Now);
             SkillLevelingManager.OnLoot(mainParty, conversationParty, itemRoster, false);
+
+            // Update _lootedCaravans on all clients
+            network.SendAll(new NetworkAddToLootedCaravans(obj.What.ConversationPartyId, CampaignTime.Now));
         });
         sessionCaravansPlayerDataInterface.SetPlayerInteraction(obj.What.MainHeroId, obj.What.ConversationPartyId, CaravansCampaignBehavior.PlayerInteraction.Hostile);
     }
@@ -269,6 +272,9 @@ internal class CaravansConversationsHandler : IHandler
             BeHostileAction.ApplyMajorCoercionHostileAction(mainParty.Party, conversationParty.Party);
             GetCaravansBehavior()._lootedCaravans.Add(conversationParty, CampaignTime.Now);
             SkillLevelingManager.OnLoot(mainParty, conversationParty, conversationParty.ItemRoster, false);
+
+            // Update _lootedCaravans on all clients
+            network.SendAll(new NetworkAddToLootedCaravans(obj.What.ConversationPartyId, CampaignTime.Now));
         });
     }
 
