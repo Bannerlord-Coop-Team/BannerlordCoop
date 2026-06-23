@@ -21,7 +21,6 @@ internal class ArmyManagementVMExecuteDonePatch
     [HarmonyPrefix]
     static bool Prefix(ArmyManagementVM __instance)
     {
-        if (MobileParty.MainParty.Army != null) return true;
         if (!MobileParty.MainParty.MapFaction.IsKingdomFaction) return true;
 
         var parties = __instance.PartiesInCart

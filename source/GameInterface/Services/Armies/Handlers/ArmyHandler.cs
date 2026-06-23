@@ -169,7 +169,9 @@ public class ArmyHandler : IHandler
         {
             try
             {
-                kingdom.CreateArmy(leader, targetSettlement, armyType);
+                if (leader.PartyBelongedTo?.Army == null)
+                    kingdom.CreateArmy(leader, targetSettlement, armyType);
+
                 var army = leader.PartyBelongedTo?.Army;
                 if (army == null) return;
 
