@@ -44,7 +44,8 @@ public class NetworkPlayerPartyInteractionSerializationTest
             initiatorAcceptedTrade: true,
             responderAcceptedTrade: false,
             partyItems: new[] { new ItemRosterElementData(new ItemObjectData("party-item", null, itemModifierNull: true), 3) },
-            otherPartyItems: new[] { new ItemRosterElementData(new ItemObjectData("other-item", null, itemModifierNull: true), 4) });
+            otherPartyItems: new[] { new ItemRosterElementData(new ItemObjectData("other-item", null, itemModifierNull: true), 4) },
+            enabledOptions: new[] { PlayerPartyInteractionOption.AcceptProposal });
 
         var result = RoundTrip(original);
 
@@ -55,6 +56,7 @@ public class NetworkPlayerPartyInteractionSerializationTest
         Assert.Equal(original.Phase, result.Phase);
         Assert.Equal(original.Proposal, result.Proposal);
         Assert.Equal(original.Options, result.Options);
+        Assert.Equal(original.EnabledOptions, result.EnabledOptions);
         Assert.Equal(original.IsInitiator, result.IsInitiator);
         Assert.Equal(original.InitiatorAcceptedTrade, result.InitiatorAcceptedTrade);
         Assert.Equal(original.ResponderAcceptedTrade, result.ResponderAcceptedTrade);

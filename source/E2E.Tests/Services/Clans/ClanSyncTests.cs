@@ -1,4 +1,6 @@
-﻿using E2E.Tests.Util;
+﻿using Common.Messaging;
+using E2E.Tests.Util;
+using GameInterface.Services.Clans.Messages;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
@@ -73,8 +75,29 @@ namespace E2E.Tests.Services.Clans
             TestEnvironment.AssertProperty<Clan, uint>(nameof(Clan.BannerBackgroundColorSecondary), 654);
             TestEnvironment.AssertProperty<Clan, uint>(nameof(Clan.BannerIconColor),765);
             //TestEnvironment.AssertProperty<Clan, bool>(nameof(Clan._midPointCalculated), true);
-            TestEnvironment.AssertProperty<Clan, float>(nameof(Clan.Renown), 20f);
+            // Clan.Renown is not AutoSynced as a property (its setter is JIT-inlined into its writers); it is
+            // replicated from the server via ClanRenownChanged. See Server_ClanRenown_SyncsToClients below.
             TestEnvironment.AssertProperty<Clan, CampaignTime>(nameof(Clan.NotAttackableByPlayerUntilTime), new CampaignTime(7644567));
+        }
+
+        [Fact]
+        public void Server_ClanRenown_SyncsToClients()
+        {
+            // Renown can't be AutoSynced through the property setter (it's inlined into Clan.AddRenown /
+            // ResetClanRenown), so the server publishes ClanRenownChanged from those writers (ClanRenownPatch)
+            // and clients apply it. Drive that publish and assert clients converge on the server's value.
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject(ClanId, out Clan clan));
+                clan.Renown = 20f;
+                MessageBroker.Instance.Publish(clan, new ClanRenownChanged(ClanId, clan.Renown));
+            });
+
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject(ClanId, out Clan clan));
+                Assert.Equal(20f, clan.Renown);
+            }
         }
     }
 }

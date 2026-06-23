@@ -44,7 +44,9 @@ internal class ClanSync : IAutoSync
         AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.BannerBackgroundColorPrimary)));
         AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.BannerBackgroundColorSecondary)));
         AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.BannerIconColor)));
-        AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.Renown)));
+        // Clan.Renown is intentionally not AutoSynced here: its trivial auto-property setter gets JIT-inlined into
+        // its writers (Clan.AddRenown / ResetClanRenown), so a setter prefix never fires. Renown is replicated
+        // from those writer methods instead (ClanRenownPatch + ClanRenownHandler).
         AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.NotAttackableByPlayerUntilTime)));
     }
 }
