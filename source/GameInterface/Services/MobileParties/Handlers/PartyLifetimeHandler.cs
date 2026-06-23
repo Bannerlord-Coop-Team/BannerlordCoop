@@ -85,8 +85,6 @@ internal class PartyLifetimeHandler : IHandler
             victoriousPartyBaseId,
             defeatedPartyId);
 
-        // Resolve and guard inside the callback so they run at apply time on the game thread, not on
-        // the poller thread — see RunOnGameThreadSkippingPatches.
         RunOnGameThreadSkippingPatches(
             "DestroyPartyAction.Apply",
             () =>
@@ -157,8 +155,6 @@ internal class PartyLifetimeHandler : IHandler
             disbandedPartyId,
             settlementId);
 
-        // Resolve and guard inside the callback so they run at apply time on the game thread, not on
-        // the poller thread — see RunOnGameThreadSkippingPatches.
         RunOnGameThreadSkippingPatches(
             "DestroyPartyAction.ApplyForDisbanding",
             () =>
