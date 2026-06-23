@@ -24,17 +24,14 @@ internal class ArmyManagementVMExecuteDonePatch
         if (!ModInformation.IsClient) return true; 
 
         if (!__instance.CanAffordInfluenceCost) return false;
-
+        // Only the player party is in the cart — treat as disband
         if (__instance.PartiesInCart.Count == 1 && __instance.PartiesInCart[0].IsMainHero)
         {
             __instance.ExecuteDisbandArmy();
             return false;
         }
 
-        if (__instance.NewCohesion > __instance.Cohesion)
-        {
-            __instance.ApplyCohesionChange();
-        }
+        // Cohesion boost is skipped on client; server applies it via vanilla and syncs via DynamicSync
 
         if (__instance.PartiesInCart.Count > 1 && MobileParty.MainParty.MapFaction.IsKingdomFaction)
         {
@@ -45,6 +42,7 @@ internal class ArmyManagementVMExecuteDonePatch
 
             if (MobileParty.MainParty.Army == null)
             {
+                // No existing army, request creation from server
                 MessageBroker.Instance.Publish(__instance, new PlayerCreatedArmy(
                     (Kingdom)MobileParty.MainParty.MapFaction,
                     Hero.MainHero,
@@ -54,16 +52,18 @@ internal class ArmyManagementVMExecuteDonePatch
             }
             else
             {
+                // Army already exists, request additional parties to be added
                 MessageBroker.Instance.Publish(__instance, new PlayerAddedPartiesToArmy(
                     MobileParty.MainParty.Army,
                     parties));
             }
-
+            // Deduct influence locally
             ChangeClanInfluenceAction.Apply(Clan.PlayerClan, (float)(-(float)(__instance.TotalCost - __instance._influenceSpentForCohesionBoosting)));
         }
 
         if (__instance._partiesToRemove.Count > 0)
         {
+            // Request removal of dismissed parties from the army
             var removeIds = __instance._partiesToRemove.Select(p => p.Party).ToList();
 
             MessageBroker.Instance.Publish(__instance, new PlayerRemovedPartiesFromArmy(removeIds));

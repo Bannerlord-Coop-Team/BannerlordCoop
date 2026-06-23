@@ -173,29 +173,7 @@ namespace GameInterface.Services.Kingdoms.Patches
                 return false; 
             }
 
-            if (!armyLeader.IsActive)
-            {
-                return false;
-            }
-
-            if (((armyLeader != null) ? armyLeader.PartyBelongedTo.LeaderHero : null) != null)
-            {
-                Army army = new Army(__instance, armyLeader.PartyBelongedTo, selectedArmyType);
-                army.Gather(targetSettlement, partiesToCallToArmy);
-                CampaignEventDispatcher.Instance.OnArmyCreated(army);
-            }
-
-            if (armyLeader == Hero.MainHero)
-            {
-                MapState mapState = Game.Current.GameStateManager.GameStates.Single((TaleWorlds.Core.GameState S) => S is MapState) as MapState;
-                if (mapState == null)
-                {
-                    return false;
-                }
-                mapState.OnArmyCreated(MobileParty.MainParty);
-            }
-
-            return false;
+            return true;
         }
     }
 }

@@ -9,10 +9,13 @@ using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.Armies.Handlers;
 
@@ -177,16 +180,24 @@ public class ArmyHandler : IHandler
         {
             try
             {
+                // Only create if the leader doesn't already have an army
                 if (leader.PartyBelongedTo?.Army == null)
+                {
                     kingdom.CreateArmy(leader, targetSettlement, armyType);
+                }
 
                 var army = leader.PartyBelongedTo?.Army;
                 if (army == null) return;
-
+                // Assign each selected party to the new army
                 foreach (var party in parties)
                 {
                     party.Army = army;
                 }
+                // Refresh the map overlay so the army icon appears on the client
+                var mapState = Game.Current.GameStateManager.GameStates
+                    .OfType<MapState>()
+                    .SingleOrDefault();
+                mapState?.OnArmyCreated(leader.PartyBelongedTo);
             }
             catch (Exception ex)
             {

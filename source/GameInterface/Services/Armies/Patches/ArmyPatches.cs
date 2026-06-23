@@ -71,7 +71,9 @@ public class ArmyPatches
                 army._parties.Add(mobileParty);
                 // Only non-leader parties attach to the leader
                 //mobileParty.AttachedTo = mobileParty == army.LeaderParty ? null : army.LeaderParty;
+                mobileParty._currentSettlement = null; // set to null so that the party thats called wont stay in the settlement waiting
                 mobileParty._army = army;
+                mobileParty.Ai.RethinkAtNextHourlyTick = true; 
             }
         });
     }
@@ -82,6 +84,7 @@ public class ArmyPatches
         {
             using (new AllowedThread())
             {
+                mobileParty.Ai.SetInitiative(1f, 1f, 24f); // Else party will be stuck holding
                 army._parties.Remove(mobileParty);
                 mobileParty.AttachedTo = null;
                 mobileParty._army = null;
