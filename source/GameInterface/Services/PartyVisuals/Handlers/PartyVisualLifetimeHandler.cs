@@ -77,10 +77,6 @@ public class PartyVisualLifetimeHandler : IHandler
         // mutates its party list here while OnTick walks it on the main thread, so this must not race.
         GameThread.RunSafe(() =>
         {
-            // No visuals manager (headless server / tests): nothing to render or register.
-            if (MobilePartyVisualManager.Current == null)
-                return;
-
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(mobilePartyId, out var mobileParty))
                 return;
 
