@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Logging;
+using GameInterface.Services.MobileParties.Extensions;
 using Helpers;
 using Serilog;
 using System;
@@ -12,6 +13,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.MountAndBlade;
 using static TaleWorlds.Core.Equipment;
 using MathF = TaleWorlds.Library.MathF;
 
@@ -214,10 +216,33 @@ namespace GameInterface.Services.Inventory.Interfaces
                 }
 
                 mobileParty.Party.SetVisualAsDirty();
+                UpdateMissionHeroVisuals(mobileParty);
 
                 // When concluding an inventory screen managing a hero not in the main party, need to also update their party's visual
                 initialHero.PartyBelongedTo.Party.SetVisualAsDirty();
             });
+        }
+
+        // Find and update all visuals of agents in a mission for managed heroes
+        private void UpdateMissionHeroVisuals(MobileParty mobileParty)
+        {
+            // Return if the client isn't in a mission, nothing to update
+            if (Mission.Current == null) return;
+
+            foreach (Agent agent in Mission.Current.Agents)
+            {
+                CharacterObject characterObject = (CharacterObject)agent.Character;
+                if (characterObject == null) continue;
+
+                foreach (var troopRosterElement in mobileParty.MemberRoster.data)
+                {
+                    // May need to add handling for not updating disguised heroes later (e.g. !Campaign.Current.IsMainHeroDisguised)
+                    if (troopRosterElement.Character == characterObject && characterObject.IsHero && characterObject.HeroObject.PartyBelongedTo.IsPlayerParty()) 
+                    {
+                        agent.UpdateSpawnEquipmentAndRefreshVisuals(Mission.Current.DoesMissionRequireCivilianEquipment ? characterObject.FirstCivilianEquipment : characterObject.FirstBattleEquipment);
+                    }
+                }
+            }
         }
     }
 }

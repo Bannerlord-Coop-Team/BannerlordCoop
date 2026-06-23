@@ -44,7 +44,8 @@ public class NetworkPlayerPartyInteractionSerializationTest
             initiatorAcceptedTrade: true,
             responderAcceptedTrade: false,
             partyItems: new[] { new ItemRosterElementData(new ItemObjectData("party-item", null, itemModifierNull: true), 3) },
-            otherPartyItems: new[] { new ItemRosterElementData(new ItemObjectData("other-item", null, itemModifierNull: true), 4) });
+            otherPartyItems: new[] { new ItemRosterElementData(new ItemObjectData("other-item", null, itemModifierNull: true), 4) },
+            enabledOptions: new[] { PlayerPartyInteractionOption.AcceptProposal });
 
         var result = RoundTrip(original);
 
@@ -55,6 +56,7 @@ public class NetworkPlayerPartyInteractionSerializationTest
         Assert.Equal(original.Phase, result.Phase);
         Assert.Equal(original.Proposal, result.Proposal);
         Assert.Equal(original.Options, result.Options);
+        Assert.Equal(original.EnabledOptions, result.EnabledOptions);
         Assert.Equal(original.IsInitiator, result.IsInitiator);
         Assert.Equal(original.InitiatorAcceptedTrade, result.InitiatorAcceptedTrade);
         Assert.Equal(original.ResponderAcceptedTrade, result.ResponderAcceptedTrade);
@@ -115,10 +117,10 @@ public class NetworkPlayerPartyInteractionSerializationTest
             "session-1",
             "party-1",
             new[] { new ItemRosterElementData(new ItemObjectData("item-1", null, itemModifierNull: true), 2) },
-            new[] { new TroopRosterElementData("troop-1", 3, 1, 4, isHero: false) },
+            new[] { new TroopRosterElementData("troop-1", 3, 1, 4) },
             offeredGold: 25,
             offeredFiefs: new[] { "fief-1" },
-            offeredPrisoners: new[] { new TroopRosterElementData("prisoner-1", 1, 0, 0, isHero: true) });
+            offeredPrisoners: new[] { new TroopRosterElementData("prisoner-1", 1, 0, 0) });
 
         var result = RoundTrip(original);
 

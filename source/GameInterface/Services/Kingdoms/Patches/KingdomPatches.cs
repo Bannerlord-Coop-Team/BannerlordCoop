@@ -38,7 +38,10 @@ namespace GameInterface.Services.Kingdoms.Patches
         {
             GameThread.Run(() =>
             {
-                ModifiedAddDecision(kingdom, kingdomDecision, ignoreInfluenceCost, randomFloat);
+                using (new AllowedThread())
+                {
+                    ModifiedAddDecision(kingdom, kingdomDecision, ignoreInfluenceCost, randomFloat);
+                }
             }, true); 
         }
 

@@ -585,6 +585,13 @@ internal class BattleHandler : IHandler
             // The setter runs the native MapEventSide.AddPartyInternal on the server (NOT under AllowedThread), so the
             // AddIntercept publishes the battle-party add and it replicates to every client through the map-event sync.
             party.MapEventSide = mapEvent.GetMapEventSide(data.Side);
+
+            // If this battle is being auto-resolved, pull the joiner into the simulation instead of leaving it stuck in
+            // the encounter menu. A ForwardingBattleObserver on the event means a server-driven simulation is running.
+            // Sent after the add above so the joiner applies the replicated battle-party add (and so builds its own
+            // party into its scoreboard) before this open arrives; the simulation handler then opens it as a spectator.
+            if (mapEvent.BattleObserver is ForwardingBattleObserver)
+                network.SendAll(new NetworkOpenBattleSimulation(data.MapEventId));
         });
     }
 

@@ -396,7 +396,7 @@ internal class PlayerPartyInteractionHandler : IHandler
 
         var proposal = ToProposal(option);
         if (proposal == PlayerPartyInteractionProposal.None) return;
-        if (!session.InitiatorOptions.Contains(option)) return;
+        if (!session.InitiatorEnabledOptions.Contains(option)) return;
 
         session.Proposal = proposal;
         SendInitiatorState(session, PlayerPartyInteractionPhase.WaitingForResponse, proposal, Array.Empty<PlayerPartyInteractionOption>());
@@ -445,7 +445,8 @@ internal class PlayerPartyInteractionHandler : IHandler
             session,
             PlayerPartyInteractionPhase.InitialOptions,
             PlayerPartyInteractionProposal.None,
-            session.InitiatorOptions.ToArray());
+            session.InitiatorOptions.ToArray(),
+            session.InitiatorEnabledOptions.ToArray());
 
         SendResponderState(
             session,
@@ -491,7 +492,8 @@ internal class PlayerPartyInteractionHandler : IHandler
         PlayerPartyInteractionSession session,
         PlayerPartyInteractionPhase phase,
         PlayerPartyInteractionProposal proposal,
-        PlayerPartyInteractionOption[] options)
+        PlayerPartyInteractionOption[] options,
+        PlayerPartyInteractionOption[] enabledOptions = null)
     {
         var partyItems = phase == PlayerPartyInteractionPhase.TradeActive
             ? ResolvePartyItemIds(session.InitiatorPartyId)
@@ -512,7 +514,8 @@ internal class PlayerPartyInteractionHandler : IHandler
             session.InitiatorAcceptedTrade,
             session.ResponderAcceptedTrade,
             partyItems,
-            otherPartyItems));
+            otherPartyItems,
+            enabledOptions));
     }
 
     private void SendResponderState(
@@ -540,7 +543,8 @@ internal class PlayerPartyInteractionHandler : IHandler
             session.InitiatorAcceptedTrade,
             session.ResponderAcceptedTrade,
             partyItems,
-            otherPartyItems));
+            otherPartyItems,
+            options));
     }
 
     private void EndSession(PlayerPartyInteractionSession session, PlayerPartyInteractionOutcomeType outcomeType)
@@ -563,47 +567,29 @@ internal class PlayerPartyInteractionHandler : IHandler
 
     private void AddInitialOptions(PlayerPartyInteractionSession session, PartyBase initiatorParty, PartyBase responderParty)
     {
-        session.InitiatorOptions.Add(PlayerPartyInteractionOption.TradeProposal);
-        session.InitiatorOptions.Add(PlayerPartyInteractionOption.OfferServices);
-
-        var serviceOptions = GetServiceOptions(initiatorParty, responderParty);
-        foreach (var serviceOption in serviceOptions)
-            session.InitiatorOptions.Add(serviceOption);
-
-        session.InitiatorOptions.Add(PlayerPartyInteractionOption.Leave);
+        AddInitiatorOption(session, PlayerPartyInteractionOption.TradeProposal, enabled: true);
+        AddInitiatorOption(session, PlayerPartyInteractionOption.OfferServices, enabled: true);
+        AddInitiatorOption(session, PlayerPartyInteractionOption.JoinClan, enabled: false);
+        AddInitiatorOption(
+            session,
+            PlayerPartyInteractionOption.Vassal,
+            IsVassalServiceAvailable(initiatorParty, responderParty));
+        AddInitiatorOption(session, PlayerPartyInteractionOption.Leave, enabled: true);
     }
 
-    private PlayerPartyInteractionOption[] GetServiceDialogOptions(PlayerPartyInteractionSession session)
+    private static void AddInitiatorOption(PlayerPartyInteractionSession session, PlayerPartyInteractionOption option, bool enabled)
     {
-        var options = new List<PlayerPartyInteractionOption>(GetServiceOptions(session));
-        options.Add(PlayerPartyInteractionOption.Leave);
-        return options.ToArray();
+        session.InitiatorOptions.Add(option);
+        if (enabled)
+            session.InitiatorEnabledOptions.Add(option);
     }
 
-    private PlayerPartyInteractionOption[] GetServiceOptions(PlayerPartyInteractionSession session)
+    private static bool IsVassalServiceAvailable(PartyBase initiatorParty, PartyBase responderParty)
     {
-        if (!objectManager.TryGetObject<PartyBase>(session.InitiatorPartyId, out var initiatorParty)) return Array.Empty<PlayerPartyInteractionOption>();
-        if (!objectManager.TryGetObject<PartyBase>(session.ResponderPartyId, out var responderParty)) return Array.Empty<PlayerPartyInteractionOption>();
-
-        return GetServiceOptions(initiatorParty, responderParty);
-    }
-
-    private static PlayerPartyInteractionOption[] GetServiceOptions(PartyBase initiatorParty, PartyBase responderParty)
-    {
-        var options = new List<PlayerPartyInteractionOption>();
         var initiatorClan = initiatorParty.LeaderHero?.Clan ?? initiatorParty.MobileParty?.ActualClan;
         var responderHero = responderParty.LeaderHero;
 
-        if (responderHero?.IsClanLeader == true)
-            options.Add(PlayerPartyInteractionOption.JoinClan);
-
-        if (responderHero?.IsKingdomLeader == true && initiatorClan != null)
-        {
-            if (initiatorClan.Tier == 2)
-                options.Add(PlayerPartyInteractionOption.Vassal);
-        }
-
-        return options.ToArray();
+        return responderHero?.IsKingdomLeader == true && initiatorClan?.Tier == 2;
     }
 
     private static PlayerPartyInteractionProposal ToProposal(PlayerPartyInteractionOption option)
@@ -1096,16 +1082,9 @@ internal class PlayerPartyInteractionHandler : IHandler
         {
             if (character == null || count <= 0) continue;
 
-            var hero = character.HeroObject;
-            var isHero = hero != null;
-            string characterId;
-            if (isHero)
-            {
-                if (!objectManager.TryGetId(hero, out characterId)) continue;
-            }
-            else if (!objectManager.TryGetId(character, out characterId)) continue;
+            if (!objectManager.TryGetIdWithLogging(character, out var characterId)) continue;
 
-            result.Add(new TroopRosterElementData(characterId, count, 0, 0, isHero));
+            result.Add(new TroopRosterElementData(characterId, count, 0, 0));
         }
 
         return result.ToArray();
@@ -1120,16 +1099,10 @@ internal class PlayerPartyInteractionHandler : IHandler
             var character = troop.Character;
             if (character == null || count <= 0) continue;
 
-            var hero = character.HeroObject;
-            var isHero = hero != null;
-            string characterId;
-            if (isHero)
-            {
-                if (!objectManager.TryGetId(hero, out characterId)) continue;
-            }
-            else if (!objectManager.TryGetId(character, out characterId)) continue;
+            if (!objectManager.TryGetIdWithLogging(character, out var characterId))
+                continue;
 
-            result.Add(new TroopRosterElementData(characterId, count, troop.WoundedNumber, troop.Xp, isHero));
+            result.Add(new TroopRosterElementData(characterId, count, troop.WoundedNumber, troop.Xp));
         }
 
         return result.ToArray();

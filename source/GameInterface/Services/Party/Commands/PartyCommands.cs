@@ -2,6 +2,7 @@
 using Common;
 using Common.Logging;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
 using Serilog;
 using System.Collections.Generic;
@@ -280,9 +281,16 @@ internal class PartyCommands
         var prisonRoster = hero.PartyBelongedTo.PrisonRoster;
         var troopRosterInterface = new TroopRosterInterface(objectManager);
 
-        // Pack the prison roster, then drop the hero elements so the snapshot no longer carries them.
-        var snapshot = troopRosterInterface.PackTroopRosterData(prisonRoster);
-        snapshot.Data.RemoveAll(e => e.IsHero);
+        // Pack the prison roster, then drop the hero elements so the snapshot no longer carries them, as if
+        // the server had freed them. Resolve each element's CharacterObject to tell heroes from basic troops.
+        var packed = troopRosterInterface.PackTroopRosterData(prisonRoster);
+        var nonHeroElements = new List<TroopRosterElementData>();
+        foreach (var element in packed.Data)
+        {
+            if (objectManager.TryGetObject(element.CharacterId, out CharacterObject troop) && troop.IsHero) continue;
+            nonHeroElements.Add(element);
+        }
+        var snapshot = new TroopRosterData(nonHeroElements);
 
         // Pass a non-null mainHero so the preserve decision turns on the prison-vs-member roster check (the
         // thing under test), not on a null mainHero short-circuit.

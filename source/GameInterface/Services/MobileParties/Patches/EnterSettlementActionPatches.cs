@@ -1,6 +1,5 @@
 ﻿using Common;
 using Common.Messaging;
-using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
@@ -25,17 +24,6 @@ namespace GameInterface.Services.MobileParties.Patches
             MessageBroker.Instance.Publish(mobileParty, message);
 
             return ModInformation.IsServer;
-        }
-
-        public static void OverrideApplyForParty(MobileParty mobileParty, Settlement settlement)
-        {
-            GameThread.Run(() =>
-            {
-                using (new AllowedThread())
-                {
-                    EnterSettlementAction.ApplyForParty(mobileParty, settlement);
-                }
-            }, blocking: true);
         }
     }
 }

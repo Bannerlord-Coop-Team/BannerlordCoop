@@ -7,7 +7,7 @@ using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.Party.Messages;
 
-public readonly struct AttemptPartyDoneLogic : IEvent
+public readonly struct PartyDoneLogicAttempted : IEvent
 {
     public readonly Hero MainHero;
     public readonly FlattenedTroopRoster TakenPrisonersRoster;
@@ -17,6 +17,12 @@ public readonly struct AttemptPartyDoneLogic : IEvent
     public readonly TroopRoster LeftPrisonerRoster;
     public readonly TroopRoster RightMemberRoster;
     public readonly TroopRoster RightPrisonerRoster;
+    // Snapshots of the rosters as they were when the party screen opened. Used to compute the per-troop
+    // delta the player made on the screen (current minus initial) so the server applies only the changes.
+    public readonly TroopRoster InitialLeftMemberRoster;
+    public readonly TroopRoster InitialLeftPrisonerRoster;
+    public readonly TroopRoster InitialRightMemberRoster;
+    public readonly TroopRoster InitialRightPrisonerRoster;
     public readonly ItemRoster RightOwnerPartyItemRoster;
     public readonly List<Tuple<CharacterObject, CharacterObject, int>> UpgradedTroopHistory;
     public readonly PartyBase LeftParty;
@@ -25,7 +31,7 @@ public readonly struct AttemptPartyDoneLogic : IEvent
     public readonly int PartyMoraleChangeAmount;
     public readonly bool DoNotApplyGoldTransactions;
 
-    public AttemptPartyDoneLogic(
+    public PartyDoneLogicAttempted(
         Hero mainHero,
         FlattenedTroopRoster takenPrisonersRoster,
         FlattenedTroopRoster donatedPrisonersRoster,
@@ -34,6 +40,10 @@ public readonly struct AttemptPartyDoneLogic : IEvent
         TroopRoster leftPrisonerRoster,
         TroopRoster rightMemberRoster,
         TroopRoster rightPrisonerRoster,
+        TroopRoster initialLeftMemberRoster,
+        TroopRoster initialLeftPrisonerRoster,
+        TroopRoster initialRightMemberRoster,
+        TroopRoster initialRightPrisonerRoster,
         ItemRoster rightOwnerPartyItemRoster,
         List<Tuple<CharacterObject, CharacterObject, int>> upgradedTroopHistory,
         PartyBase leftParty,
@@ -50,6 +60,10 @@ public readonly struct AttemptPartyDoneLogic : IEvent
         LeftPrisonerRoster = leftPrisonerRoster;
         RightMemberRoster = rightMemberRoster;
         RightPrisonerRoster = rightPrisonerRoster;
+        InitialLeftMemberRoster = initialLeftMemberRoster;
+        InitialLeftPrisonerRoster = initialLeftPrisonerRoster;
+        InitialRightMemberRoster = initialRightMemberRoster;
+        InitialRightPrisonerRoster = initialRightPrisonerRoster;
         RightOwnerPartyItemRoster = rightOwnerPartyItemRoster;
         UpgradedTroopHistory = upgradedTroopHistory;
         LeftParty = leftParty;

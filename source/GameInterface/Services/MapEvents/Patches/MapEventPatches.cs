@@ -114,6 +114,16 @@ internal class MapEventPatches
         return true;
     }
 
+    [HarmonyPatch("CommitCalculatedMapEventResults")]
+    [HarmonyPrefix]
+    private static bool Prefix_CommitCalculatedMapEventResults()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed())
+            return true;
+
+        return ModInformation.IsServer;
+    }
+
     [HarmonyPatch(nameof(MapEvent.Update))]
     [HarmonyPrefix]
     private static bool PrefixUpdate(MapEvent __instance)

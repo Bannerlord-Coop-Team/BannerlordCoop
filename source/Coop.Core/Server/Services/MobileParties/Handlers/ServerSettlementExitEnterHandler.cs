@@ -1,12 +1,16 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Settlements.Interfaces;
 using LiteNetLib;
 using Serilog;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace Coop.Core.Server.Services.MobileParties.Handlers;
 
@@ -18,21 +22,21 @@ public class ServerSettlementExitEnterHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
+    private readonly ISettlementInterface settlementInterface;
     private readonly ILogger Logger = LogManager.GetLogger<ServerSettlementExitEnterHandler>();
 
-    public ServerSettlementExitEnterHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
+    public ServerSettlementExitEnterHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager, ISettlementInterface settlementInterface)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
+        this.settlementInterface = settlementInterface;
         messageBroker.Subscribe<NetworkRequestStartSettlementEncounter>(Handle);
         messageBroker.Subscribe<NetworkRequestEndSettlementEncounter>(Handle);
 
         messageBroker.Subscribe<PartyEnterSettlementAttempted>(Handle);
         messageBroker.Subscribe<PartyLeaveSettlementAttempted>(Handle);
     }
-
-    
 
     public void Dispose()
     {
@@ -50,14 +54,17 @@ public class ServerSettlementExitEnterHandler : IHandler
 
         network.Send(peer, new NetworkStartSettlementEncounter(payload));
 
-        var partyEnteredSettlement = new NetworkPartyEnterSettlement(
-            payload.SettlementId, payload.PartyId);
+        // Tell the other clients to apply the entry synchronously here, so the broadcast does not depend
+        // on the game-loop pump (the server's own apply below is marshalled onto the game thread).
+        network.SendAllBut(peer, new NetworkPartyEnterSettlement(payload.SettlementId, payload.PartyId));
 
-        network.SendAllBut(peer, partyEnteredSettlement);
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging(payload.PartyId, out MobileParty mobileParty)) return;
+            if (!objectManager.TryGetObjectWithLogging(payload.SettlementId, out Settlement settlement)) return;
 
-        var partySettlementEnter = new PartyEnterSettlement(payload.SettlementId, payload.PartyId);
-
-        messageBroker.Publish(this, partySettlementEnter);
+            settlementInterface.PartyEnterSettlement(mobileParty, settlement);
+        });
     }
 
     private void Handle(MessagePayload<NetworkRequestEndSettlementEncounter> obj)
@@ -69,13 +76,14 @@ public class ServerSettlementExitEnterHandler : IHandler
         // slightly differently from ai or other clients parties
         network.Send(peer, new NetworkEndSettlementEncounter());
 
-        var networkMessage = new NetworkPartyLeaveSettlement(payload.PartyId);
+        network.SendAllBut(peer, new NetworkPartyLeaveSettlement(payload.PartyId));
 
-        network.SendAllBut(peer, networkMessage);
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging(payload.PartyId, out MobileParty mobileParty)) return;
 
-        var internalMessage = new PartyLeaveSettlement(payload.PartyId);
-
-        messageBroker.Publish(this, internalMessage);
+            settlementInterface.PartyLeaveSettlement(mobileParty);
+        });
     }
 
     private void Handle(MessagePayload<PartyEnterSettlementAttempted> obj)
@@ -85,15 +93,9 @@ public class ServerSettlementExitEnterHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(payload.Settlement, out var settlementId)) return;
         if (!objectManager.TryGetIdWithLogging(payload.MobileParty, out var mobilePartyId)) return;
 
-        // The sending client is currently starting a settlement encounter, this is handled
-        // slightly differently from ai or other clients parties
-        var networkMessage = new NetworkPartyEnterSettlement(settlementId, mobilePartyId);
+        network.SendAll(new NetworkPartyEnterSettlement(settlementId, mobilePartyId));
 
-        network.SendAll(networkMessage);
-
-        var internalMessage = new PartyEnterSettlement(settlementId, mobilePartyId);
-
-        messageBroker.Publish(this, internalMessage);
+        settlementInterface.OnPartyEnteredSettlement(payload.Settlement, payload.MobileParty);
     }
 
     private void Handle(MessagePayload<PartyLeaveSettlementAttempted> obj)
@@ -102,12 +104,8 @@ public class ServerSettlementExitEnterHandler : IHandler
 
         if (!objectManager.TryGetIdWithLogging(payload.MobileParty, out var mobilePartyId)) return;
 
-        var networkMessage = new NetworkPartyLeaveSettlement(mobilePartyId);
+        network.SendAll(new NetworkPartyLeaveSettlement(mobilePartyId));
 
-        network.SendAll(networkMessage);
-
-        var partySettlementEnter = new PartyLeaveSettlement(mobilePartyId);
-
-        messageBroker.Publish(this, partySettlementEnter);
+        settlementInterface.OnPartyLeftSettlement(payload.MobileParty);
     }
 }
