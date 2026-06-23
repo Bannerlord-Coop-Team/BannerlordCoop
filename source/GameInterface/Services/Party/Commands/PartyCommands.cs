@@ -214,6 +214,8 @@ internal class PartyCommands
         {
             if (hero.Name.ToString() == strings[0])
             {
+                if (hero.PartyBelongedTo == null) continue;
+
                 var prisonerRoster = hero.PartyBelongedTo.PrisonRoster;
 
                 // Walk from the end so removing the current element leaves the lower indices valid. Each

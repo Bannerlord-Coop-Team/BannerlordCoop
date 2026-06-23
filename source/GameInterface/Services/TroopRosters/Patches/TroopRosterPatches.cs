@@ -41,6 +41,10 @@ internal class TroopRosterPatches
             return;
         }
 
+        // Match the bounds guard the SetElement* prefixes use: an index in the slot-padding window
+        // (Count <= index < data.Length) would read a cleared element with a null Character.
+        if (index < 0 || index >= __instance.Count) return;
+
         // Resolve the element by identity now: the index is valid here (pre-mutation), but a subtract-to-zero
         // with removeDepleted removes it before a postfix could read it back.
         var character = __instance.GetElementCopyAtIndex(index).Character;
