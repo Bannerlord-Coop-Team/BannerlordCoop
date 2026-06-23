@@ -1,7 +1,8 @@
 ﻿using Common;
 using GameInterface.Services.Clans.Extensions;
 using HarmonyLib;
-using System;
+using System.Collections.Generic;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -11,18 +12,33 @@ using TaleWorlds.CampaignSystem.Settlements;
 namespace GameInterface.Services.MobileParties.Patches.Disable;
 
 [HarmonyPatch(typeof(DisbandPartyCampaignBehavior))]
+internal class DisablePartyCampaignBehaviorPatch
+{
+    private static IEnumerable<MethodBase> TargetMethods() => new MethodBase[]
+    {
+        AccessTools.Method(typeof(DisbandPartyCampaignBehavior), nameof(DisbandPartyCampaignBehavior.OnGameLoadFinished)),
+        AccessTools.Method(typeof(DisbandPartyCampaignBehavior), nameof(DisbandPartyCampaignBehavior.OnPartyDisbandStarted)),
+        AccessTools.Method(typeof(DisbandPartyCampaignBehavior), nameof(DisbandPartyCampaignBehavior.OnPartyDisbandCanceled)),
+        AccessTools.Method(typeof(DisbandPartyCampaignBehavior), nameof(DisbandPartyCampaignBehavior.HourlyTick)),
+        AccessTools.Method(typeof(DisbandPartyCampaignBehavior), nameof(DisbandPartyCampaignBehavior.OnMobilePartyDestroyed)),
+        AccessTools.Method(typeof(DisbandPartyCampaignBehavior), nameof(DisbandPartyCampaignBehavior.OnHeroTeleportationRequested)),
+        AccessTools.Method(typeof(DisbandPartyCampaignBehavior), nameof(DisbandPartyCampaignBehavior.OnHeroPrisonerTaken)),
+        AccessTools.Method(typeof(DisbandPartyCampaignBehavior), nameof(DisbandPartyCampaignBehavior.OnPartyDisbanded)),
+        //AccessTools.Method(typeof(DisbandPartyCampaignBehavior), nameof(DisbandPartyCampaignBehavior.OnSessionLaunched)), Needed on client to load dialogue for interacting with disbanding parties
+        AccessTools.Method(typeof(DisbandPartyCampaignBehavior), nameof(DisbandPartyCampaignBehavior.DailyTickParty)),
+        AccessTools.Method(typeof(DisbandPartyCampaignBehavior), nameof(DisbandPartyCampaignBehavior.OnSettlementLeft)),
+        AccessTools.Method(typeof(DisbandPartyCampaignBehavior), nameof(DisbandPartyCampaignBehavior.HourlyTickParty))
+    };
+
+    static bool Prefix()
+    {
+        return ModInformation.IsServer;
+    }
+}
+
+[HarmonyPatch(typeof(DisbandPartyCampaignBehavior))]
 internal class DisbandPartyCampaignBehaviorPatches
 {
-    [HarmonyPatch(nameof(DisbandPartyCampaignBehavior.RegisterEvents))]
-    public static bool RegisterEventsPrefix(ref DisbandPartyCampaignBehavior __instance)
-    {
-        if (ModInformation.IsServer) return true;
-
-        // Load dialogue for disbanding parties on client
-        CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(__instance, new Action<CampaignGameStarter>(__instance.OnSessionLaunched));
-        return false;
-    }
-
     /// <summary>
     /// Replaces several Clan.PlayerClan checks with IsPlayerClan() extension method
     /// </summary>
