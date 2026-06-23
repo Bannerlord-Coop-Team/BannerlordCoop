@@ -8,7 +8,7 @@ using TaleWorlds.Core;
 namespace GameInterface.Services.Party.Messages;
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct CompletePartyDoneLogic : ICommand
+internal readonly struct NetworkCompleteDoneLogic : ICommand
 {
     [ProtoMember(1)]
     public readonly string MainHeroId;
@@ -58,7 +58,7 @@ internal readonly struct CompletePartyDoneLogic : ICommand
     [ProtoMember(16)]
     public readonly bool DoNotApplyGoldTransactions;
 
-    public CompletePartyDoneLogic(
+    public NetworkCompleteDoneLogic(
         string mainHeroId,
         FlattenedTroop[] takenPrisonersRoster,
         FlattenedTroop[] donatedPrisonersRoster,

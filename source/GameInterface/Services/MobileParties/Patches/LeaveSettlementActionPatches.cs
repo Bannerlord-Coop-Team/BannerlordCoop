@@ -1,6 +1,5 @@
 ﻿using Common;
 using Common.Messaging;
-using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
@@ -23,25 +22,12 @@ public class LeaveSettlementActionPatches
         if (mobileParty.CurrentSettlement == null) return false;
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient) return false;
-
         var message = new PartyLeaveSettlementAttempted(mobileParty);
         MessageBroker.Instance.Publish(mobileParty, message);
 
-        return false;
-    }
-
-    public static void OverrideApplyForParty(MobileParty party)
-    {
-        GameThread.Run(() =>
-        {
-            using (new AllowedThread())
-            {
-                if (party.CurrentSettlement == null)
-                    return;
-                
-                LeaveSettlementAction.ApplyForParty(party);
-            }
-        });
+        // Client blocks (the server-applied leave replicates back); server runs the original so the
+        // leave actually happens. The server intentionally applies here rather than re-applying from
+        // the handler, which (without an allowed thread) would re-enter this prefix and recurse.
+        return ModInformation.IsServer;
     }
 }

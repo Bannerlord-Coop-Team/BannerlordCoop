@@ -88,6 +88,9 @@ namespace GameInterface.Services.Workshops.Handlers
 
                 foreach (var settlementRoster in workshopPlayerData.PlayerWarehouseRosterPerSettlement[playerHeroId])
                 {
+                    if (settlementRoster.Key == null)
+                        continue;
+
                     if (!objectManager.TryGetObjectWithLogging<Settlement>(settlementRoster.Key, out var settlement)) continue;
 
                     var itemRoster = new ItemRoster();

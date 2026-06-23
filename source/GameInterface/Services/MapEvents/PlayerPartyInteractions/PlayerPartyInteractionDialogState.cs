@@ -46,6 +46,26 @@ public static class PlayerPartyInteractionDialogState
     public static bool HasOption(PlayerPartyInteractionOption option)
         => hasState && currentState.Options != null && currentState.Options.Contains(option);
 
+    public static bool IsOptionEnabled(PlayerPartyInteractionOption option)
+    {
+        if (!HasOption(option)) return false;
+
+        var enabledOptions = currentState.EnabledOptions ?? currentState.Options;
+        return enabledOptions != null && enabledOptions.Contains(option);
+    }
+
+    public static bool IsOptionEnabled(PlayerPartyInteractionOption option, out TextObject explanation)
+    {
+        if (IsOptionEnabled(option))
+        {
+            explanation = null;
+            return true;
+        }
+
+        explanation = new TextObject("{=coop_player_party_interaction_disabled}This option is not available.");
+        return false;
+    }
+
     public static string GetDialogText()
     {
         switch (Phase)
@@ -67,7 +87,7 @@ public static class PlayerPartyInteractionDialogState
 
     public static void Submit(PlayerPartyInteractionOption option)
     {
-        if (!HasActiveState) return;
+        if (!IsOptionEnabled(option)) return;
 
         MessageBroker.Instance.Publish(null, new PlayerPartyInteractionOptionSelected(SessionId, PartyId, option));
     }
@@ -90,7 +110,8 @@ public static class PlayerPartyInteractionDialogState
             currentState.InitiatorAcceptedTrade,
             currentState.ResponderAcceptedTrade,
             currentState.PartyItems,
-            currentState.OtherPartyItems);
+            currentState.OtherPartyItems,
+            GetLocalServiceEnabledOptions());
 
         RefreshConversation();
     }
@@ -102,7 +123,7 @@ public static class PlayerPartyInteractionDialogState
             case PlayerPartyInteractionProposal.Trade:
                 return "I have a proposal that may benefit us both.";
             case PlayerPartyInteractionProposal.JoinClan:
-                return "I wish to offer my services in your clan.";
+                return "(COMING SOON) I wish to offer my services in your clan.";
             case PlayerPartyInteractionProposal.Vassal:
                 return "I wish to swear my allegiance to your majesty.";
             default:
@@ -111,11 +132,17 @@ public static class PlayerPartyInteractionDialogState
     }
 
     private static PlayerPartyInteractionOption[] GetLocalServiceOptions()
+        => GetLocalServiceOptions(currentState.Options, addLeave: true);
+
+    private static PlayerPartyInteractionOption[] GetLocalServiceEnabledOptions()
+        => GetLocalServiceOptions(currentState.EnabledOptions ?? currentState.Options, addLeave: false);
+
+    private static PlayerPartyInteractionOption[] GetLocalServiceOptions(PlayerPartyInteractionOption[] sourceOptions, bool addLeave)
     {
         var options = new List<PlayerPartyInteractionOption>();
-        if (currentState.Options != null)
+        if (sourceOptions != null)
         {
-            foreach (var option in currentState.Options)
+            foreach (var option in sourceOptions)
             {
                 if (!IsServiceOption(option)) continue;
                 if (options.Contains(option)) continue;
@@ -124,7 +151,7 @@ public static class PlayerPartyInteractionDialogState
             }
         }
 
-        if (!options.Contains(PlayerPartyInteractionOption.Leave))
+        if (addLeave && !options.Contains(PlayerPartyInteractionOption.Leave))
             options.Add(PlayerPartyInteractionOption.Leave);
 
         return options.ToArray();
