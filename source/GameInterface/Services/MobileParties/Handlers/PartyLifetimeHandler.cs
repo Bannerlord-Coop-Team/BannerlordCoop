@@ -85,34 +85,35 @@ internal class PartyLifetimeHandler : IHandler
             victoriousPartyBaseId,
             defeatedPartyId);
 
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(defeatedPartyId, out var defeatedParty))
-            return;
-
-        // An inactive party was already destroyed locally — e.g. this destruction happened inside
-        // a parent action that was also replayed here (a settlement ownership change destroying
-        // its garrison). Applying it again would double-run the vanilla destruction.
-        if (!defeatedParty.IsActive)
-        {
-            Logger.Debug(
-                "[{Role}] Skipping destroy for already-inactive party {DefeatedPartyId}",
-                role,
-                defeatedPartyId);
-            return;
-        }
-
-        // A null victor id means the server destroyed the party with a null destroyer (e.g. patrol
-        // culling). Pass null through to match the server; vanilla supports a null destroyer. A
-        // non-null id that cannot be resolved is still a real error and bails as before.
-        PartyBase victoriousPartyBase = null;
-        if (victoriousPartyBaseId != null &&
-            !objectManager.TryGetObjectWithLogging<PartyBase>(victoriousPartyBaseId, out victoriousPartyBase))
-            return;
-
-
+        // Resolve and guard inside the callback so they run at apply time on the game thread, not on
+        // the poller thread — see RunOnGameThreadSkippingPatches.
         RunOnGameThreadSkippingPatches(
             "DestroyPartyAction.Apply",
             () =>
             {
+                if (!objectManager.TryGetObjectWithLogging<MobileParty>(defeatedPartyId, out var defeatedParty))
+                    return;
+
+                // An inactive party was already destroyed locally — e.g. this destruction happened inside
+                // a parent action that was also replayed here (a settlement ownership change destroying
+                // its garrison). Applying it again would double-run the vanilla destruction.
+                if (!defeatedParty.IsActive)
+                {
+                    Logger.Debug(
+                        "[{Role}] Skipping destroy for already-inactive party {DefeatedPartyId}",
+                        role,
+                        defeatedPartyId);
+                    return;
+                }
+
+                // A null victor id means the server destroyed the party with a null destroyer (e.g. patrol
+                // culling). Pass null through to match the server; vanilla supports a null destroyer. A
+                // non-null id that cannot be resolved is still a real error and bails as before.
+                PartyBase victoriousPartyBase = null;
+                if (victoriousPartyBaseId != null &&
+                    !objectManager.TryGetObjectWithLogging<PartyBase>(victoriousPartyBaseId, out victoriousPartyBase))
+                    return;
+
                 DestroyPartyAction.Apply(victoriousPartyBase, defeatedParty);
             }
         );
@@ -156,28 +157,30 @@ internal class PartyLifetimeHandler : IHandler
             disbandedPartyId,
             settlementId);
 
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(disbandedPartyId, out var party))
-            return;
-
-        // An inactive party was already disbanded locally — e.g. the disband happened inside a
-        // parent action that was also replayed here. Applying it again would double-run the
-        // vanilla disband.
-        if (!party.IsActive)
-        {
-            Logger.Debug(
-                "[{Role}] Skipping disband for already-inactive party {DisbandedPartyId}",
-                role,
-                disbandedPartyId);
-            return;
-        }
-
-        if (!objectManager.TryGetObjectWithLogging<Settlement>(settlementId, out var settlement))
-            return;
-
+        // Resolve and guard inside the callback so they run at apply time on the game thread, not on
+        // the poller thread — see RunOnGameThreadSkippingPatches.
         RunOnGameThreadSkippingPatches(
             "DestroyPartyAction.ApplyForDisbanding",
             () =>
             {
+                if (!objectManager.TryGetObjectWithLogging<MobileParty>(disbandedPartyId, out var party))
+                    return;
+
+                // An inactive party was already disbanded locally — e.g. the disband happened inside a
+                // parent action that was also replayed here. Applying it again would double-run the
+                // vanilla disband.
+                if (!party.IsActive)
+                {
+                    Logger.Debug(
+                        "[{Role}] Skipping disband for already-inactive party {DisbandedPartyId}",
+                        role,
+                        disbandedPartyId);
+                    return;
+                }
+
+                if (!objectManager.TryGetObjectWithLogging<Settlement>(settlementId, out var settlement))
+                    return;
+
                 DestroyPartyAction.ApplyForDisbanding(party, settlement);
 
                 Logger.Debug(
@@ -191,6 +194,13 @@ internal class PartyLifetimeHandler : IHandler
 
     private static string Role => ModInformation.IsServer ? "Server" : "Client";
 
+    /// <summary>
+    /// Runs <paramref name="action"/> on the game-loop thread with the mod's Harmony patches
+    /// suspended (the receive path re-runs vanilla and must not re-announce). Resolve registry
+    /// objects and read game state <b>inside</b> <paramref name="action"/>, not before the call:
+    /// the action drains a frame or more later, so anything resolved on the network (poller) thread
+    /// can be stale by apply time and races the game loop's own registry mutations.
+    /// </summary>
     private void RunOnGameThreadSkippingPatches(
         string operation,
         Action action,
