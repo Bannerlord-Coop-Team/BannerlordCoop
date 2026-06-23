@@ -279,7 +279,9 @@ internal class PartyCommands
         if (hero?.PartyBelongedTo == null) return "Hero not found or has no party.";
 
         var prisonRoster = hero.PartyBelongedTo.PrisonRoster;
-        var troopRosterInterface = new TroopRosterInterface(objectManager);
+        if (ContainerProvider.TryGetContainer(out var container) == false ||
+            container.TryResolve(out ITroopRosterInterface troopRosterInterface) == false)
+            return "Unable to resolve TroopRosterInterface.";
 
         // Pack the prison roster, then drop the hero elements so the snapshot no longer carries them, as if
         // the server had freed them. Resolve each element's CharacterObject to tell heroes from basic troops.
