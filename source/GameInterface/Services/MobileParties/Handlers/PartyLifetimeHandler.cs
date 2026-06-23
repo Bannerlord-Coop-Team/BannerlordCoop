@@ -190,13 +190,6 @@ internal class PartyLifetimeHandler : IHandler
 
     private static string Role => ModInformation.IsServer ? "Server" : "Client";
 
-    /// <summary>
-    /// Runs <paramref name="action"/> on the game-loop thread with the mod's Harmony patches
-    /// suspended (the receive path re-runs vanilla and must not re-announce). Resolve registry
-    /// objects and read game state <b>inside</b> <paramref name="action"/>, not before the call:
-    /// the action drains a frame or more later, so anything resolved on the network (poller) thread
-    /// can be stale by apply time and races the game loop's own registry mutations.
-    /// </summary>
     private void RunOnGameThreadSkippingPatches(
         string operation,
         Action action,
