@@ -70,7 +70,7 @@ public class ArmyPatches
             {
                 army._parties.Add(mobileParty);
                 // Only non-leader parties attach to the leader
-                mobileParty.AttachedTo = mobileParty == army.LeaderParty ? null : army.LeaderParty;
+                //mobileParty.AttachedTo = mobileParty == army.LeaderParty ? null : army.LeaderParty;
                 mobileParty._army = army;
             }
         });

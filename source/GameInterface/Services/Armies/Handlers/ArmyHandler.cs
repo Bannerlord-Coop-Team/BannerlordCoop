@@ -1,10 +1,14 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Armies.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using System;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
@@ -17,7 +21,7 @@ namespace GameInterface.Services.Armies.Handlers;
 /// </summary>
 public class ArmyHandler : IHandler
 {
-    
+
     private static readonly ILogger Logger = LogManager.GetLogger<ArmyHandler>();
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
@@ -35,6 +39,8 @@ public class ArmyHandler : IHandler
         messageBroker.Subscribe<NetworkRemovePartyInArmy>(HandleChangeRemoveMobilePartyInArmy);
         messageBroker.Subscribe<ArmyAiBehaviorObjectChanged>(HandleArmyAiBehaviorObjectChanged);
         messageBroker.Subscribe<NetworkSetArmyAiBehaviorObject>(HandleNetworkSetArmyAiBehaviorObject);
+        messageBroker.Subscribe<PlayerCreatedArmy>(HandlePlayerCreatedArmy);
+        messageBroker.Subscribe<NetworkPlayerCreatedArmy>(HandleNetworkPlayerCreatedArmy);
     }
 
     public void Dispose()
@@ -45,10 +51,13 @@ public class ArmyHandler : IHandler
         messageBroker.Unsubscribe<NetworkRemovePartyInArmy>(HandleChangeRemoveMobilePartyInArmy);
         messageBroker.Unsubscribe<ArmyAiBehaviorObjectChanged>(HandleArmyAiBehaviorObjectChanged);
         messageBroker.Unsubscribe<NetworkSetArmyAiBehaviorObject>(HandleNetworkSetArmyAiBehaviorObject);
+        messageBroker.Unsubscribe<PlayerCreatedArmy>(HandlePlayerCreatedArmy);
+        messageBroker.Unsubscribe<NetworkPlayerCreatedArmy>(HandleNetworkPlayerCreatedArmy);
     }
 
     private void HandleAddMobilePartyInArmy(MessagePayload<MobilePartyInArmyAdded> obj)
     {
+
         if (!objectManager.TryGetIdWithLogging(obj.What.Army, out var armyId)) return;
         if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
 
@@ -121,5 +130,58 @@ public class ArmyHandler : IHandler
         }
 
         ArmyPatches.SetAiBehaviorObject(army, mapPoint);
+    }
+    private void HandlePlayerCreatedArmy(MessagePayload<PlayerCreatedArmy> payload)
+    {
+        var obj = payload.What;
+        if (!objectManager.TryGetIdWithLogging(obj.Kingdom, out var kingdomId)) return;
+        if (!objectManager.TryGetIdWithLogging(obj.Leader, out var leaderId)) return;
+        if (!objectManager.TryGetIdWithLogging(obj.TargetSettlement, out var targetSettlementId)) return;
+
+        var partyIds = new List<string>();
+        foreach (var party in obj.Parties)
+        {
+            if (!objectManager.TryGetIdWithLogging(party, out var partyId)) return;
+            partyIds.Add(partyId);
+        }
+
+        var message = new NetworkPlayerCreatedArmy(kingdomId, leaderId, targetSettlementId, obj.ArmyType.ToString(), partyIds);
+        network.SendAll(message);
+    }
+
+    private void HandleNetworkPlayerCreatedArmy(MessagePayload<NetworkPlayerCreatedArmy> payload)
+    {
+        var obj = payload.What;
+        if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.KingdomId, out var kingdom)) return;
+        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.LeaderId, out var leader)) return;
+        if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.TargetSettlementId, out var targetSettlement)) return;
+
+        var parties = new List<MobileParty>();
+        foreach (var partyId in obj.PartyIds)
+        {
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(partyId, out var party)) return;
+            parties.Add(party);
+        }
+
+        var armyType = (Army.ArmyTypes)Enum.Parse(typeof(Army.ArmyTypes), obj.ArmyTypeId);
+
+        GameThread.RunSafe(() =>
+        {
+            try
+            {
+                kingdom.CreateArmy(leader, targetSettlement, armyType);
+                var army = leader.PartyBelongedTo?.Army;
+                if (army == null) return;
+
+                foreach (var party in parties)
+                {
+                    party.Army = army;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "CreateArmy failed");
+            }
+        });
     }
 }

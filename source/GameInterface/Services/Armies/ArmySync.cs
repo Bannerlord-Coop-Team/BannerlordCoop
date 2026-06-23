@@ -17,5 +17,6 @@ internal class ArmySync : IAutoSync
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Army), nameof(Army.LeaderParty)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Army), nameof(Army.ArmyOwner)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Army), nameof(Army.Morale)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Army), nameof(Army.Cohesion)));
     }
 }

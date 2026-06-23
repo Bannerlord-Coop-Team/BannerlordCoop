@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common;
 using GameInterface.Services.ObjectManager;
 using System.Collections.Generic;
 using System.Linq;
@@ -258,5 +259,80 @@ namespace GameInterface.Services.GameDebug.Commands
 
             return stringBuilder.ToString();
         }
+        // coop.debug.clan.join_kingdom Player12 empire
+        [CommandLineArgumentFunction("join_kingdom", "coop.debug.clan")]
+        public static string JoinKingdom(List<string> args)
+        {
+            if (ModInformation.IsClient)
+                return "Command is only available to run on the server";
+
+            if (args.Count != 2)
+                return "Usage: coop.debug.clan.join_kingdom <clanId> <kingdomId>";
+
+            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+                return $"Unable to get {nameof(IObjectManager)}";
+
+            if (objectManager.TryGetObject<Clan>(args[0], out var clan) == false)
+                return $"Unable to get Clan with {args[0]}";
+
+            if (objectManager.TryGetObject<Kingdom>(args[1], out var kingdom) == false)
+                return $"Unable to get Kingdom with {args[1]}";
+
+            ChangeKingdomAction.ApplyByJoinToKingdom(clan, kingdom);
+
+            return $"{clan.Name} joined {kingdom.Name}";
+        }
+
+        // coop.debug.clan.give_influence Player12 500
+        [CommandLineArgumentFunction("give_influence", "coop.debug.clan")]
+        public static string GiveInfluence(List<string> args)
+        {
+            if (ModInformation.IsClient)
+                return "Command is only available to run on the server";
+
+            if (args.Count != 2)
+                return "Usage: coop.debug.clan.give_influence <clanId> <amount>";
+
+            if (!TryGetObjectManager(out IObjectManager objectManager))
+                return "Unable to resolve ObjectManager";
+
+            if (!objectManager.TryGetObject<Clan>(args[0], out var clan))
+                return $"Unable to get Clan with {args[0]}";
+
+            if (!float.TryParse(args[1], out float amount))
+                return $"Unable to parse {args[1]} as float";
+
+            ChangeClanInfluenceAction.Apply(clan, amount);
+
+            return $"Gave {amount} influence to {clan.Name}";
+        }
+        // coop.debug.clan.info
+        [CommandLineArgumentFunction("info", "coop.debug.clan")]
+        public static string InfoClan(List<string> args)
+        {
+            if (args.Count != 1)
+                return "Usage: coop.debug.clan.info <clanId>";
+
+            if (!TryGetObjectManager(out IObjectManager objectManager))
+                return "Unable to resolve ObjectManager";
+
+            if (!objectManager.TryGetObject<Clan>(args[0], out var clan))
+                return $"Unable to get Clan with {args[0]}";
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"Name: {clan.Name}");
+            sb.AppendLine($"StringId: {clan.StringId}");
+            sb.AppendLine($"Leader: {clan.Leader?.Name.ToString() ?? "none"}");
+            sb.AppendLine($"Kingdom: {clan.Kingdom?.Name.ToString() ?? "none"}");
+            sb.AppendLine($"Influence: {clan.Influence}");
+            sb.AppendLine($"Renown: {clan.Renown}");
+            sb.AppendLine($"Tier: {clan.Tier}");
+            sb.AppendLine($"IsEliminated: {clan.IsEliminated}");
+            sb.AppendLine($"Members: {string.Join(", ", clan.Heroes.Select(h => h.Name))}");
+            return sb.ToString();
+        }
     }
 }
+//coop.debug.clan.add_renown Player12 1000
+// coop.debug.clan.join_kingdom Player12 empire
+//coop.debug.clan.give_influence Player12 500
