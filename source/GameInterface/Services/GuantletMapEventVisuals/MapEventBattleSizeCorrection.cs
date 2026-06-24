@@ -13,8 +13,7 @@ namespace GameInterface.Services.GuantletMapEventVisuals;
 /// </summary>
 internal static class MapEventBattleSizeCorrection
 {
-    // Field-battle visuals needing a size correction, keyed by the visual itself (reference identity: no
-    // StringId / network id, and stable unlike the MapEvent's mutable-MBGUID hash). Value = the highest
+    // Field-battle visuals needing a size correction, keyed by the visual itself. Value = the highest
     // battle_size applied so far; TryCorrect only ever raises it, since a battle is computable while still
     // partly populated and the live headcount drops as troops die, so without a ceiling the size would lock
     // in a partial count or drift below vanilla mid-battle. Cleared when the visual is torn down or on reset.
