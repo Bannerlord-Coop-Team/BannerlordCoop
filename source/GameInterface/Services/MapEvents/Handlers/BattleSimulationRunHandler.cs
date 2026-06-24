@@ -455,7 +455,9 @@ internal class BattleSimulationRunHandler : IHandler
     {
         var message = payload.What;
 
-        GameThread.Run(() =>
+        // RunSafe so an unexpected throw in the apply is logged and skipped instead of escaping onto the game
+        // thread and hard-crashing the client to desktop (this is a client receive path, not authoritative work).
+        GameThread.RunSafe(() =>
         {
             if (!BattleSimulationReplay.IsActiveFor(message.MapEventId))
                 return;
@@ -468,7 +470,8 @@ internal class BattleSimulationRunHandler : IHandler
             {
                 // The loot/capture chance models drop any winner with ContributionToBattle == 0, which is the
                 // case on the client (its simulation engine never ran). Restore the server's values first.
-                foreach (var winner in message.Winners)
+                // protobuf-net deserializes an empty repeated field as null, so coalesce before iterating.
+                foreach (var winner in message.Winners ?? Array.Empty<BattleSimWinner>())
                 {
                     if (!objectManager.TryGetObject<PartyBase>(winner.PartyId, out var winnerParty))
                         continue;
@@ -478,7 +481,7 @@ internal class BattleSimulationRunHandler : IHandler
                         winnerMapEventParty._contributionToBattle = winner.ContributionToBattle;
                 }
 
-                foreach (var defeated in message.DefeatedParties)
+                foreach (var defeated in message.DefeatedParties ?? Array.Empty<BattleSimDefeatedParty>())
                 {
                     if (!objectManager.TryGetObject<PartyBase>(defeated.PartyId, out var party))
                         continue;
@@ -498,6 +501,11 @@ internal class BattleSimulationRunHandler : IHandler
 
     private void ApplyCasualties(TroopRoster roster, BattleSimCasualty[] casualties)
     {
+        // A defeated party with no deaths or no wounded ships an empty array, which protobuf-net deserializes
+        // as null. The server only includes a party that had died OR wounded, so one of the two is routinely null.
+        if (casualties == null)
+            return;
+
         foreach (var casualty in casualties)
         {
             if (!TryResolveCharacterObject(casualty.CharacterId, casualty.IsHero, out var character))
