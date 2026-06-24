@@ -70,6 +70,9 @@ internal class GauntletMapEventVisualRegistry : AutoRegistryBase<GauntletMapEven
         {
             obj.OnMapEventEnd();
         }
+
+        // Drop any pending ambient battle-size correction for this ended battle (issue #1449).
+        MapEventBattleSizeCorrection.Clear(obj.MapEvent);
     }
 
     public override void OnServerCreated(GauntletMapEventVisual obj, string id)
