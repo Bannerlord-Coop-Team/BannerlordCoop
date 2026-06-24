@@ -9,7 +9,7 @@ namespace GameInterface.Services.GuantletMapEventVisuals;
 /// Client-side correction for a field-battle map event's ambient battle sound.
 ///
 /// On a client a map event's visual can initialize before its sides and the parties within them have
-/// finished syncing in (issue #1449). When that happens the vanilla <see cref="GauntletMapEventVisual"/>
+/// finished syncing in. When that happens the vanilla <see cref="GauntletMapEventVisual"/>
 /// ambient sound is set up with the smallest <c>battle_size</c> - the #1426 guard defaults it to 0 to
 /// avoid dereferencing un-synced state - and because the vanilla init is one-shot the size would stay
 /// stuck there. This re-applies the real <c>battle_size</c> to the already-created sound as the sides
@@ -17,19 +17,21 @@ namespace GameInterface.Services.GuantletMapEventVisuals;
 /// </summary>
 internal static class MapEventBattleSizeCorrection
 {
-    // Pending field-battle map events, keyed by the registry StringId (a stable id - the MapEvent object's
-    // hash is its mutable MBGUID, so it makes a poor key) and valued by the highest battle_size applied so
-    // far. The value is seeded with the size Initialize applied and re-applied as the sides/parties stream
-    // in, but only ever upward: a map event is computable (and its size readable) while only partly
-    // populated, and the live headcount counts healthy members (which falls as troops die), so re-applying
+    // Pending field-battle visuals whose Initialize ran before the battle size was computable, keyed by the
+    // visual itself - a plain reference-identity key, so no StringId / network id (that's the object
+    // manager's job), and stable unlike the MapEvent whose hash is a mutable MBGUID. The value is the
+    // highest battle_size applied so far: seeded with the size Initialize applied and re-applied as the
+    // sides/parties stream in but only ever upward, because a map event is computable while only partly
+    // populated and the live headcount counts healthy members (which falls as troops die), so re-applying
     // without a ceiling would lock in a partial count or drift below vanilla mid-battle. Ratchet up to the
     // full roster's size and hold it, matching vanilla which sets it once at the peak. Cleared when the
     // visual is torn down (battle ends) or the session resets.
-    private static readonly ConcurrentDictionary<string, int> pendingMaxSize = new ConcurrentDictionary<string, int>();
+    private static readonly ConcurrentDictionary<GauntletMapEventVisual, int> pendingMaxSize = new ConcurrentDictionary<GauntletMapEventVisual, int>();
 
-    public static void Register(MapEvent mapEvent)
+    public static void Register(GauntletMapEventVisual visual)
     {
-        if (mapEvent?.StringId == null) return;
+        var mapEvent = visual?.MapEvent;
+        if (mapEvent == null) return;
 
         // Seed the ceiling with the size Initialize just applied: the real bucket if the battle was already
         // computable (possibly a partial roster), else the #1426 stopgap's 0. TryCorrect only raises it, so
@@ -37,12 +39,12 @@ internal static class MapEventBattleSizeCorrection
         var initialSize = GauntletMapEventVisualPatches.BattleSizeComputable(mapEvent)
             ? ComputeBattleSize(mapEvent.GetNumberOfInvolvedMen())
             : 0;
-        pendingMaxSize.TryAdd(mapEvent.StringId, initialSize);
+        pendingMaxSize.TryAdd(visual, initialSize);
     }
 
-    public static void Clear(MapEvent mapEvent)
+    public static void Clear(GauntletMapEventVisual visual)
     {
-        if (mapEvent?.StringId != null) pendingMaxSize.TryRemove(mapEvent.StringId, out _);
+        if (visual != null) pendingMaxSize.TryRemove(visual, out _);
     }
 
     // Drops all pending corrections - called when the client session ends so the static map does not
@@ -56,13 +58,12 @@ internal static class MapEventBattleSizeCorrection
     /// </summary>
     public static void TryCorrect(MapEvent mapEvent)
     {
-        if (mapEvent?.StringId == null || !pendingMaxSize.TryGetValue(mapEvent.StringId, out var appliedSize)) return;
+        if (mapEvent?.MapEventVisual is not GauntletMapEventVisual visual) return;
+        if (!pendingMaxSize.TryGetValue(visual, out var appliedSize)) return;
         if (!GauntletMapEventVisualPatches.BattleSizeComputable(mapEvent)) return;
 
         var size = ComputeBattleSize(mapEvent.GetNumberOfInvolvedMen());
         if (size <= appliedSize) return;
-
-        if (mapEvent.MapEventVisual is not GauntletMapEventVisual visual) return;
 
         // Initialize creates the sound; if the visual-init message has not been applied yet there is
         // nothing to correct (that first Initialize computes the real size directly once sides are ready).
@@ -70,7 +71,7 @@ internal static class MapEventBattleSizeCorrection
         if (soundEvent == null || !soundEvent.IsValid) return;
 
         soundEvent.SetParameter("battle_size", (float)size);
-        pendingMaxSize[mapEvent.StringId] = size;
+        pendingMaxSize[visual] = size;
     }
 
     // Mirrors the field-battle / sally-out buckets of vanilla GauntletMapEventVisual.GetBattleSizeValue.
