@@ -64,11 +64,15 @@ internal class ArmyRegistry : AutoRegistryBase<Army>
     {
         GameThread.Run(() =>
         {
-            Logger.Information("GameThread running for army destroy {id}", id);
+            bool containsMainParty = false;
             using (new AllowedThread())
             {
                 foreach (var party in obj._parties)
                 {
+                    if (party == MobileParty.MainParty)
+                    {
+                        containsMainParty = true;
+                    }
                     party.AttachedTo = null;
                     party._army = null;
                 }
@@ -84,7 +88,8 @@ internal class ArmyRegistry : AutoRegistryBase<Army>
                 obj._tickEvent?.DeletePeriodicEvent();
                 // this is what  removes the overlay panel
                 var mapScreen = Game.Current.GameStateManager.ActiveState as MapState;
-                if (mapScreen != null)
+                // overlay needs to be removed only when the mainparty is in the army
+                if (mapScreen != null && (containsMainParty || obj.LeaderParty == MobileParty.MainParty))
                 {
                     var screen = ScreenManager.TopScreen as MapScreen;
                     screen?.RemoveArmyOverlay();
