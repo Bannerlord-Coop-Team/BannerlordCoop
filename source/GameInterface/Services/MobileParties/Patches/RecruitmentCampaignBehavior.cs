@@ -48,7 +48,7 @@ internal class RecruitmentCampaignBehaviorPatch
         if (town == null)
             return true;
 
-        int count = Traverse.Create(__instance).Field("_selectedMercenaryCount").GetValue<int>();
+        int count = __instance._selectedMercenaryCount;
         if (count <= 0)
             return false;
 
