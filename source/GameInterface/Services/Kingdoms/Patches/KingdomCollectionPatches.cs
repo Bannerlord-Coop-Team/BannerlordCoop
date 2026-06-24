@@ -5,9 +5,11 @@ using GameInterface.Policies;
 using GameInterface.Services.Kingdoms.Messages.Collections;
 using HarmonyLib;
 using Serilog;
+using System.Threading.Channels;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Diamond;
 
 namespace GameInterface.Services.Kingdoms.Patches;
 
@@ -237,40 +239,48 @@ internal class KingdomCollectionPatches
             ? kingdom._deadLordsCache?.Contains(hero) == true
             : kingdom._aliveLordsCache?.Contains(hero) == true;
 
+        bool changed = isAdd ? !contains : contains;
         if (isDead)
         {
-            PublishIfChanging(
-                kingdom,
-                hero,
-                isAdd ? new DeadLordsCacheUpdated(kingdom, hero) : new DeadLordsCacheRemoved(kingdom, hero),
-                isAdd ? !contains : contains);
+            // Split ternary to preserve concrete type for generic type inference in PublishIfChanging
+            if (isAdd)
+                PublishIfChanging(kingdom, hero, new DeadLordsCacheUpdated(kingdom, hero), changed);
+            else
+                PublishIfChanging(kingdom, hero, new DeadLordsCacheRemoved(kingdom, hero), changed);
         }
         else
         {
-            PublishIfChanging(
-                kingdom,
-                hero,
-                isAdd ? new AliveLordsCacheUpdated(kingdom, hero) : new AliveLordsCacheRemoved(kingdom, hero),
-                isAdd ? !contains : contains);
+            // Split ternary to preserve concrete type for generic type inference in PublishIfChanging
+        if (isAdd)
+                PublishIfChanging(kingdom, hero, new AliveLordsCacheUpdated(kingdom, hero), changed);
+            else
+                PublishIfChanging(kingdom, hero, new AliveLordsCacheRemoved(kingdom, hero), changed);
         }
 
         return true;
     }
 
-    private static bool PublishSingleChange(
-        string memberName,
-        Kingdom kingdom,
-        object value,
-        IEvent message,
-        bool changed)
+    // Generic parameter TMessage preserves the concrete type(e.g.ArmyListUpdated) all the way
+    // through to MessageBroker.Publish<T>, so T is inferred as ArmyListUpdated not IEvent.
+    // Without this, message typed as IEvent causes Publish to store under subscribers[typeof(IEvent)]
+    // which never matches handlers subscribed to subscribers[typeof(ArmyListUpdated)].
+    private static bool PublishSingleChange<TMessage>(
+    string memberName,
+    Kingdom kingdom,
+    object value,
+    TMessage message,
+    bool changed)
+    where TMessage : IEvent
     {
         if (!CanPublishServerChange(memberName, out var allowOriginal)) return allowOriginal;
-
         PublishIfChanging(kingdom, value, message, changed);
         return true;
     }
 
-    private static void PublishIfChanging(Kingdom kingdom, object value, IEvent message, bool changed)
+    // TMessage preserved here for the same reason, if this accepted IEvent instead,
+    // the Publish call below would infer T = IEvent regardless of the concrete type passed in.
+    private static void PublishIfChanging<TMessage>(Kingdom kingdom, object value, TMessage message, bool changed)
+        where TMessage : IEvent
     {
         if (changed && value != null)
         {
