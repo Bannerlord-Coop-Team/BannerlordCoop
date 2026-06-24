@@ -23,7 +23,7 @@ namespace E2E.Tests.Environment;
 /// <summary>
 /// Testing environment for End to End testing
 /// </summary>
-internal class E2ETestEnvironment : IDisposable 
+public class E2ETestEnvironment : IDisposable
 {
     public IEnumerable<EnvironmentInstance> Clients => IntegrationEnvironment.Clients;
     public EnvironmentInstance Server => IntegrationEnvironment.Server;

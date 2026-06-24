@@ -82,8 +82,17 @@ public class MissionContext : IMissionContext, IHandler
     {
         lock(gate)
         {
-            idToPeer.Add(controllerId, peer);
-            peerToId.Add(peer, controllerId);
+            // A rejoining controller can still have a stale mapping (its earlier leave/disconnect didn't clear
+            // it, or it reconnected on a new NetPeer), so Dictionary.Add would throw "same key has already been
+            // added" and kill the poll loop. Drop any prior entry for this controller OR this peer, then set —
+            // making the mapping idempotent across rejoins.
+            if (idToPeer.TryGetValue(controllerId, out var previousPeer))
+                peerToId.Remove(previousPeer);
+            if (peerToId.TryGetValue(peer, out var previousId))
+                idToPeer.Remove(previousId);
+
+            idToPeer[controllerId] = peer;
+            peerToId[peer] = controllerId;
         }
     }
 

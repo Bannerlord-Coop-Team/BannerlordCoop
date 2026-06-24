@@ -112,6 +112,13 @@ public class MissionManager : IMissionManager
     public bool TryGetRelayTarget(string instanceId, string controllerId, out NetPeer peer)
     {
         peer = null;
+
+        if (instanceId == null)
+            return false;
+
+        if (controllerId == null)
+            return false;
+
         lock (gate)
         {
             if (!byInstanceId.TryGetValue(instanceId, out var instance))

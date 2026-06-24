@@ -1,6 +1,8 @@
 using Autofac;
 using GameInterface.Services.Locations;
+using GameInterface.Services.MapEvents;
 using Missions.Agents.Handlers;
+using Missions.Battles;
 using Missions.Missiles.Handlers;
 using Missions.Services.Network;
 using Missions.Taverns;
@@ -47,6 +49,41 @@ public class MissionModule : Module
             .AsSelf()
             .As<ILocationMissionBehavior>()
             .InstancePerDependency();
+
+        // The field-battle P2P controller. Resolved as IBattleMissionBehavior by BattleMissionEntryPatch and
+        // attached to every opened battle mission. The battle counterpart to CoopLocationsController; transient
+        // so each mission gets a fresh controller that is disposed with that mission.
+        builder.RegisterType<CoopBattleController>()
+            .AsSelf()
+            .As<IBattleMissionBehavior>()
+            .InstancePerDependency();
+
+        // Builds the coop field-battle mission (mirrors SandBoxMissions.OpenBattleMission with coop suppliers,
+        // no deployment phase, and the coop behaviors attached). Resolved from the container by the GameInterface
+        // battle flow (OpenAttackMission) as ICoopFieldBattleLauncher; lives in Missions so it can reference the
+        // SandBox mission behaviors. Stateless, so a single per-scope instance is fine.
+        builder.RegisterType<CoopFieldBattleLauncher>()
+            .As<ICoopFieldBattleLauncher>()
+            .InstancePerLifetimeScope();
+
+        // Battle host election + assignment store. BattleHostRegistry holds the per-map-event host/successor
+        // assignment (queried by the spawn path and, later, host migration); BattleHostHandler elects on the
+        // server and stores the broadcast on clients. Both live for the whole session (like MissionContext),
+        // and BattleHostHandler is AutoActivated so it subscribes up front on both client and server.
+        builder.RegisterType<BattleHostRegistry>()
+            .As<IBattleHostRegistry>()
+            .InstancePerLifetimeScope();
+
+        builder.RegisterType<BattleHostHandler>()
+            .AsSelf()
+            .InstancePerLifetimeScope()
+            .AutoActivate();
+
+        // [Server] Applies owner-reported battle casualties to the authoritative map-event roster.
+        builder.RegisterType<BattleCasualtyHandler>()
+            .AsSelf()
+            .InstancePerLifetimeScope()
+            .AutoActivate();
 
         builder.RegisterType<NetworkAgentRegistry>().As<INetworkAgentRegistry>().InstancePerLifetimeScope();
         //builder.RegisterType<NetworkMissileRegistry>().As<INetworkMissileRegistry>().InstancePerDependency();

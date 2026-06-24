@@ -4,11 +4,13 @@ using Common.Messaging;
 using Common.PacketHandlers;
 using Common.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.MapEvents;
 using LiteNetLib;
 using Missions.Agents.Packets;
 using Missions.Messages;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Agents.Handlers
@@ -26,12 +28,24 @@ namespace Missions.Agents.Handlers
         // poller-swallows-exceptions).
         private static readonly TimeSpan PollingInterval = TimeSpan.FromMilliseconds(10);
 
+        // Max agents per movement packet. The host has authority over every AI troop, so its batch can be
+        // dozens of agents — one packet for all of them overflows the unreliable MTU ceiling (LiteNetLib
+        // throws TooBigPacketException on oversized non-fragmentable sends, which the Poller swallows). At
+        // ~220 B/agent this keeps a chunk under a typical negotiated MTU; the send path promotes any chunk
+        // that still overflows to a fragmentable reliable channel rather than dropping it.
+        private const int MaxAgentsPerMovementPacket = 6;
+
         private readonly Poller poller;
         private readonly IPacketManager packetManager;
         private readonly IBattleNetwork client;
         private readonly IMessageBroker messageBroker;
         private readonly INetworkAgentRegistry agentRegistry;
         private readonly IControllerIdProvider controllerIdProvider;
+
+        // A puppet's horse, remembered when its owner dismounts, so a later re-mount can put it back on the
+        // same one. Touched only on the game thread (inside HandlePacket's apply), so no lock; per-mission
+        // (this handler is transient), so it can't leak across missions.
+        private readonly Dictionary<Agent, Agent> _dismountedHorses = new Dictionary<Agent, Agent>();
 
         public AgentMovementHandler(
             IBattleNetwork client,
@@ -84,40 +98,93 @@ namespace Missions.Agents.Handlers
         {
             if (Mission.Current == null) return;
 
+            // Collect every agent we have authority over, then broadcast them in MTU-safe chunks. One packet
+            // per agent floods the mesh and the receiver's game-thread queue at battle scale (the GameThread
+            // lockup); one packet for ALL of them overflows the unreliable MTU ceiling.
+            var ids = new List<Guid>();
+            var data = new List<AgentData>();
             foreach (var agentInfo in agentRegistry.GetAgents(controllerIdProvider.ControllerId))
             {
                 Agent agent = agentInfo.Agent;
                 if (agent != null && agent.Mission != null)
                 {
-                    client.SendAll(new MovementPacket(agentInfo.AgentId, agent));
+                    ids.Add(agentInfo.AgentId);
+                    data.Add(new AgentData(agent));
                 }
+            }
+
+            for (int start = 0; start < ids.Count; start += MaxAgentsPerMovementPacket)
+            {
+                int count = Math.Min(MaxAgentsPerMovementPacket, ids.Count - start);
+                var idChunk = new Guid[count];
+                var dataChunk = new AgentData[count];
+                ids.CopyTo(start, idChunk, 0, count);
+                data.CopyTo(start, dataChunk, 0, count);
+                client.SendAll(new MovementPacket(idChunk, dataChunk));
             }
         }
 
         public void HandlePacket(NetPeer peer, IPacket packet)
         {
-            MovementPacket movement = (MovementPacket)packet;
+            var movement = (MovementPacket)packet;
+            if (movement.AgentIds == null) return;
 
-            if (agentRegistry.IsLocallyControlled(movement.AgentId))
-                return;
+            // Resolve the agents to apply (skipping our own) on the network thread, then apply the whole
+            // batch in ONE game-thread action — a RunSafe per agent floods the queue at battle scale.
+            var toApply = new List<(Agent agent, AgentData data)>();
+            for (int i = 0; i < movement.AgentIds.Length; i++)
+            {
+                var agentId = movement.AgentIds[i];
+                if (agentRegistry.IsLocallyControlled(agentId)) continue;
+                if (!agentRegistry.TryGetAgentInfo(agentId, out var agentInfo)) continue;
+                toApply.Add((agentInfo.Agent, movement.Agents[i]));
+            }
 
-            if (!agentRegistry.TryGetAgentInfo(movement.AgentId, out var agentInfo))
-                return;
+            if (toApply.Count == 0) return;
 
-            Agent agent = agentInfo.Agent;
             GameThread.RunSafe(() =>
             {
-                // Queued from the network thread and run a frame later: by then the agent may be invalid
-                // (the player left, or the mission was torn down). Only apply while it is still active in the
-                // current mission.
-                if (Mission.Current == null || agent == null || agent.Mission != Mission.Current || agent.IsActive() == false)
-                    return;
+                if (Mission.Current == null) return;
 
                 using (new AllowedThread())
                 {
-                    movement.Apply(agent);
+                    foreach (var (agent, data) in toApply)
+                    {
+                        // The agent may have become invalid (player left, mission torn down) between queueing
+                        // and running; only apply while it is still active in the current mission.
+                        if (agent == null || agent.Mission != Mission.Current || agent.IsActive() == false)
+                            continue;
+
+                        SyncMountState(agent, data);
+                        data.Apply(agent);
+                    }
                 }
             });
+        }
+
+        // [Game thread] Replicate the owner's mount/dismount onto its puppet. The per-tick AgentData reports
+        // whether the owner is mounted (MountData != null); without acting on the transition a puppet stays
+        // stuck on its horse after the owner dismounts (and never re-mounts). MountAgent is set directly
+        // (controller-independent — puppets have no controller to process a mount/dismount input flag); the
+        // movement sync then keeps the rider/horse positioned. AgentData.Apply still syncs the mount's pose
+        // while both are mounted.
+        private void SyncMountState(Agent agent, AgentData data)
+        {
+            bool ownerMounted = data.MountData != null;
+
+            if (!ownerMounted && agent.HasMount)
+            {
+                // Owner dismounted: get the puppet off the horse. Remember the horse for a possible re-mount.
+                _dismountedHorses[agent] = agent.MountAgent;
+                agent.MountAgent = null;
+            }
+            else if (ownerMounted && !agent.HasMount)
+            {
+                // Owner re-mounted: put the puppet back on the horse it left, if it's still around and free.
+                if (_dismountedHorses.TryGetValue(agent, out var horse) && horse != null && horse.IsActive() && horse.RiderAgent == null)
+                    agent.MountAgent = horse;
+                _dismountedHorses.Remove(agent);
+            }
         }
 
         private void Handle_PeerEntered(MessagePayload<NetworkMissionPeerEntered> payload)
@@ -145,6 +212,11 @@ namespace Missions.Agents.Handlers
             if (string.IsNullOrEmpty(controllerId)) return;
 
             if (controllerId == controllerIdProvider.ControllerId) return;
+
+            // In a coop field battle a departing player's troops are NOT despawned: the host adopts them
+            // (CoopBattleController.HandlePeerGone) so they keep fighting under host AI, and other peers keep
+            // them as puppets that follow the host's movement. Skip the location-style cleanup entirely.
+            if (BattleSpawnGate.IsCoopBattleActive) return;
 
             bool sceneActive = Mission.Current != null;
 

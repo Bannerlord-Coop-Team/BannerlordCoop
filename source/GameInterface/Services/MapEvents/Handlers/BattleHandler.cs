@@ -345,7 +345,31 @@ internal class BattleHandler : IHandler
             position = battle.DefenderSide.LeaderParty.Position;
             rec2.PatchEncounterDir = (v2 - position.ToVec2()).Normalized();
 
-            CampaignMission.OpenBattleMission(rec2);
+            // Engage the spawn gate BEFORE OpenBattleMission builds the mission — the deployment controller
+            // spawns the initial wave during mission setup (inside OpenBattleMission), earlier than the
+            // CoopBattleController attach. The host is computed locally (deterministic lowest controller id);
+            // the server's authoritative assignment reconciles the gate later (BattleHostHandler).
+            if (BattleSpawnConfig.Enabled
+                && ContainerProvider.TryResolve(out IObjectManager battleObjectManager)
+                && battleObjectManager.TryGetId(battle, out var battleMapEventId))
+            {
+                var isLocalHost = BattleHostElection.IsLocalHost(battle);
+                BattleSpawnGate.BeginBattle(battleMapEventId, isLocalHost);
+                Logger.Information("[BattleSync] Engaged spawn gate in OpenAttackMission: mapEvent={MapEventId} isHost={IsHost}", battleMapEventId, isLocalHost);
+            }
+
+            // Coop opens a custom field-battle mission (per-client troop suppliers, no deployment phase) instead
+            // of the native one; the launcher lives in Missions and is resolved from the container. Fall back to
+            // the native mission only if it is somehow unavailable, so a misconfiguration still yields a battle.
+            if (ContainerProvider.TryResolve(out ICoopFieldBattleLauncher battleLauncher))
+            {
+                battleLauncher.OpenCoopFieldBattle(rec2);
+            }
+            else
+            {
+                Logger.Warning("[BattleSync] ICoopFieldBattleLauncher unavailable; opening native battle mission");
+                CampaignMission.OpenBattleMission(rec2);
+            }
         }
         catch (Exception e)
         {

@@ -304,7 +304,21 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     public void Send(NetPeer netPeer, IPacket packet)
     {
         byte[] data = serializer.Serialize(packet);
-        netPeer.Send(data, packet.DeliveryMethod);
+        var method = packet.DeliveryMethod;
+
+        // Unreliable/Sequenced channels can't fragment: an oversized payload makes netPeer.Send throw
+        // TooBigPacketException, which the Poller swallows (e.g. movement then silently stops). When a
+        // packet exceeds the peer's current MTU for its requested channel, promote it to a fragmentable
+        // reliable channel so LiteNetLib splits it instead of throwing. Senders chunk to keep the common
+        // case unreliable; this is the backstop for whatever still overflows (small early MTU, fat
+        // all-cavalry batches, large spawn bursts).
+        if (method != DeliveryMethod.ReliableOrdered && method != DeliveryMethod.ReliableUnordered
+            && data.Length > netPeer.GetMaxSinglePacketSize(method))
+        {
+            method = DeliveryMethod.ReliableUnordered;
+        }
+
+        netPeer.Send(data, method);
     }
 
     public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
