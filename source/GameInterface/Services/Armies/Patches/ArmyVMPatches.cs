@@ -11,6 +11,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.ViewModelCollection.ArmyManagement;
+using TaleWorlds.CampaignSystem.ViewModelCollection.GameMenu.Overlay;
 
 namespace GameInterface.Services.Armies.Patches;
 
@@ -77,3 +78,21 @@ internal class ArmyManagementVMExecuteDonePatch
         return false;
     }
 }
+// refresh ui
+//[HarmonyPatch(typeof(ArmyMenuOverlayVM), nameof(ArmyMenuOverlayVM.Refresh))]
+//public class ArmyMenuOverlayVMRefreshPatch
+//{
+//    [HarmonyPrefix]
+//    static bool Prefix(ArmyMenuOverlayVM __instance)
+//    {
+//        if (!ModInformation.IsClient) return true;
+
+//        if (__instance.ArmyToUse == null)
+//        {
+//            __instance.PartyList.Clear();
+//            return false;
+//        }
+
+//        return true;
+//    }
+//}

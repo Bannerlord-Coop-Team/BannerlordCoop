@@ -3,13 +3,17 @@ using Common.Util;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
+using SandBox.View.Map;
 using Serilog;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.Armies;
 
@@ -58,8 +62,11 @@ internal class ArmyRegistry : AutoRegistryBase<Army>
     // Just clean up the fields directly.
     public override void OnClientDestroyed(Army obj, string id)
     {
+        Logger.Information("OnClientDestroyed called for army {id}, MainParty._army == obj: {match}",
+        id, MobileParty.MainParty._army == obj);
         GameThread.Run(() =>
         {
+            Logger.Information("GameThread running for army destroy {id}", id);
             using (new AllowedThread())
             {
                 foreach (var party in obj._parties)
@@ -68,6 +75,22 @@ internal class ArmyRegistry : AutoRegistryBase<Army>
                     party._army = null;
                 }
                 obj._parties.Clear();
+                // Explicitly null MainParty in case it wasn't in _parties
+                if (MobileParty.MainParty._army == obj)
+                {
+                    MobileParty.MainParty._army = null;
+                }
+                obj.Kingdom = null; //remove army from kingdom
+
+                obj._hourlyTickEvent?.DeletePeriodicEvent();
+                obj._tickEvent?.DeletePeriodicEvent();
+                // this is what  removes the overlay panel
+                var mapScreen = Game.Current.GameStateManager.ActiveState as MapState;
+                if (mapScreen != null)
+                {
+                    var screen = ScreenManager.TopScreen as MapScreen;
+                    screen?.RemoveArmyOverlay();
+                }
             }
         });
     }
