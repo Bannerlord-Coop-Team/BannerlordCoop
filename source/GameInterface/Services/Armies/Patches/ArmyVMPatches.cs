@@ -6,6 +6,7 @@ using GameInterface.Policies;
 using GameInterface.Services.Armies.Messages;
 using HarmonyLib;
 using Serilog;
+using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -78,21 +79,21 @@ internal class ArmyManagementVMExecuteDonePatch
         return false;
     }
 }
-// refresh ui
-//[HarmonyPatch(typeof(ArmyMenuOverlayVM), nameof(ArmyMenuOverlayVM.Refresh))]
-//public class ArmyMenuOverlayVMRefreshPatch
-//{
-//    [HarmonyPrefix]
-//    static bool Prefix(ArmyMenuOverlayVM __instance)
-//    {
-//        if (!ModInformation.IsClient) return true;
+[HarmonyPatch(typeof(GameMenuOverlay), "ExecuteTroopAction")]
+public class GameMenuOverlayArmyDismissPatch
+{
+    [HarmonyPrefix]
+    static bool Prefix(GameMenuOverlay __instance, object o)
+    {
+        if (!ModInformation.IsClient) return true;
+        if ((GameMenuOverlay.MenuOverlayContextList)o != GameMenuOverlay.MenuOverlayContextList.ArmyDismiss) return true;
 
-//        if (__instance.ArmyToUse == null)
-//        {
-//            __instance.PartyList.Clear();
-//            return false;
-//        }
+        var party = __instance._contextMenuItem?.Party?.MobileParty;
+        if (party?.Army == null) return true;
 
-//        return true;
-//    }
-//}
+        MessageBroker.Instance.Publish(__instance, new PlayerRemovedPartiesFromArmy(
+            new List<MobileParty> { party }));
+
+        return false;
+    }
+}

@@ -62,8 +62,6 @@ internal class ArmyRegistry : AutoRegistryBase<Army>
     // Just clean up the fields directly.
     public override void OnClientDestroyed(Army obj, string id)
     {
-        Logger.Information("OnClientDestroyed called for army {id}, MainParty._army == obj: {match}",
-        id, MobileParty.MainParty._army == obj);
         GameThread.Run(() =>
         {
             Logger.Information("GameThread running for army destroy {id}", id);
