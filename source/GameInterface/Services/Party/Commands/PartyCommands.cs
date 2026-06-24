@@ -1,4 +1,4 @@
-﻿using Autofac;
+using Autofac;
 using Common;
 using Common.Logging;
 using GameInterface.Services.ObjectManager;
@@ -29,15 +29,30 @@ internal class PartyCommands
     }
 
     /// <summary>
-    /// Finds an alive hero by full name (the console splits arguments on spaces, so the caller joins them
-    /// back) and confirms it has a party. Reports cleanly instead of letting a cheat dereference a null
-    /// PartyBelongedTo when the name matches nothing or a partyless hero (a prisoner, notable, or wanderer).
+    /// All alive heroes whose full name matches and that have a party (the console splits arguments on spaces,
+    /// so the caller joins them back). The bulk cheats act on every match, not just the first, so a co-op test
+    /// save with several identically-named heroes - e.g. multiple "RandomPlayer" parties - is set up on all of
+    /// them at once. Heroes with no party (a prisoner, notable, or wanderer) are skipped so a cheat never
+    /// dereferences a null PartyBelongedTo.
+    /// </summary>
+    private static List<Hero> FindHeroesWithParty(string name)
+        => Hero.AllAliveHeroes.Where(h => h.Name.ToString() == name && h.PartyBelongedTo != null).ToList();
+
+    /// <summary>
+    /// Finds a single alive hero by full name with a party, for the cheats that target one party (the
+    /// companion-preserve pair - putting one hero into several prisons at once would be invalid state).
+    /// Reports cleanly when the name matches nothing or only partyless heroes.
     /// </summary>
     private static bool TryGetHeroWithParty(string name, out Hero hero, out string error)
     {
-        hero = Hero.AllAliveHeroes.FirstOrDefault(h => h.Name.ToString() == name);
-        if (hero == null) { error = "Hero \"" + name + "\" not found."; return false; }
-        if (hero.PartyBelongedTo == null) { error = hero.Name + " has no party (a prisoner, notable, or wanderer?)."; return false; }
+        hero = FindHeroesWithParty(name).FirstOrDefault();
+        if (hero == null)
+        {
+            error = Hero.AllAliveHeroes.Any(h => h.Name.ToString() == name)
+                ? "Hero \"" + name + "\" has no party (a prisoner, notable, or wanderer?)."
+                : "Hero \"" + name + "\" not found.";
+            return false;
+        }
         error = null;
         return true;
     }
@@ -50,20 +65,25 @@ internal class PartyCommands
     {
         if (strings.Count == 0) return "Hero name argument required.";
 
-        if (!TryGetHeroWithParty(string.Join(" ", strings), out var hero, out var error)) return error;
+        var name = string.Join(" ", strings);
+        var heroes = FindHeroesWithParty(name);
+        if (heroes.Count == 0) return "No hero named \"" + name + "\" with a party found.";
 
         StringBuilder stringBuilder = new StringBuilder();
-        stringBuilder.AppendLine("##" + hero.Name.ToString());
-        stringBuilder.AppendLine("Member roster:");
-        foreach (var rosterElement in hero.PartyBelongedTo.MemberRoster.data)
+        foreach (var hero in heroes)
         {
-            stringBuilder.AppendLine(rosterElement.Character?.StringId + ": " + rosterElement.Number + " " + rosterElement.Xp);
-        }
+            stringBuilder.AppendLine("##" + hero.Name.ToString());
+            stringBuilder.AppendLine("Member roster:");
+            foreach (var rosterElement in hero.PartyBelongedTo.MemberRoster.data)
+            {
+                stringBuilder.AppendLine(rosterElement.Character?.StringId + ": " + rosterElement.Number + " " + rosterElement.Xp);
+            }
 
-        stringBuilder.AppendLine("Prisoner roster:");
-        foreach (var rosterElement in hero.PartyBelongedTo.PrisonRoster.data)
-        {
-            stringBuilder.AppendLine(rosterElement.Character?.StringId + ": " + rosterElement.Number + " " + rosterElement.Xp);
+            stringBuilder.AppendLine("Prisoner roster:");
+            foreach (var rosterElement in hero.PartyBelongedTo.PrisonRoster.data)
+            {
+                stringBuilder.AppendLine(rosterElement.Character?.StringId + ": " + rosterElement.Number + " " + rosterElement.Xp);
+            }
         }
 
         return stringBuilder.ToString();
@@ -82,15 +102,20 @@ internal class PartyCommands
         // The xp amount is the last token; the rest is the (possibly multi-word) hero name.
         if (!int.TryParse(strings[strings.Count - 1], out int xpGain)) return "Please enter an integer for xp amount";
 
-        if (!TryGetHeroWithParty(string.Join(" ", strings.Take(strings.Count - 1)), out var hero, out var error)) return error;
+        var name = string.Join(" ", strings.Take(strings.Count - 1));
+        var heroes = FindHeroesWithParty(name);
+        if (heroes.Count == 0) return "No hero named \"" + name + "\" with a party found.";
 
-        var memberRoster = hero.PartyBelongedTo.MemberRoster;
-        foreach (var troop in memberRoster.data)
+        foreach (var hero in heroes)
         {
-            memberRoster.AddXpToTroop(troop.Character, xpGain);
+            var memberRoster = hero.PartyBelongedTo.MemberRoster;
+            foreach (var troop in memberRoster.data)
+            {
+                memberRoster.AddXpToTroop(troop.Character, xpGain);
+            }
         }
 
-        return "The party of " + hero.Name.ToString() + " got some xp.";
+        return "Gave xp to the troops of " + heroes.Count + " party/parties named \"" + name + "\".";
     }
 
     /// <summary>
@@ -105,9 +130,10 @@ internal class PartyCommands
 
         if (TryGetObjectManager(out var objectManager) == false) return "Unable to resolve ObjectManager.";
 
-        if (!TryGetHeroWithParty(string.Join(" ", strings), out var hero, out var error)) return error;
+        var name = string.Join(" ", strings);
+        var heroes = FindHeroesWithParty(name);
+        if (heroes.Count == 0) return "No hero named \"" + name + "\" with a party found.";
 
-        var memberRoster = hero.PartyBelongedTo.MemberRoster;
         var troopsToAdd = new Dictionary<string, int>()
         {
             { "imperial_vigla_recruit", 5 },
@@ -117,19 +143,24 @@ internal class PartyCommands
         };
 
         StringBuilder stringBuilder = new StringBuilder();
-        foreach (var troopId in troopsToAdd.Keys)
+        foreach (var hero in heroes)
         {
-            if (!objectManager.TryGetObject(troopId, out CharacterObject characterObject))
+            var memberRoster = hero.PartyBelongedTo.MemberRoster;
+            foreach (var troopId in troopsToAdd.Keys)
             {
-                stringBuilder.AppendLine("Failed to retrieve object for CharacterObject id: " + troopId);
+                if (!objectManager.TryGetObject(troopId, out CharacterObject characterObject))
+                {
+                    stringBuilder.AppendLine("Failed to retrieve object for CharacterObject id: " + troopId);
+                }
+                else
+                {
+                    memberRoster.AddToCounts(characterObject, troopsToAdd[troopId]);
+                }
             }
-            else
-            {
-                memberRoster.AddToCounts(characterObject, troopsToAdd[troopId]);
-            }
+
+            stringBuilder.AppendLine(hero.Name.ToString() + " was given troops.");
         }
 
-        stringBuilder.AppendLine(hero.Name.ToString() + " was given troops.");
         return stringBuilder.ToString();
     }
 
@@ -145,9 +176,10 @@ internal class PartyCommands
 
         if (TryGetObjectManager(out var objectManager) == false) return "Unable to resolve ObjectManager.";
 
-        if (!TryGetHeroWithParty(string.Join(" ", strings), out var hero, out var error)) return error;
+        var name = string.Join(" ", strings);
+        var heroes = FindHeroesWithParty(name);
+        if (heroes.Count == 0) return "No hero named \"" + name + "\" with a party found.";
 
-        var prisonerRoster = hero.PartyBelongedTo.PrisonRoster;
         var troopsToAdd = new Dictionary<string, int>()
         {
             { "imperial_vigla_recruit", 5 },
@@ -157,19 +189,24 @@ internal class PartyCommands
         };
 
         StringBuilder stringBuilder = new StringBuilder();
-        foreach (var troopId in troopsToAdd.Keys)
+        foreach (var hero in heroes)
         {
-            if (!objectManager.TryGetObject(troopId, out CharacterObject characterObject))
+            var prisonerRoster = hero.PartyBelongedTo.PrisonRoster;
+            foreach (var troopId in troopsToAdd.Keys)
             {
-                stringBuilder.AppendLine("Failed to retrieve object for CharacterObject id: " + troopId);
+                if (!objectManager.TryGetObject(troopId, out CharacterObject characterObject))
+                {
+                    stringBuilder.AppendLine("Failed to retrieve object for CharacterObject id: " + troopId);
+                }
+                else
+                {
+                    prisonerRoster.AddToCounts(characterObject, troopsToAdd[troopId]);
+                }
             }
-            else
-            {
-                prisonerRoster.AddToCounts(characterObject, troopsToAdd[troopId]);
-            }
+
+            stringBuilder.AppendLine(hero.Name.ToString() + " was given prisoners.");
         }
 
-        stringBuilder.AppendLine(hero.Name.ToString() + " was given prisoners.");
         return stringBuilder.ToString();
     }
 
@@ -183,19 +220,27 @@ internal class PartyCommands
 
         if (strings.Count == 0) return "Hero name required";
 
-        if (!TryGetHeroWithParty(string.Join(" ", strings), out var hero, out var error)) return error;
+        var name = string.Join(" ", strings);
+        var heroes = FindHeroesWithParty(name);
+        if (heroes.Count == 0) return "No hero named \"" + name + "\" with a party found.";
 
-        var prisonerRoster = hero.PartyBelongedTo.PrisonRoster;
-
-        // Walk from the end so removing the current element leaves the lower indices valid. Each
-        // subtract-to-zero with removeDepleted runs with patches live, so it replicates to clients.
-        for (int i = prisonerRoster.Count - 1; i >= 0; i--)
+        StringBuilder stringBuilder = new StringBuilder();
+        foreach (var hero in heroes)
         {
-            var element = prisonerRoster.GetElementCopyAtIndex(i);
-            prisonerRoster.AddToCounts(element.Character, -element.Number, false, -element.WoundedNumber, 0, true);
+            var prisonerRoster = hero.PartyBelongedTo.PrisonRoster;
+
+            // Walk from the end so removing the current element leaves the lower indices valid. Each
+            // subtract-to-zero with removeDepleted runs with patches live, so it replicates to clients.
+            for (int i = prisonerRoster.Count - 1; i >= 0; i--)
+            {
+                var element = prisonerRoster.GetElementCopyAtIndex(i);
+                prisonerRoster.AddToCounts(element.Character, -element.Number, false, -element.WoundedNumber, 0, true);
+            }
+
+            stringBuilder.AppendLine(hero.Name.ToString() + " had their prisoners removed.");
         }
 
-        return hero.Name.ToString() + " had their prisoners removed.";
+        return stringBuilder.ToString();
     }
 
     /// <summary>
@@ -212,12 +257,13 @@ internal class PartyCommands
         // The console splits arguments on spaces, so the captor is the first token and the prisoner name is
         // the rest joined back together. Companions always have a multi-word name (e.g. "Chandion the Bull"),
         // which would otherwise arrive as several tokens and never match. (The captor must be a single-token
-        // name for this split to work, which the player's own hero typically is.)
+        // name for this split to work, which the player's own hero typically is.) One captor only: a hero can
+        // only be a prisoner in one place, so imprisoning the companion in several prisons would be invalid.
         if (!TryGetHeroWithParty(strings[0], out var captor, out var error)) return error;
 
         var prisonerName = string.Join(" ", strings.Skip(1));
         var prisoner = Hero.AllAliveHeroes.FirstOrDefault(h => h.Name.ToString() == prisonerName);
-        if (prisoner == null) return "Prisoner hero not found.";
+        if (prisoner == null) return "Prisoner hero \"" + prisonerName + "\" not found.";
 
         // The preserve only fires for a player companion, so a non-companion would be removed by both the
         // fixed and the old code and prove nothing. Require a companion so the test actually exercises it.
@@ -241,6 +287,7 @@ internal class PartyCommands
 
         if (TryGetObjectManager(out var objectManager) == false) return "Unable to resolve ObjectManager.";
 
+        // One party only, to pair with imprison_companion (which targets one prison).
         if (!TryGetHeroWithParty(string.Join(" ", strings), out var hero, out var error)) return error;
 
         var prisonRoster = hero.PartyBelongedTo.PrisonRoster;
