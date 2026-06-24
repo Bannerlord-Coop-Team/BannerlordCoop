@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.MobileParties.Messages;
+using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.UI.Notifications.Messages;
 using LiteNetLib;
@@ -19,8 +20,8 @@ using TaleWorlds.Core;
 namespace GameInterface.Services.MobileParties.Handlers;
 
 /// <summary>
-/// Replicates a tavern mercenary hire from the conversing client to the server, which applies the
-/// troop add and gold cost authoritatively so they reach every client.
+/// Replicates a tavern mercenary hire from a client to the server, which validates the synced
+/// stock and applies the troop add and gold cost authoritatively so they reach every client.
 /// </summary>
 internal class MercenaryHireHandler : IHandler
 {
@@ -62,7 +63,8 @@ internal class MercenaryHireHandler : IHandler
             townId,
             mercenaryTroopId,
             obj.What.Count,
-            obj.What.GoldAmount));
+            obj.What.GoldAmount,
+            obj.What.MainHero.Gold));
     }
 
     private void Handle_HireMercenaries(MessagePayload<HireMercenaries> obj)
@@ -76,13 +78,59 @@ internal class MercenaryHireHandler : IHandler
 
         // The hire applies vanilla game actions; defer them to the game-loop thread so they run there
         // instead of on the network (poller) thread that delivered the message.
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             try
             {
                 if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
                 if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty)) return;
+                if (!objectManager.TryGetObjectWithLogging<Town>(data.TownId, out var town)) return;
                 if (!objectManager.TryGetObjectWithLogging<CharacterObject>(data.MercenaryTroopId, out var mercenaryTroop)) return;
+                if (town.Settlement == null || !town.Settlement.IsTown) return;
+
+                var recruitmentBehavior = Campaign.Current?.GetCampaignBehavior<RecruitmentCampaignBehavior>();
+                var mercenaryData = recruitmentBehavior?.GetMercenaryData(town);
+                int unitPrice = mercenaryData?.TroopType == null
+                    ? 0
+                    : Campaign.Current.Models.PartyWageModel.GetTroopRecruitmentCost(mercenaryData.TroopType, mainHero).RoundedResultNumber;
+                if (mercenaryData == null ||
+                    data.Count <= 0 ||
+                    data.GoldAmount <= 0 ||
+                    data.HeroGold < data.GoldAmount ||
+                    unitPrice <= 0 ||
+                    mercenaryData.TroopType != mercenaryTroop ||
+                    mercenaryData.Number < data.Count)
+                {
+                    var availableTroopId = "unresolved";
+                    if (mercenaryData?.TroopType != null &&
+                        objectManager.TryGetIdWithLogging(mercenaryData.TroopType, out var resolvedAvailableTroopId))
+                    {
+                        availableTroopId = resolvedAvailableTroopId;
+                    }
+
+                    logger.Warning(
+                        "Rejected town mercenary hire for {TownId}: requested {RequestedTroopId} x{RequestedCount}, available {AvailableTroop} x{AvailableCount}, client hero gold {ClientHeroGold}, server hero gold {ServerHeroGold}, cost {GoldAmount}",
+                        data.TownId,
+                        data.MercenaryTroopId,
+                        data.Count,
+                        availableTroopId,
+                        mercenaryData?.Number,
+                        data.HeroGold,
+                        mainHero.Gold,
+                        data.GoldAmount);
+
+                    if (recruitmentBehavior != null)
+                    {
+                        RecruitmentCampaignBehaviorPatch.PublishMercenaryStock(recruitmentBehavior, town);
+                    }
+
+                    return;
+                }
+
+                if (mainHero.Gold != data.HeroGold)
+                {
+                    mainHero.Gold = data.HeroGold;
+                }
 
                 // Apply with patches LIVE (no AllowedThread): the roster add replicates via the
                 // TroopRoster patches and the gold change via the Hero.Gold sync.
@@ -104,14 +152,8 @@ internal class MercenaryHireHandler : IHandler
                     SkillLevelingManager.OnBanditsRecruited(mainParty, mercenaryTroop, data.Count);
                 }
 
-                // Keep the server's own copy of the town's mercenary stock roughly in step. The stock
-                // is rolled independently by each machine's daily tick and is not authoritative across
-                // machines, so this is best-effort and never gates the hire.
-                if (objectManager.TryGetObject<Town>(data.TownId, out var town))
-                {
-                    Campaign.Current?.GetCampaignBehavior<RecruitmentCampaignBehavior>()?
-                        .GetMercenaryData(town)?.ChangeMercenaryCount(-data.Count);
-                }
+                mercenaryData.ChangeMercenaryCount(-data.Count);
+                RecruitmentCampaignBehaviorPatch.PublishMercenaryStock(recruitmentBehavior, town);
 
                 // Refresh the requesting player's gold quick-info; the actual gold value already
                 // replicated through the Hero.Gold sync above.
@@ -121,6 +163,6 @@ internal class MercenaryHireHandler : IHandler
             {
                 logger.Error(e, "Failed to apply {Message}", nameof(HireMercenaries));
             }
-        });
+        }, context: nameof(MercenaryHireHandler));
     }
 }
