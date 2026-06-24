@@ -117,6 +117,11 @@ internal class MapEventHandler : IHandler
                 if (!objectManager.TryGetObjectWithLogging<MapEvent>(mapEventId, out var mapEvent))
                     return;
 
+                // Skip if this side already surrendered — another pipeline (e.g. a PvP loser's
+                // NetworkPlayerSurrendered) may have already applied it.
+                if (mapEvent.GetMapEventSide(side).IsSurrendered)
+                    return;
+
                 mapEvent.DoSurrender(side);
             }
             catch (Exception e)
