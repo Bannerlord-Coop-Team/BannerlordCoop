@@ -1,4 +1,5 @@
 using Common.Messaging;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.TroopRosters.Messages;
@@ -10,13 +11,13 @@ namespace GameInterface.Services.TroopRosters.Messages;
 internal readonly struct ElementWoundedNumberSet : IEvent
 {
     public readonly TroopRoster TroopRoster;
-    public readonly int Index;
+    public readonly CharacterObject Character;
     public readonly int Number;
 
-    public ElementWoundedNumberSet(TroopRoster troopRoster, int index, int number)
+    public ElementWoundedNumberSet(TroopRoster troopRoster, CharacterObject character, int number)
     {
         TroopRoster = troopRoster;
-        Index = index;
+        Character = character;
         Number = number;
     }
 }

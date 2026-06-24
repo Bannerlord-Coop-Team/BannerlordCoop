@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.Messages.Collections;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Data;
@@ -108,11 +109,16 @@ internal class TroopRosterInterface : ITroopRosterInterface
 
     public void UpdateWithData(TroopRoster targetTroopRoster, TroopRosterData packedTroopRosterElements, Hero mainHero)
     {
-        // Clear without removing MainHero (causes issues if MainHero is removed)
+        // Only preserve heroes in a player's troopRoster
+        bool preserveHeroes = mainHero != null && mainHero.IsPlayerHero() && targetTroopRoster.OwnerParty?.MemberRoster == targetTroopRoster;
+
+        // If preserving heroes, clear without removing mainHero and player companions
+        // Causes issues if mainHero or player companions are removed from a player's party
         for (int i = targetTroopRoster._count - 1; i >= 0; i--)
         {
-            if (targetTroopRoster.data[i].Character?.HeroObject == mainHero || targetTroopRoster.data[i].Character?.HeroObject?.IsPlayerCompanion == true) continue;
-            targetTroopRoster.AddToCounts(targetTroopRoster.data[i].Character, -targetTroopRoster.data[i].Number, false, -targetTroopRoster.data[i].WoundedNumber, 0, true);
+            var character = targetTroopRoster.data[i].Character;
+            if (preserveHeroes && (character?.HeroObject == mainHero || character?.HeroObject?.IsPlayerCompanion == true)) continue;
+            targetTroopRoster.AddToCounts(character, -targetTroopRoster.data[i].Number, false, -targetTroopRoster.data[i].WoundedNumber, 0, true);
         }
 
         if (packedTroopRosterElements.Data == null) return;
@@ -120,6 +126,11 @@ internal class TroopRosterInterface : ITroopRosterInterface
         // Rebuild roster with new data
         foreach (var element in UnpackTroopRosterData(packedTroopRosterElements))
         {
+            // If preserving heroes, clear doesn't remove mainHero and companions
+            // Avoid adding duplicates of any existing heroes to the roster when rebuilding
+            if (preserveHeroes && targetTroopRoster.Contains(element.Character))
+                continue;
+
             targetTroopRoster.Add(element);
         }
     }

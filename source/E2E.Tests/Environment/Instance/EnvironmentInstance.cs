@@ -7,7 +7,6 @@ using Common.Tests.Utils;
 using Common.Util;
 using E2E.Tests.Environment.Mock;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.TroopRosters;
 using HarmonyLib;
 using LiteNetLib;
 using ProtoBuf.Meta;
