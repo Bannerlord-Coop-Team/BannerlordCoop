@@ -1,11 +1,6 @@
 ﻿using GameInterface.Services.Heroes.Extensions;
 using HarmonyLib;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Extensions;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
-using TaleWorlds.CampaignSystem.Roster;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.PartyComponents.Patches;

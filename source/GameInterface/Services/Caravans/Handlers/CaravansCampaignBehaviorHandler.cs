@@ -247,8 +247,12 @@ internal class CaravansCampaignBehaviorHandler : IHandler
     private bool PackTradeActionLog(CaravansCampaignBehavior.TradeActionLog tradeActionLog, out TradeActionLogData tradeActionLogData)
     {
         tradeActionLogData = new();
-        if (!objectManager.TryGetIdWithLogging(tradeActionLog.BoughtSettlement, out var boughtSettlementId)) return false;
-        if (!objectManager.TryGetIdWithLogging(tradeActionLog.SoldSettlement, out var soldSettlementId)) return false;
+
+        string boughtSettlementId = null;
+        if (tradeActionLog.BoughtSettlement != null && !objectManager.TryGetIdWithLogging(tradeActionLog.BoughtSettlement, out boughtSettlementId)) return false;
+
+        string soldSettlementId = null;
+        if (tradeActionLog.SoldSettlement != null && !objectManager.TryGetIdWithLogging(tradeActionLog.SoldSettlement, out soldSettlementId)) return false;
 
         tradeActionLogData = new TradeActionLogData(
             boughtSettlementId,
@@ -264,8 +268,12 @@ internal class CaravansCampaignBehaviorHandler : IHandler
     private bool UnpackTradeActionLogData(TradeActionLogData tradeActionLogData, out CaravansCampaignBehavior.TradeActionLog tradeActionLog)
     {
         tradeActionLog = new();
-        if (!objectManager.TryGetObjectWithLogging<Settlement>(tradeActionLogData.BoughtSettlementId, out var boughtSettlement)) return false;
-        if (!objectManager.TryGetObjectWithLogging<Settlement>(tradeActionLogData.SoldSettlementId, out var soldSettlement)) return false;
+
+        Settlement boughtSettlement = null;
+        if (tradeActionLogData.BoughtSettlementId != null && !objectManager.TryGetObjectWithLogging(tradeActionLogData.BoughtSettlementId, out boughtSettlement)) return false;
+
+        Settlement soldSettlement = null;
+        if (tradeActionLogData.SoldSettlementId != null && !objectManager.TryGetObjectWithLogging(tradeActionLogData.SoldSettlementId, out soldSettlement)) return false;
 
         tradeActionLog = new CaravansCampaignBehavior.TradeActionLog()
         {

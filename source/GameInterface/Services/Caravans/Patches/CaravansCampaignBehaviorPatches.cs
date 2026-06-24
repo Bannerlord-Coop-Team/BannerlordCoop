@@ -172,11 +172,11 @@ internal class CaravansCampaignBehaviorPatches
                     totalWeightCarried = mobileParty.TotalWeightCarried;
                 }
             }
-        }
 
-        // Send message to clients to update TradeActionLogs for this MobileParty
-        var message = new UpdateTradeActionLogsForParty(mobileParty, __instance._tradeActionLogs[mobileParty]);
-        MessageBroker.Instance.Publish(__instance, message);
+            // Send message to clients to update TradeActionLogs for this MobileParty
+            var message = new UpdateTradeActionLogsForParty(mobileParty, __instance._tradeActionLogs[mobileParty]);
+            MessageBroker.Instance.Publish(__instance, message);
+        }
     }
 }
 

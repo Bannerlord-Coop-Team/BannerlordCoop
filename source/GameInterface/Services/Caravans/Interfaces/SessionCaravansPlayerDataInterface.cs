@@ -107,6 +107,8 @@ public class SessionCaravansPlayerDataInterface : ISessionCaravansPlayerDataInte
         playerExpiredCaravansRemovalLists = new();
         foreach (var playerTradeRumourTakenCaravan in CaravansPlayerData.PlayerTradeRumorTakenCaravans)
         {
+            if (playerTradeRumourTakenCaravan.Value == null) continue;
+
             var removalList = new List<string>();
             foreach (var tradeRumorTakenCaravan in playerTradeRumourTakenCaravan.Value)
             {
