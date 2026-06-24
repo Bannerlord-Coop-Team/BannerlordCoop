@@ -90,11 +90,11 @@ public class PlayerPartyInteractionCampaignBehavior : CampaignBehaviorBase
             "coop_player_party_interaction_join_clan",
             ServiceToken,
             InitiatorWaitToken,
-            "I wish to offer my services in your clan.",
+            "(COMING SOON) I wish to offer my services in your clan.",
             () => PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.JoinClan),
             () => PlayerPartyInteractionDialogState.Submit(PlayerPartyInteractionOption.JoinClan),
             PlayerPartyDialogPriority,
-            null,
+            IsJoinClanEnabled,
             null);
 
         starter.AddPlayerLine(
@@ -105,7 +105,7 @@ public class PlayerPartyInteractionCampaignBehavior : CampaignBehaviorBase
             () => PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.Vassal),
             () => PlayerPartyInteractionDialogState.Submit(PlayerPartyInteractionOption.Vassal),
             PlayerPartyDialogPriority,
-            null,
+            IsVassalEnabled,
             null);
 
         starter.AddPlayerLine(
@@ -163,6 +163,12 @@ public class PlayerPartyInteractionCampaignBehavior : CampaignBehaviorBase
             null,
             null);
     }
+
+    private static bool IsJoinClanEnabled(out TextObject explanation)
+        => PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.JoinClan, out explanation);
+
+    private static bool IsVassalEnabled(out TextObject explanation)
+        => PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Vassal, out explanation);
 
     private static bool IsPhase(params PlayerPartyInteractionPhase[] phases)
     {

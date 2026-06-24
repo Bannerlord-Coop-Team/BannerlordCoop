@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
+using GameInterface.Services.PartyVisuals.Extensions;
 using GameInterface.Services.PartyVisuals.Messages;
 using SandBox.View.Map.Managers;
 using SandBox.View.Map.Visuals;
@@ -48,49 +49,46 @@ public class PartyVisualLifetimeHandler : IHandler
         if (!objectManager.AddNewObject(payload.What.MobilePartyVisual, out var visualId))
             return;
 
-        if (!objectManager.TryGetIdWithLogging(payload.What.PartyBase, out string partyBaseId))
+        // The visual is keyed off the mobile party. Replicate the mobile party id (always present on
+        // the server) rather than the party base id, whose MobileParty back-link the client syncs
+        // separately and may not have applied yet when the create arrives.
+        var mobileParty = payload.What.PartyBase?.MobileParty;
+        if (mobileParty == null)
             return;
 
-        network.SendAll(new NetworkCreatePartyVisual(visualId, partyBaseId));
+        if (!objectManager.TryGetIdWithLogging(mobileParty, out string mobilePartyId))
+            return;
+
+        network.SendAll(new NetworkCreatePartyVisual(visualId, mobilePartyId));
     }
 
     private void Handle(MessagePayload<NetworkCreatePartyVisual> payload)
     {
-        if (payload.What.PartyBaseId == null) return;
-
-        if (!objectManager.TryGetObjectWithLogging<PartyBase>(payload.What.PartyBaseId, out var partyBase))
-            return;
-
-        // No visuals manager (headless server / tests): nothing to render, and the object manager
-        // does not need to track the visual there. Real clients register it on the main thread below.
-        if (MobilePartyVisualManager.Current == null)
-            return;
+        var mobilePartyId = payload.What.MobilePartyId;
+        if (mobilePartyId == null) return;
 
         var partyVisualId = payload.What.PartyVisualId;
 
-        // Normal client: the map visuals manager mutates its party list and builds native visual
-        // entities here, while its OnTick walks that same list in parallel on the main thread.
-        // Doing this on the network thread races that tick and corrupts memory, so marshal it onto
-        // the main thread. Re-read Current there: it can be torn down or replaced (campaign exit,
-        // save reload, mission entry) between this enqueue and the queued action running.
-        GameThread.Run(() =>
+        // Resolve the party and build its visual on the main thread, in network order behind the
+        // party-creation handler that runs on the same FIFO game-loop queue. Resolving the id here
+        // (not on the poll thread) keeps it ordered behind that registration, and reads the mobile
+        // party directly rather than PartyBase.MobileParty, whose back-link the client syncs
+        // separately and may not have applied yet when this create arrives. The visuals manager
+        // mutates its party list here while OnTick walks it on the main thread, so this must not race.
+        GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(mobilePartyId, out var mobileParty))
+                return;
+
             using (new AllowedThread())
             {
-                try
-                {
-                    var visualManager = MobilePartyVisualManager.Current;
-                    if (visualManager == null) return;
+                mobileParty.CreateNewPartyVisual();
 
-                    visualManager.AddNewPartyVisualForParty(partyBase.MobileParty);
-                    objectManager.AddExisting(partyVisualId, partyBase.GetPartyVisual());
-                }
-                catch (Exception ex)
-                {
-                    Logger.Error(ex, "Failed to create party visual {VisualId}", partyVisualId);
-                }
+                var partyVisual = mobileParty.Party.GetPartyVisual();
+                if (partyVisual != null)
+                    objectManager.AddExisting(partyVisualId, partyVisual);
             }
-        });
+        }, context: $"create party visual {partyVisualId}");
     }
 
     private void Handle(MessagePayload<PartyVisualDestroyed> payload)
