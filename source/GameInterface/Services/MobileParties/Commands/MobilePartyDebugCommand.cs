@@ -210,6 +210,62 @@ internal class MobilePartyDebugCommand
         return $"Created new {nameof(MobileParty)} with string id: {newParty.StringId}";
     }
 
+    // coop.debug.mobileparty.spawn_test_parties [count] [settlementId]
+    // Server-only. Spawns N lord parties from currently party-less lords near the settlement
+    // (default Danustica, town_ES1) to exercise mid-session party creation/replication to clients.
+    [CommandLineArgumentFunction("spawn_test_parties", "coop.debug.mobileparty")]
+    public static string SpawnTestParties(List<string> args)
+    {
+        if (ModInformation.IsClient)
+        {
+            return "spawn_test_parties is server-only";
+        }
+
+        int count = 5;
+        if (args.Count >= 1 && int.TryParse(args[0], out var parsed) && parsed > 0)
+        {
+            count = parsed;
+        }
+
+        // Spawn near a settlement (default Danustica, town_ES1 -- a common client location).
+        string settlementId = args.Count >= 2 ? args[1] : "town_ES1";
+        var settlement = Settlement.All.FirstOrDefault(s => s.StringId == settlementId);
+        if (settlement == null)
+        {
+            var towns = string.Join(", ", Settlement.All.Where(s => s.IsTown).Take(15).Select(s => s.StringId));
+            return $"Settlement '{settlementId}' not found. Try one of: {towns}";
+        }
+
+        var candidates = Hero.AllAliveHeroes
+            .Where(h => h != Hero.MainHero && h.Clan != null && !h.IsPrisoner && !h.IsChild
+                        && h.IsLord && h.PartyBelongedTo == null)
+            .Take(count)
+            .ToList();
+
+        if (candidates.Count == 0)
+        {
+            return "No party-less lords available to spawn";
+        }
+
+        var sb = new StringBuilder();
+        int spawned = 0;
+        foreach (var hero in candidates)
+        {
+            try
+            {
+                var party = MobilePartyHelper.SpawnLordParty(hero, settlement);
+                sb.AppendLine($"Spawned {party.StringId} for {hero.Name} at {settlement.Name} ({party.MemberRoster.TotalManCount} troops)");
+                spawned++;
+            }
+            catch (Exception e)
+            {
+                sb.AppendLine($"Failed to spawn for {hero.Name}: {e.Message}");
+            }
+        }
+
+        return $"Spawned {spawned} test parties near {settlement.Name}:\n{sb}";
+    }
+
     // coop.debug.mobileParty.destroyParty tbd
     [CommandLineArgumentFunction("destroyParty", "coop.debug.mobileparty")]
     public static string DestroyParty(List<string> args)
