@@ -455,8 +455,6 @@ internal class BattleSimulationRunHandler : IHandler
     {
         var message = payload.What;
 
-        // RunSafe so an unexpected throw in the apply is logged and skipped instead of escaping onto the game
-        // thread and hard-crashing the client to desktop (this is a client receive path, not authoritative work).
         GameThread.RunSafe(() =>
         {
             if (!BattleSimulationReplay.IsActiveFor(message.MapEventId))
