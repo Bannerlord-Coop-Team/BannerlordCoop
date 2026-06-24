@@ -103,7 +103,9 @@ internal class TroopRosterDeltaHandler : IHandler
 
     private void Handle_ZeroCountsRemoved(MessagePayload<ZeroCountsRemoved> payload)
     {
-        if (!objectManager.TryGetIdWithLogging(payload.What.TroopRoster, out var rosterId)) return;
+        // Resolve silently: an unregistered roster is a scratch/dummy roster (see TryResolve) with nothing
+        // to replicate, not an error.
+        if (!objectManager.TryGetId(payload.What.TroopRoster, out var rosterId)) return;
         network.SendAll(new NetworkTroopRosterRemoveZeroCounts(rosterId));
     }
 
@@ -111,14 +113,17 @@ internal class TroopRosterDeltaHandler : IHandler
     /// Resolves the roster id and the element's CharacterObject id. Every character, hero or basic troop, is
     /// registered by its CharacterObject, so one lookup keys both. The character is captured by the patch while
     /// its index was still valid, so this never reads a post-mutation index and a removal still names the right
-    /// troop.
+    /// troop. The roster is resolved silently: an unregistered roster is a transient one with no network
+    /// identity (an AI party not synced to this client, or a battle-simulation / tooltip dummy roster) and
+    /// nothing to replicate, so it is skipped rather than logged as an error - a battle mutates thousands of
+    /// such scratch rosters and the per-miss error log floods the game thread.
     /// </summary>
     private bool TryResolve(TroopRoster roster, CharacterObject character, out string rosterId, out string characterId)
     {
         rosterId = null;
         characterId = null;
         if (roster == null || character == null) return false;
-        if (!objectManager.TryGetIdWithLogging(roster, out rosterId)) return false;
+        if (!objectManager.TryGetId(roster, out rosterId)) return false;
         return objectManager.TryGetIdWithLogging(character, out characterId);
     }
 
