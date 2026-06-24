@@ -51,7 +51,10 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
     // Casualty attribution per agent (map-event party id + troop descriptor seed), captured at spawn and used
     // by the agent's owner to report its death to the server. Written from the main thread (host capture) and
     // the network thread (peer puppet spawn), read on death — hence concurrent.
-    private readonly ConcurrentDictionary<Guid, (string mapEventPartyId, int troopSeed)> _casualtyInfo = new();
+    // Per-agent casualty attribution captured at spawn. troopSeed feeds the puppet origin on replay; the
+    // troopCharacterId is what the server keys the roster casualty on (descriptor seeds churn — see
+    // NetworkRequestBattleCasualty).
+    private readonly ConcurrentDictionary<Guid, (string mapEventPartyId, int troopSeed, string troopCharacterId)> _casualtyInfo = new();
 
     // Throttled supply-progress reporting (game thread, via OnMissionTick): tells the server how far each of
     // our troop suppliers has spawned, so its ledger pointer advances and a new owner can resume from it on
@@ -374,14 +377,17 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
         // on death (puppets, spawned with a SimpleAgentOrigin, get these from the spawn data).
         string mapEventPartyId = null;
         int troopSeed = 0;
-        if (agent.Origin is PartyGroupAgentOrigin origin && origin.Party != null)
+        // Our coop spawns carry a CoopAgentOrigin (the custom supplier's origin), NOT the native
+        // PartyGroupAgentOrigin — read the party + descriptor seed from it. Checking for the native type here
+        // left attribution null, so the death report was skipped and the map-event roster never decremented.
+        if (agent.Origin is CoopAgentOrigin origin && origin.Party != null)
         {
-            troopSeed = origin.TroopDesc.UniqueSeed;
+            troopSeed = origin.UniqueSeed;
             var mapEventParty = ResolveMapEventParty(origin.Party);
             if (mapEventParty != null && objectManager.TryGetId(mapEventParty, out var mepId))
                 mapEventPartyId = mepId;
         }
-        _casualtyInfo[agentId] = (mapEventPartyId, troopSeed);
+        _casualtyInfo[agentId] = (mapEventPartyId, troopSeed, character.StringId);
 
         int side = agent.Team != null ? (int)agent.Team.Side : (int)BattleSideEnum.None;
         var data = new BattleAgentSpawnData(agentId, characterId, isHero, agent.Position, side, agent.Health, owner, mapEventPartyId, troopSeed);
@@ -417,7 +423,7 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
         // map-event party roster. The host's own mission accounting is suppressed during a coop battle
         // (MapEventPartyPatches), so this is the single source. On a client, SendAll targets the server.
         if (_casualtyInfo.TryGetValue(info.AgentId, out var attribution) && attribution.mapEventPartyId != null)
-            relayNetwork.SendAll(new NetworkRequestBattleCasualty(attribution.mapEventPartyId, attribution.troopSeed, payload.What.Wounded));
+            relayNetwork.SendAll(new NetworkRequestBattleCasualty(attribution.mapEventPartyId, attribution.troopCharacterId, payload.What.Wounded));
 
         _casualtyInfo.TryRemove(info.AgentId, out _);
         registry.RemoveAgent(info.AgentId);
@@ -694,6 +700,8 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
         buildData.Equipment(equipment);
         buildData.TroopOrigin(origin);
         buildData.Controller(isOwnAgent ? AgentControllerType.Player : AgentControllerType.None);
+        buildData.ClothingColor1(origin.FactionColor);
+        buildData.ClothingColor2(origin.FactionColor2);
 
         // Suppress capture for the duration of this spawn: a puppet is another owner's troop replicated to us,
         // not ours, so BattleAgentSpawnedPatch must not re-capture and re-broadcast it.
@@ -715,7 +723,7 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
             Mission.Current.MainAgent = agent;
 
         registry.TryRegisterAgent(data.OwnerControllerId, data.AgentId, agent);
-        _casualtyInfo[data.AgentId] = (data.MapEventPartyId, data.TroopSeed);
+        _casualtyInfo[data.AgentId] = (data.MapEventPartyId, data.TroopSeed, character.StringId);
         Logger.Information("[BattleSync] Spawned puppet {Char} (agent {AgentId}, ownAgent={Own})", data.CharacterId, data.AgentId, isOwnAgent);
         return true;
     }
@@ -734,8 +742,19 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
         }
 
         foreach (var data in pending)
-            if (!TrySpawnPuppetNow(data))
-                lock (_pendingPuppetLock) _pendingPuppets.Add(data);
+        {
+            // Per-puppet guard: one bad record must not abort the whole drain (and re-throw every tick). On
+            // failure, drop it rather than re-buffering, so it can't spin a per-tick exception loop.
+            try
+            {
+                if (!TrySpawnPuppetNow(data))
+                    lock (_pendingPuppetLock) _pendingPuppets.Add(data);
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "[BattleSync] Failed to spawn buffered puppet {AgentId}; dropping it", data.AgentId);
+            }
+        }
     }
 
     // The PartyBase for a battle party id (a MapEventParty object-manager id), used for a puppet's origin.
