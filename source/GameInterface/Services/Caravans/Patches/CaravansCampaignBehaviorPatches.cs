@@ -100,53 +100,10 @@ internal class CaravansCampaignBehaviorPatches
         return false;
     }
 
-    [HarmonyPatch(nameof(CaravansCampaignBehavior.CanTradeWith))]
-    [HarmonyPrefix]
-    public static bool CanTradeWithPrefix(ref CaravansCampaignBehavior __instance, ref bool __result, IFaction caravanFaction, IFaction targetFaction)
-    {
-        if (ContainerProvider.TryGetContainer(out var container) == false) return false;
-        var sessionCaravansPlayerDataInterface = container.Resolve<ISessionCaravansPlayerDataInterface>();
-
-        // Handle check in sessionCaravansPlayerDataInterface to correctly handle prohibiting caravan trading with player blocked kingdoms
-        __result = sessionCaravansPlayerDataInterface.CanTradeWith(caravanFaction, targetFaction, CaravansContext.CurrentParty);
-
-        return false;
-    }
-
     /// <summary>
-    /// The following patches are needed to send the mobileParty for the patched implementation of CanTradeWith.
-    /// The vanilla implementation is problematic because it only has factions as arguments when we need
-    /// to be able to know who caravans belong to in accounting for prohibiting trading with kingdoms correctly.
+    /// Only need to update _tradeActionLogs for clients when a caravan leaves a settlement
+    /// because clients only need _tradeActionLogs for dialogue with caravans to obtain trade rumours
     /// </summary>
-    [HarmonyPatch(nameof(CaravansCampaignBehavior.HourlyTickParty))]
-    [HarmonyPrefix]
-    public static void HourlyTickPartyPrefix(MobileParty mobileParty)
-    {
-        CaravansContext.CurrentParty = mobileParty;
-    }
-
-    [HarmonyPatch(nameof(CaravansCampaignBehavior.HourlyTickParty))]
-    [HarmonyPostfix]
-    public static void HourlyTickPartyPostfix()
-    {
-        CaravansContext.CurrentParty = null;
-    }
-
-    [HarmonyPatch(nameof(CaravansCampaignBehavior.FindNextDestinationForCaravan))]
-    [HarmonyPrefix]
-    public static void FindNextDestinationForCaravanPrefix(MobileParty caravanParty)
-    {
-        CaravansContext.CurrentParty = caravanParty;
-    }
-
-    [HarmonyPatch(nameof(CaravansCampaignBehavior.FindNextDestinationForCaravan))]
-    [HarmonyPostfix]
-    public static void FindNextDestinationForCaravanPostfix()
-    {
-        CaravansContext.CurrentParty = null;
-    }
-
-    // Potentially replace with transpiler later
     [HarmonyPatch(nameof(CaravansCampaignBehavior.OnSettlementLeft))]
     [HarmonyPrefix]
     public static void OnSettlementLeftPrefix(ref CaravansCampaignBehavior __instance, MobileParty mobileParty, Settlement settlement)
@@ -174,28 +131,58 @@ internal class CaravansCampaignBehaviorPatches
             }
 
             // Send message to clients to update TradeActionLogs for this MobileParty
-            var message = new UpdateTradeActionLogsForParty(mobileParty, __instance._tradeActionLogs[mobileParty]);
-            MessageBroker.Instance.Publish(__instance, message);
+            if (__instance._tradeActionLogs.ContainsKey(mobileParty))
+            {
+                var message = new UpdateTradeActionLogsForParty(mobileParty, __instance._tradeActionLogs[mobileParty]);
+                MessageBroker.Instance.Publish(__instance, message);
+            }
         }
     }
-}
 
-[HarmonyPatch]
-internal class CaravansAllowedThreadPatches
-{
-    private static IEnumerable<MethodBase> TargetMethods() => new MethodBase[]
+    [HarmonyPatch(nameof(CaravansCampaignBehavior.CanTradeWith))]
+    [HarmonyPrefix]
+    public static bool CanTradeWithPrefix(ref CaravansCampaignBehavior __instance, ref bool __result, IFaction caravanFaction, IFaction targetFaction)
     {
-        AccessTools.Method(typeof(CaravansCampaignBehavior), nameof(CaravansCampaignBehavior.BribeAmount)) // Creates and modifies item rosters on clients
-    };
+        if (ContainerProvider.TryGetContainer(out var container) == false) return false;
+        var sessionCaravansPlayerDataInterface = container.Resolve<ISessionCaravansPlayerDataInterface>();
 
-    static void Prefix()
-    {
-        AllowedThread.AllowThisThread();
+        // Handle check in sessionCaravansPlayerDataInterface to correctly handle prohibiting caravan trading with player blocked kingdoms
+        __result = sessionCaravansPlayerDataInterface.CanTradeWith(caravanFaction, targetFaction, CaravansContext.CurrentParty);
+
+        return false;
     }
 
-    static void Finalizer()
+    /// <summary>
+    /// The following patches are needed to send the mobileParty for the patched implementation of CanTradeWith.
+    /// The vanilla implementation is problematic because it only has factions as arguments when we need
+    /// to be able to know who a caravans belongs to in accounting for prohibiting trading with kingdoms correctly.
+    /// </summary>
+    [HarmonyPatch(nameof(CaravansCampaignBehavior.HourlyTickParty))]
+    [HarmonyPrefix]
+    public static void HourlyTickPartyPrefix(MobileParty mobileParty)
     {
-        AllowedThread.RevokeThisThread();
+        CaravansContext.CurrentParty = mobileParty;
+    }
+
+    [HarmonyPatch(nameof(CaravansCampaignBehavior.HourlyTickParty))]
+    [HarmonyPostfix]
+    public static void HourlyTickPartyPostfix()
+    {
+        CaravansContext.CurrentParty = null;
+    }
+
+    [HarmonyPatch(nameof(CaravansCampaignBehavior.FindNextDestinationForCaravan))]
+    [HarmonyPrefix]
+    public static void FindNextDestinationForCaravanPrefix(MobileParty caravanParty)
+    {
+        CaravansContext.CurrentParty = caravanParty;
+    }
+
+    [HarmonyPatch(nameof(CaravansCampaignBehavior.FindNextDestinationForCaravan))]
+    [HarmonyPostfix]
+    public static void FindNextDestinationForCaravanPostfix()
+    {
+        CaravansContext.CurrentParty = null;
     }
 }
 

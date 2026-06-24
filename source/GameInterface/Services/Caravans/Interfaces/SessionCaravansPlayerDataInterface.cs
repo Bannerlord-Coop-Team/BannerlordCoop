@@ -131,10 +131,10 @@ public class SessionCaravansPlayerDataInterface : ISessionCaravansPlayerDataInte
     {
         if (mobileParty == null || caravanFaction.IsAtWarWith(targetFaction))
             return false;
-        
+
         // Allow AI caravans to trade as long as they are not at war with the target faction
-        bool isPlayerCaravan = mobileParty.ActualClan.IsPlayerClan();
-        if (!isPlayerCaravan)
+        // Not all AI caravans are part of a clan and can just belong to a kingdom directly
+        if (mobileParty.ActualClan == null || !mobileParty.ActualClan.IsPlayerClan())
             return true;
 
         // Allow player caravans to trade with non-kingdom factions (e.g. independent clans who own settlements)

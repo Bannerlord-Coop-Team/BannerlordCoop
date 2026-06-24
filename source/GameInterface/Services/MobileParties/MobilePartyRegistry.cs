@@ -66,6 +66,7 @@ internal class MobilePartyRegistry : AutoRegistryBase<MobileParty>
             obj.InitMembers();
             obj.InitCached();
             obj.Initialize();
+            obj.HasLandNavigationCapability = true;
         }
 
         MBObjectManager.Instance?.RegisterObjectInternalWithoutTypeId(obj, false, out _);
