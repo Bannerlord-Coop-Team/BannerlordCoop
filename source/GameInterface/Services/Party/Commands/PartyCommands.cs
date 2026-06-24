@@ -247,12 +247,16 @@ internal class PartyCommands
     {
         if (ModInformation.IsClient) return "Command can only be run on the server.";
 
-        if (strings.Count != 2) return "Captor hero name and prisoner hero name required.";
+        if (strings.Count < 2) return "Captor hero name and prisoner hero name required.";
 
+        // The console splits arguments on spaces, so the captor is the first token and the prisoner name is
+        // the rest joined back together. Companions always have a multi-word name (e.g. "Chandion the Bull"),
+        // which would otherwise arrive as several tokens and never match.
         var captor = Hero.AllAliveHeroes.FirstOrDefault(h => h.Name.ToString() == strings[0]);
         if (captor?.PartyBelongedTo == null) return "Captor hero not found or has no party.";
 
-        var prisoner = Hero.AllAliveHeroes.FirstOrDefault(h => h.Name.ToString() == strings[1]);
+        var prisonerName = string.Join(" ", strings.Skip(1));
+        var prisoner = Hero.AllAliveHeroes.FirstOrDefault(h => h.Name.ToString() == prisonerName);
         if (prisoner == null) return "Prisoner hero not found.";
 
         // The preserve only fires for a player companion, so a non-companion would be removed by both the
