@@ -34,14 +34,14 @@ namespace GameInterface.Services.Heroes.Handlers
 
         private void Handle(MessagePayload<HeroRelationChanged> obj)
         {
+            if (ModInformation.IsClient) return;
+
             var payload = obj.What;
             network.SendAll(new NetworkHeroRelationChanged(payload.Hero1Id, payload.Hero2Id, payload.Value));
         }
 
         private void Handle(MessagePayload<NetworkHeroRelationChanged> obj)
         {
-            if (ModInformation.IsClient) return;
-
             var payload = obj.What;
 
             GameThread.RunSafe(() =>
