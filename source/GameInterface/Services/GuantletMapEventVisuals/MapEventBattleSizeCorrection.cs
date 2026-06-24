@@ -6,26 +6,18 @@ using TaleWorlds.CampaignSystem.MapEvents;
 namespace GameInterface.Services.GuantletMapEventVisuals;
 
 /// <summary>
-/// Client-side correction for a field-battle map event's ambient battle sound.
-///
-/// On a client a map event's visual can initialize before its sides and the parties within them have
-/// finished syncing in. When that happens the vanilla <see cref="GauntletMapEventVisual"/>
-/// ambient sound is set up with the smallest <c>battle_size</c> - the #1426 guard defaults it to 0 to
-/// avoid dereferencing un-synced state - and because the vanilla init is one-shot the size would stay
-/// stuck there. This re-applies the real <c>battle_size</c> to the already-created sound as the sides
-/// and parties stream in, so a large battle ends up with the correct ambient size.
+/// Client-side: re-applies a field battle's ambient <c>battle_size</c> when its visual initialized before
+/// the sides/parties synced. Vanilla <see cref="GauntletMapEventVisual"/> bakes the size into the sound once
+/// (the #1426 guard defaults it to 0 while un-synced and never updates it), so without this a large battle
+/// stays too quiet for its whole life. We re-apply the real size to the existing sound as the parties arrive.
 /// </summary>
 internal static class MapEventBattleSizeCorrection
 {
-    // Pending field-battle visuals whose Initialize ran before the battle size was computable, keyed by the
-    // visual itself - a plain reference-identity key, so no StringId / network id (that's the object
-    // manager's job), and stable unlike the MapEvent whose hash is a mutable MBGUID. The value is the
-    // highest battle_size applied so far: seeded with the size Initialize applied and re-applied as the
-    // sides/parties stream in but only ever upward, because a map event is computable while only partly
-    // populated and the live headcount counts healthy members (which falls as troops die), so re-applying
-    // without a ceiling would lock in a partial count or drift below vanilla mid-battle. Ratchet up to the
-    // full roster's size and hold it, matching vanilla which sets it once at the peak. Cleared when the
-    // visual is torn down (battle ends) or the session resets.
+    // Field-battle visuals needing a size correction, keyed by the visual itself (reference identity: no
+    // StringId / network id, and stable unlike the MapEvent's mutable-MBGUID hash). Value = the highest
+    // battle_size applied so far; TryCorrect only ever raises it, since a battle is computable while still
+    // partly populated and the live headcount drops as troops die, so without a ceiling the size would lock
+    // in a partial count or drift below vanilla mid-battle. Cleared when the visual is torn down or on reset.
     private static readonly ConcurrentDictionary<GauntletMapEventVisual, int> pendingMaxSize = new ConcurrentDictionary<GauntletMapEventVisual, int>();
 
     public static void Register(GauntletMapEventVisual visual)
