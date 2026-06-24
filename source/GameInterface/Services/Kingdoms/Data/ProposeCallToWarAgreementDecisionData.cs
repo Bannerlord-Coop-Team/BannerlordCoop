@@ -1,7 +1,7 @@
+﻿using Common.Util;
 using GameInterface.Services.ObjectManager;
 using ProtoBuf;
 using System.Reflection;
-using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Election;
@@ -50,7 +50,7 @@ namespace GameInterface.Services.Kingdoms.Data
                 return false;
             }
 
-            ProposeCallToWarAgreementDecision proposeCallToWarAgreementDecision = (ProposeCallToWarAgreementDecision)FormatterServices.GetUninitializedObject(typeof(ProposeCallToWarAgreementDecision));
+            var proposeCallToWarAgreementDecision = ObjectHelper.SkipConstructor<ProposeCallToWarAgreementDecision>();
             SetKingdomDecisionProperties(proposeCallToWarAgreementDecision, proposerClan, kingdom);
             CalledKingdomField.SetValue(proposeCallToWarAgreementDecision, calledKingdom);
             KingdomToCallToWarAgainstField.SetValue(proposeCallToWarAgreementDecision, kingdomToCallToWarAgainst);

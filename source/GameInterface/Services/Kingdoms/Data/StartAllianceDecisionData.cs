@@ -1,7 +1,7 @@
+﻿using Common.Util;
 using GameInterface.Services.ObjectManager;
 using ProtoBuf;
 using System.Reflection;
-using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Election;
@@ -41,7 +41,7 @@ namespace GameInterface.Services.Kingdoms.Data
                 return false;
             }
 
-            StartAllianceDecision startAllianceDecision = (StartAllianceDecision)FormatterServices.GetUninitializedObject(typeof(StartAllianceDecision));
+            var startAllianceDecision = ObjectHelper.SkipConstructor<StartAllianceDecision>();
             SetKingdomDecisionProperties(startAllianceDecision, proposerClan, kingdom);
             KingdomToStartAllianceWithField.SetValue(startAllianceDecision, kingdomToStartAllianceWith);
             startAllianceDecision._allianceCampaignBehavior = allianceCampaignBehavior;

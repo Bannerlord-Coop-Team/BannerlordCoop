@@ -1,6 +1,7 @@
-using Coop.Core.Server.Services.Stances.Messages;
+﻿using Coop.Core.Server.Services.Stances.Messages;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
+using Coop.IntegrationTests.Kingdoms;
 using GameInterface.Services.Stances.Messages;
 using GameInterface.Services.Stances.Patches;
 using TaleWorlds.CampaignSystem;
@@ -11,6 +12,7 @@ namespace Coop.IntegrationTests.Stances
     /// <summary>
     /// Test class for war declaration stance sync.
     /// </summary>
+    [Collection(KingdomSyncGameThreadCollection.Name)]
     public class FactionDeclareWarSyncTest
     {
         // Creates a test environment with 1 server and 2 clients by default

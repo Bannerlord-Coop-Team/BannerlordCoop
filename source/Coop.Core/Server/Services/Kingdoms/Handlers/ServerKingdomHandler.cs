@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Network;
 using Common;
 using Common.Util;
@@ -28,6 +28,7 @@ public class ServerKingdomHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
     private readonly IKingdomCreationSettlementTracker settlementTracker;
+    private readonly IKingdomDecisionDataConverter kingdomDecisionDataConverter;
     private readonly Dictionary<string, PendingSettlementRestore> pendingKingdomCreationSettlements = new();
 
     public ServerKingdomHandler(
@@ -35,13 +36,15 @@ public class ServerKingdomHandler : IHandler
         INetwork network,
         IObjectManager objectManager,
         IPlayerManager playerManager,
-        IKingdomCreationSettlementTracker settlementTracker)
+        IKingdomCreationSettlementTracker settlementTracker,
+        IKingdomDecisionDataConverter kingdomDecisionDataConverter)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
         this.settlementTracker = settlementTracker;
+        this.kingdomDecisionDataConverter = kingdomDecisionDataConverter;
         messageBroker.Subscribe<DecisionAdded>(HandleLocalDecisionAdded);
         messageBroker.Subscribe<DecisionRemoved>(HandleLocalDecisionRemoved);
         messageBroker.Subscribe<KingdomPolicyChanged>(HandleLocalKingdomPolicyChanged);
@@ -266,7 +269,8 @@ public class ServerKingdomHandler : IHandler
 
         if (!TryGetKingdomId(payload.Kingdom, out var kingdomId)) return;
 
-        var message = new NetworkAddDecision(kingdomId, payload.Data, payload.IgnoreInfluenceCost, payload.RandomNumber);
+        var data = kingdomDecisionDataConverter.Convert(payload.Decision);
+        var message = new NetworkAddDecision(kingdomId, data, payload.IgnoreInfluenceCost, payload.RandomNumber);
         network.SendAll(message);
     }
 

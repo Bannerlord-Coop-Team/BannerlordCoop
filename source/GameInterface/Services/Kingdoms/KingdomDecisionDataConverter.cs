@@ -1,49 +1,46 @@
-using GameInterface.Services.Kingdoms.Data;
+﻿using GameInterface.Services.Kingdoms.Data;
+using GameInterface.Services.ObjectManager;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using GameInterface;
-using GameInterface.Services.ObjectManager;
 using TaleWorlds.CampaignSystem.Election;
-
-namespace GameInterface.Services.Kingdoms.Extentions
+namespace GameInterface.Services.Kingdoms
 {
-    /// <summary>
-    /// Class for extension methods for KingdomDecision class.
-    /// </summary>
-    public static class KingdomDecisionExtensions
+    public interface IKingdomDecisionDataConverter : IGameAbstraction
     {
-        private static readonly Dictionary<Type, Func<KingdomDecision, KingdomDecisionData>> SupportedConversions = new Dictionary<Type, Func<KingdomDecision, KingdomDecisionData>>()
+        KingdomDecisionData Convert(KingdomDecision kingdomDecision);
+    }
+    internal class KingdomDecisionDataConverter : IKingdomDecisionDataConverter
+    {
+        private readonly IObjectManager objectManager;
+        private readonly Dictionary<Type, Func<KingdomDecision, KingdomDecisionData>> supportedConversions;
+        public KingdomDecisionDataConverter(IObjectManager objectManager)
         {
-            { typeof(DeclareWarDecision), ConvertDeclareWarDecision },
-            { typeof(ExpelClanFromKingdomDecision), ConvertExpelClanFromKingdomDecision },
-            { typeof(KingdomPolicyDecision), ConvertKingdomPolicyDecision },
-            { typeof(KingSelectionKingdomDecision), ConvertKingSelectionKingdomDecision },
-            { typeof(MakePeaceKingdomDecision), ConvertMakePeaceKingdomDecision },
-            { typeof(SettlementClaimantDecision), ConvertSettlementClaimantDecision },
-            { typeof(SettlementClaimantPreliminaryDecision), ConvertSettlementClaimantPreliminaryDecision },
-            { typeof(AcceptCallToWarAgreementDecision), ConvertAcceptCallToWarAgreementDecision },
-            { typeof(ProposeCallToWarAgreementDecision), ConvertProposeCallToWarAgreementDecision },
-            { typeof(StartAllianceDecision), ConvertStartAllianceDecision },
-            { typeof(TradeAgreementDecision), ConvertTradeAgreementDecision },
-        };
-        
-        /// <summary>
-        /// Converts a KingdomDecision object to a serializable KingdomDecisionData object.
-        /// </summary>
-        /// <param name="kingdomDecision">kingdom decision to convert.</param>
-        /// <returns>A KingdomDecisionData object.</returns>
-        /// <exception cref="InvalidOperationException">If KingdomDecision object is not convertable.</exception>
-        public static KingdomDecisionData ToKingdomDecisionData(this KingdomDecision kingdomDecision)
+            this.objectManager = objectManager;
+            supportedConversions = new Dictionary<Type, Func<KingdomDecision, KingdomDecisionData>>()
+            {
+                { typeof(DeclareWarDecision), ConvertDeclareWarDecision },
+                { typeof(ExpelClanFromKingdomDecision), ConvertExpelClanFromKingdomDecision },
+                { typeof(KingdomPolicyDecision), ConvertKingdomPolicyDecision },
+                { typeof(KingSelectionKingdomDecision), ConvertKingSelectionKingdomDecision },
+                { typeof(MakePeaceKingdomDecision), ConvertMakePeaceKingdomDecision },
+                { typeof(SettlementClaimantDecision), ConvertSettlementClaimantDecision },
+                { typeof(SettlementClaimantPreliminaryDecision), ConvertSettlementClaimantPreliminaryDecision },
+                { typeof(AcceptCallToWarAgreementDecision), ConvertAcceptCallToWarAgreementDecision },
+                { typeof(ProposeCallToWarAgreementDecision), ConvertProposeCallToWarAgreementDecision },
+                { typeof(StartAllianceDecision), ConvertStartAllianceDecision },
+                { typeof(TradeAgreementDecision), ConvertTradeAgreementDecision },
+            };
+        }
+        public KingdomDecisionData Convert(KingdomDecision kingdomDecision)
         {
-            if (!SupportedConversions.TryGetValue(kingdomDecision.GetType(), out var conversionFunction))
+            if (!supportedConversions.TryGetValue(kingdomDecision.GetType(), out var conversionFunction))
             {
                 throw new InvalidOperationException($"Type of kingdom decision: {kingdomDecision.GetType().Name} is not supported.");
             }
             return conversionFunction(kingdomDecision);
         }
-
-        private static KingdomDecisionData ConvertDeclareWarDecision(KingdomDecision decision)
+        private KingdomDecisionData ConvertDeclareWarDecision(KingdomDecision decision)
         {
             DeclareWarDecision declareWarDecision = decision as DeclareWarDecision;
             if (declareWarDecision != null)
@@ -56,8 +53,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
                 throw new ArgumentException($"Argument is not a type of DeclareWarDecision.");
             }
         }
-
-        private static KingdomDecisionData ConvertKingdomPolicyDecision(KingdomDecision decision)
+        private KingdomDecisionData ConvertKingdomPolicyDecision(KingdomDecision decision)
         {
             KingdomPolicyDecision kingdomPolicyDecision = decision as KingdomPolicyDecision;
             if (kingdomPolicyDecision != null)
@@ -70,8 +66,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
                 throw new ArgumentException($"Argument is not a type of KingdomPolicyDecision.");
             }
         }
-
-        private static KingdomDecisionData ConvertExpelClanFromKingdomDecision(KingdomDecision decision)
+        private KingdomDecisionData ConvertExpelClanFromKingdomDecision(KingdomDecision decision)
         {
             ExpelClanFromKingdomDecision expelClanFromKingdomDecision = decision as ExpelClanFromKingdomDecision;
             if (expelClanFromKingdomDecision != null)
@@ -84,8 +79,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
                 throw new ArgumentException($"Argument is not a type of ExpelClanFromKingdomDecision.");
             }
         }
-
-        private static KingdomDecisionData ConvertKingSelectionKingdomDecision(KingdomDecision decision)
+        private KingdomDecisionData ConvertKingSelectionKingdomDecision(KingdomDecision decision)
         {
             KingSelectionKingdomDecision kingSelectionKingdomDecision = decision as KingSelectionKingdomDecision;
             if (kingSelectionKingdomDecision != null)
@@ -98,8 +92,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
                 throw new ArgumentException($"Argument is not a type of KingSelectionKingdomDecision.");
             }
         }
-
-        private static KingdomDecisionData ConvertMakePeaceKingdomDecision(KingdomDecision decision)
+        private KingdomDecisionData ConvertMakePeaceKingdomDecision(KingdomDecision decision)
         {
             MakePeaceKingdomDecision makePeaceKingdomDecision = decision as MakePeaceKingdomDecision;
             if (makePeaceKingdomDecision != null)
@@ -112,8 +105,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
                 throw new ArgumentException($"Argument is not a type of MakePeaceKingdomDecision.");
             }
         }
-
-        private static KingdomDecisionData ConvertSettlementClaimantDecision(KingdomDecision decision)
+        private KingdomDecisionData ConvertSettlementClaimantDecision(KingdomDecision decision)
         {
             SettlementClaimantDecision settlementClaimantDecision = decision as SettlementClaimantDecision;
             if (settlementClaimantDecision != null)
@@ -126,8 +118,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
                 throw new ArgumentException($"Argument is not a type of SettlementClaimantDecision.");
             }
         }
-
-        private static KingdomDecisionData ConvertSettlementClaimantPreliminaryDecision(KingdomDecision decision)
+        private KingdomDecisionData ConvertSettlementClaimantPreliminaryDecision(KingdomDecision decision)
         {
             SettlementClaimantPreliminaryDecision settlementClaimantPreliminaryDecision = decision as SettlementClaimantPreliminaryDecision;
             if (settlementClaimantPreliminaryDecision != null)
@@ -140,8 +131,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
                 throw new ArgumentException($"Argument is not a type of SettlementClaimantPreliminaryDecision.");
             }
         }
-
-        private static KingdomDecisionData ConvertAcceptCallToWarAgreementDecision(KingdomDecision decision)
+        private KingdomDecisionData ConvertAcceptCallToWarAgreementDecision(KingdomDecision decision)
         {
             AcceptCallToWarAgreementDecision acceptCallToWarAgreementDecision = decision as AcceptCallToWarAgreementDecision;
             if (acceptCallToWarAgreementDecision != null)
@@ -154,8 +144,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
                 throw new ArgumentException($"Argument is not a type of AcceptCallToWarAgreementDecision.");
             }
         }
-
-        private static KingdomDecisionData ConvertProposeCallToWarAgreementDecision(KingdomDecision decision)
+        private KingdomDecisionData ConvertProposeCallToWarAgreementDecision(KingdomDecision decision)
         {
             ProposeCallToWarAgreementDecision proposeCallToWarAgreementDecision = decision as ProposeCallToWarAgreementDecision;
             if (proposeCallToWarAgreementDecision != null)
@@ -168,8 +157,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
                 throw new ArgumentException($"Argument is not a type of ProposeCallToWarAgreementDecision.");
             }
         }
-
-        private static KingdomDecisionData ConvertStartAllianceDecision(KingdomDecision decision)
+        private KingdomDecisionData ConvertStartAllianceDecision(KingdomDecision decision)
         {
             StartAllianceDecision startAllianceDecision = decision as StartAllianceDecision;
             if (startAllianceDecision != null)
@@ -182,8 +170,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
                 throw new ArgumentException($"Argument is not a type of StartAllianceDecision.");
             }
         }
-
-        private static KingdomDecisionData ConvertTradeAgreementDecision(KingdomDecision decision)
+        private KingdomDecisionData ConvertTradeAgreementDecision(KingdomDecision decision)
         {
             TradeAgreementDecision tradeAgreementDecision = decision as TradeAgreementDecision;
             if (tradeAgreementDecision != null)
@@ -196,22 +183,17 @@ namespace GameInterface.Services.Kingdoms.Extentions
                 throw new ArgumentException($"Argument is not a type of TradeAgreementDecision.");
             }
         }
-
-        private static string GetOptionalId(object obj)
+        private string GetOptionalId(object obj)
         {
             return obj == null ? null : GetId(obj);
         }
-
-        private static string GetId(object obj)
+        private string GetId(object obj)
         {
             if (obj == null) return null;
-
-            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) &&
-                objectManager.TryGetId(obj, out string id))
+            if (objectManager.TryGetId(obj, out string id))
             {
                 return id;
             }
-
             return null;
         }
     }

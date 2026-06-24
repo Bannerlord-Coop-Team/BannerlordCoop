@@ -1,4 +1,4 @@
-using Coop.Core.Server.Services.Kingdoms.Messages;
+﻿using Coop.Core.Server.Services.Kingdoms.Messages;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Kingdoms.Messages;
@@ -13,6 +13,7 @@ namespace Coop.IntegrationTests.Kingdoms
     /// <summary>
     /// Test class for NetworkRemoveDecision message handling.
     /// </summary>
+    [Collection(KingdomSyncGameThreadCollection.Name)]
     public class KingdomRemoveDecisionTest
     {
         // Creates a test environment with 1 server and 2 clients by default

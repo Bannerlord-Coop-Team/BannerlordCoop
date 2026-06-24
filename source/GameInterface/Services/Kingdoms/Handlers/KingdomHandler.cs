@@ -1,11 +1,10 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using Common;
 using Common.Extensions;
 using Common.Util;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Kingdoms.Messages;
-using GameInterface.Services.Kingdoms.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Registry.Auto;
@@ -31,19 +30,22 @@ public class KingdomHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly IKingdomDecisionVoteManager decisionVoteManager;
     private readonly IKingdomMembershipState kingdomMembershipState;
+    private readonly IKingdomInterface kingdomInterface;
 
     public KingdomHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         IPlayerManager playerManager,
         IKingdomDecisionVoteManager decisionVoteManager,
-        IKingdomMembershipState kingdomMembershipState)
+        IKingdomMembershipState kingdomMembershipState,
+        IKingdomInterface kingdomInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
         this.decisionVoteManager = decisionVoteManager;
         this.kingdomMembershipState = kingdomMembershipState;
+        this.kingdomInterface = kingdomInterface;
         messageBroker.Subscribe<AddDecision>(HandleAddDecision);
         messageBroker.Subscribe<RemoveDecision>(HandleRemoveDecision);
         messageBroker.Subscribe<ChangeKingdomPolicy>(HandleChangeKingdomPolicy);
@@ -409,7 +411,7 @@ public class KingdomHandler : IHandler
             return;
         }
 
-        KingdomPatches.RunChangeKingdomPolicy(kingdom, policy, payload.IsAdd);
+        kingdomInterface.ChangeKingdomPolicy(kingdom, policy, payload.IsAdd);
     }
 
     private void HandleRemoveDecision(MessagePayload<RemoveDecision> obj)
@@ -437,7 +439,7 @@ public class KingdomHandler : IHandler
 
         if (payload.Index >= 0 && decisions.Count > payload.Index)
         {
-            KingdomPatches.RunOriginalRemoveDecision(kingdom, decisions[payload.Index]);
+            kingdomInterface.RemoveDecision(kingdom, decisions[payload.Index]);
         }
         else
         {
@@ -462,7 +464,7 @@ public class KingdomHandler : IHandler
             return;
         }
 
-        KingdomPatches.RunCoopAddDecision(kingdom, kingdomDecision, payload.IgnoreInfluenceCost, payload.RandomNumber);
+        kingdomInterface.RunAddDecision(kingdom, kingdomDecision, payload.IgnoreInfluenceCost, payload.RandomNumber);
     }
 
     private static void RunKingdomMutation(Action action)

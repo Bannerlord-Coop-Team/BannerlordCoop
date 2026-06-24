@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Util;
 using Coop.Core.Client.Services.Kingdoms.Handlers;
 using Coop.Core.Client.Services.MobileParties.Messages;
@@ -13,7 +13,6 @@ using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Kingdoms.Commands;
 using GameInterface.Services.Kingdoms.Data;
-using GameInterface.Services.Kingdoms.Extentions;
 using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.Kingdoms.Patches;
 using GameInterface.Services.MobileParties.Messages.Behavior;
@@ -995,7 +994,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
             var decision = new DeclareWarDecision(proposerClan, targetKingdom);
             kingdom.AddDecision(decision);
-            decisionData = decision.ToKingdomDecisionData();
+            decisionData = client1.Resolve<IKingdomDecisionDataConverter>().Convert(decision);
             clientInfluenceAfterProposal = proposerClan.Influence;
         }, new[] { AccessTools.Method(typeof(ClientKingdomHandler), "HandleLocalDecisionAdded") });
 

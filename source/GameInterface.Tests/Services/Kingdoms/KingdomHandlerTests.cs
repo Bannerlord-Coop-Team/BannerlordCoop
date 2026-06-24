@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Kingdoms.Handlers;
@@ -52,7 +52,8 @@ public class KingdomHandlerTests
             objectManager,
             new Mock<IPlayerManager>().Object,
             new Mock<IKingdomDecisionVoteManager>().Object,
-            new Mock<IKingdomMembershipState>().Object);
+            new Mock<IKingdomMembershipState>().Object,
+            new Mock<IKingdomInterface>().Object);
     }
 
     private static bool TryGetCulture(KingdomHandler handler, string cultureId, out CultureObject culture)

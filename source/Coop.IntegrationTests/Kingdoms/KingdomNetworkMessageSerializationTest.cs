@@ -1,10 +1,11 @@
-using Coop.Core.Server.Services.Kingdoms.Messages;
+﻿using Coop.Core.Server.Services.Kingdoms.Messages;
 using GameInterface.Services.Kingdoms.Data;
 using ProtoBuf;
 using TaleWorlds.CampaignSystem.Election;
 
 namespace Coop.IntegrationTests.Kingdoms;
 
+[Collection(KingdomSyncGameThreadCollection.Name)]
 public class KingdomNetworkMessageSerializationTest
 {
     [Fact]

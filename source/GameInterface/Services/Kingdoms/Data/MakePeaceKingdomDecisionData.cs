@@ -1,7 +1,7 @@
-﻿using GameInterface.Services.ObjectManager;
+﻿using Common.Util;
+using GameInterface.Services.ObjectManager;
 using ProtoBuf;
 using System.Reflection;
-using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
 
@@ -60,7 +60,7 @@ namespace GameInterface.Services.Kingdoms.Data
                 faction = factionClanToMakePeaceWith;
             }
 
-            MakePeaceKingdomDecision makePeaceKingdomDecision = (MakePeaceKingdomDecision)FormatterServices.GetUninitializedObject(typeof(MakePeaceKingdomDecision));
+            var makePeaceKingdomDecision = ObjectHelper.SkipConstructor<MakePeaceKingdomDecision>();
             SetKingdomDecisionProperties(makePeaceKingdomDecision, proposerClan, kingdom);
             FactionToMakePeaceWithField.SetValue(makePeaceKingdomDecision, faction);
             DailyTributeToBePaidField.SetValue(makePeaceKingdomDecision, DailyTributeToBePaid);

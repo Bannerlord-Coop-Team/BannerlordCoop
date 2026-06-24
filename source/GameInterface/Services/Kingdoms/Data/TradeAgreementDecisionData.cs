@@ -1,7 +1,7 @@
+﻿using Common.Util;
 using GameInterface.Services.ObjectManager;
 using ProtoBuf;
 using System.Reflection;
-using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Election;
@@ -41,7 +41,7 @@ namespace GameInterface.Services.Kingdoms.Data
                 return false;
             }
 
-            TradeAgreementDecision tradeAgreementDecision = (TradeAgreementDecision)FormatterServices.GetUninitializedObject(typeof(TradeAgreementDecision));
+            var tradeAgreementDecision = ObjectHelper.SkipConstructor<TradeAgreementDecision>();
             SetKingdomDecisionProperties(tradeAgreementDecision, proposerClan, kingdom);
             TargetKingdomField.SetValue(tradeAgreementDecision, targetKingdom);
             tradeAgreementDecision._tradeAgreementsCampaignBehavior = tradeAgreementsCampaignBehavior;
