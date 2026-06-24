@@ -414,4 +414,75 @@ public class HeroDebugCommand
         }
         return "Hero not found.";
     }
+
+    // coop.debug.hero.set_relation
+    [CommandLineArgumentFunction("set_relation", "coop.debug.hero")]
+    public static string SetRelation(List<string> args)
+    {
+        if (ModInformation.IsClient)
+        {
+            return "Set relation is only to be called on the server";
+        }
+
+        if (args.Count != 3)
+        {
+            return "Usage: coop.debug.hero.set_relation <hero1Id> <hero2Id> <value>";
+        }
+
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        {
+            return $"Unable to get {nameof(IObjectManager)}";
+        }
+
+        if (objectManager.TryGetObject<Hero>(args[0], out var hero1) == false)
+        {
+            return $"Unable to find hero with id: {args[0]}";
+        }
+
+        if (objectManager.TryGetObject<Hero>(args[1], out var hero2) == false)
+        {
+            return $"Unable to find hero with id: {args[1]}";
+        }
+
+        if (hero1 == hero2)
+        {
+            return "A hero cannot have a relation with itself";
+        }
+
+        if (int.TryParse(args[2], out int value) == false)
+        {
+            return $"{args[2]} is not a valid integer";
+        }
+
+        CharacterRelationManager.SetHeroRelation(hero1, hero2, value);
+
+        return $"Set relation between '{hero1.Name}' and '{hero2.Name}' to {CharacterRelationManager.GetHeroRelation(hero1, hero2)}";
+    }
+
+    // coop.debug.hero.get_relation
+    [CommandLineArgumentFunction("get_relation", "coop.debug.hero")]
+    public static string GetRelation(List<string> args)
+    {
+        if (args.Count != 2)
+        {
+            return "Usage: coop.debug.hero.get_relation <hero1Id> <hero2Id>";
+        }
+
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        {
+            return $"Unable to get {nameof(IObjectManager)}";
+        }
+
+        if (objectManager.TryGetObject<Hero>(args[0], out var hero1) == false)
+        {
+            return $"Unable to find hero with id: {args[0]}";
+        }
+
+        if (objectManager.TryGetObject<Hero>(args[1], out var hero2) == false)
+        {
+            return $"Unable to find hero with id: {args[1]}";
+        }
+
+        return $"Relation between '{hero1.Name}' and '{hero2.Name}': {CharacterRelationManager.GetHeroRelation(hero1, hero2)}";
+    }
 }
