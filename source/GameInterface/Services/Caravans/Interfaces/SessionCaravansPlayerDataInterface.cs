@@ -19,7 +19,7 @@ public interface ISessionCaravansPlayerDataInterface : IGameAbstraction
     void RemoveProhibitedKingdomForAllPlayers(string kingdomId);
     void SetPlayerInteraction(string playerHeroId, string mobilePartyId, CaravansCampaignBehavior.PlayerInteraction interaction);
     void RemoveInteractedCaravanForAllPlayers(string mobilePartyId);
-    void UpdateTradeRumorTakenCaravansForPlayer(string playerHeroId, Dictionary<string, CampaignTime> tradeRumorTakenCaravansIds);
+    void UpdateTradeRumorTakenCaravansForPlayer(string playerHeroId, Dictionary<string, long> tradeRumorTakenCaravansIds);
     void DeleteExpiredTradeRumorTakenCaravans(out Dictionary<string, List<string>> playerExpiredCaravansRemovalLists);
     bool CanTradeWith(IFaction caravanFaction, IFaction targetFaction, MobileParty mobileParty);
     void AddPlayerKeys(string playerHeroId);
@@ -95,7 +95,7 @@ public class SessionCaravansPlayerDataInterface : ISessionCaravansPlayerDataInte
         }
     }
 
-    public void UpdateTradeRumorTakenCaravansForPlayer(string playerHeroId, Dictionary<string, CampaignTime> tradeRumorTakenCaravansIds)
+    public void UpdateTradeRumorTakenCaravansForPlayer(string playerHeroId, Dictionary<string, long> tradeRumorTakenCaravansIds)
     {
         if (!IsPlayerHeroIdValid(playerHeroId)) return;
 
@@ -112,7 +112,7 @@ public class SessionCaravansPlayerDataInterface : ISessionCaravansPlayerDataInte
             var removalList = new List<string>();
             foreach (var tradeRumorTakenCaravan in playerTradeRumourTakenCaravan.Value)
             {
-                if (CampaignTime.Now - tradeRumorTakenCaravan.Value >= CampaignTime.Days(1f))
+                if (CampaignTime.Now - new CampaignTime(tradeRumorTakenCaravan.Value) >= CampaignTime.Days(1f))
                 {
                     removalList.Add(tradeRumorTakenCaravan.Key);
                 }
@@ -166,7 +166,7 @@ public class SessionCaravansPlayerDataInterface : ISessionCaravansPlayerDataInte
         }
         if (!CaravansPlayerData.PlayerTradeRumorTakenCaravans.ContainsKey(playerHeroId))
         {
-            CaravansPlayerData.PlayerTradeRumorTakenCaravans[playerHeroId] = new Dictionary<string, CampaignTime>();
+            CaravansPlayerData.PlayerTradeRumorTakenCaravans[playerHeroId] = new Dictionary<string, long>();
         }
     }
 

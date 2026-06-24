@@ -102,11 +102,11 @@ internal readonly struct NetworkUpdateTradeRumorTakenCaravans : ICommand
     public readonly string MainHeroId;
 
     [ProtoMember(2)]
-    public readonly Dictionary<string, CampaignTime> TradeRumorTakenCaravansIds;
+    public readonly Dictionary<string, long> TradeRumorTakenCaravansIds;
 
     public NetworkUpdateTradeRumorTakenCaravans(
         string mainHeroId,
-        Dictionary<string, CampaignTime> tradeRumorTakenCaravansIds)
+        Dictionary<string, long> tradeRumorTakenCaravansIds)
     {
         MainHeroId = mainHeroId;
         TradeRumorTakenCaravansIds = tradeRumorTakenCaravansIds;

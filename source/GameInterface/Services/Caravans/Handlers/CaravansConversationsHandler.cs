@@ -180,12 +180,12 @@ internal class CaravansConversationsHandler : IHandler
     {
         if (!objectManager.TryGetIdWithLogging(obj.What.MainHero, out var mainHeroId)) return;
 
-        var tradeRumorTakenCaravansIds = new Dictionary<string, CampaignTime>();
+        var tradeRumorTakenCaravansIds = new Dictionary<string, long>();
         foreach (var tradeRumorTakenCaravan in obj.What.TradeRumorTakenCaravans)
         {
             if (!objectManager.TryGetIdWithLogging(tradeRumorTakenCaravan.Key, out var mobilePartyId)) continue;
 
-            tradeRumorTakenCaravansIds[mobilePartyId] = tradeRumorTakenCaravan.Value;
+            tradeRumorTakenCaravansIds[mobilePartyId] = tradeRumorTakenCaravan.Value._numTicks;
         }
 
         var message = new NetworkUpdateTradeRumorTakenCaravans(mainHeroId, tradeRumorTakenCaravansIds);

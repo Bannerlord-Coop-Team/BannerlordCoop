@@ -11,7 +11,6 @@ using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Core;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Caravans.Patches;
@@ -27,6 +26,12 @@ internal class CaravansConversationsPatches
     {
         Settlement settlement = ConversationSentence.SelectedRepeatObject as Settlement;
         StringHelpers.SetSettlementProperties("SETTLEMENT", settlement, null, false);
+
+        // Update locally to update dialogue properly before being managed by the server to update all other clients
+        using (new AllowedThread())
+        {
+            MobileParty.ConversationParty.CaravanPartyComponent.ChangeHomeSettlement(settlement);
+        }
 
         var message = new ChangeCaravanHomeSettlement(MobileParty.ConversationParty, settlement);
         MessageBroker.Instance.Publish(__instance, message);

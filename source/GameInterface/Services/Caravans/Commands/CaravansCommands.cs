@@ -124,7 +124,7 @@ internal class CaravansCommands
                 stringBuilder.AppendLine($"{playerTakenTradeRumorCaravan.Key}");
                 foreach (var takenTradeRumorCaravan in playerTakenTradeRumorCaravan.Value)
                 {
-                    stringBuilder.AppendLine($"{takenTradeRumorCaravan.Key} ({takenTradeRumorCaravan.Value.NumTicks})");
+                    stringBuilder.AppendLine($"{takenTradeRumorCaravan.Key} ({takenTradeRumorCaravan.Value})");
                 }
             }
         }

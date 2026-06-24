@@ -21,14 +21,14 @@ public class CaravansPlayerData
     [ProtoMember(2)]
     public Dictionary<string, Dictionary<string, int>> PlayerInteractedCaravans { get; }
 
-    // Dictionary<PlayerHeroId, Dictionary<CaravanMobilePartyId, CampaignTime>
+    // Dictionary<PlayerHeroId, Dictionary<CaravanMobilePartyId, CampaignTime._numTicks>
     [ProtoMember(3)]
-    public Dictionary<string, Dictionary<string, CampaignTime>> PlayerTradeRumorTakenCaravans { get; }
+    public Dictionary<string, Dictionary<string, long>> PlayerTradeRumorTakenCaravans { get; }
 
     public CaravansPlayerData(
         Dictionary<string, List<string>> playerProhibitedKingdomsForPlayerCaravans,
         Dictionary<string, Dictionary<string, int>> playerInteractedCaravans,
-        Dictionary<string, Dictionary<string, CampaignTime>> playerTradeRumorTakenCaravans)
+        Dictionary<string, Dictionary<string, long>> playerTradeRumorTakenCaravans)
     {
         PlayerProhibitedKingdomsForPlayerCaravans = playerProhibitedKingdomsForPlayerCaravans;
         PlayerInteractedCaravans = playerInteractedCaravans;
