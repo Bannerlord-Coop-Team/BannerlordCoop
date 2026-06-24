@@ -40,6 +40,8 @@ namespace GameInterface.Services.Heroes.Handlers
 
         private void Handle(MessagePayload<NetworkHeroRelationChanged> obj)
         {
+            if (ModInformation.IsClient) return;
+
             var payload = obj.What;
 
             GameThread.RunSafe(() =>
