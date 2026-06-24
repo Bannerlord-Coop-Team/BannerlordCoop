@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Messages;
 using HarmonyLib;
 using Serilog;
@@ -29,6 +30,18 @@ internal class TroopRosterPatches
     [ThreadStatic]
     private static bool _inAddToCountsAtIndex;
 
+    /// <summary>
+    /// True when the registry can key a network message on this roster. A battle mutates the MapEventParty
+    /// tally rosters (died/wounded/routed) once per casualty; those are dummy rosters with no OwnerParty,
+    /// never registered, with nothing to replicate. Without this gate each of those thousands of mutations
+    /// would allocate an event and dispatch it synchronously on the game thread only for the send handler to
+    /// drop it on the missing id. Real party rosters register on set_OwnerParty before their first mutation
+    /// (<see cref="TroopRosterOwnerPartyRegistrationPatch"/>), so this only skips rosters that have no
+    /// identity to send anyway.
+    /// </summary>
+    internal static bool IsRegistered(TroopRoster roster)
+        => ContainerProvider.TryResolve<IObjectManager>(out var objectManager) && objectManager.TryGetId(roster, out _);
+
     [HarmonyPatch(nameof(TroopRoster.AddToCountsAtIndex))]
     [HarmonyPrefix]
     private static void PrefixAddToCountsAtIndex(TroopRoster __instance, int index, int countChange,
@@ -40,6 +53,9 @@ internal class TroopRosterPatches
             Logger.Error("Client attempted to {methodName} on a managed {type}", nameof(TroopRoster.AddToCountsAtIndex), typeof(TroopRoster));
             return;
         }
+
+        // Skip rosters with no network identity (battle tally dummies, etc.) before allocating/publishing.
+        if (!IsRegistered(__instance)) return;
 
         // Match the bounds guard the SetElement* prefixes use: an index in the slot-padding window
         // (Count <= index < data.Length) would read a cleared element with a null Character.
@@ -74,6 +90,8 @@ internal class TroopRosterPatches
             return;
         }
 
+        if (!IsRegistered(__instance)) return;
+
         MessageBroker.Instance.Publish(__instance, new ZeroCountsRemoved(__instance));
     }
 
@@ -87,6 +105,8 @@ internal class TroopRosterPatches
             Logger.Error("Client attempted to {methodName} on a managed {type}", nameof(TroopRoster.SetElementNumber), typeof(TroopRoster));
             return;
         }
+
+        if (!IsRegistered(__instance)) return;
 
         // Only read the element while the index points at a live slot. data has padding past Count, so an
         // out-of-range index would publish a change for a stale/null element before the original throws.
@@ -107,6 +127,8 @@ internal class TroopRosterPatches
             return;
         }
 
+        if (!IsRegistered(__instance)) return;
+
         if (index < 0 || index >= __instance.Count) return;
 
         var character = __instance.GetElementCopyAtIndex(index).Character;
@@ -123,6 +145,8 @@ internal class TroopRosterPatches
             Logger.Error("Client attempted to {methodName} on a managed {type}", nameof(TroopRoster.SetElementXp), typeof(TroopRoster));
             return;
         }
+
+        if (!IsRegistered(__instance)) return;
 
         // The xp change AddToCountsAtIndex makes internally is already carried by its CountsAtIndexAdded.
         if (_inAddToCountsAtIndex) return;
@@ -148,6 +172,7 @@ internal class TroopRosterAddToCountsPatch
         if (!AllowedThread.IsThisThreadAllowed()) return;
         if (ModInformation.IsClient) return;
         if (__instance == null || character == null) return;
+        if (!TroopRosterPatches.IsRegistered(__instance)) return;
 
         MessageBroker.Instance.Publish(__instance, new CountsAtIndexAdded(__instance, character, count, woundedCount, xpChange, removeDepleted));
     }
