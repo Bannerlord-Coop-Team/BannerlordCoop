@@ -65,7 +65,7 @@ internal class TradeHandler : IHandler
         var what = payload.What;
 
         var isManagingWarehouse = what.InventoryMode == InventoryScreenHelper.InventoryMode.Warehouse;
-        var manageLeftRoster = what.InventoryMode != InventoryScreenHelper.InventoryMode.Default && !what.CanGainXpFromDiscarding && !isManagingWarehouse;
+        var manageLeftRoster = !what.CanGainXpFromDiscarding && !isManagingWarehouse;
 
         string fromRosterId = null;
         if (manageLeftRoster && !objectManager.TryGetIdWithLogging(what.FromRoster, out fromRosterId)) return;
