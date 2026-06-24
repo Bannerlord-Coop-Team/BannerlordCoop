@@ -1,7 +1,10 @@
 ﻿using Common;
+using Common.Messaging;
 using Common.Util;
 using GameInterface.Extentions;
+using GameInterface.Policies;
 using GameInterface.Services.Kingdoms.Extentions;
+using GameInterface.Services.Kingdoms.Messages;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -10,6 +13,10 @@ using TaleWorlds.CampaignSystem.Election;
 namespace GameInterface.Services.Kingdoms;
 public interface IKingdomInterface : IGameAbstraction
 {
+    bool AddDecisionPrefix(Kingdom kingdom, KingdomDecision kingdomDecision, bool ignoreInfluenceCost);
+    bool RemoveDecisionPrefix(Kingdom kingdom, KingdomDecision kingdomDecision);
+    bool AddPolicyPrefix(Kingdom kingdom, PolicyObject policy);
+    bool RemovePolicyPrefix(Kingdom kingdom, PolicyObject policy);
     float AddDecision(Kingdom kingdom, KingdomDecision kingdomDecision, bool ignoreInfluenceCost, float? randomFloat = null, bool applyInfluenceCost = true);
     void RunAddDecision(Kingdom kingdom, KingdomDecision kingdomDecision, bool ignoreInfluenceCost, float randomFloat);
     void RemoveDecision(Kingdom kingdom, KingdomDecision kingdomDecision);
@@ -21,6 +28,56 @@ internal class KingdomInterface : IKingdomInterface
     public KingdomInterface(IKingdomDecisionVoteManager decisionVoteManager)
     {
         this.decisionVoteManager = decisionVoteManager;
+    }
+    public bool AddDecisionPrefix(Kingdom kingdom, KingdomDecision kingdomDecision, bool ignoreInfluenceCost)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (ModInformation.IsClient)
+        {
+            float clientRandomNumber = AddDecision(kingdom, kingdomDecision, ignoreInfluenceCost, applyInfluenceCost: false);
+            MessageBroker.Instance.Publish(kingdom,
+                new DecisionAdded(kingdom, kingdomDecision, ignoreInfluenceCost, clientRandomNumber));
+            return false;
+        }
+        float randomNumber = AddDecision(kingdom, kingdomDecision, ignoreInfluenceCost, applyInfluenceCost: true);
+        MessageBroker.Instance.Publish(kingdom,
+            new DecisionAdded(kingdom, kingdomDecision, ignoreInfluenceCost, randomNumber));
+        return false;
+    }
+    public bool RemoveDecisionPrefix(Kingdom kingdom, KingdomDecision kingdomDecision)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (ModInformation.IsClient) return false;
+        KingdomRegistry.EnsureRuntimeCollections(kingdom);
+        var index = kingdom._unresolvedDecisions?.FindIndex(decision => decision == kingdomDecision) ?? -1;
+        if (index >= 0)
+        {
+            MessageBroker.Instance.Publish(kingdom,
+                new DecisionRemoved(kingdom, index));
+        }
+        return true;
+    }
+    public bool AddPolicyPrefix(Kingdom kingdom, PolicyObject policy)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (ModInformation.IsClient) return false;
+        KingdomRegistry.EnsureRuntimeCollections(kingdom);
+        if (!kingdom._activePolicies.Contains(policy))
+        {
+            MessageBroker.Instance.Publish(kingdom, new KingdomPolicyChanged(kingdom, policy, isAdd: true));
+        }
+        return true;
+    }
+    public bool RemovePolicyPrefix(Kingdom kingdom, PolicyObject policy)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (ModInformation.IsClient) return false;
+        KingdomRegistry.EnsureRuntimeCollections(kingdom);
+        if (kingdom._activePolicies.Contains(policy))
+        {
+            MessageBroker.Instance.Publish(kingdom, new KingdomPolicyChanged(kingdom, policy, isAdd: false));
+        }
+        return true;
     }
     public float AddDecision(
         Kingdom kingdom,
