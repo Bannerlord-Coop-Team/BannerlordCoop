@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Party.Commands;
@@ -39,22 +40,35 @@ internal class PartyCommands
         => Hero.AllAliveHeroes.Where(h => h.Name.ToString() == name && h.PartyBelongedTo != null).ToList();
 
     /// <summary>
-    /// Finds a single alive hero by full name with a party, for the cheats that target one party (the
-    /// companion-preserve pair - putting one hero into several prisons at once would be invalid state).
-    /// Reports cleanly when the name matches nothing or only partyless heroes.
+    /// Finds a single alive hero with a party, for the cheats that target one party (the companion-preserve
+    /// pair - putting one hero into several prisons at once would be invalid state). Accepts a hero StringId
+    /// (unique, printed by `whoami`) so you can target one specific party when several heroes share a name
+    /// (multiple "RandomPlayer" parties), or falls back to a full-name match. Reports cleanly on a miss.
     /// </summary>
-    private static bool TryGetHeroWithParty(string name, out Hero hero, out string error)
+    private static bool TryGetHeroWithParty(string nameOrId, out Hero hero, out string error)
     {
-        hero = FindHeroesWithParty(name).FirstOrDefault();
-        if (hero == null)
-        {
-            error = Hero.AllAliveHeroes.Any(h => h.Name.ToString() == name)
-                ? "Hero \"" + name + "\" has no party (a prisoner, notable, or wanderer?)."
-                : "Hero \"" + name + "\" not found.";
-            return false;
-        }
+        hero = Hero.AllAliveHeroes.FirstOrDefault(h => h.StringId == nameOrId)
+            ?? Hero.AllAliveHeroes.FirstOrDefault(h => h.Name.ToString() == nameOrId && h.PartyBelongedTo != null);
+        if (hero == null) { error = "No hero \"" + nameOrId + "\" (by id or name) with a party found."; return false; }
+        if (hero.PartyBelongedTo == null) { error = hero.Name + " (" + hero.StringId + ") has no party (a prisoner, notable, or wanderer?)."; return false; }
         error = null;
         return true;
+    }
+
+    /// <summary>
+    /// Prints this instance's controlled hero and its ids. Run on a CLIENT to learn your own hero's StringId,
+    /// then pass that to imprison_companion / snapshot_prison to target your exact party when several share the
+    /// "RandomPlayer" name.
+    /// </summary>
+    [CommandLineArgumentFunction("whoami", "coop.debug.mobileparty")]
+    public static string WhoAmICommand(List<string> strings)
+    {
+        var me = Hero.MainHero;
+        if (me == null) return "No main hero on this instance (the host has none; run this on a client).";
+
+        return me.PartyBelongedTo != null
+            ? "You are " + me.Name + " | hero id: " + me.StringId + " | party id: " + me.PartyBelongedTo.StringId
+            : "You are " + me.Name + " | hero id: " + me.StringId + " | NO PARTY";
     }
 
     /// <summary>
@@ -72,7 +86,7 @@ internal class PartyCommands
         StringBuilder stringBuilder = new StringBuilder();
         foreach (var hero in heroes)
         {
-            stringBuilder.AppendLine("##" + hero.Name.ToString());
+            stringBuilder.AppendLine("##" + hero.Name.ToString() + "  (hero id: " + hero.StringId + ")");
             stringBuilder.AppendLine("Member roster:");
             foreach (var rosterElement in hero.PartyBelongedTo.MemberRoster.data)
             {
@@ -269,8 +283,11 @@ internal class PartyCommands
         // fixed and the old code and prove nothing. Require a companion so the test actually exercises it.
         if (!prisoner.IsPlayerCompanion) return prisoner.Name + " is not a player companion; this test needs one.";
 
-        captor.PartyBelongedTo.PrisonRoster.AddToCounts(prisoner.CharacterObject, 1);
-        return prisoner.Name + " (a player companion) added to " + captor.Name + "'s prison roster.";
+        // A real imprisonment, so the companion MOVES into the prison (removed from its home party) instead of
+        // being copied there while still a member - a raw PrisonRoster.AddToCounts would leave it in both
+        // rosters. TakePrisonerAction's roster changes run with patches live, so they replicate as deltas.
+        TakePrisonerAction.Apply(captor.PartyBelongedTo.Party, prisoner);
+        return prisoner.Name + " (a player companion) imprisoned in " + captor.Name + "'s party.";
     }
 
     /// <summary>
