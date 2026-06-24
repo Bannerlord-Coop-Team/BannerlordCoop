@@ -120,6 +120,10 @@ internal class TroopRosterInterface : ITroopRosterInterface
         // Rebuild roster with new data
         foreach (var element in UnpackTroopRosterData(packedTroopRosterElements))
         {
+            // Clear doesn't remove mainHero and companions, avoid adding duplicates of any existing heroes to the roster when rebuilding
+            if (element.Character.IsHero && targetTroopRoster.Contains(element.Character))
+                continue;
+
             targetTroopRoster.Add(element);
         }
     }
