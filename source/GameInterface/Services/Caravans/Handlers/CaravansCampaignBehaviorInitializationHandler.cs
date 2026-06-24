@@ -13,7 +13,7 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Caravans.Handlers;
 
-internal class CaravansCampaignBehaviorInitializationHandler
+internal class CaravansCampaignBehaviorInitializationHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<CaravansCampaignBehaviorInitializationHandler>();
     private readonly IMessageBroker messageBroker;
@@ -50,7 +50,7 @@ internal class CaravansCampaignBehaviorInitializationHandler
         caravansPlayerData = obj.What.CaravansPlayerData;
     }
 
-    // Need to load workshop data when the hero changes for the player
+    // Need to load caravan data when the hero changes for the player
     private void Handle(MessagePayload<PlayerHeroChanged> obj)
     {
         if (!objectManager.TryGetIdWithLogging(obj.What.NewHero, out string playerHeroId)) return;

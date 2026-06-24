@@ -15,7 +15,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Caravans.Handlers;
 
-internal class CaravansCampaignBehaviorHandler
+internal class CaravansCampaignBehaviorHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<CaravansCampaignBehaviorHandler>();
 
@@ -217,6 +217,8 @@ internal class CaravansCampaignBehaviorHandler
     private void Handle_NetworkUpdateTradeActionLogsForParty(MessagePayload<NetworkUpdateTradeActionLogsForParty> obj)
     {
         if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
+
+        if (obj.What.TradeActionLogsData == null) return;
 
         var tradeActionLogs = new List<CaravansCampaignBehavior.TradeActionLog>();
         foreach (var tradeActionLogData in obj.What.TradeActionLogsData)

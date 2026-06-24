@@ -72,7 +72,7 @@ public class SessionCaravansPlayerDataInterface : ISessionCaravansPlayerDataInte
     {
         if (!IsPlayerHeroIdValid(playerHeroId)) return;
 
-        // Cast to save, can't use enumerable directly because of protection level
+        // Cast to save, can't use enumerable directly because of protection level in Coop.Core
         int interactionInt = (int)interaction;
 
         if (CaravansPlayerData.PlayerInteractedCaravans[playerHeroId].ContainsKey(mobilePartyId))
