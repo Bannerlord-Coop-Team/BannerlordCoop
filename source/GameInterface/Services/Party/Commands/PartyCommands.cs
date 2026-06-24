@@ -9,7 +9,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Party.Commands;
@@ -283,11 +282,13 @@ internal class PartyCommands
         // fixed and the old code and prove nothing. Require a companion so the test actually exercises it.
         if (!prisoner.IsPlayerCompanion) return prisoner.Name + " is not a player companion; this test needs one.";
 
-        // A real imprisonment, so the companion MOVES into the prison (removed from its home party) instead of
-        // being copied there while still a member - a raw PrisonRoster.AddToCounts would leave it in both
-        // rosters. TakePrisonerAction's roster changes run with patches live, so they replicate as deltas.
-        TakePrisonerAction.Apply(captor.PartyBelongedTo.Party, prisoner);
-        return prisoner.Name + " (a player companion) imprisoned in " + captor.Name + "'s party.";
+        // Place a copy of the companion in the prison roster as a test fixture for the snapshot path.
+        // Deliberately a raw AddToCounts, NOT a TakePrisonerAction: the full imprisonment doesn't replicate
+        // cleanly in co-op (it zeroes the prisoner's home party on its owning client - a separate captivity
+        // sync bug). The companion stays in its own party, so the snapshot test only ever clears the prison
+        // copy and there is nothing to restore afterwards.
+        captor.PartyBelongedTo.PrisonRoster.AddToCounts(prisoner.CharacterObject, 1);
+        return prisoner.Name + " (a player companion) placed in " + captor.Name + "'s prison roster (a test copy; it stays in its own party).";
     }
 
     /// <summary>
