@@ -48,6 +48,8 @@ public class ArmyHandler : IHandler
         messageBroker.Subscribe<NetworkPlayerAddedPartiesToArmy>(HandleNetworkPlayerAddedPartiesToArmy);
         messageBroker.Subscribe<PlayerRemovedPartiesFromArmy>(HandlePlayerRemovedPartiesFromArmy);
         messageBroker.Subscribe<NetworkPlayerRemovedPartiesFromArmy>(HandleNetworkPlayerRemovedPartiesFromArmy);
+        messageBroker.Subscribe<PlayerBoostedArmyCohesion>(HandlePlayerBoostedArmyCohesion);
+        messageBroker.Subscribe<NetworkPlayerBoostedArmyCohesion>(HandleNetworkPlayerBoostedArmyCohesion);
     }
 
     public void Dispose()
@@ -64,6 +66,8 @@ public class ArmyHandler : IHandler
         messageBroker.Unsubscribe<NetworkPlayerAddedPartiesToArmy>(HandleNetworkPlayerAddedPartiesToArmy);
         messageBroker.Unsubscribe<PlayerRemovedPartiesFromArmy>(HandlePlayerRemovedPartiesFromArmy);
         messageBroker.Unsubscribe<NetworkPlayerRemovedPartiesFromArmy>(HandleNetworkPlayerRemovedPartiesFromArmy);
+        messageBroker.Unsubscribe<PlayerBoostedArmyCohesion>(HandlePlayerBoostedArmyCohesion);
+        messageBroker.Unsubscribe<NetworkPlayerBoostedArmyCohesion>(HandleNetworkPlayerBoostedArmyCohesion);
     }
 
     private void HandleAddMobilePartyInArmy(MessagePayload<MobilePartyInArmyAdded> obj)
@@ -284,6 +288,34 @@ public class ArmyHandler : IHandler
             catch (Exception ex)
             {
                 Logger.Error(ex, "Failed to remove parties from army");
+            }
+        });
+    }
+    private void HandlePlayerBoostedArmyCohesion(MessagePayload<PlayerBoostedArmyCohesion> payload)
+    {
+        var obj = payload.What;
+        if (!objectManager.TryGetIdWithLogging(obj.ArmyLeaderParty, out var leaderPartyId)) return;
+
+        network.SendAll(new NetworkPlayerBoostedArmyCohesion(leaderPartyId, obj.CohesionToGain, obj.InfluenceCost));
+    }
+
+    private void HandleNetworkPlayerBoostedArmyCohesion(MessagePayload<NetworkPlayerBoostedArmyCohesion> payload)
+    {
+        var obj = payload.What;
+        if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.ArmyLeaderPartyId, out var leaderParty)) return;
+
+        GameThread.RunSafe(() =>
+        {
+            try
+            {
+                if (leaderParty.Army == null) return;
+                // BoostCohesionWithInfluence increments Army.Cohesion and deducts influence.
+                // Do not deduct influence separately it is fully handled here
+                leaderParty.Army.BoostCohesionWithInfluence(obj.CohesionToGain, obj.InfluenceCost);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Failed to boost army cohesion");
             }
         });
     }

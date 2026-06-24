@@ -32,9 +32,17 @@ internal class ArmyManagementVMExecuteDonePatch
             __instance.ExecuteDisbandArmy();
             return false;
         }
-
-        // Cohesion boost is skipped on client; server applies it via vanilla and syncs via DynamicSync
-
+        // If the player clicked the +10 cohesion boost one or more times,
+        // publish the total accumulated boost to be applied server-side.
+        // BoostCohesionWithInfluence on each peer handles both cohesion and influence deduction,
+        if (__instance.NewCohesion > __instance.Cohesion)
+        {
+            int delta = __instance.NewCohesion - __instance.Cohesion;
+            MessageBroker.Instance.Publish(__instance, new PlayerBoostedArmyCohesion(
+                MobileParty.MainParty.Army.LeaderParty,
+                (float)delta,
+                __instance._influenceSpentForCohesionBoosting));
+        }
         if (__instance.PartiesInCart.Count > 1 && MobileParty.MainParty.MapFaction.IsKingdomFaction)
         {
             var parties = __instance.PartiesInCart
@@ -60,6 +68,9 @@ internal class ArmyManagementVMExecuteDonePatch
                     parties));
             }
             // Deduct influence locally
+            // Deduct influence for party recruitment only
+            // cohesion boost cost is excluded
+            // since it is handled by BoostCohesionWithInfluence on all peers.
             ChangeClanInfluenceAction.Apply(Clan.PlayerClan, (float)(-(float)(__instance.TotalCost - __instance._influenceSpentForCohesionBoosting)));
         }
 
