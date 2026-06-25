@@ -1,7 +1,7 @@
-﻿using GameInterface.Services.ObjectManager;
+﻿using Common.Util;
+using GameInterface.Services.ObjectManager;
 using ProtoBuf;
 using System.Reflection;
-using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
 
@@ -15,7 +15,9 @@ namespace GameInterface.Services.Kingdoms.Data
     {
         private static readonly FieldInfo FactionToMakePeaceWithField = typeof(MakePeaceKingdomDecision).GetField(nameof(MakePeaceKingdomDecision.FactionToMakePeaceWith), BindingFlags.Instance | BindingFlags.Public);
         private static readonly FieldInfo DailyTributeToBePaidField = typeof(MakePeaceKingdomDecision).GetField(nameof(MakePeaceKingdomDecision.DailyTributeToBePaid), BindingFlags.Instance | BindingFlags.Public);
+        private static readonly FieldInfo DailyTributeDurationInDaysField = typeof(MakePeaceKingdomDecision).GetField(nameof(MakePeaceKingdomDecision.DailyTributeDurationInDays), BindingFlags.Instance | BindingFlags.Public);
         private static readonly FieldInfo ApplyResultsField = typeof(MakePeaceKingdomDecision).GetField("_applyResults", BindingFlags.Instance | BindingFlags.NonPublic);
+        private static readonly FieldInfo IsProposedByOpponentField = typeof(MakePeaceKingdomDecision).GetField("_isProposedByOpponent", BindingFlags.Instance | BindingFlags.NonPublic);
 
         [ProtoMember(1)]
         public string FactionToMakePeaceWithId { get; }
@@ -23,12 +25,18 @@ namespace GameInterface.Services.Kingdoms.Data
         public int DailyTributeToBePaid { get; }
         [ProtoMember(3)]
         public bool ApplyResults { get; }
+        [ProtoMember(4)]
+        public int DailyTributeDurationInDays { get; }
+        [ProtoMember(5)]
+        public bool IsProposedByOpponent { get; }
 
-        public MakePeaceKingdomDecisionData(string proposedClanId, string kingdomId, long triggerTime, bool isEnforced, bool notifyPlayer, bool playerExamined, string factionToMakePeaceWithId, int dailyTributeToBePaid, bool applyResults) : base(proposedClanId, kingdomId, triggerTime, isEnforced, notifyPlayer, playerExamined)
+        public MakePeaceKingdomDecisionData(string proposedClanId, string kingdomId, long triggerTime, bool isEnforced, bool notifyPlayer, bool playerExamined, string factionToMakePeaceWithId, int dailyTributeToBePaid, bool applyResults, int dailyTributeDurationInDays, bool isProposedByOpponent) : base(proposedClanId, kingdomId, triggerTime, isEnforced, notifyPlayer, playerExamined)
         {
-            FactionToMakePeaceWithId= factionToMakePeaceWithId;
-            DailyTributeToBePaid= dailyTributeToBePaid;
-            ApplyResults= applyResults;
+            FactionToMakePeaceWithId = factionToMakePeaceWithId;
+            DailyTributeToBePaid = dailyTributeToBePaid;
+            ApplyResults = applyResults;
+            DailyTributeDurationInDays = dailyTributeDurationInDays;
+            IsProposedByOpponent = isProposedByOpponent;
         }
 
         /// <inheritdoc/>
@@ -52,11 +60,13 @@ namespace GameInterface.Services.Kingdoms.Data
                 faction = factionClanToMakePeaceWith;
             }
 
-            MakePeaceKingdomDecision makePeaceKingdomDecision = (MakePeaceKingdomDecision)FormatterServices.GetUninitializedObject(typeof(MakePeaceKingdomDecision));
+            var makePeaceKingdomDecision = ObjectHelper.SkipConstructor<MakePeaceKingdomDecision>();
             SetKingdomDecisionProperties(makePeaceKingdomDecision, proposerClan, kingdom);
             FactionToMakePeaceWithField.SetValue(makePeaceKingdomDecision, faction);
             DailyTributeToBePaidField.SetValue(makePeaceKingdomDecision, DailyTributeToBePaid);
+            DailyTributeDurationInDaysField.SetValue(makePeaceKingdomDecision, DailyTributeDurationInDays);
             ApplyResultsField.SetValue(makePeaceKingdomDecision, ApplyResults);
+            IsProposedByOpponentField.SetValue(makePeaceKingdomDecision, IsProposedByOpponent);
             kingdomDecision = makePeaceKingdomDecision;
             return true;
         }

@@ -1,5 +1,6 @@
 using Common;
 using Common.Logging;
+using GameInterface;
 using GameInterface.Extentions;
 using HarmonyLib;
 using Serilog;
@@ -44,7 +45,7 @@ namespace GameInterface.Services.Kingdoms.Patches
 
         /// <summary>
         /// Replacement for the per-clan daily proposer. Mirrors the vanilla logic but
-        /// drops the Clan.PlayerClan / Hero.MainHero dependencies and proposes only war/peace/policy.
+        /// drops the Clan.PlayerClan / Hero.MainHero dependencies and proposes synced kingdom decisions.
         /// Proposed decisions flow through the live Kingdom.AddDecision funnel, which resolves
         /// player-free kingdoms immediately and queues the rest for the hourly sweep.
         /// </summary>
@@ -91,11 +92,13 @@ namespace GameInterface.Services.Kingdoms.Patches
             {
                 kingdomDecision = __instance.GetRandomWarDecision(clan);
             }
+            else if (randomFloat < chance * 2.25f)
+            {
+                kingdomDecision = __instance.GetRandomTradeAgreementDecision(clan);
+            }
             else if (randomFloat < chance * 2.5f)
             {
-                // Trade-agreement / alliance band — not synced; preserved as a no-op so the
-                // remaining decision types keep their vanilla probabilities.
-                return false;
+                kingdomDecision = __instance.GetRandomStartingAllianceDecision(clan);
             }
             else if (randomFloat < chance * 2.75f
                 && clan.Influence > diplomacyModel.GetInfluenceCostOfPolicyProposalAndDisavowal(clan) * 4)
@@ -159,6 +162,12 @@ namespace GameInterface.Services.Kingdoms.Patches
                         }
                         else if (decision.TriggerTime.IsPast)
                         {
+                            if (ContainerProvider.TryResolve<IKingdomDecisionVoteManager>(out var voteManager) &&
+                                voteManager.TryResolveDecision(decision, force: true))
+                            {
+                                continue;
+                            }
+
                             // Resolves AI-side; ApplyChosenOutcome calls Kingdom.RemoveDecision,
                             // which replicates the removal by index through the live patch.
                             new KingdomElection(decision).StartElectionWithoutPlayer();

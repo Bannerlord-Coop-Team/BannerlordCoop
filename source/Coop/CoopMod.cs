@@ -5,7 +5,6 @@ using Coop.Lib.NoHarmony;
 using Coop.UI.LoadGameUI;
 using GameInterface;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
-using GameInterface.Services.TroopRosters;
 using GameInterface.Services.UI;
 using Serilog;
 using System;

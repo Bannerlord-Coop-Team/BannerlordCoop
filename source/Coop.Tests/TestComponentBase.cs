@@ -10,6 +10,7 @@ using GameInterface.Registry;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.Kingdoms;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
@@ -73,6 +74,8 @@ internal abstract class TestComponentBase
 
         builder.RegisterType<ObjectManager>().As<IObjectManager>().InstancePerLifetimeScope();
         builder.RegisterType<RegistryCollection>().As<IRegistryCollection>().InstancePerLifetimeScope();
+        builder.RegisterType<KingdomCreationSettlementTracker>().As<IKingdomCreationSettlementTracker>().InstancePerLifetimeScope();
+        builder.RegisterType<KingdomDecisionDataConverter>().As<IKingdomDecisionDataConverter>().InstancePerLifetimeScope();
 
         RegisterMock<ILogger>(builder);
         RegisterMock<IGameInterface>(builder);
