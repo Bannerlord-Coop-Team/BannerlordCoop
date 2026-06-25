@@ -2,6 +2,7 @@
 using GameInterface.Services.ObjectManager;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -43,6 +44,43 @@ namespace GameInterface.Services.GameDebug.Commands
             });
 
             return stringBuilder.ToString();
+        }
+
+        // coop.debug.clan.info <clanId>
+        /// <summary>
+        /// Reflection-dumps every field of a Clan so a server screenshot and a client screenshot can be
+        /// compared field-for-field to confirm Clan field syncs still replicate.
+        /// </summary>
+        [CommandLineArgumentFunction("info", "coop.debug.clan")]
+        public static string Info(List<string> args)
+        {
+            if (args.Count != 1) return "Usage: coop.debug.clan.info <clanId>";
+            if (!TryGetObjectManager(out IObjectManager objectManager)) return "Unable to resolve ObjectManager";
+            if (!objectManager.TryGetObject(args[0], out Clan clan)) return $"Unable to find clan with id: {args[0]}";
+
+            var stringBuilder = new StringBuilder();
+            foreach (var field in typeof(Clan).GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance))
+            {
+                stringBuilder.AppendLine($"{field.Name} = {field.GetValue(clan)}");
+            }
+            return stringBuilder.ToString();
+        }
+
+        // coop.debug.clan.add_influence <clanId> <amount>   (SERVER only)
+        /// <summary>
+        /// Authoritatively changes a clan's influence by the given amount via ChangeClanInfluenceAction so
+        /// the _influence scalar-field store replicates; verify on both sides with coop.debug.clan.info.
+        /// </summary>
+        [CommandLineArgumentFunction("add_influence", "coop.debug.clan")]
+        public static string AddClanInfluence(List<string> args)
+        {
+            if (args.Count != 2) return "Usage: coop.debug.clan.add_influence <clanId> <amount>";
+            if (!TryGetObjectManager(out IObjectManager objectManager)) return "Unable to resolve ObjectManager";
+            if (!objectManager.TryGetObject(args[0], out Clan clan)) return $"Unable to find clan with id: {args[0]}";
+            if (!float.TryParse(args[1], out float amount)) return $"'{args[1]}' is not a valid number";
+
+            ChangeClanInfluenceAction.Apply(clan, amount);
+            return $"Applied {amount} influence to '{clan.Name}'; clan is now at {clan.Influence} influence";
         }
 
 

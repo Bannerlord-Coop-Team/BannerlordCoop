@@ -60,6 +60,29 @@ internal class MobilePartyDebugCommand
         return $"{partyResult}\n{partyBaseResults}";
     }
 
+    // coop.debug.mobileparty.component_info <PartyStringID>
+    // Dumps the party's _partyComponent fields (LordPartyComponent/Caravan/Garrison/etc.), which the plain
+    // info cheat does NOT show (it dumps MobileParty + PartyBase only). e.g. LordPartyComponent._wagePaymentLimit.
+    [CommandLineArgumentFunction("component_info", "coop.debug.mobileparty")]
+    public static string ComponentInfo(List<string> args)
+    {
+        if (args.Count < 1)
+        {
+            return "Usage: coop.debug.mobileparty.component_info <PartyStringID>";
+        }
+
+        MobileParty mobileParty = Campaign.Current.CampaignObjectManager.Find<MobileParty>(args[0]);
+        if (mobileParty == null)
+        {
+            return string.Format("ID: '{0}' not found", args[0]);
+        }
+
+        var stringBuilder = new StringBuilder();
+        stringBuilder.AppendLine($"PartyComponent ({mobileParty.PartyComponent?.GetType().Name ?? "null"}) for: {SafeToString(mobileParty.Name)}");
+        AppendFields(stringBuilder, mobileParty.PartyComponent);
+        return stringBuilder.ToString();
+    }
+
     private static void AppendFields(StringBuilder stringBuilder, object instance)
     {
         if (instance == null)

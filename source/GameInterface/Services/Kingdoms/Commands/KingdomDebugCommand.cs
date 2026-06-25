@@ -7,6 +7,7 @@ using GameInterface.Services.Kingdoms.Messages.Collections;
 using GameInterface.Services.ObjectManager;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -96,6 +97,26 @@ public class KingdomDebugCommand
         {
             stringBuilder.Append(string.Format("Name: '{0}'\n Id : '{1}'\n", kingdom.Name, kingdom.StringId));
         });
+        return stringBuilder.ToString();
+    }
+
+    // coop.debug.kingdom.info <kingdomId>
+    /// <summary>
+    /// Reflection-dumps every field of a Kingdom so a server screenshot and a client screenshot can be
+    /// compared field-for-field to confirm Kingdom field syncs still replicate.
+    /// </summary>
+    [CommandLineArgumentFunction("info", "coop.debug.kingdom")]
+    public static string Info(List<string> args)
+    {
+        if (args.Count != 1) return "Usage: coop.debug.kingdom.info <kingdomId>";
+        if (!TryGetObjectManager(out IObjectManager objectManager)) return "Unable to resolve ObjectManager";
+        if (objectManager.TryGetObject(args[0], out Kingdom kingdom) == false) return $"Unable to find kingdom with id: {args[0]}";
+
+        StringBuilder stringBuilder = new StringBuilder();
+        foreach (var field in typeof(Kingdom).GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance))
+        {
+            stringBuilder.AppendLine($"{field.Name} = {field.GetValue(kingdom)}");
+        }
         return stringBuilder.ToString();
     }
 
