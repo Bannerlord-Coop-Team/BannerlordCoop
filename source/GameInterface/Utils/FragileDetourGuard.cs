@@ -11,14 +11,14 @@ using System.Runtime.InteropServices;
 namespace GameInterface.Utils
 {
     /// <summary>
-    /// Closes the #1539 co-op server freeze at its single root: Harmony detours a method by writing a 5-byte
+    /// Harmony detours a method by writing a 5-byte
     /// rel32 jmp over its entry, and for a tiny method whose inline x64 unwind info (.xdata) sits within those
     /// 5 bytes, that write corrupts the unwind data the GC's suspend-time stack walk reads, self-deadlocking
-    /// the GC. AutoSync used to detour every declared method of every synced type, so it detoured a flood of
-    /// such tiny stubs (e.g. <c>Clan.IFaction.get_IsKingdomFaction =&gt; false</c>).
+    /// the GC. AutoSync detours every declared method of every synced type, so it detours a flood of
+    /// such tiny stubs (e.g. <c>Clan.IFaction.get_IsKingdomFaction => false</c>).
     ///
     /// Rather than narrow each patch class's TargetMethods (which can't see hand-written patches and risks
-    /// un-detouring a load-bearing caller), this is a single Harmony prefix on <c>PatchTools.DetourMethod</c>,
+    /// not detouring a function that needs to be detoured), this is a single Harmony prefix on <c>PatchTools.DetourMethod</c>,
     /// the one chokepoint every patch path funnels through. It skips the byte write ONLY for a "fragile no-op"
     /// detour: a method that is
     ///   (a) fragile  - its detour would corrupt its own unwind info (<see cref="IsFragile"/>), AND
@@ -30,8 +30,14 @@ namespace GameInterface.Utils
     ///
     /// Soundness: the only way a method is load-bearing for a field-set transpiler is to do a field store, so
     /// (b) never skips one; (c) catches prefix/postfix patches on tiny stubs. Measured across all synced
-    /// types, this skips the freeze-causing stubs with zero load-bearing methods dropped. Windows x64 only -
-    /// <see cref="IsFragile"/> returns false elsewhere (Linux/CI), so off that platform the guard is inert.
+    /// types, this skips the freeze-causing stubs with zero load-bearing methods dropped.
+    ///
+    /// The freeze is Windows x64 specific: on Windows a method's unwind info (.xdata) is laid out inline right
+    /// after its code, so the 5-byte detour overruns into it. On Linux the platform ABI keeps unwind info in a
+    /// separate .eh_frame section, never within the method's first bytes, so the same overrun only reaches
+    /// alignment padding and the GC's stack walk never reads corrupted data - the deadlock can't happen there.
+    /// So <see cref="IsFragile"/> returns false off Windows (Linux/CI) and the guard is inert, with nothing
+    /// to guard against.
     /// </summary>
     public static class FragileDetourGuard
     {
@@ -51,7 +57,7 @@ namespace GameInterface.Utils
             var detourMethod = patchTools == null ? null : AccessTools.Method(patchTools, "DetourMethod");
             if (detourMethod == null)
             {
-                Logger.Error("FragileDetourGuard: HarmonyLib.PatchTools.DetourMethod not found; the #1539 unwind-corruption guard is INACTIVE");
+                Logger.Error("FragileDetourGuard: HarmonyLib.PatchTools.DetourMethod not found");
                 return;
             }
 
@@ -65,7 +71,7 @@ namespace GameInterface.Utils
         {
             if (!ShouldSkipDetour(method, IsFragile, HasLoadBearingPatch)) return true;
 
-            Logger.Debug("Skipped a fragile no-op detour on {type}.{method} to preserve its inline x64 unwind info (#1539)",
+            Logger.Debug("Skipped a fragile no-op detour on {type}.{method} to preserve its inline x64 unwind info",
                 method.DeclaringType?.Name, method.Name);
             return false;
         }
@@ -73,7 +79,7 @@ namespace GameInterface.Utils
         /// <summary>
         /// The skip decision, with <paramref name="isFragile"/> and <paramref name="hasLoadBearingPatch"/>
         /// injected so the keep/drop logic is unit-testable on any platform (the real <see cref="IsFragile"/>
-        /// is Windows-x64 only). Skip iff the method is fragile, stores no field, and has no prefix/postfix.
+        /// is Windows-x64 only). Skip iff the method is fragile, stores no field, and has no prefix/postfix/finalizer.
         /// </summary>
         public static bool ShouldSkipDetour(MethodBase method, Func<MethodBase, bool> isFragile, Func<MethodBase, bool> hasLoadBearingPatch)
         {
@@ -146,7 +152,7 @@ namespace GameInterface.Utils
         /// <summary>
         /// True when detouring <paramref name="method"/> would overwrite its own inline x64 unwind info: the
         /// 5-byte jmp at the entry overruns a method whose .xdata (UnwindData) sits within 5 bytes of
-        /// BeginAddress, corrupting the unwind data the GC's suspend-time stack walk reads (the #1539 freeze).
+        /// BeginAddress, corrupting the unwind data the GC's suspend-time stack walk reads.
         /// Windows x64 only; returns false where RtlLookupFunctionEntry is unavailable (Linux/CI) or on any
         /// error, so the guard is inert off the platform that actually has the deadlock.
         /// </summary>

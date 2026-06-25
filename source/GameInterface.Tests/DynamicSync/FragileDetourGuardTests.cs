@@ -8,7 +8,7 @@ namespace GameInterface.Tests.AutoSync;
 
 /// <summary>
 /// Covers <see cref="FragileDetourGuard"/>: the guard skips a Harmony detour only for a "fragile no-op"
-/// method - fragile (its detour would corrupt its inline x64 unwind info, the #1539 freeze), does no field
+/// method - fragile (its detour would corrupt its inline x64 unwind info), does no field
 /// store (so no transpiler can rewrite it), and has no prefix/postfix. The skip decision is tested with an
 /// injected fragility predicate so it is deterministic on any platform; the real RtlLookupFunctionEntry-based
 /// IsFragile is Windows-x64 only.
