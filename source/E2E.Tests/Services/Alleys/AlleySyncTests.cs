@@ -24,6 +24,7 @@ public class AlleySyncTests : SyncTestBase
         TestEnvironment.AssertField<Alley, TextObject>(nameof(Alley._name), new TextObject("test alley name"), defaultValue: serverInstance.Name);
         TestEnvironment.AssertReferenceField<Alley, Settlement>(nameof(Alley._settlement), defaultValue: serverInstance.Settlement);
         TestEnvironment.AssertField<Alley, string>(nameof(Alley._tag), "testtag", defaultValue: "tag");
-        TestEnvironment.AssertReferenceField<Alley, Hero>(nameof(Alley._owner));
+        // _owner is not a synced field; owner changes replicate by replaying Alley.SetOwner
+        // (covered by AlleyCreationTests / AlleyOwnerSyncTests), not by AssertReferenceField.
     }
 }

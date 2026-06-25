@@ -1,4 +1,5 @@
 ﻿using Common.PacketHandlers;
+using GameInterface.Services.Alleys;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.Workshops;
 using LiteNetLib;
@@ -36,11 +37,15 @@ public readonly struct GameSaveDataPacket : IPacket
     [ProtoMember(4)]
     public readonly WorkshopPlayerData WorkshopPlayerData;
 
-    public GameSaveDataPacket(byte[] gameSaveData, string campaignID, CraftingPlayerData craftingPlayerData, WorkshopPlayerData workshopPlayerData)
+    [ProtoMember(5)]
+    public readonly AlleyPlayerData AlleyPlayerData;
+
+    public GameSaveDataPacket(byte[] gameSaveData, string campaignID, CraftingPlayerData craftingPlayerData, WorkshopPlayerData workshopPlayerData, AlleyPlayerData alleyPlayerData)
     {
         GameSaveData = gameSaveData;
         CampaignID = campaignID;
         CraftingPlayerData = craftingPlayerData;
         WorkshopPlayerData = workshopPlayerData;
+        AlleyPlayerData = alleyPlayerData;
     }
 }

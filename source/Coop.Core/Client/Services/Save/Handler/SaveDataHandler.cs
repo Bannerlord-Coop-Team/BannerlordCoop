@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Coop.Core.Client.Messages;
+using GameInterface.Services.Alleys.Messages;
 using GameInterface.Services.Smithing.Messages;
 using GameInterface.Services.Workshops.Messages;
 
@@ -34,6 +35,7 @@ internal class SaveDataHandler : IHandler
 
         messageBroker.Publish(this, new InitializeClientCraftingData(saveDataMessage.CraftingPlayerData));
         messageBroker.Publish(this, new InitializeClientWorkshopData(saveDataMessage.WorkshopPlayerData));
+        messageBroker.Publish(this, new InitializeClientAlleyData(saveDataMessage.AlleyPlayerData));
         // Add any other CoopSession data initialisations for clients here
     }
 }

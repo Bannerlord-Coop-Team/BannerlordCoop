@@ -45,8 +45,8 @@ namespace GameInterface.Utils
         /// <param name="fieldName">Name of the field to be patched</param>
         /// <remarks> Calls should look like:<br /><br />
         /// [HarmonyTranspiler] <br />
-        /// static IEnumerable&lt;CodeInstruction&gt; AlleyTranspiler(IEnumerable&lt;CodeInstruction&gt; instructions) <br />
-        /// => ListFieldTranspiler&lt;Alley, AlleyListUpdated, AlleyListRemoved&gt;(instructions);
+        /// static IEnumerable&lt;CodeInstruction&gt; WorkshopTranspiler(IEnumerable&lt;CodeInstruction&gt; instructions) <br />
+        /// => ListFieldTranspiler&lt;Workshop, WorkshopListUpdated, WorkshopListRemoved&gt;(instructions);
         /// </remarks>
         /// <returns>The CodeInstructions</returns>
         public static IEnumerable<CodeInstruction> ListFieldChangeTranspiler<TItem, TAddMessage, TRemoveMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
@@ -87,8 +87,8 @@ namespace GameInterface.Utils
         /// <param name="propertyName">Name of the property to be patched</param>
         /// <remarks> Calls should look like:<br /><br />
         /// [HarmonyTranspiler] <br />
-        /// static IEnumerable&lt;CodeInstruction&gt; AlleyTranspiler(IEnumerable&lt;CodeInstruction&gt; instructions) <br />
-        /// => ListPropertyTranspiler&lt;Alley, AlleyListUpdated, AlleyListRemoved&gt;(instructions);
+        /// static IEnumerable&lt;CodeInstruction&gt; WorkshopTranspiler(IEnumerable&lt;CodeInstruction&gt; instructions) <br />
+        /// => ListPropertyTranspiler&lt;Workshop, WorkshopListUpdated, WorkshopListRemoved&gt;(instructions);
         /// </remarks>
         /// <returns>The CodeInstructions</returns>
         public static IEnumerable<CodeInstruction> ListPropertyChangeTranspiler<TItem, TAddMessage, TRemoveMessage>(IEnumerable<CodeInstruction> instructions, string propertyName)
@@ -206,8 +206,8 @@ namespace GameInterface.Utils
         /// <param name="fieldName">Name of the field to be patched</param>
         /// <remarks> Calls should look like:<br /><br />
         /// [HarmonyTranspiler] <br />
-        /// static IEnumerable&lt;CodeInstruction&gt; AlleyTranspiler(IEnumerable&lt;CodeInstruction&gt; instructions) <br />
-        /// => MBListFieldTranspiler&lt;Alley, AlleyListUpdated, AlleyListRemoved&gt;(instructions);
+        /// static IEnumerable&lt;CodeInstruction&gt; WorkshopTranspiler(IEnumerable&lt;CodeInstruction&gt; instructions) <br />
+        /// => MBListFieldTranspiler&lt;Workshop, WorkshopListUpdated, WorkshopListRemoved&gt;(instructions);
         /// </remarks>
         /// <returns>The CodeInstructions</returns>
         public static IEnumerable<CodeInstruction> MBListFieldChangeTranspiler<TItem, TAddMessage, TRemoveMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
@@ -250,8 +250,8 @@ namespace GameInterface.Utils
         /// <param name="propertyName">Name of the property to be patched</param>
         /// <remarks> Calls should look like:<br /><br />
         /// [HarmonyTranspiler] <br />
-        /// static IEnumerable&lt;CodeInstruction&gt; AlleyTranspiler(IEnumerable&lt;CodeInstruction&gt; instructions) <br />
-        /// => MBListPropertyTranspiler&lt;Alley, AlleyListUpdated, AlleyListRemoved&gt;(instructions);
+        /// static IEnumerable&lt;CodeInstruction&gt; WorkshopTranspiler(IEnumerable&lt;CodeInstruction&gt; instructions) <br />
+        /// => MBListPropertyTranspiler&lt;Workshop, WorkshopListUpdated, WorkshopListRemoved&gt;(instructions);
         /// </remarks>
         /// <returns>The CodeInstructions</returns>
         public static IEnumerable<CodeInstruction> MBListPropertyChangeTranspiler<TItem, TAddMessage, TRemoveMessage>(IEnumerable<CodeInstruction> instructions, string propertyName)
@@ -370,8 +370,8 @@ namespace GameInterface.Utils
         /// <param name="fieldName">Name of the field to be patched</param>
         /// <remarks> Calls should look like:<br /><br />
         /// [HarmonyTranspiler] <br />
-        /// static IEnumerable&lt;CodeInstruction&gt; AlleyTranspiler(IEnumerable&lt;CodeInstruction&gt; instructions) <br />
-        /// => QueueFieldTranspiler&lt;Alley, AlleyListUpdated, AlleyListRemoved&gt;(instructions);
+        /// static IEnumerable&lt;CodeInstruction&gt; WorkshopTranspiler(IEnumerable&lt;CodeInstruction&gt; instructions) <br />
+        /// => QueueFieldTranspiler&lt;Workshop, WorkshopListUpdated, WorkshopListRemoved&gt;(instructions);
         /// </remarks>
         /// <returns>The CodeInstructions</returns>
         public static IEnumerable<CodeInstruction> QueueFieldChangeTranspiler<TItem, TEnqueueMessage, TDequeueMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
@@ -414,8 +414,8 @@ namespace GameInterface.Utils
         /// <param name="propertyName">Name of the property to be patched</param>
         /// <remarks> Calls should look like:<br /><br />
         /// [HarmonyTranspiler] <br />
-        /// static IEnumerable&lt;CodeInstruction&gt; AlleyTranspiler(IEnumerable&lt;CodeInstruction&gt; instructions) <br />
-        /// => QueuePropertyTranspiler&lt;Alley, AlleyListUpdated, AlleyListRemoved&gt;(instructions);
+        /// static IEnumerable&lt;CodeInstruction&gt; WorkshopTranspiler(IEnumerable&lt;CodeInstruction&gt; instructions) <br />
+        /// => QueuePropertyTranspiler&lt;Workshop, WorkshopListUpdated, WorkshopListRemoved&gt;(instructions);
         /// </remarks>
         /// <returns>The CodeInstructions</returns>
         public static IEnumerable<CodeInstruction> QueuePropertyChangeTranspiler<TItem, TEnqueueMessage, TDequeueMessage>(IEnumerable<CodeInstruction> instructions, string propertyName)
@@ -552,7 +552,7 @@ namespace GameInterface.Utils
         /// <param name="instructions">CodeInstructions provided by the calling HarmonyTranspiler</param>
         /// <remarks> Calls should look like:<br /><br />
         /// [HarmonyTranspiler] <br />
-        /// static IEnumerable&lt;CodeInstruction&gt; AlleyTranspiler(IEnumerable&lt;CodeInstruction&gt; instructions) <br />
+        /// static IEnumerable&lt;CodeInstruction&gt; WorkshopTranspiler(IEnumerable&lt;CodeInstruction&gt; instructions) <br />
         /// => ArrayFieldChangeTranspiler&lt;EquipmentElement, ItemSlotsArrayUpdated&gt;(instructions, nameof(Equipment._itemSlots));
         /// </remarks>
         /// <returns>The CodeInstructions</returns>
@@ -597,7 +597,7 @@ namespace GameInterface.Utils
         /// <param name="instructions">CodeInstructions provided by the calling HarmonyTranspiler</param>
         /// <remarks> Calls should look like:<br /><br />
         /// [HarmonyTranspiler] <br />
-        /// static IEnumerable&lt;CodeInstruction&gt; AlleyTranspiler(IEnumerable&lt;CodeInstruction&gt; instructions) <br />
+        /// static IEnumerable&lt;CodeInstruction&gt; WorkshopTranspiler(IEnumerable&lt;CodeInstruction&gt; instructions) <br />
         /// => ArrayPropertyChangeTranspiler&lt;EquipmentElement, ItemSlotsArrayUpdated&gt;(instructions, nameof(Equipment._itemSlots));
         /// </remarks>
         /// <returns>The CodeInstructions</returns>

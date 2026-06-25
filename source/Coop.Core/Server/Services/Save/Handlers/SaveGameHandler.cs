@@ -2,6 +2,7 @@
 using GameInterface.CoopSessionData;
 using GameInterface.CoopSessionData.Save.Data;
 using GameInterface.Registry.Messages;
+using GameInterface.Services.Alleys;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
@@ -56,7 +57,10 @@ internal class SaveGameHandler : IHandler
         WorkshopPlayerData workshopPlayerData = coopSessionProvider.CoopSession.WorkshopPlayerData;
         workshopPlayerData ??= new(new());
 
-        CoopSession session = new CoopSession(saveName, playerRegistry.Players.ToArray(), craftingPlayerData, workshopPlayerData);
+        AlleyPlayerData alleyPlayerData = coopSessionProvider.CoopSession.AlleyPlayerData;
+        alleyPlayerData ??= new(new());
+
+        CoopSession session = new CoopSession(saveName, playerRegistry.Players.ToArray(), craftingPlayerData, workshopPlayerData, alleyPlayerData);
         coopSessionProvider.CoopSession = session;
 
         saveManager.SaveCoopSession(saveName, session);
@@ -68,7 +72,13 @@ internal class SaveGameHandler : IHandler
         savedSession = saveManager.LoadCoopSession(obj.What.SaveName);
         if(savedSession == null)
         {
-            savedSession = new CoopSession(obj.What.SaveName, new Player[0], new CraftingPlayerData(new(), new(), new()), new WorkshopPlayerData(new()));
+            savedSession = new CoopSession(obj.What.SaveName, new Player[0], new CraftingPlayerData(new(), new(), new()), new WorkshopPlayerData(new()), new AlleyPlayerData(new()));
+        }
+        else if (savedSession.AlleyPlayerData == null)
+        {
+            // Saves created before AlleyPlayerData existed deserialize with a null field; give it an
+            // empty store so alley management can be recorded after loading such a save.
+            savedSession = new CoopSession(savedSession.UniqueGameId, savedSession.Players, savedSession.CraftingPlayerData, savedSession.WorkshopPlayerData, new AlleyPlayerData(new()));
         }
         coopSessionProvider.CoopSession = savedSession;
     }

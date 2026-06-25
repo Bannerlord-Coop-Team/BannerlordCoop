@@ -1,0 +1,172 @@
+﻿using Common;
+using Common.Logging;
+using Common.Util;
+using HarmonyLib;
+using SandBox.CampaignBehaviors;
+using Serilog;
+using System;
+using System.Collections;
+using System.Reflection;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements;
+
+namespace GameInterface.Services.Alleys.Interfaces;
+
+/// <summary>
+/// Client-side access to the owning player's alley management state, which lives in the
+/// (internal, nested) <c>AlleyCampaignBehavior.PlayerAlleyData</c> entries of its private
+/// <c>_playerOwnedCommonAreaData</c> list. Reached by reflection because that type is internal.
+/// Populating this list is what lights up the in-game manage-alley menus on the owning client.
+/// </summary>
+public interface IAlleyCampaignBehaviorInterface : IGameAbstraction
+{
+    void AddOrUpdatePlayerAlleyData(Alley alley, Hero overseer, TroopRoster garrison);
+    void RemovePlayerAlleyData(Alley alley);
+    void ClearPlayerAlleyData();
+    bool TryGetCurrentSettlementAlley(out Alley alley);
+}
+
+/// <inheritdoc cref="IAlleyCampaignBehaviorInterface"/>
+public class AlleyCampaignBehaviorInterface : IAlleyCampaignBehaviorInterface
+{
+    private static readonly ILogger Logger = LogManager.GetLogger<AlleyCampaignBehaviorInterface>();
+
+    private static readonly Type PlayerAlleyDataType =
+        typeof(AlleyCampaignBehavior).GetNestedType("PlayerAlleyData", BindingFlags.NonPublic);
+    private static readonly FieldInfo PlayerOwnedDataField =
+        AccessTools.Field(typeof(AlleyCampaignBehavior), "_playerOwnedCommonAreaData");
+    private static readonly ConstructorInfo PlayerAlleyDataCtor = PlayerAlleyDataType != null
+        ? AccessTools.Constructor(PlayerAlleyDataType, new[] { typeof(Alley), typeof(TroopRoster) })
+        : null;
+    private static readonly FieldInfo AlleyField =
+        PlayerAlleyDataType != null ? AccessTools.Field(PlayerAlleyDataType, "Alley") : null;
+    private static readonly FieldInfo AssignedClanMemberField =
+        PlayerAlleyDataType != null ? AccessTools.Field(PlayerAlleyDataType, "AssignedClanMember") : null;
+
+    private static AlleyCampaignBehavior Behavior => Campaign.Current?.GetCampaignBehavior<AlleyCampaignBehavior>();
+
+    public void AddOrUpdatePlayerAlleyData(Alley alley, Hero overseer, TroopRoster garrison)
+    {
+        if (!ReflectionReady()) return;
+        if (alley == null || garrison == null)
+        {
+            Logger.Error("Cannot add alley management data with a null alley/garrison");
+            return;
+        }
+
+        GameThread.RunSafe(() =>
+        {
+            var behavior = Behavior;
+            if (behavior == null) return;
+            if (PlayerOwnedDataField.GetValue(behavior) is not IList list) return;
+
+            using (new AllowedThread())
+            {
+                // The vanilla ctor derives the overseer from the first hero in the roster. Ensure an
+                // explicit overseer is present; otherwise the roster must already contain one.
+                if (overseer != null && !garrison.Contains(overseer.CharacterObject))
+                {
+                    garrison.AddToCounts(overseer.CharacterObject, 1, false, 0, 0, true, -1);
+                }
+
+                if (!RosterHasHero(garrison))
+                {
+                    Logger.Error("Cannot add alley management data: no overseer hero in the garrison roster");
+                    return;
+                }
+
+                RemoveByAlley(list, alley);
+                var data = PlayerAlleyDataCtor.Invoke(new object[] { alley, garrison });
+                if (overseer != null) AssignedClanMemberField.SetValue(data, overseer);
+                list.Add(data);
+            }
+        });
+    }
+
+    private static bool RosterHasHero(TroopRoster roster)
+    {
+        foreach (var element in roster.GetTroopRoster())
+        {
+            if (element.Character != null && element.Character.IsHero) return true;
+        }
+        return false;
+    }
+
+    public void RemovePlayerAlleyData(Alley alley)
+    {
+        if (!ReflectionReady() || alley == null) return;
+
+        GameThread.RunSafe(() =>
+        {
+            var behavior = Behavior;
+            if (behavior == null) return;
+            if (PlayerOwnedDataField.GetValue(behavior) is not IList list) return;
+
+            using (new AllowedThread())
+            {
+                RemoveByAlley(list, alley);
+            }
+        });
+    }
+
+    public void ClearPlayerAlleyData()
+    {
+        if (!ReflectionReady()) return;
+
+        GameThread.RunSafe(() =>
+        {
+            var behavior = Behavior;
+            if (behavior == null) return;
+            if (PlayerOwnedDataField.GetValue(behavior) is not IList list) return;
+
+            using (new AllowedThread())
+            {
+                list.Clear();
+            }
+        });
+    }
+
+    public bool TryGetCurrentSettlementAlley(out Alley alley)
+    {
+        alley = null;
+        if (!ReflectionReady()) return false;
+
+        var behavior = Behavior;
+        if (behavior == null) return false;
+
+        var settlement = Settlement.CurrentSettlement;
+        if (settlement == null) return false;
+
+        if (PlayerOwnedDataField.GetValue(behavior) is not IList list) return false;
+
+        foreach (var data in list)
+        {
+            if (AlleyField.GetValue(data) is Alley a && a.Settlement == settlement)
+            {
+                alley = a;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void RemoveByAlley(IList list, Alley alley)
+    {
+        for (int i = list.Count - 1; i >= 0; i--)
+        {
+            if (AlleyField.GetValue(list[i]) as Alley == alley) list.RemoveAt(i);
+        }
+    }
+
+    private static bool ReflectionReady()
+    {
+        if (PlayerAlleyDataType == null || PlayerOwnedDataField == null ||
+            PlayerAlleyDataCtor == null || AlleyField == null || AssignedClanMemberField == null)
+        {
+            Logger.Error("AlleyCampaignBehavior.PlayerAlleyData reflection members could not be resolved; alley management cannot be applied");
+            return false;
+        }
+        return true;
+    }
+}
