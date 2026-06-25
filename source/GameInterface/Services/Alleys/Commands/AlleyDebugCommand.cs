@@ -65,18 +65,33 @@ public class AlleyDebugCommand
         return sb.ToString();
     }
 
+    [CommandLineArgumentFunction("my_hero_id", "coop.debug.alley")]
+    public static string MyHeroId(List<string> args)
+    {
+        var hero = Hero.MainHero;
+        if (hero == null) return "No main hero on this instance (run this on a client, not the host)";
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return "Unable to resolve IObjectManager";
+        if (!objectManager.TryGetId(hero, out var id)) return $"{hero.Name} is not registered";
+        return $"{hero.Name} registry id: {id}  (pass this to the host's coop.debug.alley.set_owner)";
+    }
+
     [CommandLineArgumentFunction("set_owner", "coop.debug.alley")]
     public static string SetOwner(List<string> args)
     {
         if (ModInformation.IsClient) return "Run coop.debug.alley.set_owner on the server (host) only";
-        if (args.Count != 3) return "Usage: coop.debug.alley.set_owner <settlementId> <alleyIndex> <heroIdOrName>";
+        if (args.Count != 3) return "Usage: coop.debug.alley.set_owner <settlementId> <alleyIndex> <heroRegistryId>";
 
         if (!TryGetAlley(args[0], args[1], out var alley, out _, out var error)) return error;
 
-        Hero hero = Hero.FindFirst(h => h.StringId == args[2] || h.Name?.ToString() == args[2]);
-        if (hero == null) return $"Hero with id or name '{args[2]}' not found";
-
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return "Unable to resolve IObjectManager";
+
+        // Resolve by the registry id (coop.debug.alley.my_hero_id on the owning client), which is the
+        // same on every machine. Player-hero StringIds are generated per-machine, so a client's StringId
+        // or name won't match the host's copy; fall back to those only for non-player heroes.
+        if (!objectManager.TryGetObject<Hero>(args[2], out var hero))
+            hero = Hero.FindFirst(h => h.StringId == args[2] || h.Name?.ToString() == args[2]);
+        if (hero == null) return $"Hero '{args[2]}' not found (use the registry id from coop.debug.alley.my_hero_id on the owning client)";
+
         if (!objectManager.TryGetId(alley, out var alleyId)) return "Alley is not registered";
         if (!objectManager.TryGetId(hero, out var heroId)) return "Hero is not registered";
 
