@@ -1,10 +1,12 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Alleys.Interfaces;
 using GameInterface.Services.Alleys.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Data;
+using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -22,6 +24,8 @@ namespace GameInterface.Services.Alleys.Handlers;
 /// </summary>
 internal class AlleyManagementHandler : IHandler
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<AlleyManagementHandler>();
+
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
@@ -127,12 +131,46 @@ internal class AlleyManagementHandler : IHandler
             // run by the chosen clan member (overseer). The garrison + overseer are stored, the overseer
             // travels to the alley settlement, and the result is broadcast so the owning client's
             // manage-alley menus light up (its alley.Owner == its main hero).
+            var displacedOwner = alley.Owner;
             alley.SetOwner(owner);
+            ApplyAcquisitionRelationPenalties(owner, displacedOwner, alley.Settlement);
             sessionInterface.SetManagementData(data.AlleyId, data.OverseerId, garrison);
             TeleportHeroAction.ApplyDelayedTeleportToSettlement(overseer, alley.Settlement);
 
             network.SendAll(new NetworkAlleyManagementUpdated(data.AlleyId, data.OverseerId, garrison));
         });
+    }
+
+    /// <summary>
+    /// Replays vanilla OnAlleyOccupiedByPlayer's relation hits (server authoritative; relation is not
+    /// itself networked): the displaced gang leader loses 5, and if the settlement isn't the new owner's
+    /// own, its owner loses 2 and its non-gang-leader notables lose 1 each. Keyed off the acquiring
+    /// owner rather than Hero.MainHero, which is null on the host.
+    /// </summary>
+    private static void ApplyAcquisitionRelationPenalties(Hero owner, Hero displacedOwner, Settlement settlement)
+    {
+        if (owner == null) return;
+
+        if (displacedOwner != null && displacedOwner != owner)
+        {
+            ChangeRelationAction.ApplyRelationChangeBetweenHeroes(owner, displacedOwner, -5, showQuickNotification: false);
+        }
+
+        if (settlement == null || settlement.OwnerClan == owner.Clan) return;
+
+        if (settlement.Owner != null)
+        {
+            ChangeRelationAction.ApplyRelationChangeBetweenHeroes(owner, settlement.Owner, -2, showQuickNotification: false);
+        }
+
+        if (settlement.Notables == null) return;
+        foreach (var notable in settlement.Notables)
+        {
+            if (notable != null && !notable.IsGangLeader)
+            {
+                ChangeRelationAction.ApplyRelationChangeBetweenHeroes(owner, notable, -1, showQuickNotification: false);
+            }
+        }
     }
 
     private void Handle_RequestAbandonAlley(MessagePayload<RequestAbandonAlley> payload)
@@ -249,8 +287,16 @@ internal class AlleyManagementHandler : IHandler
 
     private void ReturnGarrisonToOwner(Hero owner, TroopRosterElementData[] garrison)
     {
+        if (garrison == null) return;
+
         var party = owner?.PartyBelongedTo;
-        if (party == null || garrison == null) return;
+        if (party == null)
+        {
+            // No party to return the garrison to (the owner isn't leading one); surface it rather than
+            // silently dropping the troops.
+            Logger.Error("Could not return alley garrison: owner {owner} has no party", owner?.StringId);
+            return;
+        }
 
         foreach (var element in garrison)
         {
