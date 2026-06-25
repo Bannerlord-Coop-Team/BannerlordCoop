@@ -15,7 +15,7 @@ namespace GameInterface.Services.Kingdoms.Data
     public class SettlementClaimantPreliminaryDecisionData : KingdomDecisionData
     {
         private static readonly FieldInfo SettlementField = typeof(SettlementClaimantPreliminaryDecision).GetField(nameof(SettlementClaimantPreliminaryDecision.Settlement), BindingFlags.Instance | BindingFlags.Public);
-        
+
         [ProtoMember(1)]
         public string SettlementId { get; }
         [ProtoMember(2)]

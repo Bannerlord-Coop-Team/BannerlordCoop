@@ -1,5 +1,5 @@
 ﻿using GameInterface.Services.Kingdoms.Data;
-using GameInterface.Services.Kingdoms.Extentions;
+using GameInterface.Services.Kingdoms;
 using GameInterface.Services.ObjectManager;
 using ProtoBuf;
 using Serilog;
@@ -69,7 +69,6 @@ namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision
             objectManager.AddExisting(proposerClan.StringId, proposerClan);
             objectManager.AddExisting(kingdom.StringId, kingdom);
             objectManager.AddExisting(settlement.StringId, settlement);
-
             SettlementClaimantDecisionData data = new SettlementClaimantDecisionData(
                 proposerClan.StringId, kingdom.StringId, 10, true, true, true, settlement.StringId, null, null);
 
@@ -82,7 +81,7 @@ namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision
             Assert.Same(settlement, decision.Settlement);
 
             // Serialization: converting back must not throw on the null fields and must keep them null.
-            KingdomDecisionData roundTrippedData = decision.ToKingdomDecisionData();
+            KingdomDecisionData roundTrippedData = new KingdomDecisionDataConverter(objectManager).Convert(decision);
             Assert.True(roundTrippedData is SettlementClaimantDecisionData);
             SettlementClaimantDecisionData roundTripped = (SettlementClaimantDecisionData)roundTrippedData;
             Assert.Null(roundTripped.CapturerHeroId);

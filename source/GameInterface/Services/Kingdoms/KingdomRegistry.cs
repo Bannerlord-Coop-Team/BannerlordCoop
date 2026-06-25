@@ -7,6 +7,9 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Election;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
@@ -49,12 +52,7 @@ internal class KingdomRegistry : AutoRegistryBase<Kingdom>
     {
         using(new AllowedThread())
         {
-            obj._activePolicies = new MBList<PolicyObject>();
-            obj._armies = new MBList<Army>();
-            obj.InitializeCachedLists();
-            obj.EncyclopediaText = TextObject.GetEmpty();
-            obj.EncyclopediaTitle = TextObject.GetEmpty();
-            obj.EncyclopediaRulerTitle = TextObject.GetEmpty();
+            EnsureRuntimeCollections(obj);
             obj._distanceToClosestNonAllyFortificationCacheDirty = true;
             obj._isEliminated = false;
             obj.NotAttackableByPlayerUntilTime = CampaignTime.Zero;
@@ -67,6 +65,32 @@ internal class KingdomRegistry : AutoRegistryBase<Kingdom>
 
     public override void OnClientDestroyed(Kingdom obj, string id)
     {
+    }
+
+    internal static void EnsureRuntimeCollections(Kingdom obj)
+    {
+        if (obj == null) return;
+
+        // Network-created kingdoms skip the native constructor, but the kingdom management UI
+        // enumerates these collections as soon as the state opens. Keep existing collections intact
+        // because sync may already have populated them before this safety pass runs.
+        obj._activePolicies ??= new MBList<PolicyObject>();
+        obj._armies ??= new MBList<Army>();
+        obj._clans ??= new MBList<Clan>();
+        obj._unresolvedDecisions ??= new MBList<KingdomDecision>();
+        obj._factionsAtWarWith ??= new MBList<IFaction>();
+        obj._alliedKingdoms ??= new MBList<Kingdom>();
+        obj._fiefsCache ??= new MBList<Town>();
+        obj._townsCache ??= new MBList<Town>();
+        obj._settlementsCache ??= new MBList<Settlement>();
+        obj._villagesCache ??= new MBList<Village>();
+        obj._heroesCache ??= new MBList<Hero>();
+        obj._aliveLordsCache ??= new MBList<Hero>();
+        obj._deadLordsCache ??= new MBList<Hero>();
+        obj._warPartyComponentsCache ??= new MBList<WarPartyComponent>();
+        obj.EncyclopediaText ??= TextObject.GetEmpty();
+        obj.EncyclopediaTitle ??= TextObject.GetEmpty();
+        obj.EncyclopediaRulerTitle ??= TextObject.GetEmpty();
     }
 
     public override void OnServerCreated(Kingdom obj, string id)

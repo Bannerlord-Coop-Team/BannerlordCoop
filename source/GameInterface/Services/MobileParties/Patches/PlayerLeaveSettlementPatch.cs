@@ -1,4 +1,4 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
 using System.Collections.Generic;
