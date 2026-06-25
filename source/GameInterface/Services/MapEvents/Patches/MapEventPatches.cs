@@ -205,6 +205,42 @@ internal class InteractionPatches
     private static readonly ConditionalWeakTable<MapEvent, PlayerBattleAiJoinWindow> playerBattleAiJoinWindows = new();
 
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.CanPartyJoinBattle))]
+    [HarmonyPrefix]
+    private static bool Prefix_CanPartyJoinBattle(MapEvent __instance, PartyBase party, ref bool __result)
+    {
+        if (CanEvaluateJoinBattle(__instance, party))
+            return true;
+
+        __result = true;
+        return false;
+    }
+
+    // The vanilla check dereferences the passed party's MapFaction and, for every MapEventParty on both
+    // sides, its Party and that Party's MapFaction. On the client those sync in over several messages, so
+    // all must be present before the check can run without hitting un-ready state.
+    internal static bool CanEvaluateJoinBattle(MapEvent mapEvent, PartyBase party)
+    {
+        if (mapEvent?.AttackerSide == null || mapEvent.DefenderSide == null)
+            return false;
+
+        if (party?.MapFaction == null)
+            return false;
+
+        return PartiesResolved(mapEvent.AttackerSide) && PartiesResolved(mapEvent.DefenderSide);
+    }
+
+    private static bool PartiesResolved(MapEventSide side)
+    {
+        foreach (var mapEventParty in side.Parties)
+        {
+            if (mapEventParty?.Party?.MapFaction == null)
+                return false;
+        }
+
+        return true;
+    }
+
+    [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.CanPartyJoinBattle))]
     [HarmonyPostfix]
     private static void Postfix_CanPartyJoinBattle(
         MapEvent __instance,
@@ -215,7 +251,7 @@ internal class InteractionPatches
         // building the encounter "join the battle" menu options; native can return false there (e.g. war state /
         // side expectations not matching on the client), which would hide the join option. Force it true so the
         // player can always join.
-        if (party.MobileParty?.IsPlayerParty() == true)
+        if (party?.MobileParty?.IsPlayerParty() == true)
         {
             __result = true;
             return;
