@@ -10,6 +10,7 @@ using HarmonyLib;
 using Serilog;
 using System;
 using System.Reflection;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -54,12 +55,18 @@ internal class PartyComponentHandler : IHandler
 
         messageBroker.Subscribe<PartyComponentMobilePartyUpdated>(Handle_PartyComponentMobilePartyUpdated);
         messageBroker.Subscribe<NetworkPartyComponentMobilePartyUpdated>(Handle_NetworkPartyComponentMobilePartyUpdated);
+
+        messageBroker.Subscribe<PartyComponentLeaderChanged>(Handle_PartyComponentLeaderChanged);
+        messageBroker.Subscribe<NetworkPartyComponentLeaderChanged>(Handle_NetworkPartyComponentLeaderChanged);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<PartyComponentCreated>(Handle);
         messageBroker.Unsubscribe<NetworkCreatePartyComponent>(Handle);
+
+        messageBroker.Subscribe<PartyComponentLeaderChanged>(Handle_PartyComponentLeaderChanged);
+        messageBroker.Unsubscribe<NetworkPartyComponentLeaderChanged>(Handle_NetworkPartyComponentLeaderChanged);
     }
 
     private void Handle(MessagePayload<PartyComponentCreated> payload)
@@ -221,6 +228,46 @@ internal class PartyComponentHandler : IHandler
             catch (Exception e)
             {
                 Logger.Error(e, "Failed to apply {Message}", nameof(NetworkPartyComponentMobilePartyUpdated));
+            }
+        });
+    }
+
+    private void Handle_PartyComponentLeaderChanged(MessagePayload<PartyComponentLeaderChanged> payload)
+    {
+        var obj = payload.What;
+
+        if (!objectManager.TryGetIdWithLogging(obj.Instance, out var partyComponentId)) return;
+
+        // NewLeader can be null (when a party is disbanded)
+        string newLeaderId = null;
+        if (obj.NewLeader != null && !objectManager.TryGetIdWithLogging(obj.NewLeader, out newLeaderId)) return;
+
+        var message = new NetworkPartyComponentLeaderChanged(partyComponentId, newLeaderId);
+        network.SendAll(message);
+    }
+
+    private void Handle_NetworkPartyComponentLeaderChanged(MessagePayload<NetworkPartyComponentLeaderChanged> payload)
+    {
+        var obj = payload.What;
+
+        GameThread.Run(() =>
+        {
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging<PartyComponent>(obj.PartyComponentId, out var partyComponent)) return;
+
+                Hero newLeader = null;
+                if (obj.NewLeaderId != null && !objectManager.TryGetObjectWithLogging<Hero>(obj.NewLeaderId, out newLeader)) return;
+
+                using (new AllowedThread())
+                {
+                    partyComponent.OnChangePartyLeader(newLeader);
+                    partyComponent.Party?.SetVisualAsDirty();
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to apply {Message}", nameof(NetworkPartyComponentLeaderChanged));
             }
         });
     }
