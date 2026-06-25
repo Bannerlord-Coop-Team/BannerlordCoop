@@ -15,10 +15,21 @@ namespace GameInterface.Services.Alleys.Patches;
 /// applied on the server and replicates via <c>GiveGoldAction</c>; the same calculation runs on the
 /// client purely so its clan-finance display matches). Summing over the clan's heroes - rather than
 /// just the leader or a single main hero - keeps it correct when several players share one clan.
+///
+/// This patch is in <see cref="DeferredCategory"/> so the early, pre-load <c>PatchAll</c> does NOT
+/// apply it. <c>DefaultClanFinanceModel</c> is <c>beforefieldinit</c> and its static ctor eagerly calls
+/// <c>Game.Current.GameTextManager.FindText</c>; touching the type during the pre-load patch pass (when
+/// <c>Game.Current</c> is null) throws in that ctor and the CLR caches the failure, killing all clan
+/// finance for the run (frozen clan screen + AI ticks aborting). <see cref="AlleyIncomePatchHandler"/>
+/// applies this category on <c>GameLoaded</c> instead, once the text manager exists.
 /// </summary>
 [HarmonyPatch(typeof(DefaultClanFinanceModel))]
+[HarmonyPatchCategory(DeferredCategory)]
 internal class AlleyIncomePatch
 {
+    /// <summary>Applied after game load (see the type remarks), not by the early <c>PatchAll</c>.</summary>
+    public const string DeferredCategory = "CoopAlleyIncomeDeferred";
+
     private static readonly TextObject AlleyIncomeText = new TextObject("{=coop_alley_income}Alleys");
 
     // Vanilla's Hero.MainHero based version is null-unsafe on the host and undercounts a shared clan
