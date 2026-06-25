@@ -50,6 +50,7 @@ internal class ArmyRegistry : AutoRegistryBase<Army>
     public override void OnClientCreated(Army obj, string id)
     {
         AccessTools.Field(typeof(Army), nameof(Army._parties)).SetValue(obj, new MBList<MobileParty>());
+        obj.Cohesion = 100f;
 
         // The client Army is created via SkipConstructor, so the periodic tick events
         // (_hourlyTickEvent / _tickEvent) are never initialized. Native methods such as
