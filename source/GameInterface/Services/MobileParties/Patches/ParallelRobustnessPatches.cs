@@ -24,7 +24,9 @@ internal class ParallelRobustnessPatches
     {
         if (mobileParty.PartyMoveMode == MoveModeType.Party && mobileParty.MoveTargetParty == null)
         {
-            Logger.Warning("Resetting stale Party move mode for party {stringId}: MoveTargetParty is null",
+            // Expected after a save/reload (the two fields serialize independently) and self-healing, so
+            // a Debug breadcrumb is enough - not a Warning.
+            Logger.Debug("Resetting stale Party move mode for party {stringId}: MoveTargetParty is null",
                 mobileParty.StringId);
             mobileParty.ResetNavigationToHold();
         }

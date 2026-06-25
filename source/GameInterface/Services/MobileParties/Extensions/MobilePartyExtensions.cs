@@ -58,17 +58,12 @@ public static class MobilePartyExtensions
     }
 
     /// <summary>
-    /// Clears a party's navigation orders so it stops at its current position (and is no longer classified
-    /// as moving), then asks the AI to re-decide at the next hourly tick. This is the navigation half of
-    /// how the engine fully stops a party - native pairs the public <c>SetMoveModeHold</c> (which resets
-    /// the AI behavior and <c>MoveTargetPoint</c>) with the internal <c>SetNavigationModeHold</c> (which
-    /// clears <c>PartyMoveMode</c>/<c>MoveTargetParty</c>). It deliberately leaves <c>DefaultBehavior</c>
-    /// alone so the caller, or the AI re-think, picks the next behavior. Needed because <c>SetMoveModeHold</c>
-    /// on its own leaves <c>PartyMoveMode</c>/<c>MoveTargetParty</c> intact: a party reactivated after
-    /// captivity, or one whose <c>MoveTargetParty</c> deserialized to null after a save/reload (the two
-    /// fields are saved independently), otherwise keeps stale Party-mode targeting that
-    /// <c>GetTargetCampaignPosition</c> dereferences unguarded. (The engine also clears the private
-    /// <c>_pathMode</c>; it self-corrects once the party is holding, so it is not reset here.)
+    /// Stops a party at its current position and asks its AI to re-pick a behavior, by clearing the
+    /// navigation fields directly. The engine's own <c>MobileParty.SetNavigationModeHold</c> does exactly
+    /// this, but it's <c>internal</c> so the mod can't call it; and the public <c>SetMoveModeHold</c> is not
+    /// a substitute - it resets the AI behavior but leaves <c>PartyMoveMode</c>/<c>MoveTargetParty</c> set,
+    /// which is the stale Party-mode targeting that <c>GetTargetCampaignPosition</c> dereferences (a null
+    /// <c>MoveTargetParty</c>) after a save/reload.
     /// </summary>
     public static void ResetNavigationToHold(this MobileParty party)
     {

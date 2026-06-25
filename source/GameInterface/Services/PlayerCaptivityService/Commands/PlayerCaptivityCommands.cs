@@ -93,41 +93,6 @@ Captures the given hero and assigns the given mobile party as the captor.";
         return CaptureHero(hero, newCaptor);
     }
 
-    private const string ReleasePlayerUsage =
-@"Usage:
-  coop.debug.player_captivity.release_player <heroId>
-
-Example:
-  coop.debug.player_captivity.release_player Player
-
-Releases the given captive hero from captivity (server-authoritative).";
-
-    [CommandLineArgumentFunction("release_player", "coop.debug.player_captivity")]
-    public static string ReleasePlayer(List<string> args)
-    {
-        var ctx = new CommandContext(
-            "release_player",
-            ReleasePlayerUsage,
-            args);
-
-        if (!ctx.RequireServer(out var error))
-            return error;
-
-        if (!ctx.RequireArgCount(1, out error))
-            return error;
-
-        if (!ctx.TryGetArg(0, "heroId", out var heroId, out error))
-            return error;
-
-        if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
-            return "Failed to release hero: " + error;
-
-        if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, heroId, out var hero, out error))
-            return "Failed to release hero: " + error;
-
-        return ReleaseHero(hero);
-    }
-
     private static bool TryGetRandomCaptor(out MobileParty newCaptor, out string error)
     {
         newCaptor = null;
@@ -208,48 +173,6 @@ Releases the given captive hero from captivity (server-authoritative).";
         {
             return CommandHelpers.FormatException(
                 $"Failed to capture hero '{GetHeroDisplayName(hero)}' by '{newCaptor.StringId}'",
-                ex);
-        }
-    }
-
-    private static string ReleaseHero(Hero hero)
-    {
-        if (hero == null)
-        {
-            return "Failed to release hero: hero is null.";
-        }
-
-        if (!hero.IsPrisoner)
-        {
-            return $"Hero '{GetHeroDisplayName(hero)}' is not a prisoner.";
-        }
-
-        var captorName = hero.PartyBelongedToAsPrisoner?.MobileParty?.StringId
-            ?? hero.PartyBelongedToAsPrisoner?.Settlement?.StringId
-            ?? "unknown";
-
-        try
-        {
-            // On the server the EndCaptivityAction patch routes a player hero through the coop release
-            // (PlayerCaptivityEndedByServer -> ReleasePlayerFromCaptivity), which reactivates its parked party.
-            EndCaptivityAction.ApplyByEscape(hero);
-
-            // The coop release skips and returns if it can't resolve the player's party, leaving the hero
-            // captive without throwing, so confirm the state actually changed before reporting success.
-            if (hero.IsPrisoner)
-            {
-                return $"Release did not complete: hero '{GetHeroDisplayName(hero)}' is still a prisoner (the server could not resolve its party).";
-            }
-
-            return
-                "Hero released successfully.\n" +
-                $"Hero: {GetHeroDisplayName(hero)}\n" +
-                $"Former captor: {captorName}";
-        }
-        catch (Exception ex)
-        {
-            return CommandHelpers.FormatException(
-                $"Failed to release hero '{GetHeroDisplayName(hero)}'",
                 ex);
         }
     }
