@@ -250,8 +250,7 @@ internal class InteractionPatches
         // Always allow a player party to join, on both client and server. The joining client evaluates this when
         // building the encounter "join the battle" menu options; native can return false there (e.g. war state /
         // side expectations not matching on the client), which would hide the join option. Force it true so the
-        // player can always join. party can be null here when the prefix above skipped vanilla for an
-        // unresolved map-event party, so guard it.
+        // player can always join.
         if (party?.MobileParty?.IsPlayerParty() == true)
         {
             __result = true;

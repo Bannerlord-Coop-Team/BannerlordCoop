@@ -10,8 +10,7 @@ public static class MapEventExtensions
     {
         if (mapEvent is null) return false;
 
-        // Prevent any parties from joining a player battle. InvolvedParties yields MapEventParty.Party,
-        // which can be null on a receiving co-op machine before it has synced, so guard it.
+        // Prevent any parties from joining a player battle
         return mapEvent.InvolvedParties.Any(party => party?.MobileParty?.IsPlayerParty() == true);
     }
 }
