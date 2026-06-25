@@ -455,7 +455,7 @@ internal class BattleSimulationRunHandler : IHandler
     {
         var message = payload.What;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             if (!BattleSimulationReplay.IsActiveFor(message.MapEventId))
                 return;
@@ -468,7 +468,7 @@ internal class BattleSimulationRunHandler : IHandler
             {
                 // The loot/capture chance models drop any winner with ContributionToBattle == 0, which is the
                 // case on the client (its simulation engine never ran). Restore the server's values first.
-                foreach (var winner in message.Winners)
+                foreach (var winner in message.Winners ?? Array.Empty<BattleSimWinner>())
                 {
                     if (!objectManager.TryGetObject<PartyBase>(winner.PartyId, out var winnerParty))
                         continue;
@@ -478,7 +478,7 @@ internal class BattleSimulationRunHandler : IHandler
                         winnerMapEventParty._contributionToBattle = winner.ContributionToBattle;
                 }
 
-                foreach (var defeated in message.DefeatedParties)
+                foreach (var defeated in message.DefeatedParties ?? Array.Empty<BattleSimDefeatedParty>())
                 {
                     if (!objectManager.TryGetObject<PartyBase>(defeated.PartyId, out var party))
                         continue;
@@ -498,6 +498,9 @@ internal class BattleSimulationRunHandler : IHandler
 
     private void ApplyCasualties(TroopRoster roster, BattleSimCasualty[] casualties)
     {
+        if (casualties == null)
+            return;
+
         foreach (var casualty in casualties)
         {
             if (!TryResolveCharacterObject(casualty.CharacterId, casualty.IsHero, out var character))

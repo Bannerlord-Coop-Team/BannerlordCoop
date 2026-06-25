@@ -1,19 +1,10 @@
-﻿using Common;
-using Common.Messaging;
-using Common.Util;
-using GameInterface.Extentions;
-using GameInterface.Policies;
-using GameInterface.Services.Kingdoms.Extentions;
-using GameInterface.Services.Kingdoms.Messages;
+﻿using GameInterface;
 using HarmonyLib;
-using System.Linq;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
-
 namespace GameInterface.Services.Kingdoms.Patches
 {
     /// <summary>
@@ -28,136 +19,33 @@ namespace GameInterface.Services.Kingdoms.Patches
         [HarmonyPrefix]
         public static bool AddDecisionPrefix(Kingdom __instance, KingdomDecision kingdomDecision, bool ignoreInfluenceCost)
         {
-            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-            if (ModInformation.IsClient) return false;
-            float randomNumber = ModifiedAddDecision(__instance, kingdomDecision, ignoreInfluenceCost);
-            MessageBroker.Instance.Publish(__instance,
-                new DecisionAdded(__instance, kingdomDecision.ToKingdomDecisionData(), ignoreInfluenceCost, randomNumber));
-            return false;
+            if (!TryGetKingdomInterface(out var kingdomInterface)) return true;
+            return kingdomInterface.AddDecisionPrefix(__instance, kingdomDecision, ignoreInfluenceCost);
         }
-
-        public static void RunCoopAddDecision(Kingdom kingdom, KingdomDecision kingdomDecision, bool ignoreInfluenceCost, float randomFloat)
-        {
-            GameThread.Run(() =>
-            {
-                using (new AllowedThread())
-                {
-                    ModifiedAddDecision(kingdom, kingdomDecision, ignoreInfluenceCost, randomFloat);
-                }
-            }, true); 
-        }
-
-        private static float ModifiedAddDecision(Kingdom __instance, KingdomDecision kingdomDecision, bool ignoreInfluenceCost, float? randomFloat = null)
-        {
-            if (!ignoreInfluenceCost)
-            {
-                Clan proposerClan = kingdomDecision.ProposerClan;
-                int influenceCost = kingdomDecision.GetInfluenceCost(proposerClan);
-                ChangeClanInfluenceAction.Apply(proposerClan, (float)(-(float)influenceCost));
-            }
-            bool flag;
-            if (!kingdomDecision.DetermineChooser().Leader.IsHumanPlayerCharacter)
-            {
-                flag = kingdomDecision.DetermineSupporters().Any((Supporter x) => x.IsPlayer);
-            }
-            else
-            {
-                flag = true;
-            }
-
-            bool isPlayerInvolved = flag;
-            CampaignEventDispatcher.Instance.OnKingdomDecisionAdded(kingdomDecision, isPlayerInvolved);
-
-            var playerParties = Campaign.Current.CampaignObjectManager.GetPlayerMobileParties();
-            if (playerParties.All(party => party.ActualClan.Kingdom != kingdomDecision.Kingdom))
-            {
-                CoopKingdomElection election = new CoopKingdomElection(kingdomDecision, randomFloat);
-                election.StartElectionCoop();
-                return election.RandomFloat;
-            }
-
-            __instance._unresolvedDecisions.Add(kingdomDecision);
-            return default;
-        }
-
         [HarmonyPatch(nameof(Kingdom.RemoveDecision))]
         [HarmonyPrefix]
         public static bool RemoveDecisionPrefix(Kingdom __instance, KingdomDecision kingdomDecision)
         {
-            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-            if (ModInformation.IsClient) return false;
-
-            var index = __instance._unresolvedDecisions.FindIndex(decision => decision == kingdomDecision);
-
-            MessageBroker.Instance.Publish(__instance,
-                new DecisionRemoved(__instance, index));
-
-            return true;
+            if (!TryGetKingdomInterface(out var kingdomInterface)) return true;
+            return kingdomInterface.RemoveDecisionPrefix(__instance, kingdomDecision);
         }
-
-        public static void RunOriginalRemoveDecision(Kingdom kingdom, KingdomDecision kingdomDecision)
-        {
-            GameThread.Run(() =>
-            {
-                using (new AllowedThread())
-                {
-                    kingdom.RemoveDecision(kingdomDecision);
-                }
-            }, true);
-        }
-
         [HarmonyPatch("AddPolicy")]
         [HarmonyPrefix]
         public static bool AddPolicyPrefix(Kingdom __instance, PolicyObject policy)
         {
-            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-            if (ModInformation.IsClient) return false;
-
-            // Vanilla AddPolicy is an idempotent no-op when the policy is already active; only
-            // announce a change that will actually take effect.
-            if (!__instance.ActivePolicies.Contains(policy))
-            {
-                MessageBroker.Instance.Publish(__instance, new KingdomPolicyChanged(__instance, policy, isAdd: true));
-            }
-            return true;
+            if (!TryGetKingdomInterface(out var kingdomInterface)) return true;
+            return kingdomInterface.AddPolicyPrefix(__instance, policy);
         }
-
         [HarmonyPatch("RemovePolicy")]
         [HarmonyPrefix]
         public static bool RemovePolicyPrefix(Kingdom __instance, PolicyObject policy)
         {
-            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-            if (ModInformation.IsClient) return false;
-
-            // Vanilla RemovePolicy is an idempotent no-op when the policy is not active; only
-            // announce a change that will actually take effect.
-            if (__instance.ActivePolicies.Contains(policy))
-            {
-                MessageBroker.Instance.Publish(__instance, new KingdomPolicyChanged(__instance, policy, isAdd: false));
-            }
-            return true;
+            if (!TryGetKingdomInterface(out var kingdomInterface)) return true;
+            return kingdomInterface.RemovePolicyPrefix(__instance, policy);
         }
-
-        public static void RunChangeKingdomPolicy(Kingdom kingdom, PolicyObject policy, bool isAdd)
+        private static bool TryGetKingdomInterface(out IKingdomInterface kingdomInterface)
         {
-            GameThread.Run(() =>
-            {
-                using (new AllowedThread())
-                {
-                    if (isAdd)
-                    {
-                        kingdom.AddPolicy(policy);
-                    }
-                    else
-                    {
-                        kingdom.RemovePolicy(policy);
-                    }
-                }
-            }, true);
+            return ContainerProvider.TryResolve(out kingdomInterface);
         }
         [HarmonyPatch(nameof(Kingdom.CreateArmy))]
         [HarmonyPrefix]

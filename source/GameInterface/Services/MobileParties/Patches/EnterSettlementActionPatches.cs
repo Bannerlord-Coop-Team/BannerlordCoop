@@ -27,5 +27,3 @@ namespace GameInterface.Services.MobileParties.Patches
         }
     }
 }
-
-
