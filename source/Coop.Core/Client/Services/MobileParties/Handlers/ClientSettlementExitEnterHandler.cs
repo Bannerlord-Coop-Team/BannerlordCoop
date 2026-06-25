@@ -1,10 +1,11 @@
-﻿using System;
+using System;
 using Common;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
+using GameInterface.Services.Kingdoms;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Interfaces;
@@ -24,15 +25,22 @@ public class ClientSettlementExitEnterHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly ISettlementInterface settlementInterface;
+    private readonly IKingdomCreationSettlementTracker settlementTracker;
 
     private DateTime lastRequestSentUtc = DateTime.MinValue;
 
-    public ClientSettlementExitEnterHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager, ISettlementInterface settlementInterface)
+    public ClientSettlementExitEnterHandler(
+        IMessageBroker messageBroker,
+        INetwork network,
+        IObjectManager objectManager,
+        ISettlementInterface settlementInterface,
+        IKingdomCreationSettlementTracker settlementTracker)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.settlementInterface = settlementInterface;
+        this.settlementTracker = settlementTracker;
         messageBroker.Subscribe<StartSettlementEncounterAttempted>(Handle);
         messageBroker.Subscribe<EndSettlementEncounterAttempted>(Handle);
         messageBroker.Subscribe<NetworkEndSettlementEncounter>(Handle);
@@ -41,8 +49,6 @@ public class ClientSettlementExitEnterHandler : IHandler
         messageBroker.Subscribe<NetworkPartyEnterSettlement>(Handle);
         messageBroker.Subscribe<NetworkPartyLeaveSettlement>(Handle);
     }
-
-
 
     public void Dispose()
     {
@@ -54,7 +60,6 @@ public class ClientSettlementExitEnterHandler : IHandler
         messageBroker.Unsubscribe<NetworkPartyEnterSettlement>(Handle);
         messageBroker.Unsubscribe<NetworkPartyLeaveSettlement>(Handle);
     }
-
 
     private void Handle(MessagePayload<StartSettlementEncounterAttempted> obj)
     {
@@ -83,6 +88,12 @@ public class ClientSettlementExitEnterHandler : IHandler
         var payload = obj.What;
 
         if (!objectManager.TryGetIdWithLogging(payload.Party, out var partyId)) return;
+
+        // Ignore the synthetic leave caused by kingdom creation UI cleanup.
+        if (settlementTracker.TryConsumeLeave(payload.Party, partyId))
+        {
+            return;
+        }
 
         var message = new NetworkRequestEndSettlementEncounter(partyId);
 
@@ -113,6 +124,13 @@ public class ClientSettlementExitEnterHandler : IHandler
         {
             using (new AllowedThread())
             {
+                var mainParty = MobileParty.MainParty;
+                objectManager.TryGetId(mainParty, out var partyId);
+                if (settlementTracker.TryConsumeLeave(mainParty, partyId))
+                {
+                    return;
+                }
+
                 settlementInterface.EndSettlementEncounter();
             }
         });
