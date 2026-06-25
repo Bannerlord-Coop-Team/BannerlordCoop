@@ -9,13 +9,11 @@ using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Core;
 
 namespace GameInterface.Services.Armies.Handlers;
 
@@ -44,12 +42,10 @@ public class ArmyHandler : IHandler
         messageBroker.Subscribe<NetworkSetArmyAiBehaviorObject>(HandleNetworkSetArmyAiBehaviorObject);
         messageBroker.Subscribe<PlayerCreatedArmy>(HandlePlayerCreatedArmy);
         messageBroker.Subscribe<NetworkPlayerCreatedArmy>(HandleNetworkPlayerCreatedArmy);
-        messageBroker.Subscribe<PlayerAddedPartiesToArmy>(HandlePlayerAddedPartiesToArmy);
-        messageBroker.Subscribe<NetworkPlayerAddedPartiesToArmy>(HandleNetworkPlayerAddedPartiesToArmy);
-        messageBroker.Subscribe<PlayerRemovedPartiesFromArmy>(HandlePlayerRemovedPartiesFromArmy);
-        messageBroker.Subscribe<NetworkPlayerRemovedPartiesFromArmy>(HandleNetworkPlayerRemovedPartiesFromArmy);
         messageBroker.Subscribe<PlayerBoostedArmyCohesion>(HandlePlayerBoostedArmyCohesion);
         messageBroker.Subscribe<NetworkPlayerBoostedArmyCohesion>(HandleNetworkPlayerBoostedArmyCohesion);
+        messageBroker.Subscribe<ChangeClanInfluence>(HandleInfluencespent);
+        messageBroker.Subscribe<NetworkChangeClanInfluence>(HandleNetworkInfluencespent);
     }
 
     public void Dispose()
@@ -62,18 +58,16 @@ public class ArmyHandler : IHandler
         messageBroker.Unsubscribe<NetworkSetArmyAiBehaviorObject>(HandleNetworkSetArmyAiBehaviorObject);
         messageBroker.Unsubscribe<PlayerCreatedArmy>(HandlePlayerCreatedArmy);
         messageBroker.Unsubscribe<NetworkPlayerCreatedArmy>(HandleNetworkPlayerCreatedArmy);
-        messageBroker.Unsubscribe<PlayerAddedPartiesToArmy>(HandlePlayerAddedPartiesToArmy);
-        messageBroker.Unsubscribe<NetworkPlayerAddedPartiesToArmy>(HandleNetworkPlayerAddedPartiesToArmy);
-        messageBroker.Unsubscribe<PlayerRemovedPartiesFromArmy>(HandlePlayerRemovedPartiesFromArmy);
-        messageBroker.Unsubscribe<NetworkPlayerRemovedPartiesFromArmy>(HandleNetworkPlayerRemovedPartiesFromArmy);
         messageBroker.Unsubscribe<PlayerBoostedArmyCohesion>(HandlePlayerBoostedArmyCohesion);
         messageBroker.Unsubscribe<NetworkPlayerBoostedArmyCohesion>(HandleNetworkPlayerBoostedArmyCohesion);
+        messageBroker.Unsubscribe<ChangeClanInfluence>(HandleInfluencespent);
+        messageBroker.Unsubscribe<NetworkChangeClanInfluence>(HandleNetworkInfluencespent);
     }
 
     private void HandleAddMobilePartyInArmy(MessagePayload<MobilePartyInArmyAdded> obj)
     {
-
         if (!objectManager.TryGetIdWithLogging(obj.What.Army, out var armyId)) return;
+
         if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
 
         var message = new NetworkAddMobilePartyInArmy(armyId, mobilePartyId);
@@ -85,15 +79,20 @@ public class ArmyHandler : IHandler
     private void HandleChangeAddMobilePartyInArmy(MessagePayload<NetworkAddMobilePartyInArmy> payload)
     {
         var obj = payload.What;
-
-        if (objectManager.TryGetObjectWithLogging(obj.MobilePartyId, out MobileParty mobileParty) == false) return;
-        if (objectManager.TryGetObjectWithLogging<Army>(obj.ArmyId, out var army) == false) return;
-
-        ArmyPatches.AddMobilePartyInArmy(mobileParty, army);
+        GameThread.Run(() =>
+        {
+            if (objectManager.TryGetObjectWithLogging(obj.MobilePartyId, out MobileParty mobileParty) == false) return;
+            if (objectManager.TryGetObjectWithLogging<Army>(obj.ArmyId, out var army) == false) return;
+            using (new AllowedThread())
+            {
+                mobileParty.Army = army;
+            }
+        });
     }
 
     private void HandleRemoveMobilePartyInArmy(MessagePayload<MobilePartyInArmyRemoved> obj)
     {
+
         if (!objectManager.TryGetIdWithLogging(obj.What.Army, out var armyId)) return;
         if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
 
@@ -106,11 +105,13 @@ public class ArmyHandler : IHandler
     private void HandleChangeRemoveMobilePartyInArmy(MessagePayload<NetworkRemovePartyInArmy> payload)
     {
         var data = payload.What;
+        GameThread.Run(() =>
+        {
+            if (objectManager.TryGetObjectWithLogging(data.MobilePartyId, out MobileParty mobileParty) == false) return;
+            if (objectManager.TryGetObjectWithLogging<Army>(data.ArmyId, out var army) == false) return;
 
-        if (objectManager.TryGetObjectWithLogging(data.MobilePartyId, out MobileParty mobileParty) == false) return;
-        if (objectManager.TryGetObjectWithLogging<Army>(data.ArmyId, out var army) == false) return;
-
-        ArmyPatches.RemoveMobilePartyInArmy(mobileParty, army);
+            ArmyPatches.RemoveMobilePartyInArmy(mobileParty, army);
+        });
     }
 
     private void HandleArmyAiBehaviorObjectChanged(MessagePayload<ArmyAiBehaviorObjectChanged> payload)
@@ -152,11 +153,10 @@ public class ArmyHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(obj.Kingdom, out var kingdomId)) return;
         if (!objectManager.TryGetIdWithLogging(obj.Leader, out var leaderId)) return;
         if (!objectManager.TryGetIdWithLogging(obj.TargetSettlement, out var targetSettlementId)) return;
-
         var partyIds = new List<string>();
         foreach (var party in obj.Parties)
         {
-            if (!objectManager.TryGetIdWithLogging(party, out var partyId)) return;
+            if (!objectManager.TryGetIdWithLogging(party, out var partyId)) continue;
             partyIds.Add(partyId);
         }
 
@@ -167,128 +167,29 @@ public class ArmyHandler : IHandler
     private void HandleNetworkPlayerCreatedArmy(MessagePayload<NetworkPlayerCreatedArmy> payload)
     {
         var obj = payload.What;
-        if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.KingdomId, out var kingdom)) return;
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.LeaderId, out var leader)) return;
-        if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.TargetSettlementId, out var targetSettlement)) return;
-
-        var parties = new List<MobileParty>();
-        foreach (var partyId in obj.PartyIds)
-        {
-            if (!objectManager.TryGetObjectWithLogging<MobileParty>(partyId, out var party)) return;
-            parties.Add(party);
-        }
-
-        var armyType = (Army.ArmyTypes)Enum.Parse(typeof(Army.ArmyTypes), obj.ArmyTypeId);
-
         GameThread.RunSafe(() =>
         {
-            try
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.KingdomId, out var kingdom)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.LeaderId, out var leader)) return;
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.TargetSettlementId, out var targetSettlement)) return;
+            var parties = new List<MobileParty>();
+            foreach (var partyId in obj.PartyIds)
             {
-                // Only create if the leader doesn't already have an army
-                if (leader.PartyBelongedTo?.Army == null)
-                {
-                    kingdom.CreateArmy(leader, targetSettlement, armyType);
-                }
-
-                var army = leader.PartyBelongedTo?.Army;
-                if (army == null) return;
-                // Assign each selected party to the new army
-                foreach (var party in parties)
-                {
-                    party.Army = army;
-                }
-                // Refresh the map overlay so the army icon appears on the client
-                var mapState = Game.Current.GameStateManager.GameStates
-                    .OfType<MapState>()
-                    .SingleOrDefault();
-                mapState?.OnArmyCreated(leader.PartyBelongedTo);
+                if (!objectManager.TryGetObjectWithLogging<MobileParty>(partyId, out var party)) continue;
+                parties.Add(party);
             }
-            catch (Exception ex)
+            var armyType = (Army.ArmyTypes)Enum.Parse(typeof(Army.ArmyTypes), obj.ArmyTypeId);
+            kingdom.CreateArmy(leader, targetSettlement, armyType);
+            var army = leader.PartyBelongedTo?.Army;
+            if (army == null)
             {
-                Logger.Error(ex, "CreateArmy failed");
+                return;
             }
-        });
-    }
-    private void HandlePlayerAddedPartiesToArmy(MessagePayload<PlayerAddedPartiesToArmy> payload)
-    {
-        var obj = payload.What;
-        if (!objectManager.TryGetIdWithLogging(obj.Army, out var armyId)) return;
-
-        var partyIds = new List<string>();
-        foreach (var party in obj.Parties)
-        {
-            if (!objectManager.TryGetIdWithLogging(party, out var partyId)) return;
-            partyIds.Add(partyId);
-        }
-
-        network.SendAll(new NetworkPlayerAddedPartiesToArmy(armyId, partyIds));
-    }
-
-    private void HandleNetworkPlayerAddedPartiesToArmy(MessagePayload<NetworkPlayerAddedPartiesToArmy> payload)
-    {
-        var obj = payload.What;
-        if (!objectManager.TryGetObjectWithLogging<Army>(obj.ArmyId, out var army)) return;
-
-        var parties = new List<MobileParty>();
-        foreach (var partyId in obj.PartyIds)
-        {
-            if (!objectManager.TryGetObjectWithLogging<MobileParty>(partyId, out var party)) return;
-            parties.Add(party);
-        }
-
-        GameThread.RunSafe(() =>
-        {
-            try
+            foreach (var party in parties)
             {
-                foreach (var party in parties)
-                {
-                    party.Army = army;
-                }
+                party.Army = army;
             }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to add parties to army");
-            }
-        });
-    }
-    private void HandlePlayerRemovedPartiesFromArmy(MessagePayload<PlayerRemovedPartiesFromArmy> payload)
-    {
-        var obj = payload.What;
-
-        var partyIds = new List<string>();
-        foreach (var party in obj.Parties)
-        {
-            if (!objectManager.TryGetIdWithLogging(party, out var partyId)) return;
-            partyIds.Add(partyId);
-        }
-
-        network.SendAll(new NetworkPlayerRemovedPartiesFromArmy(partyIds));
-    }
-
-    private void HandleNetworkPlayerRemovedPartiesFromArmy(MessagePayload<NetworkPlayerRemovedPartiesFromArmy> payload)
-    {
-        var obj = payload.What;
-
-        var parties = new List<MobileParty>();
-        foreach (var partyId in obj.PartyIds)
-        {
-            if (!objectManager.TryGetObjectWithLogging<MobileParty>(partyId, out var party)) return;
-            parties.Add(party);
-        }
-
-        GameThread.RunSafe(() =>
-        {
-            try
-            {
-                foreach (var party in parties)
-                {
-                    party.Army = null;
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to remove parties from army");
-            }
+            CampaignEventDispatcher.Instance.OnArmyOverlaySetDirty();
         });
     }
     private void HandlePlayerBoostedArmyCohesion(MessagePayload<PlayerBoostedArmyCohesion> payload)
@@ -306,17 +207,21 @@ public class ArmyHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            try
-            {
-                if (leaderParty.Army == null) return;
-                // BoostCohesionWithInfluence increments Army.Cohesion and deducts influence.
-                // Do not deduct influence separately it is fully handled here
-                leaderParty.Army.BoostCohesionWithInfluence(obj.CohesionToGain, obj.InfluenceCost);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to boost army cohesion");
-            }
+            if (leaderParty.Army == null) return;
+            // BoostCohesionWithInfluence increments Army.Cohesion and deducts influence.
+            // Do not deduct influence separately it is fully handled here
+            leaderParty.Army.BoostCohesionWithInfluence(obj.CohesionToGain, obj.InfluenceCost);
+        });
+    }
+    private void HandleInfluencespent(MessagePayload<ChangeClanInfluence> payload)
+    {
+        network.SendAll(new NetworkChangeClanInfluence(payload.What.Influence));
+    }
+    private void HandleNetworkInfluencespent(MessagePayload<NetworkChangeClanInfluence> payload)
+    {
+        GameThread.RunSafe(() =>
+        {
+            ChangeClanInfluenceAction.Apply(Clan.PlayerClan, (float)(-(float)(payload.What.Influence)));
         });
     }
 }

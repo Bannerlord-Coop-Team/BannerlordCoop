@@ -62,40 +62,7 @@ internal class ArmyRegistry : AutoRegistryBase<Army>
     // Just clean up the fields directly.
     public override void OnClientDestroyed(Army obj, string id)
     {
-        GameThread.Run(() =>
-        {
-            bool containsMainParty = false;
-            using (new AllowedThread())
-            {
-                foreach (var party in obj._parties)
-                {
-                    if (party == MobileParty.MainParty)
-                    {
-                        containsMainParty = true;
-                    }
-                    party.AttachedTo = null;
-                    party._army = null;
-                }
-                obj._parties.Clear();
-                // Explicitly null MainParty in case it wasn't in _parties
-                if (MobileParty.MainParty._army == obj)
-                {
-                    MobileParty.MainParty._army = null;
-                }
-                obj.Kingdom = null; //remove army from kingdom
-
-                obj._hourlyTickEvent?.DeletePeriodicEvent();
-                obj._tickEvent?.DeletePeriodicEvent();
-                // this is what  removes the overlay panel
-                var mapScreen = Game.Current.GameStateManager.ActiveState as MapState;
-                // overlay needs to be removed only when the mainparty is in the army
-                if (mapScreen != null && (containsMainParty || obj.LeaderParty == MobileParty.MainParty))
-                {
-                    var screen = ScreenManager.TopScreen as MapScreen;
-                    screen?.RemoveArmyOverlay();
-                }
-            }
-        });
+        obj.DisperseInternal(); // seems to work fine
     }
 
     public override void OnServerCreated(Army obj, string id)

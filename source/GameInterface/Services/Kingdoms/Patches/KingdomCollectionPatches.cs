@@ -5,11 +5,9 @@ using GameInterface.Policies;
 using GameInterface.Services.Kingdoms.Messages.Collections;
 using HarmonyLib;
 using Serilog;
-using System.Threading.Channels;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Diamond;
 
 namespace GameInterface.Services.Kingdoms.Patches;
 
