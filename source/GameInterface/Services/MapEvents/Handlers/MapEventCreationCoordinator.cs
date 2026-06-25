@@ -5,6 +5,7 @@ using Common.Network;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Villages.Interfaces;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -47,18 +48,21 @@ internal class MapEventCreationCoordinator : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly INetworkConfig configuration;
+    private readonly IVillageHostileActionInterface villageHostileActionInterface;
     private readonly ConcurrentDictionary<string, PendingRequest> pendingRequests = new ConcurrentDictionary<string, PendingRequest>();
 
     public MapEventCreationCoordinator(
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
-        INetworkConfig configuration)
+        INetworkConfig configuration,
+        IVillageHostileActionInterface villageHostileActionInterface)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.configuration = configuration;
+        this.villageHostileActionInterface = villageHostileActionInterface;
 
         Instance = this;
 
@@ -173,31 +177,44 @@ internal class MapEventCreationCoordinator : IHandler
         if (!objectManager.TryGetObjectWithLogging<PartyBase>(request.AttackerId, out var attacker)) return;
         if (!objectManager.TryGetObjectWithLogging<PartyBase>(request.DefenderId, out var defender)) return;
 
+        if (!villageHostileActionInterface.TryConsumeApprovedMapEventStart(attacker, defender, request.Flags, out var reason))
+        {
+            Logger.Warning(
+                "Rejecting hostile-action map event creation. RequestId={RequestId}, AttackerId={AttackerId}, DefenderId={DefenderId}, Reason={Reason}",
+                request.RequestId,
+                request.AttackerId,
+                request.DefenderId,
+                reason);
+            return;
+        }
+
         string mapEventId = null;
 
         // MapEvent creation mutates campaign state and must run on the server's main thread. The AllowedThread scope
         // lets the resulting StartBattleInternal/MapEvent construction run through unblocked by the mod's patches,
         // and registers the new MapEvent (broadcasting it to clients) before we read back its id.
-        GameThread.Run(() =>
-        {
-            if (attacker.MobileParty?.IsPlayerParty() == true && 
-                defender.MobileParty?.IsCurrentlyEngagingParty == true && 
-                defender.MobileParty?.ShortTermTargetParty == attacker.MobileParty)
+        GameThread.RunSafe(
+            () =>
             {
-                var temp = attacker;
-                attacker = defender;
-                defender = temp;
-            }
+                if (attacker.MobileParty?.IsPlayerParty() == true &&
+                    defender.MobileParty?.IsCurrentlyEngagingParty == true &&
+                    defender.MobileParty?.ShortTermTargetParty == attacker.MobileParty)
+                {
+                    var temp = attacker;
+                    attacker = defender;
+                    defender = temp;
+                }
 
-            var mapEvent = MapEventBattleFactory.CreateMapEvent(attacker, defender, request.Flags);
-            if (mapEvent == null) return;
+                var mapEvent = MapEventBattleFactory.CreateMapEvent(attacker, defender, request.Flags);
+                if (mapEvent == null) return;
 
-            if (!objectManager.TryGetIdWithLogging(mapEvent, out mapEventId))
-            {
-                Logger.Error("Server created a map event but it has no registered id. RequestId={RequestId}", request.RequestId);
-            }
-        },
-        blocking: true);
+                if (!objectManager.TryGetIdWithLogging(mapEvent, out mapEventId))
+                {
+                    Logger.Error("Server created a map event but it has no registered id. RequestId={RequestId}", request.RequestId);
+                }
+            },
+            blocking: true,
+            context: nameof(Handle_NetworkRequestCreateMapEvent));
 
         if (string.IsNullOrEmpty(mapEventId))
         {

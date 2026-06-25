@@ -1,9 +1,9 @@
 ﻿[HarmonyTranspiler]
-private static IEnumerable<CodeInstruction> {{MemberName}}_SetTranspiler(IEnumerable<CodeInstruction> instructions)
+private static IEnumerable<CodeInstruction> {{MemberIdentifier}}_SetTranspiler(IEnumerable<CodeInstruction> instructions)
 {
-    var fieldIntercept = typeof({{MemberDeclaringTypeName}}_DynamicPatches).GetMethod(nameof({{MemberName}}_Intercept));
+    var fieldIntercept = typeof({{MemberDeclaringTypeName}}_DynamicPatches).GetMethod(nameof({{MemberIdentifier}}_Intercept));
 
-    var fieldInfo = AccessTools.Field(typeof({{MemberDeclaringType}}), nameof({{MemberDeclaringType}}.{{MemberName}}));
+    var fieldInfo = {{MemberIdentifier}}FieldInfo;
 
     GenericPatchHelpers.FieldInterceptCache.TryAdd(fieldInfo, fieldIntercept);
 
@@ -27,23 +27,21 @@ private static IEnumerable<CodeInstruction> {{MemberName}}_SetTranspiler(IEnumer
     }
 }
 
-{{~ if ReadOnly ~}}
-private static readonly FieldInfo {{MemberName}}FieldInfo = AccessTools.Field(typeof({{MemberDeclaringType}}), "{{MemberName}}");
-{{~ end ~}}
+private static readonly FieldInfo {{MemberIdentifier}}FieldInfo = AccessTools.Field(typeof({{MemberDeclaringType}}), "{{MemberName}}");
 
-public static void {{MemberName}}_Intercept({{MemberDeclaringType}} instance, {{MemberType}} newValue)
+public static void {{MemberIdentifier}}_Intercept({{MemberDeclaringType}} instance, {{MemberType}} newValue)
 {
-    var currentValue = instance.{{MemberName}};
+    var currentValue = {{MemberIdentifier}}FieldInfo.GetValue(instance);
 
-    // Skip if value hasn´t changed
+    // Skip if value hasn't changed
     if (currentValue != null && currentValue.Equals(newValue)) return;
 
     if (CallOriginalPolicy.IsOriginalAllowed())
     {
-{{~ if ReadOnly ~}}
-        {{MemberName}}FieldInfo.SetValue(instance, newValue);
+{{~ if DirectAssignment ~}}
+        instance.{{MemberName}} = newValue;
 {{~ else ~}}
-		instance.{{MemberName}} = newValue;
+        {{MemberIdentifier}}FieldInfo.SetValue(instance, newValue);
 {{~ end ~}}
         return;
     }
@@ -51,10 +49,10 @@ public static void {{MemberName}}_Intercept({{MemberDeclaringType}} instance, {{
     if (ModInformation.IsClient)
     {
         Logger.Error("Client updated managed {type}", "{{MemberName}}");
-{{~ if ReadOnly ~}}
-	    {{MemberName}}FieldInfo.SetValue(instance, newValue);
+{{~ if DirectAssignment ~}}
+        instance.{{MemberName}} = newValue;
 {{~ else ~}}
-		instance.{{MemberName}} = newValue;
+        {{MemberIdentifier}}FieldInfo.SetValue(instance, newValue);
 {{~ end ~}}
         return;
     }
@@ -63,11 +61,11 @@ public static void {{MemberName}}_Intercept({{MemberDeclaringType}} instance, {{
     Logger.Debug("[Server] Publishing local set message for {type}", "{{MemberName}}");
 {{~ end ~}}
 
-    var message = new {{MemberDeclaringTypeName}}_{{MemberName}}_SetLocalMessage(instance, newValue);
+    var message = new {{MemberDeclaringTypeName}}_{{MemberIdentifier}}_SetLocalMessage(instance, newValue);
     MessageBroker.Instance.Publish(instance, message);
-{{~ if ReadOnly ~}}
-	{{MemberName}}FieldInfo.SetValue(instance, newValue);
+{{~ if DirectAssignment ~}}
+    instance.{{MemberName}} = newValue;
 {{~ else ~}}
-	instance.{{MemberName}} = newValue;
+    {{MemberIdentifier}}FieldInfo.SetValue(instance, newValue);
 {{~ end ~}}
 }

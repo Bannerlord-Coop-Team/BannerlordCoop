@@ -180,6 +180,13 @@ internal class MapEventPatches
         if (CallOriginalPolicy.IsOriginalAllowed())
             return true;
 
+        RaidAiInterventionSuppression.SuppressJoinedDefenders(__instance);
+
+        // Slow village raids are campaign-map progress events, so the server must tick them even
+        // though they involve a player party and a settlement defender without a MobileParty.
+        if (__instance.IsActiveSlowVillageRaid())
+            return true;
+
         // Skip if any parties are not set
         if (__instance.InvolvedParties.Any(x => x?.MobileParty is null))
             return false;
@@ -314,6 +321,15 @@ internal class InteractionPatches
         if (!__result)
             return;
 
+        if (__instance.IsRaidAiInterventionSuppressed())
+        {
+            __result = false;
+            return;
+        }
+
+        if (__instance.IsRaidHostileAction() && MapEventConfig.AllowRaidAiIntervention)
+            return;
+
         // Allow AI to join if no players are involved
         if (!__instance.ContainsPlayerParty())
             return;
@@ -336,7 +352,7 @@ internal class InteractionPatches
     {
         if (ModInformation.IsClient)
             return;
-        
+
         var attackerIsPlayer = attackerParty.MobileParty?.IsPlayerParty() == true;
         var defenderIsPlayer = defenderParty.MobileParty?.IsPlayerParty() == true;
 

@@ -867,6 +867,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         var allowed = Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>().Single();
         Assert.Equal(initiatorPartyId, allowed.AttackerId);
         Assert.Equal(responderPartyId, allowed.DefenderId);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkConversationDenied>());
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>());
     }
 

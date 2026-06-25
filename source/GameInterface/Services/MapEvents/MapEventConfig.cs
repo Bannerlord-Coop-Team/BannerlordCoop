@@ -8,4 +8,6 @@ internal static class MapEventConfig
     // How long after a player's battle begins that AI parties may still join it as reinforcements. One
     // campaign day; after it passes, AI can no longer join a player's battle (see Postfix_CanPartyJoinBattle).
     public const int PlayerBattleAiJoinWindowHours = 24;
+
+    public static bool AllowRaidAiIntervention { get; set; } = true;
 }

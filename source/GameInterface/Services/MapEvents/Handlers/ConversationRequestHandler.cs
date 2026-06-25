@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
 using Common.Util;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
@@ -142,7 +143,9 @@ internal class ConversationRequestHandler : IHandler
         // Mark and hold on the game thread, then reply, so the party is frozen and protected before the client
         // (re)opens the encounter. The filter above runs on the network thread; game state can change while the
         // approval is queued, so the hold step re-validates everything it depends on.
-        GameThread.Run(() => HoldAndApprove(requestingPeer, request, aiPartyId, playerPartyId));
+        GameThread.RunSafe(
+            () => HoldAndApprove(requestingPeer, request, aiPartyId, playerPartyId),
+            context: nameof(Handle_NetworkRequestConversation));
     }
 
     /// <summary>
@@ -359,7 +362,7 @@ internal class ConversationRequestHandler : IHandler
             return;
         }
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             try
             {
@@ -399,7 +402,7 @@ internal class ConversationRequestHandler : IHandler
                 Logger.Error(e, "Failed to restart approved conversation encounter; releasing the server-side party hold");
                 SendConversationEndedToServer();
             }
-        });
+        }, context: nameof(Handle_NetworkAllowConversation));
     }
 
     /// <summary>[Client] This player's encounter finished; tell the server to release the held party.</summary>
@@ -438,7 +441,9 @@ internal class ConversationRequestHandler : IHandler
     {
         if (ModInformation.IsServer) return;
 
-        GameThread.Run(ConversationPartyHold.ShowInteractionBlockedMessage);
+        GameThread.RunSafe(
+            ConversationPartyHold.ShowInteractionBlockedMessage,
+            context: nameof(Handle_NetworkConversationDenied));
     }
 
     /// <summary>[Server] The defender's client reports it is showing the "hold on" popup; record its peer so a
@@ -478,7 +483,8 @@ internal class ConversationRequestHandler : IHandler
     /// <summary>[Server] Releases the given player's engagement on the game thread.</summary>
     private void ReleaseEngagementOnMainThread(NetPeer peer)
     {
-        GameThread.Run(() =>
-            ConversationPartyHold.EndEngagement(conversationPartyTracker, peer));
+        GameThread.RunSafe(() =>
+            ConversationPartyHold.EndEngagement(conversationPartyTracker, peer),
+            context: nameof(ReleaseEngagementOnMainThread));
     }
 }

@@ -6,9 +6,11 @@ using Common.Util;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using GameInterface.Services.Kingdoms;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Interfaces;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -114,8 +116,19 @@ public class ClientSettlementExitEnterHandler : IHandler
             using (new AllowedThread())
             {
                 settlementInterface.StartSettlementEncounter(party, settlement);
+
+                if (ShouldShowRaidOccupiedMenu(party, settlement))
+                    GameMenu.SwitchToMenu("raid_occupied");
             }
         });
+    }
+
+    private static bool ShouldShowRaidOccupiedMenu(MobileParty party, Settlement settlement)
+    {
+        if (party?.Party?.MapEvent != null)
+            return false;
+
+        return settlement?.Party?.MapEvent?.IsActiveSlowVillageRaid() == true;
     }
 
     private void Handle(MessagePayload<NetworkEndSettlementEncounter> obj)

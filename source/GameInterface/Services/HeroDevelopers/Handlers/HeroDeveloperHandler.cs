@@ -60,8 +60,10 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
 
         private void Handle(MessagePayload<NetworkSetSkillXpServer> obj)
         {
+            if (!ModInformation.IsServer) return;
+
             // Send to all clients and apply on server
-            GameThread.Run(() =>
+            GameThread.RunSafe(() =>
             {
                 using (new AllowedThread())
                 {
@@ -76,7 +78,7 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
         {
             var data = obj.What;
 
-            GameThread.Run(() =>
+            GameThread.RunSafe(() =>
             {
                 try
                 {
@@ -95,8 +97,10 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
         }
         private void Handle(MessagePayload<NetworkSkillLevelChangeServer> obj)
         {
+            if (!ModInformation.IsServer) return;
+
             // Send to all clients and apply on server
-            GameThread.Run(() =>
+            GameThread.RunSafe(() =>
             {
                 using (new AllowedThread())
                 {
@@ -111,7 +115,7 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
         {
             var data = obj.What;
 
-            GameThread.Run(() =>
+            GameThread.RunSafe(() =>
             {
                 try
                 {
@@ -130,6 +134,8 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
         }
         private void Handle(MessagePayload<NetworkRawXpGainServer> obj)
         {
+            if (!ModInformation.IsServer) return;
+
             // Send to all clients and apply on server
             GameThread.RunSafe(() =>
             {
@@ -146,9 +152,17 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
         {
             var data = obj.What;
 
-            GameThread.RunSafe(
-                () => ChangeRawXp(data),
-                context: nameof(HeroDeveloperHandler));
+            GameThread.RunSafe(() =>
+            {
+                try
+                {
+                    ChangeRawXp(data);
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to apply NetworkRawXpGainClients");
+                }
+            }, context: nameof(HeroDeveloperHandler));
         }
 
         private void SendSkillXp(SkillXpSet obj)
@@ -167,12 +181,24 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
                 return;
             }
 
-            // Send to server from client
             NetworkSetSkillXpServer message = new(
                 heroId,
                 skillObjectId,
                 obj.Value
             );
+
+            if (ModInformation.IsServer)
+            {
+                NetworkSetSkillXpClients changes = new(message);
+                network.SendAll(changes);
+                using (new AllowedThread())
+                {
+                    SetSkillXp(changes);
+                }
+                return;
+            }
+
+            // Send to server from client
             network.SendAll(message);
         }
 
@@ -218,13 +244,22 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
                 return;
             }
 
-            // Send to server from client
             NetworkSkillLevelChangeServer message = new(
                 heroId,
                 skillObjectId,
                 obj.ChangeAmount,
                 obj.ShouldNotify
             );
+
+            if (ModInformation.IsServer)
+            {
+                NetworkSkillLevelChangeClients changes = new(message);
+                network.SendAll(changes);
+                ChangeSkillLevel(changes);
+                return;
+            }
+
+            // Send to server from client
             network.SendAll(message);
         }
 
@@ -269,12 +304,21 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
                 return;
             }
 
-            // Send to server from client
             NetworkRawXpGainServer message = new(
                 heroId,
                 obj.RawXp,
                 obj.ShouldNotify
             );
+
+            if (ModInformation.IsServer)
+            {
+                NetworkRawXpGainClients changes = new(message);
+                network.SendAll(changes);
+                ChangeRawXp(changes);
+                return;
+            }
+
+            // Send to server from client
             network.SendAll(message);
         }
 

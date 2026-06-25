@@ -60,6 +60,7 @@ public class AutoSyncPropertyBuilder : AutoSyncBuilderBase
             MemberDeclaringType = AutoSyncUtils.GetSimpleTypeName(propertyInfo.DeclaringType),
             MemberDeclaringTypeName = AutoSyncUtils.GetSimpleTypeName(propertyInfo.DeclaringType).Replace(".", "_"),
             MemberName = propertyInfo.Name,
+            MemberIdentifier = AutoSyncUtils.GetMemberIdentifier(propertyInfo.Name),
             MemberType = AutoSyncUtils.GetSimpleTypeName(propertyInfo.PropertyType),
             Libraries = AutoSyncUtils.GetLibraries(propertyInfo),
             SerializeMethod = serializerNames.serialize,

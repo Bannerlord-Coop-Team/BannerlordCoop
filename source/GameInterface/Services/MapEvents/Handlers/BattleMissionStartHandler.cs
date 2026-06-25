@@ -12,7 +12,6 @@ using Serilog;
 using System;
 using System.Collections.Concurrent;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -37,10 +36,6 @@ internal class BattleMissionStartHandler : IHandler
     // Exclusive upper bound for the terrain seed, preserving the range of the original
     // client-side MBRandom.RandomInt(10000) roll this replaces.
     private const int MaxTerrainSeed = 10000;
-
-    // The -10 player-hostility relation penalty vanilla applies against the target faction leader
-    // when an attack first turns a faction hostile (the war block of BeHostileAction).
-    private const int PlayerHostilityRelationPenalty = -10;
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
@@ -106,12 +101,19 @@ internal class BattleMissionStartHandler : IHandler
         // Re-resolve the event at drain time: it may have finalized between this request
         // arriving and the queued action running, in which case a captured reference would
         // point at a torn-down event.
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             try
             {
                 if (!objectManager.TryGetObject(payload.What.MapEventId, out MapEvent mapEvent))
                     return;
+
+                if (mapEvent.IsVillageHostileActionWithMultiplePlayerParties())
+                {
+                    Logger.Warning("Rejecting attack mission start for map event {MapEventId}: multiple player parties are involved", payload.What.MapEventId);
+                    network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
+                    return;
+                }
 
                 // Server-authoritative mode gate: accept the live mission only if no auto-resolve simulation already
                 // owns this event. On reject, don't make the sides mission-ready or reply — the requesting client
@@ -152,71 +154,25 @@ internal class BattleMissionStartHandler : IHandler
                 Logger.Error(e, "Failed to make map event sides mission-ready for {Message}", nameof(NetworkBattleStartRequest));
                 network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
             }
-        });
+        }, context: nameof(Handle_NetworkBattleStartRequest));
     }
 
     /// <summary>
     /// When a client attacks a not-already-hostile party, declares war on the target faction and
-    /// applies the player-hostility relation penalty against its leader — the war block of vanilla
+    /// applies the player-hostility relation penalty against its leader - the war block of vanilla
     /// MenuHelper.EncounterAttackConsequence (BeHostileAction.ApplyEncounterHostileAction), which
     /// neither the client (it defers to the server) nor the dedicated server (it never opens the
-    /// encounter menu) runs. Vanilla gates the war declaration on the attacker being the
-    /// single-player main party; the server is never that party, so it is reproduced explicitly for
-    /// the client attacker. Runs with patches live: the war declaration replicates through the
-    /// server-authoritative stance sync, and the relation change is applied server-authoritatively
-    /// like every other co-op relation change. The whole block sits behind the not-already-at-war
-    /// check, so repeated attack requests for the same battle apply it at most once.
+    /// encounter menu) runs.
     /// </summary>
     private void ApplyClientAttackHostileConsequences(MapEvent mapEvent, string attackerPartyId)
     {
-        try
+        if (!objectManager.TryGetObject(attackerPartyId, out MobileParty attackerMobileParty))
         {
-            // GameThread runs queued actions unguarded, so the campaign can have been torn down
-            // between the request arriving and this draining; the sibling OpenAttackMission guards
-            // the same way before dereferencing campaign state.
-            if (Campaign.Current == null)
-                return;
-
-            if (!objectManager.TryGetObject(attackerPartyId, out MobileParty attackerMobileParty))
-            {
-                Logger.Warning("Could not resolve attacker party {AttackerPartyId} for attack hostile-action consequences", attackerPartyId);
-                return;
-            }
-
-            var attackerParty = attackerMobileParty.Party;
-
-            // OpponentSide is only meaningful while the attacker is a side in this event.
-            if (attackerParty.MapEvent != mapEvent)
-                return;
-
-            var defenderParty = mapEvent.GetLeaderParty(attackerParty.OpponentSide);
-            if (defenderParty == null)
-                return;
-
-            var attackerFaction = attackerParty.MapFaction;
-            var defenderFaction = defenderParty.MapFaction;
-            if (attackerFaction == null || defenderFaction == null || attackerFaction == defenderFaction)
-                return;
-
-            if (Campaign.Current.Models.EncounterModel.IsEncounterExemptFromHostileActions(attackerParty, defenderParty))
-                return;
-
-            // Already hostile: nothing to declare, and this is what makes the consequence idempotent
-            // across the duplicate attack requests a client can send during the server round-trip.
-            if (FactionManager.IsAtWarAgainstFaction(attackerFaction, defenderFaction))
-                return;
-
-            if (attackerParty.LeaderHero != null && defenderFaction.Leader != null)
-            {
-                ChangeRelationAction.ApplyRelationChangeBetweenHeroes(attackerParty.LeaderHero, defenderFaction.Leader, PlayerHostilityRelationPenalty);
-            }
-
-            DeclareWarAction.ApplyByPlayerHostility(attackerFaction, defenderFaction);
+            Logger.Warning("Could not resolve attacker party {AttackerPartyId} for attack hostile-action consequences", attackerPartyId);
+            return;
         }
-        catch (Exception e)
-        {
-            Logger.Error(e, "Failed to apply attack hostile-action consequences");
-        }
+
+        MapEventHostileActionConsequences.Apply(mapEvent, attackerMobileParty.Party, "attack");
     }
 
     private int RollTerrainSeed()
@@ -236,7 +192,9 @@ internal class BattleMissionStartHandler : IHandler
         // changes from the main thread; doing it from the network thread races its
         // layer lists and crashes the game.
         var randomTerrainSeed = payload.What.RandomTerrainSeed;
-        GameThread.Run(() => OpenAttackMission(randomTerrainSeed));
+        GameThread.RunSafe(
+            () => OpenAttackMission(randomTerrainSeed),
+            context: nameof(Handle_NetworkStartAttackMission));
     }
 
     private static void OpenAttackMission(int randomTerrainSeed)

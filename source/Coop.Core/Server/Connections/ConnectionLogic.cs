@@ -14,6 +14,7 @@ namespace Coop.Core.Server.Connections;
 public interface IConnectionLogic : IConnectionState
 {
     NetPeer Peer { get; }
+    string PlayerId { get; set; }
     IConnectionState State { get; }
     TState SetState<TState>() where TState : IConnectionState;
 }
@@ -23,6 +24,7 @@ public class ConnectionLogic : IConnectionLogic
 {
     private readonly ILogger Logger = LogManager.GetLogger<ConnectionLogic>();
     public NetPeer Peer { get; }
+    public string PlayerId { get; set; }
 
     private readonly ConnectionContext context;
     private readonly IReadOnlyDictionary<Type, Func<IConnectionState>> stateFactories;

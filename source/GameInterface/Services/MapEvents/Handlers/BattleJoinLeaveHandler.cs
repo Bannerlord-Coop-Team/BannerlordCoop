@@ -14,6 +14,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.MapEvents.Handlers;
 
@@ -136,28 +137,44 @@ internal class BattleJoinLeaveHandler : IHandler
 
         var data = payload.What;
 
-        GameThread.RunSafe(() =>
-        {
-            if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.MapEventId, out var mapEvent)) return;
-            if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.PartyId, out var party)) return;
-
-            if (party.MapEventSide != null)
+        GameThread.RunSafe(
+            () =>
             {
-                Logger.Warning("Ignoring join request: party {PartyId} is already in a map event", data.PartyId);
-                return;
-            }
+                if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.MapEventId, out var mapEvent)) return;
+                if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.PartyId, out var party)) return;
 
-            // The setter runs the native MapEventSide.AddPartyInternal on the server (NOT under AllowedThread), so the
-            // AddIntercept publishes the battle-party add and it replicates to every client through the map-event sync.
-            party.MapEventSide = mapEvent.GetMapEventSide(data.Side);
+                if (party.MapEventSide != null)
+                {
+                    Logger.Warning("Ignoring join request: party {PartyId} is already in a map event", data.PartyId);
+                    return;
+                }
+                if (mapEvent.IsActiveSlowVillageRaid() && data.Side == BattleSideEnum.Defender)
+                {
+                    Logger.Warning("Ignoring defender join request: map event {MapEventId} is an active slow village raid", data.MapEventId);
+                    return;
+                }
+                var side = mapEvent.GetMapEventSide(data.Side);
+                if (side == null)
+                {
+                    Logger.Warning("Ignoring join request: map event {MapEventId} has no side {Side}", data.MapEventId, data.Side);
+                    return;
+                }
 
-            // If this battle is being auto-resolved, pull the joiner into the simulation instead of leaving it stuck in
-            // the encounter menu. A ForwardingBattleObserver on the event means a server-driven simulation is running.
-            // Sent after the add above so the joiner applies the replicated battle-party add (and so builds its own
-            // party into its scoreboard) before this open arrives; the simulation handler then opens it as a spectator.
-            if (mapEvent.BattleObserver is ForwardingBattleObserver)
-                network.SendAll(new NetworkOpenBattleSimulation(data.MapEventId));
-        });
+                // The setter runs the native MapEventSide.AddPartyInternal on the server (NOT under AllowedThread), so the
+                // AddIntercept publishes the battle-party add and it replicates to every client through the map-event sync.
+                party.MapEventSide = side;
+                if (mapEvent.IsRaidHostileAction() && data.Side == BattleSideEnum.Attacker)
+                    MapEventHostileActionConsequences.Apply(mapEvent, party, "raid attacker join");
+
+                // If this battle is being auto-resolved, pull the joiner into the simulation instead of leaving it stuck in
+                // the encounter menu. A ForwardingBattleObserver on the event means a server-driven simulation is running.
+                // Sent after the add above so the joiner applies the replicated battle-party add (and so builds its own
+                // party into its scoreboard) before this open arrives; the simulation handler then opens it as a spectator.
+                if (mapEvent.BattleObserver is ForwardingBattleObserver && !mapEvent.IsUnsupportedMultiPlayerHostileAction())
+                    network.SendAll(new NetworkOpenBattleSimulation(data.MapEventId));
+            },
+            blocking: true,
+            context: nameof(Handle_NetworkRequestJoinBattle));
     }
 
     /// <summary>[Client] Bridge a joiner's leave to a server request; [Server/host] perform it directly.</summary>
@@ -183,13 +200,16 @@ internal class BattleJoinLeaveHandler : IHandler
     // collection sync), so remove authoritatively and broadcast the removal explicitly.
     private void RemovePartyFromBattleAndBroadcast(string partyId)
     {
-        GameThread.RunSafe(() =>
-        {
-            if (!objectManager.TryGetObjectWithLogging<PartyBase>(partyId, out var party)) return;
+        GameThread.RunSafe(
+            () =>
+            {
+                if (!objectManager.TryGetObjectWithLogging<PartyBase>(partyId, out var party)) return;
 
-            ApplyLeave(party);
-            network.SendAll(new NetworkPartyLeftBattle(partyId));
-        });
+                ApplyLeave(party);
+                network.SendAll(new NetworkPartyLeftBattle(partyId));
+            },
+            blocking: true,
+            context: nameof(RemovePartyFromBattleAndBroadcast));
     }
 
     /// <summary>[Client] Apply a joiner's removal from its map event side.</summary>
@@ -197,13 +217,15 @@ internal class BattleJoinLeaveHandler : IHandler
     {
         var partyId = payload.What.PartyId;
 
-        GameThread.RunSafe(() =>
-        {
-            if (Campaign.Current == null) return;
-            if (!objectManager.TryGetObjectWithLogging<PartyBase>(partyId, out var party)) return;
+        GameThread.RunSafe(
+            () =>
+            {
+                if (Campaign.Current == null) return;
+                if (!objectManager.TryGetObjectWithLogging<PartyBase>(partyId, out var party)) return;
 
-            ApplyLeave(party);
-        });
+                ApplyLeave(party);
+            },
+            context: nameof(Handle_NetworkPartyLeftBattle));
     }
 
     // Remove the party from its side (idempotent) and, if it is this instance's own party, close its encounter UI.

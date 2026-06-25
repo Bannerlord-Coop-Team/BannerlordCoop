@@ -16,7 +16,6 @@ using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
-using TaleWorlds.LinQuick;
 
 namespace GameInterface.Services.PlayerCaptivityService.Patches;
 
@@ -99,7 +98,12 @@ internal class PlayerStartCaptivityPatches
             if (playerHero.IsPrisoner)
                 continue;
 
-            PartyBase captorParty = winnerParties.WhereQ((MapEventParty x) => x.Party.MemberRoster.TotalManCount > 0).MaxBy((MapEventParty x) => x.ContributionToBattle).Party;
+            if (!TryResolveCaptorParty(winnerParties, out var captorParty))
+            {
+                Logger.Warning("Could not resolve a captor party for defeated player party {PartyId}, skipping prisoner capture", defeatedParty.StringId);
+                continue;
+            }
+
             if (captorParty.IsMobile && (captorParty.MobileParty.IsMilitia || captorParty.MobileParty.IsGarrison))
             {
                 captorParty = captorParty.MobileParty.HomeSettlement.Party;
@@ -107,6 +111,27 @@ internal class PlayerStartCaptivityPatches
             TakePrisonerAction.Apply(captorParty, playerHero);
         }
 
+        return true;
+    }
+
+    private static bool TryResolveCaptorParty(MBReadOnlyList<MapEventParty> winnerParties, out PartyBase captorParty)
+    {
+        MapEventParty captor = null;
+        captorParty = null;
+
+        foreach (var party in winnerParties)
+        {
+            if (party?.Party?.MemberRoster.TotalManCount <= 0)
+                continue;
+
+            if (captor == null || party.ContributionToBattle > captor.ContributionToBattle)
+                captor = party;
+        }
+
+        if (captor == null)
+            return false;
+
+        captorParty = captor.Party;
         return true;
     }
 

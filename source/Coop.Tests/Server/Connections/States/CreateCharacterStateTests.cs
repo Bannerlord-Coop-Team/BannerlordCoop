@@ -84,6 +84,7 @@ namespace Coop.Tests.Server.Connections.States
             // for the client to load (LoadingState).
             var message = Assert.Single(serverComponent.TestNetwork.GetPeerMessages(playerPeer));
             Assert.IsType<NetworkHeroRecieved>(message);
+            Assert.Equal("MyId", connectionLogic.PlayerId);
             Assert.IsType<LoadingState>(connectionLogic.State);
         }
 
