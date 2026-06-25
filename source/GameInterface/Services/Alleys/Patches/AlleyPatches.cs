@@ -12,8 +12,7 @@ namespace GameInterface.Services.Alleys.Patches;
 /// Routes authoritative <see cref="Alley"/> mutations through the network.
 /// An alley's only persisted state is its owner; <c>State</c> and the owner's
 /// <c>OwnedAlleys</c> list are both maintained by <c>Alley.SetOwner</c>, so the
-/// owner change is replicated by replaying <c>SetOwner</c> on every client rather
-/// than poking the <c>_owner</c> field directly.
+/// owner change is replicated by replaying <c>SetOwner</c> on every client.
 /// </summary>
 [HarmonyPatch(typeof(Alley))]
 internal class AlleyPatches
