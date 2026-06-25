@@ -39,7 +39,7 @@ internal class AlleyHandler : IHandler
 
     private void Handle_AlleyOwnerChanged(MessagePayload<AlleyOwnerChanged> payload)
     {
-        if (!ModInformation.IsServer) return;
+        if (ModInformation.IsClient) return;
 
         var data = payload.What;
 
@@ -54,7 +54,7 @@ internal class AlleyHandler : IHandler
 
     private void Handle_ChangeAlleyOwner(MessagePayload<ChangeAlleyOwner> payload)
     {
-        if (!ModInformation.IsClient) return;
+        if (ModInformation.IsServer) return;
 
         var data = payload.What;
 

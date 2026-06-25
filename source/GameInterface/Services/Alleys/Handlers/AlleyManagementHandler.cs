@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Alleys.Interfaces;
 using GameInterface.Services.Alleys.Messages;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Data;
 using Serilog;
@@ -79,7 +80,7 @@ internal class AlleyManagementHandler : IHandler
 
     private void Handle_AlleyAcquiredRequested(MessagePayload<AlleyAcquiredRequested> payload)
     {
-        if (!ModInformation.IsClient) return;
+        if (ModInformation.IsServer) return;
         if (!objectManager.TryGetIdWithLogging(payload.What.Alley, out var alleyId)) return;
         if (!objectManager.TryGetIdWithLogging(payload.What.Owner, out var ownerId)) return;
         if (!objectManager.TryGetIdWithLogging(payload.What.Overseer, out var overseerId)) return;
@@ -89,7 +90,7 @@ internal class AlleyManagementHandler : IHandler
 
     private void Handle_AbandonAlleyRequested(MessagePayload<AbandonAlleyRequested> payload)
     {
-        if (!ModInformation.IsClient) return;
+        if (ModInformation.IsServer) return;
         if (!objectManager.TryGetIdWithLogging(payload.What.Alley, out var alleyId)) return;
 
         network.SendAll(new RequestAbandonAlley(alleyId, payload.What.FromClanScreen));
@@ -97,7 +98,7 @@ internal class AlleyManagementHandler : IHandler
 
     private void Handle_ChangeAlleyOverseerRequested(MessagePayload<ChangeAlleyOverseerRequested> payload)
     {
-        if (!ModInformation.IsClient) return;
+        if (ModInformation.IsServer) return;
         if (!objectManager.TryGetIdWithLogging(payload.What.Alley, out var alleyId)) return;
         if (!objectManager.TryGetIdWithLogging(payload.What.NewOverseer, out var overseerId)) return;
 
@@ -106,7 +107,7 @@ internal class AlleyManagementHandler : IHandler
 
     private void Handle_SetAlleyGarrisonRequested(MessagePayload<SetAlleyGarrisonRequested> payload)
     {
-        if (!ModInformation.IsClient) return;
+        if (ModInformation.IsServer) return;
         if (!objectManager.TryGetIdWithLogging(payload.What.Alley, out var alleyId)) return;
 
         network.SendAll(new RequestSetAlleyGarrison(alleyId, AlleyGarrisonData.ToData(payload.What.NewGarrison, objectManager)));
@@ -116,7 +117,7 @@ internal class AlleyManagementHandler : IHandler
 
     private void Handle_RequestAcquireAlley(MessagePayload<RequestAcquireAlley> payload)
     {
-        if (!ModInformation.IsServer) return;
+        if (ModInformation.IsClient) return;
 
         var data = payload.What;
         GameThread.RunSafe(() =>
@@ -135,7 +136,7 @@ internal class AlleyManagementHandler : IHandler
             alley.SetOwner(owner);
             ApplyAcquisitionRelationPenalties(owner, displacedOwner, alley.Settlement);
             sessionInterface.SetManagementData(data.AlleyId, data.OverseerId, garrison);
-            TeleportHeroAction.ApplyDelayedTeleportToSettlement(overseer, alley.Settlement);
+            TeleportOverseerToAlley(overseer, alley);
 
             network.SendAll(new NetworkAlleyManagementUpdated(data.AlleyId, data.OverseerId, garrison));
         });
@@ -173,9 +174,20 @@ internal class AlleyManagementHandler : IHandler
         }
     }
 
+    /// <summary>
+    /// Sends the overseer to the alley's settlement to run it, the way vanilla does - but never a
+    /// player-controlled hero: a player must stay free to move on the map and is never pinned to a
+    /// settlement just for being assigned to an alley.
+    /// </summary>
+    private static void TeleportOverseerToAlley(Hero overseer, Alley alley)
+    {
+        if (overseer == null || overseer.IsPlayerHero()) return;
+        TeleportHeroAction.ApplyDelayedTeleportToSettlement(overseer, alley.Settlement);
+    }
+
     private void Handle_RequestAbandonAlley(MessagePayload<RequestAbandonAlley> payload)
     {
-        if (!ModInformation.IsServer) return;
+        if (ModInformation.IsClient) return;
 
         var alleyId = payload.What.AlleyId;
         var fromClanScreen = payload.What.FromClanScreen;
@@ -184,7 +196,7 @@ internal class AlleyManagementHandler : IHandler
 
     private void Handle_RequestChangeAlleyOverseer(MessagePayload<RequestChangeAlleyOverseer> payload)
     {
-        if (!ModInformation.IsServer) return;
+        if (ModInformation.IsClient) return;
 
         var data = payload.What;
         GameThread.RunSafe(() =>
@@ -197,10 +209,7 @@ internal class AlleyManagementHandler : IHandler
             var garrison = SwapOverseerInGarrison(stored?.Garrison, stored?.OverseerId, data.NewOverseerId);
 
             sessionInterface.SetManagementData(data.AlleyId, data.NewOverseerId, garrison);
-
-            // Vanilla ChangeTheLeaderOfAlleyInternal teleports the new overseer unconditionally;
-            // TeleportHeroAction handles a partyless hero, so don't gate this on PartyBelongedTo.
-            TeleportHeroAction.ApplyDelayedTeleportToSettlement(newOverseer, alley.Settlement);
+            TeleportOverseerToAlley(newOverseer, alley);
 
             network.SendAll(new NetworkAlleyManagementUpdated(data.AlleyId, data.NewOverseerId, garrison));
         });
@@ -208,7 +217,7 @@ internal class AlleyManagementHandler : IHandler
 
     private void Handle_RequestSetAlleyGarrison(MessagePayload<RequestSetAlleyGarrison> payload)
     {
-        if (!ModInformation.IsServer) return;
+        if (ModInformation.IsClient) return;
 
         var data = payload.What;
         GameThread.RunSafe(() =>
@@ -230,7 +239,7 @@ internal class AlleyManagementHandler : IHandler
 
     private void Handle_NetworkAlleyManagementUpdated(MessagePayload<NetworkAlleyManagementUpdated> payload)
     {
-        if (!ModInformation.IsClient) return;
+        if (ModInformation.IsServer) return;
 
         var data = payload.What;
         GameThread.RunSafe(() =>
@@ -255,7 +264,7 @@ internal class AlleyManagementHandler : IHandler
 
     private void Handle_NetworkAlleyManagementRemoved(MessagePayload<NetworkAlleyManagementRemoved> payload)
     {
-        if (!ModInformation.IsClient) return;
+        if (ModInformation.IsServer) return;
 
         var data = payload.What;
         GameThread.RunSafe(() =>

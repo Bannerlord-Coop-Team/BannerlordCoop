@@ -5,8 +5,6 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 
-#nullable enable
-
 namespace GameInterface.Services.Alleys.Messages;
 
 // --- Local events: published on the requesting client from the menu/screen patches ---
@@ -144,10 +142,10 @@ public readonly struct NetworkAlleyManagementUpdated : ICommand
     [ProtoMember(1)]
     public readonly string AlleyId;
     [ProtoMember(2)]
-    public readonly string? OverseerId;
+    public readonly string OverseerId;
     [ProtoMember(3)]
     public readonly TroopRosterElementData[] Garrison;
-    public NetworkAlleyManagementUpdated(string alleyId, string? overseerId, TroopRosterElementData[] garrison)
+    public NetworkAlleyManagementUpdated(string alleyId, string overseerId, TroopRosterElementData[] garrison)
     {
         AlleyId = alleyId;
         OverseerId = overseerId;

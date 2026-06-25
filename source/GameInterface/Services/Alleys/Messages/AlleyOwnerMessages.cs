@@ -3,8 +3,6 @@ using ProtoBuf;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 
-#nullable enable
-
 namespace GameInterface.Services.Alleys.Messages;
 
 /// <summary>
@@ -15,9 +13,9 @@ namespace GameInterface.Services.Alleys.Messages;
 public readonly struct AlleyOwnerChanged : IEvent
 {
     public readonly Alley Alley;
-    public readonly Hero? NewOwner;
+    public readonly Hero NewOwner;
 
-    public AlleyOwnerChanged(Alley alley, Hero? newOwner)
+    public AlleyOwnerChanged(Alley alley, Hero newOwner)
     {
         Alley = alley;
         NewOwner = newOwner;
@@ -37,9 +35,9 @@ public readonly struct ChangeAlleyOwner : ICommand
     public readonly string AlleyId;
 
     [ProtoMember(2)]
-    public readonly string? NewOwnerId;
+    public readonly string NewOwnerId;
 
-    public ChangeAlleyOwner(string alleyId, string? newOwnerId)
+    public ChangeAlleyOwner(string alleyId, string newOwnerId)
     {
         AlleyId = alleyId;
         NewOwnerId = newOwnerId;

@@ -23,7 +23,6 @@ public interface IAlleyCampaignBehaviorInterface : IGameAbstraction
 {
     void AddOrUpdatePlayerAlleyData(Alley alley, Hero overseer, TroopRoster garrison);
     void RemovePlayerAlleyData(Alley alley);
-    void ClearPlayerAlleyData();
     bool TryGetCurrentSettlementAlley(out Alley alley);
 }
 
@@ -110,23 +109,6 @@ public class AlleyCampaignBehaviorInterface : IAlleyCampaignBehaviorInterface
         });
     }
 
-    public void ClearPlayerAlleyData()
-    {
-        if (!ReflectionReady()) return;
-
-        GameThread.RunSafe(() =>
-        {
-            var behavior = Behavior;
-            if (behavior == null) return;
-            if (PlayerOwnedDataField.GetValue(behavior) is not IList list) return;
-
-            using (new AllowedThread())
-            {
-                list.Clear();
-            }
-        });
-    }
-
     public bool TryGetCurrentSettlementAlley(out Alley alley)
     {
         alley = null;
@@ -153,9 +135,18 @@ public class AlleyCampaignBehaviorInterface : IAlleyCampaignBehaviorInterface
 
     private static void RemoveByAlley(IList list, Alley alley)
     {
-        for (int i = list.Count - 1; i >= 0; i--)
+        // Walk forward, only advancing when we keep an entry, so removing one doesn't skip the next.
+        int i = 0;
+        while (i < list.Count)
         {
-            if (AlleyField.GetValue(list[i]) as Alley == alley) list.RemoveAt(i);
+            if (AlleyField.GetValue(list[i]) as Alley == alley)
+            {
+                list.RemoveAt(i);
+            }
+            else
+            {
+                i++;
+            }
         }
     }
 

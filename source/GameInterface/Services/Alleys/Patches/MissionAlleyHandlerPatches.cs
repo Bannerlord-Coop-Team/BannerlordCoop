@@ -24,7 +24,7 @@ internal class MissionAlleyHandlerPatches
     [HarmonyPostfix]
     private static void OnPartyScreenDoneClickedPostfix(TroopRoster leftMemberRoster)
     {
-        if (!ModInformation.IsClient) return;
+        if (ModInformation.IsServer) return;
 
         var alley = CampaignMission.Current?.LastVisitedAlley;
         if (alley == null || leftMemberRoster == null) return;

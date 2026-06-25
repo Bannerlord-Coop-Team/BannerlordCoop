@@ -48,20 +48,16 @@ internal class AlleyInitializationHandler : IHandler
 
     private void Handle(MessagePayload<PlayerHeroChanged> payload)
     {
-        if (!ModInformation.IsClient) return;
+        if (ModInformation.IsServer) return;
 
         var newHero = payload.What.NewHero;
         if (newHero == null) return;
 
+        var managementData = alleyPlayerData?.ManagementDataPerAlley;
+        if (managementData == null) return;
+
         GameThread.RunSafe(() =>
         {
-            // The loaded host save can carry PlayerAlleyData for the save's original player; clear it
-            // first so this client only manages alleys its own hero actually owns.
-            behaviorInterface.ClearPlayerAlleyData();
-
-            var managementData = alleyPlayerData?.ManagementDataPerAlley;
-            if (managementData == null) return;
-
             foreach (var pair in managementData)
             {
                 if (!objectManager.TryGetObjectWithLogging<Alley>(pair.Key, out var alley)) continue;

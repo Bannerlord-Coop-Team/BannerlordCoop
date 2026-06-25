@@ -19,7 +19,7 @@ internal static class AlleyGarrisonData
 
         foreach (var element in roster.GetTroopRoster())
         {
-            if (!objectManager.TryGetId(element.Character, out var characterId)) continue;
+            if (!objectManager.TryGetIdWithLogging(element.Character, out var characterId)) continue;
             list.Add(new TroopRosterElementData(characterId, element.Number, element.WoundedNumber, element.Xp));
         }
         return list.ToArray();
@@ -32,7 +32,7 @@ internal static class AlleyGarrisonData
 
         foreach (var d in data)
         {
-            if (!objectManager.TryGetObject<CharacterObject>(d.CharacterId, out var character)) continue;
+            if (!objectManager.TryGetObjectWithLogging<CharacterObject>(d.CharacterId, out var character)) continue;
             roster.AddToCounts(character, d.Number, false, d.WoundedNumber, d.Xp, true, -1);
         }
         return roster;
