@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -13,6 +14,21 @@ internal class ParallelRobustnessPatches
 {
     static ILogger Logger = LogManager.GetLogger<ParallelRobustnessPatches>();
 
+    // PartyMoveMode and MoveTargetParty are saved independently, so a save/reload can leave
+    // PartyMoveMode == Party with a MoveTargetParty that deserialized to null - the targeted party was
+    // removed and the pointer was never cleared (RemoveParty only clears it for parties whose
+    // TargetParty/AiBehaviorPartyBase matched the removed party, not ones that merely held it as a
+    // MoveTargetParty). GetTargetCampaignPosition then dereferences MoveTargetParty unguarded and throws
+    // every tick, so demote the stale mode to Hold and let the AI re-pick a behavior.
+    static void DemoteStaleMoveTargetParty(MobileParty mobileParty)
+    {
+        if (mobileParty.PartyMoveMode == MoveModeType.Party && mobileParty.MoveTargetParty == null)
+        {
+            Logger.Warning("Resetting stale Party move mode for party {stringId}: MoveTargetParty is null",
+                mobileParty.StringId);
+            mobileParty.ResetNavigationToHold();
+        }
+    }
 
     [HarmonyPatch(nameof(CampaignTickCacheDataStore.ParallelCheckExitingSettlements))]
     [HarmonyPrefix]
@@ -117,6 +133,8 @@ internal class ParallelRobustnessPatches
                 continue;
             }
 
+            DemoteStaleMoveTargetParty(mobileParty);
+
             try
             {
                 MobileParty.CachedPartyVariables localVariables = tickCachePerParty.LocalVariables;
@@ -155,6 +173,8 @@ internal class ParallelRobustnessPatches
                     mobileParty.StringId);
                 continue;
             }
+
+            DemoteStaleMoveTargetParty(mobileParty);
 
             try
             {
