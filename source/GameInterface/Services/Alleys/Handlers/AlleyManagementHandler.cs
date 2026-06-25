@@ -41,10 +41,12 @@ internal class AlleyManagementHandler : IHandler
         this.sessionInterface = sessionInterface;
         this.behaviorInterface = behaviorInterface;
 
+        messageBroker.Subscribe<AlleyAcquiredRequested>(Handle_AlleyAcquiredRequested);
         messageBroker.Subscribe<AbandonAlleyRequested>(Handle_AbandonAlleyRequested);
         messageBroker.Subscribe<ChangeAlleyOverseerRequested>(Handle_ChangeAlleyOverseerRequested);
         messageBroker.Subscribe<SetAlleyGarrisonRequested>(Handle_SetAlleyGarrisonRequested);
 
+        messageBroker.Subscribe<RequestAcquireAlley>(Handle_RequestAcquireAlley);
         messageBroker.Subscribe<RequestAbandonAlley>(Handle_RequestAbandonAlley);
         messageBroker.Subscribe<RequestChangeAlleyOverseer>(Handle_RequestChangeAlleyOverseer);
         messageBroker.Subscribe<RequestSetAlleyGarrison>(Handle_RequestSetAlleyGarrison);
@@ -55,10 +57,12 @@ internal class AlleyManagementHandler : IHandler
 
     public void Dispose()
     {
+        messageBroker.Unsubscribe<AlleyAcquiredRequested>(Handle_AlleyAcquiredRequested);
         messageBroker.Unsubscribe<AbandonAlleyRequested>(Handle_AbandonAlleyRequested);
         messageBroker.Unsubscribe<ChangeAlleyOverseerRequested>(Handle_ChangeAlleyOverseerRequested);
         messageBroker.Unsubscribe<SetAlleyGarrisonRequested>(Handle_SetAlleyGarrisonRequested);
 
+        messageBroker.Unsubscribe<RequestAcquireAlley>(Handle_RequestAcquireAlley);
         messageBroker.Unsubscribe<RequestAbandonAlley>(Handle_RequestAbandonAlley);
         messageBroker.Unsubscribe<RequestChangeAlleyOverseer>(Handle_RequestChangeAlleyOverseer);
         messageBroker.Unsubscribe<RequestSetAlleyGarrison>(Handle_RequestSetAlleyGarrison);
@@ -68,6 +72,16 @@ internal class AlleyManagementHandler : IHandler
     }
 
     // --- Local requests (requesting client) -> network request to the server ---
+
+    private void Handle_AlleyAcquiredRequested(MessagePayload<AlleyAcquiredRequested> payload)
+    {
+        if (!ModInformation.IsClient) return;
+        if (!objectManager.TryGetIdWithLogging(payload.What.Alley, out var alleyId)) return;
+        if (!objectManager.TryGetIdWithLogging(payload.What.Owner, out var ownerId)) return;
+        if (!objectManager.TryGetIdWithLogging(payload.What.Overseer, out var overseerId)) return;
+
+        network.SendAll(new RequestAcquireAlley(alleyId, ownerId, overseerId, AlleyGarrisonData.ToData(payload.What.Garrison, objectManager)));
+    }
 
     private void Handle_AbandonAlleyRequested(MessagePayload<AbandonAlleyRequested> payload)
     {
@@ -95,6 +109,31 @@ internal class AlleyManagementHandler : IHandler
     }
 
     // --- Network requests (server, authoritative) ---
+
+    private void Handle_RequestAcquireAlley(MessagePayload<RequestAcquireAlley> payload)
+    {
+        if (!ModInformation.IsServer) return;
+
+        var data = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Alley>(data.AlleyId, out var alley)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.OwnerId, out var owner)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.OverseerId, out var overseer)) return;
+
+            var garrison = data.Garrison ?? new TroopRosterElementData[0];
+
+            // The take-over is authoritative: the alley is owned by the acquiring player (owner) and
+            // run by the chosen clan member (overseer). The garrison + overseer are stored, the overseer
+            // travels to the alley settlement, and the result is broadcast so the owning client's
+            // manage-alley menus light up (its alley.Owner == its main hero).
+            alley.SetOwner(owner);
+            sessionInterface.SetManagementData(data.AlleyId, data.OverseerId, garrison);
+            TeleportHeroAction.ApplyDelayedTeleportToSettlement(overseer, alley.Settlement);
+
+            network.SendAll(new NetworkAlleyManagementUpdated(data.AlleyId, data.OverseerId, garrison));
+        });
+    }
 
     private void Handle_RequestAbandonAlley(MessagePayload<RequestAbandonAlley> payload)
     {

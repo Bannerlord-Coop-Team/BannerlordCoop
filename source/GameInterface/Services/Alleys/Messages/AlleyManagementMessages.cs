@@ -51,7 +51,48 @@ public readonly struct SetAlleyGarrisonRequested : IEvent
     }
 }
 
+/// <summary>
+/// Player won the alley fight and took over the alley. The alley is owned by the acquiring player
+/// (<see cref="Owner"/>) and run by the chosen clan member (<see cref="Overseer"/>) - these are
+/// distinct, matching vanilla (owner = Hero.MainHero, overseer = AssignedClanMember). The fight is
+/// a local solo mission, so only this authoritative result is sent to the server.
+/// </summary>
+public readonly struct AlleyAcquiredRequested : IEvent
+{
+    public readonly Alley Alley;
+    public readonly Hero Owner;
+    public readonly Hero Overseer;
+    public readonly TroopRoster Garrison;
+    public AlleyAcquiredRequested(Alley alley, Hero owner, Hero overseer, TroopRoster garrison)
+    {
+        Alley = alley;
+        Owner = owner;
+        Overseer = overseer;
+        Garrison = garrison;
+    }
+}
+
 // --- Networked client -> server requests ---
+
+[ProtoContract(SkipConstructor = true)]
+public readonly struct RequestAcquireAlley : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string AlleyId;
+    [ProtoMember(2)]
+    public readonly string OwnerId;
+    [ProtoMember(3)]
+    public readonly string OverseerId;
+    [ProtoMember(4)]
+    public readonly TroopRosterElementData[] Garrison;
+    public RequestAcquireAlley(string alleyId, string ownerId, string overseerId, TroopRosterElementData[] garrison)
+    {
+        AlleyId = alleyId;
+        OwnerId = ownerId;
+        OverseerId = overseerId;
+        Garrison = garrison;
+    }
+}
 
 [ProtoContract(SkipConstructor = true)]
 public readonly struct RequestAbandonAlley : ICommand

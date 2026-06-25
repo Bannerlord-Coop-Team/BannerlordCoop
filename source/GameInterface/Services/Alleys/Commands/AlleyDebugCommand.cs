@@ -1,6 +1,5 @@
 ﻿using Common;
 using Common.Messaging;
-using Common.Network;
 using GameInterface.Services.Alleys.Interfaces;
 using GameInterface.Services.Alleys.Messages;
 using GameInterface.Services.ObjectManager;
@@ -78,27 +77,16 @@ public class AlleyDebugCommand
         if (hero == null) return $"Hero with id or name '{args[2]}' not found";
 
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return "Unable to resolve IObjectManager";
-        if (!ContainerProvider.TryResolve<ISessionAlleyPlayerDataInterface>(out var sessionInterface)) return "Unable to resolve ISessionAlleyPlayerDataInterface";
-        if (!ContainerProvider.TryResolve<INetwork>(out var network)) return "Unable to resolve INetwork";
         if (!objectManager.TryGetId(alley, out var alleyId)) return "Alley is not registered";
         if (!objectManager.TryGetId(hero, out var heroId)) return "Hero is not registered";
 
-        // Authoritative owner change (replicates via AlleyPatches) + seed the management data with the
-        // owner as overseer and as the single garrison member, then broadcast it to the owning client.
-        alley.SetOwner(hero);
+        // Drive the same authoritative take-over the in-game alley fight uses; for the cheat the granted
+        // hero is both the owner and the overseer (single garrison member). AlleyManagementHandler applies it.
+        TroopRosterElementData[] garrison = objectManager.TryGetId(hero.CharacterObject, out var heroCharId)
+            ? new[] { new TroopRosterElementData(heroCharId, 1, 0, 0) }
+            : new TroopRosterElementData[0];
 
-        TroopRosterElementData[] garrison;
-        if (objectManager.TryGetId(hero.CharacterObject, out var heroCharId))
-        {
-            garrison = new[] { new TroopRosterElementData(heroCharId, 1, 0, 0) };
-        }
-        else
-        {
-            garrison = new TroopRosterElementData[0];
-        }
-
-        sessionInterface.SetManagementData(alleyId, heroId, garrison);
-        network.SendAll(new NetworkAlleyManagementUpdated(alleyId, heroId, garrison));
+        MessageBroker.Instance.Publish(alley, new RequestAcquireAlley(alleyId, heroId, heroId, garrison));
 
         return $"Set alley [{args[1]}] in {alley.Settlement.Name} to {hero.Name}";
     }
