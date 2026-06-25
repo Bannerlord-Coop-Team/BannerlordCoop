@@ -205,6 +205,50 @@ internal class InteractionPatches
     private static readonly ConditionalWeakTable<MapEvent, PlayerBattleAiJoinWindow> playerBattleAiJoinWindows = new();
 
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.CanPartyJoinBattle))]
+    [HarmonyPrefix]
+    private static bool Prefix_CanPartyJoinBattle(MapEvent __instance, PartyBase party, ref bool __result)
+    {
+        // Vanilla CanPartyJoinBattle runs All(...) over both sides, dereferencing party.MapFaction and,
+        // for every MapEventParty, x.Party and x.Party.MapFaction. On a receiving co-op machine a
+        // MapEventParty can sit in a side before its Party/MapFaction has synced, so the lambda hits a
+        // null and throws when a war is declared mid-battle (issue #1538). While anything the check needs
+        // is still unresolved, skip vanilla and answer true ("can stay") so the diplomacy-continuity sweep
+        // in CheckMapEvents leaves the half-synced event intact instead of tearing it down; the server
+        // replicates the real side membership separately. Once everything is resolved (always on the
+        // server) this is a no-op and vanilla computes the real answer.
+        if (CanEvaluateJoinBattle(__instance, party))
+            return true;
+
+        __result = true;
+        return false;
+    }
+
+    // The vanilla check dereferences the passed party's MapFaction and, for every MapEventParty on both
+    // sides, its Party and that Party's MapFaction. On the client those sync in over several messages, so
+    // all must be present before the check can run without hitting un-ready state.
+    internal static bool CanEvaluateJoinBattle(MapEvent mapEvent, PartyBase party)
+    {
+        if (mapEvent?.AttackerSide == null || mapEvent.DefenderSide == null)
+            return false;
+
+        if (party?.MapFaction == null)
+            return false;
+
+        return PartiesResolved(mapEvent.AttackerSide) && PartiesResolved(mapEvent.DefenderSide);
+    }
+
+    private static bool PartiesResolved(MapEventSide side)
+    {
+        foreach (var mapEventParty in side.Parties)
+        {
+            if (mapEventParty?.Party?.MapFaction == null)
+                return false;
+        }
+
+        return true;
+    }
+
+    [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.CanPartyJoinBattle))]
     [HarmonyPostfix]
     private static void Postfix_CanPartyJoinBattle(
         MapEvent __instance,
@@ -214,8 +258,9 @@ internal class InteractionPatches
         // Always allow a player party to join, on both client and server. The joining client evaluates this when
         // building the encounter "join the battle" menu options; native can return false there (e.g. war state /
         // side expectations not matching on the client), which would hide the join option. Force it true so the
-        // player can always join.
-        if (party.MobileParty?.IsPlayerParty() == true)
+        // player can always join. party can be null here when the prefix above skipped vanilla for an
+        // unresolved map-event party, so guard it.
+        if (party?.MobileParty?.IsPlayerParty() == true)
         {
             __result = true;
             return;
