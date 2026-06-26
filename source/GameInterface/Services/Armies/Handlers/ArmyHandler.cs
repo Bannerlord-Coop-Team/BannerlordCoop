@@ -83,7 +83,6 @@ public class ArmyHandler : IHandler
         {
             if (objectManager.TryGetObjectWithLogging(obj.MobilePartyId, out MobileParty mobileParty) == false) return;
             if (objectManager.TryGetObjectWithLogging<Army>(obj.ArmyId, out var army) == false) return;
-            mobileParty._army = army;
             ArmyPatches.AddMobilePartyInArmy(mobileParty, army);
         });
     }
@@ -117,7 +116,6 @@ public class ArmyHandler : IHandler
                 objectManager.TryGetObjectWithLogging(data.ClientMobilePartyId, out clientMobileParty);
             }
             ArmyPatches.RemoveMobilePartyInArmy(mobileParty, army, clientMobileParty);
-            mobileParty._army = null;
         });
     }
 

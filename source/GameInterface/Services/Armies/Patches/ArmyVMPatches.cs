@@ -4,6 +4,7 @@ using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Armies.Messages;
 using HarmonyLib;
+using NetworkMessages.FromClient;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -87,7 +88,10 @@ internal class ArmyManagementVMPatch
                 if (party == MobileParty.MainParty)
                 { 
                     MessageBroker.Instance.Publish(__instance, new MobilePartyInArmyRemoved(MobileParty.MainParty.Army, party, MobileParty.MainParty));
-                    ArmyPatches.RemoveMobilePartyInArmy(party, MobileParty.MainParty.Army, MobileParty.MainParty);
+                    using (new AllowedThread())
+                    {
+                        ArmyPatches.RemoveMobilePartyInArmy(party, MobileParty.MainParty.Army, MobileParty.MainParty);
+                    }
                     flag = true;
                 }
             }
@@ -99,7 +103,10 @@ internal class ArmyManagementVMPatch
                     if (army != null && army.Parties.Contains(party2))
                     {
                         MessageBroker.Instance.Publish(__instance, new MobilePartyInArmyRemoved(MobileParty.MainParty.Army, party2, MobileParty.MainParty));
-                        ArmyPatches.RemoveMobilePartyInArmy(party2, MobileParty.MainParty.Army, MobileParty.MainParty);
+                        using (new AllowedThread())
+                        {
+                            ArmyPatches.RemoveMobilePartyInArmy(party2, MobileParty.MainParty.Army, MobileParty.MainParty);
+                        }
                     }
                 }
             }

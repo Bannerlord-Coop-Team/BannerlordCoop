@@ -69,8 +69,8 @@ public class ArmyPatches
     {
         GameThread.RunSafe(() =>
         {
-            army._parties.Add(mobileParty);
             mobileParty._army = army;
+            army._parties.Add(mobileParty);
             mobileParty.Ai.RethinkAtNextHourlyTick = true;
             CampaignEventDispatcher.Instance.OnPartyJoinedArmy(mobileParty);
         });
@@ -82,57 +82,60 @@ public class ArmyPatches
         {
             mobileParty.Ai.SetInitiative(1f, 1f, 24f);
             army._parties.Remove(mobileParty);
+            CampaignEventDispatcher.Instance.OnPartyRemovedFromArmy(mobileParty);
             if (army == clientMobileParty?.Army && !army._armyIsDispersing)
             {
                 CampaignEventDispatcher.Instance.OnArmyOverlaySetDirty();
             }
             mobileParty.AttachedTo = null;
-            if (army.LeaderParty == mobileParty && !army._armyIsDispersing)
+            if (ModInformation.IsServer) // only let the server destroy, autoregistry will then sync destruction to the client
             {
-                DisbandArmyAction.ApplyByLeaderPartyRemoved(army);
-            }
-            if (mobileParty == clientMobileParty)
-            {
-                Campaign.Current.CameraFollowParty = clientMobileParty?.Party;
-                army.StopTrackingTargetSettlement();
-            }
-            if (((army != null) ? army.LeaderParty : null) == mobileParty)
-            {
-                army.FinishArmyObjective();
-                if (!army._armyIsDispersing)
+                if (army.LeaderParty == mobileParty && !army._armyIsDispersing)
                 {
-                    Army army2 = mobileParty.Army;
-                    if (((army2 != null) ? army2.LeaderParty.LeaderHero : null) == null)
+                    DisbandArmyAction.ApplyByLeaderPartyRemoved(army);
+                }
+                if (mobileParty == clientMobileParty)
+                {
+                    Campaign.Current.CameraFollowParty = clientMobileParty?.Party;
+                    army.StopTrackingTargetSettlement();
+                }
+                if (((army != null) ? army.LeaderParty : null) == mobileParty)
+                {
+                    army.FinishArmyObjective();
+                    if (!army._armyIsDispersing)
                     {
-                        DisbandArmyAction.ApplyByArmyLeaderIsDead(mobileParty.Army);
+                        Army army2 = mobileParty.Army;
+                        if (((army2 != null) ? army2.LeaderParty.LeaderHero : null) == null)
+                        {
+                            DisbandArmyAction.ApplyByArmyLeaderIsDead(mobileParty.Army);
+                        }
+                        else
+                        {
+                            DisbandArmyAction.ApplyByObjectiveFinished(mobileParty.Army);
+                        }
+                    }
+                }
+                else if (army.Parties.Count == 0 && !army._armyIsDispersing)
+                {
+                    if (mobileParty.Army != null && clientMobileParty?.Army != null && mobileParty.Army == clientMobileParty?.Army && (clientMobileParty?.LeaderHero?.IsPrisoner ?? false))
+                    {
+                        DisbandArmyAction.ApplyByPlayerTakenPrisoner(army);
                     }
                     else
                     {
-                        DisbandArmyAction.ApplyByObjectiveFinished(mobileParty.Army);
+                        DisbandArmyAction.ApplyByNotEnoughParty(army);
                     }
                 }
-            }
-            else if (army.Parties.Count == 0 && !army._armyIsDispersing)
-            {
-                if (mobileParty.Army != null && clientMobileParty?.Army != null && mobileParty.Army == clientMobileParty?.Army && (clientMobileParty?.LeaderHero?.IsPrisoner ?? false))
-                {
-                    DisbandArmyAction.ApplyByPlayerTakenPrisoner(army);
-                }
-                else
+                // Mainplayer cant have an army with only itself
+                if (army.LeaderParty == clientMobileParty && army.Parties.Count <= 1)
                 {
                     DisbandArmyAction.ApplyByNotEnoughParty(army);
                 }
-            }
-            // Mainplayer cant have an army with only itself
-            if (army.LeaderParty == clientMobileParty && army.Parties.Count <= 1)
-            {
-                DisbandArmyAction.ApplyByNotEnoughParty(army);
             }
             if (mobileParty == clientMobileParty && Game.Current.GameStateManager.ActiveState is MapState)
             {
                 ((MapState)Game.Current.GameStateManager.ActiveState).OnLeaveArmy();
             }
-            CampaignEventDispatcher.Instance.OnPartyLeftArmy(mobileParty, army);
             mobileParty.Party.SetVisualAsDirty();
             if (clientMobileParty != null)
             {
@@ -142,6 +145,7 @@ public class ArmyPatches
             {
                 mobileParty.Ai.RethinkAtNextHourlyTick = true;
             }
+            mobileParty._army = null;
         });
     }
     public static void SetAiBehaviorObject(Army army, IMapPoint mapPoint)

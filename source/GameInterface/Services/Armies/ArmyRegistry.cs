@@ -14,6 +14,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.ScreenSystem;
+using static TaleWorlds.CampaignSystem.CampaignTime;
 
 namespace GameInterface.Services.Armies;
 
@@ -67,12 +68,32 @@ internal class ArmyRegistry : AutoRegistryBase<Army>
         {
             using (new AllowedThread())
             {
+                CampaignEventDispatcher.Instance.OnArmyDispersed(obj, Army.ArmyDispersionReason.Unknown, obj.Parties.Contains(MobileParty.MainParty));
                 foreach (var party in obj._parties)
                 {
+                    if (MobileParty.MainParty != null)
+                    {
+                        party.Party.UpdateVisibilityAndInspected(MobileParty.MainParty.Position, 0f);
+                    }
+                    if (MobileParty.MainParty != party)
+                    {
+                        party.Ai.RethinkAtNextHourlyTick = true;
+                    }
                     party.AttachedTo = null;
                     party._army = null;
                 }
                 obj._parties.Clear();
+                obj.Kingdom = null;
+                if (obj.LeaderParty == MobileParty.MainParty)
+                {
+                    MapState mapState = Game.Current.GameStateManager.ActiveState as MapState;
+                    if (mapState != null)
+                    {
+                        mapState.OnDispersePlayerLeadedArmy();
+                    }
+                }
+                obj._hourlyTickEvent?.DeletePeriodicEvent();
+                obj._tickEvent?.DeletePeriodicEvent();
             }
         });
     }
