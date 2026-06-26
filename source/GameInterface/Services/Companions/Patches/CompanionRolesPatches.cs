@@ -124,4 +124,18 @@ internal class CompanionRolesPatches
 
         return false;
     }
+
+    [HarmonyPatch(nameof(CompanionRolesCampaignBehavior.companion_rejoin_after_emprisonment_role_on_condition))]
+    [HarmonyPrefix]
+    public static bool CompanionRejoinAfterEmprisonmentRoleOnConditionPrefix(ref CompanionRolesCampaignBehavior __instance, ref bool __result)
+    {
+        // Prevent players of other clans returning a companion to their party
+        if (Hero.OneToOneConversationHero.Clan != Clan.PlayerClan)
+        {
+            __result = false;
+            return false;
+        }
+
+        return true;
+    }
 }
