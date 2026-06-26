@@ -13,7 +13,8 @@ public sealed class LatestWinsPayload : ICoalescedPayload
 
     public LatestWinsPayload(IMessage message)
     {
-        this.message = message ?? throw new ArgumentNullException(nameof(message));
+        if (message == null) throw new ArgumentNullException(nameof(message));
+        this.message = message;
     }
 
     public ICoalescedPayload Merge(ICoalescedPayload incoming)
@@ -43,7 +44,8 @@ public sealed class SnapshotPayload : ICoalescedPayload
 
     public SnapshotPayload(Func<IMessage> producer)
     {
-        this.producer = producer ?? throw new ArgumentNullException(nameof(producer));
+        if (producer == null) throw new ArgumentNullException(nameof(producer));
+        this.producer = producer;
     }
 
     public ICoalescedPayload Merge(ICoalescedPayload incoming)
@@ -75,9 +77,11 @@ public sealed class SummedPayload<T> : ICoalescedPayload
 
     public SummedPayload(T value, Func<T, T, T> add, Func<T, IMessage> build)
     {
+        if (add == null) throw new ArgumentNullException(nameof(add));
+        if (build == null) throw new ArgumentNullException(nameof(build));
         this.value = value;
-        this.add = add ?? throw new ArgumentNullException(nameof(add));
-        this.build = build ?? throw new ArgumentNullException(nameof(build));
+        this.add = add;
+        this.build = build;
     }
 
     public ICoalescedPayload Merge(ICoalescedPayload incoming)

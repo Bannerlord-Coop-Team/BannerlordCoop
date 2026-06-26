@@ -22,8 +22,8 @@ public readonly struct CoalesceKey : IEquatable<CoalesceKey>
 
     public CoalesceKey(string channel, string instanceId, string member = "")
     {
-        Channel = channel ?? throw new ArgumentNullException(nameof(channel));
-        InstanceId = instanceId ?? throw new ArgumentNullException(nameof(instanceId));
+        Channel = channel;
+        InstanceId = instanceId;
         Member = member ?? string.Empty;
     }
 
