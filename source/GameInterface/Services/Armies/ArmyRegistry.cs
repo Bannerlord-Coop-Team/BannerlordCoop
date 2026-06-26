@@ -63,7 +63,18 @@ internal class ArmyRegistry : AutoRegistryBase<Army>
     // Just clean up the fields directly.
     public override void OnClientDestroyed(Army obj, string id)
     {
-        obj.DisperseInternal(); // seems to work fine
+        GameThread.Run(() =>
+        {
+            using (new AllowedThread())
+            {
+                foreach (var party in obj._parties)
+                {
+                    party.AttachedTo = null;
+                    party._army = null;
+                }
+                obj._parties.Clear();
+            }
+        });
     }
 
     public override void OnServerCreated(Army obj, string id)

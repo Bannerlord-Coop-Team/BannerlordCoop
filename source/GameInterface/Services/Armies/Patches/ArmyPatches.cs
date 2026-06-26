@@ -45,6 +45,7 @@ public class ArmyPatches
 
         if (ModInformation.IsClient)
         {
+            return false;
         }
 
         var message = new MobilePartyInArmyRemoved(__instance, mobileParty, null); // mobileparty.mainparty is only needed for the client for ui stuff
