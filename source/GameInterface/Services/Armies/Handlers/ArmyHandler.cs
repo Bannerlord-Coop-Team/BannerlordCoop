@@ -90,7 +90,6 @@ public class ArmyHandler : IHandler
 
     private void HandleRemoveMobilePartyInArmy(MessagePayload<MobilePartyInArmyRemoved> obj)
     {
-
         if (!objectManager.TryGetIdWithLogging(obj.What.Army, out var armyId)) return;
         if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
         var clientMobilePartyId = string.Empty;
@@ -98,7 +97,6 @@ public class ArmyHandler : IHandler
         {
             if (!objectManager.TryGetIdWithLogging(obj.What.ClientMobileParty, out clientMobilePartyId)) return;
         }
-
 
         var message = new NetworkRemovePartyInArmy(armyId, mobilePartyId, clientMobilePartyId);
 

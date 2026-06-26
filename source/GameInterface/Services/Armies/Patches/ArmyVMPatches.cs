@@ -28,7 +28,6 @@ internal class ArmyManagementVMPatch
         if (__instance.PartiesInCart.Count == 1 && __instance.PartiesInCart[0].IsMainHero)
         {
             __instance.ExecuteDisbandArmy();
-
         }
         if (!__instance.CanAffordInfluenceCost) return false;
         // If the player clicked the +10 cohesion boost one or more times,
