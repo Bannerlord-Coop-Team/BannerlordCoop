@@ -169,8 +169,9 @@ internal class PartyDoneLogicHandler : IHandler
             }
             if (obj.What.PartyInfluenceChangeAmount != 0)
             {
-                // TODO
-                GainKingdomInfluenceAction.ApplyForLeavingTroopToGarrison(Hero.MainHero, (float)obj.What.PartyInfluenceChangeAmount);
+                // Influence goes to the requesting player's clan (mainHero), not the local machine's
+                // Hero.MainHero - which is null on a dedicated server (NRE) and the wrong clan otherwise.
+                GainKingdomInfluenceAction.ApplyForLeavingTroopToGarrison(mainHero, (float)obj.What.PartyInfluenceChangeAmount);
             }
 
             //Replacement for CampaignEventDispatcher.Instance.OnPlayerUpgradedTroops(tuple.Item1, tuple.Item2, tuple.Item3) without MainParty
