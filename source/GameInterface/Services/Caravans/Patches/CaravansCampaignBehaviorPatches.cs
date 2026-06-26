@@ -58,27 +58,6 @@ internal class CaravansCampaignBehaviorPatches
         return false;
     }
 
-    [HarmonyPatch(nameof(CaravansCampaignBehavior.OnKingdomDestroyed))]
-    [HarmonyPostfix]
-    public static void OnKingdomDestroyedPostfix(ref CaravansCampaignBehavior __instance, Kingdom destroyedKingdom)
-    {
-        // Update CoopSession.CaravansPlayerData by removing the kingdom if any player has it prohibited for trading
-        var message = new CaravansKingdomDestroyed(destroyedKingdom);
-        MessageBroker.Instance.Publish(__instance, message);
-    }
-
-    [HarmonyPatch(nameof(CaravansCampaignBehavior.OnMobilePartyDestroyed))]
-    [HarmonyPostfix]
-    public static void OnMobilePartyDestroyedPostfix(ref CaravansCampaignBehavior __instance, MobileParty mobileParty, PartyBase destroyerParty)
-    {
-        // Don't publish message if it wasn't a caravan that was destroyed
-        if (!mobileParty.IsCaravan) return;
-
-        // Update CoopSession.CaravansPlayerData by removing the interacted caravan from all players' interaction history
-        var message = new CaravanPartyDestroyed(mobileParty);
-        MessageBroker.Instance.Publish(__instance, message);
-    }
-
     [HarmonyPatch(nameof(CaravansCampaignBehavior.DeleteExpiredTradeRumorTakenCaravans))]
     [HarmonyPrefix]
     public static bool DeleteExpiredTradeRumorTakenCaravansPrefix(ref CaravansCampaignBehavior __instance)
@@ -94,7 +73,7 @@ internal class CaravansCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool DeleteExpiredLootedCaravansPrefix(ref CaravansCampaignBehavior __instance)
     {
-        var message = new DeleteExpiredTradeRumorTakenCaravans();
+        var message = new DeleteExpiredLootedCaravans();
         MessageBroker.Instance.Publish(__instance, message);
 
         return false;
@@ -155,7 +134,7 @@ internal class CaravansCampaignBehaviorPatches
     /// <summary>
     /// The following patches are needed to send the mobileParty for the patched implementation of CanTradeWith.
     /// The vanilla implementation is problematic because it only has factions as arguments when we need
-    /// to be able to know who a caravans belongs to in accounting for prohibiting trading with kingdoms correctly.
+    /// to be able to know who a caravan belongs for prohibiting trading with certain kingdoms correctly.
     /// </summary>
     [HarmonyPatch(nameof(CaravansCampaignBehavior.HourlyTickParty))]
     [HarmonyPrefix]

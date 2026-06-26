@@ -96,6 +96,9 @@ internal class CaravansCampaignBehaviorHandler : IHandler
 
     private void Handle_CaravanPartyDestroyed(MessagePayload<CaravanPartyDestroyed> obj)
     {
+        // Don't process anything for destroyed mobile parties that aren't caravans
+        if (!obj.What.MobileParty.IsCaravan) return;
+
         if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
 
         // Update CoopSession data on server

@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.Caravans.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
@@ -108,9 +109,9 @@ internal class MobilePartyRegistry : AutoRegistryBase<MobileParty>
         obj.PrisonRoster.Clear();
         obj.Party.SetVisualAsDirty();
 
+        messageBroker.Publish(this, new CaravanPartyDestroyed(obj));
+
         var message = new InstanceDestroyed<PartyBase>(obj.Party);
         messageBroker.Publish(this, message);
-
-        
     }
 }

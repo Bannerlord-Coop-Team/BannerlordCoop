@@ -55,7 +55,6 @@ public class SessionCaravansPlayerDataInterface : ISessionCaravansPlayerDataInte
         CaravansPlayerData.PlayerProhibitedKingdomsForPlayerCaravans[playerHeroId].Remove(kingdomId);
     }
 
-    // Called on a CaravansCampaignBehavior.OnKingdomDestroyed patch
     public void RemoveProhibitedKingdomForAllPlayers(string kingdomId)
     {
         foreach (var player in playerManager.Players)

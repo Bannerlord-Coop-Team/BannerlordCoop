@@ -11,6 +11,7 @@ using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Caravans.Patches;
@@ -18,7 +19,7 @@ namespace GameInterface.Services.Caravans.Patches;
 [HarmonyPatch(typeof(CaravansCampaignBehavior))]
 internal class CaravansConversationsPatches
 {
-    private static readonly bool caravanHostileActionsEnabled = false;
+    private static readonly bool caravanHostileActionsEnabled = true;
 
     [HarmonyPatch(nameof(CaravansCampaignBehavior.caravan_companion_ask_change_home_settlement_4_on_consequence))]
     [HarmonyPrefix]
@@ -92,7 +93,7 @@ internal class CaravansConversationsPatches
         explanation = new TextObject("");
         if (__instance._lootedCaravans.ContainsKey(MobileParty.ConversationParty))
         {
-            explanation = new TextObject("{=!}This party has been looted recently.", null);
+            explanation = new TextObject("{=!}This caravan has been looted recently.", null);
             __result = false;
             return false;
         }
@@ -148,6 +149,9 @@ internal class CaravansConversationsPatches
         // Call helper function to implement vanilla open loot screen logic
         OpenLootScreen(MobileParty.ConversationParty, out bool caravanHasItems);
 
+        // Locally set player interaction, and then save in CoopSession on server
+        __instance.SetPlayerInteraction(MobileParty.ConversationParty, CaravansCampaignBehavior.PlayerInteraction.Hostile);
+
         PlayerEncounter.LeaveEncounter = true;
 
         var message = new CaravanSurrenderLeaveOnConsequence(Hero.MainHero, MobileParty.MainParty, MobileParty.ConversationParty, caravanHasItems);
@@ -175,6 +179,9 @@ internal class CaravansConversationsPatches
             }
             PartyScreenHelper.OpenScreenAsLoot(TroopRoster.CreateDummyTroopRoster(), troopRoster, encounteredMobileParty.Name, troopRoster.TotalManCount, null);
         }
+
+        // Locally set player interaction, and then save in CoopSession on server
+        __instance.SetPlayerInteraction(MobileParty.ConversationParty, CaravansCampaignBehavior.PlayerInteraction.Hostile);
 
         PlayerEncounter.LeaveEncounter = true;
 

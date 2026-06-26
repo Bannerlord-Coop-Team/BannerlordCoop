@@ -276,6 +276,7 @@ internal class CaravansConversationsHandler : IHandler
             // Update _lootedCaravans on all clients
             network.SendAll(new NetworkAddToLootedCaravans(obj.What.ConversationPartyId, CampaignTime.Now));
         });
+        sessionCaravansPlayerDataInterface.SetPlayerInteraction(obj.What.MainHeroId, obj.What.ConversationPartyId, CaravansCampaignBehavior.PlayerInteraction.Hostile);
     }
 
     private void Handle_CaravanTookPrisonerOnConsequence(MessagePayload<CaravanTookPrisonerOnConsequence> obj)
@@ -309,6 +310,7 @@ internal class CaravansConversationsHandler : IHandler
             SkillLevelingManager.OnLoot(mainParty, conversationParty, conversationParty.ItemRoster, false);
             DestroyPartyAction.Apply(mainParty.Party, conversationParty);
         });
+        sessionCaravansPlayerDataInterface.SetPlayerInteraction(obj.What.MainHeroId, obj.What.ConversationPartyId, CaravansCampaignBehavior.PlayerInteraction.Hostile);
     }
 
     private CaravansCampaignBehavior GetCaravansBehavior()
