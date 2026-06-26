@@ -6,6 +6,7 @@ using GameInterface.Policies;
 using GameInterface.Services.Armies.Messages;
 using HarmonyLib;
 using Serilog;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.GameState;
@@ -61,9 +62,15 @@ public class ArmyPatches
         if (ModInformation.IsClient)
         {
             __instance.UpdateName();
+            if (__instance.LeaderParty == MobileParty.MainParty)
+            {
+                var mapState = Game.Current.GameStateManager.GameStates
+                    .OfType<MapState>()
+                    .SingleOrDefault();
+                mapState?.OnArmyCreated(MobileParty.MainParty);
+            }
         }
     }
-
 
     public static void AddMobilePartyInArmy(MobileParty mobileParty, Army army)
     {
@@ -83,21 +90,13 @@ public class ArmyPatches
             mobileParty.Ai.SetInitiative(1f, 1f, 24f);
             army._parties.Remove(mobileParty);
             CampaignEventDispatcher.Instance.OnPartyRemovedFromArmy(mobileParty);
-            if (army == clientMobileParty?.Army && !army._armyIsDispersing)
-            {
-                CampaignEventDispatcher.Instance.OnArmyOverlaySetDirty();
-            }
+            CampaignEventDispatcher.Instance.OnArmyOverlaySetDirty();
             mobileParty.AttachedTo = null;
             if (ModInformation.IsServer) // only let the server destroy, autoregistry will then sync destruction to the client
             {
                 if (army.LeaderParty == mobileParty && !army._armyIsDispersing)
                 {
                     DisbandArmyAction.ApplyByLeaderPartyRemoved(army);
-                }
-                if (mobileParty == clientMobileParty)
-                {
-                    Campaign.Current.CameraFollowParty = clientMobileParty?.Party;
-                    army.StopTrackingTargetSettlement();
                 }
                 if (((army != null) ? army.LeaderParty : null) == mobileParty)
                 {
@@ -131,6 +130,11 @@ public class ArmyPatches
                 {
                     DisbandArmyAction.ApplyByNotEnoughParty(army);
                 }
+            }
+            if (mobileParty == MobileParty.MainParty)
+            {
+                Campaign.Current.CameraFollowParty = clientMobileParty?.Party;
+                army.StopTrackingTargetSettlement();
             }
             if (mobileParty == clientMobileParty && Game.Current.GameStateManager.ActiveState is MapState)
             {
