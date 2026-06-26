@@ -16,6 +16,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
@@ -165,7 +166,7 @@ public class PartySyncPerformanceSerializationTests
     {
         var original = new NetworkPartySyncPerformanceSnapshot(34, new[]
         {
-            Data("party-a", "Party A", 1f, 2f),
+            Data("party-a", 1f, 2f),
         });
 
         using var stream = new MemoryStream();
@@ -176,13 +177,12 @@ public class PartySyncPerformanceSerializationTests
         Assert.Equal(34, copy.RequestId);
         var data = Assert.Single(copy.Data);
         Assert.Equal("party-a", data.MobilePartyId);
-        Assert.Equal("Party A", data.Name);
         Assert.Equal(1f, data.Position.X);
         Assert.Equal(2f, data.Position.Y);
     }
 
-    private static PartySyncPerformanceData Data(string id, string name, float x, float y) =>
-        new(id, name, new CampaignVec2(new Vec2(x, y), true));
+    private static PartySyncPerformanceData Data(string id, float x, float y) =>
+        new(id, new CampaignVec2(new Vec2(x, y), true));
 }
 
 [Collection(nameof(PartySyncPerformanceLogsCommandCollection))]
@@ -262,15 +262,15 @@ public class PartySyncPerformanceLoggerTests : IDisposable
         logger.Enable(TimeSpan.FromSeconds(60), "test_log");
         partyProvider.Data = new[]
         {
-            Data("party-a", "Client A", 3f, 4f),
-            Data("party-c", "Client C", 10f, 10f),
+            Data("party-a", 3f, 4f),
+            Data("party-c", 10f, 10f),
         };
 
         logger.RequestSnapshot();
         logger.HandleSnapshotOnGameThread(new NetworkPartySyncPerformanceSnapshot(1, new[]
         {
-            Data("party-a", "Server A", 0f, 0f),
-            Data("party-b", "Server B", 1f, 1f),
+            Data("party-a", 0f, 0f),
+            Data("party-b", 1f, 1f),
         }));
 
         var append = Assert.Single(fileWriter.Appends);
@@ -312,8 +312,8 @@ public class PartySyncPerformanceLoggerTests : IDisposable
         Assert.False(network.SentNetworkMessages.ContainsKey(peer.Id));
     }
 
-    private static PartySyncPerformanceData Data(string id, string name, float x, float y) =>
-        new(id, name, new CampaignVec2(new Vec2(x, y), true));
+    private static PartySyncPerformanceData Data(string id, float x, float y) =>
+        new(id, new CampaignVec2(new Vec2(x, y), true));
 }
 
 [Collection(nameof(PartySyncPerformanceLogsCommandCollection))]
@@ -324,6 +324,11 @@ public class PartySyncPerformanceHandlerTests : IDisposable
     private readonly FakePartyProvider partyProvider = new();
     private readonly Mock<IPartySyncPerformanceLogger> logger = new();
     private readonly PartySyncPerformanceHandler handler;
+
+    static PartySyncPerformanceHandlerTests()
+    {
+        RuntimeHelpers.RunModuleConstructor(typeof(Coop.Tests.Mocks.TestNetwork).Module.ModuleHandle);
+    }
 
     public PartySyncPerformanceHandlerTests()
     {
@@ -341,7 +346,7 @@ public class PartySyncPerformanceHandlerTests : IDisposable
     {
         ModInformation.IsServer = true;
         var peer = network.CreatePeer();
-        partyProvider.Data = new[] { Data("party-a", "Party A", 1f, 2f) };
+        partyProvider.Data = new[] { Data("party-a", 1f, 2f) };
 
         handler.Handle_Request(new MessagePayload<NetworkRequestPartySyncPerformanceSnapshot>(
             peer,
@@ -351,6 +356,32 @@ public class PartySyncPerformanceHandlerTests : IDisposable
         Assert.Equal(42, response.RequestId);
         Assert.Single(response.Data);
         Assert.Equal("party-a", response.Data[0].MobilePartyId);
+    }
+
+    [Fact]
+    public void Request_OnServer_GetsPartyDataOnGameThread()
+    {
+        ModInformation.IsServer = true;
+        Assert.True(GameThread.Instance.IsInitialized, "game-loop pump was not initialized");
+        Assert.False(GameThread.Instance.IsGameThread);
+
+        int gameThreadId = 0;
+        GameThread.Run(() => gameThreadId = Environment.CurrentManagedThreadId, blocking: true);
+
+        var peer = network.CreatePeer();
+        var threadedPartyProvider = new FakePartyProvider
+        {
+            Data = new[] { Data("party-a", 1f, 2f) },
+        };
+        using var threadedHandler = new PartySyncPerformanceHandler(new TestMessageBroker(), network, threadedPartyProvider, logger.Object);
+
+        threadedHandler.Handle_Request(new MessagePayload<NetworkRequestPartySyncPerformanceSnapshot>(
+            peer,
+            new NetworkRequestPartySyncPerformanceSnapshot(42)));
+
+        var response = Assert.Single(network.GetPeerMessagesFromType<NetworkPartySyncPerformanceSnapshot>(peer));
+        Assert.Equal(42, response.RequestId);
+        Assert.Equal(gameThreadId, threadedPartyProvider.GetPartyDataThreadId);
     }
 
     [Fact]
@@ -378,15 +409,20 @@ public class PartySyncPerformanceHandlerTests : IDisposable
         Assert.Empty(result);
     }
 
-    private static PartySyncPerformanceData Data(string id, string name, float x, float y) =>
-        new(id, name, new CampaignVec2(new Vec2(x, y), true));
+    private static PartySyncPerformanceData Data(string id, float x, float y) =>
+        new(id, new CampaignVec2(new Vec2(x, y), true));
 }
 
 internal class FakePartyProvider : IPartySyncPerformancePartyProvider
 {
     public PartySyncPerformanceData[] Data { get; set; } = Array.Empty<PartySyncPerformanceData>();
+    public int GetPartyDataThreadId { get; private set; }
 
-    public PartySyncPerformanceData[] GetPartyData() => Data;
+    public PartySyncPerformanceData[] GetPartyData()
+    {
+        GetPartyDataThreadId = Environment.CurrentManagedThreadId;
+        return Data;
+    }
 }
 
 internal class FakeClock : IPartySyncPerformanceClock

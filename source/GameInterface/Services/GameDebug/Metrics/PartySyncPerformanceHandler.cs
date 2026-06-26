@@ -43,9 +43,29 @@ internal class PartySyncPerformanceHandler : IHandler
         if (!ModInformation.IsServer) return;
         if (payload.Who is not NetPeer peer) return;
 
+        int requestId = payload.What.RequestId;
+
+        if (GameThread.Instance.IsInitialized && !GameThread.Instance.IsGameThread)
+        {
+            try
+            {
+                GameThread.RunSafe(() => SendSnapshot(peer, requestId), blocking: true, context: "PartySyncPerformanceHandler.Handle_Request");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Failed to send party sync performance snapshot");
+            }
+            return;
+        }
+
+        SendSnapshot(peer, requestId);
+    }
+
+    private void SendSnapshot(NetPeer peer, int requestId)
+    {
         try
         {
-            network.Send(peer, new NetworkPartySyncPerformanceSnapshot(payload.What.RequestId, partyProvider.GetPartyData()));
+            network.Send(peer, new NetworkPartySyncPerformanceSnapshot(requestId, partyProvider.GetPartyData()));
         }
         catch (Exception ex)
         {

@@ -84,7 +84,7 @@ internal class PartySyncPerformancePartyProvider : IPartySyncPerformancePartyPro
                 continue;
             }
 
-            result.Add(new PartySyncPerformanceData(partyId, party.Name?.ToString(), party.Position));
+            result.Add(new PartySyncPerformanceData(partyId, party.Position));
         }
 
         return result.ToArray();
@@ -133,17 +133,6 @@ internal class PartySyncPerformanceLogger : IPartySyncPerformanceLogger, IDispos
         messageBroker.Subscribe<GameLoadStarted>(Handle_Reset);
         messageBroker.Subscribe<CampaignReady>(Handle_Reset);
         messageBroker.Subscribe<MainMenuEntered>(Handle_Reset);
-    }
-
-    public bool IsEnabled
-    {
-        get
-        {
-            lock (gate)
-            {
-                return timer != null;
-            }
-        }
     }
 
     public string Enable(TimeSpan interval, string fileName)
@@ -273,13 +262,7 @@ internal class PartySyncPerformanceLogger : IPartySyncPerformanceLogger, IDispos
         {
             lock (gate)
             {
-                try
-                {
-                    timer?.Start();
-                }
-                catch (ObjectDisposedException)
-                {
-                }
+                timer?.Start();
             }
         }
     }
