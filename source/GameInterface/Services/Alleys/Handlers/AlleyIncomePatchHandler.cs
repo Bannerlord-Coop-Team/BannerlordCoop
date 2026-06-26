@@ -59,11 +59,12 @@ internal class AlleyIncomePatchHandler : IHandler
             return;
         }
 
-        applied = true;
-
         try
         {
             harmony.PatchCategory(typeof(AlleyIncomePatch).Assembly, AlleyIncomePatch.DeferredCategory);
+            // Latch only after success: if PatchCategory throws, leave applied false so the next
+            // CampaignReady retries (matches the GameTextManager-null guard above).
+            applied = true;
             Logger.Information("Applied deferred alley income patch ({Category}) on campaign ready", AlleyIncomePatch.DeferredCategory);
         }
         catch (Exception ex)

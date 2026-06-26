@@ -50,8 +50,9 @@ internal class AlleyIncomePatch
         // Sum alley income across every living hero in the clan, not just the leader, so it stays
         // correct when several players share one clan. Each alley is owned by exactly one hero in
         // exactly one clan, so no alley is double-counted; for a solo player this reduces to their own
-        // alleys. Dead heroes are skipped: the host runs no daily tick to destroy a dead owner's alley,
-        // so without this their alley would keep paying out forever.
+        // alleys. Dead heroes are skipped because clan.Heroes still contains them (the cache isn't
+        // pruned on death, only on leaving the clan), so without this a dead owner's alley would keep
+        // paying out.
         int income = 0;
         foreach (Hero hero in clan.Heroes)
         {
