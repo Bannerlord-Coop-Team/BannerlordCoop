@@ -30,6 +30,9 @@ internal class EncounterManagerPatches
         if (RaidAiInterventionSuppression.ShouldSuppressSettlementEncounter(attackerParty, settlement))
             return false;
 
+        if (TryRequestActiveSlowRaidConversation(attackerParty, settlement))
+            return false;
+
         if (ModInformation.IsServer) return true;
 
         if (!attackerParty.IsControlledByThisInstance())
@@ -106,6 +109,22 @@ internal class EncounterManagerPatches
         MessageBroker.Instance.Publish(null, new ConversationRequested(defenderParty, attackerParty, forcePlayerOutFromSettlement: false, ConversationRestartSource.EncounterManager));
 
         return false;
+    }
+
+    private static bool TryRequestActiveSlowRaidConversation(MobileParty attackerParty, Settlement settlement)
+    {
+        if (ModInformation.IsServer)
+            return false;
+
+        if (attackerParty?.IsControlledByThisInstance() != true)
+            return false;
+
+        var defenderParty = settlement?.Party;
+        if (defenderParty?.MapEvent?.IsActiveSlowVillageRaid() != true)
+            return false;
+
+        MessageBroker.Instance.Publish(null, new ConversationRequested(defenderParty, attackerParty.Party, false, ConversationRestartSource.EncounterManager));
+        return true;
     }
 
     private static bool TryRequestActiveSlowRaidSettlementEncounter(PartyBase attackerParty, PartyBase defenderParty)

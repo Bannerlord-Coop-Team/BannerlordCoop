@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Stances;
 using GameInterface.Services.Stances.Messages;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -42,24 +43,11 @@ namespace GameInterface.Services.Stances.Handlers
                 using (new AllowedThread())
                 {
                     DeclareWarAction.ApplyInternal(faction1, faction2, (DeclareWarAction.DeclareWarDetail)payload.Detail);
-                    ApplyWarStance(faction1, faction2);
+                    FactionStanceHelper.ApplyWarStance(faction1, faction2);
                 }
             }, true);
         }
 
-        private static void ApplyWarStance(IFaction faction1, IFaction faction2)
-        {
-            if (FactionManager.IsAtWarAgainstFaction(faction1, faction2))
-                return;
-
-            var stanceLink = FactionManager.Instance.GetStanceLinkInternal(faction1, faction2);
-            if (stanceLink.StanceType == StanceType.War)
-                return;
-
-            stanceLink.StanceType = StanceType.War;
-            faction1.UpdateFactionsAtWarWith();
-            faction2.UpdateFactionsAtWarWith();
-        }
 
         private void HandleMakePeace(MessagePayload<MakePeaceChanged> obj)
         {

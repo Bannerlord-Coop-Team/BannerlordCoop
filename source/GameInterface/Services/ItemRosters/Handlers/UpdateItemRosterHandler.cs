@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using GameInterface.Services.ItemObjects;
 using GameInterface.Services.ItemRosters.Messages;
 using GameInterface.Services.ItemRosters.Patches;
 using GameInterface.Services.ObjectManager;
@@ -19,11 +20,13 @@ internal class UpdateItemRosterHandler : IHandler
     private static readonly ILogger Logger = LogManager.GetLogger<UpdateItemRosterHandler>();
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
+    private readonly ItemObjectRegistry itemObjectRegistry;
 
-    public UpdateItemRosterHandler(IMessageBroker messageBroker, IObjectManager objectManager)
+    public UpdateItemRosterHandler(IMessageBroker messageBroker, IObjectManager objectManager, ItemObjectRegistry itemObjectRegistry)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
+        this.itemObjectRegistry = itemObjectRegistry;
 
         messageBroker.Subscribe<UpdateItemRoster>(Handle);
     }
@@ -41,7 +44,7 @@ internal class UpdateItemRosterHandler : IHandler
         {
             try
             {
-                if (objectManager.TryGetObject(msg.ItemId, out ItemObject item) == false)
+                if (TryGetItem(msg.ItemId, out ItemObject item) == false)
                 {
                     Logger.Error("Unable to find item with id: {itemId}", msg.ItemId);
                     return;
@@ -66,6 +69,14 @@ internal class UpdateItemRosterHandler : IHandler
                 Logger.Error(e, "Failed to apply {Message}", nameof(UpdateItemRoster));
             }
         });
+    }
+
+    private bool TryGetItem(string itemId, out ItemObject item)
+    {
+        if (objectManager.TryGetObject(itemId, out item))
+            return true;
+
+        return itemObjectRegistry.TryGetRegisteredItem(itemId, out item);
     }
 
     public void Dispose()

@@ -3,6 +3,7 @@ using Common.Logging;
 using GameInterface.Policies;
 using HarmonyLib;
 using Serilog;
+using System;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 
@@ -49,6 +50,23 @@ namespace GameInterface.Services.Stances.Patches
             return AllowStanceMutation(__originalMethod);
         }
 
+        [HarmonyPatch("IsAtWarAgainstFaction")]
+        [HarmonyPostfix]
+        private static void IsAtWarAgainstFactionPostfix(IFaction faction1, IFaction faction2, ref bool __result)
+        {
+            if (__result)
+                return;
+
+            if (faction1 == null || faction2 == null || faction1 == faction2)
+                return;
+
+            if (faction1.IsEliminated || faction2.IsEliminated)
+                return;
+
+            if (HasFactionWar(faction1, faction2) && HasFactionWar(faction2, faction1))
+                __result = true;
+        }
+
         private static bool AllowStanceMutation(MethodBase originalMethod)
         {
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
@@ -60,6 +78,18 @@ namespace GameInterface.Services.Stances.Patches
             }
 
             return true;
+        }
+
+        private static bool HasFactionWar(IFaction faction, IFaction otherFaction)
+        {
+            try
+            {
+                return faction.FactionsAtWarWith?.Contains(otherFaction) == true;
+            }
+            catch (NullReferenceException)
+            {
+                return false;
+            }
         }
     }
 }

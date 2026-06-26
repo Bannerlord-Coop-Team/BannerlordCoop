@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using System.Collections.Generic;
+using Coop.Core.Server.Services.ItemRosters.Messages;
 using Coop.Core.Server.Services.Stances.Messages;
 using Coop.Core.Server.Services.Time.Messages;
 using Common.Util;
@@ -400,6 +401,7 @@ public class VillageHostileActionTests : MapEventTestBase
     {
         var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
         var target = CreateVillageTarget();
+        var itemRosterId = RegisterMobilePartyItemRoster(mobilePartyId);
         var itemId = TestEnvironment.CreateRegisteredObject<ItemObject>();
         var villageTypeId = TestEnvironment.CreateRegisteredObject<VillageType>();
 
@@ -435,6 +437,11 @@ public class VillageHostileActionTests : MapEventTestBase
                 mapEvent,
                 VillageHostileAction.ForceSupplies);
         }, disabledMethods);
+
+        var itemRosterUpdate = Server.NetworkSentMessages.GetMessages<NetworkItemRosterUpdate>().Single();
+        Assert.Equal(itemRosterId, itemRosterUpdate.ItemRosterId);
+        Assert.Equal(itemId, itemRosterUpdate.ItemID);
+        Assert.Equal(40, itemRosterUpdate.Amount);
 
         AssertCooldownBroadcast(target.SettlementId);
         AssertForceSuppliesOutcome(Server, mobilePartyId, target.SettlementId, itemId);
@@ -803,7 +810,6 @@ public class VillageHostileActionTests : MapEventTestBase
             }
 
             var mapEvent = CreateHostileActionMapEvent(mobileParty.Party, settlement.Party, VillageHostileAction.Raid);
-            AddSyntheticMapEventParty(mapEvent.DefenderSide, settlement.Party);
             mapEvent._battleState = BattleState.AttackerVictory;
 
             Assert.True(mapEvent.HasWinner);
@@ -866,12 +872,18 @@ public class VillageHostileActionTests : MapEventTestBase
             AssertVillageStateAndHitPoints(client, target.SettlementId, target.VillageId, Village.VillageStates.Looted, 0.99f);
         }
 
+        var disabledMethods = MapEventDisabledMethods
+            .Append(AccessTools.Method(typeof(Settlement), "TransferReadyMilitiasToMilitiaParty"))
+            .Append(AccessTools.Method(typeof(Settlement), "AddMilitiasToParty"))
+            .Where(method => method != null)
+            .ToList();
+
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
 
             InvokeVillageHealDailyTick(settlement);
-        });
+        }, disabledMethods);
 
         AssertVillageStateAndHitPoints(Server, target.SettlementId, target.VillageId, Village.VillageStates.Normal, 1f);
         foreach (var client in Clients)
@@ -2172,6 +2184,7 @@ public class VillageHostileActionTests : MapEventTestBase
         var boundTownId = TestEnvironment.CreateRegisteredObject<Town>();
         var boundOwnerClanId = TestEnvironment.CreateRegisteredObject<Clan>();
         var boundOwnerKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var boundOwnerHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
         string? settlementPartyId = null;
         string? ownerFactionId = null;
 
@@ -2183,11 +2196,14 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<Town>(boundTownId, out var boundTown));
             Assert.True(Server.ObjectManager.TryGetObject<Clan>(boundOwnerClanId, out var boundOwnerClan));
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(boundOwnerKingdomId, out var boundOwnerKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(boundOwnerHeroId, out var boundOwnerHero));
 
             using (new AllowedThread())
             {
                 boundSettlement.SetSettlementComponent(boundTown);
+                boundOwnerHero.Clan = boundOwnerClan;
                 boundOwnerClan.Kingdom = boundOwnerKingdom;
+                boundOwnerClan.SetLeader(boundOwnerHero);
                 boundOwnerKingdom.RulingClan = boundOwnerClan;
                 boundTown.OwnerClan = boundOwnerClan;
                 boundTown.IsOwnerUnassigned = false;
@@ -2206,6 +2222,39 @@ public class VillageHostileActionTests : MapEventTestBase
         });
 
         Assert.NotNull(settlementPartyId);
+        foreach (var client in Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+                Assert.True(client.ObjectManager.TryGetObject<Clan>(boundOwnerClanId, out var boundOwnerClan));
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(boundOwnerHeroId, out var boundOwnerHero));
+
+                using (new AllowedThread())
+                {
+                    boundOwnerHero.Clan = boundOwnerClan;
+                    boundOwnerClan.SetLeader(boundOwnerHero);
+                }
+
+                if (!client.ObjectManager.TryGetObject<PartyBase>(settlementPartyId!, out var settlementParty))
+                {
+                    using (new AllowedThread())
+                    {
+                        settlementParty = new PartyBase(settlement);
+                        settlement.Party = settlementParty;
+                    }
+
+                    Assert.True(client.ObjectManager.AddExisting(settlementPartyId!, settlementParty));
+                    return;
+                }
+
+                using (new AllowedThread())
+                {
+                    settlement.Party = settlementParty;
+                }
+            });
+        }
+
         return new VillageTarget(settlementId, villageId, settlementPartyId!, ownerFactionId!);
     }
 
@@ -2299,6 +2348,62 @@ public class VillageHostileActionTests : MapEventTestBase
         return partyBaseId!;
     }
 
+    private string RegisterMobilePartyItemRoster(string mobilePartyId)
+    {
+        string? itemRosterId = null;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty));
+            Assert.NotNull(mobileParty.Party?.ItemRoster);
+
+            itemRosterId = Server.ObjectManager.TryGetId(mobileParty.Party.ItemRoster, out var existingItemRosterId)
+                ? existingItemRosterId
+                : $"{nameof(ItemRoster)}_{mobileParty.StringId}";
+        });
+
+        Assert.NotNull(itemRosterId);
+        RegisterMobilePartyItemRoster(Server, mobilePartyId, itemRosterId!);
+        foreach (var client in Clients)
+        {
+            RegisterMobilePartyItemRoster(client, mobilePartyId, itemRosterId!);
+        }
+
+        return itemRosterId!;
+    }
+
+    private static void RegisterMobilePartyItemRoster(
+        EnvironmentInstance instance,
+        string mobilePartyId,
+        string itemRosterId)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty));
+            Assert.NotNull(mobileParty.Party?.ItemRoster);
+
+            var itemRoster = mobileParty.Party.ItemRoster;
+            if (instance.ObjectManager.TryGetId(itemRoster, out var existingItemRosterId))
+            {
+                if (existingItemRosterId == itemRosterId)
+                    return;
+
+                Assert.True(instance.ObjectManager.Remove(itemRoster));
+            }
+
+            if (instance.ObjectManager.Contains(itemRosterId))
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<ItemRoster>(itemRosterId, out var registeredItemRoster));
+                if (ReferenceEquals(registeredItemRoster, itemRoster))
+                    return;
+
+                Assert.True(instance.ObjectManager.Remove(registeredItemRoster));
+            }
+
+            Assert.True(instance.ObjectManager.AddExisting(itemRosterId, itemRoster));
+        });
+    }
+
     private static MapEvent CreateHostileActionMapEvent(PartyBase attacker, PartyBase defender, VillageHostileAction action)
     {
         var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
@@ -2324,22 +2429,11 @@ public class VillageHostileActionTests : MapEventTestBase
                 throw new ArgumentOutOfRangeException(nameof(action), action, null);
         }
 
-        mapEvent.Component = component;
-        mapEvent._mapEventType = battleType;
+        mapEvent.Initialize(attacker, defender, component, battleType);
         mapEvent.MapEventSettlement = defender.Settlement;
         mapEvent.Position = defender.Position;
         mapEvent.State = MapEventState.Wait;
 
-        var defenderSide = new MapEventSide(mapEvent, BattleSideEnum.Defender, attacker);
-        defenderSide.LeaderParty = defender;
-        var attackerSide = new MapEventSide(mapEvent, BattleSideEnum.Attacker, attacker);
-        attackerSide.LeaderParty = attacker;
-        mapEvent._sides[(int)BattleSideEnum.Defender] = defenderSide;
-        mapEvent._sides[(int)BattleSideEnum.Attacker] = attackerSide;
-        MessageBroker.Instance.Publish(mapEvent, new MapEventSideAssigned(mapEvent, defenderSide, BattleSideEnum.Defender));
-        MessageBroker.Instance.Publish(mapEvent, new MapEventSideAssigned(mapEvent, attackerSide, BattleSideEnum.Attacker));
-
-        AddSyntheticMapEventParty(attackerSide, attacker);
         SetVillageStateForHostileAction(defender.Settlement, action);
         return mapEvent;
     }

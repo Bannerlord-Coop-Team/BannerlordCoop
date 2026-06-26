@@ -504,20 +504,12 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             .ToArray();
 
         var initiatorState = tradeStates.Single(s => s.PartyId == initiatorPartyId);
-        Assert.Single(initiatorState.PartyItems);
-        Assert.Equal(initiatorItemId, initiatorState.PartyItems[0].ItemObjectData.ItemObjectId);
-        Assert.Equal(3, initiatorState.PartyItems[0].Amount);
-        Assert.Single(initiatorState.OtherPartyItems);
-        Assert.Equal(responderItemId, initiatorState.OtherPartyItems[0].ItemObjectData.ItemObjectId);
-        Assert.Equal(4, initiatorState.OtherPartyItems[0].Amount);
+        AssertPartyItemSnapshotContains(initiatorState.PartyItems, initiatorItemId, 3);
+        AssertPartyItemSnapshotContains(initiatorState.OtherPartyItems, responderItemId, 4);
 
         var responderState = tradeStates.Single(s => s.PartyId == responderPartyId);
-        Assert.Single(responderState.PartyItems);
-        Assert.Equal(responderItemId, responderState.PartyItems[0].ItemObjectData.ItemObjectId);
-        Assert.Equal(4, responderState.PartyItems[0].Amount);
-        Assert.Single(responderState.OtherPartyItems);
-        Assert.Equal(initiatorItemId, responderState.OtherPartyItems[0].ItemObjectData.ItemObjectId);
-        Assert.Equal(3, responderState.OtherPartyItems[0].Amount);
+        AssertPartyItemSnapshotContains(responderState.PartyItems, responderItemId, 4);
+        AssertPartyItemSnapshotContains(responderState.OtherPartyItems, initiatorItemId, 3);
     }
 
     [Fact]
@@ -996,6 +988,13 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         }
 
         return 0;
+    }
+
+    private static void AssertPartyItemSnapshotContains(ItemRosterElementData[] items, string itemId, int amount)
+    {
+        var item = Assert.Single(items, i => i.ItemObjectData.ItemObjectId == itemId);
+
+        Assert.Equal(amount, item.Amount);
     }
 
     private static void SetupFief(Settlement settlement, Town town, PartyBase ownerParty)

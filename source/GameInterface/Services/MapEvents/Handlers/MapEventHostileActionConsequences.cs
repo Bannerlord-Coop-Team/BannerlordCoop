@@ -1,4 +1,5 @@
 using Common.Logging;
+using GameInterface.Services.Stances;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
@@ -58,26 +59,12 @@ internal static class MapEventHostileActionConsequences
 
             Logger.Debug("Applying {Source} hostile-action war between {AttackerFaction} and {DefenderFaction}", source, attackerFaction.Name, defenderFaction.Name);
             DeclareWarAction.ApplyByPlayerHostility(attackerFaction, defenderFaction);
-            ApplyWarStance(attackerFaction, defenderFaction);
+            FactionStanceHelper.ApplyWarStance(attackerFaction, defenderFaction);
         }
         catch (Exception e)
         {
             Logger.Error(e, "Failed to apply {Source} hostile-action consequences", source);
         }
-    }
-
-    private static void ApplyWarStance(IFaction attackerFaction, IFaction defenderFaction)
-    {
-        if (FactionManager.IsAtWarAgainstFaction(attackerFaction, defenderFaction))
-            return;
-
-        var stanceLink = FactionManager.Instance.GetStanceLinkInternal(attackerFaction, defenderFaction);
-        if (stanceLink.StanceType == StanceType.War)
-            return;
-
-        stanceLink.StanceType = StanceType.War;
-        attackerFaction.UpdateFactionsAtWarWith();
-        defenderFaction.UpdateFactionsAtWarWith();
     }
 
     private static IFaction GetMapFaction(IFaction faction)

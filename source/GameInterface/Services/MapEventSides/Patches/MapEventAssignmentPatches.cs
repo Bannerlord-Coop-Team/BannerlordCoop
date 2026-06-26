@@ -54,7 +54,7 @@ internal class MapEventAssignmentPatches
         BattleSideEnum side,
         PartyBase party)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed()) new MapEventSide(mapEvent, side, party);
+        if (CallOriginalPolicy.IsOriginalAllowed()) return new MapEventSide(mapEvent, side, party);
 
         if (ModInformation.IsClient)
         {

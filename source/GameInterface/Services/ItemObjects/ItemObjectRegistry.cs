@@ -48,7 +48,18 @@ public class ItemObjectRegistry : AutoRegistryBase<ItemObject>
 
         itemId = IdPrefix + item.StringId;
         if (objectManager.Contains(itemId))
+        {
+            if (objectManager.TryGetObject<ItemObject>(itemId, out var registeredItem) &&
+                registeredItem != item &&
+                registeredItem.StringId == item.StringId)
+            {
+                objectManager.Remove(registeredItem);
+                if (objectManager.AddExisting(itemId, item))
+                    return objectManager.TryGetId(item, out itemId);
+            }
+
             return objectManager.TryGetId(item, out itemId);
+        }
 
         if (objectManager.AddExisting(itemId, item) == false)
             return false;

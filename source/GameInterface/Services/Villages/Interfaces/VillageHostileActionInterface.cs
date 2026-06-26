@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Stances;
 using GameInterface.Services.Villages.Data;
 using GameInterface.Services.Villages.Messages;
 using Serilog;
@@ -487,21 +488,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface
             ChangeRelationAction.ApplyRelationChangeBetweenHeroes(attackerParty.LeaderHero, defenderFaction.Leader, PlayerHostilityRelationPenalty);
 
         DeclareWarAction.ApplyByPlayerHostility(attackerFaction, defenderFaction);
-        ApplyWarStance(attackerFaction, defenderFaction);
-    }
-
-    private static void ApplyWarStance(IFaction attackerFaction, IFaction defenderFaction)
-    {
-        if (FactionManager.IsAtWarAgainstFaction(attackerFaction, defenderFaction))
-            return;
-
-        var stanceLink = FactionManager.Instance.GetStanceLinkInternal(attackerFaction, defenderFaction);
-        if (stanceLink.StanceType == StanceType.War)
-            return;
-
-        stanceLink.StanceType = StanceType.War;
-        attackerFaction.UpdateFactionsAtWarWith();
-        defenderFaction.UpdateFactionsAtWarWith();
+        FactionStanceHelper.ApplyWarStance(attackerFaction, defenderFaction);
     }
 
     private static IFaction GetMapFaction(IFaction faction)

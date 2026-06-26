@@ -38,10 +38,14 @@ public class NetworkRawXpGainClients : ICommand
     [ProtoMember(3)]
     public bool ShouldNotify;
 
-    public NetworkRawXpGainClients(NetworkRawXpGainServer cloneObject)
+    [ProtoMember(4)]
+    public int TotalXp;
+
+    public NetworkRawXpGainClients(NetworkRawXpGainServer cloneObject, int totalXp)
     {
         HeroId = cloneObject.HeroId;
         RawXp = cloneObject.RawXp;
         ShouldNotify = cloneObject.ShouldNotify;
+        TotalXp = totalXp;
     }
 }
