@@ -93,7 +93,12 @@ public class ArmyHandler : IHandler
 
         if (!objectManager.TryGetIdWithLogging(obj.What.Army, out var armyId)) return;
         if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
-        if (!objectManager.TryGetIdWithLogging(obj.What.ClientMobileParty, out var clientMobilePartyId)) return;
+        var clientMobilePartyId = string.Empty;
+        if (obj.What.ClientMobileParty != null)
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.ClientMobileParty, out clientMobilePartyId)) return;
+        }
+
 
         var message = new NetworkRemovePartyInArmy(armyId, mobilePartyId, clientMobilePartyId);
 
@@ -108,7 +113,11 @@ public class ArmyHandler : IHandler
         {
             if (objectManager.TryGetObjectWithLogging(data.MobilePartyId, out MobileParty mobileParty) == false) return;
             if (objectManager.TryGetObjectWithLogging<Army>(data.ArmyId, out var army) == false) return;
-            if (objectManager.TryGetObjectWithLogging(data.ClientMobilePartyId, out MobileParty clientMobileParty) == false) return;
+            MobileParty clientMobileParty = null;
+            if (!string.IsNullOrEmpty(data.ClientMobilePartyId))
+            {
+                objectManager.TryGetObjectWithLogging(data.ClientMobilePartyId, out clientMobileParty);
+            }
             ArmyPatches.RemoveMobilePartyInArmy(mobileParty, army, clientMobileParty);
             mobileParty._army = null;
         });
