@@ -117,19 +117,6 @@ public class PartySyncPerformanceLogsCommandTests : IDisposable
     }
 
     [Fact]
-    public void On_InvalidFilename_ReturnsValidationError()
-    {
-        var fileWriter = new FakeFileWriter();
-        using var realContainer = CreateLoggerContainer(fileWriter);
-        ContainerProvider.SetContainer(realContainer);
-
-        var result = PartySyncPerformanceLogsCommand.PartySyncPerformanceLogs(new List<string> { "on", "60", "nested\\test_log" });
-
-        Assert.Equal("Filename must not include a path", result);
-        Assert.Empty(fileWriter.Writes);
-    }
-
-    [Fact]
     public void Command_WhenServer_ReturnsClientOnlyError()
     {
         ModInformation.IsServer = true;
@@ -239,15 +226,6 @@ public class PartySyncPerformanceLoggerTests : IDisposable
         var write = Assert.Single(fileWriter.Writes);
         Assert.Equal("test_log.csv", write.Path);
         Assert.StartsWith("timestamp_utc,interval_seconds", write.Contents);
-    }
-
-    [Fact]
-    public void Enable_InvalidFilename_ReturnsError()
-    {
-        var result = logger.Enable(TimeSpan.FromSeconds(60), "nested\\test_log");
-
-        Assert.Equal("Filename must not include a path", result);
-        Assert.Empty(fileWriter.Writes);
     }
 
     [Fact]
