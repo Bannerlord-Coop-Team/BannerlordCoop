@@ -39,9 +39,9 @@ public readonly struct CoalesceKey : IEquatable<CoalesceKey>
         unchecked
         {
             int hash = 17;
-            hash = hash * 31 + (Channel?.GetHashCode() ?? 0);
-            hash = hash * 31 + (InstanceId?.GetHashCode() ?? 0);
-            hash = hash * 31 + (Member?.GetHashCode() ?? 0);
+            hash = (hash * 31) + (Channel?.GetHashCode() ?? 0);
+            hash = (hash * 31) + (InstanceId?.GetHashCode() ?? 0);
+            hash = (hash * 31) + (Member?.GetHashCode() ?? 0);
             return hash;
         }
     }
