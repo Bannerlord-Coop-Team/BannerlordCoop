@@ -46,8 +46,6 @@ public sealed class SendCoalescer : ISendCoalescer
             pending.Clear();
         }
 
-        // Build and send outside the lock: ToMessage and SendAll do real work and we never hold the
-        // buffer lock across network I/O.
         foreach (var payload in toSend)
         {
             network.SendAll(payload.ToMessage());
