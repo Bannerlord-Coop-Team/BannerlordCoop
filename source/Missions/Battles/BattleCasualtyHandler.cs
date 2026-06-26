@@ -1,13 +1,12 @@
 using Common;
 using Common.Logging;
 using Common.Messaging;
-using GameInterface.Services.MapEventParties;
 using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.ObjectManager;
 using Missions.Messages;
 using Serilog;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
-using TaleWorlds.Core;
 
 namespace Missions.Battles;
 
@@ -50,29 +49,42 @@ internal class BattleCasualtyHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MapEventParty>(msg.MapEventPartyId, out var mapEventParty))
                 return;
 
-            // Resolve a CURRENT descriptor for this character from the live roster: the owner's captured seed
-            // may have churned out of the server roster (the engine re-flattens parties during setup), so
-            // applying the raw seed threw KeyNotFoundException and dropped the casualty. Match by character and
-            // take a valid descriptor instead — one of N identical troops is interchangeable for the count.
-            if (!BattleRosterHelper.TryGetLiveDescriptor(mapEventParty, msg.TroopCharacterId, excludeWounded: msg.Wounded, out var descriptor))
-            {
-                Logger.Warning("[BattleSync] Casualty for {Char} in party {Party} dropped: no live matching troop in the server roster",
-                    msg.TroopCharacterId, msg.MapEventPartyId);
+            // The casualty is addressed by the troop character's coop object id (never a raw StringId);
+            // resolve the character through the object manager.
+            if (!objectManager.TryGetObjectWithLogging<CharacterObject>(msg.TroopCharacterId, out var troop))
                 return;
+
+            // Find a live troop of this character in the party's flattened battle roster and apply the casualty
+            // to its CURRENT descriptor. Matching by character rather than the owner's captured seed sidesteps
+            // the descriptor churn — the engine re-flattens parties during setup, minting fresh seeds — that
+            // otherwise threw KeyNotFoundException and dropped casualties. One of N identical troops is
+            // interchangeable here. Applying to the server roster runs the original (the prefix lets the server
+            // through), then we republish the attempt so MapEventPartyHandler broadcasts NetworkTroop* to clients.
+            var roster = mapEventParty.Troops;
+            if (roster != null)
+            {
+                foreach (var element in roster)
+                {
+                    if (element.IsKilled) continue;
+                    if (msg.Wounded && element.IsWounded) continue;     // a wound shouldn't target a man already down
+                    if (element.Troop != troop) continue;
+
+                    if (msg.Wounded)
+                    {
+                        mapEventParty.OnTroopWounded(element.Descriptor);
+                        messageBroker.Publish(this, new OnTroopWoundedAttempted(mapEventParty, element.Descriptor.UniqueSeed));
+                    }
+                    else
+                    {
+                        mapEventParty.OnTroopKilled(element.Descriptor);
+                        messageBroker.Publish(this, new OnTroopKilledAttempted(mapEventParty, element.Descriptor.UniqueSeed));
+                    }
+                    return;
+                }
             }
 
-            // Apply to the authoritative server roster (the prefix runs the original on the server), then
-            // republish the attempt so MapEventPartyHandler broadcasts NetworkTroop* to every client.
-            if (msg.Wounded)
-            {
-                mapEventParty.OnTroopWounded(descriptor);
-                messageBroker.Publish(this, new OnTroopWoundedAttempted(mapEventParty, descriptor.UniqueSeed));
-            }
-            else
-            {
-                mapEventParty.OnTroopKilled(descriptor);
-                messageBroker.Publish(this, new OnTroopKilledAttempted(mapEventParty, descriptor.UniqueSeed));
-            }
+            Logger.Warning("[BattleSync] Casualty for {Char} in party {Party} dropped: no live matching troop in the server roster",
+                msg.TroopCharacterId, msg.MapEventPartyId);
         });
     }
 }

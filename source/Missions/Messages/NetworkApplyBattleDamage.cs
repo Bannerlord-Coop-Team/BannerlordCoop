@@ -1,26 +1,42 @@
 using Common.Messaging;
 using ProtoBuf;
 using System;
+using TaleWorlds.MountAndBlade;
 
 namespace Missions.Messages;
 
 /// <summary>
-/// Attacker's node → peers (over the mesh): apply this much damage to an agent. Only the agent's OWNER (the
-/// node with authority) acts on it — applying the damage to the real agent and, if it dies, broadcasting the
-/// death via the normal path. Sent when a local troop hits a puppet, so that puppet's life and death stay
-/// authoritative on its owner and the clients' battles don't diverge.
+/// Attacker's node → peers (over the mesh): a local troop hit a PUPPET, so route the WHOLE blow to that
+/// puppet's owner. Only the owner (the node with authority) acts on it — re-applying the blow through
+/// <c>Agent.RegisterBlow</c> so the engine resolves real damage, hit reaction, ragdoll and death (the death
+/// then flows through <c>Agent.Die</c> → the death/casualty sync). Routing the real blow (instead of a bare
+/// damage number + a synthetic kill) keeps combat faithful and removes the fixed-magnitude "fatal blow".
+/// <para>
+/// Agent indices are per-client, so the blow's attacker index can't be used as-is: <see cref="AttackerAgentId"/>
+/// carries the attacker's network id and the owner re-maps it to its local agent's index. Missiles are not
+/// synced (the projectile is simulated only on the shooter), but <c>Agent.RegisterBlow</c> resolves damage
+/// from the blow and never dereferences the projectile index — so a routed missile blow applies cleanly with
+/// no fix-up.
+/// </para>
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public class NetworkApplyBattleDamage : IEvent
 {
     [ProtoMember(1)]
-    public readonly Guid VictimAgentId;
+    public Guid VictimAgentId { get; }
+    /// <summary>Network id of the attacker, or <see cref="Guid.Empty"/> if it couldn't be resolved.</summary>
     [ProtoMember(2)]
-    public readonly float Damage;
+    public Guid AttackerAgentId { get; }
+    [ProtoMember(3)]
+    public Blow Blow { get; }
+    [ProtoMember(4)]
+    public AttackCollisionData CollisionData { get; }
 
-    public NetworkApplyBattleDamage(Guid victimAgentId, float damage)
+    public NetworkApplyBattleDamage(Guid victimAgentId, Guid attackerAgentId, Blow blow, AttackCollisionData collisionData)
     {
         VictimAgentId = victimAgentId;
-        Damage = damage;
+        AttackerAgentId = attackerAgentId;
+        Blow = blow;
+        CollisionData = collisionData;
     }
 }

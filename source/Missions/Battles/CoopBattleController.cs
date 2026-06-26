@@ -234,6 +234,12 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
 
     protected override void OnLeaving()
     {
+        // Commit the concluded battle's result to the campaign BEFORE tearing the instance down, so the server
+        // captures losers / awards the win and finalizes the encounter. A live coop battle never sets the map
+        // event's BattleState on its own (the encounter doesn't resolve), so without this the defeated players
+        // are left uncaptured with the encounter still open.
+        CommitBattleResultIfHost();
+
         BattleSpawnGate.EndBattle();
 
         if (instanceId != null)
@@ -244,6 +250,27 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
         }
 
         network.Stop();
+    }
+
+    /// <summary>
+    /// [Host] Commits this concluded coop battle's <see cref="MissionResult"/> to the campaign map event. Setting
+    /// <c>MapEvent.BattleState</c> runs the native setter, which the coop intercept (<c>MapEventPatches</c>) syncs
+    /// to the server — there it runs <c>OnBattleWon</c> (capturing the defeated players) and the auto-finalize
+    /// (closing every player's encounter). Only the host commits; a retreat (unresolved result) commits nothing;
+    /// an already-resolved state (e.g. a simulated battle) is left untouched.
+    /// </summary>
+    private void CommitBattleResultIfHost()
+    {
+        if (instanceId == null || !hostRegistry.IsLocalHost(instanceId)) return;
+
+        var result = Mission.Current?.MissionResult;
+        if (result == null || !result.BattleResolved) return;
+
+        if (!objectManager.TryGetObject<MapEvent>(instanceId, out var mapEvent)) return;
+        if (mapEvent.BattleState != BattleState.None) return;
+
+        Logger.Information("[BattleSync] Committing concluded battle result {State} for instance {Instance}", result.BattleState, instanceId);
+        mapEvent.BattleState = result.BattleState;
     }
 
     public override void OnMissionTick(float dt)
@@ -387,7 +414,10 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
             if (mapEventParty != null && objectManager.TryGetId(mapEventParty, out var mepId))
                 mapEventPartyId = mepId;
         }
-        _casualtyInfo[agentId] = (mapEventPartyId, troopSeed, character.StringId);
+        // Key the casualty on the troop's CHARACTER through the object manager (never a raw StringId). For a
+        // hero `characterId` above is the HeroObject's id, so resolve the character's own id here.
+        objectManager.TryGetId(character, out var troopCharacterId);
+        _casualtyInfo[agentId] = (mapEventPartyId, troopSeed, troopCharacterId);
 
         int side = agent.Team != null ? (int)agent.Team.Side : (int)BattleSideEnum.None;
         var data = new BattleAgentSpawnData(agentId, characterId, isHero, agent.Position, side, agent.Health, owner, mapEventPartyId, troopSeed);
@@ -417,13 +447,28 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
         if (!registry.TryGetAgentInfo(payload.What.Agent, out var info)) return;
         if (info.CurrentAuthority != controllerIdProvider.ControllerId) return;
 
-        network.SendAll(new NetworkBattleAgentDied(info.AgentId, payload.What.Wounded));
+        _casualtyInfo.TryGetValue(info.AgentId, out var attribution);
+
+        // A hero is never a KILLED casualty. A downed hero in battle is knocked unconscious and taken prisoner,
+        // not removed from its party roster - so report it WOUNDED even when the blow killed the agent outright
+        // (e.g. kill_own_team's forced Agent.Die sets State=Killed for heroes too). A KILLED casualty does
+        // RemoveTroop (count 1->0); the capture then forfeits the same hero again (0->-1), the live "captured
+        // party roster goes negative" bug. Wounding keeps the hero in the roster so the capture removes it once.
+        bool wounded = payload.What.Wounded;
+        if (attribution.troopCharacterId != null
+            && objectManager.TryGetObject<CharacterObject>(attribution.troopCharacterId, out var troop)
+            && troop.IsHero)
+        {
+            wounded = true;
+        }
+
+        network.SendAll(new NetworkBattleAgentDied(info.AgentId, wounded));
 
         // Owner-authoritative casualty: tell the server to account this troop's death/wound against its
         // map-event party roster. The host's own mission accounting is suppressed during a coop battle
         // (MapEventPartyPatches), so this is the single source. On a client, SendAll targets the server.
-        if (_casualtyInfo.TryGetValue(info.AgentId, out var attribution) && attribution.mapEventPartyId != null)
-            relayNetwork.SendAll(new NetworkRequestBattleCasualty(attribution.mapEventPartyId, attribution.troopCharacterId, payload.What.Wounded));
+        if (attribution.mapEventPartyId != null)
+            relayNetwork.SendAll(new NetworkRequestBattleCasualty(attribution.mapEventPartyId, attribution.troopCharacterId, wounded));
 
         _casualtyInfo.TryRemove(info.AgentId, out _);
         registry.RemoveAgent(info.AgentId);
@@ -450,51 +495,70 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
         _casualtyInfo.TryRemove(payload.What.AgentId, out _);
     }
 
-    // [Attacker's node] A local troop hit a puppet (damage suppressed locally by BattleBlowInterceptPatch).
-    // Route the damage to the puppet over the mesh; only its owner will apply it.
+    // [Attacker's node] A local troop hit a puppet (suppressed locally by BattleBlowInterceptPatch). Route the
+    // WHOLE blow to the puppet's owner; only the owner re-applies it. The attacker's network id rides along so
+    // the owner can re-map the (per-client) attacker index to its local agent.
     private void Handle_BattlePuppetHit(MessagePayload<BattlePuppetHit> payload)
     {
         var registry = coopMissionComponent.AgentRegistry;
-        if (!registry.TryGetAgentInfo(payload.What.Victim, out var info)) return;
+        if (!registry.TryGetAgentInfo(payload.What.Victim, out var victimInfo)) return;
 
-        network.SendAll(new NetworkApplyBattleDamage(info.AgentId, payload.What.Damage));
+        Guid attackerId = Guid.Empty;
+        if (payload.What.Attacker != null && registry.TryGetAgentInfo(payload.What.Attacker, out var attackerInfo))
+            attackerId = attackerInfo.AgentId;
+
+        network.SendAll(new NetworkApplyBattleDamage(victimInfo.AgentId, attackerId, payload.What.Blow, payload.What.CollisionData));
     }
 
-    // [Owner] Another client's troop hit one of OUR agents. Apply the damage authoritatively; if it dies, the
-    // Agent.Die chokepoint feeds the normal death sync (NetworkBattleAgentDied + server casualty). Non-owners
-    // ignore the message — the agent's life/death is decided only here.
+    // [Owner] Another client's troop hit one of OUR agents. Re-apply the real blow through Agent.RegisterBlow so
+    // the engine resolves damage, hit reaction, ragdoll and (if lethal) death — the death then flows through
+    // Agent.Die -> BattleAgentDiedPatch -> the normal death/casualty sync. Non-owners ignore it. No synthetic blow.
     private void Handle_NetworkApplyBattleDamage(MessagePayload<NetworkApplyBattleDamage> payload)
     {
         var registry = coopMissionComponent.AgentRegistry;
         if (!registry.TryGetAgentInfo(payload.What.VictimAgentId, out var info)) return;
         if (info.CurrentAuthority != controllerIdProvider.ControllerId) return;
 
-        var agent = info.Agent;
-        var damage = payload.What.Damage;
+        var victim = info.Agent;
+        var blow = payload.What.Blow;
+        var collisionData = payload.What.CollisionData;
+        var attackerId = payload.What.AttackerAgentId;
         GameThread.RunSafe(() =>
         {
-            if (Mission.Current == null || agent == null || !agent.IsActive() || agent.Health <= 0) return;
+            if (Mission.Current == null || victim == null || !victim.IsActive() || victim.Health <= 0) return;
 
-            agent.Health -= damage;
-            if (agent.Health < 1f)
-                agent.Die(CreateFatalBlow(agent), Agent.KillInfo.Invalid);
+            // Re-map the attacker index to OUR local agent (indices are per-client); -1 if not resolvable here.
+            if (attackerId != Guid.Empty && registry.TryGetAgentInfo(attackerId, out var attackerInfo) && attackerInfo.Agent != null)
+                blow.OwnerId = attackerInfo.Agent.Index;
+            else
+                blow.OwnerId = -1;
+
+            // Missile blows: the projectile is simulated only on the shooter (missiles aren't synced), so its
+            // index is absent from THIS client's _missilesDictionary — Mission.OnAgentHit does
+            // _missilesDictionary[index] for a missile blow and throws KeyNotFound. Clear the missile flag (the
+            // publicizer exposes the private BlowWeaponRecord._isMissile) and the dangling projectile index so
+            // OnAgentHit takes the no-missile path, while keeping the weapon class/flags for the hit reaction.
+            // The already-resolved InflictedDamage still lands and the agent dies naturally. (A visible arrow on
+            // this client would need real missile sync — a separate feature.)
+            bool wasMissile = blow.IsMissile;
+            if (wasMissile)
+            {
+                blow.WeaponRecord._isMissile = false;
+                blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex = -1;
+            }
+
+            // TEMP diagnostic: confirms the routed blow's damage/missile flag per hit. Remove once solid.
+            Logger.Information("[BattleSync] Applying routed blow to {Agent}: dmg={Damage}, missile={Missile}, health={Health}",
+                victim.Name, blow.InflictedDamage, wasMissile, victim.Health);
+            victim.RegisterBlow(blow, in collisionData);
+
+            // A hero's in-mission Agent.Health only propagates to the campaign Hero.HitPoints when the agent is
+            // removed (Mission.OnAgentRemoved), so a wounded-but-SURVIVING hero's damage never reaches the server.
+            // Mirror the owned hero's post-blow health onto Hero.HitPoints; HeroHitPointsRequestPatch then forwards
+            // it to the server. A lethal blow is left to the death path (Agent.Die + the native removal set_HitPoints).
+            if (victim.Health > 0 && victim.Character is CharacterObject character && character.IsHero && character.HeroObject is Hero hero)
+                hero.HitPoints = Math.Max(1, (int)victim.Health);
         });
-    }
-
-    // A minimal lethal blow so the agent dies through the normal Agent.Die path (which triggers our death
-    // capture/broadcast). Self-attributed; routed damage doesn't carry the attacker for v1.
-    private static Blow CreateFatalBlow(Agent agent)
-    {
-        return new Blow(agent.Index)
-        {
-            DamageType = DamageTypes.Pierce,
-            BaseMagnitude = 100000f,
-            InflictedDamage = 100000,
-            DamagedPercentage = 1f,
-            DamageCalculated = true,
-            GlobalPosition = agent.Position,
-            VictimBodyPart = BoneBodyPartType.Head,
-        };
     }
 
     // A graceful leave is a RETREAT: the player withdraws, so their troops despawn on every client — the
@@ -600,12 +664,30 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
             GameThread.RunSafe(() =>
             {
                 if (Mission.Current == null) return;
+                var formations = new HashSet<Formation>();
+                int aiCount = 0;
                 foreach (var info in adopted)
                 {
                     var agent = info.Agent;
                     if (agent == null || !agent.IsActive()) continue;
                     ConvertPuppetToHostAi(agent);
+                    if (agent.Controller == AgentControllerType.AI) aiCount++;
+                    if (agent.Formation != null) formations.Add(agent.Formation);
                 }
+
+                // The converted agents are AI-controlled now, but in a coop battle no general commands their
+                // formation — and Formation.SetControlledByAI only issues a movement order when the formation AI
+                // has an active behavior (there is none here), so they'd stand idle. Give each adopted formation
+                // an explicit Charge so the NPCs actually engage. (Freshly spawned troops move because their
+                // OWNER's team AI drives them; these adopted puppets have no such driver and need the order.)
+                foreach (var formation in formations)
+                    formation.SetMovementOrder(MovementOrder.MovementOrderCharge);
+
+                // TEMP diagnostic: how many adopted agents actually became AI-controlled, across how many
+                // formations (each ordered to Charge above). The per-formation state is covered by the
+                // BattleMigrationMirror E2E test.
+                Logger.Information("[BattleSync] Adopt-AI: {AI}/{Total} now AI-controlled across {Forms} formation(s)",
+                    aiCount, adopted.Count, formations.Count);
             });
 
             Logger.Information("[BattleSync] Adopted {Count} agent(s) from {Controller} ({Reason})",
@@ -723,7 +805,9 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
             Mission.Current.MainAgent = agent;
 
         registry.TryRegisterAgent(data.OwnerControllerId, data.AgentId, agent);
-        _casualtyInfo[data.AgentId] = (data.MapEventPartyId, data.TroopSeed, character.StringId);
+        // Key the casualty on the troop's CHARACTER through the object manager (never a raw StringId).
+        objectManager.TryGetId(character, out var troopCharacterId);
+        _casualtyInfo[data.AgentId] = (data.MapEventPartyId, data.TroopSeed, troopCharacterId);
         Logger.Information("[BattleSync] Spawned puppet {Char} (agent {AgentId}, ownAgent={Own})", data.CharacterId, data.AgentId, isOwnAgent);
         return true;
     }

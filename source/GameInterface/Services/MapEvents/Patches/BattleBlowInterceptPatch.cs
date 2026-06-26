@@ -23,7 +23,7 @@ namespace GameInterface.Services.MapEvents.Patches;
 internal class BattleBlowInterceptPatch
 {
     [HarmonyPrefix]
-    private static bool Prefix(Agent __instance, Blow blow)
+    private static bool Prefix(Agent __instance, Blow blow, ref AttackCollisionData collisionData)
     {
         if (!BattleSpawnConfig.Enabled) return true;
         if (!BattleSpawnGate.IsCoopBattleActive) return true;
@@ -34,9 +34,14 @@ internal class BattleBlowInterceptPatch
         if (__instance == null || !__instance.IsHuman || __instance.Controller != AgentControllerType.None)
             return true;
 
-        // Suppress local damage on the puppet and route the damage to its owner (the authority).
+        // Suppress locally and route the WHOLE blow (+ collision data) to the puppet's owner, which re-applies
+        // it through Agent.RegisterBlow so the engine resolves real damage/ragdoll/death. blow.OwnerId is the
+        // attacker's LOCAL index here — resolve the agent so the owner can re-map it to its own local index.
         if (blow.InflictedDamage > 0)
-            MessageBroker.Instance.Publish(__instance, new BattlePuppetHit(__instance, blow.InflictedDamage));
+        {
+            var attacker = Mission.Current?.FindAgentWithIndex(blow.OwnerId);
+            MessageBroker.Instance.Publish(__instance, new BattlePuppetHit(__instance, attacker, blow, collisionData));
+        }
         return false;
     }
 }

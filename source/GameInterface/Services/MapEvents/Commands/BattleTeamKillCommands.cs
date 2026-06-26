@@ -1,0 +1,159 @@
+using Common.Logging;
+using GameInterface.Utils.Commands;
+using Serilog;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using TaleWorlds.Core;
+using TaleWorlds.MountAndBlade;
+using static TaleWorlds.Library.CommandLineFunctionality;
+
+namespace GameInterface.Services.MapEvents.Commands;
+
+/// <summary>
+/// [Host debug] Battle-outcome test commands: kill one enemy, the whole enemy team, or the whole host (player)
+/// team in the current battle mission. Run these on the HOST — it owns the AI/enemy agents, so each kill goes
+/// through the coop death path (<c>Agent.Die</c> → <c>BattleAgentDiedPatch</c> → the death broadcast + the
+/// server-roster casualty), exactly like <c>coop.debug.mapevent.kms</c>. Agents owned by other clients (puppets)
+/// only die locally on the host, since the host isn't their authority.
+/// </summary>
+internal class BattleTeamKillCommands
+{
+    public static readonly ILogger Logger = LogManager.GetLogger<BattleTeamKillCommands>();
+
+    private const string KillEnemyUsage =
+@"Usage:
+  coop.debug.mapevent.kill_enemy
+
+Kills one live enemy-team agent in the current battle (host-side).";
+
+    [CommandLineArgumentFunction("kill_enemy", "coop.debug.mapevent")]
+    public static string KillOneEnemy(List<string> args)
+    {
+        var ctx = new CommandContext("kill_one_enemy", KillEnemyUsage, args);
+        if (!ctx.RequireArgCount(0, out var error))
+            return error;
+
+        if (!TryGetEnemyAgents(out var agents, out var failure))
+            return failure;
+
+        var agent = agents.FirstOrDefault();
+        if (agent is null)
+            return "No live enemy agents to kill.";
+
+        try
+        {
+            Kill(agent);
+        }
+        catch (Exception ex)
+        {
+            return CommandHelpers.FormatException("Kill enemy", ex);
+        }
+
+        return $"Killed enemy agent: {agent.Name}";
+    }
+
+    private const string KillEnemyTeamUsage =
+@"Usage:
+  coop.debug.mapevent.kill_enemy_team
+
+Kills every live enemy-team agent in the current battle (host-side). Useful for testing a coop battle WIN.";
+
+    [CommandLineArgumentFunction("kill_enemy_team", "coop.debug.mapevent")]
+    public static string KillEnemyTeam(List<string> args)
+    {
+        var ctx = new CommandContext("kill_enemy_team", KillEnemyTeamUsage, args);
+        if (!ctx.RequireArgCount(0, out var error))
+            return error;
+
+        if (!TryGetEnemyAgents(out var agents, out var failure))
+            return failure;
+
+        var killed = KillAll(agents, out var ex);
+        if (ex != null)
+            return CommandHelpers.FormatException("Kill enemy team", ex);
+
+        return $"Killed {killed} enemy agent(s).";
+    }
+
+    private const string KillOwnTeamUsage =
+@"Usage:
+  coop.debug.mapevent.kill_own_team
+
+Kills every live agent on the host's own (player) team in the current battle (host-side). Useful for testing a
+coop battle LOSS.";
+
+    [CommandLineArgumentFunction("kill_own_team", "coop.debug.mapevent")]
+    public static string KillOwnTeam(List<string> args)
+    {
+        var ctx = new CommandContext("kill_own_team", KillOwnTeamUsage, args);
+        if (!ctx.RequireArgCount(0, out var error))
+            return error;
+
+        var mission = Mission.Current;
+        if (mission is null)
+            return "Failed: no active mission.";
+        if (mission.PlayerTeam is null)
+            return "Failed: no player team in this mission.";
+
+        var agents = mission.PlayerTeam.ActiveAgents.ToList();
+        var killed = KillAll(agents, out var ex);
+        if (ex != null)
+            return CommandHelpers.FormatException("Kill own team", ex);
+
+        return $"Killed {killed} agent(s) on the host's own team.";
+    }
+
+    /// <summary>Live agents on any team hostile to the player (host) team.</summary>
+    private static bool TryGetEnemyAgents(out List<Agent> agents, out string failure)
+    {
+        agents = null;
+        failure = null;
+
+        var mission = Mission.Current;
+        if (mission is null) { failure = "Failed: no active mission."; return false; }
+        if (mission.PlayerTeam is null) { failure = "Failed: no player team in this mission."; return false; }
+
+        agents = mission.Agents
+            .Where(a => a != null && a.IsActive() && a.Team != null && a.Team.IsEnemyOf(mission.PlayerTeam))
+            .ToList();
+        return true;
+    }
+
+    private static int KillAll(List<Agent> agents, out Exception error)
+    {
+        error = null;
+        var killed = 0;
+        foreach (var agent in agents)
+        {
+            if (agent is null || !agent.IsActive())
+                continue;
+            try
+            {
+                Kill(agent);
+                killed++;
+            }
+            catch (Exception ex)
+            {
+                error = ex;
+                break;
+            }
+        }
+        return killed;
+    }
+
+    private static void Kill(Agent agent)
+    {
+        var blow = new Blow(agent.Index)
+        {
+            DamageType = DamageTypes.Pierce,
+            BaseMagnitude = 100000f,
+            InflictedDamage = 100000,
+            DamagedPercentage = 1f,
+            DamageCalculated = true,
+            GlobalPosition = agent.Position,
+            VictimBodyPart = BoneBodyPartType.Head,
+        };
+        agent.Die(blow, Agent.KillInfo.Invalid);
+    }
+}

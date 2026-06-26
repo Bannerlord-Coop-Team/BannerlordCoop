@@ -14,6 +14,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameComponents;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
@@ -425,6 +426,74 @@ public abstract class MapEventTestBase : IDisposable
     }
 
     /// <summary>
+    /// Simulates one or more ALLIED players losing a battle to <paramref name="captorPartyId"/> through the
+    /// <em>real</em> result path: the losers share the defender side, a client commits the captor's victory
+    /// <see cref="BattleState.AttackerVictory"/>, and the server applies it authoritatively — capturing every
+    /// defeated player there (the coop capture resolves each from the player registry in a prefix, before native
+    /// removes the side leaders). <see cref="DefeatPlayerByBattleStateSync"/> is the one-loser case.
+    /// </summary>
+    protected void DefeatAlliedPlayersByBattleStateSync(string captorPartyId, bool playersAreAttackers, params (string heroId, string partyId)[] players)
+    {
+        Assert.NotEmpty(players);
+
+        string? mapEventId = null;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(captorPartyId, out var captorParty));
+
+            var loserParties = new MobileParty[players.Length];
+            using (new AllowedThread())
+            {
+                for (int i = 0; i < players.Length; i++)
+                {
+                    Assert.True(Server.ObjectManager.TryGetObject<Hero>(players[i].heroId, out var hero));
+                    Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(players[i].partyId, out var party));
+                    party.MemberRoster.AddToCounts(hero.CharacterObject, 1);
+                    hero.PartyBelongedTo = party;
+                    loserParties[i] = party;
+                }
+            }
+
+            // The losing players share one side; the captor (winner) holds the other. The first loser is wired via
+            // Initialize, the rest joined onto the same side through the PartyBase.MapEventSide setter (the vanilla
+            // reinforcement entry point, which wires Side before the renown recalculation).
+            var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
+            mapEvent.MapEventVisual = MockMapEventVisual();
+            if (playersAreAttackers)
+                mapEvent.Initialize(loserParties[0].Party, captorParty.Party);
+            else
+                mapEvent.Initialize(captorParty.Party, loserParties[0].Party);
+
+            var losingSide = playersAreAttackers ? mapEvent.AttackerSide : mapEvent.DefenderSide;
+            for (int i = 1; i < loserParties.Length; i++)
+                loserParties[i].Party.MapEventSide = losingSide;
+
+            Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
+        }, MapEventDisabledMethods);
+
+        Assert.NotNull(mapEventId);
+
+        var disabledMethods = MapEventDisabledMethods
+            .Append(AccessTools.Method(typeof(DefaultBattleRewardModel), nameof(DefaultBattleRewardModel.GetCaptureMemberChancesForWinnerParties)))
+            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyCasualties"))
+            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyItems"))
+            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyPrisoners"))
+            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyShips"))
+            .Append(AccessTools.Method(typeof(MapEvent), "CalculateMapEventResults"))
+            .Append(AccessTools.Method(typeof(MapEvent), "CommitCalculatedMapEventResults"))
+            .ToList();
+
+        // The winning side is the captor's — the opposite of the players'.
+        var winningState = playersAreAttackers ? BattleState.DefenderVictory : BattleState.AttackerVictory;
+        var client = Clients.First();
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out var clientMapEvent));
+            clientMapEvent.BattleState = winningState;
+        }, disabledMethods);
+    }
+
+    /// <summary>
     /// Frees the captive player hero the way the live escape pop-up ("you were able to get away")
     /// does: the owning client's <see cref="EndCaptivityAction"/> is intercepted locally and forwarded
     /// as a <c>NetworkEndPlayerCaptivityAttempted</c> request, which the server applies
@@ -664,6 +733,25 @@ public abstract class MapEventTestBase : IDisposable
                 Assert.NotNull(PlayerEncounter.Current);
             else
                 Assert.Null(PlayerEncounter.Current);
+        }, MapEventDisabledMethods);
+    }
+
+    /// <summary>
+    /// Gives <paramref name="instance"/> the minimal campaign state <see cref="PlayerEncounter.Finish"/> needs to
+    /// run headless. With no menu context open, Finish writes <c>Campaign.Current.MapStateData.GameMenuId</c>,
+    /// which NREs when <see cref="MapStateData"/> is unset (the harness Campaign is constructor-skipped). Set it
+    /// to a real, empty <see cref="MapStateData"/>. Combined with a set <see cref="MobileParty.MainParty"/> (no
+    /// army/settlement/siege) and an encounter with a null map event (so <c>FinalizeBattle</c> no-ops) and no
+    /// encountered party (so the result path does not teleport), Finish then runs to completion and clears
+    /// <see cref="PlayerEncounter.Current"/>. Finish's own menu exit is guarded by the (null) menu context, but
+    /// the surrounding finalize handler's unconditional <c>GameMenu.ExitToLast</c> still needs disabling.
+    /// </summary>
+    protected void EnableHeadlessEncounterFinish(EnvironmentInstance instance)
+    {
+        instance.Call(() =>
+        {
+            if (Campaign.Current.MapStateData == null)
+                Campaign.Current.MapStateData = new MapStateData();
         }, MapEventDisabledMethods);
     }
 }

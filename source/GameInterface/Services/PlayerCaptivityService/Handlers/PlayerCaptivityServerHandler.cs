@@ -17,6 +17,7 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 
@@ -110,15 +111,46 @@ internal class PlayerCaptivityServerHandler : IHandler
             return;
         }
 
-        // Park the now-leaderless player party so native post-battle processing cannot scatter or destroy
-        // it; the captivity-end flow reactivates it. The clears run with patches live: each per-element
-        // removal replicates to the clients, whose rosters have tracked the same sequence of replicated
-        // deltas (the hero's own removal already replicated from the patches-live native capture), so
-        // the indices line up everywhere.
-        playerParty.MemberRoster.Clear();
-        playerParty.PrisonRoster.Clear();
+        // Park the now-leaderless player party so native post-battle processing cannot scatter or destroy it;
+        // the captivity-end flow reactivates it. Empty the rosters by each element's ACTUAL current count rather
+        // than TroopRoster.Clear(): the native TakePrisonerAction (run by Prefix_CaptureDefeatedPartyMembers)
+        // already removed the captured hero, leaving a depleted element that Clear() subtracts AGAIN, driving the
+        // member count to -1 (the live "captured party roster goes negative" bug). Removing by the real count can
+        // never fall below zero. The removals run with patches live, so each replicates to the clients.
+        EmptyRoster(playerParty.MemberRoster);
+        EmptyRoster(playerParty.PrisonRoster);
         playerParty.IsActive = false;
         playerParty.ChangePartyLeader(null);
+    }
+
+    /// <summary>
+    /// Empties a roster to exactly zero by removing each element by its actual current count, then dropping the
+    /// depleted entries. Unlike <see cref="TroopRoster.Clear"/>, this can never drive a count negative even when
+    /// an element was already removed-to-zero elsewhere (e.g. a captured hero the native TakePrisonerAction
+    /// already depleted but left in the roster).
+    /// </summary>
+    private static void EmptyRoster(TroopRoster roster)
+    {
+        if (roster == null) return;
+
+        // Remove each element by its actual count, but NEVER subtract more men than the cached total still
+        // reports. A captured party's MemberRoster can arrive INCONSISTENT here: it holds more element-men than
+        // TotalManCount reflects (a phantom troop whose add never updated the cached total - the same server-side
+        // sync gap behind the recurring "X is not in roster yet" client skips). Removing every element outright
+        // then drives the cached total negative (the live "captured party roster goes to -1" bug). Clamping each
+        // removal to the remaining total keeps it pinned at zero instead of underflowing.
+        for (int i = roster.Count - 1; i >= 0; i--)
+        {
+            int remaining = roster.TotalManCount;
+            if (remaining <= 0) break;
+
+            var element = roster.GetElementCopyAtIndex(i);
+            int removeNumber = Math.Min(Math.Max(element.Number, 0), remaining);
+            if (removeNumber > 0 || element.WoundedNumber > 0)
+                roster.AddToCounts(element.Character, -removeNumber, false, -element.WoundedNumber, 0, true);
+        }
+
+        roster.RemoveZeroCounts();
     }
 
     /// <summary>

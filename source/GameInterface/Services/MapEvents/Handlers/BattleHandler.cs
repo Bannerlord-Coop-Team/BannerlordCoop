@@ -23,6 +23,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -65,6 +66,16 @@ internal class BattleHandler : IHandler
     private readonly ConcurrentDictionary<string, int> mapEventTerrainSeeds = new ConcurrentDictionary<string, int>();
     private readonly Random terrainSeedRandom = new Random();
 
+    // Server-side: map events whose finalize has already run, so a duplicate finalize is ignored. A battle can
+    // be finalized twice: the host leaves (finalize #1), host migration promotes another player, and that new
+    // host's own "done" sends finalize #2. Re-running MapEvent.FinalizeEventAux re-forfeits the rosters (the same
+    // troop removed twice -> the client roster goes negative). Keyed by the event INSTANCE via a weak table, so
+    // it self-evicts when the event is GC'd (no growth, no eviction race vs. a duplicate that arrives a second
+    // later) and never conflates two distinct events that happen to share an object id.
+    private static readonly object FinalizedMarker = new object();
+    private readonly ConditionalWeakTable<MapEvent, object> finalizedMapEvents = new ConditionalWeakTable<MapEvent, object>();
+    private readonly object finalizedMapEventsLock = new object();
+
     public BattleHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
@@ -84,6 +95,7 @@ internal class BattleHandler : IHandler
         messageBroker.Subscribe<MapEventFinalizeAttempted>(Handle_MapEventFinalizeAttempted);
         messageBroker.Subscribe<NetworkMapEventFinalizeAttempted>(Handle_NetworkMapEventFinalizeAttempted);
         messageBroker.Subscribe<NetworkMapEventFinalized>(Handle_NetworkMapEventFinalized);
+        messageBroker.Subscribe<MapEventConcluded>(Handle_MapEventConcluded);
 
         messageBroker.Subscribe<MapEventInvolvedPartiesAdded>(Handle_MapEventInvolvedPartiesAdded);
         messageBroker.Subscribe<NetworkAddInvolvedParties>(Handle_NetworkAddInvolvedParties);
@@ -112,6 +124,7 @@ internal class BattleHandler : IHandler
         messageBroker.Unsubscribe<MapEventFinalizeAttempted>(Handle_MapEventFinalizeAttempted);
         messageBroker.Unsubscribe<NetworkMapEventFinalizeAttempted>(Handle_NetworkMapEventFinalizeAttempted);
         messageBroker.Unsubscribe<NetworkMapEventFinalized>(Handle_NetworkMapEventFinalized);
+        messageBroker.Unsubscribe<MapEventConcluded>(Handle_MapEventConcluded);
 
         messageBroker.Unsubscribe<MapEventInvolvedPartiesAdded>(Handle_MapEventInvolvedPartiesAdded);
         messageBroker.Unsubscribe<NetworkAddInvolvedParties>(Handle_NetworkAddInvolvedParties);
@@ -399,24 +412,74 @@ internal class BattleHandler : IHandler
         if (MapEventConfig.Debug)
             mapEventLogger.DebugMapEvent(mapEvent, "Handling network map event finalize attempted. Finalizing map event.");
 
-        // Capture the player parties on both sides before finalize clears them. They get a reliable,
-        // server-addressed close (below) instead of each racing its own local teardown.
+        var playerPartyIds = FinalizeAndCollectPlayers(mapEvent);
+
+        network.Send(payload.Who as NetPeer, new NetworkMapEventFinalized());
+
+        // PvP (more than one player party): tell every involved player party to close its encounter menu.
+        if (playerPartyIds.Length > 1)
+            network.SendAll(new NetworkClosePvpEncounter(playerPartyIds));
+    }
+
+    /// <summary>
+    /// [Server] A battle reached a victory state — finalize it and close EVERY involved player's encounter, so a
+    /// concluded coop battle tears down without the player leaving the post-battle menu (the auto-finalize on
+    /// conclusion). The explicit-leave path above keeps its single-player <c>NetworkMapEventFinalized</c> reply;
+    /// here there is no leaver, so the close instruction covers all involved players directly.
+    /// </summary>
+    private void Handle_MapEventConcluded(MessagePayload<MapEventConcluded> payload)
+    {
+        if (!ModInformation.IsServer) return;
+
+        if (!objectManager.TryGetObjectWithLogging(payload.What.MapEventId, out MapEvent mapEvent))
+            return;
+
+        if (MapEventConfig.Debug)
+            mapEventLogger.DebugMapEvent(mapEvent, "Battle concluded; auto-finalizing and closing every involved player's encounter.");
+
+        // Fires automatically on every victory, so guard the game thread: a finalize edge case must not escape
+        // and tear down the campaign tick.
+        try
+        {
+            var playerPartyIds = FinalizeAndCollectPlayers(mapEvent);
+
+            if (playerPartyIds.Length > 0)
+                network.SendAll(new NetworkClosePvpEncounter(playerPartyIds));
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Failed to auto-finalize concluded map event");
+        }
+    }
+
+    /// <summary>
+    /// [Server] Finalize <paramref name="mapEvent"/> on the game thread, capturing the involved player party ids
+    /// first (finalize clears them) so they get a reliable server-addressed encounter close instead of each
+    /// racing its own local teardown. <see cref="GameThread.Run"/> runs inline when already on the game thread.
+    /// </summary>
+    private string[] FinalizeAndCollectPlayers(MapEvent mapEvent)
+    {
+        // Finalize each map event at most once (see finalizedMapEvents). A duplicate finalize - most often a
+        // post-migration second "done", where the host leaves, migration promotes another player, and that new
+        // host's leave sends a second finalize - must not re-run FinalizeEventAux and re-forfeit the rosters.
+        lock (finalizedMapEventsLock)
+        {
+            if (finalizedMapEvents.TryGetValue(mapEvent, out _))
+            {
+                objectManager.TryGetId(mapEvent, out var duplicateId);
+                Logger.Warning("Ignoring duplicate finalize for already-finalized map event {MapEventId} (likely a post-migration second leave); not re-running the capture/roster forfeit.", duplicateId);
+                return Array.Empty<string>();
+            }
+            finalizedMapEvents.Add(mapEvent, FinalizedMarker);
+        }
 
         string[] playerPartyIds = null;
-        
         GameThread.Run(() =>
         {
             playerPartyIds = CollectPlayerPartyIds(mapEvent);
             mapEvent.FinalizeEventAux();
         }, blocking: true);
-
-
-        var message = new NetworkMapEventFinalized();
-        network.Send(payload.Who as NetPeer, message);
-
-        // PvP (more than one player party): tell every involved player party to close its encounter menu.
-        if (playerPartyIds.Length > 1)
-            network.SendAll(new NetworkClosePvpEncounter(playerPartyIds));
+        return playerPartyIds ?? Array.Empty<string>();
     }
 
     /// <summary>[Server] Ids of the player parties on both sides of the event, captured before finalize clears them.</summary>
