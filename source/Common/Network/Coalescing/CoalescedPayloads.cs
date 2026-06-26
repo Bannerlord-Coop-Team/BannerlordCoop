@@ -35,8 +35,7 @@ public sealed class LatestWinsPayload : ICoalescedPayload
 
 /// <summary>
 /// Keeps the most recent message producer and invokes it at flush time, so a large message is built
-/// once from the latest live state instead of on every change. Use for whole-object / whole-roster
-/// snapshots.
+/// once from the latest live state instead of on every change.
 /// </summary>
 public sealed class SnapshotPayload : ICoalescedPayload
 {
