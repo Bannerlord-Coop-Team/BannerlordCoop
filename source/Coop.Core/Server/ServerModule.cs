@@ -2,6 +2,7 @@
 using Common.LogicStates;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Coalescing;
 using Common.PacketHandlers;
 using Coop.Core.Common;
 using Coop.Core.Server.Connections;
@@ -29,6 +30,9 @@ public class ServerModule : CommonModule
         builder.RegisterType<ServerContext>().AsSelf().InstancePerLifetimeScope();
         builder.RegisterType<ServerLogic>().As<IServerLogic>().As<ILogic>().InstancePerLifetimeScope();
         builder.RegisterType<CoopServer>().As<ICoopServer>().As<INetwork>().As<INetEventListener>().InstancePerLifetimeScope();
+        // Per-tick send coalescer. Same scope as CoopServer and the handlers so they share one buffer:
+        // a send path enqueues, CoopServer.Update flushes.
+        builder.RegisterType<SendCoalescer>().As<ISendCoalescer>().InstancePerLifetimeScope();
         builder.RegisterType<CoopSaveManager>().As<ICoopSaveManager>().InstancePerLifetimeScope();
 
         // Withholds world broadcasts from a peer until it has the transfer save and has entered the

@@ -1,6 +1,8 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Coalescing;
 using Common.Network.Messages;
 using Common.PacketHandlers;
 using Common.Serialization;
@@ -37,6 +39,8 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     private readonly IMessageBroker messageBroker;
     private readonly IPacketManager packetManager;
     private readonly IConnectionMessageQueue connectionMessageQueue;
+    // Buffers per-change sends and merges them into one send per key. Drained each tick in Update.
+    private readonly ISendCoalescer coalescer;
     // Lazy breaks the construction cycle: the manager depends on ITimeControlInterface, which depends
     // on INetwork (this server). It is only needed each Update, so deferring construction is fine.
     private readonly Lazy<IOverloadedPeerManager> overloadedPeerManager;
@@ -53,6 +57,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         IControllerIdProvider controllerIdProvider,
         IMissionManager missionManager,
         Lazy<IOverloadedPeerManager> overloadedPeerManager,
+        ISendCoalescer coalescer,
         ICommonSerializer serializer) : base(configuration, serializer)
     {
         // Dependancy assignment
@@ -61,6 +66,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         this.connectionMessageQueue = connectionMessageQueue;
         this.missionManager = missionManager;
         this.overloadedPeerManager = overloadedPeerManager;
+        this.coalescer = coalescer;
 
         // Netmanager initialization
         netManager.NatPunchEnabled = true;
@@ -124,6 +130,15 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
         netManager.PollEvents();
         netManager.NatPunchModule.PollEvents();
+
+        // Drain this tick's coalesced sends. Update runs on the poll thread, but creates and destroys
+        // send on the game thread, so we marshal the flush there too: that keeps each merged SendAll
+        // ordered behind an object's create and ahead of its destroy, and off netPeer.Send's non-thread-safe
+        // path. Inert until a send path enqueues, so the guard avoids queueing an empty flush every tick.
+        if (coalescer.HasPending)
+        {
+            GameThread.RunSafe(() => coalescer.Flush(this));
+        }
     }
 
     public override void Start()
