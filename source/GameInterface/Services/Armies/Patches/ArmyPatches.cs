@@ -122,7 +122,11 @@ public class ArmyPatches
                     DisbandArmyAction.ApplyByNotEnoughParty(army);
                 }
             }
-            mobileParty._army = null;
+            // Mainplayer cant have an army with only itself
+            if (army.LeaderParty == clientMobileParty && army.Parties.Count <= 1)
+            {
+                DisbandArmyAction.ApplyByNotEnoughParty(army);
+            }
             if (mobileParty == clientMobileParty && Game.Current.GameStateManager.ActiveState is MapState)
             {
                 ((MapState)Game.Current.GameStateManager.ActiveState).OnLeaveArmy();

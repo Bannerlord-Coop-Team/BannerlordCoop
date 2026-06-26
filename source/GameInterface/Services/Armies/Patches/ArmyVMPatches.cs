@@ -125,17 +125,9 @@ public class GameMenuOverlayArmyDismissPatch
         var party = __instance._contextMenuItem?.Party?.MobileParty;
         if (party?.Army == null) return true;
         var army = party.Army;
-        if (army.LeaderParty == MobileParty.MainParty &&
-            army.Parties.Count <= 2)
-        {
-            DisbandArmyAction.ApplyByNotEnoughParty(army);
-        }
-        else
-        {
-            MessageBroker.Instance.Publish(__instance, new MobilePartyInArmyRemoved(army, party, MobileParty.MainParty));
+        MessageBroker.Instance.Publish(__instance, new MobilePartyInArmyRemoved(army, party, MobileParty.MainParty));
 
-            ArmyPatches.RemoveMobilePartyInArmy(party, MobileParty.MainParty.Army, MobileParty.MainParty);
-        }
+        ArmyPatches.RemoveMobilePartyInArmy(party, MobileParty.MainParty.Army, MobileParty.MainParty);
         // cleanup
         if (!__instance._closedHandled)
         {
