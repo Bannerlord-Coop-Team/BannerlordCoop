@@ -141,7 +141,7 @@ public class ArmyPatches
     }
     public static void SetAiBehaviorObject(Army army, IMapPoint mapPoint)
     {
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             using (new AllowedThread())
             {
