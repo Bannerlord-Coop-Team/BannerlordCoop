@@ -4,6 +4,8 @@ using GameInterface.Services.Alleys.Interfaces;
 using GameInterface.Services.Alleys.Messages;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.ObjectManager;
+using HarmonyLib;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -16,6 +18,11 @@ namespace GameInterface.Services.Alleys.Handlers;
 /// </summary>
 internal class AlleyInitializationHandler : IHandler
 {
+    // Alley.State is a private-setter, non-saved, MainHero-relative enum. The host saves it as
+    // OccupiedByGangLeader (host has no main hero) and vanilla's load re-derive runs before this client's
+    // main hero exists, so owned alleys load gang-occupied. We re-set it for the owning client on load.
+    private static readonly MethodInfo StateSetter = AccessTools.PropertySetter(typeof(Alley), nameof(Alley.State));
+
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly IAlleyCampaignBehaviorInterface behaviorInterface;
@@ -54,10 +61,18 @@ internal class AlleyInitializationHandler : IHandler
         if (newHero == null) return;
 
         var managementData = alleyPlayerData?.ManagementDataPerAlley;
-        if (managementData == null) return;
 
         GameThread.RunSafe(() =>
         {
+            // Re-derive State for every alley this client owns (owner is saved, so OwnedAlleys is correct),
+            // independent of whether we have management data for it.
+            foreach (var alley in newHero.OwnedAlleys)
+            {
+                StateSetter?.Invoke(alley, new object[] { Alley.AreaState.OccupiedByPlayer });
+            }
+
+            if (managementData == null) return;
+
             foreach (var pair in managementData)
             {
                 if (!objectManager.TryGetObjectWithLogging<Alley>(pair.Key, out var alley)) continue;
