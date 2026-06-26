@@ -8,7 +8,6 @@ using GameInterface.Services.TroopRosters.Messages;
 using HarmonyLib;
 using Serilog;
 using System;
-using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Roster;
 
@@ -157,39 +156,6 @@ internal class TroopRosterPatches
         var character = __instance.GetElementCopyAtIndex(index).Character;
         MessageBroker.Instance.Publish(__instance, new ElementXpSet(__instance, character, number));
     }
-
-    // ─── TEMP [RosterDiag] ──────────────────────────────────────────────────────────────────────────────────
-    // Server-side trace to nail the captured-party "roster goes to -1" bug. Fires only for REGISTERED (real
-    // party) rosters whose total has landed at or below zero, and dumps the CALLER STACK so we can see exactly
-    // which operation drove it there (a battle casualty's OnTroopKilled, the capture's CaptureDefeatedPartyMembers,
-    // a loot step, etc.) and whether the same troop is removed twice. Quiet outside the failure window. REMOVE
-    // once the root cause is confirmed.
-    private static void DiagRoster(TroopRoster roster, string op)
-    {
-        if (ModInformation.IsClient || roster == null) return;
-        if (roster.TotalManCount > 0) return; // only the failure zone: a real party at 0 or negative
-        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) || !objectManager.TryGetId(roster, out var rosterId)) return;
-
-        var frames = Environment.StackTrace.Split('\n');
-        var caller = string.Join("\n", frames.Skip(3).Take(18));
-        Logger.Warning("[RosterDiag] {Op} -> roster={Roster} Total={Total} Count={Count}\n{Caller}",
-            op, rosterId, roster.TotalManCount, roster.Count, caller);
-    }
-
-    [HarmonyPatch(nameof(TroopRoster.AddToCountsAtIndex))]
-    [HarmonyPostfix]
-    private static void DiagPostfix_AddToCountsAtIndex(TroopRoster __instance, int countChange, int woundedCountChange, bool removeDepleted)
-        => DiagRoster(__instance, $"AddToCountsAtIndex(n={countChange}, w={woundedCountChange}, removeDepleted={removeDepleted})");
-
-    [HarmonyPatch(nameof(TroopRoster.SetElementNumber))]
-    [HarmonyPostfix]
-    private static void DiagPostfix_SetElementNumber(TroopRoster __instance, int number)
-        => DiagRoster(__instance, $"SetElementNumber({number})");
-
-    [HarmonyPatch(nameof(TroopRoster.SetElementWoundedNumber))]
-    [HarmonyPostfix]
-    private static void DiagPostfix_SetElementWoundedNumber(TroopRoster __instance, int number)
-        => DiagRoster(__instance, $"SetElementWoundedNumber({number})");
 }
 
 // Some co-op flows commit troops via AddToCounts while already inside an AllowedThread opened for another

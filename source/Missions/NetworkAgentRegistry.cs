@@ -3,6 +3,7 @@ using GameInterface.Services.Entity;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions;

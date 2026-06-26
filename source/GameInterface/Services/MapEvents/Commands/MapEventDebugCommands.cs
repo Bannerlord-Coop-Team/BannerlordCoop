@@ -15,6 +15,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
+using TaleWorlds.MountAndBlade;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Villages.Commands;
@@ -229,6 +230,58 @@ public class MapEventDebugCommands
         Logger.Debug("{PlayerEncounter}", result);
 
         return result;
+    }
+
+    /// <summary>
+    /// Prints a compact, teardown-focused snapshot of the current <see cref="PlayerEncounter"/> and the main
+    /// party's map-event state. Run on each client after a battle to spot an encounter that did not tear down —
+    /// e.g. PlayerEncounter.Current still PRESENT, or MainParty.MapEvent lingering on an already-finalized event.
+    /// Unlike <c>list_player_encounter</c> (full reflection dump) this is short enough to diff across clients.
+    /// </summary>
+    [CommandLineArgumentFunction("encounter_state", "coop.debug.mapevent")]
+    public static string EncounterState(List<string> args)
+    {
+        TryGetObjectManager(out var objectManager);
+
+        var sb = new StringBuilder();
+
+        var encounter = PlayerEncounter.Current;
+        sb.AppendLine($"PlayerEncounter.Current: {(encounter == null ? "<null> (torn down)" : "PRESENT")}");
+        if (encounter != null)
+        {
+            sb.AppendLine($"\tBattle:           {FormatMapEvent(PlayerEncounter.Battle, objectManager)}");
+            sb.AppendLine($"\t_mapEvent:        {FormatMapEvent(encounter._mapEvent, objectManager)}");
+            sb.AppendLine($"\tEncounteredParty: {FormatPartyBase(PlayerEncounter.EncounteredParty)}");
+            sb.AppendLine($"\t_attackerParty:   {FormatPartyBase(encounter._attackerParty)}");
+            sb.AppendLine($"\t_defenderParty:   {FormatPartyBase(encounter._defenderParty)}");
+        }
+
+        var mainParty = MobileParty.MainParty;
+        sb.AppendLine($"MainParty.MapEvent:      {FormatMapEvent(mainParty?.MapEvent, objectManager)}");
+
+        var side = mainParty?.Party?.MapEventSide;
+        if (side == null)
+            sb.AppendLine("MainParty.MapEventSide:  <null>");
+        else
+            sb.AppendLine($"MainParty.MapEventSide:  leader={FormatPartyBase(side.LeaderParty)} mainPartyIsLeader={side.LeaderParty == mainParty?.Party}");
+
+        sb.AppendLine($"CurrentMenu:             {Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "<none>"}");
+        sb.AppendLine($"MissionState.Current:    {(MissionState.Current == null ? "<null>" : "PRESENT")}");
+
+        var result = sb.ToString();
+        Logger.Debug("{EncounterState}", result);
+        return result;
+    }
+
+    private static string FormatMapEvent(MapEvent mapEvent, IObjectManager objectManager)
+    {
+        if (mapEvent == null) return "<null>";
+
+        var id = "<no id>";
+        if (objectManager != null && objectManager.TryGetId(mapEvent, out var resolved))
+            id = resolved;
+
+        return $"id={id} finalized={mapEvent.IsFinalized} state={mapEvent.BattleState} winner={mapEvent.WinningSide}";
     }
 
     [CommandLineArgumentFunction("get_events", "coop.debug.mapevent")]

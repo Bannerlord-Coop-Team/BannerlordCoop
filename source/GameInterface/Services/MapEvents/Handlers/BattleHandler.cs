@@ -103,6 +103,7 @@ internal class BattleHandler : IHandler
         messageBroker.Subscribe<AttackMissionAttempted>(Handle_AttackMissionAttempted);
         messageBroker.Subscribe<NetworkAttackMissionAttempted>(Handle_NetworkAttackMissionAttempted);
         messageBroker.Subscribe<NetworkStartAttackMission>(Handle_NetworkStartAttackMission);
+        messageBroker.Subscribe<NetworkBattleMissionStarted>(Handle_NetworkBattleMissionStarted);
 
         messageBroker.Subscribe<MapEventFinalized>(Handle_MapEventFinalized);
         messageBroker.Subscribe<TimeSpeedChangedAttempted>(Handle_TimeSpeedChangedAttempted);
@@ -132,6 +133,7 @@ internal class BattleHandler : IHandler
         messageBroker.Unsubscribe<AttackMissionAttempted>(Handle_AttackMissionAttempted);
         messageBroker.Unsubscribe<NetworkAttackMissionAttempted>(Handle_NetworkAttackMissionAttempted);
         messageBroker.Unsubscribe<NetworkStartAttackMission>(Handle_NetworkStartAttackMission);
+        messageBroker.Unsubscribe<NetworkBattleMissionStarted>(Handle_NetworkBattleMissionStarted);
 
         messageBroker.Unsubscribe<MapEventFinalized>(Handle_MapEventFinalized);
         messageBroker.Unsubscribe<TimeSpeedChangedAttempted>(Handle_TimeSpeedChangedAttempted);
@@ -199,11 +201,40 @@ internal class BattleHandler : IHandler
                 }
 
                 network.Send(requester, new NetworkStartAttackMission(randomTerrainSeed));
+
+                // Tell every client the battle is now mission-ready, so a client still sitting at the encounter
+                // menu greys out the auto-resolve option — a map event is fought as a live mission XOR an
+                // auto-resolve, never both (see BattleModeEncounterOptionsPatch / BattleMissionInProgress).
+                network.SendAll(new NetworkBattleMissionStarted(payload.What.MapEventId));
             }
             catch (Exception e)
             {
                 Logger.Error(e, "Failed to make map event sides mission-ready for {Message}", nameof(NetworkAttackMissionAttempted));
             }
+        });
+    }
+
+    /// <summary>
+    /// [Client] The server reports a live battle mission has started (sides are mission-ready) for a map event.
+    /// If the local player's own party is in that event, record the mission as in progress so the encounter menu
+    /// greys out the auto-resolve option (<see cref="Patches.BattleModeEncounterOptionsPatch"/>). Clients not in
+    /// the event ignore it. Mirrors the simulation spectator guard in BattleSimulationRunHandler.
+    /// </summary>
+    private void Handle_NetworkBattleMissionStarted(MessagePayload<NetworkBattleMissionStarted> payload)
+    {
+        if (!ModInformation.IsClient) return;
+
+        var mapEventId = payload.What.MapEventId;
+
+        GameThread.Run(() =>
+        {
+            if (!objectManager.TryGetObject(mapEventId, out MapEvent mapEvent) || mapEvent == null)
+                return;
+
+            if (MobileParty.MainParty?.MapEvent != mapEvent && PlayerEncounter.Battle != mapEvent)
+                return;
+
+            BattleMissionInProgress.Begin(mapEventId);
         });
     }
 
@@ -443,6 +474,11 @@ internal class BattleHandler : IHandler
         {
             var playerPartyIds = FinalizeAndCollectPlayers(mapEvent);
 
+            // TEMP [UiDiag]: confirm the auto-finalize targets every winning player's party for the encounter
+            // close (a winner missing here would never be told to close). Remove once the stuck-screen is fixed.
+            Logger.Information("[UiDiag] MapEventConcluded {Id}: closing encounter for {Count} player party id(s): [{Ids}]",
+                payload.What.MapEventId, playerPartyIds.Length, string.Join(",", playerPartyIds));
+
             if (playerPartyIds.Length > 0)
                 network.SendAll(new NetworkClosePvpEncounter(playerPartyIds));
         }
@@ -502,6 +538,10 @@ internal class BattleHandler : IHandler
         GameThread.Run(() =>
         {
             if (Campaign.Current == null) return;
+
+            // The local player's battle has ended — clear the mission-in-progress flag so the encounter-menu mode
+            // gate (BattleModeEncounterOptionsPatch) stops treating this event as having a live mission underway.
+            BattleMissionInProgress.End();
 
             // When this battle ended with the local player captured, the captivity flow owns the UI:
             // PlayerCaptivityClientHandler has switched to the prisoner menu and leaves the encounter

@@ -6,6 +6,7 @@ using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
@@ -36,6 +37,11 @@ internal class PvPInteractionClientHandler : IHandler
     // Only touched on the game main thread.
     private string shownDefenderPartyId;
 
+    // Set when a server close (NetworkClosePvpEncounter) arrives while a battle mission is still running. The
+    // close cannot happen mid-mission, so it is retried on the next CampaignTick once the mission has ended
+    // (Handle_CampaignTick). Static because CloseEncounter is static.
+    private static bool pendingEncounterClose;
+
     // This instance's player hero name, to tell instances apart in a combined log.
     private static string Who => Hero.MainHero?.Name?.ToString() ?? "?";
 
@@ -49,6 +55,7 @@ internal class PvPInteractionClientHandler : IHandler
         messageBroker.Subscribe<NetworkPlayerInteractionEnded>(Handle_NetworkPlayerInteractionEnded);
         messageBroker.Subscribe<NetworkHidePvpPopup>(Handle_NetworkHidePvpPopup);
         messageBroker.Subscribe<NetworkClosePvpEncounter>(Handle_NetworkClosePvpEncounter);
+        messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
     }
 
     public void Dispose()
@@ -57,6 +64,7 @@ internal class PvPInteractionClientHandler : IHandler
         messageBroker.Unsubscribe<NetworkPlayerInteractionEnded>(Handle_NetworkPlayerInteractionEnded);
         messageBroker.Unsubscribe<NetworkHidePvpPopup>(Handle_NetworkHidePvpPopup);
         messageBroker.Unsubscribe<NetworkClosePvpEncounter>(Handle_NetworkClosePvpEncounter);
+        messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
 
         // Make sure a popup never outlives the co-op session.
         if (shownDefenderPartyId != null)
@@ -139,6 +147,22 @@ internal class PvPInteractionClientHandler : IHandler
         });
     }
 
+    /// <summary>
+    /// Retries a deferred encounter close. <see cref="CloseEncounter"/> defers when the server's close arrives
+    /// while the battle mission is still running; once the mission has torn down this runs the close so the
+    /// player is not left stranded on the post-battle encounter menu.
+    /// </summary>
+    private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
+    {
+        if (ModInformation.IsServer) return;
+        if (!pendingEncounterClose) return;
+        if (MissionState.Current != null) return;
+
+        pendingEncounterClose = false;
+        Logger.Debug("[MapEvent] {Who}: running deferred encounter close (mission ended)", Who);
+        CloseEncounter();
+    }
+
     /// <summary>The defender was added to the map event (battle started); drop the popup — the battle menu blocks them now.</summary>
     private void Handle_NetworkHidePvpPopup(MessagePayload<NetworkHidePvpPopup> payload)
     {
@@ -195,8 +219,15 @@ internal class PvPInteractionClientHandler : IHandler
             MobileParty.MainParty?.MapEvent != null,
             Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "<none>");
 
-        // A battle mission is open — the party belongs in it; never pull it out.
-        if (MissionState.Current != null) return;
+        // A battle mission is still running — the party belongs in it; never pull it out now. The server's
+        // NetworkClosePvpEncounter arrives before the local mission tears down, so defer the close and let
+        // Handle_CampaignTick retry it once the mission has ended.
+        if (MissionState.Current != null)
+        {
+            pendingEncounterClose = true;
+            Logger.Debug("[MapEvent] {Who}: CloseEncounter deferred (mission still running)", Who);
+            return;
+        }
 
         // The local player was captured in this battle: the captivity flow owns the UI (prisoner menu) and leaves the
         // encounter itself. Finishing/exiting here would close the capture screen. Mirrors

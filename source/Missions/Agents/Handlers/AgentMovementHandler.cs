@@ -103,10 +103,14 @@ namespace Missions.Agents.Handlers
             // lockup); one packet for ALL of them overflows the unreliable MTU ceiling.
             var ids = new List<Guid>();
             var data = new List<AgentData>();
+
             foreach (var agentInfo in agentRegistry.GetAgents(controllerIdProvider.ControllerId))
             {
                 Agent agent = agentInfo.Agent;
-                if (agent != null && agent.Mission != null)
+                // Skip agents whose native object is already gone (dead/removed but not yet deregistered):
+                // building AgentData calls into the agent (GetCurrentActionType, etc.), which throws an
+                // AccessViolationException on a freed agent. Mirrors the IsActive() guard on the apply path.
+                if (agent != null && agent.Mission != null && agent.IsActive())
                 {
                     ids.Add(agentInfo.AgentId);
                     data.Add(new AgentData(agent));
