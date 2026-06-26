@@ -79,14 +79,12 @@ public class ArmyHandler : IHandler
     private void HandleChangeAddMobilePartyInArmy(MessagePayload<NetworkAddMobilePartyInArmy> payload)
     {
         var obj = payload.What;
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             if (objectManager.TryGetObjectWithLogging(obj.MobilePartyId, out MobileParty mobileParty) == false) return;
             if (objectManager.TryGetObjectWithLogging<Army>(obj.ArmyId, out var army) == false) return;
-            using (new AllowedThread())
-            {
-                mobileParty.Army = army;
-            }
+            mobileParty._army = army;
+            ArmyPatches.AddMobilePartyInArmy(mobileParty, army);
         });
     }
 
@@ -95,8 +93,9 @@ public class ArmyHandler : IHandler
 
         if (!objectManager.TryGetIdWithLogging(obj.What.Army, out var armyId)) return;
         if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
+        if (!objectManager.TryGetIdWithLogging(obj.What.ClientMobileParty, out var clientMobilePartyId)) return;
 
-        var message = new NetworkRemovePartyInArmy(armyId, mobilePartyId);
+        var message = new NetworkRemovePartyInArmy(armyId, mobilePartyId, clientMobilePartyId);
 
         // Broadcast to all the clients that the state was changed
         network.SendAll(message);
@@ -105,12 +104,13 @@ public class ArmyHandler : IHandler
     private void HandleChangeRemoveMobilePartyInArmy(MessagePayload<NetworkRemovePartyInArmy> payload)
     {
         var data = payload.What;
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             if (objectManager.TryGetObjectWithLogging(data.MobilePartyId, out MobileParty mobileParty) == false) return;
             if (objectManager.TryGetObjectWithLogging<Army>(data.ArmyId, out var army) == false) return;
-
-            ArmyPatches.RemoveMobilePartyInArmy(mobileParty, army);
+            if (objectManager.TryGetObjectWithLogging(data.ClientMobilePartyId, out MobileParty clientMobileParty) == false) return;
+            ArmyPatches.RemoveMobilePartyInArmy(mobileParty, army, clientMobileParty);
+            mobileParty._army = null;
         });
     }
 
@@ -215,13 +215,15 @@ public class ArmyHandler : IHandler
     }
     private void HandleInfluencespent(MessagePayload<ChangeClanInfluence> payload)
     {
-        network.SendAll(new NetworkChangeClanInfluence(payload.What.Influence));
+        if (!objectManager.TryGetIdWithLogging(payload.What.PlayerClan, out var playerClanId)) return;
+        network.SendAll(new NetworkChangeClanInfluence(playerClanId, payload.What.Influence));
     }
     private void HandleNetworkInfluencespent(MessagePayload<NetworkChangeClanInfluence> payload)
     {
         GameThread.RunSafe(() =>
         {
-            ChangeClanInfluenceAction.Apply(Clan.PlayerClan, (float)(-(float)(payload.What.Influence)));
+            if (!objectManager.TryGetObjectWithLogging<Clan>(payload.What.PlayerClanId, out var playerClan)) return;
+            ChangeClanInfluenceAction.Apply(playerClan, (float)(-(float)(payload.What.Influence)));
         });
     }
 }

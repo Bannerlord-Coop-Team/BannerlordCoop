@@ -10,10 +10,13 @@ namespace GameInterface.Services.Armies.Messages;
 public readonly struct NetworkChangeClanInfluence : ICommand
 {
     [ProtoMember(1)]
+    public readonly string PlayerClanId;
+    [ProtoMember(2)]
     public readonly int Influence;
 
-    public NetworkChangeClanInfluence(int influence)
+    public NetworkChangeClanInfluence(string playerClanId, int influence)
     {
+        PlayerClanId = playerClanId;
         Influence = influence;
     }
 }

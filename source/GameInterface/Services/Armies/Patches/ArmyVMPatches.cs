@@ -6,9 +6,11 @@ using GameInterface.Services.Armies.Messages;
 using HarmonyLib;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.ViewModelCollection.ArmyManagement;
 using TaleWorlds.CampaignSystem.ViewModelCollection.GameMenu.Overlay;
+using TaleWorlds.CampaignSystem.ViewModelCollection.Party;
 
 namespace GameInterface.Services.Armies.Patches;
 
@@ -72,8 +74,8 @@ internal class ArmyManagementVMPatch
                         }
                     }
                 }
+                MessageBroker.Instance.Publish(__instance, new ChangeClanInfluence(Clan.PlayerClan, __instance.TotalCost - __instance._influenceSpentForCohesionBoosting));
             }
-        MessageBroker.Instance.Publish(__instance, new ChangeClanInfluence(__instance.TotalCost - __instance._influenceSpentForCohesionBoosting));
         }
 
         if (__instance._partiesToRemove.Count > 0)
@@ -85,8 +87,8 @@ internal class ArmyManagementVMPatch
             {
                 if (party == MobileParty.MainParty)
                 { 
-                    MessageBroker.Instance.Publish(__instance, new MobilePartyInArmyRemoved(MobileParty.MainParty.Army, party));
-                    ArmyPatches.RemoveMobilePartyInArmy(party, MobileParty.MainParty.Army);
+                    MessageBroker.Instance.Publish(__instance, new MobilePartyInArmyRemoved(MobileParty.MainParty.Army, party, MobileParty.MainParty));
+                    ArmyPatches.RemoveMobilePartyInArmy(party, MobileParty.MainParty.Army, MobileParty.MainParty);
                     flag = true;
                 }
             }
@@ -97,8 +99,8 @@ internal class ArmyManagementVMPatch
                     Army army = MobileParty.MainParty.Army;
                     if (army != null && army.Parties.Contains(party2))
                     {
-                        MessageBroker.Instance.Publish(__instance, new MobilePartyInArmyRemoved(MobileParty.MainParty.Army, party2));
-                        ArmyPatches.RemoveMobilePartyInArmy(party2, MobileParty.MainParty.Army);
+                        MessageBroker.Instance.Publish(__instance, new MobilePartyInArmyRemoved(MobileParty.MainParty.Army, party2, MobileParty.MainParty));
+                        ArmyPatches.RemoveMobilePartyInArmy(party2, MobileParty.MainParty.Army, MobileParty.MainParty);
                     }
                 }
             }
@@ -122,11 +124,24 @@ public class GameMenuOverlayArmyDismissPatch
 
         var party = __instance._contextMenuItem?.Party?.MobileParty;
         if (party?.Army == null) return true;
-        { 
-            MessageBroker.Instance.Publish(__instance, new MobilePartyInArmyRemoved(party.Army, party));
-            ArmyPatches.RemoveMobilePartyInArmy(party, MobileParty.MainParty.Army);
+        var army = party.Army;
+        if (army.LeaderParty == MobileParty.MainParty &&
+            army.Parties.Count <= 2)
+        {
+            DisbandArmyAction.ApplyByNotEnoughParty(army);
         }
+        else
+        {
+            MessageBroker.Instance.Publish(__instance, new MobilePartyInArmyRemoved(army, party, MobileParty.MainParty));
 
+            ArmyPatches.RemoveMobilePartyInArmy(party, MobileParty.MainParty.Army, MobileParty.MainParty);
+        }
+        // cleanup
+        if (!__instance._closedHandled)
+        {
+            CampaignEventDispatcher.Instance.OnCharacterPortraitPopUpClosed();
+            __instance._closedHandled = true;
+        }
         return false;
     }
 }

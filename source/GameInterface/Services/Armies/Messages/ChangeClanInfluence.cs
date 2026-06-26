@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Armies.Messages;
 
@@ -7,10 +8,12 @@ namespace GameInterface.Services.Armies.Messages;
 /// </summary>
 public readonly struct ChangeClanInfluence : IEvent
 {
+    public readonly Clan PlayerClan;
     public readonly int Influence;
 
-    public ChangeClanInfluence(int influence)
+    public ChangeClanInfluence(Clan playerClan, int influence)
     {
+        PlayerClan = playerClan;
         Influence = influence;
     }
 }
