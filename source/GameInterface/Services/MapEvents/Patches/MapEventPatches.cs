@@ -90,8 +90,48 @@ internal class MapEventPatches
             return true;
         }
 
+        // While the conversing client is accepting a bandit surrender, the victory state is set here
+        // (by SetOverrideWinner) before the surrender is forwarded. Hold back the relay so the server
+        // is not driven to capture before it knows the side surrendered; the forwarded surrender then
+        // drives the authoritative victory and capture instead (at the full surrendered rate).
+        if (BanditSurrenderPatch.InSurrenderConsequence)
+        {
+            return true;
+        }
+
+        // The same victory state can be assigned more than once in quick succession (e.g. accepting
+        // a bandit surrender sets the override winner and then surrenders the enemy side, both
+        // resolving to the same victory). The native setter ignores a no-op change, so only relay an
+        // actual state change to avoid sending a redundant battle result to the server.
+        if (value == __instance.BattleState)
+        {
+            return true;
+        }
+
         var message = new MapEventBattleStateChangeAttempted(__instance, value);
         MessageBroker.Instance.Publish(__instance, message);
+
+        return true;
+    }
+
+    [HarmonyPatch(nameof(MapEvent.DoSurrender))]
+    [HarmonyPrefix]
+    private static bool Prefix_DoSurrender(MapEvent __instance, BattleSideEnum side)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed())
+        {
+            return true;
+        }
+
+        // The defeated troops are captured authoritatively on the server, and the capture rate is
+        // full only when the defeated side is flagged surrendered (otherwise it is the reduced battle
+        // rate). The surrender flag is set here by the native call, but that runs on the conversing
+        // client, which never captures — so forward it for the server to apply before it captures.
+        // This still runs locally too, so the conversing client's own encounter resolves as normal.
+        if (ModInformation.IsClient)
+        {
+            MessageBroker.Instance.Publish(__instance, new MapEventSurrenderAttempted(__instance, side));
+        }
 
         return true;
     }
