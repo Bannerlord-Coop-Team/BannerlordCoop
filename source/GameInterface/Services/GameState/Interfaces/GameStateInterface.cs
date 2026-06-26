@@ -46,6 +46,7 @@ internal class GameStateInterface : IGameStateInterface
 
     public void LoadSaveData(byte[] saveData)
     {
+        messageBroker.Publish(this, new GameLoadStarted());
         GameThread.Run(() => InteralLoadSaveGame(saveData), blocking: true);
     }
 
@@ -65,6 +66,7 @@ internal class GameStateInterface : IGameStateInterface
 
     public void StartNewGame()
     {
+        messageBroker.Publish(this, new GameLoadStarted());
         GameThread.Run(() =>
         {
             MBGameManager.StartNewGame(new SandBoxGameManager(() => new Campaign(CampaignGameMode.Campaign)));
@@ -73,6 +75,7 @@ internal class GameStateInterface : IGameStateInterface
 
     public void LoadGame(string saveName)
     {
+        messageBroker.Publish(this, new GameLoadStarted());
         GameThread.Run(() =>
         {
             var save = MBSaveLoad.GetSaveFiles(null).SingleOrDefault(x => x.Name == saveName);
