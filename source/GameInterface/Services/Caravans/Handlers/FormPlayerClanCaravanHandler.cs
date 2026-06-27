@@ -74,7 +74,7 @@ internal class FormPlayerClanCaravanHandler : IHandler
     
     private void Handle_NetworkFadeOutNewCaravanLeader(MessagePayload<NetworkFadeOutNewCaravanLeader> obj)
     {
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.CaravanLeaderId, out var caravanLeader)) return;
 
