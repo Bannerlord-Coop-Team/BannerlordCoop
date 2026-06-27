@@ -69,16 +69,15 @@ internal class SaveGameHandler : IHandler
     private ICoopSession savedSession;
     private void Handle_GameLoaded(MessagePayload<GameLoaded> obj)
     {
-        savedSession = saveManager.LoadCoopSession(obj.What.SaveName);
-        if(savedSession == null)
-        {
-            savedSession = new CoopSession(
-                obj.What.SaveName,
-                new Player[0],
-                new CraftingPlayerData(new(), new(), new()),
-                new WorkshopPlayerData(new()),
-                new CaravansPlayerData(new(), new(), new()));
-        }
+        var loaded = saveManager.LoadCoopSession(obj.What.SaveName);
+
+        savedSession ??= new CoopSession(
+            loaded?.UniqueGameId ?? obj.What.SaveName,
+            loaded?.Players ?? new Player[0],
+            loaded?.CraftingPlayerData ?? new CraftingPlayerData(new(), new(), new()),
+            loaded?.WorkshopPlayerData ?? new WorkshopPlayerData(new()),
+            loaded?.CaravansPlayerData ?? new CaravansPlayerData(new(), new(), new()));
+
         coopSessionProvider.CoopSession = savedSession;
     }
 
