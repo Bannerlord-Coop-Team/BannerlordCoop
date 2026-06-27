@@ -65,10 +65,12 @@ internal class TradeHandler : IHandler
         var what = payload.What;
 
         var isManagingWarehouse = what.InventoryMode == InventoryScreenHelper.InventoryMode.Warehouse;
-        var manageLeftRoster = what.InventoryMode != InventoryScreenHelper.InventoryMode.Default && !what.CanGainXpFromDiscarding && !isManagingWarehouse;
 
+        // Don't update warehouse rosters directly if managing a warehouse, server uses CoopSession.WorkshopPlayerData
+        // Not all left rosters need to be managed by server so no need to check result of resolving it
+        // e.g. Discarding items in default inventory screen only needs to save the right roster
         string fromRosterId = null;
-        if (manageLeftRoster && !objectManager.TryGetIdWithLogging(what.FromRoster, out fromRosterId)) return;
+        if (!isManagingWarehouse) objectManager.TryGetIdWithLogging(what.FromRoster, out fromRosterId);
 
         if (!objectManager.TryGetIdWithLogging(what.ToRoster, out var toRosterId)) return;
         if (!objectManager.TryGetIdWithLogging(what.Hero, out var heroId)) return;

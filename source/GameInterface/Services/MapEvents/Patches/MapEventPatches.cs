@@ -90,8 +90,48 @@ internal class MapEventPatches
             return true;
         }
 
+        // While the conversing client is accepting a bandit surrender, the victory state is set here
+        // (by SetOverrideWinner) before the surrender is forwarded. Hold back the relay so the server
+        // is not driven to capture before it knows the side surrendered; the forwarded surrender then
+        // drives the authoritative victory and capture instead (at the full surrendered rate).
+        if (BanditSurrenderPatch.InSurrenderConsequence)
+        {
+            return true;
+        }
+
+        // The same victory state can be assigned more than once in quick succession (e.g. accepting
+        // a bandit surrender sets the override winner and then surrenders the enemy side, both
+        // resolving to the same victory). The native setter ignores a no-op change, so only relay an
+        // actual state change to avoid sending a redundant battle result to the server.
+        if (value == __instance.BattleState)
+        {
+            return true;
+        }
+
         var message = new MapEventBattleStateChangeAttempted(__instance, value);
         MessageBroker.Instance.Publish(__instance, message);
+
+        return true;
+    }
+
+    [HarmonyPatch(nameof(MapEvent.DoSurrender))]
+    [HarmonyPrefix]
+    private static bool Prefix_DoSurrender(MapEvent __instance, BattleSideEnum side)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed())
+        {
+            return true;
+        }
+
+        // The defeated troops are captured authoritatively on the server, and the capture rate is
+        // full only when the defeated side is flagged surrendered (otherwise it is the reduced battle
+        // rate). The surrender flag is set here by the native call, but that runs on the conversing
+        // client, which never captures — so forward it for the server to apply before it captures.
+        // This still runs locally too, so the conversing client's own encounter resolves as normal.
+        if (ModInformation.IsClient)
+        {
+            MessageBroker.Instance.Publish(__instance, new MapEventSurrenderAttempted(__instance, side));
+        }
 
         return true;
     }
@@ -205,6 +245,42 @@ internal class InteractionPatches
     private static readonly ConditionalWeakTable<MapEvent, PlayerBattleAiJoinWindow> playerBattleAiJoinWindows = new();
 
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.CanPartyJoinBattle))]
+    [HarmonyPrefix]
+    private static bool Prefix_CanPartyJoinBattle(MapEvent __instance, PartyBase party, ref bool __result)
+    {
+        if (CanEvaluateJoinBattle(__instance, party))
+            return true;
+
+        __result = true;
+        return false;
+    }
+
+    // The vanilla check dereferences the passed party's MapFaction and, for every MapEventParty on both
+    // sides, its Party and that Party's MapFaction. On the client those sync in over several messages, so
+    // all must be present before the check can run without hitting un-ready state.
+    internal static bool CanEvaluateJoinBattle(MapEvent mapEvent, PartyBase party)
+    {
+        if (mapEvent?.AttackerSide == null || mapEvent.DefenderSide == null)
+            return false;
+
+        if (party?.MapFaction == null)
+            return false;
+
+        return PartiesResolved(mapEvent.AttackerSide) && PartiesResolved(mapEvent.DefenderSide);
+    }
+
+    private static bool PartiesResolved(MapEventSide side)
+    {
+        foreach (var mapEventParty in side.Parties)
+        {
+            if (mapEventParty?.Party?.MapFaction == null)
+                return false;
+        }
+
+        return true;
+    }
+
+    [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.CanPartyJoinBattle))]
     [HarmonyPostfix]
     private static void Postfix_CanPartyJoinBattle(
         MapEvent __instance,
@@ -215,7 +291,7 @@ internal class InteractionPatches
         // building the encounter "join the battle" menu options; native can return false there (e.g. war state /
         // side expectations not matching on the client), which would hide the join option. Force it true so the
         // player can always join.
-        if (party.MobileParty?.IsPlayerParty() == true)
+        if (party?.MobileParty?.IsPlayerParty() == true)
         {
             __result = true;
             return;

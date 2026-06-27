@@ -3,6 +3,7 @@ using Common.Messaging;
 using Coop.Core.Client;
 using Coop.Core.Client.Messages;
 using Coop.Core.Client.States;
+using GameInterface.Services.Caravans;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.UI.Interfaces;
@@ -33,7 +34,7 @@ namespace Coop.Tests.Client.States
         }
 
         private static NetworkGameSaveDataReceived SaveData(byte[] data, string campaignId) =>
-            new NetworkGameSaveDataReceived(data, campaignId, new CraftingPlayerData(new(), new(), new()), new WorkshopPlayerData(new()), new AlleyPlayerData(new()));
+            new NetworkGameSaveDataReceived(data, campaignId, new CraftingPlayerData(new(), new(), new()), new WorkshopPlayerData(new()), new CaravansPlayerData(new(), new(), new()), new AlleyPlayerData(new()));
 
         [Fact]
         public void StateEntered_Shows_LoadingProgressMessage()

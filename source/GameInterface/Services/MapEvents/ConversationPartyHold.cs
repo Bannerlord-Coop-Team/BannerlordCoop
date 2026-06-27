@@ -53,6 +53,10 @@ internal static class ConversationPartyHold
         if (!wasAiDisabled)
         {
             party.SetMoveModeHold();
+
+            // Certain parties such as caravans are still able to make new decisions even with their AI disabled
+            // Setting DoNotMakeNewDecisions to true blocks setting new behaviors for these parties
+            party.Ai.DoNotMakeNewDecisions = true;
             party.Ai.DisableAi();
         }
 
@@ -132,6 +136,7 @@ internal static class ConversationPartyHold
         if (ai == null) return;
 
         ai.EnableAi();
+        ai.DoNotMakeNewDecisions = false;
         ai.RethinkAtNextHourlyTick = true;
     }
 }

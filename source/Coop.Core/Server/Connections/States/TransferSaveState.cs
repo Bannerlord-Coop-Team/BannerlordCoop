@@ -38,6 +38,7 @@ public class TransferSaveState : ConnectionStateBase
                 saveResults.CampaignId,
                 coopSessionProvider.CoopSession?.CraftingPlayerData,
                 coopSessionProvider.CoopSession?.WorkshopPlayerData,
+                coopSessionProvider.CoopSession?.CaravansPlayerData,
                 coopSessionProvider.CoopSession?.AlleyPlayerData);
 
             // Disconnect peer on failure

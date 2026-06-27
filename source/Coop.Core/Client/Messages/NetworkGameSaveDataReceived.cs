@@ -2,6 +2,7 @@
 
 using Common.Messaging;
 using GameInterface.Services.Alleys;
+using GameInterface.Services.Caravans;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.Workshops;
 using ProtoBuf;
@@ -23,6 +24,8 @@ public record NetworkGameSaveDataReceived : IEvent
     [ProtoMember(4)]
     public WorkshopPlayerData WorkshopPlayerData { get; }
     [ProtoMember(5)]
+    public CaravansPlayerData CaravansPlayerData { get; }
+    [ProtoMember(6)]
     public AlleyPlayerData AlleyPlayerData { get; }
 
     public NetworkGameSaveDataReceived(
@@ -30,12 +33,14 @@ public record NetworkGameSaveDataReceived : IEvent
         string campaignID,
         CraftingPlayerData craftingPlayerData,
         WorkshopPlayerData workshopPlayerData,
+        CaravansPlayerData caravansPlayerData,
         AlleyPlayerData alleyPlayerData)
     {
         GameSaveData = gameSaveData;
         CampaignID = campaignID;
         CraftingPlayerData = craftingPlayerData;
         WorkshopPlayerData = workshopPlayerData;
+        CaravansPlayerData = caravansPlayerData;
         AlleyPlayerData = alleyPlayerData;
     }
 }

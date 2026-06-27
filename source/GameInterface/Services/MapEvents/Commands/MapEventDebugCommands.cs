@@ -64,6 +64,40 @@ public class MapEventDebugCommands
         return $"MapEvent Started";
     }
 
+    // coop.debug.mapevent.start_nearest_looter
+    /// <summary>
+    /// Forces an encounter between the player's party and the nearest active bandit/looter party, so
+    /// the bandit surrender/recruit dialogue can be reached without chasing one down. Run on a client
+    /// (uses the player's main party). Bring a much larger party than the bandits so they offer to
+    /// surrender or join.
+    /// </summary>
+    [CommandLineArgumentFunction("start_nearest_looter", "coop.debug.mapevent")]
+    public static string StartNearestLooterMapEvent(List<string> args)
+    {
+        var mainParty = MobileParty.MainParty;
+        if (mainParty == null)
+        {
+            return "No main party — run this on a client with a player party.";
+        }
+
+        var mainPos = mainParty.Position.ToVec2();
+        var nearest = MobileParty.All
+            .Where(p => p.IsActive && p.IsBandit && p != mainParty
+                        && p.MapEvent == null && p.CurrentSettlement == null && p.MemberRoster.TotalManCount > 0)
+            .OrderBy(p => p.Position.ToVec2().DistanceSquared(mainPos))
+            .FirstOrDefault();
+
+        if (nearest == null)
+        {
+            return "No active bandit/looter party found on the map.";
+        }
+
+        EncounterManager.StartPartyEncounter(mainParty.Party, nearest.Party);
+
+        return $"Started encounter with {nearest.Name} ({nearest.StringId}), " +
+               $"{nearest.MemberRoster.TotalManCount} troops, {nearest.Position.ToVec2().Distance(mainPos):0.0} away.";
+    }
+
     /// <summary>
     /// Kills a random troop from the enemy side of the current map event.
     /// </summary>

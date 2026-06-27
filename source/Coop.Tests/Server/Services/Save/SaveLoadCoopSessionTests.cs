@@ -8,6 +8,7 @@ using Xunit;
 using Xunit.Abstractions;
 using GameInterface.Services.Workshops;
 using GameInterface.Services.Alleys;
+using GameInterface.Services.Caravans;
 
 namespace Coop.Tests.Server.Services.Save
 {
@@ -40,7 +41,13 @@ namespace Coop.Tests.Server.Services.Save
                 new Player("MyPlayer2", "MyHero2","MyParty2", "MyClan2", "MyCharacter2"),
             };
 
-            ICoopSession sessionData = new CoopSession("SaveManagerTest", players, new CraftingPlayerData(new(), new(), new()), new WorkshopPlayerData(new()), new AlleyPlayerData(new()));
+            ICoopSession sessionData = new CoopSession(
+                "SaveManagerTest",
+                players,
+                new CraftingPlayerData(new(), new(), new()),
+                new WorkshopPlayerData(new()),
+                new CaravansPlayerData(new(), new(), new()),
+                new AlleyPlayerData(new()));
 
             string saveFile = sessionData.UniqueGameId;
 
@@ -73,7 +80,13 @@ namespace Coop.Tests.Server.Services.Save
                 new Player("MyPlayer2", "MyHero2","MyParty2", "MyClan2", "MyCharacter2"),
             };
 
-            ICoopSession sessionData = new CoopSession("SaveManagerTest", players, new CraftingPlayerData(new(), new(), new()), new WorkshopPlayerData(new()), new AlleyPlayerData(new()));
+            ICoopSession sessionData = new CoopSession(
+                "SaveManagerTest",
+                players,
+                new CraftingPlayerData(new(), new(), new()),
+                new WorkshopPlayerData(new()),
+                new CaravansPlayerData(new(), new(), new()),
+                new AlleyPlayerData(new()));
 
             string saveFile = SAVE_PATH + sessionData.UniqueGameId;
 
