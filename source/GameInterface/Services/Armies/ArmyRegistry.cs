@@ -68,7 +68,12 @@ internal class ArmyRegistry : AutoRegistryBase<Army>
         {
             using (new AllowedThread())
             {
+                if (obj._armyIsDispersing)
+                {
+                    return;
+                }
                 CampaignEventDispatcher.Instance.OnArmyDispersed(obj, Army.ArmyDispersionReason.Unknown, obj.Parties.Contains(MobileParty.MainParty));
+                obj._armyIsDispersing = true;
                 foreach (var party in obj._parties)
                 {
                     if (MobileParty.MainParty != null)
@@ -94,6 +99,7 @@ internal class ArmyRegistry : AutoRegistryBase<Army>
                 }
                 obj._hourlyTickEvent?.DeletePeriodicEvent();
                 obj._tickEvent?.DeletePeriodicEvent();
+                obj._armyIsDispersing = false;
             }
         });
     }

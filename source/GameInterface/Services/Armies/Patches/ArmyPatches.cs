@@ -71,11 +71,22 @@ public class ArmyPatches
             }
         }
     }
+    [HarmonyPatch(typeof(Army), "set_Kingdom")]
+    [HarmonyPrefix]
+    public static bool ArmySetKingdomPrefix(Army __instance, Kingdom value)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (ModInformation.IsClient) return false;
+        var message = new SetArmyKingdom(__instance, value);
+        MessageBroker.Instance.Publish(__instance, message);
+        return true;
+    }
 
     public static void AddMobilePartyInArmy(MobileParty mobileParty, Army army)
     {
         GameThread.RunSafe(() =>
         {
+            if (army._parties.Contains(mobileParty)) return;
             mobileParty._army = army;
             army._parties.Add(mobileParty);
             mobileParty.Ai.RethinkAtNextHourlyTick = true;
@@ -87,6 +98,7 @@ public class ArmyPatches
     {
         GameThread.RunSafe(() =>
         {
+            if (!army._parties.Contains(mobileParty)) return;
             mobileParty.Ai.SetInitiative(1f, 1f, 24f);
             army._parties.Remove(mobileParty);
             CampaignEventDispatcher.Instance.OnPartyRemovedFromArmy(mobileParty);

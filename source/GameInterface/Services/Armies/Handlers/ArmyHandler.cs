@@ -46,6 +46,8 @@ public class ArmyHandler : IHandler
         messageBroker.Subscribe<NetworkPlayerBoostedArmyCohesion>(HandleNetworkPlayerBoostedArmyCohesion);
         messageBroker.Subscribe<ChangeClanInfluence>(HandleInfluencespent);
         messageBroker.Subscribe<NetworkChangeClanInfluence>(HandleNetworkInfluencespent);
+        messageBroker.Subscribe<SetArmyKingdom>(HandleSetArmyKingdom);
+        messageBroker.Subscribe<NetworkSetArmyKingdom>(HandleNetworkSetArmyKingdom);
     }
 
     public void Dispose()
@@ -62,6 +64,8 @@ public class ArmyHandler : IHandler
         messageBroker.Unsubscribe<NetworkPlayerBoostedArmyCohesion>(HandleNetworkPlayerBoostedArmyCohesion);
         messageBroker.Unsubscribe<ChangeClanInfluence>(HandleInfluencespent);
         messageBroker.Unsubscribe<NetworkChangeClanInfluence>(HandleNetworkInfluencespent);
+        messageBroker.Unsubscribe<SetArmyKingdom>(HandleSetArmyKingdom);
+        messageBroker.Unsubscribe<NetworkSetArmyKingdom>(HandleNetworkSetArmyKingdom);
     }
 
     private void HandleAddMobilePartyInArmy(MessagePayload<MobilePartyInArmyAdded> obj)
@@ -84,6 +88,10 @@ public class ArmyHandler : IHandler
             if (objectManager.TryGetObjectWithLogging(obj.MobilePartyId, out MobileParty mobileParty) == false) return;
             if (objectManager.TryGetObjectWithLogging<Army>(obj.ArmyId, out var army) == false) return;
             ArmyPatches.AddMobilePartyInArmy(mobileParty, army);
+            if (ModInformation.IsServer)
+            {
+                network.SendAll(new NetworkAddMobilePartyInArmy(obj.ArmyId, obj.MobilePartyId));
+            }
         });
     }
 
@@ -108,14 +116,18 @@ public class ArmyHandler : IHandler
         var data = payload.What;
         GameThread.RunSafe(() =>
         {
-            if (objectManager.TryGetObjectWithLogging(data.MobilePartyId, out MobileParty mobileParty) == false) return;
-            if (objectManager.TryGetObjectWithLogging<Army>(data.ArmyId, out var army) == false) return;
-            MobileParty clientMobileParty = null;
-            if (!string.IsNullOrEmpty(data.ClientMobilePartyId))
-            {
-                objectManager.TryGetObjectWithLogging(data.ClientMobilePartyId, out clientMobileParty);
-            }
-            ArmyPatches.RemoveMobilePartyInArmy(mobileParty, army, clientMobileParty);
+        if (objectManager.TryGetObjectWithLogging(data.MobilePartyId, out MobileParty mobileParty) == false) return;
+        if (objectManager.TryGetObjectWithLogging<Army>(data.ArmyId, out var army) == false) return;
+        MobileParty clientMobileParty = null;
+        if (!string.IsNullOrEmpty(data.ClientMobilePartyId))
+        {
+            objectManager.TryGetObjectWithLogging(data.ClientMobilePartyId, out clientMobileParty);
+        }
+        ArmyPatches.RemoveMobilePartyInArmy(mobileParty, army, clientMobileParty);
+        if (ModInformation.IsServer)
+        {
+            network.SendAll(new NetworkRemovePartyInArmy(data.ArmyId, data.MobilePartyId, data.ClientMobilePartyId));
+        }
         });
     }
 
@@ -229,6 +241,37 @@ public class ArmyHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Clan>(payload.What.PlayerClanId, out var playerClan)) return;
             ChangeClanInfluenceAction.Apply(playerClan, (float)(-(float)(payload.What.Influence)));
+        });
+    }
+    private void HandleSetArmyKingdom(MessagePayload<SetArmyKingdom> payload)
+    {
+        Logger.Debug($"coolio1");
+        if (!objectManager.TryGetIdWithLogging(payload.What.Army, out var armyId)) return;
+        var kingdomId = string.Empty;
+        if (payload.What.Kingdom != null)
+        {
+            if (!objectManager.TryGetIdWithLogging(payload.What.Kingdom, out  kingdomId)) return;
+        }
+        network.SendAll(new NetworkSetArmyKingdom(armyId, kingdomId));
+        Logger.Debug($"coolio3");
+    }
+    private void HandleNetworkSetArmyKingdom(MessagePayload<NetworkSetArmyKingdom> payload)
+    {
+        GameThread.RunSafe(() =>
+        {
+            Logger.Debug($"coolio2");
+            if (!objectManager.TryGetObjectWithLogging<Army>(payload.What.ArmyId, out var army)) return;
+            Kingdom kingdom = null;
+            if (!string.IsNullOrEmpty(payload.What.KingdomId))
+            {
+                if (!objectManager.TryGetObjectWithLogging<Kingdom>(payload.What.KingdomId, out kingdom)) return;
+            }
+            using (new AllowedThread())
+            {
+
+                army.Kingdom = kingdom;
+                Logger.Debug($"armycount: {kingdom.Armies.Count}");
+            }
         });
     }
 }

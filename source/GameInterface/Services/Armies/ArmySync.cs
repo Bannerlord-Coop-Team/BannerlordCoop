@@ -12,7 +12,7 @@ internal class ArmySync : IAutoSync
     public ArmySync(AutoSyncRegistry autoSyncBuilder)
     {
         //fields
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Army), nameof(Army._kingdom)));
+        //autoSyncBuilder.AddField(AccessTools.Field(typeof(Army), nameof(Army._kingdom)));
 
         //properties
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Army), nameof(Army.LeaderParty)));
