@@ -90,7 +90,12 @@ internal class CaravansCampaignBehaviorHandler : IHandler
         GameThread.Run(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.DestroyedKingdomId, out var destroyedKingdom)) return;
-            GetCaravansBehavior().OnKingdomDestroyed(destroyedKingdom);
+
+            var caravansBehavior = GetCaravansBehavior();
+            if (caravansBehavior._prohibitedKingdomsForPlayerCaravans.Contains(destroyedKingdom))
+            {
+                caravansBehavior._prohibitedKingdomsForPlayerCaravans.Remove(destroyedKingdom);
+            }
         });
     }
 

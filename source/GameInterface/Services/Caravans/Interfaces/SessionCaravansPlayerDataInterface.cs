@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.ObjectManager;
@@ -43,16 +44,22 @@ public class SessionCaravansPlayerDataInterface : ISessionCaravansPlayerDataInte
 
     public void AddProhibitedKingdom(string playerHeroId, string kingdomId)
     {
-        if (!IsPlayerHeroIdValid(playerHeroId)) return;
+        GameThread.RunSafe(() =>
+        {
+            if (!IsPlayerHeroIdValid(playerHeroId)) return;
 
-        CaravansPlayerData.PlayerProhibitedKingdomsForPlayerCaravans[playerHeroId].Add(kingdomId);
+            CaravansPlayerData.PlayerProhibitedKingdomsForPlayerCaravans[playerHeroId].Add(kingdomId);
+        });
     }
 
     public void RemoveProhibitedKingdom(string playerHeroId, string kingdomId)
     {
-        if (!IsPlayerHeroIdValid(playerHeroId)) return;
+        GameThread.RunSafe(() =>
+        {
+            if (!IsPlayerHeroIdValid(playerHeroId)) return;
 
-        CaravansPlayerData.PlayerProhibitedKingdomsForPlayerCaravans[playerHeroId].Remove(kingdomId);
+            CaravansPlayerData.PlayerProhibitedKingdomsForPlayerCaravans[playerHeroId].Remove(kingdomId);
+        });
     }
 
     public void RemoveProhibitedKingdomForAllPlayers(string kingdomId)
@@ -60,6 +67,8 @@ public class SessionCaravansPlayerDataInterface : ISessionCaravansPlayerDataInte
         foreach (var player in playerManager.Players)
         {
             string playerHeroId = player.HeroId;
+            if (!CaravansPlayerData.PlayerProhibitedKingdomsForPlayerCaravans.ContainsKey(playerHeroId)) continue;
+
             if (CaravansPlayerData.PlayerProhibitedKingdomsForPlayerCaravans[playerHeroId].Contains(kingdomId))
             {
                 CaravansPlayerData.PlayerProhibitedKingdomsForPlayerCaravans[playerHeroId].Remove(kingdomId);
@@ -69,17 +78,20 @@ public class SessionCaravansPlayerDataInterface : ISessionCaravansPlayerDataInte
 
     public void SetPlayerInteraction(string playerHeroId, string mobilePartyId, CaravansCampaignBehavior.PlayerInteraction interaction)
     {
-        if (!IsPlayerHeroIdValid(playerHeroId)) return;
-
-        // Cast to save, can't use enumerable directly because of protection level in Coop.Core
-        int interactionInt = (int)interaction;
-
-        if (CaravansPlayerData.PlayerInteractedCaravans[playerHeroId].ContainsKey(mobilePartyId))
+        GameThread.RunSafe(() =>
         {
-            CaravansPlayerData.PlayerInteractedCaravans[playerHeroId][mobilePartyId] = interactionInt;
-            return;
-        }
-        CaravansPlayerData.PlayerInteractedCaravans[playerHeroId].Add(mobilePartyId, interactionInt);
+            if (!IsPlayerHeroIdValid(playerHeroId)) return;
+
+            // Cast to save, can't use enumerable directly because of protection level in Coop.Core
+            int interactionInt = (int)interaction;
+
+            if (CaravansPlayerData.PlayerInteractedCaravans[playerHeroId].ContainsKey(mobilePartyId))
+            {
+                CaravansPlayerData.PlayerInteractedCaravans[playerHeroId][mobilePartyId] = interactionInt;
+                return;
+            }
+            CaravansPlayerData.PlayerInteractedCaravans[playerHeroId].Add(mobilePartyId, interactionInt);
+        });
     }
 
     public void RemoveInteractedCaravanForAllPlayers(string mobilePartyId)
@@ -87,6 +99,8 @@ public class SessionCaravansPlayerDataInterface : ISessionCaravansPlayerDataInte
         foreach (var player in playerManager.Players)
         {
             string playerHeroId = player.HeroId;
+            if (!CaravansPlayerData.PlayerInteractedCaravans.ContainsKey(playerHeroId)) continue;
+
             if (CaravansPlayerData.PlayerInteractedCaravans[playerHeroId].ContainsKey(mobilePartyId))
             {
                 CaravansPlayerData.PlayerInteractedCaravans[playerHeroId].Remove(mobilePartyId);
@@ -96,9 +110,12 @@ public class SessionCaravansPlayerDataInterface : ISessionCaravansPlayerDataInte
 
     public void UpdateTradeRumorTakenCaravansForPlayer(string playerHeroId, Dictionary<string, long> tradeRumorTakenCaravansIds)
     {
-        if (!IsPlayerHeroIdValid(playerHeroId)) return;
+        GameThread.RunSafe(() =>
+        {
+            if (!IsPlayerHeroIdValid(playerHeroId)) return;
 
-        CaravansPlayerData.PlayerTradeRumorTakenCaravans[playerHeroId] = tradeRumorTakenCaravansIds;
+            CaravansPlayerData.PlayerTradeRumorTakenCaravans[playerHeroId] = tradeRumorTakenCaravansIds;
+        });
     }
 
     public void DeleteExpiredTradeRumorTakenCaravans(out Dictionary<string, List<string>> playerExpiredCaravansRemovalLists)
@@ -140,8 +157,14 @@ public class SessionCaravansPlayerDataInterface : ISessionCaravansPlayerDataInte
         if (targetFaction is not Kingdom kingdom)
             return true;
 
-        if (!objectManager.TryGetIdWithLogging(mobileParty.ActualClan.Leader, out var playerHeroId) || !IsPlayerHeroIdValid(playerHeroId)) return false;
-        if (!objectManager.TryGetIdWithLogging(kingdom, out var kingdomId)) return false;
+        string playerHeroId = null;
+        string kingdomId = null;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(mobileParty.ActualClan.Leader, out playerHeroId) || !IsPlayerHeroIdValid(playerHeroId)) return;
+            if (!objectManager.TryGetIdWithLogging(kingdom, out kingdomId)) return;
+        });
+        if (playerHeroId == null || kingdomId == null) return false;
 
         // Prevent trading if the caravan's player owner has prohibited trading with this kingdom
         return !CaravansPlayerData.PlayerProhibitedKingdomsForPlayerCaravans[playerHeroId].Contains(kingdomId);

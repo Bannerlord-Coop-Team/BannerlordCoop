@@ -65,7 +65,7 @@ internal class PartyComponentHandler : IHandler
         messageBroker.Unsubscribe<PartyComponentCreated>(Handle);
         messageBroker.Unsubscribe<NetworkCreatePartyComponent>(Handle);
 
-        messageBroker.Subscribe<PartyComponentLeaderChanged>(Handle_PartyComponentLeaderChanged);
+        messageBroker.Unsubscribe<PartyComponentLeaderChanged>(Handle_PartyComponentLeaderChanged);
         messageBroker.Unsubscribe<NetworkPartyComponentLeaderChanged>(Handle_NetworkPartyComponentLeaderChanged);
     }
 

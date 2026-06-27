@@ -73,6 +73,11 @@ internal class CaravansConversationsPatches
     [HarmonyPostfix]
     public static void CaravanStartTalkOnConditionPostfix(ref CaravansCampaignBehavior __instance)
     {
+        if (MobileParty.ConversationParty == null || !MobileParty.ConversationParty.IsCaravan)
+        {
+            return;
+        }
+
         // Local update is needed so separately publish message to server in postfix to store change in CoopSession
         var message = new SetPlayerCaravanInteraction(Hero.MainHero, MobileParty.ConversationParty, CaravansCampaignBehavior.PlayerInteraction.Friendly);
         MessageBroker.Instance.Publish(__instance, message);
@@ -147,14 +152,14 @@ internal class CaravansConversationsPatches
     public static bool ConversationCaravanSurrenderLeaveOnConsequencePrefix(ref CaravansCampaignBehavior __instance)
     {
         // Call helper function to implement vanilla open loot screen logic
-        OpenLootScreen(MobileParty.ConversationParty, out bool caravanHasItems);
+        OpenLootScreen(MobileParty.ConversationParty, out var caravanHasItems, out var itemRosterElements);
 
         // Locally set player interaction, and then save in CoopSession on server
         __instance.SetPlayerInteraction(MobileParty.ConversationParty, CaravansCampaignBehavior.PlayerInteraction.Hostile);
 
         PlayerEncounter.LeaveEncounter = true;
 
-        var message = new CaravanSurrenderLeaveOnConsequence(Hero.MainHero, MobileParty.MainParty, MobileParty.ConversationParty, caravanHasItems);
+        var message = new CaravanSurrenderLeaveOnConsequence(Hero.MainHero, MobileParty.MainParty, MobileParty.ConversationParty, caravanHasItems, itemRosterElements);
         MessageBroker.Instance.Publish(__instance, message);
 
         return false;
@@ -167,7 +172,7 @@ internal class CaravansConversationsPatches
         MobileParty encounteredMobileParty = PlayerEncounter.EncounteredMobileParty;
 
         // Call helper function to implement vanilla open loot screen logic
-        OpenLootScreen(encounteredMobileParty, out bool caravanHasItems);
+        OpenLootScreen(encounteredMobileParty, out var caravanHasItems, out var itemRosterElements);
 
         // Open prisoner transfer screne
         using (new AllowedThread())
@@ -185,19 +190,21 @@ internal class CaravansConversationsPatches
 
         PlayerEncounter.LeaveEncounter = true;
 
-        var message = new CaravanTookPrisonerOnConsequence(Hero.MainHero, MobileParty.MainParty, encounteredMobileParty, caravanHasItems);
+        var message = new CaravanTookPrisonerOnConsequence(Hero.MainHero, MobileParty.MainParty, encounteredMobileParty, caravanHasItems, itemRosterElements);
         MessageBroker.Instance.Publish(__instance, message);
 
         return false;
     }
 
-    private static void OpenLootScreen(MobileParty encounterParty, out bool caravanHasItems)
+    private static void OpenLootScreen(MobileParty encounterParty, out bool caravanHasItems, out ItemRosterElement[] itemRosterElements)
     {
         ItemRoster itemRoster = null;
         using (new AllowedThread())
         {
             itemRoster = new ItemRoster(encounterParty.ItemRoster);
         }
+
+        itemRosterElements = itemRoster._data;
 
         caravanHasItems = false;
         for (int i = 0; i < itemRoster.Count; i++)

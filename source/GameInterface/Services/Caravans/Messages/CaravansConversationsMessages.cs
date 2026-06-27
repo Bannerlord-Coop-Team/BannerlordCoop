@@ -116,17 +116,20 @@ public readonly struct CaravanSurrenderLeaveOnConsequence : IEvent
     public readonly MobileParty MainParty;
     public readonly MobileParty ConversationParty;
     public readonly bool CaravanHasItems;
+    public readonly ItemRosterElement[] ItemRosterElements;
 
     public CaravanSurrenderLeaveOnConsequence(
         Hero mainHero,
         MobileParty mainParty,
         MobileParty conversationParty,
-        bool caravanHasItems)
+        bool caravanHasItems,
+        ItemRosterElement[] itemRosterElements)
     {
         MainHero = mainHero;
         MainParty = mainParty;
         ConversationParty = conversationParty;
         CaravanHasItems = caravanHasItems;
+        ItemRosterElements = itemRosterElements;
     }
 }
 
@@ -136,16 +139,19 @@ public readonly struct CaravanTookPrisonerOnConsequence : IEvent
     public readonly MobileParty MainParty;
     public readonly MobileParty ConversationParty;
     public readonly bool CaravanHasItems;
+    public readonly ItemRosterElement[] ItemRosterElements;
 
     public CaravanTookPrisonerOnConsequence(
         Hero mainHero,
         MobileParty mainParty,
         MobileParty conversationParty,
-        bool caravanHasItems)
+        bool caravanHasItems,
+        ItemRosterElement[] itemRosterElements)
     {
         MainHero = mainHero;
         MainParty = mainParty;
         ConversationParty = conversationParty;
         CaravanHasItems = caravanHasItems;
+        ItemRosterElements = itemRosterElements;
     }
 }

@@ -149,15 +149,3 @@ public class CaravanPartyComponentTranspilers
         instance._initializationArgs = initArgs;
     }
 }
-
-[HarmonyPatch(typeof(CaravanPartyComponent.InitializationArgs))]
-internal class CaravanPartyComponentInitializationArgsPatches
-{
-    [HarmonyPatch(nameof(CaravanPartyComponent.InitializationArgs.InitializeCaravanOnCreation))]
-    [HarmonyPrefix]
-    public static bool InitializeLordPartyPropertiesPrefix(ref LordPartyComponent.InitializationArgs __instance, MobileParty mobileParty, Settlement settlement)
-    {
-        // Shouldn't be needed?
-        return true;
-    }
-}

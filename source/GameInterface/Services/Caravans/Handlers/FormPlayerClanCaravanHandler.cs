@@ -56,12 +56,12 @@ internal class FormPlayerClanCaravanHandler : IHandler
 
     private void Handle_NetworkFormPlayerClanCaravan(MessagePayload<NetworkFormPlayerClanCaravan> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.CaravanLeaderId, out var caravanLeader)) return;
-        if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.CurrentSettlementId, out var currentSettlement)) return;
-
         GameThread.Run(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.CaravanLeaderId, out var caravanLeader)) return;
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.CurrentSettlementId, out var currentSettlement)) return;
+
             LeaveSettlementAction.ApplyForCharacterOnly(caravanLeader);
             PartyTemplateObject randomCaravanTemplate = CaravanHelper.GetRandomCaravanTemplate(currentSettlement.Culture, obj.What.IsElite, !obj.What.ShouldCreateConvoy);
             CaravanPartyComponent.CreateCaravanParty(mainHero, currentSettlement, randomCaravanTemplate, false, caravanLeader, null, obj.What.IsElite);
@@ -74,9 +74,12 @@ internal class FormPlayerClanCaravanHandler : IHandler
     
     private void Handle_NetworkFadeOutNewCaravanLeader(MessagePayload<NetworkFadeOutNewCaravanLeader> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.CaravanLeaderId, out var caravanLeader)) return;
+        GameThread.Run(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.CaravanLeaderId, out var caravanLeader)) return;
 
-        // No need to check current mission and if character in mission, vanilla already implements these checks
-        Campaign.Current.GetCampaignBehavior<CaravanConversationsCampaignBehavior>().FadeOutSelectedCaravanCompanionInMission(caravanLeader.CharacterObject);
+            // No need to check current mission and if character in mission, vanilla already implements these checks
+            Campaign.Current.GetCampaignBehavior<CaravanConversationsCampaignBehavior>().FadeOutSelectedCaravanCompanionInMission(caravanLeader.CharacterObject);
+        });
     }
 }

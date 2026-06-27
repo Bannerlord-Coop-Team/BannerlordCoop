@@ -161,16 +161,21 @@ internal readonly struct NetworkCaravanSurrenderLeaveOnConsequence : ICommand
     [ProtoMember(4)]
     public readonly bool CaravanHasItems;
 
+    [ProtoMember(5)]
+    public readonly ItemRosterElement[] ItemRosterElements;
+
     public NetworkCaravanSurrenderLeaveOnConsequence(
         string mainHeroId,
         string mainPartyId,
         string conversationPartyId,
-        bool caravanHasItems)
+        bool caravanHasItems,
+        ItemRosterElement[] itemRosterElements)
     {
         MainHeroId = mainHeroId;
         MainPartyId = mainPartyId;
         ConversationPartyId = conversationPartyId;
         CaravanHasItems = caravanHasItems;
+        ItemRosterElements = itemRosterElements;
     }
 }
 
@@ -189,15 +194,20 @@ internal readonly struct NetworkCaravanTookPrisonerOnConsequence : ICommand
     [ProtoMember(4)]
     public readonly bool CaravanHasItems;
 
+    [ProtoMember(5)]
+    public readonly ItemRosterElement[] ItemRosterElements;
+
     public NetworkCaravanTookPrisonerOnConsequence(
         string mainHeroId,
         string mainPartyId,
         string conversationPartyId,
-        bool caravanHasItems)
+        bool caravanHasItems,
+        ItemRosterElement[] itemRosterElements)
     {
         MainHeroId = mainHeroId;
         MainPartyId = mainPartyId;
         ConversationPartyId = conversationPartyId;
         CaravanHasItems = caravanHasItems;
+        ItemRosterElements = itemRosterElements;
     }
 }

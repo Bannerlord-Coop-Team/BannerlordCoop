@@ -101,11 +101,11 @@ internal class CaravansConversationsHandler : IHandler
 
     private void Handle_NetworkChangeCaravanHomeSettlement(MessagePayload<NetworkChangeCaravanHomeSettlement> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var conversationParty)) return;
-        if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.SettlementId, out var settlement)) return;
-
         GameThread.Run(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var conversationParty)) return;
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.SettlementId, out var settlement)) return;
+
             conversationParty.CaravanPartyComponent.ChangeHomeSettlement(settlement);
         });
     }
@@ -147,13 +147,13 @@ internal class CaravansConversationsHandler : IHandler
 
     private void Handle_NetworkApplyHostileCaravanInteraction(MessagePayload<NetworkApplyHostileCaravanInteraction> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var conversationParty)) return;
-
         sessionCaravansPlayerDataInterface.SetPlayerInteraction(obj.What.MainHeroId, obj.What.ConversationPartyId, CaravansCampaignBehavior.PlayerInteraction.Hostile);
         GameThread.Run(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var conversationParty)) return;
+
             BeHostileAction.ApplyEncounterHostileAction(mainParty.Party, conversationParty.Party);
         });
     }
@@ -211,12 +211,12 @@ internal class CaravansConversationsHandler : IHandler
 
     private void Handle_NetworkCaravanLootedLeaveOnConsequence(MessagePayload<NetworkCaravanLootedLeaveOnConsequence> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var conversationParty)) return;
-
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var conversationParty)) return;
+
             ItemRoster itemRoster = new();
             foreach (var itemRosterElement in obj.What.ItemRosterData)
             {
@@ -248,18 +248,23 @@ internal class CaravansConversationsHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(obj.What.MainParty, out var mainPartyId)) return;
         if (!objectManager.TryGetIdWithLogging(obj.What.ConversationParty, out var conversationPartyId)) return;
 
-        var message = new NetworkCaravanSurrenderLeaveOnConsequence(mainHeroId, mainPartyId, conversationPartyId, obj.What.CaravanHasItems);
+        var message = new NetworkCaravanSurrenderLeaveOnConsequence(mainHeroId, mainPartyId, conversationPartyId, obj.What.CaravanHasItems, obj.What.ItemRosterElements);
         network.SendAll(message);
     }
 
     private void Handle_NetworkCaravanSurrenderLeaveOnConsequence(MessagePayload<NetworkCaravanSurrenderLeaveOnConsequence> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var conversationParty)) return;
-
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var conversationParty)) return;
+
+            ItemRoster itemRoster = new()
+            {
+                _data = obj.What.ItemRosterElements
+            };
+
             if (obj.What.CaravanHasItems)
             {
                 conversationParty.ItemRoster.Clear();
@@ -271,7 +276,7 @@ internal class CaravansConversationsHandler : IHandler
             }
             BeHostileAction.ApplyMajorCoercionHostileAction(mainParty.Party, conversationParty.Party);
             GetCaravansBehavior()._lootedCaravans.Add(conversationParty, CampaignTime.Now);
-            SkillLevelingManager.OnLoot(mainParty, conversationParty, conversationParty.ItemRoster, false);
+            SkillLevelingManager.OnLoot(mainParty, conversationParty, itemRoster, false);
 
             // Update _lootedCaravans on all clients
             network.SendAll(new NetworkAddToLootedCaravans(obj.What.ConversationPartyId, CampaignTime.Now));
@@ -285,18 +290,23 @@ internal class CaravansConversationsHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(obj.What.MainParty, out var mainPartyId)) return;
         if (!objectManager.TryGetIdWithLogging(obj.What.ConversationParty, out var conversationPartyId)) return;
 
-        var message = new NetworkCaravanTookPrisonerOnConsequence(mainHeroId, mainPartyId, conversationPartyId, obj.What.CaravanHasItems);
+        var message = new NetworkCaravanTookPrisonerOnConsequence(mainHeroId, mainPartyId, conversationPartyId, obj.What.CaravanHasItems, obj.What.ItemRosterElements);
         network.SendAll(message);
     }
 
     private void Handle_NetworkCaravanTookPrisonerOnConsequence(MessagePayload<NetworkCaravanTookPrisonerOnConsequence> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var conversationParty)) return;
-
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var conversationParty)) return;
+
+            ItemRoster itemRoster = new()
+            {
+                _data = obj.What.ItemRosterElements
+            };
+
             if (obj.What.CaravanHasItems)
             {
                 conversationParty.ItemRoster.Clear();
@@ -307,7 +317,7 @@ internal class CaravansConversationsHandler : IHandler
                 GiveGoldAction.ApplyForPartyToCharacter(conversationParty.Party, mainHero, num, false);
             }
             BeHostileAction.ApplyEncounterHostileAction(mainParty.Party, conversationParty.Party);
-            SkillLevelingManager.OnLoot(mainParty, conversationParty, conversationParty.ItemRoster, false);
+            SkillLevelingManager.OnLoot(mainParty, conversationParty, itemRoster, false);
             DestroyPartyAction.Apply(mainParty.Party, conversationParty);
         });
         sessionCaravansPlayerDataInterface.SetPlayerInteraction(obj.What.MainHeroId, obj.What.ConversationPartyId, CaravansCampaignBehavior.PlayerInteraction.Hostile);

@@ -85,7 +85,7 @@ internal class CaravansCampaignBehaviorPatches
     /// </summary>
     [HarmonyPatch(nameof(CaravansCampaignBehavior.OnSettlementLeft))]
     [HarmonyPrefix]
-    public static void OnSettlementLeftPrefix(ref CaravansCampaignBehavior __instance, MobileParty mobileParty, Settlement settlement)
+    public static bool OnSettlementLeftPrefix(ref CaravansCampaignBehavior __instance, MobileParty mobileParty, Settlement settlement)
     {
         // Replace Static Mobile.MainParty check with IsPlayerParty()
         if (mobileParty != null && !mobileParty.IsPlayerParty() && (mobileParty.IsCaravan || mobileParty.IsLordParty))
@@ -116,6 +116,8 @@ internal class CaravansCampaignBehaviorPatches
                 MessageBroker.Instance.Publish(__instance, message);
             }
         }
+
+        return false;
     }
 
     [HarmonyPatch(nameof(CaravansCampaignBehavior.CanTradeWith))]
