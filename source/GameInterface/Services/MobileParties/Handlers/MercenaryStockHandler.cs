@@ -65,7 +65,9 @@ internal class MercenaryStockHandler : IHandler
         if (!ModInformation.IsServer) return;
 
         if (!objectManager.TryGetIdWithLogging(payload.What.Town, out var townId)) return;
-        if (!objectManager.TryGetIdWithLogging(payload.What.TroopType, out var troopTypeId)) return;
+
+        string troopTypeId = null;
+        if (payload.What.TroopType != null && !objectManager.TryGetId(payload.What.TroopType, out troopTypeId)) return;
 
         network.SendAll(new NetworkUpdateMercenaryStock(
             townId,
@@ -82,7 +84,9 @@ internal class MercenaryStockHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Town>(data.TownId, out var town)) return;
-            if (!objectManager.TryGetObjectWithLogging<CharacterObject>(data.TroopTypeId, out var troopType)) return;
+
+            CharacterObject troopType = null;
+            if (data.TroopTypeId != null && !objectManager.TryGetObjectWithLogging<CharacterObject>(data.TroopTypeId, out troopType)) return;
 
             ApplyMercenaryStock(town, troopType, data.Number);
             RefreshCurrentMercenaryMenu(town);
@@ -214,7 +218,7 @@ internal class MercenaryStockHandler : IHandler
         if (campaign == null) return Enumerable.Empty<Town>();
 
         return campaign.CampaignObjectManager.Settlements
-            .Where(settlement => settlement.IsTown && settlement.Town != null)
+            .Where(settlement => IsMercenaryTown(settlement.Town))
             .Select(settlement => settlement.Town);
     }
 

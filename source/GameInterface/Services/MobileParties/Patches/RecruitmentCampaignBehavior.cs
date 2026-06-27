@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
+using GameInterface.Services.MobileParties.Handlers;
 using GameInterface.Services.MobileParties.Messages;
 using HarmonyLib;
 using System.Collections.Generic;
@@ -19,10 +20,25 @@ internal class RecruitmentCampaignBehaviorPatch
 
     [HarmonyPrefix]
     [HarmonyPatch("CheckRecruiting")]
-    private static bool CheckRecruitingPrefix(ref MobileParty mobileParty, ref Settlement settlement)
+    private static bool CheckRecruitingPrefix(RecruitmentCampaignBehavior __instance, ref MobileParty mobileParty, ref Settlement settlement, out MercenaryStockState __state)
     {
-        // TODO only allow for server and broadcast when it happens
+        if (!ModInformation.IsServer)
+        {
+            __state = default;
+            return false;
+        }
+
+        __state = GetMercenaryStockState(__instance, settlement?.Town);
         return true;
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch("CheckRecruiting")]
+    private static void CheckRecruitingPostfix(RecruitmentCampaignBehavior __instance, ref Settlement settlement, MercenaryStockState __state, bool __runOriginal)
+    {
+        if (!ModInformation.IsServer || !__runOriginal) return;
+
+        PublishMercenaryStockIfChanged(__instance, settlement?.Town, __state);
     }
 
     [HarmonyPrefix]
@@ -42,43 +58,13 @@ internal class RecruitmentCampaignBehaviorPatch
     [HarmonyPatch("BuyMercenaries")]
     private static bool BuyMercenariesPrefix(RecruitmentCampaignBehavior __instance)
     {
-        // The server applies the hire authoritatively from the client's request; let it run vanilla.
+        // Clients forward hires to the server; if this ever runs on the server, leave vanilla behavior alone.
         if (ModInformation.IsServer)
             return true;
 
-        if (!TryGetCurrentMercenaryTown(out var town))
-            return true;
-
-        var mercenaryData = __instance.GetMercenaryData(town);
-        if (mercenaryData.TroopType == null || mercenaryData.Number <= 0)
-            return false;
-
-        var mercenaryTroop = CharacterObject.OneToOneConversationCharacter;
-        int unitPrice = Campaign.Current.Models.PartyWageModel.GetTroopRecruitmentCost(mercenaryData.TroopType, Hero.MainHero).RoundedResultNumber;
-        if (unitPrice <= 0)
-            return false;
-
-        int selectedMercenaryCount = __instance._selectedMercenaryCount;
-        int count = GetMercenaryHireCount(selectedMercenaryCount, mercenaryData.Number, Hero.MainHero.Gold, unitPrice);
-        if (count <= 0)
-            return false;
-
-        int goldAmount = count * unitPrice;
-
-        PublishMercenariesHired(__instance, town, mercenaryTroop, count, goldAmount);
+        TryPublishMercenariesHired(__instance, __instance._selectedMercenaryCount, useConversationCharacter: true);
 
         return false;
-    }
-
-    [HarmonyPostfix]
-    [HarmonyPatch("BuyMercenaries")]
-    private static void BuyMercenariesPostfix(RecruitmentCampaignBehavior __instance)
-    {
-        if (!ModInformation.IsServer) return;
-
-        if (!TryGetCurrentMercenaryTown(out var town)) return;
-
-        PublishMercenaryStock(__instance, town);
     }
 
     [HarmonyPrefix]
@@ -88,56 +74,85 @@ internal class RecruitmentCampaignBehaviorPatch
         if (ModInformation.IsServer)
             return true;
 
+        if (TryPublishMercenariesHired(__instance, 0, useConversationCharacter: false))
+        {
+            GameMenu.SwitchToMenu(TownBackstreetMenu);
+        }
+
+        return false;
+    }
+
+    [HarmonyPrefix]
+    [HarmonyPatch("DailyTickTown")]
+    private static void DailyTickTownPrefix(RecruitmentCampaignBehavior __instance, Town town, out MercenaryStockState __state)
+    {
+        __state = ModInformation.IsServer
+            ? GetMercenaryStockState(__instance, town)
+            : default;
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch("DailyTickTown")]
+    private static void DailyTickTownPostfix(RecruitmentCampaignBehavior __instance, Town town, MercenaryStockState __state)
+    {
+        if (!ModInformation.IsServer) return;
+
+        PublishMercenaryStockIfChanged(__instance, town, __state);
+    }
+
+    internal static void PublishMercenaryStock(RecruitmentCampaignBehavior behavior, Town town)
+    {
+        if (!MercenaryStockHandler.IsMercenaryTown(town)) return;
+
+        var mercenaryData = behavior.GetMercenaryData(town);
+        var message = new MercenaryStockChanged(town, mercenaryData.TroopType, mercenaryData.Number);
+        MessageBroker.Instance.Publish(behavior, message);
+    }
+
+    private static void PublishMercenaryStockIfChanged(RecruitmentCampaignBehavior behavior, Town town, MercenaryStockState previousStock)
+    {
+        var currentStock = GetMercenaryStockState(behavior, town);
+        if (!currentStock.IsMercenaryTown ||
+            !IsMercenaryStockChanged(previousStock.TroopType, previousStock.Number, currentStock.TroopType, currentStock.Number)) return;
+
+        PublishMercenaryStock(behavior, town);
+    }
+
+    private static MercenaryStockState GetMercenaryStockState(RecruitmentCampaignBehavior behavior, Town town)
+    {
+        if (!MercenaryStockHandler.IsMercenaryTown(town)) return default;
+
+        var mercenaryData = behavior.GetMercenaryData(town);
+        return new MercenaryStockState(true, mercenaryData.TroopType, mercenaryData.Number);
+    }
+
+    private static bool TryPublishMercenariesHired(RecruitmentCampaignBehavior behavior, int selectedMercenaryCount, bool useConversationCharacter)
+    {
         if (!TryGetCurrentMercenaryTown(out var town))
             return false;
 
-        var mercenaryData = __instance.GetMercenaryData(town);
+        var mercenaryData = behavior.GetMercenaryData(town);
         if (mercenaryData.TroopType == null || mercenaryData.Number <= 0)
+            return false;
+
+        CharacterObject mercenaryTroop = useConversationCharacter
+            ? CharacterObject.OneToOneConversationCharacter
+            : mercenaryData.TroopType;
+        if (mercenaryTroop == null)
             return false;
 
         int unitPrice = Campaign.Current.Models.PartyWageModel.GetTroopRecruitmentCost(mercenaryData.TroopType, Hero.MainHero).RoundedResultNumber;
         if (unitPrice <= 0)
             return false;
 
-        int count = GetMercenaryHireCount(0, mercenaryData.Number, Hero.MainHero.Gold, unitPrice);
+        int count = GetMercenaryHireCount(selectedMercenaryCount, mercenaryData.Number, Hero.MainHero.Gold, unitPrice);
         if (count <= 0)
             return false;
 
         int goldAmount = count * unitPrice;
+        PublishMercenariesHired(behavior, town, mercenaryTroop, count, goldAmount);
 
-        PublishMercenariesHired(__instance, town, mercenaryData.TroopType, count, goldAmount);
-        GameMenu.SwitchToMenu(TownBackstreetMenu);
-
-        return false;
-    }
-
-    [HarmonyPostfix]
-    [HarmonyPatch("buy_mercenaries_on_consequence")]
-    private static void BuyMercenariesOnConsequencePostfix(RecruitmentCampaignBehavior __instance)
-    {
-        if (!ModInformation.IsServer) return;
-
-        if (!TryGetCurrentMercenaryTown(out var town)) return;
-
-        PublishMercenaryStock(__instance, town);
-    }
-
-    [HarmonyPostfix]
-    [HarmonyPatch("DailyTickTown")]
-    private static void DailyTickTownPostfix(RecruitmentCampaignBehavior __instance, Town town)
-    {
-        if (!ModInformation.IsServer) return;
-
-        PublishMercenaryStock(__instance, town);
-    }
-
-    internal static void PublishMercenaryStock(RecruitmentCampaignBehavior behavior, Town town)
-    {
-        if (town?.Settlement == null || !town.Settlement.IsTown) return;
-
-        var mercenaryData = behavior.GetMercenaryData(town);
-        var message = new MercenaryStockChanged(town, mercenaryData.TroopType, mercenaryData.Number);
-        MessageBroker.Instance.Publish(behavior, message);
+        return true;
     }
 
     private static void PublishMercenariesHired(RecruitmentCampaignBehavior behavior, Town town, CharacterObject mercenaryTroop, int count, int goldAmount)
@@ -150,6 +165,11 @@ internal class RecruitmentCampaignBehaviorPatch
             count,
             goldAmount);
         MessageBroker.Instance.Publish(behavior, message);
+    }
+
+    internal static bool IsMercenaryStockChanged(CharacterObject previousTroopType, int previousNumber, CharacterObject currentTroopType, int currentNumber)
+    {
+        return previousTroopType != currentTroopType || previousNumber != currentNumber;
     }
 
     internal static int GetMercenaryHireCount(int selectedMercenaryCount, int availableMercenaries, int heroGold, int unitPrice)
@@ -166,11 +186,25 @@ internal class RecruitmentCampaignBehaviorPatch
     internal static bool TryGetCurrentMercenaryTown(out Town town)
     {
         town = PlayerEncounter.EncounterSettlement?.Town;
-        if (town?.Settlement != null && town.Settlement.IsTown)
+        if (MercenaryStockHandler.IsMercenaryTown(town))
             return true;
 
         town = MobileParty.MainParty?.CurrentSettlement?.Town;
-        return town?.Settlement != null && town.Settlement.IsTown;
+        return MercenaryStockHandler.IsMercenaryTown(town);
+    }
+
+    private readonly struct MercenaryStockState
+    {
+        public readonly bool IsMercenaryTown;
+        public readonly CharacterObject TroopType;
+        public readonly int Number;
+
+        public MercenaryStockState(bool isMercenaryTown, CharacterObject troopType, int number)
+        {
+            IsMercenaryTown = isMercenaryTown;
+            TroopType = troopType;
+            Number = number;
+        }
     }
 
     [HarmonyPatch(nameof(RecruitmentCampaignBehavior.UpdateVolunteersOfNotablesInSettlement))]

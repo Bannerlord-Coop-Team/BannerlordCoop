@@ -94,6 +94,65 @@ public class MercenaryHireHandlerTests
         network.Verify(n => n.SendAll(It.IsAny<IMessage>()), Times.Never);
     }
 
+    [Fact]
+    public void CanApplyMercenaryHire_ValidCurrentStockAndGold_ReturnsTrue()
+    {
+        int count = 5;
+        int unitPrice = 50;
+        int goldAmount = MercenaryHireHandler.GetMercenaryHireGoldAmount(count, unitPrice);
+
+        bool canApply = MercenaryHireHandler.CanApplyMercenaryHire(
+            count,
+            goldAmount,
+            clientHeroGold: 1000,
+            serverHeroGold: 1000,
+            unitPrice: unitPrice,
+            availableTroopMatches: true,
+            availableMercenaries: 10);
+
+        Assert.True(canApply);
+    }
+
+    [Theory]
+    [InlineData(false, 10)]
+    [InlineData(true, 4)]
+    public void CanApplyMercenaryHire_StaleConversationStock_ReturnsFalse(bool availableTroopMatches, int availableMercenaries)
+    {
+        int count = 5;
+        int unitPrice = 50;
+        int goldAmount = MercenaryHireHandler.GetMercenaryHireGoldAmount(count, unitPrice);
+
+        bool canApply = MercenaryHireHandler.CanApplyMercenaryHire(
+            count,
+            goldAmount,
+            clientHeroGold: 1000,
+            serverHeroGold: 1000,
+            unitPrice: unitPrice,
+            availableTroopMatches,
+            availableMercenaries);
+
+        Assert.False(canApply);
+    }
+
+    [Fact]
+    public void CanApplyMercenaryHire_InsufficientCurrentServerGold_ReturnsFalse()
+    {
+        int count = 5;
+        int unitPrice = 50;
+        int goldAmount = MercenaryHireHandler.GetMercenaryHireGoldAmount(count, unitPrice);
+
+        bool canApply = MercenaryHireHandler.CanApplyMercenaryHire(
+            count,
+            goldAmount,
+            clientHeroGold: 1000,
+            serverHeroGold: goldAmount - 1,
+            unitPrice: unitPrice,
+            availableTroopMatches: true,
+            availableMercenaries: 10);
+
+        Assert.False(canApply);
+    }
+
     private MessagePayload<MercenariesHired> Payload(Hero hero, MobileParty party, Town town, CharacterObject troop, int count, int goldAmount) =>
         new(this, new MercenariesHired(hero, party, town, troop, count, goldAmount));
 

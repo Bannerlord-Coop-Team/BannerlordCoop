@@ -92,6 +92,30 @@ public class MercenaryStockHandlerTests
     }
 
     [Fact]
+    public void Handle_MercenaryStockChanged_Server_SendsEmptyStockUpdateWithoutTroopId()
+    {
+        var wasServer = ModInformation.IsServer;
+        ModInformation.IsServer = true;
+        try
+        {
+            var town = new Town();
+            SetupId(town, "town-1");
+
+            handler.Handle_MercenaryStockChanged(Payload(town, null, 0));
+
+            var sent = Assert.IsType<NetworkUpdateMercenaryStock>(sentMessage!);
+            Assert.Equal("town-1", sent.TownId);
+            Assert.Null(sent.TroopTypeId);
+            Assert.Equal(0, sent.Number);
+            network.Verify(n => n.SendAll(It.IsAny<IMessage>()), Times.Once);
+        }
+        finally
+        {
+            ModInformation.IsServer = wasServer;
+        }
+    }
+
+    [Fact]
     public void Handle_MercenaryStockChanged_Client_DoesNotSend()
     {
         var wasServer = ModInformation.IsServer;
@@ -138,12 +162,16 @@ public class MercenaryStockHandlerTests
     private MessagePayload<MercenaryStockChanged> Payload(Town town, CharacterObject troop, int number) =>
         new(this, new MercenaryStockChanged(town, troop, number));
 
-    private void SetupId(object obj, string id) =>
+    private void SetupId(object obj, string id)
+    {
         objectManager.Setup(o => o.TryGetIdWithLogging(obj, out id)).Returns(true);
+        objectManager.Setup(o => o.TryGetId(obj, out id)).Returns(true);
+    }
 
     private void SetupNoId(object obj)
     {
         string unused = string.Empty;
         objectManager.Setup(o => o.TryGetIdWithLogging(obj, out unused)).Returns(false);
+        objectManager.Setup(o => o.TryGetId(obj, out unused)).Returns(false);
     }
 }

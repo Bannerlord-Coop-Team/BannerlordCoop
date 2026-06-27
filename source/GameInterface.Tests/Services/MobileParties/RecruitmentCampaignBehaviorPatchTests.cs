@@ -1,4 +1,5 @@
 using GameInterface.Services.MobileParties.Patches;
+using TaleWorlds.CampaignSystem;
 using Xunit;
 
 namespace GameInterface.Tests.Services.MobileParties;
@@ -30,5 +31,36 @@ public class RecruitmentCampaignBehaviorPatchTests
             unitPrice);
 
         Assert.Equal(expectedCount, count);
+    }
+
+    [Fact]
+    public void IsMercenaryStockChanged_SameTroopAndCount_ReturnsFalse()
+    {
+        var troop = new CharacterObject();
+
+        bool changed = RecruitmentCampaignBehaviorPatch.IsMercenaryStockChanged(troop, 5, troop, 5);
+
+        Assert.False(changed);
+    }
+
+    [Fact]
+    public void IsMercenaryStockChanged_CountChanged_ReturnsTrue()
+    {
+        var troop = new CharacterObject();
+
+        bool changed = RecruitmentCampaignBehaviorPatch.IsMercenaryStockChanged(troop, 5, troop, 4);
+
+        Assert.True(changed);
+    }
+
+    [Fact]
+    public void IsMercenaryStockChanged_TroopChanged_ReturnsTrue()
+    {
+        var previousTroop = new CharacterObject();
+        var currentTroop = new CharacterObject();
+
+        bool changed = RecruitmentCampaignBehaviorPatch.IsMercenaryStockChanged(previousTroop, 5, currentTroop, 5);
+
+        Assert.True(changed);
     }
 }
