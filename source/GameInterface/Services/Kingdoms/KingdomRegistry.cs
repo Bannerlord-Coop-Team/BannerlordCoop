@@ -1,5 +1,7 @@
-﻿using Common.Util;
+﻿using Common.Messaging;
+using Common.Util;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.Caravans.Messages;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
@@ -99,5 +101,6 @@ internal class KingdomRegistry : AutoRegistryBase<Kingdom>
 
     public override void OnServerDestroyed(Kingdom obj, string id)
     {
+        MessageBroker.Instance.Publish(this, new CaravansKingdomDestroyed(obj));
     }
 }
