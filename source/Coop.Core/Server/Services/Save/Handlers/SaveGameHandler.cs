@@ -71,7 +71,7 @@ internal class SaveGameHandler : IHandler
     {
         var loaded = saveManager.LoadCoopSession(obj.What.SaveName);
 
-        savedSession ??= new CoopSession(
+        savedSession = new CoopSession(
             loaded?.UniqueGameId ?? obj.What.SaveName,
             loaded?.Players ?? new Player[0],
             loaded?.CraftingPlayerData ?? new CraftingPlayerData(new(), new(), new()),
