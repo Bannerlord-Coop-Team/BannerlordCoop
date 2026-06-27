@@ -260,10 +260,11 @@ internal class CaravansConversationsHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var conversationParty)) return;
 
-            ItemRoster itemRoster = new()
+            ItemRoster itemRoster = new();
+            foreach (var itemRosterElement in obj.What.ItemRosterElements)
             {
-                _data = obj.What.ItemRosterElements
-            };
+                itemRoster.Add(itemRosterElement);
+            }
 
             if (obj.What.CaravanHasItems)
             {
@@ -302,10 +303,11 @@ internal class CaravansConversationsHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var conversationParty)) return;
 
-            ItemRoster itemRoster = new()
+            ItemRoster itemRoster = new();
+            foreach (var itemRosterElement in obj.What.ItemRosterElements)
             {
-                _data = obj.What.ItemRosterElements
-            };
+                itemRoster.Add(itemRosterElement);
+            }
 
             if (obj.What.CaravanHasItems)
             {
