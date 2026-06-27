@@ -245,7 +245,6 @@ public class ArmyHandler : IHandler
     }
     private void HandleSetArmyKingdom(MessagePayload<SetArmyKingdom> payload)
     {
-        Logger.Debug($"coolio1");
         if (!objectManager.TryGetIdWithLogging(payload.What.Army, out var armyId)) return;
         var kingdomId = string.Empty;
         if (payload.What.Kingdom != null)
@@ -253,13 +252,11 @@ public class ArmyHandler : IHandler
             if (!objectManager.TryGetIdWithLogging(payload.What.Kingdom, out  kingdomId)) return;
         }
         network.SendAll(new NetworkSetArmyKingdom(armyId, kingdomId));
-        Logger.Debug($"coolio3");
     }
     private void HandleNetworkSetArmyKingdom(MessagePayload<NetworkSetArmyKingdom> payload)
     {
         GameThread.RunSafe(() =>
         {
-            Logger.Debug($"coolio2");
             if (!objectManager.TryGetObjectWithLogging<Army>(payload.What.ArmyId, out var army)) return;
             Kingdom kingdom = null;
             if (!string.IsNullOrEmpty(payload.What.KingdomId))
@@ -270,7 +267,6 @@ public class ArmyHandler : IHandler
             {
 
                 army.Kingdom = kingdom;
-                Logger.Debug($"armycount: {kingdom.Armies.Count}");
             }
         });
     }
