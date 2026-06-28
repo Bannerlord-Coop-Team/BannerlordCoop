@@ -59,11 +59,11 @@ namespace Coop.UI.LoadGameUI
         {
             Initialize();
 
-            for (int groupIndex = SaveGroups.Count - 1; groupIndex >= 0; groupIndex--)
+            for (int groupIndex = 0; groupIndex < SaveGroups.Count;)
             {
                 var group = SaveGroups[groupIndex];
                 var saves = group.SavedGamesList;
-                for (int saveIndex = saves.Count - 1; saveIndex >= 0; saveIndex--)
+                for (int saveIndex = 0; saveIndex < saves.Count;)
                 {
                     var save = saves[saveIndex].Save;
                     if (!CoopSaveMetadata.ContainsCoopModule(save.MetaData))
@@ -73,9 +73,16 @@ namespace Coop.UI.LoadGameUI
                     }
 
                     saves[saveIndex] = new SelectedGameVM(save, IsSaving, OnDeleteSavedGame, OnSaveSelection, OnCancelLoadSave, ExecuteDone);
+                    saveIndex++;
                 }
 
-                if (saves.Count == 0) SaveGroups.RemoveAt(groupIndex);
+                if (saves.Count == 0)
+                {
+                    SaveGroups.RemoveAt(groupIndex);
+                    continue;
+                }
+
+                groupIndex++;
             }
             OnSaveSelection(GetSavedGames()?.FirstOrDefault());
             RefreshValues();
