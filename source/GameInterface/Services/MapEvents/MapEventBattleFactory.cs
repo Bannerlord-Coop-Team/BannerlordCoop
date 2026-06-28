@@ -45,22 +45,7 @@ internal sealed class MapEventBattleFactory
             return ForceSuppliesEventComponent.CreateForceSuppliesEvent(attacker, defender).MapEvent;
 
         if (defender.IsSettlement)
-        {
-            if (defender.Settlement.IsFortification)
-                return mapEventManager.StartSiegeMapEvent(attacker, defender);
-
-            if (defender.Settlement.IsVillage)
-                return RaidEventComponent.CreateRaidEvent(attacker, defender).MapEvent;
-
-            if (defender.Settlement.IsHideout)
-                return HideoutEventComponent.CreateHideoutEvent(attacker, defender, flags.ForceHideoutSendTroops).MapEvent;
-
-            Logger.Error(
-                "Proper map event type could not be determined for settlement battle. Attacker={Attacker}, Defender={Defender}",
-                attacker.Name,
-                defender.Name);
-            return null;
-        }
+            return CreateSettlementMapEvent(mapEventManager, attacker, defender, flags);
 
         if (flags.IsSallyOutAmbush)
             return SiegeAmbushEventComponent.CreateSiegeAmbushEvent(attacker, defender).MapEvent;
@@ -85,5 +70,27 @@ internal sealed class MapEventBattleFactory
             return mapEventManager.StartSiegeOutsideMapEvent(attacker, defender);
 
         return FieldBattleEventComponent.CreateFieldBattleEvent(attacker, defender).MapEvent;
+    }
+
+    private static MapEvent CreateSettlementMapEvent(
+        MapEventManager mapEventManager,
+        PartyBase attacker,
+        PartyBase defender,
+        BattleCreationFlags flags)
+    {
+        if (defender.Settlement.IsFortification)
+            return mapEventManager.StartSiegeMapEvent(attacker, defender);
+
+        if (defender.Settlement.IsVillage)
+            return RaidEventComponent.CreateRaidEvent(attacker, defender).MapEvent;
+
+        if (defender.Settlement.IsHideout)
+            return HideoutEventComponent.CreateHideoutEvent(attacker, defender, flags.ForceHideoutSendTroops).MapEvent;
+
+        Logger.Error(
+            "Proper map event type could not be determined for settlement battle. Attacker={Attacker}, Defender={Defender}",
+            attacker.Name,
+            defender.Name);
+        return null;
     }
 }
