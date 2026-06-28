@@ -184,7 +184,7 @@ namespace Coop
 #if DEBUG
             CoopCampaign = new InitialStateOption(
                     "CoOp Campaign",
-                    new TextObject(isServer ? "Host Co-op Campaign" : "Join Co-op Campaign"),
+                    new TextObject(isServer ? "Host Co-op Sandbox" : "Join Co-op Sandbox"),
                     9990,
                     () =>
                     {
@@ -204,7 +204,7 @@ namespace Coop
 #else
             CoopCampaign = new InitialStateOption(
                     "CoOp Campaign",
-                    new TextObject("Host Co-op Campaign"),
+                    new TextObject("Host Co-op Sandbox"),
                     9990,
                     () =>
                     {
@@ -222,7 +222,7 @@ namespace Coop
             JoinCoopGame =
                 new InitialStateOption(
                   "Join Coop Game",
-                  new TextObject("Join Co-op Campaign"),
+                  new TextObject("Join Co-op Sandbox"),
                   9991,
                   JoinWindow,
               () => { return (false, new TextObject("")); }

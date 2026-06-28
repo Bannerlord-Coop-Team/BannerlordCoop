@@ -2,6 +2,7 @@
 using GameInterface.CoopSessionData;
 using GameInterface.CoopSessionData.Save.Data;
 using GameInterface.Registry.Messages;
+using GameInterface.Services.Caravans;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
@@ -56,7 +57,10 @@ internal class SaveGameHandler : IHandler
         WorkshopPlayerData workshopPlayerData = coopSessionProvider.CoopSession.WorkshopPlayerData;
         workshopPlayerData ??= new(new());
 
-        CoopSession session = new CoopSession(saveName, playerRegistry.Players.ToArray(), craftingPlayerData, workshopPlayerData);
+        CaravansPlayerData caravansPlayerData = coopSessionProvider.CoopSession.CaravansPlayerData;
+        caravansPlayerData ??= new(new(), new(), new());
+
+        CoopSession session = new CoopSession(saveName, playerRegistry.Players.ToArray(), craftingPlayerData, workshopPlayerData, caravansPlayerData);
         coopSessionProvider.CoopSession = session;
 
         saveManager.SaveCoopSession(saveName, session);
@@ -65,11 +69,15 @@ internal class SaveGameHandler : IHandler
     private ICoopSession savedSession;
     private void Handle_GameLoaded(MessagePayload<GameLoaded> obj)
     {
-        savedSession = saveManager.LoadCoopSession(obj.What.SaveName);
-        if(savedSession == null)
-        {
-            savedSession = new CoopSession(obj.What.SaveName, new Player[0], new CraftingPlayerData(new(), new(), new()), new WorkshopPlayerData(new()));
-        }
+        var loaded = saveManager.LoadCoopSession(obj.What.SaveName);
+
+        savedSession = new CoopSession(
+            loaded?.UniqueGameId ?? obj.What.SaveName,
+            loaded?.Players ?? new Player[0],
+            loaded?.CraftingPlayerData ?? new CraftingPlayerData(new(), new(), new()),
+            loaded?.WorkshopPlayerData ?? new WorkshopPlayerData(new()),
+            loaded?.CaravansPlayerData ?? new CaravansPlayerData(new(), new(), new()));
+
         coopSessionProvider.CoopSession = savedSession;
     }
 
