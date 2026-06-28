@@ -4,7 +4,6 @@ using SandBox.ViewModelCollection.Map;
 using Serilog;
 using System;
 using System.Reflection;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.Services.MapEvents.Patches;
@@ -13,18 +12,6 @@ namespace GameInterface.Services.MapEvents.Patches;
 internal class MapEventRobustnessPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MapEvent>();
-
-    [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.TroopUpgradeTracker), MethodType.Getter)]
-    [HarmonyPostfix]
-    private static void PostfixTroopUpgradeTracker(MapEvent __instance, TroopUpgradeTracker __result)
-    {
-        if (__result is null)
-        {
-            Logger.Error("{Property} was not properly set for MapEvent {MapEventId}", nameof(MapEvent.TroopUpgradeTracker), __instance.StringId);
-            __instance.TroopUpgradeTracker = new TroopUpgradeTracker();
-            __result = __instance.TroopUpgradeTracker;
-        }
-    }
 
     [HarmonyPatch(typeof(MapEventVisualsVM), nameof(MapEventVisualsVM.UpdateMapEventsAux))]
     [HarmonyFinalizer]

@@ -24,8 +24,7 @@ internal sealed class MapEventBattleFactory
 
     /// <summary>
     /// Creates the <see cref="MapEvent"/> the supplied parties would produce in <c>StartBattleInternal</c>.
-    /// Must be called on the server's main thread with synchronization patches live so the created
-    /// object graph is registered and replicated.
+    /// Must be called on the main thread inside an <see cref="Common.Util.AllowedThread"/> scope.
     /// </summary>
     /// <returns>The created <see cref="MapEvent"/>, or null if no proper type could be determined.</returns>
     public static MapEvent CreateMapEvent(PartyBase attacker, PartyBase defender, BattleCreationFlags flags)
@@ -45,7 +44,22 @@ internal sealed class MapEventBattleFactory
             return ForceSuppliesEventComponent.CreateForceSuppliesEvent(attacker, defender).MapEvent;
 
         if (defender.IsSettlement)
-            return CreateSettlementMapEvent(mapEventManager, attacker, defender, flags);
+        {
+            if (defender.Settlement.IsFortification)
+                return mapEventManager.StartSiegeMapEvent(attacker, defender);
+
+            if (defender.Settlement.IsVillage)
+                return RaidEventComponent.CreateRaidEvent(attacker, defender).MapEvent;
+
+            if (defender.Settlement.IsHideout)
+                return HideoutEventComponent.CreateHideoutEvent(attacker, defender, flags.ForceHideoutSendTroops).MapEvent;
+
+            Logger.Error(
+                "Proper map event type could not be determined for settlement battle. Attacker={Attacker}, Defender={Defender}",
+                attacker.Name,
+                defender.Name);
+            return null;
+        }
 
         if (flags.IsSallyOutAmbush)
             return SiegeAmbushEventComponent.CreateSiegeAmbushEvent(attacker, defender).MapEvent;
@@ -70,27 +84,5 @@ internal sealed class MapEventBattleFactory
             return mapEventManager.StartSiegeOutsideMapEvent(attacker, defender);
 
         return FieldBattleEventComponent.CreateFieldBattleEvent(attacker, defender).MapEvent;
-    }
-
-    private static MapEvent CreateSettlementMapEvent(
-        MapEventManager mapEventManager,
-        PartyBase attacker,
-        PartyBase defender,
-        BattleCreationFlags flags)
-    {
-        if (defender.Settlement.IsFortification)
-            return mapEventManager.StartSiegeMapEvent(attacker, defender);
-
-        if (defender.Settlement.IsVillage)
-            return RaidEventComponent.CreateRaidEvent(attacker, defender).MapEvent;
-
-        if (defender.Settlement.IsHideout)
-            return HideoutEventComponent.CreateHideoutEvent(attacker, defender, flags.ForceHideoutSendTroops).MapEvent;
-
-        Logger.Error(
-            "Proper map event type could not be determined for settlement battle. Attacker={Attacker}, Defender={Defender}",
-            attacker.Name,
-            defender.Name);
-        return null;
     }
 }

@@ -61,12 +61,6 @@ public abstract class AutoRegistryBase<T> : IAutoRegistry<T> where T : class
 {
     public virtual bool Debug { get; } = false;
 
-    /// <summary>
-    /// Controls the order used for initial object registration. Registries with a higher priority
-    /// run first so parent objects can establish identities used by dependent registries.
-    /// </summary>
-    public virtual int RegistrationPriority => 0;
-
     protected readonly ILogger Logger;
 
     protected readonly IObjectManager objectManager;
@@ -109,14 +103,13 @@ public abstract class AutoRegistryBase<T> : IAutoRegistry<T> where T : class
     /// <param name="id">The unique identifier to associate with the object. This value is used to distinguish the object within the manager
     /// and must not conflict with identifiers of other types.</param>
     /// <param name="obj">The object instance to register. Cannot be null.</param>
-    /// <returns>True when the object was registered; otherwise false.</returns>
-    protected bool RegisterExistingObject(string id, T obj)
+    protected void RegisterExistingObject(string id, T obj)
     {
         id = $"{typeof(T).Name}_{id}";
 
         EnsureObjectManagerCounter(id, obj);
 
-        return objectManager.AddExisting(id, obj);
+        objectManager.AddExisting(id, obj);
     }
 
     private void EnsureObjectManagerCounter(string id, T obj)

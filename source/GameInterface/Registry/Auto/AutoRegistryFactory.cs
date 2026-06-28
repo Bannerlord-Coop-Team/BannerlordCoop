@@ -30,7 +30,7 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
     ISerializableTypeMapper TypeMapper { get; }
     List<IDisposable> Disposables { get; } = new List<IDisposable>();
 
-    List<(int Priority, Action Callback)> RegisterAllCallbacks = new List<(int, Action)>();
+    List<Action> RegisterAllCallbacks = new List<Action>();
 
     public AutoRegistryFactory(
         IRegistryCollection collection,
@@ -83,24 +83,16 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
             PatchCollector.AddPostfix(destroy, patch);
         }
 
-        RegisterAllCallbacks.Add((autoRegistry.RegistrationPriority, autoRegistry.RegisterAllObjects));
+        RegisterAllCallbacks.Add(autoRegistry.RegisterAllObjects);
         Disposables.Add(handler);
     }
 
     public void RegisterAll()
     {
-        foreach (var callback in OrderByRegistrationPriority(RegisterAllCallbacks))
+        foreach (var callback in RegisterAllCallbacks)
         {
             callback();
         }
-    }
-
-    internal static IEnumerable<Action> OrderByRegistrationPriority(
-        IEnumerable<(int Priority, Action Callback)> registrations)
-    {
-        return registrations
-            .OrderByDescending(registration => registration.Priority)
-            .Select(registration => registration.Callback);
     }
 
     private void ValidateConstructorTypes(IEnumerable<MethodBase> ctros, Type expectedType)

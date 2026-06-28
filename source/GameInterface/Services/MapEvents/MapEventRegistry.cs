@@ -4,9 +4,7 @@ using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
-using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -22,11 +20,6 @@ namespace GameInterface.Services.MapEvents;
 internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 {
     public override bool Debug => true;
-
-    // Map event sides, parties, components, visuals, and troop trackers derive their ids from the
-    // owning map event. Register map events first so those registries never observe an unregistered parent.
-    public override int RegistrationPriority => 100;
-
     public MapEventRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
         : base(logger, autoRegistryFactory, objectManager)
     {
@@ -47,73 +40,19 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 
     public override void RegisterAllObjects()
     {
-        RegisterMapEvents(Campaign.Current.MapEventManager.MapEvents);
-    }
-
-    /// <summary>
-    /// Registers map events that existed before co-op lifetime patches were enabled. Vanilla map events do not
-    /// assign <see cref="MapEvent.StringId"/> in their constructor, so the registry owns assigning a persistent
-    /// network identity when an event first enters the co-op object graph. Runtime events use the same
-    /// <c>Created_N</c> identity path through <see cref="AutoRegistryHandler{T}"/>.
-    /// </summary>
-    internal void RegisterMapEvents(IEnumerable<MapEvent> mapEvents)
-    {
-        if (mapEvents == null) return;
-
-        var snapshot = mapEvents.Where(mapEvent => mapEvent != null).ToList();
-
-        // Register every persisted identity first. This seeds the MapEvent counter above all existing
-        // numeric suffixes before a new identity is allocated, preventing a Created_N collision.
-        foreach (var mapEvent in snapshot)
+        foreach (var mapEvent in Campaign.Current.MapEventManager.MapEvents)
         {
-            if (string.IsNullOrEmpty(mapEvent.StringId)) continue;
+            if (mapEvent.StringId == null) continue;
 
-            RegisterMapEvent(mapEvent.StringId, mapEvent);
+            RegisterExistingObject(mapEvent.StringId, mapEvent);
         }
-
-        foreach (var mapEvent in snapshot)
-        {
-            if (!string.IsNullOrEmpty(mapEvent.StringId)) continue;
-
-            string id = $"Created_{objectManager.GetUniqueTypeId(mapEvent)}";
-            mapEvent.StringId = id;
-
-            if (!string.Equals(mapEvent.StringId, id, StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException($"Failed to assign network id {id} to MapEvent");
-            }
-
-            RegisterMapEvent(id, mapEvent);
-            Logger.Information("Assigned network id {MapEventId} to preexisting MapEvent", id);
-        }
-    }
-
-    private void RegisterMapEvent(string id, MapEvent mapEvent)
-    {
-        if (!RegisterExistingObject(id, mapEvent))
-        {
-            throw new InvalidOperationException($"Failed to register MapEvent with network id {id}");
-        }
-    }
-
-    internal static string GetNetworkId(MapEvent mapEvent)
-    {
-        if (string.IsNullOrEmpty(mapEvent.StringId))
-        {
-            throw new InvalidOperationException(
-                "MapEvent must be registered before registering its dependent objects");
-        }
-
-        return mapEvent.StringId;
     }
 
     public override void OnClientCreated(MapEvent obj, string id)
     {
         using (new AllowedThread())
         {
-            obj.StringId = id;
-            obj._sides = new MapEventSide[2];
-            obj.WonRounds = new MBList<BattleSideEnum>();
+            InitializeClientMapEvent(obj, id);
         }
 
         // OnMapEventCreated adds to MapEventManager._mapEvents, the list the main-thread map tick
@@ -127,6 +66,18 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
                 Campaign.Current.MapEventManager.OnMapEventCreated(obj);
             }
         });
+    }
+
+    internal static void InitializeClientMapEvent(MapEvent mapEvent, string id)
+    {
+        mapEvent.StringId = id;
+        mapEvent._sides = new MapEventSide[2];
+        mapEvent.WonRounds = new MBList<BattleSideEnum>();
+
+        // AutoRegistry creates client objects without running their constructors. Mirror the
+        // MapEvent field initializer here so the event is complete before any ordered follow-up
+        // message can add its involved parties.
+        mapEvent.TroopUpgradeTracker = new TroopUpgradeTracker();
     }
 
     public override void OnClientDestroyed(MapEvent obj, string id)

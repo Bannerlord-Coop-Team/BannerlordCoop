@@ -1,6 +1,5 @@
 ﻿using Common.Util;
 using GameInterface.Registry.Auto;
-using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
@@ -30,13 +29,11 @@ internal class MapEventPartyRegistry : AutoRegistryBase<MapEventParty>
         foreach (MapEvent mapEvent in Campaign.Current.MapEventManager.MapEvents)
         {
             int counter = 1;
-            string mapEventId = MapEventRegistry.GetNetworkId(mapEvent);
-
             foreach (var side in mapEvent._sides.Where(x => x != null))
             {
                 foreach (var party in side.Parties.Where(x => x != null))
                 {
-                    RegisterExistingObject($"{mapEventId}_{counter++}", party);
+                    RegisterExistingObject($"{mapEvent.StringId}_{counter++}", party);
                 }
             }
         }
