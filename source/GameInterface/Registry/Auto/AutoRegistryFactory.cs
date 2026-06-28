@@ -89,10 +89,18 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
 
     public void RegisterAll()
     {
-        foreach (var registration in RegisterAllCallbacks.OrderByDescending(registration => registration.Priority))
+        foreach (var callback in OrderByRegistrationPriority(RegisterAllCallbacks))
         {
-            registration.Callback();
+            callback();
         }
+    }
+
+    internal static IEnumerable<Action> OrderByRegistrationPriority(
+        IEnumerable<(int Priority, Action Callback)> registrations)
+    {
+        return registrations
+            .OrderByDescending(registration => registration.Priority)
+            .Select(registration => registration.Callback);
     }
 
     private void ValidateConstructorTypes(IEnumerable<MethodBase> ctros, Type expectedType)
