@@ -59,15 +59,25 @@ namespace Coop.UI.LoadGameUI
         {
             Initialize();
 
-            foreach (var group in SaveGroups)
+            for (int groupIndex = SaveGroups.Count - 1; groupIndex >= 0; groupIndex--)
             {
+                var group = SaveGroups[groupIndex];
                 var saves = group.SavedGamesList;
-                for (int i = 0; i < saves.Count; i++)
+                for (int saveIndex = saves.Count - 1; saveIndex >= 0; saveIndex--)
                 {
-                    saves[i] = new SelectedGameVM(saves[i].Save, IsSaving, OnDeleteSavedGame, OnSaveSelection, OnCancelLoadSave, ExecuteDone);
+                    var save = saves[saveIndex].Save;
+                    if (!CoopSaveMetadata.ContainsCoopModule(save.MetaData))
+                    {
+                        saves.RemoveAt(saveIndex);
+                        continue;
+                    }
+
+                    saves[saveIndex] = new SelectedGameVM(save, IsSaving, OnDeleteSavedGame, OnSaveSelection, OnCancelLoadSave, ExecuteDone);
                 }
+
+                if (saves.Count == 0) SaveGroups.RemoveAt(groupIndex);
             }
-            OnSaveSelection(GetSavedGames().FirstOrDefault());
+            OnSaveSelection(GetSavedGames()?.FirstOrDefault());
             RefreshValues();
         }
 
@@ -115,12 +125,12 @@ namespace Coop.UI.LoadGameUI
             InformationManager.ShowInquiry(new InquiryData(titleText, text, true, true, new TextObject("{=aeouhelq}Yes", null).ToString(), new TextObject("{=8OkPHu4f}No", null).ToString(), delegate ()
             {
                 MBSaveLoad.DeleteSaveGame(savedGame.Save.Name);
-                GetSavedGames().Remove(savedGame);
-                OnSaveSelection(GetSavedGames().FirstOrDefault());
+                GetSavedGames()?.Remove(savedGame);
+                OnSaveSelection(GetSavedGames()?.FirstOrDefault());
             }, null, ""), false);
         }
 
-        private MBBindingList<SavedGameVM> GetSavedGames() => SaveGroups.FirstOrDefault().SavedGamesList;
+        private MBBindingList<SavedGameVM> GetSavedGames() => SaveGroups.FirstOrDefault()?.SavedGamesList;
 	}
 
 	public class CoopLoadScreen : SaveLoadScreen
