@@ -1,4 +1,5 @@
 ﻿using GameInterface.Registry.Auto;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
@@ -41,18 +42,15 @@ internal class MapEventComponentsRegistry : AutoRegistryBase<MapEventComponent>
     {
         foreach (var mapEvent in Campaign.Current.MapEventManager.MapEvents)
         {
-            if (mapEvent.StringId == null) {
-                Logger.Warning("MapEvent with null StringId found, skipping registration of its components");
-                continue;
-            }
+            string mapEventId = MapEventRegistry.GetNetworkId(mapEvent);
 
             if (mapEvent.Component == null)
             {
-                Logger.Warning("MapEvent with StringId {StringId} has null Component, skipping registration", mapEvent.StringId);
+                Logger.Warning("MapEvent with StringId {StringId} has null Component, skipping registration", mapEventId);
                 continue;
             }
 
-            RegisterExistingObject(mapEvent.StringId, mapEvent.Component);
+            RegisterExistingObject(mapEventId, mapEvent.Component);
         }
     }
 }

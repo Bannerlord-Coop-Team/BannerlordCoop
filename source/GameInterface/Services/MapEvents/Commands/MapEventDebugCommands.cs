@@ -18,6 +18,7 @@ using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
+using TaleWorlds.ObjectSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Villages.Commands;
@@ -47,9 +48,25 @@ public class MapEventDebugCommands
     [CommandLineArgumentFunction("start_ai_battle", "coop.debug.mapevent")]
     public static string StartAiBattle(List<string> args)
     {
+        return StartAiBattle(args, clearStringIdForReload: false);
+    }
+
+    // coop.debug.mapevent.start_ai_battle_missing_id town_ES1
+    /// <summary>
+    /// Starts an AI field battle normally, then clears its saved id to reproduce loaded map-event
+    /// registration failures after saving and restarting the server.
+    /// </summary>
+    [CommandLineArgumentFunction("start_ai_battle_missing_id", "coop.debug.mapevent")]
+    public static string StartAiBattleWithMissingId(List<string> args)
+    {
+        return StartAiBattle(args, clearStringIdForReload: true);
+    }
+
+    private static string StartAiBattle(List<string> args, bool clearStringIdForReload)
+    {
         if (ModInformation.IsClient)
         {
-            return "start_ai_battle is server-only";
+            return "start_ai_battle commands are server-only";
         }
 
         string settlementId = args.Count > 0 ? args[0] : "town_ES1";
@@ -91,8 +108,25 @@ public class MapEventDebugCommands
             .CreateFieldBattleEvent(banditParty.Party, opposingParty.Party)
             .MapEvent;
 
-        return $"Started AI field battle near {settlement.Name} ({settlementId}): "
-            + $"{banditParty.StringId} vs {opposingParty.StringId}; MapEvent={mapEvent.StringId}";
+        string mapEventId = mapEvent.StringId;
+        string result = $"Started AI field battle near {settlement.Name} ({settlementId}): "
+            + $"{banditParty.StringId} vs {opposingParty.StringId}; MapEvent={mapEventId}";
+
+        if (!clearStringIdForReload) return result;
+
+        var stringIdField = typeof(MBObjectBase).GetField(
+            "<StringId>k__BackingField",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        if (stringIdField == null)
+        {
+            return result + "; failed to find the StringId backing field";
+        }
+
+        // The battle and its objects were created with patches live and remain registered for this session.
+        // Only the saved field is cleared so the next load deterministically exercises the missing-id path.
+        stringIdField.SetValue(mapEvent, null);
+
+        return result + "; cleared MapEvent.StringId for save/reload reproduction";
     }
 
     // coop.debug.mapevent.start_looter

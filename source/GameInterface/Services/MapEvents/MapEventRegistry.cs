@@ -21,9 +21,12 @@ namespace GameInterface.Services.MapEvents;
 /// </summary>
 internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 {
-    internal const string LoadedMapEventIdPrefix = "CoopLoadedMapEvent_";
-
     public override bool Debug => true;
+
+    // Map event sides, parties, components, visuals, and troop trackers derive their ids from the
+    // owning map event. Register map events first so those registries never observe an unregistered parent.
+    public override int RegistrationPriority => 100;
+
     public MapEventRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
         : base(logger, autoRegistryFactory, objectManager)
     {
@@ -44,44 +47,64 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 
     public override void RegisterAllObjects()
     {
-        foreach (var mapEvent in Campaign.Current.MapEventManager.MapEvents)
-        {
-            if (string.IsNullOrEmpty(mapEvent.StringId)) continue;
-
-            RegisterExistingObject(mapEvent.StringId, mapEvent);
-        }
+        RegisterMapEvents(Campaign.Current.MapEventManager.MapEvents);
     }
 
     /// <summary>
-    /// Gives save-loaded map events deterministic ids before any registry walks their object graph.
-    /// Runtime-created map events receive ids from the constructor patch, but loaded instances exist
-    /// before lifetime patches are enabled and can therefore still have a null <see cref="MapEvent.StringId"/>.
+    /// Registers map events that existed before co-op lifetime patches were enabled. Vanilla map events do not
+    /// assign <see cref="MapEvent.StringId"/> in their constructor, so the registry owns assigning a persistent
+    /// network identity when an event first enters the co-op object graph. Runtime events use the same
+    /// <c>Created_N</c> identity path through <see cref="AutoRegistryHandler{T}"/>.
     /// </summary>
-    internal static void NormalizeLoadedMapEventIds(IEnumerable<MapEvent> mapEvents)
+    internal void RegisterMapEvents(IEnumerable<MapEvent> mapEvents)
     {
         if (mapEvents == null) return;
 
         var snapshot = mapEvents.Where(mapEvent => mapEvent != null).ToList();
-        var usedIds = new HashSet<string>(
-            snapshot
-                .Select(mapEvent => mapEvent.StringId)
-                .Where(id => !string.IsNullOrEmpty(id)),
-            StringComparer.Ordinal);
 
-        int nextId = 0;
+        // Register every persisted identity first. This seeds the MapEvent counter above all existing
+        // numeric suffixes before a new identity is allocated, preventing a Created_N collision.
+        foreach (var mapEvent in snapshot)
+        {
+            if (string.IsNullOrEmpty(mapEvent.StringId)) continue;
+
+            RegisterMapEvent(mapEvent.StringId, mapEvent);
+        }
+
         foreach (var mapEvent in snapshot)
         {
             if (!string.IsNullOrEmpty(mapEvent.StringId)) continue;
 
-            string id;
-            do
-            {
-                id = $"{LoadedMapEventIdPrefix}{nextId++}";
-            }
-            while (!usedIds.Add(id));
-
+            string id = $"Created_{objectManager.GetUniqueTypeId(mapEvent)}";
             mapEvent.StringId = id;
+
+            if (!string.Equals(mapEvent.StringId, id, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException($"Failed to assign network id {id} to MapEvent");
+            }
+
+            RegisterMapEvent(id, mapEvent);
+            Logger.Information("Assigned network id {MapEventId} to preexisting MapEvent", id);
         }
+    }
+
+    private void RegisterMapEvent(string id, MapEvent mapEvent)
+    {
+        if (!RegisterExistingObject(id, mapEvent))
+        {
+            throw new InvalidOperationException($"Failed to register MapEvent with network id {id}");
+        }
+    }
+
+    internal static string GetNetworkId(MapEvent mapEvent)
+    {
+        if (string.IsNullOrEmpty(mapEvent.StringId))
+        {
+            throw new InvalidOperationException(
+                "MapEvent must be registered before registering its dependent objects");
+        }
+
+        return mapEvent.StringId;
     }
 
     public override void OnClientCreated(MapEvent obj, string id)

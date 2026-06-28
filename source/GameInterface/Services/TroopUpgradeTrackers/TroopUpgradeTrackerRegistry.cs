@@ -1,5 +1,6 @@
 ﻿using Common.Util;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
@@ -27,10 +28,10 @@ internal class TroopUpgradeTrackerRegistry : AutoRegistryBase<TroopUpgradeTracke
     {
         foreach (var mapEvent in Campaign.Current.MapEventManager.MapEvents)
         {
-            if (mapEvent.StringId == null) continue;
+            string mapEventId = MapEventRegistry.GetNetworkId(mapEvent);
             if (mapEvent.TroopUpgradeTracker == null) continue;
 
-            RegisterExistingObject(mapEvent.StringId, mapEvent.TroopUpgradeTracker);
+            RegisterExistingObject(mapEventId, mapEvent.TroopUpgradeTracker);
         }
     }
 

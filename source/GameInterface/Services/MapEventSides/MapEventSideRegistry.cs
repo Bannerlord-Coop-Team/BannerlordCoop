@@ -1,4 +1,5 @@
 ﻿using GameInterface.Registry.Auto;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
@@ -42,10 +43,11 @@ internal class MapEventSideRegistry : AutoRegistryBase<MapEventSide>
         foreach (MapEvent mapEvent in Campaign.Current.MapEventManager.MapEvents)
         {
             int counter = 1;
+            string mapEventId = MapEventRegistry.GetNetworkId(mapEvent);
 
             foreach (var side in mapEvent._sides.Where(side => side != null))
             {
-                var networkId = mapEvent.StringId + "_" + counter++;
+                var networkId = mapEventId + "_" + counter++;
 
                 RegisterExistingObject(networkId, side);
             }

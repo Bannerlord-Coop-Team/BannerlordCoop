@@ -30,7 +30,7 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
     ISerializableTypeMapper TypeMapper { get; }
     List<IDisposable> Disposables { get; } = new List<IDisposable>();
 
-    List<Action> RegisterAllCallbacks = new List<Action>();
+    List<(int Priority, Action Callback)> RegisterAllCallbacks = new List<(int, Action)>();
 
     public AutoRegistryFactory(
         IRegistryCollection collection,
@@ -83,15 +83,15 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
             PatchCollector.AddPostfix(destroy, patch);
         }
 
-        RegisterAllCallbacks.Add(autoRegistry.RegisterAllObjects);
+        RegisterAllCallbacks.Add((autoRegistry.RegistrationPriority, autoRegistry.RegisterAllObjects));
         Disposables.Add(handler);
     }
 
     public void RegisterAll()
     {
-        foreach (var callback in RegisterAllCallbacks)
+        foreach (var registration in RegisterAllCallbacks.OrderByDescending(registration => registration.Priority))
         {
-            callback();
+            registration.Callback();
         }
     }
 

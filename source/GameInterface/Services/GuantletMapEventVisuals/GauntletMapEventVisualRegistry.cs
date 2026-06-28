@@ -1,5 +1,6 @@
 ﻿using Common.Util;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using SandBox.GauntletUI.Map;
@@ -30,11 +31,11 @@ internal class GauntletMapEventVisualRegistry : AutoRegistryBase<GauntletMapEven
     {
         foreach (var mapEvent in Campaign.Current.MapEventManager.MapEvents)
         {
-            if (mapEvent.StringId == null) continue;
+            string mapEventId = MapEventRegistry.GetNetworkId(mapEvent);
 
             if (mapEvent.MapEventVisual is not GauntletMapEventVisual mapEventVisual) continue;
 
-            RegisterExistingObject(mapEvent.StringId, mapEventVisual);
+            RegisterExistingObject(mapEventId, mapEventVisual);
         }
     }
 
