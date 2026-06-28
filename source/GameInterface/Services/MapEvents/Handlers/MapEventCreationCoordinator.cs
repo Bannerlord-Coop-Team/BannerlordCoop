@@ -164,9 +164,8 @@ internal class MapEventCreationCoordinator : IHandler
 
         string mapEventId = null;
 
-        // MapEvent creation mutates campaign state and must run on the server's main thread. The AllowedThread scope
-        // lets the resulting StartBattleInternal/MapEvent construction run through unblocked by the mod's patches,
-        // and registers the new MapEvent (broadcasting it to clients) before we read back its id.
+        // MapEvent creation mutates campaign state and must run on the server's main thread with patches live.
+        // The lifetime patches register and broadcast the new object graph before we read back the MapEvent id.
         GameThread.Run(() =>
         {
             if (attacker.MobileParty?.IsPlayerParty() == true && 

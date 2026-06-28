@@ -1,5 +1,7 @@
 ﻿using Autofac;
+using Common;
 using Common.Logging;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
@@ -13,6 +15,7 @@ using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using static TaleWorlds.Library.CommandLineFunctionality;
@@ -34,6 +37,62 @@ public class MapEventDebugCommands
         if (ContainerProvider.TryGetContainer(out var container) == false) return false;
 
         return container.TryResolve(out objectManager);
+    }
+
+    // coop.debug.mapevent.start_ai_battle town_ES1
+    /// <summary>
+    /// Starts a server-authoritative AI field battle near the requested settlement so a save can be
+    /// created with an active map event and reloaded to test loaded map-event registration.
+    /// </summary>
+    [CommandLineArgumentFunction("start_ai_battle", "coop.debug.mapevent")]
+    public static string StartAiBattle(List<string> args)
+    {
+        if (ModInformation.IsClient)
+        {
+            return "start_ai_battle is server-only";
+        }
+
+        string settlementId = args.Count > 0 ? args[0] : "town_ES1";
+        var settlement = Settlement.All.FirstOrDefault(candidate => candidate.StringId == settlementId);
+        if (settlement == null)
+        {
+            return $"Settlement '{settlementId}' not found";
+        }
+
+        var eligibleParties = MobileParty.All
+            .Where(party => party.IsActive
+                && !party.IsPlayerParty()
+                && party.MapEvent == null
+                && party.CurrentSettlement == null
+                && party.Party != null
+                && party.MapFaction != null
+                && party.MemberRoster.TotalManCount > 0)
+            .ToList();
+
+        var banditParty = eligibleParties
+            .Where(party => party.IsBandit)
+            .OrderBy(party => party.Position.ToVec2().DistanceSquared(settlement.Position.ToVec2()))
+            .FirstOrDefault();
+        if (banditParty == null)
+        {
+            return $"No active bandit party found near {settlement.Name} ({settlementId})";
+        }
+
+        var opposingParty = eligibleParties
+            .Where(party => party != banditParty && party.MapFaction != banditParty.MapFaction)
+            .OrderBy(party => party.Position.ToVec2().DistanceSquared(banditParty.Position.ToVec2()))
+            .FirstOrDefault();
+        if (opposingParty == null)
+        {
+            return $"No opposing AI party found for {banditParty.StringId} near {settlement.Name} ({settlementId})";
+        }
+
+        var mapEvent = FieldBattleEventComponent
+            .CreateFieldBattleEvent(banditParty.Party, opposingParty.Party)
+            .MapEvent;
+
+        return $"Started AI field battle near {settlement.Name} ({settlementId}): "
+            + $"{banditParty.StringId} vs {opposingParty.StringId}; MapEvent={mapEvent.StringId}";
     }
 
     // coop.debug.mapevent.start_looter

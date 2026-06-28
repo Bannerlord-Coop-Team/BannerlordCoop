@@ -2,7 +2,9 @@
 using GameInterface.AutoSync;
 using GameInterface.Registry.Auto;
 using GameInterface.Registry.Messages;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
+using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Registry;
 
@@ -42,6 +44,8 @@ internal class RegistryManager : IRegistryManager
 
     public void RegisterAllGameObjects()
     {
+        MapEventRegistry.NormalizeLoadedMapEventIds(Campaign.Current?.MapEventManager?.MapEvents);
+
         autoRegistryFactory.RegisterAll();
 
         messageBroker.Publish(this, new AllGameObjectsRegistered());

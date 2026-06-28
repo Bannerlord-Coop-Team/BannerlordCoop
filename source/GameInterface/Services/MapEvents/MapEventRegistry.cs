@@ -4,7 +4,9 @@ using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -19,6 +21,8 @@ namespace GameInterface.Services.MapEvents;
 /// </summary>
 internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 {
+    internal const string LoadedMapEventIdPrefix = "CoopLoadedMapEvent_";
+
     public override bool Debug => true;
     public MapEventRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
         : base(logger, autoRegistryFactory, objectManager)
@@ -42,9 +46,41 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
     {
         foreach (var mapEvent in Campaign.Current.MapEventManager.MapEvents)
         {
-            if (mapEvent.StringId == null) continue;
+            if (string.IsNullOrEmpty(mapEvent.StringId)) continue;
 
             RegisterExistingObject(mapEvent.StringId, mapEvent);
+        }
+    }
+
+    /// <summary>
+    /// Gives save-loaded map events deterministic ids before any registry walks their object graph.
+    /// Runtime-created map events receive ids from the constructor patch, but loaded instances exist
+    /// before lifetime patches are enabled and can therefore still have a null <see cref="MapEvent.StringId"/>.
+    /// </summary>
+    internal static void NormalizeLoadedMapEventIds(IEnumerable<MapEvent> mapEvents)
+    {
+        if (mapEvents == null) return;
+
+        var snapshot = mapEvents.Where(mapEvent => mapEvent != null).ToList();
+        var usedIds = new HashSet<string>(
+            snapshot
+                .Select(mapEvent => mapEvent.StringId)
+                .Where(id => !string.IsNullOrEmpty(id)),
+            StringComparer.Ordinal);
+
+        int nextId = 0;
+        foreach (var mapEvent in snapshot)
+        {
+            if (!string.IsNullOrEmpty(mapEvent.StringId)) continue;
+
+            string id;
+            do
+            {
+                id = $"{LoadedMapEventIdPrefix}{nextId++}";
+            }
+            while (!usedIds.Add(id));
+
+            mapEvent.StringId = id;
         }
     }
 
