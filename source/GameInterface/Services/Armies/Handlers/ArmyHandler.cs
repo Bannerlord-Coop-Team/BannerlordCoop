@@ -265,7 +265,6 @@ public class ArmyHandler : IHandler
             }
             using (new AllowedThread())
             {
-
                 army.Kingdom = kingdom;
             }
         });
