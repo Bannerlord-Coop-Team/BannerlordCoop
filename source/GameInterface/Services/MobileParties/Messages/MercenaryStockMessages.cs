@@ -52,13 +52,6 @@ internal readonly struct NetworkRequestMercenaryStockAudit : ICommand
 [ProtoContract(SkipConstructor = true)]
 internal readonly struct NetworkRequestMercenaryStockSync : ICommand
 {
-    [ProtoMember(1)]
-    public readonly bool Request;
-
-    public NetworkRequestMercenaryStockSync(bool request = true)
-    {
-        Request = request;
-    }
 }
 
 [ProtoContract(SkipConstructor = true)]

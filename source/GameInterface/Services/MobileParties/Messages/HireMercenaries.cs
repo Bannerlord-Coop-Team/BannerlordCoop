@@ -8,7 +8,8 @@ namespace GameInterface.Services.MobileParties.Messages;
 /// to the player's party member roster and deduct the gold cost. The server applies both with
 /// patches live, so the troop add (TroopRoster patches) and gold change (Hero.Gold sync) replicate
 /// to every client. The count is the client's requested hire amount; the server validates it against
-/// authoritative stock and applies the client-computed price against the client gold snapshot.
+/// authoritative stock and current server hero gold. HeroGold is the client's snapshot for reject
+/// diagnostics only.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 internal readonly struct HireMercenaries : ICommand

@@ -70,7 +70,7 @@ internal class MercenaryHireHandler : IHandler
     {
         // Only the server applies the hire authoritatively; clients receive the replicated troop and
         // gold changes instead.
-        if (!ModInformation.IsServer) return;
+        if (ModInformation.IsClient) return;
 
         var data = obj.What;
         var peer = obj.Who as NetPeer;
@@ -103,7 +103,6 @@ internal class MercenaryHireHandler : IHandler
             !CanApplyMercenaryHire(
                 data.Count,
                 goldAmount,
-                data.HeroGold,
                 mainHero.Gold,
                 unitPrice,
                 availableTroopMatches,
@@ -128,10 +127,7 @@ internal class MercenaryHireHandler : IHandler
                 data.GoldAmount,
                 goldAmount);
 
-            if (recruitmentBehavior != null)
-            {
-                RecruitmentCampaignBehaviorPatch.PublishMercenaryStock(recruitmentBehavior, town);
-            }
+            SendMercenaryStock(peer, town, mercenaryData?.TroopType, mercenaryData?.Number ?? 0);
 
             return;
         }
@@ -164,6 +160,17 @@ internal class MercenaryHireHandler : IHandler
         network.Send(peer, new NotifyGoldChange(-goldAmount));
     }
 
+    private void SendMercenaryStock(NetPeer peer, Town town, CharacterObject troopType, int number)
+    {
+        if (peer == null) return;
+        if (!objectManager.TryGetIdWithLogging(town, out var townId)) return;
+
+        string troopTypeId = null;
+        if (troopType != null && !objectManager.TryGetId(troopType, out troopTypeId)) return;
+
+        network.Send(peer, new NetworkUpdateMercenaryStock(townId, troopTypeId, number));
+    }
+
     internal static int GetMercenaryHireGoldAmount(int count, int unitPrice)
     {
         if (count <= 0 || unitPrice <= 0)
@@ -175,7 +182,6 @@ internal class MercenaryHireHandler : IHandler
     internal static bool CanApplyMercenaryHire(
         int count,
         int goldAmount,
-        int clientHeroGold,
         int serverHeroGold,
         int unitPrice,
         bool availableTroopMatches,
@@ -183,7 +189,6 @@ internal class MercenaryHireHandler : IHandler
     {
         return count > 0 &&
                goldAmount > 0 &&
-               clientHeroGold >= goldAmount &&
                serverHeroGold >= goldAmount &&
                unitPrice > 0 &&
                availableTroopMatches &&

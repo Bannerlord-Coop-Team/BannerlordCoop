@@ -57,12 +57,12 @@ internal class MercenaryStockHandler : IHandler
     {
         if (ModInformation.IsServer) return;
 
-        network.SendAll(new NetworkRequestMercenaryStockSync(true));
+        network.SendAll(new NetworkRequestMercenaryStockSync());
     }
 
     internal void Handle_MercenaryStockChanged(MessagePayload<MercenaryStockChanged> payload)
     {
-        if (!ModInformation.IsServer) return;
+        if (ModInformation.IsClient) return;
 
         if (!objectManager.TryGetIdWithLogging(payload.What.Town, out var townId)) return;
 
@@ -95,7 +95,7 @@ internal class MercenaryStockHandler : IHandler
 
     internal void Handle_NetworkRequestMercenaryStockSync(MessagePayload<NetworkRequestMercenaryStockSync> payload)
     {
-        if (!ModInformation.IsServer) return;
+        if (ModInformation.IsClient) return;
 
         var peer = payload.Who as NetPeer;
         if (peer == null) return;
@@ -121,7 +121,7 @@ internal class MercenaryStockHandler : IHandler
 
     private void Handle_NetworkMercenaryStockAudit(MessagePayload<NetworkMercenaryStockAudit> payload)
     {
-        if (!ModInformation.IsServer) return;
+        if (ModInformation.IsClient) return;
 
         var data = payload.What;
         var peer = payload.Who as NetPeer;

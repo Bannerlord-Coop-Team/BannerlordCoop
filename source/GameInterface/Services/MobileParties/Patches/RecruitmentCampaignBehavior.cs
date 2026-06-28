@@ -22,7 +22,7 @@ internal class RecruitmentCampaignBehaviorPatch
     [HarmonyPatch("CheckRecruiting")]
     private static bool CheckRecruitingPrefix(RecruitmentCampaignBehavior __instance, ref MobileParty mobileParty, ref Settlement settlement, out MercenaryStockState __state)
     {
-        if (!ModInformation.IsServer)
+        if (ModInformation.IsClient)
         {
             __state = default;
             return false;
@@ -36,7 +36,7 @@ internal class RecruitmentCampaignBehaviorPatch
     [HarmonyPatch("CheckRecruiting")]
     private static void CheckRecruitingPostfix(RecruitmentCampaignBehavior __instance, ref Settlement settlement, MercenaryStockState __state, bool __runOriginal)
     {
-        if (!ModInformation.IsServer || !__runOriginal) return;
+        if (ModInformation.IsClient || !__runOriginal) return;
 
         PublishMercenaryStockIfChanged(__instance, settlement?.Town, __state);
     }
@@ -95,7 +95,7 @@ internal class RecruitmentCampaignBehaviorPatch
     [HarmonyPatch("DailyTickTown")]
     private static void DailyTickTownPostfix(RecruitmentCampaignBehavior __instance, Town town, MercenaryStockState __state)
     {
-        if (!ModInformation.IsServer) return;
+        if (ModInformation.IsClient) return;
 
         PublishMercenaryStockIfChanged(__instance, town, __state);
     }

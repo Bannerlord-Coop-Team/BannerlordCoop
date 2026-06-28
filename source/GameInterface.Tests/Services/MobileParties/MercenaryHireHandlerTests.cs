@@ -104,7 +104,6 @@ public class MercenaryHireHandlerTests
         bool canApply = MercenaryHireHandler.CanApplyMercenaryHire(
             count,
             goldAmount,
-            clientHeroGold: 1000,
             serverHeroGold: 1000,
             unitPrice: unitPrice,
             availableTroopMatches: true,
@@ -125,7 +124,6 @@ public class MercenaryHireHandlerTests
         bool canApply = MercenaryHireHandler.CanApplyMercenaryHire(
             count,
             goldAmount,
-            clientHeroGold: 1000,
             serverHeroGold: 1000,
             unitPrice: unitPrice,
             availableTroopMatches,
@@ -144,7 +142,6 @@ public class MercenaryHireHandlerTests
         bool canApply = MercenaryHireHandler.CanApplyMercenaryHire(
             count,
             goldAmount,
-            clientHeroGold: 1000,
             serverHeroGold: goldAmount - 1,
             unitPrice: unitPrice,
             availableTroopMatches: true,
