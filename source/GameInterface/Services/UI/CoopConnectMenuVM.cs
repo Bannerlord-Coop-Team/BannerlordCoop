@@ -14,7 +14,7 @@ namespace GameInterface.Services.UI
         public string JoinButtonText => "Join";
         public string GithubButtonText => "Github";
         public string DiscordButtonText => "Discord";
-        public string MovieTextHeader => "Join Co-op Campaign";
+        public string MovieTextHeader => "Join Co-op Sandbox";
         public string CommunityText => "Join the Community";
         public string IpText => "IP-Address:";
         public string PortText => "Port:";
