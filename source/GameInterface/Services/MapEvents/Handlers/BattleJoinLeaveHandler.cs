@@ -1,0 +1,222 @@
+using Common;
+using Common.Logging;
+using Common.Messaging;
+using Common.Network;
+using Common.Util;
+using GameInterface.Services.MapEvents.Logging;
+using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.Messages.Leave;
+using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.ObjectManager;
+using Serilog;
+using System;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
+
+namespace GameInterface.Services.MapEvents.Handlers;
+
+/// <summary>
+/// Owns a party joining or leaving a battle without ending it (split out of <see cref="BattleHandler"/>). A client
+/// bridges its join/leave to a server request; the server performs it authoritatively and, for a single-party
+/// removal that does not auto-replicate, broadcasts it. Also applies the server's involved-party snapshot on the
+/// client (troop-upgrade tracking + position snap). The server-side involved-parties broadcast and the player-count
+/// fast-forward bookkeeping stay in <see cref="BattleHandler"/> because they drive time control.
+/// </summary>
+internal class BattleJoinLeaveHandler : IHandler
+{
+    private static readonly ILogger Logger = LogManager.GetLogger<BattleJoinLeaveHandler>();
+
+    private readonly IMessageBroker messageBroker;
+    private readonly IObjectManager objectManager;
+    private readonly INetwork network;
+    private readonly IMapEventLogger mapEventLogger;
+
+    public BattleJoinLeaveHandler(
+        IMessageBroker messageBroker,
+        IObjectManager objectManager,
+        INetwork network,
+        IMapEventLogger mapEventLogger)
+    {
+        this.messageBroker = messageBroker;
+        this.objectManager = objectManager;
+        this.network = network;
+        this.mapEventLogger = mapEventLogger;
+
+        messageBroker.Subscribe<NetworkAddInvolvedParties>(Handle_NetworkAddInvolvedParties);
+        messageBroker.Subscribe<PlayerJoinBattleAttempted>(Handle_PlayerJoinBattleAttempted);
+        messageBroker.Subscribe<NetworkRequestJoinBattle>(Handle_NetworkRequestJoinBattle);
+        messageBroker.Subscribe<PlayerLeaveBattleAttempted>(Handle_PlayerLeaveBattleAttempted);
+        messageBroker.Subscribe<NetworkRequestLeaveBattle>(Handle_NetworkRequestLeaveBattle);
+        messageBroker.Subscribe<NetworkPartyLeftBattle>(Handle_NetworkPartyLeftBattle);
+    }
+
+    public void Dispose()
+    {
+        messageBroker.Unsubscribe<NetworkAddInvolvedParties>(Handle_NetworkAddInvolvedParties);
+        messageBroker.Unsubscribe<PlayerJoinBattleAttempted>(Handle_PlayerJoinBattleAttempted);
+        messageBroker.Unsubscribe<NetworkRequestJoinBattle>(Handle_NetworkRequestJoinBattle);
+        messageBroker.Unsubscribe<PlayerLeaveBattleAttempted>(Handle_PlayerLeaveBattleAttempted);
+        messageBroker.Unsubscribe<NetworkRequestLeaveBattle>(Handle_NetworkRequestLeaveBattle);
+        messageBroker.Unsubscribe<NetworkPartyLeftBattle>(Handle_NetworkPartyLeftBattle);
+    }
+
+    private void Handle_NetworkAddInvolvedParties(MessagePayload<NetworkAddInvolvedParties> payload)
+    {
+        var message = payload.What;
+
+        GameThread.Run(() =>
+        {
+            try
+            {
+                // The campaign can tear down (exit to menu, disconnect, save load) between
+                // enqueuing this and the main thread draining it; bail before touching
+                // campaign state (the position snap below dereferences Campaign.Current).
+                if (Campaign.Current == null)
+                    return;
+
+                if (!objectManager.TryGetObjectWithLogging<MapEvent>(message.MapEventId, out var mapEvent))
+                    return;
+
+                mapEventLogger.DebugMapEvent(mapEvent, "Handling network add involved parties. Party count: {MapEventPartyCount}", message.MapEventPartyIds.Length);
+
+                var positions = message.Positions;
+
+                // Re-applying campaign-collection state replicated from the server; the
+                // AutoSync TroopUpgradeTracker patches must stand down during the apply.
+                using (new AllowedThread())
+                {
+                    for (int i = 0; i < message.MapEventPartyIds.Length; i++)
+                    {
+                        var mapEventPartyId = message.MapEventPartyIds[i];
+                        if (!objectManager.TryGetObjectWithLogging<MapEventParty>(mapEventPartyId, out var mapEventParty))
+                            continue;
+
+                        mapEventLogger.DebugMapEvent(mapEvent, "Adding involved map event party {MapEventPartyId} to troop upgrade tracker", mapEventPartyId);
+                        mapEvent.TroopUpgradeTracker.AddParty(mapEventParty);
+
+                        // Snap the party to its server-side map position so it lines up with the
+                        // battle. Every involved party is snapped, including this client's own, so
+                        // all clients place the parties where the server has them, lined up with the
+                        // battle center the server is authoritative for.
+                        var mobileParty = mapEventParty.Party.MobileParty;
+                        if (mobileParty != null && positions != null && i < positions.Length)
+                        {
+                            mobileParty.Position = positions[i];
+                        }
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to apply {Message}", nameof(NetworkAddInvolvedParties));
+            }
+        });
+    }
+
+    /// <summary>[Client] Bridge the local player's battle join to a server request.</summary>
+    private void Handle_PlayerJoinBattleAttempted(MessagePayload<PlayerJoinBattleAttempted> payload)
+    {
+        var data = payload.What;
+
+        if (!objectManager.TryGetIdWithLogging(data.MapEvent, out var mapEventId)) return;
+        if (!objectManager.TryGetIdWithLogging(data.JoiningParty, out var partyId)) return;
+
+        mapEventLogger.DebugMapEvent(data.MapEvent, "Requesting server to join battle. PartyId={PartyId}, Side={Side}", partyId, data.Side);
+
+        // On a client, SendAll targets the server (its only connected peer).
+        network.SendAll(new NetworkRequestJoinBattle(mapEventId, partyId, data.Side));
+    }
+
+    /// <summary>[Server] Perform the authoritative join; the native add replicates to all clients.</summary>
+    private void Handle_NetworkRequestJoinBattle(MessagePayload<NetworkRequestJoinBattle> payload)
+    {
+        if (!ModInformation.IsServer) return;
+
+        var data = payload.What;
+
+        GameThread.Run(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.MapEventId, out var mapEvent)) return;
+            if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.PartyId, out var party)) return;
+
+            if (party.MapEventSide != null)
+            {
+                Logger.Warning("Ignoring join request: party {PartyId} is already in a map event", data.PartyId);
+                return;
+            }
+
+            // The setter runs the native MapEventSide.AddPartyInternal on the server (NOT under AllowedThread), so the
+            // AddIntercept publishes the battle-party add and it replicates to every client through the map-event sync.
+            party.MapEventSide = mapEvent.GetMapEventSide(data.Side);
+
+            // If this battle is being auto-resolved, pull the joiner into the simulation instead of leaving it stuck in
+            // the encounter menu. A ForwardingBattleObserver on the event means a server-driven simulation is running.
+            // Sent after the add above so the joiner applies the replicated battle-party add (and so builds its own
+            // party into its scoreboard) before this open arrives; the simulation handler then opens it as a spectator.
+            if (mapEvent.BattleObserver is ForwardingBattleObserver)
+                network.SendAll(new NetworkOpenBattleSimulation(data.MapEventId));
+        });
+    }
+
+    /// <summary>[Client] Bridge a joiner's leave to a server request; [Server/host] perform it directly.</summary>
+    private void Handle_PlayerLeaveBattleAttempted(MessagePayload<PlayerLeaveBattleAttempted> payload)
+    {
+        if (!objectManager.TryGetIdWithLogging(payload.What.LeavingParty, out var partyId)) return;
+
+        if (ModInformation.IsServer)
+            RemovePartyFromBattleAndBroadcast(partyId);
+        else
+            network.SendAll(new NetworkRequestLeaveBattle(partyId));
+    }
+
+    /// <summary>[Server] A client asked to leave a battle without ending it.</summary>
+    private void Handle_NetworkRequestLeaveBattle(MessagePayload<NetworkRequestLeaveBattle> payload)
+    {
+        if (!ModInformation.IsServer) return;
+
+        RemovePartyFromBattleAndBroadcast(payload.What.PartyId);
+    }
+
+    // Single-party removal does not auto-replicate (RemovePartyInternal uses RemoveAt, bypassing the
+    // collection sync), so remove authoritatively and broadcast the removal explicitly.
+    private void RemovePartyFromBattleAndBroadcast(string partyId)
+    {
+        GameThread.Run(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<PartyBase>(partyId, out var party)) return;
+
+            ApplyLeave(party);
+            network.SendAll(new NetworkPartyLeftBattle(partyId));
+        });
+    }
+
+    /// <summary>[Client] Apply a joiner's removal from its map event side.</summary>
+    private void Handle_NetworkPartyLeftBattle(MessagePayload<NetworkPartyLeftBattle> payload)
+    {
+        var partyId = payload.What.PartyId;
+
+        GameThread.Run(() =>
+        {
+            if (Campaign.Current == null) return;
+            if (!objectManager.TryGetObjectWithLogging<PartyBase>(partyId, out var party)) return;
+
+            ApplyLeave(party);
+        });
+    }
+
+    // Remove the party from its side (idempotent) and, if it is this instance's own party, close its encounter UI.
+    // PlayerEncounter.Finish is safe here: with MapEventSide already cleared, LeaveBattle no longer finalizes.
+    private static void ApplyLeave(PartyBase party)
+    {
+        using (new AllowedThread())
+        {
+            if (party.MapEventSide != null)
+                party.MapEventSide = null;
+
+            if (party == PartyBase.MainParty && PlayerEncounter.Current != null)
+                PlayerEncounter.Finish(false);
+        }
+    }
+}
