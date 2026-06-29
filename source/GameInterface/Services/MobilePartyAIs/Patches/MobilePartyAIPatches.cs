@@ -34,7 +34,7 @@ internal class MobilePartyAIPatches
 
     [HarmonyPatch(nameof(MobilePartyAi.AiBehaviorInteractable), MethodType.Setter)]
     [HarmonyPrefix]
-    internal static void AiBehaviorInteractable_Prefix(ref MobilePartyAi __instance, ref IInteractablePoint value)
+    static void AiBehaviorInteractable_Prefix(ref MobilePartyAi __instance, ref IInteractablePoint value)
     {
         if (CallOriginalPolicy.IsOriginalAllowed())
             return;

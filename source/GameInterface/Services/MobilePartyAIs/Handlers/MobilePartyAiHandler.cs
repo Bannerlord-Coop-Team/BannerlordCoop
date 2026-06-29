@@ -62,7 +62,7 @@ internal class MobilePartyAiHandler : IHandler
         network.SendAll(new UpdateAiBehaviorInteractablePoint(partyAiId, interactablePointId));
     }
 
-    internal void Handle_UpdateAiBehaviorInteractablePoint(MessagePayload<UpdateAiBehaviorInteractablePoint> payload)
+    private void Handle_UpdateAiBehaviorInteractablePoint(MessagePayload<UpdateAiBehaviorInteractablePoint> payload)
     {
         var message = payload.What;
         GameThread.RunSafe(() =>
