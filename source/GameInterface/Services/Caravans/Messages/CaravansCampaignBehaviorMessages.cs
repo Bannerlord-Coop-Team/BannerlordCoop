@@ -16,16 +16,6 @@ public readonly struct CaravansKingdomDestroyed : IEvent
     }
 }
 
-public readonly struct CaravanPartyDestroyed : IEvent
-{
-    public readonly MobileParty MobileParty;
-
-    public CaravanPartyDestroyed(MobileParty mobileParty)
-    {
-        MobileParty = mobileParty;
-    }
-}
-
 public readonly struct DeleteExpiredTradeRumorTakenCaravans : IEvent
 {
     public DeleteExpiredTradeRumorTakenCaravans() { }

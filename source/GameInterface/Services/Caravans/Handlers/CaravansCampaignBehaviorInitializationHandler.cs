@@ -4,6 +4,7 @@ using Common.Network;
 using GameInterface.Services.Caravans.Interfaces;
 using GameInterface.Services.Caravans.Messages;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System.Collections.Generic;
@@ -58,7 +59,6 @@ internal class CaravansCampaignBehaviorInitializationHandler : IHandler
         CaravansCampaignBehavior caravansCampaignBehavior = Campaign.Current.GetCampaignBehavior<CaravansCampaignBehavior>();
 
         caravansCampaignBehavior._prohibitedKingdomsForPlayerCaravans = GetProhibitedKingdoms(playerHeroId);
-        caravansCampaignBehavior._interactedCaravans = GetInteractedCaravans(playerHeroId);
         caravansCampaignBehavior._tradeRumorTakenCaravans = GetTradeRumorTakenCaravans(playerHeroId);
 
         network.SendAll(new NetworkInitializeServerCaravansDataKeys(playerHeroId));
@@ -84,23 +84,6 @@ internal class CaravansCampaignBehaviorInitializationHandler : IHandler
         }
 
         return prohibitedKingdoms;
-    }
-
-    private Dictionary<MobileParty, CaravansCampaignBehavior.PlayerInteraction> GetInteractedCaravans(string playerHeroId)
-    {
-        var interactedCaravans = new Dictionary<MobileParty, CaravansCampaignBehavior.PlayerInteraction>();
-
-        // Null and key check for players without existing caravans data
-        if (caravansPlayerData?.PlayerInteractedCaravans?.ContainsKey(playerHeroId) != true) return interactedCaravans;
-
-        foreach (KeyValuePair<string, int> caravanInteraction in caravansPlayerData.PlayerInteractedCaravans[playerHeroId])
-        {
-            if (!objectManager.TryGetObjectWithLogging<MobileParty>(caravanInteraction.Key, out var caravan)) continue;
-
-            interactedCaravans[caravan] = (CaravansCampaignBehavior.PlayerInteraction)caravanInteraction.Value;
-        }
-
-        return interactedCaravans;
     }
 
     private Dictionary<MobileParty, CampaignTime> GetTradeRumorTakenCaravans(string playerHeroId)

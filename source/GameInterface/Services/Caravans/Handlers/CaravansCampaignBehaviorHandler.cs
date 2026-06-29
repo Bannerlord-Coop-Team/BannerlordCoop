@@ -5,6 +5,8 @@ using Common.Network;
 using GameInterface.Services.Caravans.Data;
 using GameInterface.Services.Caravans.Interfaces;
 using GameInterface.Services.Caravans.Messages;
+using GameInterface.Services.MobileParties.Interfaces;
+using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System.Collections.Generic;
@@ -23,22 +25,24 @@ internal class CaravansCampaignBehaviorHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ISessionCaravansPlayerDataInterface sessionCaravansPlayerDataInterface;
+    private readonly ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface;
 
     public CaravansCampaignBehaviorHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        ISessionCaravansPlayerDataInterface sessionCaravansPlayerDataInterface)
+        ISessionCaravansPlayerDataInterface sessionCaravansPlayerDataInterface,
+        ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.sessionCaravansPlayerDataInterface = sessionCaravansPlayerDataInterface;
-
+        this.sessionInteractionsPlayerDataInterface = sessionInteractionsPlayerDataInterface;
         messageBroker.Subscribe<CaravansKingdomDestroyed>(Handle_CaravansKingdomDestroyed);
         messageBroker.Subscribe<NetworkCaravansKingdomDestroyed>(Handle_NetworkCaravansKingdomDestroyed);
 
-        messageBroker.Subscribe<CaravanPartyDestroyed>(Handle_CaravanPartyDestroyed);
+        messageBroker.Subscribe<MobilePartyDestroyed>(Handle_MobilePartyDestroyed);
         messageBroker.Subscribe<NetworkCaravanPartyDestroyed>(Handle_NetworkCaravanPartyDestroyed);
 
         messageBroker.Subscribe<DeleteExpiredTradeRumorTakenCaravans>(Handle_DeleteExpiredTradeRumorTakenCaravans);
@@ -58,7 +62,7 @@ internal class CaravansCampaignBehaviorHandler : IHandler
         messageBroker.Unsubscribe<CaravansKingdomDestroyed>(Handle_CaravansKingdomDestroyed);
         messageBroker.Unsubscribe<NetworkCaravansKingdomDestroyed>(Handle_NetworkCaravansKingdomDestroyed);
 
-        messageBroker.Unsubscribe<CaravanPartyDestroyed>(Handle_CaravanPartyDestroyed);
+        messageBroker.Unsubscribe<MobilePartyDestroyed>(Handle_MobilePartyDestroyed);
         messageBroker.Unsubscribe<NetworkCaravanPartyDestroyed>(Handle_NetworkCaravanPartyDestroyed);
 
         messageBroker.Unsubscribe<DeleteExpiredTradeRumorTakenCaravans>(Handle_DeleteExpiredTradeRumorTakenCaravans);
@@ -99,7 +103,7 @@ internal class CaravansCampaignBehaviorHandler : IHandler
         });
     }
 
-    private void Handle_CaravanPartyDestroyed(MessagePayload<CaravanPartyDestroyed> obj)
+    private void Handle_MobilePartyDestroyed(MessagePayload<MobilePartyDestroyed> obj)
     {
         // Don't process anything for destroyed mobile parties that aren't caravans
         if (!obj.What.MobileParty.IsCaravan) return;
@@ -107,7 +111,7 @@ internal class CaravansCampaignBehaviorHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
 
         // Update CoopSession data on server
-        sessionCaravansPlayerDataInterface.RemoveInteractedCaravanForAllPlayers(mobilePartyId);
+        sessionInteractionsPlayerDataInterface.RemoveInteractedCaravanForAllPlayers(mobilePartyId);
 
         var message = new NetworkCaravanPartyDestroyed(mobilePartyId);
         network.SendAll(message);

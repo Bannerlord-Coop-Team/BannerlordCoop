@@ -1,5 +1,6 @@
 ﻿using Common.PacketHandlers;
 using GameInterface.Services.Caravans;
+using GameInterface.Services.MobileParties;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.Workshops;
 using LiteNetLib;
@@ -40,17 +41,22 @@ public readonly struct GameSaveDataPacket : IPacket
     [ProtoMember(5)]
     public readonly CaravansPlayerData CaravansPlayerData;
 
+    [ProtoMember(6)]
+    public readonly InteractionsPlayerData InteractionsPlayerData;
+
     public GameSaveDataPacket(
         byte[] gameSaveData,
         string campaignID,
         CraftingPlayerData craftingPlayerData,
         WorkshopPlayerData workshopPlayerData,
-        CaravansPlayerData caravansPlayerData)
+        CaravansPlayerData caravansPlayerData,
+        InteractionsPlayerData interactionsPlayerData)
     {
         GameSaveData = gameSaveData;
         CampaignID = campaignID;
         CraftingPlayerData = craftingPlayerData;
         WorkshopPlayerData = workshopPlayerData;
         CaravansPlayerData = caravansPlayerData;
+        InteractionsPlayerData = interactionsPlayerData;
     }
 }
