@@ -6,6 +6,7 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.MapEvents.TroopSupply;
@@ -76,12 +77,12 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
             if (!objectManager.TryGetId(party, out var partyId))
                 continue;
 
-            // A party is owned by the player whose party it is, else by the host. The requester owns it when
-            // it is that player, or — for an AI party — when the requester is the host.
-            bool ownedByRequester = TryGetOwningPlayer(party, out var ownerControllerId)
-                ? ownerControllerId == controllerId
-                : isHost;
-            if (!ownedByRequester)
+            // Who fields this party: its own player; or — for an AI party in a player-led army — that army
+            // leader (#3 "army leader deploys the army"); or, when no player does, the host.
+            TryGetOwningPlayer(party, out var partyOwnerController);
+            TryGetArmyLeaderPlayer(party, out var armyLeaderController);
+            var owningController = BattleDeploymentAuthority.ResolveOwningController(partyOwnerController, armyLeaderController);
+            if (!BattleDeploymentAuthority.IsOwnedByRequester(owningController, controllerId, isHost))
                 continue;
 
             if (!ledger.TryGetReserve(mapEventId, partyId, out var entries, out var supplied))
@@ -202,9 +203,24 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
     private bool TryGetOwningPlayer(MapEventParty party, out string controllerId)
     {
         controllerId = null;
-
         var mobileParty = party.Party?.MobileParty;
-        if (mobileParty == null || !objectManager.TryGetId(mobileParty, out var mobilePartyId))
+        return mobileParty != null && TryGetPlayerController(mobileParty, out controllerId);
+    }
+
+    // The controller of the player who LEADS this party's army, if the army's leader party is a player's. Null
+    // when the party is not in an army, or the army is led by an AI lord.
+    private bool TryGetArmyLeaderPlayer(MapEventParty party, out string controllerId)
+    {
+        controllerId = null;
+        var leaderMobileParty = party.Party?.MobileParty?.Army?.LeaderParty;
+        return leaderMobileParty != null && TryGetPlayerController(leaderMobileParty, out controllerId);
+    }
+
+    // The controller of the connected player whose party this is, if any.
+    private bool TryGetPlayerController(MobileParty mobileParty, out string controllerId)
+    {
+        controllerId = null;
+        if (!objectManager.TryGetId(mobileParty, out var mobilePartyId))
             return false;
 
         foreach (var player in playerManager.Players)

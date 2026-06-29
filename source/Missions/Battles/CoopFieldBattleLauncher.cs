@@ -16,6 +16,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.MountAndBlade.Missions.Handlers;
 using TaleWorlds.MountAndBlade.Source.Missions;
 using TaleWorlds.MountAndBlade.Source.Missions.Handlers;
 using TaleWorlds.MountAndBlade.Source.Missions.Handlers.Logic;
@@ -26,8 +27,8 @@ namespace Missions.Battles;
 /// Coop replacement for <c>SandBoxMissions.OpenBattleMission</c>. Mirrors the native field-battle behavior
 /// list but: (1) builds the spawn logic with our <see cref="CoopTroopSupplier"/>s so each client fields only
 /// the troops it OWNS (its own party; plus the AI/enemy side for the host) — see
-/// <see cref="CoopBattleMissionSpawnHandler"/> for the per-side sizing; (2) omits the deployment behaviors so
-/// there is no "place then start" phase coop cannot drive; and (3) attaches the coop P2P behaviors and raises
+/// <see cref="CoopBattleMissionSpawnHandler"/> for the per-side sizing; (2) keeps the native deployment
+/// behaviors so each client runs its own Order-of-Battle phase (Phase A); and (3) attaches the coop P2P behaviors and raises
 /// <see cref="PlayerEnteredBattle"/> itself (the native path did this from <c>BattleMissionEntryPatch</c>,
 /// which does not fire for our <c>MissionState.OpenNew</c> mission).
 /// <para>
@@ -70,6 +71,10 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
     {
         bool isPlayerSergeant = MobileParty.MainParty.MapEvent.IsPlayerSergeant();
         bool isPlayerInArmy = MobileParty.MainParty.Army != null;
+        // Same source the native OpenBattleMission uses to orient deployment (which side's spawn frames the
+        // player deploys onto). PartyBase.MainParty.Side is the authoritative battle side — already used below
+        // to drive the spawn logic's player side.
+        bool isPlayerAttacker = PartyBase.MainParty.Side == BattleSideEnum.Attacker;
         List<string> heroesOnPlayerSideByPriority = HeroHelper.OrderHeroesOnPlayerSideByPriority(false, false);
 
         Hero attackerLeader = MapEvent.PlayerMapEvent.AttackerSide.LeaderParty.LeaderHero;
@@ -128,8 +133,13 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
                 new MissionBoundaryCrossingHandler(10f),
                 new HighlightsController(),
                 new BattleHighlightsController(),
-                // Coop omits BattleDeploymentMissionController + BattleDeploymentHandler: no deployment phase,
-                // so both sides spawn immediately (sized to owned counts by CoopBattleMissionSpawnHandler).
+                // Phase A deployment: the same two behaviors native OpenBattleMission adds last. They drive the
+                // deployment views the "Battle" ViewMethod already attaches (DeploymentMissionView + Order of
+                // Battle), spawn both sides frozen during SetupTeams, hold Mission.AllowAiTicking off, and start
+                // the spawners + un-pause AI only on Start Battle (FinishDeployment). This replaces the coop
+                // force-spawn shortcut (CoopBattleController.EnsureSidesSpawning), now removed.
+                new BattleDeploymentMissionController(isPlayerAttacker),
+                new BattleDeploymentHandler(isPlayerAttacker),
             };
 
             // Coop P2P behaviors (CoopBattleController, ...) — resolved fresh per mission, as BattleMissionEntryPatch did.
