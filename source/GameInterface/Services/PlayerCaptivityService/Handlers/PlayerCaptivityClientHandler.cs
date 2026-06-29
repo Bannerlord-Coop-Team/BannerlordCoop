@@ -54,6 +54,7 @@ internal class PlayerCaptivityClientHandler : IHandler
         messageBroker.Subscribe<PlayerSurrendered>(Handle_PlayerSurrendered);
         messageBroker.Subscribe<EndPlayerCaptivityAttempted>(Handle_EndPlayerCaptivityAttempted);
         messageBroker.Subscribe<NetworkPlayerCaptivityEnded>(Handle_NetworkPlayerCaptivityEnded);
+        messageBroker.Subscribe<NetworkFreedPrisonerPosition>(Handle_NetworkFreedPrisonerPosition);
     }
 
     public void Dispose()
@@ -62,6 +63,7 @@ internal class PlayerCaptivityClientHandler : IHandler
         messageBroker.Unsubscribe<PlayerSurrendered>(Handle_PlayerSurrendered);
         messageBroker.Unsubscribe<EndPlayerCaptivityAttempted>(Handle_EndPlayerCaptivityAttempted);
         messageBroker.Unsubscribe<NetworkPlayerCaptivityEnded>(Handle_NetworkPlayerCaptivityEnded);
+        messageBroker.Unsubscribe<NetworkFreedPrisonerPosition>(Handle_NetworkFreedPrisonerPosition);
     }
 
     /// <summary>
@@ -244,6 +246,37 @@ internal class PlayerCaptivityClientHandler : IHandler
             {
                 GameMenu.ExitToLast();
             }
+        });
+    }
+
+    /// <summary>
+    /// The server freed a player party and snapped its authoritative map position
+    /// (<see cref="MobileParty"/>.Position is not auto-synced). Apply it so the reactivated party shows at
+    /// the release spot instead of its stale pre-capture position.
+    /// </summary>
+    private void Handle_NetworkFreedPrisonerPosition(MessagePayload<NetworkFreedPrisonerPosition> payload)
+    {
+        if (ModInformation.IsServer) return;
+
+        var partyId = payload.What.PartyId;
+        var position = payload.What.Position;
+        var isCurrentlyAtSea = payload.What.IsCurrentlyAtSea;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(partyId, out var party)) return;
+
+            party.Position = position;
+            // IsCurrentlyAtSea isn't auto-synced, so carry it on the snap to keep the client's branch in
+            // step with the server's release path.
+            party.IsCurrentlyAtSea = isCurrentlyAtSea;
+            if (!party.IsCurrentlyAtSea)
+            {
+                // Spot from THIS client's main party, not the freed party's own position, so each client
+                // keeps its local fog-of-war instead of force-revealing the freed party everywhere.
+                party.Party.UpdateVisibilityAndInspected(MobileParty.MainParty.Position, 0f);
+            }
+            party.Party.SetVisualAsDirty();
         });
     }
 }

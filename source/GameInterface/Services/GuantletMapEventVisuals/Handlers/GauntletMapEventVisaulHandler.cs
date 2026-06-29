@@ -5,9 +5,13 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.GuantletMapEventVisuals.Messages;
 using GameInterface.Services.ObjectManager;
+using HarmonyLib;
 using SandBox.GauntletUI.Map;
 using Serilog;
 using System;
+using System.Collections.Generic;
+using System.Reflection;
+using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.GuantletMapEventVisuals.Handlers;
 
@@ -68,6 +72,11 @@ internal class GauntletMapEventVisaulHandler : IHandler
                     // keeps the visual in lock-step, so seeding the visual from the local value keeps the icon
                     // and battle sound consistent here instead of starting in the server-visible state.
                     visual.Initialize(position, visual.MapEvent?.IsVisible ?? false);
+
+                    // Client visuals are built via SkipConstructor, bypassing vanilla CreateMapEventVisual,
+                    // so they never land in the creator's _listOfEvents that the map screen rebuilds icons
+                    // from. Register it so the icon survives a screen rebuild (e.g. returning from a battle).
+                    RegisterForScreenRebuild(visual);
                 }
                 catch (Exception ex)
                 {
@@ -75,5 +84,22 @@ internal class GauntletMapEventVisaulHandler : IHandler
                 }
             }
         });
+    }
+
+    private static readonly FieldInfo ListOfEventsField =
+        AccessTools.Field(typeof(GauntletMapEventVisualCreator), "_listOfEvents");
+
+    // Adds the visual to the creator's private _listOfEvents (what vanilla CreateMapEventVisual does),
+    // so GauntletMapEventVisualsView.CreateLayout can rebuild the icon after the map screen recreates.
+    private static void RegisterForScreenRebuild(GauntletMapEventVisual visual)
+    {
+        if (Campaign.Current?.VisualCreator?.MapEventVisualCreator is not GauntletMapEventVisualCreator creator)
+            return;
+
+        if (ListOfEventsField.GetValue(creator) is not List<GauntletMapEventVisual> events)
+            return;
+
+        if (!events.Contains(visual))
+            events.Add(visual);
     }
 }

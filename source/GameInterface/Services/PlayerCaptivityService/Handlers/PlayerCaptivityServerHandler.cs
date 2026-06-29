@@ -342,6 +342,15 @@ internal class PlayerCaptivityServerHandler : IHandler
             // Rebuild the map mesh after the roster/leader/position are restored, so the freed party's map
             // figure reflects its (re-mounted) state rather than the stale on-foot captive mesh.
             playerParty.Party.SetVisualAsDirty();
+
+            // MobileParty.Position is not auto-synced and the captive party was pinned to its captor
+            // server-side, so other clients still place the freed party at its stale pre-capture spot.
+            // Snap the authoritative release position to every client so the reactivated party shows
+            // where it actually is.
+            if (objectManager.TryGetIdWithLogging(playerParty, out var freedPartyId))
+            {
+                network.SendAll(new NetworkFreedPrisonerPosition(freedPartyId, playerParty.Position, playerParty.IsCurrentlyAtSea));
+            }
         }
     }
 
@@ -367,7 +376,9 @@ internal class PlayerCaptivityServerHandler : IHandler
     /// <summary>
     /// Keeps captive players' parties at their captor's position; the server-side replacement for
     /// native <see cref="PlayerCaptivity"/>.Update, which only handles the local main hero.
-    /// Positions are server-authoritative and replicate to the clients through party movement sync.
+    /// This position stays server-only — MobileParty.Position is not auto-synced — but the captive party
+    /// is parked (inactive) so it is not drawn on other clients until release, when
+    /// <see cref="ReleasePlayerFromCaptivity"/> snaps the freed party's position to them.
     /// </summary>
     private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
     {
