@@ -224,9 +224,9 @@ internal class PartyComponentHandler : IHandler
                     partyComponent.MobileParty = mobileParty;
                     mobileParty._partyComponent = partyComponent;
 
-                    // IsMilitia/IsLordParty/IsCaravan/etc. are derived from the component and are
-                    // no longer synced from the server, so recompute them from the component we
-                    // just set, otherwise they stay stale on the client.
+                    // The type flags (IsMilitia/IsLordParty/IsCaravan/etc.) are derived from the
+                    // component, so recompute them from the component we just set; otherwise they
+                    // stay stale on the client.
                     mobileParty.UpdatePartyComponentFlags();
                 }
             }
