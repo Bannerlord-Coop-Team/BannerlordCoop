@@ -4,7 +4,6 @@ using GameInterface.Services.Heroes.Messages.Collections;
 using GameInterface.Services.Heroes.Patches;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using Xunit.Abstractions;
 
@@ -17,7 +16,6 @@ public class HeroCollectionTests : IDisposable
     private string HeroId;
     private string CharacterObjectId;
     private string WorkshopId;
-    private string AlleyId;
     private string CaravanId;
 
     public HeroCollectionTests(ITestOutputHelper output)
@@ -38,7 +36,6 @@ public class HeroCollectionTests : IDisposable
         CharacterObject Character = null;
         Hero Child = null;
         Workshop workshop = null;
-        Alley alley = null;
         CaravanPartyComponent caravan = null;
 
         // Act
@@ -67,13 +64,6 @@ public class HeroCollectionTests : IDisposable
             HeroCollectionPatches.MBListAddIntercept<Workshop, WorkshopListUpdated>(Hero._ownedWorkshops, workshop, Hero);
             Assert.Equal(workshop, Hero.OwnedWorkshops.Last());
 
-            AlleyId = TestEnvironment.CreateRegisteredObject<Alley>();
-            Assert.True(server.ObjectManager.TryGetObject<Alley>(AlleyId, out alley));
-
-            Assert.Empty(Hero.OwnedAlleys);
-            HeroCollectionPatches.ListAddIntercept<Alley, AlleyListUpdated>(Hero.OwnedAlleys, alley, Hero);
-            Assert.Equal(alley, Hero.OwnedAlleys.Last());
-
             var componentBuilder = new CaravanPartyComponentBuilder();
             caravan = componentBuilder.BuildWithHero(Hero);
             Assert.True(server.ObjectManager.TryGetId(caravan, out CaravanId));
@@ -92,7 +82,6 @@ public class HeroCollectionTests : IDisposable
             Assert.Equal(Child.StringId, clientHero.Children.Last().StringId);  // Some fields are not synced like BannerItem,  
             Assert.Equal(Character.StringId, clientHero.VolunteerTypes[0].StringId);  // CharacterObject props/fields is not synced yet
             Assert.Equal(workshop.Tag, clientHero.OwnedWorkshops.Last().Tag);
-            Assert.Equal(alley.Tag, clientHero.OwnedAlleys.Last().Tag);
             Assert.NotEmpty(clientHero.OwnedCaravans); // Some fields like (cached)Name are not synced for (Caravan)PartyComponent
         }
 
@@ -102,9 +91,6 @@ public class HeroCollectionTests : IDisposable
             HeroCollectionPatches.MBListRemoveIntercept<Workshop, WorkshopListRemoved>(Hero._ownedWorkshops, workshop, Hero);
             Assert.Empty(Hero.OwnedWorkshops);
 
-            HeroCollectionPatches.ListRemoveIntercept<Alley, AlleyListRemoved>(Hero.OwnedAlleys, alley, Hero);
-            Assert.Empty(Hero.OwnedAlleys);
-
             HeroCollectionPatches.ListRemoveIntercept<CaravanPartyComponent, CaravanListRemoved>(Hero.OwnedCaravans, caravan, Hero);
             Assert.Empty(Hero.OwnedCaravans);
         });
@@ -113,7 +99,6 @@ public class HeroCollectionTests : IDisposable
         {
             Assert.True(client.ObjectManager.TryGetObject<Hero>(HeroId, out var clientHero));
             Assert.Empty(clientHero.OwnedWorkshops);
-            Assert.Empty(clientHero.OwnedAlleys);
             Assert.Empty(clientHero.OwnedCaravans);
         }
     }
