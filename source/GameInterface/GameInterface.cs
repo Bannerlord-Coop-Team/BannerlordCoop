@@ -33,7 +33,14 @@ public class GameInterface : IGameInterface
     public void PatchAll()
     {
         // NOTE: Patching in constructor causes issues with tests and CI
-        if (Harmony.HasAnyPatches(harmony.Id)) return;
+        if (Harmony.HasAnyPatches(harmony.Id))
+        {
+            // Patches persist for the whole process (UnpatchAll is disabled), but the AutoSync apply-handlers
+            // are container-scoped and were torn down on disconnect. The patch install below is skipped on a
+            // reconnect, so rebind the handlers onto the new container here or every synced update is dropped.
+            AutoSyncPatcher.RebindHandlers();
+            return;
+        }
 
         var assembly = typeof(GameInterface).Assembly;
 
