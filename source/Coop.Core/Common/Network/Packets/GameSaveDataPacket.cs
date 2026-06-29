@@ -1,4 +1,5 @@
 ﻿using Common.PacketHandlers;
+using GameInterface.Services.Alleys;
 using GameInterface.Services.Caravans;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.Workshops;
@@ -40,17 +41,22 @@ public readonly struct GameSaveDataPacket : IPacket
     [ProtoMember(5)]
     public readonly CaravansPlayerData CaravansPlayerData;
 
+    [ProtoMember(6)]
+    public readonly AlleyPlayerData AlleyPlayerData;
+
     public GameSaveDataPacket(
         byte[] gameSaveData,
         string campaignID,
         CraftingPlayerData craftingPlayerData,
         WorkshopPlayerData workshopPlayerData,
-        CaravansPlayerData caravansPlayerData)
+        CaravansPlayerData caravansPlayerData,
+        AlleyPlayerData alleyPlayerData)
     {
         GameSaveData = gameSaveData;
         CampaignID = campaignID;
         CraftingPlayerData = craftingPlayerData;
         WorkshopPlayerData = workshopPlayerData;
         CaravansPlayerData = caravansPlayerData;
+        AlleyPlayerData = alleyPlayerData;
     }
 }

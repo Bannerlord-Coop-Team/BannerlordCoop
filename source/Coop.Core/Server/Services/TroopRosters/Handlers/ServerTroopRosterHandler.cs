@@ -37,15 +37,12 @@ internal class ServerTroopRosterHandler : IHandler
     private void HandleOnRecruitmentDone(MessagePayload<ClientRequestRecruitment> payload)
     {
         var data = payload.What;
-        var peer = payload.Who as NetPeer;
 
         GameThread.Run(() =>
         {
             try
             {
-                troopRosterInterface.HandleOnRecruitmentDone(data.MobilePartyId, data.TroopsInCart, out var changedGold);
-
-                network.Send(peer, new NotifyGoldChange(changedGold));
+                troopRosterInterface.HandleOnRecruitmentDone(data.MobilePartyId, data.TroopsInCart);
             }
             catch (Exception e)
             {

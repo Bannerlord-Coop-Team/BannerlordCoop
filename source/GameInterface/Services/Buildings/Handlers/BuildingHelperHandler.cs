@@ -160,8 +160,6 @@ internal class BuildingHelperHandler : IHandler
                     GiveGoldAction.ApplyBetweenCharacters(hero, null, difference, false);
                 }
                 town.BoostBuildingProcess = data.Gold;
-
-                network.Send(peer, new NotifyGoldChange(-difference));
             }
             catch (Exception e)
             {

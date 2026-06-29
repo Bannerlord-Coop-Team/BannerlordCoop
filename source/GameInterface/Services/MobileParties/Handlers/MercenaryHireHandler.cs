@@ -154,10 +154,6 @@ internal class MercenaryHireHandler : IHandler
 
         mercenaryData.ChangeMercenaryCount(-data.Count);
         RecruitmentCampaignBehaviorPatch.PublishMercenaryStock(recruitmentBehavior, town);
-
-        // Refresh the requesting player's gold quick-info; the actual gold value already
-        // replicated through the Hero.Gold sync above.
-        network.Send(peer, new NotifyGoldChange(-goldAmount));
     }
 
     private void SendMercenaryStock(NetPeer peer, Town town, CharacterObject troopType, int number)
