@@ -32,6 +32,20 @@ internal class GauntletMapEventVisualPatches
         MessageBroker.Instance.Publish(__instance, message);
     }
 
+    [HarmonyPatch(nameof(GauntletMapEventVisual.OnMapEventEnd))]
+    [HarmonyPrefix]
+    private static bool PrefixOnMapEventEnd(GauntletMapEventVisual __instance)
+    {
+        // A client-replicated visual whose map event never synced has a null MapEvent, and OnMapEventEnd drives
+        // the settlement-nameplate handler into a null deref. Such a visual was never initialized, so there is no
+        // sound or icon to stop - skip the teardown. The server's MapEvent is never null, so this only fires on a
+        // client; LifetimePatches.DestroyPostfix already treats a blocked original as nothing to replicate.
+        if (__instance.MapEvent != null) return true;
+
+        Logger.Warning("Skipping OnMapEventEnd for GauntletMapEventVisual: its MapEvent did not resolve on this client");
+        return false;
+    }
+
     [HarmonyPatch("GetBattleSizeValue")]
     [HarmonyPrefix]
     private static bool PrefixGetBattleSizeValue(GauntletMapEventVisual __instance, ref int __result)

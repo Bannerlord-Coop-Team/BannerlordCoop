@@ -58,6 +58,15 @@ internal class GauntletMapEventVisaulHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<GauntletMapEventVisual>(instanceId, out var visual))
                 return;
 
+            // The visual's MapEvent syncs in separately; if that map event never resolved on this client its
+            // MapEvent stays null and vanilla Initialize dereferences it (nameplate setup) and throws. An
+            // un-synced visual has no battle to show, so skip the init.
+            if (visual.MapEvent == null)
+            {
+                Logger.Warning("Skipping init of GauntletMapEventVisual {InstanceId}: its MapEvent did not resolve on this client", instanceId);
+                return;
+            }
+
             using (new AllowedThread())
             {
                 try
