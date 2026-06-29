@@ -15,6 +15,8 @@ public interface IAutoRegistryFactory : IDisposable
     void AddRegistry<T>(AutoRegistryBase<T> autoRegistry) where T : class;
 
     void RegisterAll();
+
+    bool IsManaged(Type type);
 }
 
 internal class AutoRegistryFactory : IAutoRegistryFactory
@@ -31,6 +33,8 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
     List<IDisposable> Disposables { get; } = new List<IDisposable>();
 
     List<Action> RegisterAllCallbacks = new List<Action>();
+
+    private readonly HashSet<Type> managedTypes = new HashSet<Type>();
 
     public AutoRegistryFactory(
         IRegistryCollection collection,
@@ -53,8 +57,12 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
         Disposables.ForEach(disposable => disposable.Dispose());
     }
 
+    public bool IsManaged(Type type) => managedTypes.Contains(type) || Collection.RegistryMap.ContainsKey(type);
+
     public void AddRegistry<T>(AutoRegistryBase<T> autoRegistry) where T : class
     {
+        managedTypes.Add(typeof(T));
+
         ValidateConstructorTypes(autoRegistry.Constructors, typeof(T));
 
         TypeMapper.AddTypes(new Type[] { 

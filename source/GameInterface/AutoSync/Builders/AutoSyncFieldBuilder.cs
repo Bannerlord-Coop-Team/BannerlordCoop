@@ -1,5 +1,5 @@
 ﻿using GameInterface.AutoSync.Templates;
-using ProtoBuf.Meta;
+using GameInterface.Registry.Auto;
 using System.Collections.Generic;
 using System.Reflection;
 
@@ -8,8 +8,9 @@ namespace GameInterface.AutoSync.Builders;
 public class AutoSyncFieldBuilder : AutoSyncBuilderBase
 {
     public AutoSyncFieldBuilder(
+        IAutoRegistryFactory autoRegistryFactory,
         AutoSyncRegistry autoSyncRegistry,
-        AutoSyncConstantsBuilder autoSyncConstantsBuilder) : base(autoSyncRegistry, autoSyncConstantsBuilder)
+        AutoSyncConstantsBuilder autoSyncConstantsBuilder) : base(autoSyncRegistry, autoSyncConstantsBuilder, autoRegistryFactory)
     {
     }
     public string GetTranspiler(Debuggable<FieldInfo> fieldInfo)
@@ -24,7 +25,7 @@ public class AutoSyncFieldBuilder : AutoSyncBuilderBase
         var templateData = GetTemplateData(fieldInfo, fieldItem.Debug);
         string localMessage = AutoSyncUtils.GetLocalSetMessage(fieldInfo);
         string networkMessage;
-        if (RuntimeTypeModel.Default.CanSerialize(fieldInfo.FieldType))
+        if (SyncByValue(fieldInfo.FieldType))
         {
             networkMessage = TemplateParser.Parse("Messages.NetworkSetValueMessageTemplate", templateData);
         }
@@ -45,7 +46,7 @@ public class AutoSyncFieldBuilder : AutoSyncBuilderBase
         var fieldInfo = fieldItem.Value;
 
         var templateData = GetTemplateData(fieldInfo, fieldItem.Debug);
-        if (RuntimeTypeModel.Default.CanSerialize(fieldInfo.FieldType))
+        if (SyncByValue(fieldInfo.FieldType))
             return TemplateParser.Parse("Handlers.SubscribeSetValueTemplate", templateData);
         else
             return TemplateParser.Parse("Handlers.SubscribeSetReferenceTemplate", templateData);
