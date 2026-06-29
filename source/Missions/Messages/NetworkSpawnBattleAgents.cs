@@ -1,6 +1,7 @@
 using Common.Messaging;
 using ProtoBuf;
 using System;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 
 namespace Missions.Messages;
@@ -37,7 +38,7 @@ public class BattleAgentSpawnData
     [ProtoMember(4)]
     public readonly Vec3 Position;
     [ProtoMember(5)]
-    public readonly int Side;
+    public readonly BattleSideEnum Side;
     [ProtoMember(6)]
     public readonly float Health;
     [ProtoMember(7)]
@@ -49,7 +50,7 @@ public class BattleAgentSpawnData
     [ProtoMember(9)]
     public readonly int TroopSeed;
 
-    public BattleAgentSpawnData(Guid agentId, string characterId, bool isHero, Vec3 position, int side, float health, string ownerControllerId, string mapEventPartyId, int troopSeed)
+    public BattleAgentSpawnData(Guid agentId, string characterId, bool isHero, Vec3 position, BattleSideEnum side, float health, string ownerControllerId, string mapEventPartyId, int troopSeed)
     {
         AgentId = agentId;
         CharacterId = characterId;

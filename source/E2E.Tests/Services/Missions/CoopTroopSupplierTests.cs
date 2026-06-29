@@ -40,7 +40,7 @@ public class CoopTroopSupplierTests
     {
         // A side this client owns nothing on still gets an (empty) reserve, so deployment completes.
         var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker);
-        supplier.SetReserve(new PartyReserve[0]);
+        supplier.SetReserve(Array.Empty<PartyReserve>());
 
         Assert.False(supplier.AnyTroopRemainsToBeSupplied);
         Assert.Equal(0, supplier.NumTroopsNotSupplied);

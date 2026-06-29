@@ -284,7 +284,6 @@ internal class BattleMissionStartHandler : IHandler
             IMapScene mapSceneWrapper = Campaign.Current.MapSceneWrapper;
             MapPatchData mapPatchAtPosition = mapSceneWrapper.GetMapPatchAtPosition(position);
 
-
             string battleScene = Campaign.Current.Models.SceneModel.GetBattleSceneForMapPatch(mapPatchAtPosition, isNavalEncounter);
             MissionInitializerRecord rec2 = new MissionInitializerRecord(battleScene);
             TerrainType faceTerrainType2 = Campaign.Current.MapSceneWrapper.GetFaceTerrainType(MobileParty.MainParty.CurrentNavigationFace);

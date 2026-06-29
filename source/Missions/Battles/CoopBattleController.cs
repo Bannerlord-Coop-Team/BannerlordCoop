@@ -381,18 +381,10 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
         var agent = payload.What.Agent;
         if (agent == null || !(agent.Character is CharacterObject character)) return;
 
-        // Our own hero just spawned: the native deployment doesn't hand the player their agent in our coop
-        // flow, so take control of it ourselves — set it as the mission's controllable main agent (the camera
-        // follows the main agent). Done before the resolution/registration below so it runs even if those fail.
-        if (character.IsHero && character.HeroObject == Hero.MainHero && Mission.Current != null && Mission.Current.MainAgent != agent)
-        {
-            agent.Controller = AgentControllerType.Player;
-            Mission.Current.MainAgent = agent;
-            Logger.Information("[BattleSync] Attached player to own hero agent ({Char})", character.StringId);
-        }
+        AttachPlayerAgent(agent, character);
 
         bool isHero = character.IsHero;
-        object toResolve = isHero ? (object)character.HeroObject : character;
+        object toResolve = isHero ? character.HeroObject : character;
         if (toResolve == null || !objectManager.TryGetId(toResolve, out var characterId)) return;
 
         string owner = controllerIdProvider.ControllerId;
@@ -419,12 +411,25 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
         objectManager.TryGetId(character, out var troopCharacterId);
         _casualtyInfo[agentId] = (mapEventPartyId, troopSeed, troopCharacterId);
 
-        int side = agent.Team != null ? (int)agent.Team.Side : (int)BattleSideEnum.None;
+        BattleSideEnum side = agent.Team != null ? agent.Team.Side : BattleSideEnum.None;
         var data = new BattleAgentSpawnData(agentId, characterId, isHero, agent.Position, side, agent.Health, owner, mapEventPartyId, troopSeed);
 
         // SendAll over the mesh reaches every peer in this battle instance (not us).
         Logger.Information("[BattleSync] Captured own spawn {Char} (agent {AgentId}); broadcasting over mesh", characterId, agentId);
         network.SendAll(new NetworkSpawnBattleAgents(new[] { data }));
+    }
+
+    private void AttachPlayerAgent(Agent agent, CharacterObject character)
+    {
+        // Our own hero just spawned: the native deployment doesn't hand the player their agent in our coop
+        // flow, so take control of it ourselves — set it as the mission's controllable main agent (the camera
+        // follows the main agent). Done before the resolution/registration below so it runs even if those fail.
+        if (character.IsHero && character.HeroObject == Hero.MainHero && Mission.Current != null && Mission.Current.MainAgent != agent)
+        {
+            agent.Controller = AgentControllerType.Player;
+            Mission.Current.MainAgent = agent;
+            Logger.Information("[BattleSync] Attached player to own hero agent ({Char})", character.StringId);
+        }
     }
 
     // [Peer] Spawn the host's agents as local puppets. They are inert in v1 (no AI/movement); Phase 3 drives
@@ -863,9 +868,9 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
         return null;
     }
 
-    private static Team ResolveTeam(int side)
+    private static Team ResolveTeam(BattleSideEnum side)
     {
-        return (BattleSideEnum)side switch
+        return side switch
         {
             BattleSideEnum.Attacker => Mission.Current.AttackerTeam,
             BattleSideEnum.Defender => Mission.Current.DefenderTeam,

@@ -74,7 +74,6 @@ internal class BattleFinalizeHandler : IHandler
 
     private void Handle_MapEventFinalizeAttempted(MessagePayload<MapEventFinalizeAttempted> payload)
     {
-
         if (!objectManager.TryGetIdWithLogging(payload.What.MapEvent, out string mapEventId))
             return;
 
