@@ -11,6 +11,6 @@ public static class MapEventExtensions
         if (mapEvent is null) return false;
 
         // Prevent any parties from joining a player battle
-        return mapEvent.InvolvedParties.Any(party => party.MobileParty?.IsPlayerParty() == true);
+        return mapEvent.InvolvedParties.Any(party => party?.MobileParty?.IsPlayerParty() == true);
     }
 }

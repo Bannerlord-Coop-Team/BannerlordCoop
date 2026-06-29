@@ -11,11 +11,3 @@ class ArmyDisablePatches
     [HarmonyPrefix]
     private static bool DisableArmyTick() => ModInformation.IsServer;
 }
-
-[HarmonyPatch(typeof(Kingdom))]
-class CreateArmyDisablePatches
-{
-    [HarmonyPatch(nameof(Kingdom.CreateArmy))]
-    [HarmonyPrefix]
-    private static bool DisableArmyTick() => ArmyConfig.Enabled;
-}

@@ -340,6 +340,7 @@ public class ArmyDebugCommand
         sb.AppendLine($"Army.name {army.Name}");
         sb.AppendLine($"Armyowner {army.ArmyOwner.Name}");
         sb.AppendLine($"leaderparty owner {army?.LeaderParty.Owner.Name}");
+        sb.AppendLine($"armycohesion: {army?.Cohesion}");
         return sb.ToString();
         }
     }

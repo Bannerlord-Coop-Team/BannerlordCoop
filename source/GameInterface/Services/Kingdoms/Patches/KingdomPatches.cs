@@ -1,7 +1,11 @@
-﻿using GameInterface;
+﻿using Common;
+using GameInterface.Policies;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Library;
 namespace GameInterface.Services.Kingdoms.Patches
 {
     /// <summary>
@@ -43,6 +47,19 @@ namespace GameInterface.Services.Kingdoms.Patches
         private static bool TryGetKingdomInterface(out IKingdomInterface kingdomInterface)
         {
             return ContainerProvider.TryResolve(out kingdomInterface);
+        }
+        [HarmonyPatch(nameof(Kingdom.CreateArmy))]
+        [HarmonyPrefix]
+        public static bool CreateArmyPrefix(Kingdom __instance, Hero armyLeader, Settlement targetSettlement, Army.ArmyTypes selectedArmyType, MBReadOnlyList<MobileParty> partiesToCallToArmy)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+            if (ModInformation.IsClient)
+            {
+                return false; 
+            }
+
+            return true;
         }
     }
 }

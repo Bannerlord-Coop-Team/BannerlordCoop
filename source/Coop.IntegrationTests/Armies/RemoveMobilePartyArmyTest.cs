@@ -32,7 +32,7 @@ namespace Coop.IntegrationTests.Armies
                 client.CreateRegisteredObject<Army>(armyId);
             }
 
-            var triggerMessage = new MobilePartyInArmyRemoved(army, party);
+            var triggerMessage = new MobilePartyInArmyRemoved(army, party, null);
 
             // Act
             server.SimulateMessage(this, triggerMessage);
