@@ -14,7 +14,7 @@ namespace GameInterface.Tests.Services.MobileParties;
 
 /// <summary>
 /// Unit tests for the client send-side of mercenary-hire replication in
-/// <see cref="MercenaryHireHandler"/>: a hire on the conversing client is relayed to the server as a
+/// <see cref="MercenaryHireHandler"/>: a client-side hire is relayed to the server as a
 /// <see cref="HireMercenaries"/> request carrying the resolved ids, troop count and gold cost.
 /// </summary>
 public class MercenaryHireHandlerTests
@@ -41,6 +41,7 @@ public class MercenaryHireHandlerTests
         var party = ObjectHelper.SkipConstructor<MobileParty>();
         var town = ObjectHelper.SkipConstructor<Town>();
         var troop = ObjectHelper.SkipConstructor<CharacterObject>();
+        hero.Gold = 1000;
         SetupId(hero, "hero-1");
         SetupId(party, "party-1");
         SetupId(town, "town-1");
@@ -55,6 +56,7 @@ public class MercenaryHireHandlerTests
         Assert.Equal("troop-1", sent.MercenaryTroopId);
         Assert.Equal(5, sent.Count);
         Assert.Equal(250, sent.GoldAmount);
+        Assert.Equal(1000, sent.HeroGold);
         network.Verify(n => n.SendAll(It.IsAny<IMessage>()), Times.Once);
     }
 
@@ -80,6 +82,7 @@ public class MercenaryHireHandlerTests
         var party = ObjectHelper.SkipConstructor<MobileParty>();
         var town = ObjectHelper.SkipConstructor<Town>();
         var troop = ObjectHelper.SkipConstructor<CharacterObject>();
+        hero.Gold = 1000;
         SetupId(hero, "hero-1");
         SetupId(party, "party-1");
         SetupId(town, "town-1");
@@ -89,6 +92,62 @@ public class MercenaryHireHandlerTests
 
         Assert.Null(sentMessage);
         network.Verify(n => n.SendAll(It.IsAny<IMessage>()), Times.Never);
+    }
+
+    [Fact]
+    public void CanApplyMercenaryHire_ValidCurrentStockAndGold_ReturnsTrue()
+    {
+        int count = 5;
+        int unitPrice = 50;
+        int goldAmount = MercenaryHireHandler.GetMercenaryHireGoldAmount(count, unitPrice);
+
+        bool canApply = MercenaryHireHandler.CanApplyMercenaryHire(
+            count,
+            goldAmount,
+            serverHeroGold: 1000,
+            unitPrice: unitPrice,
+            availableTroopMatches: true,
+            availableMercenaries: 10);
+
+        Assert.True(canApply);
+    }
+
+    [Theory]
+    [InlineData(false, 10)]
+    [InlineData(true, 4)]
+    public void CanApplyMercenaryHire_StaleConversationStock_ReturnsFalse(bool availableTroopMatches, int availableMercenaries)
+    {
+        int count = 5;
+        int unitPrice = 50;
+        int goldAmount = MercenaryHireHandler.GetMercenaryHireGoldAmount(count, unitPrice);
+
+        bool canApply = MercenaryHireHandler.CanApplyMercenaryHire(
+            count,
+            goldAmount,
+            serverHeroGold: 1000,
+            unitPrice: unitPrice,
+            availableTroopMatches,
+            availableMercenaries);
+
+        Assert.False(canApply);
+    }
+
+    [Fact]
+    public void CanApplyMercenaryHire_InsufficientCurrentServerGold_ReturnsFalse()
+    {
+        int count = 5;
+        int unitPrice = 50;
+        int goldAmount = MercenaryHireHandler.GetMercenaryHireGoldAmount(count, unitPrice);
+
+        bool canApply = MercenaryHireHandler.CanApplyMercenaryHire(
+            count,
+            goldAmount,
+            serverHeroGold: goldAmount - 1,
+            unitPrice: unitPrice,
+            availableTroopMatches: true,
+            availableMercenaries: 10);
+
+        Assert.False(canApply);
     }
 
     private MessagePayload<MercenariesHired> Payload(Hero hero, MobileParty party, Town town, CharacterObject troop, int count, int goldAmount) =>

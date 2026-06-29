@@ -121,6 +121,48 @@ public class TownDebugCommand
         return sb.ToString();
     }
 
+    // coop.debug.town.list_buildings <townId>
+    /// <summary>
+    /// Lists a town's Buildings + BuildingsInProgress (the synced collection-FIELD MBLists) with each
+    /// building's level/progress, so server and client screenshots can be compared to confirm the building
+    /// collection still replicates.
+    /// </summary>
+    [CommandLineArgumentFunction("list_buildings", "coop.debug.town")]
+    public static string ListBuildings(List<string> args)
+    {
+        if (args.Count != 1) return "Usage: coop.debug.town.list_buildings <townId>";
+        if (TryGetObjectManager(out var objectManager) == false) return "Unable to resolve ObjectManager";
+        if (objectManager.TryGetObject(args[0], out Town town) == false) return $"ID: '{args[0]}' not found";
+
+        StringBuilder sb = new();
+        sb.AppendFormat("Buildings for '{0}' ({1}):\n", town.Name, town.Buildings.Count);
+        foreach (var building in town.Buildings)
+            sb.AppendFormat("  {0} level={1} progress={2}\n", building.BuildingType?.StringId, building.CurrentLevel, building.BuildingProgress);
+        sb.AppendFormat("BuildingsInProgress queue ({0}):\n", town.BuildingsInProgress.Count);
+        foreach (var building in town.BuildingsInProgress)
+            sb.AppendFormat("  {0} level={1}\n", building.BuildingType?.StringId, building.CurrentLevel);
+        return sb.ToString();
+    }
+
+    // coop.debug.town.list_workshops <townId>
+    /// <summary>
+    /// Lists a town's Workshops (the synced collection-PROPERTY array) with each workshop's type and owner,
+    /// so server and client screenshots can be compared to confirm the workshop collection still replicates.
+    /// </summary>
+    [CommandLineArgumentFunction("list_workshops", "coop.debug.town")]
+    public static string ListWorkshops(List<string> args)
+    {
+        if (args.Count != 1) return "Usage: coop.debug.town.list_workshops <townId>";
+        if (TryGetObjectManager(out var objectManager) == false) return "Unable to resolve ObjectManager";
+        if (objectManager.TryGetObject(args[0], out Town town) == false) return $"ID: '{args[0]}' not found";
+
+        StringBuilder sb = new();
+        sb.AppendFormat("Workshops for '{0}' ({1}):\n", town.Name, town.Workshops.Length);
+        foreach (var workshop in town.Workshops)
+            sb.AppendFormat("  {0} owner={1}\n", workshop.WorkshopType?.StringId, workshop.Owner?.Name);
+        return sb.ToString();
+    }
+
     // coop.debug.town.set_foodStocks
     /// <summary>
     /// Set the food stocks for a Town
