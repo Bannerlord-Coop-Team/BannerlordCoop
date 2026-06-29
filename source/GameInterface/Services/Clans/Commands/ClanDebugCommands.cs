@@ -1,7 +1,9 @@
 ﻿using Autofac;
+using Common;
 using GameInterface.Services.ObjectManager;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -43,6 +45,43 @@ namespace GameInterface.Services.GameDebug.Commands
             });
 
             return stringBuilder.ToString();
+        }
+
+        // coop.debug.clan.info <clanId>
+        /// <summary>
+        /// Reflection-dumps every field of a Clan so a server screenshot and a client screenshot can be
+        /// compared field-for-field to confirm Clan field syncs still replicate.
+        /// </summary>
+        [CommandLineArgumentFunction("info", "coop.debug.clan")]
+        public static string Info(List<string> args)
+        {
+            if (args.Count != 1) return "Usage: coop.debug.clan.info <clanId>";
+            if (!TryGetObjectManager(out IObjectManager objectManager)) return "Unable to resolve ObjectManager";
+            if (!objectManager.TryGetObject(args[0], out Clan clan)) return $"Unable to find clan with id: {args[0]}";
+
+            var stringBuilder = new StringBuilder();
+            foreach (var field in typeof(Clan).GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance))
+            {
+                stringBuilder.AppendLine($"{field.Name} = {field.GetValue(clan)}");
+            }
+            return stringBuilder.ToString();
+        }
+
+        // coop.debug.clan.add_influence <clanId> <amount>   (SERVER only)
+        /// <summary>
+        /// Authoritatively changes a clan's influence by the given amount via ChangeClanInfluenceAction so
+        /// the _influence scalar-field store replicates; verify on both sides with coop.debug.clan.info.
+        /// </summary>
+        [CommandLineArgumentFunction("add_influence", "coop.debug.clan")]
+        public static string AddClanInfluence(List<string> args)
+        {
+            if (args.Count != 2) return "Usage: coop.debug.clan.add_influence <clanId> <amount>";
+            if (!TryGetObjectManager(out IObjectManager objectManager)) return "Unable to resolve ObjectManager";
+            if (!objectManager.TryGetObject(args[0], out Clan clan)) return $"Unable to find clan with id: {args[0]}";
+            if (!float.TryParse(args[1], out float amount)) return $"'{args[1]}' is not a valid number";
+
+            ChangeClanInfluenceAction.Apply(clan, amount);
+            return $"Applied {amount} influence to '{clan.Name}'; clan is now at {clan.Influence} influence";
         }
 
 
@@ -258,5 +297,80 @@ namespace GameInterface.Services.GameDebug.Commands
 
             return stringBuilder.ToString();
         }
+        // coop.debug.clan.join_kingdom Player12 empire
+        [CommandLineArgumentFunction("join_kingdom", "coop.debug.clan")]
+        public static string JoinKingdom(List<string> args)
+        {
+            if (ModInformation.IsClient)
+                return "Command is only available to run on the server";
+
+            if (args.Count != 2)
+                return "Usage: coop.debug.clan.join_kingdom <clanId> <kingdomId>";
+
+            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+                return $"Unable to get {nameof(IObjectManager)}";
+
+            if (objectManager.TryGetObject<Clan>(args[0], out var clan) == false)
+                return $"Unable to get Clan with {args[0]}";
+
+            if (objectManager.TryGetObject<Kingdom>(args[1], out var kingdom) == false)
+                return $"Unable to get Kingdom with {args[1]}";
+
+            ChangeKingdomAction.ApplyByJoinToKingdom(clan, kingdom);
+
+            return $"{clan.Name} joined {kingdom.Name}";
+        }
+
+        // coop.debug.clan.give_influence Player12 500
+        [CommandLineArgumentFunction("give_influence", "coop.debug.clan")]
+        public static string GiveInfluence(List<string> args)
+        {
+            if (ModInformation.IsClient)
+                return "Command is only available to run on the server";
+
+            if (args.Count != 2)
+                return "Usage: coop.debug.clan.give_influence <clanId> <amount>";
+
+            if (!TryGetObjectManager(out IObjectManager objectManager))
+                return "Unable to resolve ObjectManager";
+
+            if (!objectManager.TryGetObject<Clan>(args[0], out var clan))
+                return $"Unable to get Clan with {args[0]}";
+
+            if (!float.TryParse(args[1], out float amount))
+                return $"Unable to parse {args[1]} as float";
+
+            ChangeClanInfluenceAction.Apply(clan, amount);
+
+            return $"Gave {amount} influence to {clan.Name}";
+        }
+        // coop.debug.clan.info
+        [CommandLineArgumentFunction("info", "coop.debug.clan")]
+        public static string InfoClan(List<string> args)
+        {
+            if (args.Count != 1)
+                return "Usage: coop.debug.clan.info <clanId>";
+
+            if (!TryGetObjectManager(out IObjectManager objectManager))
+                return "Unable to resolve ObjectManager";
+
+            if (!objectManager.TryGetObject<Clan>(args[0], out var clan))
+                return $"Unable to get Clan with {args[0]}";
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"Name: {clan.Name}");
+            sb.AppendLine($"StringId: {clan.StringId}");
+            sb.AppendLine($"Leader: {clan.Leader?.Name.ToString() ?? "none"}");
+            sb.AppendLine($"Kingdom: {clan.Kingdom?.Name.ToString() ?? "none"}");
+            sb.AppendLine($"Influence: {clan.Influence}");
+            sb.AppendLine($"Renown: {clan.Renown}");
+            sb.AppendLine($"Tier: {clan.Tier}");
+            sb.AppendLine($"IsEliminated: {clan.IsEliminated}");
+            sb.AppendLine($"Members: {string.Join(", ", clan.Heroes.Select(h => h.Name))}");
+            return sb.ToString();
+        }
     }
 }
+//coop.debug.clan.add_renown Player 1000
+// coop.debug.clan.join_kingdom Player empire
+//coop.debug.clan.give_influence Player 500

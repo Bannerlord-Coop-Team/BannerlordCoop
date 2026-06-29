@@ -98,15 +98,66 @@ public class PartyLifetimeHandlerTests
         network.Verify(n => n.SendAll(It.IsAny<IMessage>()), Times.Never);
     }
 
+    [Fact]
+    public void Handle_DestroyPartyRequested_ResolvableParties_SendsRequest()
+    {
+        var destroyer = ObjectHelper.SkipConstructor<PartyBase>();
+        var defeated = ObjectHelper.SkipConstructor<MobileParty>();
+        SetupId(destroyer, "destroyer-1");
+        SetupId(defeated, "defeated-1");
+
+        handler.Handle_DestroyPartyRequested(RequestPayload(destroyer, defeated));
+
+        var sent = Assert.IsType<NetworkRequestDestroyParty>(sentMessage!);
+        Assert.Equal("destroyer-1", sent.DestroyerPartyId);
+        Assert.Equal("defeated-1", sent.DefeatedPartyId);
+        network.Verify(n => n.SendAll(It.IsAny<IMessage>()), Times.Once);
+    }
+
+    [Fact]
+    public void Handle_DestroyPartyRequested_UnresolvableDestroyer_DoesNotSend()
+    {
+        var destroyer = ObjectHelper.SkipConstructor<PartyBase>();
+        var defeated = ObjectHelper.SkipConstructor<MobileParty>();
+        SetupId(defeated, "defeated-1");
+        SetupNoId(destroyer);
+
+        handler.Handle_DestroyPartyRequested(RequestPayload(destroyer, defeated));
+
+        Assert.Null(sentMessage);
+        network.Verify(n => n.SendAll(It.IsAny<IMessage>()), Times.Never);
+    }
+
+    [Fact]
+    public void Handle_DestroyPartyRequested_UnresolvableDefeated_DoesNotSend()
+    {
+        var destroyer = ObjectHelper.SkipConstructor<PartyBase>();
+        var defeated = ObjectHelper.SkipConstructor<MobileParty>();
+        SetupId(destroyer, "destroyer-1");
+        SetupNoId(defeated);
+
+        handler.Handle_DestroyPartyRequested(RequestPayload(destroyer, defeated));
+
+        Assert.Null(sentMessage);
+        network.Verify(n => n.SendAll(It.IsAny<IMessage>()), Times.Never);
+    }
+
+    private MessagePayload<DestroyPartyRequested> RequestPayload(PartyBase destroyer, MobileParty defeated) =>
+        new(this, new DestroyPartyRequested(destroyer, defeated));
+
     private MessagePayload<DestroyPartyApplied> Payload(PartyBase? victoriousPartyBase, MobileParty defeated) =>
         new(this, new DestroyPartyApplied(victoriousPartyBase, defeated));
 
-    private void SetupId(object party, string id) =>
+    private void SetupId(object party, string id)
+    {
         objectManager.Setup(o => o.TryGetIdWithLogging(party, out id)).Returns(true);
+        objectManager.Setup(o => o.TryGetId(party, out id)).Returns(true);
+    }
 
     private void SetupNoId(object party)
     {
         string unused = string.Empty;
         objectManager.Setup(o => o.TryGetIdWithLogging(party, out unused)).Returns(false);
+        objectManager.Setup(o => o.TryGetId(party, out unused)).Returns(false);
     }
 }

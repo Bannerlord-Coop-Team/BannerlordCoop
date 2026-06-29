@@ -352,6 +352,11 @@ internal class PlayerCaptivityServerHandler : IHandler
             playerParty.IgnoreForHours(4);
             playerParty.Party.SetAsCameraFollowParty();
             playerParty.SetMoveModeHold();
+            // SetMoveModeHold only resets the AI behavior, not the navigation mode, so the freed party
+            // would keep whatever Party-mode target it had at capture (its old captor, or a party that
+            // was destroyed and deserialized to null after a save/reload). Clear it so the released party
+            // actually holds and obeys the player's next move order instead of being stuck or throwing.
+            playerParty.ResetNavigationToHold();
 
             // Native grants the released hero captivity XP through Campaign.Current.PlayerCaptivity,
             // which on the server tracks the host hero — using it here would XP the wrong hero.

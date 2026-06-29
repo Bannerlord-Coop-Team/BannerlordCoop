@@ -3,6 +3,7 @@ using Common.Logging;
 using GameInterface.Services.Heroes.Audit;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.ObjectManager.Extensions;
+using GameInterface.Utils.Commands;
 using Serilog;
 using System.Collections.Generic;
 using System.Linq;
@@ -155,6 +156,8 @@ public class HeroDebugCommand
     [CommandLineArgumentFunction("SetGold", "coop.debug.hero")]
     public static string SetGold(List<string> args)
     {
+        if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.SetGold")) return error;
+
         if (args.Count < 2)
         {
             return "Usage: coop.debug.hero.SetGold <heroName> <gold>";

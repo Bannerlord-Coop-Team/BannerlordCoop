@@ -13,10 +13,13 @@ public readonly struct NetworkRemovePartyInArmy : ICommand
     public readonly string ArmyId;
     [ProtoMember(2)]
     public readonly string MobilePartyId;
+    [ProtoMember(3)]
+    public readonly string ClientMobilePartyId;
 
-    public NetworkRemovePartyInArmy(string armyId, string mobilePartyId)
+    public NetworkRemovePartyInArmy(string armyId, string mobilePartyId, string clientMobilePartyId)
     {
         ArmyId = armyId;
         MobilePartyId = mobilePartyId;
+        ClientMobilePartyId = clientMobilePartyId;
     }
 }
