@@ -42,6 +42,9 @@ internal class MobilePartyAIPatches
         if (ModInformation.IsClient)
             return;
 
+        if (value == __instance.AiBehaviorInteractable)
+            return;
+
         MessageBroker.Instance.Publish(__instance, new AiBehaviorInteractablePointUpdated(__instance, value));
     }
 }
