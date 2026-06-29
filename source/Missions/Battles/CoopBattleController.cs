@@ -211,7 +211,7 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
                 if (toResolve == null || !objectManager.TryGetId(toResolve, out var characterId)) continue;
 
                 _casualtyInfo.TryGetValue(info.AgentId, out var attribution);
-                int side = agent.Team != null ? (int)agent.Team.Side : (int)BattleSideEnum.None;
+                var side = agent.Team != null ? agent.Team.Side : BattleSideEnum.None;
 
                 records.Add(new BattleAgentSpawnData(
                     info.AgentId, characterId, isHero, agent.Position, side, agent.Health,
