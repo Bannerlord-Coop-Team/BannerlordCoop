@@ -41,6 +41,47 @@ namespace GameInterface.Services.ItemRosters.Commands
             return $"Added {randomItem.Name} to {settlement.Name}'s ItemRoster";
         }
 
+        [CommandLineArgumentFunction("add_item_burst", "coop.debug.itemrosters")]
+        public static string AddItemBurst(List<string> args)
+        {
+            if (ModInformation.IsClient)
+            {
+                return "Run this on the server; it is authoritative and replicates to clients.";
+            }
+
+            if (args.Count < 2)
+            {
+                return "Usage: coop.debug.itemrosters.add_item_burst <settlement id> <count> (i.e. town_ES1 20)";
+            }
+
+            var settlementId = args[0];
+            var settlement = MBObjectManager.Instance.GetObject<Settlement>(settlementId);
+
+            if (settlement == null) return $"Unable to find settlement with id: {settlementId}";
+
+            if (!int.TryParse(args[1], out var count) || count < 1)
+            {
+                return $"Invalid count: '{args[1]}'. Provide a positive integer.";
+            }
+
+            var itemEnumerable = MBObjectManager.Instance.GetObjectTypeList<ItemObject>();
+
+            if (itemEnumerable.Count == 0) return "No items are loaded.";
+
+            Random random = new();
+
+            var randomItem = itemEnumerable.Skip(random.Next(itemEnumerable.Count)).First();
+
+            // Add the same item count times in one tick so the coalescer collapses them into a single
+            // update carrying the final count.
+            for (int i = 0; i < count; i++)
+            {
+                settlement.ItemRoster.AddToCounts(new EquipmentElement(randomItem), 1);
+            }
+
+            return $"Added {count}x {randomItem.Name} to {settlement.Name}'s ItemRoster in one tick";
+        }
+
         [CommandLineArgumentFunction("info", "coop.debug.itemrosters")]
         public static string Info(List<string> args)
         {
