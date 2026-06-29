@@ -54,12 +54,9 @@ public class MobilePartyPropertyTests : SyncTestBase
         TestEnvironment.AssertReferenceProperty<MobileParty, Hero>(nameof(MobileParty.Surgeon));
         TestEnvironment.AssertProperty<MobileParty, float>(nameof(MobileParty.RecentEventsMorale), 5f);
         TestEnvironment.AssertProperty<MobileParty, Vec2>(nameof(MobileParty.EventPositionAdder), new Vec2(2,2));
-        TestEnvironment.AssertProperty<MobileParty, bool>(nameof(MobileParty.IsMilitia), true);
-        TestEnvironment.AssertProperty<MobileParty, bool>(nameof(MobileParty.IsLordParty), false, true);
-        TestEnvironment.AssertProperty<MobileParty, bool>(nameof(MobileParty.IsVillager), true);
-        TestEnvironment.AssertProperty<MobileParty, bool>(nameof(MobileParty.IsCaravan), true);
-        TestEnvironment.AssertProperty<MobileParty, bool>(nameof(MobileParty.IsGarrison), true);
-        TestEnvironment.AssertProperty<MobileParty, bool>(nameof(MobileParty.IsCustomParty), true);
-        TestEnvironment.AssertProperty<MobileParty, bool>(nameof(MobileParty.IsBandit), true);
+        // The IsMilitia/IsLordParty/IsVillager/IsCaravan/IsGarrison/IsCustomParty/IsBandit flags
+        // are no longer synced as properties; the client recomputes them from the synced
+        // _partyComponent (see PartyComponentHandler). Their recompute is covered by
+        // CaravanPartyComponentTests.ServerCreateParty_SyncAllClients.
     }
 }

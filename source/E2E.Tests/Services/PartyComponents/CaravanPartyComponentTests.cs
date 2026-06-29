@@ -63,6 +63,12 @@ public class CaravanPartyComponentTests : SyncTestBase
             Assert.NotNull(newLeaderHero);
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var newParty));
             Assert.IsType<CaravanPartyComponent>(newParty.PartyComponent);
+
+            // The type flags are no longer synced from the server; the client must recompute them
+            // from the applied component (UpdatePartyComponentFlags). IsCaravan should be true and
+            // the other flags false.
+            Assert.True(newParty.IsCaravan);
+            Assert.False(newParty.IsLordParty);
         }
     }
 
