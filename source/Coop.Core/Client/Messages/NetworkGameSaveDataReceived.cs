@@ -1,6 +1,7 @@
 ﻿// Ignore Spelling: Guids
 
 using Common.Messaging;
+using GameInterface.Services.Alleys;
 using GameInterface.Services.Caravans;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.Workshops;
@@ -24,18 +25,22 @@ public record NetworkGameSaveDataReceived : IEvent
     public WorkshopPlayerData WorkshopPlayerData { get; }
     [ProtoMember(5)]
     public CaravansPlayerData CaravansPlayerData { get; }
+    [ProtoMember(6)]
+    public AlleyPlayerData AlleyPlayerData { get; }
 
     public NetworkGameSaveDataReceived(
         byte[] gameSaveData,
         string campaignID,
         CraftingPlayerData craftingPlayerData,
         WorkshopPlayerData workshopPlayerData,
-        CaravansPlayerData caravansPlayerData)
+        CaravansPlayerData caravansPlayerData,
+        AlleyPlayerData alleyPlayerData)
     {
         GameSaveData = gameSaveData;
         CampaignID = campaignID;
         CraftingPlayerData = craftingPlayerData;
         WorkshopPlayerData = workshopPlayerData;
         CaravansPlayerData = caravansPlayerData;
+        AlleyPlayerData = alleyPlayerData;
     }
 }

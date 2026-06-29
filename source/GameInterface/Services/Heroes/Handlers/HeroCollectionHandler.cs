@@ -41,11 +41,6 @@ namespace GameInterface.Services.Heroes.Handlers
             messageBroker.Subscribe<CaravanListRemoved>(Handle);
             messageBroker.Subscribe<NetworkRemoveCaravanList>(Handle);
 
-            messageBroker.Subscribe<AlleyListUpdated>(Handle);
-            messageBroker.Subscribe<NetworkUpdateAlleyList>(Handle);
-            messageBroker.Subscribe<AlleyListRemoved>(Handle);
-            messageBroker.Subscribe<NetworkRemoveAlleyList>(Handle);
-
             messageBroker.Subscribe<WorkshopListUpdated>(Handle);
             messageBroker.Subscribe<NetworkUpdateWorkshopList>(Handle);
             messageBroker.Subscribe<WorkshopListRemoved>(Handle);
@@ -64,11 +59,6 @@ namespace GameInterface.Services.Heroes.Handlers
             messageBroker.Unsubscribe<NetworkUpdateCaravanList>(Handle);
             messageBroker.Unsubscribe<CaravanListRemoved>(Handle);
             messageBroker.Unsubscribe<NetworkRemoveCaravanList>(Handle);
-
-            messageBroker.Unsubscribe<AlleyListUpdated>(Handle);
-            messageBroker.Unsubscribe<NetworkUpdateAlleyList>(Handle);
-            messageBroker.Unsubscribe<AlleyListRemoved>(Handle);
-            messageBroker.Unsubscribe<NetworkRemoveAlleyList>(Handle);
 
             messageBroker.Unsubscribe<WorkshopListUpdated>(Handle);
             messageBroker.Unsubscribe<NetworkUpdateWorkshopList>(Handle);
@@ -204,72 +194,6 @@ namespace GameInterface.Services.Heroes.Handlers
                 catch (Exception e)
                 {
                     Logger.Error(e, "Failed to apply NetworkRemoveCaravanList");
-                }
-            });
-        }
-
-        private void Handle(MessagePayload<AlleyListUpdated> payload)
-        {
-            var data = payload.What;
-
-            if (!TryGetId(data.Instance, out string HeroId)) return;
-            if (!TryGetId(data.Value, out string AlleyId)) return;
-
-            network.SendAll(new NetworkUpdateAlleyList(HeroId, AlleyId));
-        }
-
-        private void Handle(MessagePayload<NetworkUpdateAlleyList> payload)
-        {
-            var data = payload.What;
-
-            GameThread.Run(() =>
-            {
-                try
-                {
-                    if (!objectManager.TryGetObject(data.HeroId, out Hero hero)) return;
-                    if (!objectManager.TryGetObject(data.ValueId, out Alley alley)) return;
-
-                    using (new AllowedThread())
-                    {
-                        hero.OwnedAlleys.Add(alley);
-                    }
-                }
-                catch (Exception e)
-                {
-                    Logger.Error(e, "Failed to apply NetworkUpdateAlleyList");
-                }
-            });
-        }
-
-        private void Handle(MessagePayload<AlleyListRemoved> payload)
-        {
-            var data = payload.What;
-
-            if (!TryGetId(data.Instance, out string HeroId)) return;
-            if (!TryGetId(data.Value, out string AlleyId)) return;
-
-            network.SendAll(new NetworkRemoveAlleyList(HeroId, AlleyId));
-        }
-
-        private void Handle(MessagePayload<NetworkRemoveAlleyList> payload)
-        {
-            var data = payload.What;
-
-            GameThread.Run(() =>
-            {
-                try
-                {
-                    if (!objectManager.TryGetObject(data.HeroId, out Hero hero)) return;
-                    if (!objectManager.TryGetObject(data.ValueId, out Alley alley)) return;
-
-                    using (new AllowedThread())
-                    {
-                        hero.OwnedAlleys.Remove(alley);
-                    }
-                }
-                catch (Exception e)
-                {
-                    Logger.Error(e, "Failed to apply NetworkRemoveAlleyList");
                 }
             });
         }

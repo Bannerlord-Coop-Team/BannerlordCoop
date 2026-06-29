@@ -2,6 +2,7 @@
 using GameInterface.CoopSessionData;
 using GameInterface.CoopSessionData.Save.Data;
 using GameInterface.Registry.Messages;
+using GameInterface.Services.Alleys;
 using GameInterface.Services.Caravans;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Players;
@@ -60,7 +61,10 @@ internal class SaveGameHandler : IHandler
         CaravansPlayerData caravansPlayerData = coopSessionProvider.CoopSession.CaravansPlayerData;
         caravansPlayerData ??= new(new(), new(), new());
 
-        CoopSession session = new CoopSession(saveName, playerRegistry.Players.ToArray(), craftingPlayerData, workshopPlayerData, caravansPlayerData);
+        AlleyPlayerData alleyPlayerData = coopSessionProvider.CoopSession.AlleyPlayerData;
+        alleyPlayerData ??= new(new());
+
+        CoopSession session = new CoopSession(saveName, playerRegistry.Players.ToArray(), craftingPlayerData, workshopPlayerData, caravansPlayerData, alleyPlayerData);
         coopSessionProvider.CoopSession = session;
 
         saveManager.SaveCoopSession(saveName, session);
@@ -76,7 +80,8 @@ internal class SaveGameHandler : IHandler
             loaded?.Players ?? new Player[0],
             loaded?.CraftingPlayerData ?? new CraftingPlayerData(new(), new(), new()),
             loaded?.WorkshopPlayerData ?? new WorkshopPlayerData(new()),
-            loaded?.CaravansPlayerData ?? new CaravansPlayerData(new(), new(), new()));
+            loaded?.CaravansPlayerData ?? new CaravansPlayerData(new(), new(), new()),
+            loaded?.AlleyPlayerData ?? new AlleyPlayerData(new()));
 
         coopSessionProvider.CoopSession = savedSession;
     }
