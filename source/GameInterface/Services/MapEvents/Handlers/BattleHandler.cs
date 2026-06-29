@@ -100,10 +100,9 @@ internal class BattleHandler : IHandler
         messageBroker.Subscribe<MapEventInvolvedPartiesAdded>(Handle_MapEventInvolvedPartiesAdded);
         messageBroker.Subscribe<NetworkAddInvolvedParties>(Handle_NetworkAddInvolvedParties);
 
-        messageBroker.Subscribe<AttackMissionAttempted>(Handle_AttackMissionAttempted);
-        messageBroker.Subscribe<NetworkAttackMissionAttempted>(Handle_NetworkAttackMissionAttempted);
+        messageBroker.Subscribe<NetworkBattleStartRequest>(Handle_NetworkBattleStartRequest);
         messageBroker.Subscribe<NetworkStartAttackMission>(Handle_NetworkStartAttackMission);
-        messageBroker.Subscribe<NetworkBattleMissionStarted>(Handle_NetworkBattleMissionStarted);
+        messageBroker.Subscribe<NetworkBattleModeSet>(Handle_NetworkBattleModeSet);
 
         messageBroker.Subscribe<MapEventFinalized>(Handle_MapEventFinalized);
         messageBroker.Subscribe<TimeSpeedChangedAttempted>(Handle_TimeSpeedChangedAttempted);
@@ -130,10 +129,9 @@ internal class BattleHandler : IHandler
         messageBroker.Unsubscribe<MapEventInvolvedPartiesAdded>(Handle_MapEventInvolvedPartiesAdded);
         messageBroker.Unsubscribe<NetworkAddInvolvedParties>(Handle_NetworkAddInvolvedParties);
 
-        messageBroker.Unsubscribe<AttackMissionAttempted>(Handle_AttackMissionAttempted);
-        messageBroker.Unsubscribe<NetworkAttackMissionAttempted>(Handle_NetworkAttackMissionAttempted);
+        messageBroker.Unsubscribe<NetworkBattleStartRequest>(Handle_NetworkBattleStartRequest);
         messageBroker.Unsubscribe<NetworkStartAttackMission>(Handle_NetworkStartAttackMission);
-        messageBroker.Unsubscribe<NetworkBattleMissionStarted>(Handle_NetworkBattleMissionStarted);
+        messageBroker.Unsubscribe<NetworkBattleModeSet>(Handle_NetworkBattleModeSet);
 
         messageBroker.Unsubscribe<MapEventFinalized>(Handle_MapEventFinalized);
         messageBroker.Unsubscribe<TimeSpeedChangedAttempted>(Handle_TimeSpeedChangedAttempted);
@@ -148,25 +146,16 @@ internal class BattleHandler : IHandler
         timeControlInterface.RemoveFastForwardPolicy(FastForwardWhilePlayerInMapEventPolicy);
     }
 
-    private void Handle_AttackMissionAttempted(MessagePayload<AttackMissionAttempted> payload)
+    /// <summary>[Server] Handle a battle-start request for the live-mission mode: gate it, make the sides
+    /// mission-ready, send the requester the mission start, and reply. Requests for other modes are ignored here.</summary>
+    private void Handle_NetworkBattleStartRequest(MessagePayload<NetworkBattleStartRequest> payload)
     {
-        if (!objectManager.TryGetIdWithLogging(payload.What.MapEvent, out string mapEventId))
+        if (!ModInformation.IsServer)
             return;
 
-        mapEventLogger.DebugMapEvent(payload.What.MapEvent, "Handling attack mission attempted for map event");
+        if (payload.What.Mode != (int)BattleStartMode.Mission)
+            return;
 
-        // Carry the attacking party (this client's main party) so the server can apply the
-        // attack's hostile-action consequences against the opposing side; the server has no
-        // main party to derive the attacker from. If it can't be resolved the mission still
-        // proceeds and only the consequences are skipped server-side.
-        objectManager.TryGetIdWithLogging(MobileParty.MainParty, out string attackerPartyId);
-
-        var message = new NetworkAttackMissionAttempted(mapEventId, attackerPartyId);
-        network.SendAll(message);
-    }
-
-    private void Handle_NetworkAttackMissionAttempted(MessagePayload<NetworkAttackMissionAttempted> payload)
-    {
         if (!objectManager.TryGetObject(payload.What.MapEventId, out MapEvent _))
             return;
 
@@ -188,6 +177,16 @@ internal class BattleHandler : IHandler
                 if (!objectManager.TryGetObject(payload.What.MapEventId, out MapEvent mapEvent))
                     return;
 
+                // Server-authoritative mode gate: accept the live mission only if no auto-resolve simulation already
+                // owns this event. On reject, don't make the sides mission-ready or reply — the requesting client
+                // waits for NetworkStartAttackMission to open the mission, so it simply stays at the encounter menu.
+                if (!ServerBattleModeArbiter.TryClaimMission(payload.What.MapEventId))
+                {
+                    mapEventLogger.DebugMapEvent(mapEvent, "Rejecting attack mission: an auto-resolve simulation is already underway for this event");
+                    network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
+                    return;
+                }
+
                 mapEventLogger.DebugMapEvent(mapEvent, "Handling network attack mission attempted for map event. Making sides mission-ready and replying with mission start");
 
                 // Apply the diplomatic consequences of the client's attack (war / relation)
@@ -200,31 +199,37 @@ internal class BattleHandler : IHandler
                     side.MakeReadyForMission(null);
                 }
 
+                // Reply first so the requesting client's blocked consequence unblocks before the mission-open
+                // message arrives — the mission then opens off the menu-consequence stack, as in the pre-coordinator
+                // flow, rather than re-entrantly during the blocking wait.
+                network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, true));
+
                 network.Send(requester, new NetworkStartAttackMission(randomTerrainSeed));
 
-                // Tell every client the battle is now mission-ready, so a client still sitting at the encounter
-                // menu greys out the auto-resolve option — a map event is fought as a live mission XOR an
-                // auto-resolve, never both (see BattleModeEncounterOptionsPatch / BattleMissionInProgress).
-                network.SendAll(new NetworkBattleMissionStarted(payload.What.MapEventId));
+                // Claim the event for the mission mode on every client, so one still sitting at the encounter menu
+                // greys out the auto-resolve option — a map event is fought as a live mission XOR an auto-resolve,
+                // never both (see BattleModeEncounterOptionsPatch / BattleModeRegistry).
+                network.SendAll(new NetworkBattleModeSet(payload.What.MapEventId, (int)BattleStartMode.Mission));
             }
             catch (Exception e)
             {
-                Logger.Error(e, "Failed to make map event sides mission-ready for {Message}", nameof(NetworkAttackMissionAttempted));
+                Logger.Error(e, "Failed to make map event sides mission-ready for {Message}", nameof(NetworkBattleStartRequest));
+                network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
             }
         });
     }
 
     /// <summary>
-    /// [Client] The server reports a live battle mission has started (sides are mission-ready) for a map event.
-    /// If the local player's own party is in that event, record the mission as in progress so the encounter menu
-    /// greys out the auto-resolve option (<see cref="Patches.BattleModeEncounterOptionsPatch"/>). Clients not in
-    /// the event ignore it. Mirrors the simulation spectator guard in BattleSimulationRunHandler.
+    /// [Client] The server claimed a map event for a battle-resolution mode. If the local player's own party is in
+    /// that event, record the mode (<see cref="BattleModeRegistry"/>) so the encounter menu greys out the wrong-mode
+    /// options (<see cref="Patches.BattleModeEncounterOptionsPatch"/>). Clients not in the event ignore it.
     /// </summary>
-    private void Handle_NetworkBattleMissionStarted(MessagePayload<NetworkBattleMissionStarted> payload)
+    private void Handle_NetworkBattleModeSet(MessagePayload<NetworkBattleModeSet> payload)
     {
         if (!ModInformation.IsClient) return;
 
         var mapEventId = payload.What.MapEventId;
+        var mode = (BattleStartMode)payload.What.Mode;
 
         GameThread.Run(() =>
         {
@@ -234,7 +239,7 @@ internal class BattleHandler : IHandler
             if (MobileParty.MainParty?.MapEvent != mapEvent && PlayerEncounter.Battle != mapEvent)
                 return;
 
-            BattleMissionInProgress.Begin(mapEventId);
+            BattleModeRegistry.Begin(mapEventId, mode);
         });
     }
 
@@ -509,6 +514,10 @@ internal class BattleHandler : IHandler
             finalizedMapEvents.Add(mapEvent, FinalizedMarker);
         }
 
+        // The battle is over — release the mode claim so a later, unrelated battle on this event starts unclaimed.
+        if (objectManager.TryGetId(mapEvent, out var mapEventIdForRelease))
+            ServerBattleModeArbiter.Release(mapEventIdForRelease);
+
         string[] playerPartyIds = null;
         GameThread.Run(() =>
         {
@@ -539,9 +548,9 @@ internal class BattleHandler : IHandler
         {
             if (Campaign.Current == null) return;
 
-            // The local player's battle has ended — clear the mission-in-progress flag so the encounter-menu mode
-            // gate (BattleModeEncounterOptionsPatch) stops treating this event as having a live mission underway.
-            BattleMissionInProgress.End();
+            // The local player's battle has ended — clear the recorded mode so the encounter-menu gate
+            // (BattleModeEncounterOptionsPatch) no longer treats this event as claimed.
+            BattleModeRegistry.End();
 
             // When this battle ended with the local player captured, the captivity flow owns the UI:
             // PlayerCaptivityClientHandler has switched to the prisoner menu and leaves the encounter

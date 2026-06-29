@@ -16,11 +16,11 @@ namespace GameInterface.Services.MapEvents.Patches;
 /// Enforces mission-XOR-simulation on the encounter menu: a map event shared by several players is resolved either
 /// as a live battle mission or as an auto-resolve simulation, never both at once.
 /// <list type="bullet">
-/// <item>Once any player has launched the mission for the event (<see cref="BattleMissionInProgress"/>, set from the
-/// server's <see cref="Messages.Start.NetworkBattleMissionStarted"/> broadcast), the auto-resolve options are greyed
-/// out for everyone still at the menu.</item>
-/// <item>Once any player has started the auto-resolve for the event (<see cref="BattleSimulationReplay"/>, set from
-/// the server's NetworkOpenBattleSimulation broadcast), the mission-start options are greyed out.</item>
+/// <item>Once the server claims the event for a live mission (<see cref="BattleModeRegistry.IsMission"/>, set from the
+/// server's <see cref="Messages.Start.NetworkBattleModeSet"/> broadcast), the auto-resolve options are greyed out for
+/// everyone still at the menu.</item>
+/// <item>Once it claims the event for an auto-resolve (<see cref="BattleModeRegistry.IsSimulation"/>), the
+/// mission-start options are greyed out.</item>
 /// </list>
 /// Every other option (join the mission, leave, talk, surrender) is left untouched, so a joiner can still act —
 /// only the wrong-mode battle-start is blocked.
@@ -92,7 +92,7 @@ internal class BattleModeEncounterOptionsPatch
         var name = __originalMethod.Name;
 
         // A live mission is underway for this event → block starting an auto-resolve simulation.
-        if (SimulationStartConditions.Contains(name) && BattleMissionInProgress.IsActiveFor(mapEventId))
+        if (SimulationStartConditions.Contains(name) && BattleModeRegistry.IsMission(mapEventId))
         {
             __0.IsEnabled = false;
             __0.Tooltip = MissionUnderwayTooltip;
@@ -100,7 +100,7 @@ internal class BattleModeEncounterOptionsPatch
         }
 
         // An auto-resolve simulation is underway for this event → block starting a live mission.
-        if (MissionStartConditions.Contains(name) && BattleSimulationReplay.IsActiveFor(mapEventId))
+        if (MissionStartConditions.Contains(name) && BattleModeRegistry.IsSimulation(mapEventId))
         {
             __0.IsEnabled = false;
             __0.Tooltip = SimulationUnderwayTooltip;

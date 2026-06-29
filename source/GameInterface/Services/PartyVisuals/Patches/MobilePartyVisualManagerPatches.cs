@@ -27,9 +27,17 @@ namespace GameInterface.Services.PartyVisuals.Patches
                         continue;
                     }
 
+                    // Skip a visual whose party has been removed (IsActive == false) or unhooked: its native
+                    // scene entity is already freed, so the native Tick below throws AccessViolationException —
+                    // a corrupted-state exception the try/catch cannot catch, so it hard-crashes the game.
+                    var visual = __instance._visualsFlattened[i];
+                    var party = visual?.MapEntity?.MobileParty;  
+                    if (party == null || !party.IsActive)
+                        continue;
+
                     try
                     {
-                        __instance._visualsFlattened[i].Tick(dt, realDt, ref __instance._dirtyPartyVisualCount, ref __instance._dirtyPartiesList);
+                        visual.Tick(dt, realDt, ref __instance._dirtyPartyVisualCount, ref __instance._dirtyPartiesList);
                     }
                     catch (Exception ex)
                     {
