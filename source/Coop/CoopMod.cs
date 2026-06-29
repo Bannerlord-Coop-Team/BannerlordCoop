@@ -110,6 +110,13 @@ namespace Coop
 #endif
 
             Logger = LogManager.GetLogger<CoopMod>();
+
+            // Pin the build for bug triage: read the commit SHA off Common (Coop.dll carries none), at Information so it survives Release.
+            var informationalVersion = typeof(ModInformation).Assembly
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+                ?.InformationalVersion ?? "unknown";
+            Logger.Information("BannerlordCoop build {Build}", informationalVersion);
+
             Logger.Verbose("Coop Mod Module Started");
         }
 
