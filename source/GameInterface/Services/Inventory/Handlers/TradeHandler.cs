@@ -199,11 +199,6 @@ internal class TradeHandler : IHandler
                     boughtItems,
                     soldItems
                 );
-
-                if (hero.CharacterObject != null && hero != null && message.IsTrading)
-                {
-                    network.Send(peer, new NotifyGoldChange(-totalAmount));
-                }
             }
             catch (Exception e)
             {
