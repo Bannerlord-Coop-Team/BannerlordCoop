@@ -165,7 +165,6 @@ internal class PartyDoneLogicHandler : IHandler
             if (!obj.What.DoNotApplyGoldTransactions)
             {
                 GiveGoldAction.ApplyBetweenCharacters(null, mainHero, obj.What.PartyGoldChangeAmount, false);
-                network.Send(obj.Who as NetPeer, new NotifyGoldChange(obj.What.PartyGoldChangeAmount));
             }
             if (obj.What.PartyInfluenceChangeAmount != 0)
             {

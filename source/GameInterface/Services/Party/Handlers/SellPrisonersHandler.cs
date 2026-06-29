@@ -64,11 +64,7 @@ internal class SellPrisonersHandler : IHandler
             TroopRoster leftPrisonerRoster = new();
             troopRosterInterface.UpdateWithData(leftPrisonerRoster, obj.What.LeftPrisonerRosterData, sellingParty.LeaderHero);
 
-            int initialGold = sellingParty.LeaderHero.Gold;
             SellPrisonersAction.ApplyForSelectedPrisoners(sellingParty, null, leftPrisonerRoster);
-
-            // Give client notification of changed gold
-            network.Send(obj.Who as NetPeer, new NotifyGoldChange(sellingParty.LeaderHero.Gold - initialGold));
 
             // Refresh the menu to show updated menu items
             if (!objectManager.TryGetIdWithLogging(sellingParty.LeaderHero, out var heroId)) return;

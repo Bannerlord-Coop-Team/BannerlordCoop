@@ -78,8 +78,6 @@ internal class HireCompanionHandler : IHandler
                 GiveGoldAction.ApplyBetweenCharacters(mainHero, oneToOneConversationHero, data.HiringPrice, false);
                 AddCompanionAction.Apply(playerClan, oneToOneConversationHero);
                 AddHeroToPartyAction.Apply(oneToOneConversationHero, mainParty, true);
-
-                network.Send(peer, new NotifyGoldChange(-data.HiringPrice));
             }
             catch (Exception e)
             {
