@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Xml.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 
@@ -54,7 +55,7 @@ public interface ITroopRosterInterface : IGameAbstraction
     /// <summary>
     /// Runs troop recruitment logic for client requests.
     /// </summary>
-    void HandleOnRecruitmentDone(string mobilePartyId, TroopInfo[] troopsInCart, out int changedGold);
+    void HandleOnRecruitmentDone(string mobilePartyId, TroopInfo[] troopsInCart);
 }
 
 internal class TroopRosterInterface : ITroopRosterInterface
@@ -210,10 +211,8 @@ internal class TroopRosterInterface : ITroopRosterInterface
         return counts;
     }
 
-    public void HandleOnRecruitmentDone(string mobilePartyId, TroopInfo[] troopsInCart, out int changedGold)
+    public void HandleOnRecruitmentDone(string mobilePartyId, TroopInfo[] troopsInCart)
     {
-        changedGold = 0;
-
         if (!objectManager.TryGetObjectWithLogging(mobilePartyId, out MobileParty mobileParty)) return;
 
         List<(Hero, CharacterObject, int)> herosValidated = new();
@@ -255,7 +254,6 @@ internal class TroopRosterInterface : ITroopRosterInterface
             CampaignEventDispatcher.Instance.OnUnitRecruited(characterObject, 1);
         }
 
-        mobileParty.LeaderHero.Gold -= cost;
-        changedGold = -cost;
+        GiveGoldAction.ApplyBetweenCharacters(mobileParty.LeaderHero, null, cost, false);
     }
 }
