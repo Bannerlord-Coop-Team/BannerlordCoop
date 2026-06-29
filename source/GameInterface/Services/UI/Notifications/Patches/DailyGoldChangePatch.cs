@@ -16,9 +16,9 @@ internal class DailyGoldChangePatch
     public static bool DailyTickClanPrefix(ref ClanVariablesCampaignBehavior __instance, Clan clan)
     {
         // Only need to notify of daily gold change for player clans
-        if (clan != null && !clan.IsPlayerClan()) return true;
+        if (clan == null || !clan.IsPlayerClan()) return true;
 
-        int goldChange = MathF.Round(Campaign.Current.Models.ClanFinanceModel.CalculateClanGoldChange(clan, false, true, false).ResultNumber);
+        int goldChange = MathF.Round(Campaign.Current.Models.ClanFinanceModel.CalculateClanGoldChange(clan, false, false, false).ResultNumber);
 
         var message = new NotifyDailyGoldChange(clan, goldChange);
         MessageBroker.Instance.Publish(__instance, message);
