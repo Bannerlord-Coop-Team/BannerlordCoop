@@ -16,8 +16,8 @@ namespace Missions.Battles;
 /// once; every other party's troops arrive as puppets broadcast by their owner.
 /// <para>
 /// Relies on the reserve being fed before the mission starts (bundled into the mission-start message), so the
-/// suppliers are populated by <see cref="AfterStart"/>. The deployment phase is skipped (the launcher omits
-/// the deployment behaviors), so initial spawn == total and both sides spawn immediately.
+/// suppliers are populated by <see cref="AfterStart"/>. Initial == total (no staged reinforcement waves); the
+/// deployment controller decides WHEN the sized troops spawn (frozen during deployment, released on Start Battle).
 /// </para>
 /// </summary>
 public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
@@ -45,8 +45,9 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
         _missionAgentSpawnLogic.SetSpawnHorses(BattleSideEnum.Defender, !_mapEvent.IsSiegeAssault);
         _missionAgentSpawnLogic.SetSpawnHorses(BattleSideEnum.Attacker, !_mapEvent.IsSiegeAssault);
 
-        // initial == total: field the whole owned set at once. No deployment phase in coop, so there is no
-        // staged "place then start" — the spawn logic spawns as soon as it has the reserved troops.
+        // initial == total: size the whole owned set as one (no staged reinforcement waves). The deployment
+        // controller gates when these actually spawn — frozen in formation during deployment, released on
+        // Start Battle (FinishDeployment).
         var settings = CreateSandBoxBattleWaveSpawnSettings();
         _missionAgentSpawnLogic.InitWithSinglePhase(defenderOwned, attackerOwned, defenderOwned, attackerOwned, spawnDefenders: true, spawnAttackers: true, in settings);
 
