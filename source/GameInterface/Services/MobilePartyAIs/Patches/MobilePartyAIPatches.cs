@@ -34,12 +34,15 @@ internal class MobilePartyAIPatches
 
     [HarmonyPatch(nameof(MobilePartyAi.AiBehaviorInteractable), MethodType.Setter)]
     [HarmonyPrefix]
-    static void AiBehaviorInteractable_Prefix(ref MobilePartyAi __instance, ref IInteractablePoint value)
+    internal static void AiBehaviorInteractable_Prefix(ref MobilePartyAi __instance, ref IInteractablePoint value)
     {
         if (CallOriginalPolicy.IsOriginalAllowed())
             return;
 
         if (ModInformation.IsClient)
+            return;
+
+        if (value == __instance.AiBehaviorInteractable)
             return;
 
         MessageBroker.Instance.Publish(__instance, new AiBehaviorInteractablePointUpdated(__instance, value));

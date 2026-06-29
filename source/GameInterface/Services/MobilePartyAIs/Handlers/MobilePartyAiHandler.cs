@@ -6,7 +6,6 @@ using Common.Util;
 using GameInterface.Services.MobilePartyAIs.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using System;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobilePartyAIs.Handlers;
@@ -63,49 +62,23 @@ internal class MobilePartyAiHandler : IHandler
         network.SendAll(new UpdateAiBehaviorInteractablePoint(partyAiId, interactablePointId));
     }
 
-    private void Handle_UpdateAiBehaviorInteractablePoint(MessagePayload<UpdateAiBehaviorInteractablePoint> payload)
+    internal void Handle_UpdateAiBehaviorInteractablePoint(MessagePayload<UpdateAiBehaviorInteractablePoint> payload)
     {
-        if (!objectManager.TryGetObject<MobilePartyAi>(payload.What.MobilePartyAiId, out var partyAi))
+        var message = payload.What;
+        GameThread.RunSafe(() =>
         {
-            return;
-        }
+            if (!objectManager.TryGetObjectWithLogging(message.MobilePartyAiId, out MobilePartyAi partyAi)) return;
 
-        if (payload.What.IsNull)
-        {
-            GameThread.Run(() =>
+            PartyBase interactablePoint = null;
+            if (!message.IsNull &&
+                !objectManager.TryGetObjectWithLogging(message.InteractablePointId, out interactablePoint))
             {
-                try
-                {
-                    using (new AllowedThread())
-                    {
-                        partyAi.AiBehaviorInteractable = null;
-                    }
-                }
-                catch (Exception e)
-                {
-                    logger.Error(e, "Failed to apply UpdateAiBehaviorInteractablePoint");
-                }
-            });
-            return;
-        }
-
-        if (!objectManager.TryGetObject<PartyBase>(payload.What.InteractablePointId, out var interactablePoint))
-        {
-            return;
-        }
-
-        GameThread.Run(() =>
-        {
-            try
-            {
-                using (new AllowedThread())
-                {
-                    partyAi.AiBehaviorInteractable = interactablePoint;
-                }
+                return;
             }
-            catch (Exception e)
+
+            using (new AllowedThread())
             {
-                logger.Error(e, "Failed to apply UpdateAiBehaviorInteractablePoint");
+                partyAi.AiBehaviorInteractable = interactablePoint;
             }
         });
     }
