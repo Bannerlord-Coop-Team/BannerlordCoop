@@ -94,9 +94,6 @@ internal abstract class TestComponentBase
         RegisterMock<IMobilePartyInterface>(builder);
         RegisterMock<IGameStateInterface>(builder);
         RegisterMock<ISettlementInterface>(builder);
-        // BattleHostHandler (Missions, auto-registered as an IHandler in both containers) takes this
-        // GameInterface abstraction. It is auto-registered in production but not in the test container,
-        // so mock it like the other game abstractions — these state tests only need the container to build.
         RegisterMock<IBattleTroopReserveBuilder>(builder);
 
         // ISaveInterface is consumed by TransferSaveState's constructor, which packages a save the
