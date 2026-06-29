@@ -57,7 +57,7 @@ internal static class RaidAiInterventionSuppression
             HoldParty(party);
             return true;
         }
-        
+
         return false;
     }
 

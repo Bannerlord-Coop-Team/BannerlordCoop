@@ -47,7 +47,7 @@ namespace GameInterface.Services.Stances.Handlers
                 }
             }, true);
         }
-        
+
         private void HandleMakePeace(MessagePayload<MakePeaceChanged> obj)
         {
             var payload = obj.What;

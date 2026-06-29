@@ -1576,6 +1576,8 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.True(mapEvent.IsVillageHostileAction());
             Assert.False(mapEvent.IsVillageHostileActionWithMultiplePlayerParties());
         }, MapEventDisabledMethods);
+
+        ServerBattleModeArbiter.Release(hostileAction.MapEventId);
     }
 
     [Theory]
@@ -1620,6 +1622,13 @@ public class VillageHostileActionTests : MapEventTestBase
 
         var open = Server.NetworkSentMessages.GetMessages<NetworkOpenBattleSimulation>().Single();
         Assert.Equal(hostileAction.MapEventId, open.MapEventId);
+
+        var mode = Server.NetworkSentMessages.GetMessages<NetworkBattleModeSet>().Single();
+        Assert.Equal(hostileAction.MapEventId, mode.MapEventId);
+        Assert.Equal((int)BattleStartMode.Simulation, mode.Mode);
+
+        var reply = Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>().Single();
+        Assert.True(reply.Accepted);
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>());
 
         Server.Call(() =>
@@ -1629,6 +1638,8 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.True(mapEvent.IsVillageHostileActionWithMultiplePlayerParties());
             Assert.True(mapEvent.BattleObserver is ForwardingBattleObserver);
         }, MapEventDisabledMethods);
+
+        ServerBattleModeArbiter.Release(hostileAction.MapEventId);
     }
 
     [Theory]
