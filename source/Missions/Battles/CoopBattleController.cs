@@ -604,8 +604,16 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
     private void Handle_BattleAgentDied(MessagePayload<BattleAgentDied> payload)
     {
         var registry = coopMissionComponent.AgentRegistry;
-        if (!registry.TryGetAgentInfo(payload.What.Agent, out var info)) return;
-        if (info.CurrentAuthority != controllerIdProvider.ControllerId) return;
+        if (!registry.TryGetAgentInfo(payload.What.Agent, out var info))
+        {
+            Logger.Information("[DeathDiag] An agent died but is not in our registry — not ours to broadcast (a puppet or an uncaptured agent)");
+            return;
+        }
+        if (info.CurrentAuthority != controllerIdProvider.ControllerId)
+        {
+            Logger.Information("[DeathDiag] Agent {AgentId} died but its authority is {Auth}, not us ({Us}) — not broadcasting", info.AgentId, info.CurrentAuthority, controllerIdProvider.ControllerId);
+            return;
+        }
 
         _casualtyInfo.TryGetValue(info.AgentId, out var attribution);
 
@@ -618,6 +626,7 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
             wounded = true;
         }
 
+        Logger.Information("[DeathDiag] Broadcasting death of agent {AgentId} (wounded={Wounded}) to the battle mesh", info.AgentId, wounded);
         network.SendAll(new NetworkBattleAgentDied(info.AgentId, wounded));
 
         // Owner-authoritative casualty: tell the server to account this troop's death/wound against its
@@ -634,6 +643,12 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
     private void Handle_NetworkBattleAgentDied(MessagePayload<NetworkBattleAgentDied> payload)
     {
         var registry = coopMissionComponent.AgentRegistry;
+        Logger.Information("[DeathDiag] Received death broadcast for agent {AgentId}", payload.What.AgentId);
+        if (!registry.TryGetAgentInfo(payload.What.AgentId, out _))
+        {
+            Logger.Information("[DeathDiag] No registered puppet for {AgentId} — cannot kill it (its spawn was missed, or the id does not match)", payload.What.AgentId);
+            return;
+        }
 
         GameThread.RunSafe(() =>
         {
@@ -641,6 +656,7 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
 
             Agent agent = info.Agent;
             if (Mission.Current == null) return;
+            Logger.Information("[DeathDiag] Killing puppet {AgentId}: agentPresent={Present}, health={Health}", payload.What.AgentId, agent != null, agent?.Health ?? -1f);
             if (agent != null && agent.Health > 0)
             {
                 agent.MakeDead(false, ActionIndexCache.act_none);
@@ -658,12 +674,17 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
     private void Handle_BattlePuppetHit(MessagePayload<BattlePuppetHit> payload)
     {
         var registry = coopMissionComponent.AgentRegistry;
-        if (!registry.TryGetAgentInfo(payload.What.Victim, out var victimInfo)) return;
+        if (!registry.TryGetAgentInfo(payload.What.Victim, out var victimInfo))
+        {
+            Logger.Information("[DeathDiag] Local hit on a puppet that is not in our registry — cannot route it");
+            return;
+        }
 
         Guid attackerId = Guid.Empty;
         if (payload.What.Attacker != null && registry.TryGetAgentInfo(payload.What.Attacker, out var attackerInfo))
             attackerId = attackerInfo.AgentId;
 
+        Logger.Information("[DeathDiag] Routing puppet hit to owner {Owner}: victim={Victim}, dmg={Dmg}", victimInfo.CurrentAuthority, victimInfo.AgentId, payload.What.Blow.InflictedDamage);
         network.SendAll(new NetworkApplyBattleDamage(victimInfo.AgentId, attackerId, payload.What.Blow, payload.What.CollisionData));
     }
 
