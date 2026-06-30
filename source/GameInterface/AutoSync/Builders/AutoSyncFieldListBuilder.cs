@@ -1,5 +1,5 @@
 ﻿using GameInterface.AutoSync.Templates;
-using ProtoBuf.Meta;
+using GameInterface.Registry.Auto;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -9,8 +9,9 @@ namespace GameInterface.AutoSync.Builders;
 public class AutoSyncFieldListBuilder : AutoSyncBuilderBase
 {
     public AutoSyncFieldListBuilder(
+        IAutoRegistryFactory autoRegistryFactory,
         AutoSyncRegistry autoSyncRegistry,
-        AutoSyncConstantsBuilder autoSyncConstantsBuilder) : base(autoSyncRegistry, autoSyncConstantsBuilder)
+        AutoSyncConstantsBuilder autoSyncConstantsBuilder) : base(autoSyncRegistry, autoSyncConstantsBuilder, autoRegistryFactory)
     {
     }
 
@@ -35,7 +36,7 @@ public class AutoSyncFieldListBuilder : AutoSyncBuilderBase
         string networkMessage;
         string networkAddMessage;
         string networkRemoveMessage;
-        if (RuntimeTypeModel.Default.CanSerialize(GetElementType(fieldInfo.FieldType)))
+        if (SyncByValue(GetElementType(fieldInfo.FieldType)))
         {
             networkMessage = TemplateParser.Parse("Messages.NetworkCollectionSetValueMessageTemplate", templateData);
             networkAddMessage = TemplateParser.Parse("Messages.NetworkCollectionAddValueMessageTemplate", templateData);
@@ -70,7 +71,7 @@ public class AutoSyncFieldListBuilder : AutoSyncBuilderBase
         var fieldInfo = fieldItem.Value;
 
         var templateData = GetTemplateData(fieldItem);
-        if (RuntimeTypeModel.Default.CanSerialize(GetElementType(fieldInfo.FieldType)))
+        if (SyncByValue(GetElementType(fieldInfo.FieldType)))
             return TemplateParser.Parse("Handlers.SubscribeCollectionValueTemplate", templateData);
         else
             return TemplateParser.Parse("Handlers.SubscribeCollectionReferenceTemplate", templateData);

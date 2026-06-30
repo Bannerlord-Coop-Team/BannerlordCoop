@@ -1,5 +1,5 @@
 ﻿using GameInterface.AutoSync.Templates;
-using ProtoBuf.Meta;
+using GameInterface.Registry.Auto;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -9,8 +9,9 @@ namespace GameInterface.AutoSync.Builders
     public class AutoSyncPropertyMBListBuilder : AutoSyncBuilderBase
     {
         public AutoSyncPropertyMBListBuilder(
+            IAutoRegistryFactory autoRegistryFactory,
             AutoSyncRegistry autoSyncRegistry,
-            AutoSyncConstantsBuilder autoSyncConstantsBuilder) : base(autoSyncRegistry, autoSyncConstantsBuilder)
+            AutoSyncConstantsBuilder autoSyncConstantsBuilder) : base(autoSyncRegistry, autoSyncConstantsBuilder, autoRegistryFactory)
         {
         }
         public string GetPrefix(Debuggable<PropertyInfo> propertyItem) => AutoSyncUtils.GetPrefix(propertyItem);
@@ -34,7 +35,7 @@ namespace GameInterface.AutoSync.Builders
             string networkMessage;
             string networkAddMessage;
             string networkRemoveMessage;
-            if (RuntimeTypeModel.Default.CanSerialize(GetElementType(propertyInfo.PropertyType)))
+            if (SyncByValue(GetElementType(propertyInfo.PropertyType)))
             {
                 networkMessage = TemplateParser.Parse("Messages.NetworkCollectionSetValueMessageTemplate", templateData);
                 networkAddMessage = TemplateParser.Parse("Messages.NetworkCollectionAddValueMessageTemplate", templateData);
@@ -69,7 +70,7 @@ namespace GameInterface.AutoSync.Builders
             var propertyInfo = propertyItem.Value;
 
             var templateData = GetTemplateData(propertyItem);
-            if (RuntimeTypeModel.Default.CanSerialize(GetElementType(propertyInfo.PropertyType)))
+            if (SyncByValue(GetElementType(propertyInfo.PropertyType)))
                 return TemplateParser.Parse("Handlers.SubscribeCollectionValueTemplate", templateData);
             else
                 return TemplateParser.Parse("Handlers.SubscribeCollectionReferenceTemplate", templateData);
