@@ -82,15 +82,21 @@ internal class VolunteerTypesHandler : IHandler
         {
             if (!objectManager.TryGetIdWithLogging(keyValuePair.Key, out var currentHeroId)) continue;
 
-            updatedVolunteerTypeIds[currentHeroId] = new string[] {};
-            foreach (CharacterObject character in keyValuePair.Value)
+            CharacterObject[] volunteerTypes = keyValuePair.Value;
+            string[] volunteerTypeIds = new string[volunteerTypes.Length];
+            for (int i = 0; i < volunteerTypes.Length; i++)
             {
-                if (character is null) continue;
-
-                if (!objectManager.TryGetIdWithLogging(character, out var currentCharacterId)) continue;
-
-                updatedVolunteerTypeIds[currentHeroId].AddItem(currentCharacterId);
+                CharacterObject character = volunteerTypes[i];
+                if (character != null && objectManager.TryGetIdWithLogging(character, out var currentCharacterId))
+                {
+                    volunteerTypeIds[i] = currentCharacterId;
+                }
+                else
+                {
+                    volunteerTypeIds[i] = string.Empty;
+                }
             }
+            updatedVolunteerTypeIds[currentHeroId] = volunteerTypeIds;
         }
         
         var message = new UpdateVolunteers(updatedVolunteerTypeIds);
@@ -105,18 +111,23 @@ internal class VolunteerTypesHandler : IHandler
         {
             try
             {
-                Dictionary<Hero, CharacterObject[]> updatedVolunteerTypes = new();
                 foreach (KeyValuePair<string, string[]> keyValuePair in updatedVolunteerTypeIds)
                 {
                     if (!objectManager.TryGetObjectWithLogging<Hero>(keyValuePair.Key, out var currentHero)) continue;
 
-                    for (int i = 0; i < keyValuePair.Value.Length; i++)
+                    string[] volunteerTypeIds = keyValuePair.Value;
+                    using (new AllowedThread())
                     {
-                        if (!objectManager.TryGetObjectWithLogging<CharacterObject>(keyValuePair.Value[i], out var currentCharacter)) continue;
-
-                        using (new AllowedThread())
+                        for (int i = 0; i < volunteerTypeIds.Length && i < currentHero.VolunteerTypes.Length; i++)
                         {
-                            currentHero.VolunteerTypes[i] = currentCharacter;
+                            if (string.IsNullOrEmpty(volunteerTypeIds[i]))
+                            {
+                                currentHero.VolunteerTypes[i] = null;
+                            }
+                            else if (objectManager.TryGetObjectWithLogging<CharacterObject>(volunteerTypeIds[i], out var currentCharacter))
+                            {
+                                currentHero.VolunteerTypes[i] = currentCharacter;
+                            }
                         }
                     }
                 }
