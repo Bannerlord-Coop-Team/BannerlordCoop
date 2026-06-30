@@ -89,7 +89,7 @@ internal class DisbandPartyCampaignBehaviorPatches
     public static bool OnSettlementLeftPrefix(ref DisbandPartyCampaignBehavior __instance, MobileParty mobileParty, Settlement settlement)
     {
         // IsPlayerClan() replacement for Clan.PlayerClan
-        if (mobileParty.IsCaravan && mobileParty.ActualClan.IsPlayerClan() && !mobileParty.IsDisbanding && __instance._partiesThatWaitingToDisband.ContainsKey(mobileParty) && mobileParty.CurrentSettlement == null && mobileParty.TargetSettlement != null)
+        if (mobileParty.IsCaravan && mobileParty.ActualClan?.IsPlayerClan() == true && !mobileParty.IsDisbanding && __instance._partiesThatWaitingToDisband.ContainsKey(mobileParty) && mobileParty.CurrentSettlement == null && mobileParty.TargetSettlement != null)
         {
             __instance.GetTargetSettlementForDisbandingParty(mobileParty, out Settlement settlement2, out MobileParty.NavigationType navigationType, out bool isTargetingThePort);
             if (settlement2 != null)

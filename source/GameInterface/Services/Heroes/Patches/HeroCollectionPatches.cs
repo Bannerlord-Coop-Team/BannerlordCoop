@@ -7,7 +7,6 @@ using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.CampaignSystem.ViewModelCollection.GameMenu.Recruitment;
 
@@ -29,9 +28,8 @@ internal class HeroCollectionPatches : GenericPatches<HeroCollectionPatches, Her
         // Carvans
         yield return AccessTools.Method(typeof(CaravanPartyComponent), nameof(CaravanPartyComponent.OnFinalize));
         yield return AccessTools.Method(typeof(CaravanPartyComponent), nameof(CaravanPartyComponent.OnInitialize));
-        // Alleys
-        yield return AccessTools.Method(typeof(Alley), nameof(Alley.AfterLoad));
-        yield return AccessTools.Method(typeof(Alley), nameof(Alley.SetOwner));
+        // Alleys: Hero.OwnedAlleys is maintained by replaying Alley.SetOwner on each client
+        // (see AlleyPatches / AlleyHandler), so it is not collection-synced here.
         //yield return AccessTools.Method(typeof(TroopRosterHandler), nameof(TroopRosterHandler.HandleOnRecruitmentDone));
     }
 
@@ -97,10 +95,6 @@ internal class HeroCollectionPatches : GenericPatches<HeroCollectionPatches, Her
     [HarmonyTranspiler]
     static IEnumerable<CodeInstruction> CaravanTranspiler(IEnumerable<CodeInstruction> instructions) 
         => ListPropertyChangeTranspiler<CaravanPartyComponent, CaravanListUpdated, CaravanListRemoved>(instructions, nameof(Hero.OwnedCaravans));
-
-    [HarmonyTranspiler]
-    static IEnumerable<CodeInstruction> AlleyTranspiler(IEnumerable<CodeInstruction> instructions)
-        => ListPropertyChangeTranspiler<Alley, AlleyListUpdated, AlleyListRemoved>(instructions, nameof(Hero.OwnedAlleys));
 
     [HarmonyTranspiler]
     static IEnumerable<CodeInstruction> WorkshopTranspiler(IEnumerable<CodeInstruction> instructions)

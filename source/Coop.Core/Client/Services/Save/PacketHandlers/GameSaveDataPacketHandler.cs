@@ -42,6 +42,7 @@ internal class GameSaveDataPacketHandler : IPacketHandler
             convertedPacket.CraftingPlayerData,
             convertedPacket.WorkshopPlayerData,
             convertedPacket.CaravansPlayerData,
+            convertedPacket.AlleyPlayerData,
             convertedPacket.InteractionsPlayerData));
     }
 }

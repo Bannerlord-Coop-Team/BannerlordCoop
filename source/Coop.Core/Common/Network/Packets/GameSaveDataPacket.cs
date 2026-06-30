@@ -1,4 +1,5 @@
 ﻿using Common.PacketHandlers;
+using GameInterface.Services.Alleys;
 using GameInterface.Services.Caravans;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.Smithing;
@@ -42,6 +43,9 @@ public readonly struct GameSaveDataPacket : IPacket
     public readonly CaravansPlayerData CaravansPlayerData;
 
     [ProtoMember(6)]
+    public readonly AlleyPlayerData AlleyPlayerData;
+
+    [ProtoMember(7)]
     public readonly InteractionsPlayerData InteractionsPlayerData;
 
     public GameSaveDataPacket(
@@ -50,6 +54,7 @@ public readonly struct GameSaveDataPacket : IPacket
         CraftingPlayerData craftingPlayerData,
         WorkshopPlayerData workshopPlayerData,
         CaravansPlayerData caravansPlayerData,
+        AlleyPlayerData alleyPlayerData,
         InteractionsPlayerData interactionsPlayerData)
     {
         GameSaveData = gameSaveData;
@@ -57,6 +62,7 @@ public readonly struct GameSaveDataPacket : IPacket
         CraftingPlayerData = craftingPlayerData;
         WorkshopPlayerData = workshopPlayerData;
         CaravansPlayerData = caravansPlayerData;
+        AlleyPlayerData = alleyPlayerData;
         InteractionsPlayerData = interactionsPlayerData;
     }
 }

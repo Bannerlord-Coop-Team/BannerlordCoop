@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.Caravans;
+﻿using GameInterface.Services.Alleys;
+using GameInterface.Services.Caravans;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Smithing;
@@ -18,6 +19,7 @@ public interface ICoopSession
     CraftingPlayerData CraftingPlayerData { get; }
     WorkshopPlayerData WorkshopPlayerData { get; }
     CaravansPlayerData CaravansPlayerData { get; }
+    AlleyPlayerData AlleyPlayerData { get; }
     InteractionsPlayerData InteractionsPlayerData { get; }
 }
 
@@ -36,6 +38,8 @@ public class CoopSession : ICoopSession
     [ProtoMember(5)]
     public CaravansPlayerData CaravansPlayerData { get; }
     [ProtoMember(6)]
+    public AlleyPlayerData AlleyPlayerData { get; }
+    [ProtoMember(7)]
     public InteractionsPlayerData InteractionsPlayerData { get; }
 
     public CoopSession(
@@ -44,6 +48,7 @@ public class CoopSession : ICoopSession
         CraftingPlayerData craftingPlayerData,
         WorkshopPlayerData workshopPlayerData,
         CaravansPlayerData caravansPlayerData,
+        AlleyPlayerData alleyPlayerData,
         InteractionsPlayerData interactionsPlayerData)
     {
         UniqueGameId = uniqueGameId;
@@ -51,6 +56,7 @@ public class CoopSession : ICoopSession
         CraftingPlayerData = craftingPlayerData;
         WorkshopPlayerData = workshopPlayerData;
         CaravansPlayerData = caravansPlayerData;
+        AlleyPlayerData = alleyPlayerData;
         InteractionsPlayerData = interactionsPlayerData;
     }
 }

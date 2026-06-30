@@ -2,6 +2,7 @@
 using GameInterface.CoopSessionData;
 using GameInterface.CoopSessionData.Save.Data;
 using GameInterface.Registry.Messages;
+using GameInterface.Services.Alleys;
 using GameInterface.Services.Caravans;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.MobileParties;
@@ -59,6 +60,7 @@ internal class SaveGameHandler : IHandler
             current?.CraftingPlayerData ?? new CraftingPlayerData(new(), new(), new()),
             current?.WorkshopPlayerData ?? new WorkshopPlayerData(new()),
             current?.CaravansPlayerData ?? new CaravansPlayerData(new(), new()),
+            current?.AlleyPlayerData ?? new AlleyPlayerData(new()),
             current?.InteractionsPlayerData ?? new InteractionsPlayerData(new(), new(), new(), new()));
 
         coopSessionProvider.CoopSession = session;
@@ -76,7 +78,8 @@ internal class SaveGameHandler : IHandler
             loaded?.Players ?? new Player[0],
             loaded?.CraftingPlayerData ?? new CraftingPlayerData(new(), new(), new()),
             loaded?.WorkshopPlayerData ?? new WorkshopPlayerData(new()),
-            loaded?.CaravansPlayerData ?? new CaravansPlayerData(new(), new()),
+            loaded?.CaravansPlayerData ?? new CaravansPlayerData(new(), new(), new()),
+            loaded?.AlleyPlayerData ?? new AlleyPlayerData(new()),
             loaded?.InteractionsPlayerData ?? new InteractionsPlayerData(new(), new(), new(), new()));
 
         coopSessionProvider.CoopSession = savedSession;
