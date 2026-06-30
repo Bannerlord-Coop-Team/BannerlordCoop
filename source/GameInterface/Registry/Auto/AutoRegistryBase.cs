@@ -92,6 +92,22 @@ public abstract class AutoRegistryBase<T> : IAutoRegistry<T> where T : class
     /// <inheritdoc/>
     public abstract void RegisterAllObjects();
 
+    private IDictionary<string, string> idRemapCollector;
+
+    /// <summary>
+    /// Runs <see cref="RegisterAllObjects"/> in "collect" mode: instead of registering each object, records into
+    /// <paramref name="map"/> the owner-derived id this registry would mint mapped to the object's current server
+    /// id, for every object whose two ids differ (i.e. live-created ones). RegisterAllObjects is the single source
+    /// of the owner-derived id formula, so reusing it keeps the join-time reconciliation (see AttachmentIdMapper)
+    /// from re-deriving the formula and silently drifting from the registries.
+    /// </summary>
+    public void CollectIdRemap(IDictionary<string, string> map)
+    {
+        idRemapCollector = map;
+        try { RegisterAllObjects(); }
+        finally { idRemapCollector = null; }
+    }
+
     /// <summary>
     /// Registers an existing object with the specified identifier, associating it with the current object manager.
     /// </summary>
@@ -106,6 +122,15 @@ public abstract class AutoRegistryBase<T> : IAutoRegistry<T> where T : class
     protected void RegisterExistingObject(string id, T obj)
     {
         id = $"{typeof(T).Name}_{id}";
+
+        if (idRemapCollector != null)
+        {
+            // Collect mode: record the divergence so a joining client can re-key from this owner-derived id to
+            // the server's current id, instead of registering.
+            if (objectManager.TryGetId(obj, out var serverId) && serverId != id)
+                idRemapCollector[id] = serverId;
+            return;
+        }
 
         EnsureObjectManagerCounter(id, obj);
 

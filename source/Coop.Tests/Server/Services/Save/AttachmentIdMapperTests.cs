@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using Moq;
 using Serilog;
@@ -23,7 +24,7 @@ public class AttachmentIdMapperTests
         var attachment = new object();
         objectManager.AddExisting("PartyBase_Created_2835", attachment);
 
-        var mapper = new AttachmentIdMapper(objectManager);
+        var mapper = new AttachmentIdMapper(objectManager, Mock.Of<IAutoRegistryFactory>());
         var map = new AttachmentIdMap(new Dictionary<string, string>
         {
             ["PartyBase_Created_2835"] = "PartyBase_Created_3328",
@@ -42,7 +43,7 @@ public class AttachmentIdMapperTests
     public void ApplyClientMap_SkipsEntriesWhoseDerivedIdIsNotRegistered()
     {
         var objectManager = new ObjectManager(Mock.Of<ILogger>());
-        var mapper = new AttachmentIdMapper(objectManager);
+        var mapper = new AttachmentIdMapper(objectManager, Mock.Of<IAutoRegistryFactory>());
         var map = new AttachmentIdMap(new Dictionary<string, string>
         {
             ["PartyBase_Created_9999"] = "PartyBase_Created_1234",
@@ -66,7 +67,7 @@ public class AttachmentIdMapperTests
         objectManager.AddExisting("PartyBase_Created_5", partyBaseA);
         objectManager.AddExisting("PartyBase_Created_12", partyBaseB);
 
-        var mapper = new AttachmentIdMapper(objectManager);
+        var mapper = new AttachmentIdMapper(objectManager, Mock.Of<IAutoRegistryFactory>());
         var map = new AttachmentIdMap(new Dictionary<string, string>
         {
             ["PartyBase_Created_5"] = "PartyBase_Created_12",   // A's server id is B's re-derived id (the chain)
