@@ -2,6 +2,7 @@
 using GameInterface.Services.Alleys;
 using GameInterface.Services.Caravans;
 using GameInterface.Services.MobileParties;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.Workshops;
 using LiteNetLib;
@@ -48,6 +49,9 @@ public readonly struct GameSaveDataPacket : IPacket
     [ProtoMember(7)]
     public readonly InteractionsPlayerData InteractionsPlayerData;
 
+    [ProtoMember(8)]
+    public readonly AttachmentIdMap AttachmentIdMap;
+
     public GameSaveDataPacket(
         byte[] gameSaveData,
         string campaignID,
@@ -55,7 +59,8 @@ public readonly struct GameSaveDataPacket : IPacket
         WorkshopPlayerData workshopPlayerData,
         CaravansPlayerData caravansPlayerData,
         AlleyPlayerData alleyPlayerData,
-        InteractionsPlayerData interactionsPlayerData)
+        InteractionsPlayerData interactionsPlayerData,
+        AttachmentIdMap attachmentIdMap)
     {
         GameSaveData = gameSaveData;
         CampaignID = campaignID;
@@ -64,5 +69,6 @@ public readonly struct GameSaveDataPacket : IPacket
         CaravansPlayerData = caravansPlayerData;
         AlleyPlayerData = alleyPlayerData;
         InteractionsPlayerData = interactionsPlayerData;
+        AttachmentIdMap = attachmentIdMap;
     }
 }

@@ -5,6 +5,7 @@ using GameInterface.CoopSessionData;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.ObjectManager;
 
 namespace Coop.Core.Server.Connections.States;
 
@@ -20,7 +21,8 @@ public class TransferSaveState : ConnectionStateBase
         ICoopSessionProvider coopSessionProvider,
         ISaveInterface saveInterface,
         ITimeControlInterface timeControlInterface,
-        IConnectionMessageQueue connectionMessageQueue)
+        IConnectionMessageQueue connectionMessageQueue,
+        IAttachmentIdMapper attachmentIdMapper)
         : base(connectionLogic)
     {
         GameThread.Run(() =>
@@ -40,7 +42,8 @@ public class TransferSaveState : ConnectionStateBase
                 coopSessionProvider.CoopSession?.WorkshopPlayerData,
                 coopSessionProvider.CoopSession?.CaravansPlayerData,
                 coopSessionProvider.CoopSession?.AlleyPlayerData,
-                coopSessionProvider.CoopSession?.InteractionsPlayerData);
+                coopSessionProvider.CoopSession?.InteractionsPlayerData,
+                attachmentIdMapper.BuildServerMap());
 
             // Disconnect peer on failure
             if (!saveResults.Success)

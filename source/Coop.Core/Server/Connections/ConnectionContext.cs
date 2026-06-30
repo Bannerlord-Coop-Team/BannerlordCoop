@@ -30,7 +30,8 @@ public class ConnectionContext
         ICoopSessionProvider coopSessionProvider,
         ISaveInterface saveInterface,
         ITimeControlInterface timeControlInterface,
-        IConnectionMessageQueue connectionMessageQueue)
+        IConnectionMessageQueue connectionMessageQueue,
+        IAttachmentIdMapper attachmentIdMapper)
     {
         MessageBroker = messageBroker;
         Network = network;
@@ -44,6 +45,7 @@ public class ConnectionContext
         SaveInterface = saveInterface;
         TimeControlInterface = timeControlInterface;
         ConnectionMessageQueue = connectionMessageQueue;
+        AttachmentIdMapper = attachmentIdMapper;
     }
 
     public IMessageBroker MessageBroker { get; }
@@ -58,4 +60,5 @@ public class ConnectionContext
     public ISaveInterface SaveInterface { get; }
     public ITimeControlInterface TimeControlInterface { get; }
     public IConnectionMessageQueue ConnectionMessageQueue { get; }
+    public IAttachmentIdMapper AttachmentIdMapper { get; }
 }
