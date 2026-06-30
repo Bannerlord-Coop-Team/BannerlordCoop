@@ -77,7 +77,6 @@ public readonly struct VillagersTookPrisonerOnConsequence : IEvent
     }
 }
 
-
 public readonly struct VillagersLootedLeaveOnConsequence : IEvent
 {
     public readonly Hero MainHero;

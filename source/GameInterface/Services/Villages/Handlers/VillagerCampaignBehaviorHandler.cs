@@ -122,13 +122,12 @@ internal class VillagerCampaignBehaviorHandler : IHandler
 
     private void Handle_NetworkVillagerPartyDestroyed(MessagePayload<NetworkVillagerPartyDestroyed> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
-
         // Update interacted villagers locally on all clients
         GameThread.Run(() =>
         {
             if (!TryGetVillagerBehavior(out var villagerBehavior)) return;
-            
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
+
             if (villagerBehavior._interactedVillagers.ContainsKey(mobileParty))
             {
                 villagerBehavior._interactedVillagers.Remove(mobileParty);

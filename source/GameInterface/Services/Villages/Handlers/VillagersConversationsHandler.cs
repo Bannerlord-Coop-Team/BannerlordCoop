@@ -106,27 +106,30 @@ internal class VillagersConversationsHandler : IHandler
 
     private void Handle_NetworkPlayerBoughtFromVillagersOnConsequence(MessagePayload<NetworkPlayerBoughtFromVillagersOnConsequence> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var conversationParty)) return;
-
-        for (int i = conversationParty.ItemRoster.Count - 1; i >= 0; i--)
+        GameThread.RunSafe(() =>
         {
-            ItemRosterElement elementCopyAtIndex = conversationParty.ItemRoster.GetElementCopyAtIndex(i);
-            if (elementCopyAtIndex.EquipmentElement.Item.ItemCategory != DefaultItemCategories.PackAnimal)
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var conversationParty)) return;
+
+            for (int i = conversationParty.ItemRoster.Count - 1; i >= 0; i--)
             {
-                int itemPrice = conversationParty.HomeSettlement.Village.GetItemPrice(elementCopyAtIndex.EquipmentElement, mainParty, true);
-                int elementNumber = conversationParty.ItemRoster.GetElementNumber(i);
-                int num = itemPrice * elementNumber;
-                if (elementNumber > 0)
+                ItemRosterElement elementCopyAtIndex = conversationParty.ItemRoster.GetElementCopyAtIndex(i);
+                if (elementCopyAtIndex.EquipmentElement.Item.ItemCategory != DefaultItemCategories.PackAnimal)
                 {
-                    GiveGoldAction.ApplyBetweenCharacters(mainHero, null, num, false);
-                    conversationParty.PartyTradeGold += num;
-                    mainParty.ItemRoster.AddToCounts(conversationParty.ItemRoster.GetElementCopyAtIndex(i).EquipmentElement, elementNumber);
-                    conversationParty.ItemRoster.AddToCounts(conversationParty.ItemRoster.GetElementCopyAtIndex(i).EquipmentElement, -1 * elementNumber);
+                    int itemPrice = conversationParty.HomeSettlement.Village.GetItemPrice(elementCopyAtIndex.EquipmentElement, mainParty, true);
+                    int elementNumber = conversationParty.ItemRoster.GetElementNumber(i);
+                    int num = itemPrice * elementNumber;
+                    if (elementNumber > 0)
+                    {
+                        GiveGoldAction.ApplyBetweenCharacters(mainHero, null, num, false);
+                        conversationParty.PartyTradeGold += num;
+                        mainParty.ItemRoster.AddToCounts(conversationParty.ItemRoster.GetElementCopyAtIndex(i).EquipmentElement, elementNumber);
+                        conversationParty.ItemRoster.AddToCounts(conversationParty.ItemRoster.GetElementCopyAtIndex(i).EquipmentElement, -1 * elementNumber);
+                    }
                 }
             }
-        }
+        });
     }
 
     private void Handle_ApplyHostileVillagersInteraction(MessagePayload<ApplyHostileVillagersInteraction> obj)
@@ -141,13 +144,13 @@ internal class VillagersConversationsHandler : IHandler
 
     private void Handle_NetworkApplyHostileVillagersInteraction(MessagePayload<NetworkApplyHostileVillagersInteraction> obj)
     {
-        sessionInteractionsPlayerDataInterface.SetPlayerVillagersInteraction(obj.What.MainHeroId, obj.What.ConversationPartyId, VillagerCampaignBehavior.PlayerInteraction.Hostile);
         GameThread.Run(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var conversationParty)) return;
 
+            sessionInteractionsPlayerDataInterface.SetPlayerVillagersInteraction(obj.What.MainHeroId, obj.What.ConversationPartyId, VillagerCampaignBehavior.PlayerInteraction.Hostile);
             BeHostileAction.ApplyEncounterHostileAction(mainParty.Party, conversationParty.Party);
         });
     }

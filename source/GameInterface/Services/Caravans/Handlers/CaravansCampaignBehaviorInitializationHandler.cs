@@ -4,7 +4,6 @@ using Common.Network;
 using GameInterface.Services.Caravans.Interfaces;
 using GameInterface.Services.Caravans.Messages;
 using GameInterface.Services.Heroes.Messages;
-using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System.Collections.Generic;
