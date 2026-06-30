@@ -27,8 +27,12 @@ public interface IAlleyCampaignBehaviorInterface : IGameAbstraction
     bool TryGetCurrentSettlementAlley(out Alley alley);
 
     /// <summary>
-    /// Reads the loaded behavior's player-owned alleys (alley, overseer, garrison) so the host can seed
-    /// the authoritative CoopSession management data from a save that was never played in co-op.
+    /// Enumerates the currently player-owned alleys (alley, overseer, garrison) so the host can seed the
+    /// authoritative CoopSession from a save it doesn't already cover. Ownership is read from the
+    /// replicated/saved <c>Alley.Owner</c>, because the host's own <c>_playerOwnedCommonAreaData</c> is
+    /// empty in co-op (it has no main hero); gang-occupied alleys are excluded. The overseer + garrison
+    /// come from <c>_playerOwnedCommonAreaData</c> when the loaded behavior still has them (an SP-origin
+    /// save), otherwise the owner is the overseer and the garrison starts empty.
     /// </summary>
     IEnumerable<(Alley alley, Hero overseer, TroopRoster garrison)> GetPlayerOwnedAlleys();
 }
@@ -156,17 +160,37 @@ public class AlleyCampaignBehaviorInterface : IAlleyCampaignBehaviorInterface
 
         var behavior = Behavior;
         if (behavior == null) yield break;
-        if (PlayerOwnedDataField.GetValue(behavior) is not IList list) yield break;
 
-        foreach (var data in list)
+        var storedDetail = PlayerOwnedDataField.GetValue(behavior) as IList;
+
+        foreach (var settlement in Settlement.All)
         {
-            if (data == null) continue;
-            if (AlleyField.GetValue(data) is not Alley alley) continue;
+            var alleys = settlement.Alleys;
+            if (alleys == null) continue;
 
-            var overseer = AssignedClanMemberField.GetValue(data) as Hero;
-            var garrison = TroopRosterField.GetValue(data) as TroopRoster;
-            yield return (alley, overseer, garrison);
+            foreach (var alley in alleys)
+            {
+                // Alley.Owner is the replicated/saved source of truth. Skip the unowned (e.g. abandoned)
+                // and the gang-occupied (owner is a gang leader, not a player); only seed player-owned.
+                if (alley?.Owner == null || alley.Owner.IsGangLeader) continue;
+
+                var (overseer, garrison) = FindStoredDetail(storedDetail, alley);
+                yield return (alley, overseer ?? alley.Owner, garrison);
+            }
         }
+    }
+
+    // The overseer + garrison only survive on the host for an SP-origin save (the loaded behavior still
+    // carries _playerOwnedCommonAreaData); a co-op save has none, so the caller falls back to owner-only.
+    private static (Hero overseer, TroopRoster garrison) FindStoredDetail(IList storedDetail, Alley alley)
+    {
+        if (storedDetail == null) return (null, null);
+        foreach (var data in storedDetail)
+        {
+            if (data != null && AlleyField.GetValue(data) as Alley == alley)
+                return (AssignedClanMemberField.GetValue(data) as Hero, TroopRosterField.GetValue(data) as TroopRoster);
+        }
+        return (null, null);
     }
 
     private static void RemoveByAlley(IList list, Alley alley)
