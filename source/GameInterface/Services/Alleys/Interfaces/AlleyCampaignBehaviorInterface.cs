@@ -33,7 +33,7 @@ public interface IAlleyCampaignBehaviorInterface : IGameAbstraction
     /// <c>_playerOwnedCommonAreaData</c> is empty in co-op, it has no main hero); gang-occupied alleys
     /// are excluded.
     /// </summary>
-    IEnumerable<Alley> GetPlayerOwnedAlleys();
+    IReadOnlyList<Alley> GetPlayerOwnedAlleys();
 }
 
 /// <inheritdoc cref="IAlleyCampaignBehaviorInterface"/>
@@ -151,8 +151,9 @@ public class AlleyCampaignBehaviorInterface : IAlleyCampaignBehaviorInterface
         return false;
     }
 
-    public IEnumerable<Alley> GetPlayerOwnedAlleys()
+    public IReadOnlyList<Alley> GetPlayerOwnedAlleys()
     {
+        var owned = new List<Alley>();
         foreach (var settlement in Settlement.All)
         {
             var alleys = settlement.Alleys;
@@ -161,12 +162,13 @@ public class AlleyCampaignBehaviorInterface : IAlleyCampaignBehaviorInterface
             foreach (var alley in alleys)
             {
                 // Alley.Owner is the replicated/saved source of truth. Skip the unowned (e.g. abandoned)
-                // and the gang-occupied (owner is a gang leader, not a player); only yield player-owned.
+                // and the gang-occupied (owner is a gang leader, not a player); keep only player-owned.
                 if (alley?.Owner == null || alley.Owner.IsGangLeader) continue;
 
-                yield return alley;
+                owned.Add(alley);
             }
         }
+        return owned;
     }
 
     private static void RemoveByAlley(IList list, Alley alley)
