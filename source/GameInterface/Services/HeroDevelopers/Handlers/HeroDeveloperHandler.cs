@@ -137,7 +137,7 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
                 {
                     NetworkRawXpGainClients changes = new(obj.What);
                     network.SendAll(changes);
-                    ChangeRawXp(changes, Campaign.Current);
+                    ChangeRawXp(changes);
                 }
             }, context: nameof(HeroDeveloperHandler));
         }
@@ -147,7 +147,7 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
             var data = obj.What;
 
             GameThread.RunSafe(
-                () => ChangeRawXp(data, Campaign.Current),
+                () => ChangeRawXp(data),
                 context: nameof(HeroDeveloperHandler));
         }
 
@@ -278,8 +278,9 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
             network.SendAll(message);
         }
 
-        internal void ChangeRawXp(NetworkRawXpGainClients obj, Campaign campaign)
+        private void ChangeRawXp(NetworkRawXpGainClients obj)
         {
+            var campaign = Campaign.Current;
             if (campaign == null) return;
 
             // Get hero from objectManager
