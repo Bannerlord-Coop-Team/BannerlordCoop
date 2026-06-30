@@ -1,4 +1,5 @@
 ﻿using GameInterface.AutoSync.Templates;
+using GameInterface.Registry.Auto;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -8,8 +9,9 @@ namespace GameInterface.AutoSync.Builders;
 public class AutoSyncFieldPropertyOwnerBuilder : AutoSyncBuilderBase
 {
     public AutoSyncFieldPropertyOwnerBuilder(
+        IAutoRegistryFactory autoRegistryFactory,
         AutoSyncRegistry autoSyncRegistry,
-        AutoSyncConstantsBuilder autoSyncConstantsBuilder) : base(autoSyncRegistry, autoSyncConstantsBuilder)
+        AutoSyncConstantsBuilder autoSyncConstantsBuilder) : base(autoSyncRegistry, autoSyncConstantsBuilder, autoRegistryFactory)
     {
     }
 
