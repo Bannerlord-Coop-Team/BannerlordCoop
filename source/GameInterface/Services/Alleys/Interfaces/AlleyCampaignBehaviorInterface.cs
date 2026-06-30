@@ -27,14 +27,13 @@ public interface IAlleyCampaignBehaviorInterface : IGameAbstraction
     bool TryGetCurrentSettlementAlley(out Alley alley);
 
     /// <summary>
-    /// Enumerates the currently player-owned alleys (alley, overseer, garrison) so the host can seed the
-    /// authoritative CoopSession from a save it doesn't already cover. Ownership is read from the
-    /// replicated/saved <c>Alley.Owner</c>, because the host's own <c>_playerOwnedCommonAreaData</c> is
-    /// empty in co-op (it has no main hero); gang-occupied alleys are excluded. The overseer + garrison
-    /// come from <c>_playerOwnedCommonAreaData</c> when the loaded behavior still has them (an SP-origin
-    /// save), otherwise the owner is the overseer and the garrison starts empty.
+    /// Enumerates the currently player-owned alleys so the host can add management data for them to the
+    /// authoritative CoopSession when it has no entry yet (an owned alley the session never recorded).
+    /// Ownership is read from the replicated/saved <c>Alley.Owner</c> (the host's own
+    /// <c>_playerOwnedCommonAreaData</c> is empty in co-op, it has no main hero); gang-occupied alleys
+    /// are excluded.
     /// </summary>
-    IEnumerable<(Alley alley, Hero overseer, TroopRoster garrison)> GetPlayerOwnedAlleys();
+    IEnumerable<Alley> GetPlayerOwnedAlleys();
 }
 
 /// <inheritdoc cref="IAlleyCampaignBehaviorInterface"/>
@@ -53,8 +52,6 @@ public class AlleyCampaignBehaviorInterface : IAlleyCampaignBehaviorInterface
         PlayerAlleyDataType != null ? AccessTools.Field(PlayerAlleyDataType, "Alley") : null;
     private static readonly FieldInfo AssignedClanMemberField =
         PlayerAlleyDataType != null ? AccessTools.Field(PlayerAlleyDataType, "AssignedClanMember") : null;
-    private static readonly FieldInfo TroopRosterField =
-        PlayerAlleyDataType != null ? AccessTools.Field(PlayerAlleyDataType, "TroopRoster") : null;
     private static readonly MethodInfo StateSetter =
         AccessTools.PropertySetter(typeof(Alley), nameof(Alley.State));
 
@@ -154,15 +151,8 @@ public class AlleyCampaignBehaviorInterface : IAlleyCampaignBehaviorInterface
         return false;
     }
 
-    public IEnumerable<(Alley alley, Hero overseer, TroopRoster garrison)> GetPlayerOwnedAlleys()
+    public IEnumerable<Alley> GetPlayerOwnedAlleys()
     {
-        if (!ReflectionReady()) yield break;
-
-        var behavior = Behavior;
-        if (behavior == null) yield break;
-
-        var storedDetail = PlayerOwnedDataField.GetValue(behavior) as IList;
-
         foreach (var settlement in Settlement.All)
         {
             var alleys = settlement.Alleys;
@@ -171,26 +161,12 @@ public class AlleyCampaignBehaviorInterface : IAlleyCampaignBehaviorInterface
             foreach (var alley in alleys)
             {
                 // Alley.Owner is the replicated/saved source of truth. Skip the unowned (e.g. abandoned)
-                // and the gang-occupied (owner is a gang leader, not a player); only seed player-owned.
+                // and the gang-occupied (owner is a gang leader, not a player); only yield player-owned.
                 if (alley?.Owner == null || alley.Owner.IsGangLeader) continue;
 
-                var (overseer, garrison) = FindStoredDetail(storedDetail, alley);
-                yield return (alley, overseer ?? alley.Owner, garrison);
+                yield return alley;
             }
         }
-    }
-
-    // The overseer + garrison only survive on the host for an SP-origin save (the loaded behavior still
-    // carries _playerOwnedCommonAreaData); a co-op save has none, so the caller falls back to owner-only.
-    private static (Hero overseer, TroopRoster garrison) FindStoredDetail(IList storedDetail, Alley alley)
-    {
-        if (storedDetail == null) return (null, null);
-        foreach (var data in storedDetail)
-        {
-            if (data != null && AlleyField.GetValue(data) as Alley == alley)
-                return (AssignedClanMemberField.GetValue(data) as Hero, TroopRosterField.GetValue(data) as TroopRoster);
-        }
-        return (null, null);
     }
 
     private static void RemoveByAlley(IList list, Alley alley)
@@ -214,7 +190,7 @@ public class AlleyCampaignBehaviorInterface : IAlleyCampaignBehaviorInterface
     {
         if (PlayerAlleyDataType == null || PlayerOwnedDataField == null ||
             PlayerAlleyDataCtor == null || AlleyField == null || AssignedClanMemberField == null ||
-            TroopRosterField == null || StateSetter == null)
+            StateSetter == null)
         {
             Logger.Error("AlleyCampaignBehavior.PlayerAlleyData reflection members could not be resolved; alley management cannot be applied");
             return false;
