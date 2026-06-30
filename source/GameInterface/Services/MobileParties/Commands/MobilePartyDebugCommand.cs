@@ -83,6 +83,58 @@ internal class MobilePartyDebugCommand
         return stringBuilder.ToString();
     }
 
+    // coop.debug.mobileparty.attachment_ids <PartyStringID>
+    // Prints the network ObjectManager id THIS machine holds for a party and each of its non-MBObjectBase
+    // attachments. Run on the server and on each client and compare: a party the client got via live create
+    // matches the server's runtime "Created_N"/concrete-type ids, while a party re-derived at join carries
+    // "{Type}_{StringId}" ids that never reconcile with the server's, so its synced updates fail to resolve.
+    [CommandLineArgumentFunction("attachment_ids", "coop.debug.mobileparty")]
+    public static string AttachmentIds(List<string> args)
+    {
+        if (args.Count < 1)
+        {
+            return "Usage: coop.debug.mobileparty.attachment_ids <PartyStringID>";
+        }
+
+        MobileParty mobileParty = Campaign.Current.CampaignObjectManager.Find<MobileParty>(args[0]);
+        if (mobileParty == null)
+        {
+            return string.Format("ID: '{0}' not found", args[0]);
+        }
+
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        var party = mobileParty.Party;
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"Attachment ids on {(ModInformation.IsServer ? "SERVER" : "CLIENT")} for {SafeToString(mobileParty.Name)} (StringId {mobileParty.StringId}):");
+        AppendAttachmentId(sb, objectManager, "MobileParty", mobileParty);
+        AppendAttachmentId(sb, objectManager, "PartyBase", party);
+        AppendAttachmentId(sb, objectManager, "MemberRoster", party?.MemberRoster);
+        AppendAttachmentId(sb, objectManager, "PrisonRoster", party?.PrisonRoster);
+        AppendAttachmentId(sb, objectManager, "ItemRoster", party?.ItemRoster);
+        AppendAttachmentId(sb, objectManager, "PartyComponent", mobileParty.PartyComponent);
+
+        var result = sb.ToString();
+        Logger.Debug("{AttachmentIds}", result);
+        return result;
+    }
+
+    private static void AppendAttachmentId(StringBuilder sb, IObjectManager objectManager, string label, object obj)
+    {
+        if (obj == null)
+        {
+            sb.AppendLine($"  {label}: <null>");
+            return;
+        }
+
+        var id = objectManager.TryGetId(obj, out var foundId) ? foundId : "NOT REGISTERED on this machine";
+        sb.AppendLine($"  {label} ({obj.GetType().Name}): {id}");
+    }
+
     private static void AppendFields(StringBuilder stringBuilder, object instance)
     {
         if (instance == null)

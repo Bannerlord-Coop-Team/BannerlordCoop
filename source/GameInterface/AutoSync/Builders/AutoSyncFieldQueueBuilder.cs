@@ -1,5 +1,5 @@
 ﻿using GameInterface.AutoSync.Templates;
-using ProtoBuf.Meta;
+using GameInterface.Registry.Auto;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -9,8 +9,9 @@ namespace GameInterface.AutoSync.Builders;
 public class AutoSyncFieldQueueBuilder : AutoSyncBuilderBase
 {
     public AutoSyncFieldQueueBuilder(
+        IAutoRegistryFactory autoRegistryFactory,
         AutoSyncRegistry autoSyncRegistry,
-        AutoSyncConstantsBuilder autoSyncConstantsBuilder) : base(autoSyncRegistry, autoSyncConstantsBuilder)
+        AutoSyncConstantsBuilder autoSyncConstantsBuilder) : base(autoSyncRegistry, autoSyncConstantsBuilder, autoRegistryFactory)
     {
     }
 
@@ -42,7 +43,7 @@ public class AutoSyncFieldQueueBuilder : AutoSyncBuilderBase
         string networkMessage;
         string networkAddMessage;
         string networkRemoveMessage;
-        if (RuntimeTypeModel.Default.CanSerialize(GetElementType(fieldInfo.FieldType)))
+        if (SyncByValue(GetElementType(fieldInfo.FieldType)))
         {
             networkMessage = TemplateParser.Parse("Messages.NetworkCollectionSetValueMessageTemplate", templateData);
             networkAddMessage = TemplateParser.Parse("Messages.NetworkCollectionAddValueMessageTemplate", templateData);
@@ -82,7 +83,7 @@ public class AutoSyncFieldQueueBuilder : AutoSyncBuilderBase
         var fieldInfo = fieldItem.Value;
 
         var templateData = GetTemplateData(fieldItem);
-        if (RuntimeTypeModel.Default.CanSerialize(GetElementType(fieldInfo.FieldType)))
+        if (SyncByValue(GetElementType(fieldInfo.FieldType)))
         {
             yield return TemplateParser.Parse("Handlers.SubscribeQueueValueTemplate", templateData);
         }

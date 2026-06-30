@@ -15,6 +15,8 @@ public interface IAutoRegistryFactory : IDisposable
     void AddRegistry<T>(AutoRegistryBase<T> autoRegistry) where T : class;
 
     void RegisterAll();
+
+    bool IsManaged(Type type);
 }
 
 internal class AutoRegistryFactory : IAutoRegistryFactory
@@ -31,6 +33,8 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
     List<IDisposable> Disposables { get; } = new List<IDisposable>();
 
     List<Action> RegisterAllCallbacks = new List<Action>();
+
+    private readonly HashSet<Type> managedTypes = new HashSet<Type>();
 
     public AutoRegistryFactory(
         IRegistryCollection collection,
@@ -53,8 +57,19 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
         Disposables.ForEach(disposable => disposable.Dispose());
     }
 
+    // True if the type or any of its base types is registry-managed (the ObjectManager tracks it by id). Walks
+    // the base chain so a concrete subclass of a registered base (e.g. a PartyComponent) is also caught.
+    public bool IsManaged(Type type)
+    {
+        for (var current = type; current != null; current = current.BaseType)
+            if (managedTypes.Contains(current) || Collection.RegistryMap.ContainsKey(current)) return true;
+        return false;
+    }
+
     public void AddRegistry<T>(AutoRegistryBase<T> autoRegistry) where T : class
     {
+        managedTypes.Add(typeof(T));
+
         ValidateConstructorTypes(autoRegistry.Constructors, typeof(T));
 
         TypeMapper.AddTypes(new Type[] { 
