@@ -1,4 +1,6 @@
 ﻿using GameInterface.AutoSync.Templates;
+using GameInterface.Registry.Auto;
+using ProtoBuf.Meta;
 using System;
 using System.Reflection;
 
@@ -8,12 +10,19 @@ namespace GameInterface.AutoSync.Builders
     {
         private readonly AutoSyncRegistry autoSyncRegistry;
         private readonly AutoSyncConstantsBuilder autoSyncConstantsBuilder;
+        private readonly IAutoRegistryFactory autoRegistryFactory;
 
-        public AutoSyncBuilderBase(AutoSyncRegistry autoSyncRegistry, AutoSyncConstantsBuilder autoSyncConstantsBuilder)
+        public AutoSyncBuilderBase(AutoSyncRegistry autoSyncRegistry, AutoSyncConstantsBuilder autoSyncConstantsBuilder, IAutoRegistryFactory autoRegistryFactory)
         {
             this.autoSyncRegistry = autoSyncRegistry;
             this.autoSyncConstantsBuilder = autoSyncConstantsBuilder;
+            this.autoRegistryFactory = autoRegistryFactory;
         }
+
+        // Reference-sync anything the ObjectManager tracks by id (it must resolve by id on the receiver), and
+        // only value-sync a genuine non-managed serializable type. CanSerialize alone wrongly value-syncs a
+        // registered-but-serializable type (e.g. ItemRoster), deserializing an unregistered copy on the client.
+        protected bool SyncByValue(Type type) => RuntimeTypeModel.Default.CanSerialize(type) && !autoRegistryFactory.IsManaged(type);
 
         protected (string serialize,string deserialize) GetSerializerMethodNames(Type type)
         {
