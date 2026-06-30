@@ -2,7 +2,6 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using GameInterface.Services.Caravans.Messages;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Villages.Messages;
@@ -189,11 +188,12 @@ internal class VillagersConversationsHandler : IHandler
             {
                 GiveGoldAction.ApplyForPartyToCharacter(conversationParty.Party, mainHero, partyTradeGold, false);
             }
+
+            sessionInteractionsPlayerDataInterface.SetPlayerVillagersInteraction(obj.What.MainHeroId, obj.What.ConversationPartyId, VillagerCampaignBehavior.PlayerInteraction.Hostile);
             BeHostileAction.ApplyEncounterHostileAction(mainParty.Party, conversationParty.Party);
             SkillLevelingManager.OnLoot(mainParty, conversationParty, itemRoster, false);
             DestroyPartyAction.Apply(mainParty.Party, conversationParty);
         });
-        sessionInteractionsPlayerDataInterface.SetPlayerVillagersInteraction(obj.What.MainHeroId, obj.What.ConversationPartyId, VillagerCampaignBehavior.PlayerInteraction.Hostile);
     }
 
     private void Handle_VillagersLootedLeaveOnConsequence(MessagePayload<VillagersLootedLeaveOnConsequence> obj)
@@ -210,6 +210,7 @@ internal class VillagersConversationsHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
+            if (!TryGetVillagerBehavior(out var villagerBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var conversationParty)) return;
@@ -233,13 +234,14 @@ internal class VillagersConversationsHandler : IHandler
                 }
             }
             BeHostileAction.ApplyMinorCoercionHostileAction(mainParty.Party, conversationParty.Party);
-            GetVillagerBehavior()._lootedVillagers.Add(conversationParty, CampaignTime.Now);
+            villagerBehavior._lootedVillagers.Add(conversationParty, CampaignTime.Now);
             SkillLevelingManager.OnLoot(mainParty, conversationParty, itemRoster, false);
+
+            sessionInteractionsPlayerDataInterface.SetPlayerVillagersInteraction(obj.What.MainHeroId, obj.What.ConversationPartyId, VillagerCampaignBehavior.PlayerInteraction.Hostile);
 
             // Update _lootedVillagers on all clients
             network.SendAll(new NetworkAddToLootedVillagers(obj.What.ConversationPartyId, CampaignTime.Now));
         });
-        sessionInteractionsPlayerDataInterface.SetPlayerVillagersInteraction(obj.What.MainHeroId, obj.What.ConversationPartyId, VillagerCampaignBehavior.PlayerInteraction.Hostile);
     }
 
     private void Handle_VillagersSurrenderLeaveOnConsequence(MessagePayload<VillagersSurrenderLeaveOnConsequence> obj)
@@ -256,6 +258,7 @@ internal class VillagersConversationsHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
+            if (!TryGetVillagerBehavior(out var villagerBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var conversationParty)) return;
@@ -279,17 +282,22 @@ internal class VillagersConversationsHandler : IHandler
                 GiveGoldAction.ApplyForPartyToCharacter(conversationParty.Party, mainHero, partyTradeGold, false);
             }
             BeHostileAction.ApplyMajorCoercionHostileAction(mainParty.Party, conversationParty.Party);
-            GetVillagerBehavior()._lootedVillagers.Add(conversationParty, CampaignTime.Now);
+            villagerBehavior._lootedVillagers.Add(conversationParty, CampaignTime.Now);
             SkillLevelingManager.OnLoot(mainParty, conversationParty, itemRoster, false);
 
+            sessionInteractionsPlayerDataInterface.SetPlayerVillagersInteraction(obj.What.MainHeroId, obj.What.ConversationPartyId, VillagerCampaignBehavior.PlayerInteraction.Hostile);
+
             // Update _lootedVillagers on all clients
-            network.SendAll(new NetworkAddToLootedCaravans(obj.What.ConversationPartyId, CampaignTime.Now));
+            network.SendAll(new NetworkAddToLootedVillagers(obj.What.ConversationPartyId, CampaignTime.Now));
         });
-        sessionInteractionsPlayerDataInterface.SetPlayerVillagersInteraction(obj.What.MainHeroId, obj.What.ConversationPartyId, VillagerCampaignBehavior.PlayerInteraction.Hostile);
     }
 
-    private VillagerCampaignBehavior GetVillagerBehavior()
+    private bool TryGetVillagerBehavior(out VillagerCampaignBehavior villagerBehavior)
     {
-        return Campaign.Current.GetCampaignBehavior<VillagerCampaignBehavior>();
+        villagerBehavior = Campaign.Current?.GetCampaignBehavior<VillagerCampaignBehavior>();
+        if (villagerBehavior != null) return true;
+
+        Logger.Debug("Skipping villager update because VillagerCampaignBehavior is unavailable");
+        return false;
     }
 }

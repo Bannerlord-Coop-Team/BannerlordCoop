@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
@@ -22,17 +23,20 @@ internal class VillagerCampaignBehaviorHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface;
+    private readonly ConversationPartyTracker conversationPartyTracker;
 
     public VillagerCampaignBehaviorHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface)
+        ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface,
+        ConversationPartyTracker conversationPartyTracker)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.sessionInteractionsPlayerDataInterface = sessionInteractionsPlayerDataInterface;
+        this.conversationPartyTracker = conversationPartyTracker;
 
         messageBroker.Subscribe<DeleteExpiredLootedVillagers>(Handle_DeleteExpiredLootedVillagers);
         messageBroker.Subscribe<NetworkDeleteExpiredLootedVillagers>(Handle_NetworkDeleteExpiredLootedVillagers);
@@ -56,12 +60,13 @@ internal class VillagerCampaignBehaviorHandler : IHandler
 
     private void Handle_DeleteExpiredLootedVillagers(MessagePayload<DeleteExpiredLootedVillagers> obj)
     {
-        var villagersBehavior = GetVillagerBehavior();
         GameThread.RunSafe(() =>
         {
+            if (!TryGetVillagerBehavior(out var villagerBehavior)) return;
+
             // Vanilla implementation, need to send list to clients
             List<MobileParty> list = new List<MobileParty>();
-            foreach (KeyValuePair<MobileParty, CampaignTime> keyValuePair in villagersBehavior._lootedVillagers)
+            foreach (KeyValuePair<MobileParty, CampaignTime> keyValuePair in villagerBehavior._lootedVillagers)
             {
                 if (CampaignTime.Now - keyValuePair.Value >= CampaignTime.Days(10f))
                 {
@@ -70,7 +75,7 @@ internal class VillagerCampaignBehaviorHandler : IHandler
             }
             foreach (MobileParty key in list)
             {
-                villagersBehavior._lootedVillagers.Remove(key);
+                villagerBehavior._lootedVillagers.Remove(key);
             }
 
             // Update changes to _lootedVillagers on clients
@@ -90,11 +95,13 @@ internal class VillagerCampaignBehaviorHandler : IHandler
         // Update looted villagers on clients
         GameThread.RunSafe(() =>
         {
+            if (!TryGetVillagerBehavior(out var villagerBehavior)) return;
+
             foreach (var deletedVillagerId in obj.What.DeletedLootedVillagersIdsList)
             {
                 if (!objectManager.TryGetObjectWithLogging<MobileParty>(deletedVillagerId, out var deletedVillager)) continue;
 
-                GetVillagerBehavior()._lootedVillagers.Remove(deletedVillager);
+                villagerBehavior._lootedVillagers.Remove(deletedVillager);
             }
         });
     }
@@ -120,10 +127,11 @@ internal class VillagerCampaignBehaviorHandler : IHandler
         // Update interacted villagers locally on all clients
         GameThread.Run(() =>
         {
-            var villagersBehavior = GetVillagerBehavior();
-            if (villagersBehavior._interactedVillagers.ContainsKey(mobileParty))
+            if (!TryGetVillagerBehavior(out var villagerBehavior)) return;
+            
+            if (villagerBehavior._interactedVillagers.ContainsKey(mobileParty))
             {
-                villagersBehavior._interactedVillagers.Remove(mobileParty);
+                villagerBehavior._interactedVillagers.Remove(mobileParty);
             }
         });
     }
@@ -132,14 +140,28 @@ internal class VillagerCampaignBehaviorHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
+            if (!TryGetVillagerBehavior(out var villagerBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.VillagersPartyId, out var villagerParty)) return;
 
-            GetVillagerBehavior()._lootedVillagers.Add(villagerParty, obj.What.CampaignTime);
+            villagerBehavior._lootedVillagers.Add(villagerParty, obj.What.CampaignTime);
         });
     }
 
-    private VillagerCampaignBehavior GetVillagerBehavior()
+    private bool TryGetVillagerBehavior(out VillagerCampaignBehavior villagerBehavior)
     {
-        return Campaign.Current.GetCampaignBehavior<VillagerCampaignBehavior>();
+        villagerBehavior = Campaign.Current?.GetCampaignBehavior<VillagerCampaignBehavior>();
+        if (villagerBehavior != null) return true;
+
+        Logger.Debug("Skipping villager update because VillagerCampaignBehavior is unavailable");
+        return false;
+    }
+
+    // Used by VillagerCampaignBehaviorPatches.HourlyTickPartyPrefix to check if a villager party
+    // is in a conversation with a player using the ConversationPartyTracker
+    public bool CanVillagerPartyMove(MobileParty villagerParty)
+    {
+        if (!objectManager.TryGetIdWithLogging(villagerParty.Party, out var villagerPartyId)) return false;
+
+        return !conversationPartyTracker.IsEngagedByOther(villagerPartyId, null);
     }
 }

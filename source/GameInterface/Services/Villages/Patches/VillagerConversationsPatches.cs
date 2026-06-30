@@ -62,7 +62,7 @@ internal class VillagerConversationsPatches
 
     [HarmonyPatch(nameof(VillagerCampaignBehavior.conversation_player_decided_to_buy_on_consequence))]
     [HarmonyPrefix]
-    public static void ConversationPlayerDecidedToBuyOnConsequencePrefix(ref VillagerCampaignBehavior __instance)
+    public static bool ConversationPlayerDecidedToBuyOnConsequencePrefix(ref VillagerCampaignBehavior __instance)
     {
         if (MobileParty.ConversationParty.IsVillager && MobileParty.ConversationParty.ItemRoster.Count > 0)
         {
@@ -70,6 +70,8 @@ internal class VillagerConversationsPatches
             MessageBroker.Instance.Publish(__instance, message);
         }
         PlayerEncounter.LeaveEncounter = true;
+
+        return false;
     }
 
     [HarmonyPatch(nameof(VillagerCampaignBehavior.conversation_village_farmer_took_prisoner_on_consequence))]
@@ -168,19 +170,19 @@ internal class VillagerConversationsPatches
         using (new AllowedThread())
         {
             itemRoster = new ItemRoster(encounterParty.ItemRoster);
-        }
 
-        itemRosterElements = itemRoster._data;
+            itemRosterElements = itemRoster._data;
 
-        if (itemRoster.Count > 0)
-        {
-            InventoryScreenHelper.OpenScreenAsLoot(new Dictionary<PartyBase, ItemRoster>
+            if (itemRoster.Count > 0)
+            {
+                InventoryScreenHelper.OpenScreenAsLoot(new Dictionary<PartyBase, ItemRoster>
             {
                 {
                     PartyBase.MainParty,
                     itemRoster
                 }
             });
+            }
         }
     }
 }
