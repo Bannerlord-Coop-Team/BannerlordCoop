@@ -144,7 +144,7 @@ internal class VillagersConversationsHandler : IHandler
 
     private void Handle_NetworkApplyHostileVillagersInteraction(MessagePayload<NetworkApplyHostileVillagersInteraction> obj)
     {
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
