@@ -30,10 +30,11 @@ public class AgentMovementHandler : IAgentMovementHandler
 
     // Max agents per movement packet. The host has authority over every AI troop, so its batch can be
     // dozens of agents — one packet for all of them overflows the unreliable MTU ceiling (LiteNetLib
-    // throws TooBigPacketException on oversized non-fragmentable sends, which the Poller swallows). At
-    // ~220 B/agent this keeps a chunk under a typical negotiated MTU; the send path promotes any chunk
-    // that still overflows to a fragmentable reliable channel rather than dropping it.
-    private const int MaxAgentsPerMovementPacket = 6;
+    // throws TooBigPacketException on oversized non-fragmentable sends, which the Poller swallows). The MTU
+    // can stay near its ~1 KB floor (no negotiation up over P2P), and a mounted/well-equipped agent can run
+    // a few hundred bytes, so keep the chunk small enough that the common case fits one unreliable packet;
+    // the send path promotes any chunk that still overflows to a fragmentable reliable channel.
+    private const int MaxAgentsPerMovementPacket = 4;
 
     private readonly Poller poller;
     private readonly IPacketManager packetManager;
