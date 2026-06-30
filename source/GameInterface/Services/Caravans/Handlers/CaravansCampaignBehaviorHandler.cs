@@ -190,12 +190,16 @@ internal class CaravansCampaignBehaviorHandler : IHandler
 
                 deletedLootedCaravansIdsList.Add(caravanPartyId);
             }
+            if (deletedLootedCaravansIdsList.Count == 0) return;
+
             network.SendAll(new NetworkDeleteExpiredLootedCaravans(deletedLootedCaravansIdsList));
         });
     }
 
     private void Handle_NetworkDeleteExpiredLootedCaravans(MessagePayload<NetworkDeleteExpiredLootedCaravans> obj)
     {
+        if (obj.What.DeletedLootedCaravansIdsList == null) return;
+
         GameThread.RunSafe(() =>
         {
             if (!TryGetCaravansBehavior(out var caravansBehavior)) return;
