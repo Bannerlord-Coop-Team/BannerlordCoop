@@ -1,11 +1,12 @@
-﻿using Common;
-using HarmonyLib;
-using TaleWorlds.CampaignSystem.Conversation.Tags;
+﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.MobileParties.Patches;
-
+/// <summary>
+/// Skips the <see cref="MobileParty.PartyTradeGold"/> setter for lord parties, since their
+/// trade gold is derived from <see cref="Hero.Gold"/> which is already synced by autosync
+/// </summary>
 [HarmonyPatch(typeof(MobileParty))]
 internal class PartyTradeGoldPatch
 {
