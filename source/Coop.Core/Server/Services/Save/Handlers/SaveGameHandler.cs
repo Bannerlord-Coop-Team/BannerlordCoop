@@ -78,7 +78,7 @@ internal class SaveGameHandler : IHandler
             loaded?.Players ?? new Player[0],
             loaded?.CraftingPlayerData ?? new CraftingPlayerData(new(), new(), new()),
             loaded?.WorkshopPlayerData ?? new WorkshopPlayerData(new()),
-            loaded?.CaravansPlayerData ?? new CaravansPlayerData(new(), new(), new()),
+            loaded?.CaravansPlayerData ?? new CaravansPlayerData(new(), new()),
             loaded?.AlleyPlayerData ?? new AlleyPlayerData(new()),
             loaded?.InteractionsPlayerData ?? new InteractionsPlayerData(new(), new(), new(), new()));
 

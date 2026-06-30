@@ -35,7 +35,7 @@ namespace Coop.Tests.Client.States
         }
 
         private static NetworkGameSaveDataReceived SaveData(byte[] data, string campaignId) =>
-            new NetworkGameSaveDataReceived(data, campaignId, new CraftingPlayerData(new(), new(), new()), new WorkshopPlayerData(new()), new CaravansPlayerData(new(), new(), new()), new AlleyPlayerData(new()), new InteractionsPlayerData(new(), new(), new(), new()));
+            new NetworkGameSaveDataReceived(data, campaignId, new CraftingPlayerData(new(), new(), new()), new WorkshopPlayerData(new()), new CaravansPlayerData(new(), new()), new AlleyPlayerData(new()), new InteractionsPlayerData(new(), new(), new(), new()));
 
         [Fact]
         public void StateEntered_Shows_LoadingProgressMessage()

@@ -50,14 +50,13 @@ internal class VillagerConversationsPatches
         if (PlayerEncounter.Current == null
             || Campaign.Current.CurrentConversationContext != ConversationContext.PartyEncounter
             || !encounteredParty.IsMobile
-            || !encounteredParty.MobileParty.IsVillager
-            || __instance.GetPlayerInteraction(encounteredParty.MobileParty) != VillagerCampaignBehavior.PlayerInteraction.None)
+            || !encounteredParty.MobileParty.IsVillager)
         {
             return;
         }
 
         // Local update is needed so separately publish message to server in postfix to store change in CoopSession
-        var message = new SetPlayerVillagersInteraction(Hero.MainHero, MobileParty.ConversationParty, VillagerCampaignBehavior.PlayerInteraction.Friendly);
+        var message = new SetPlayerVillagersInteraction(Hero.MainHero, MobileParty.ConversationParty, __instance.GetPlayerInteraction(encounteredParty.MobileParty));
         MessageBroker.Instance.Publish(__instance, message);
     }
 

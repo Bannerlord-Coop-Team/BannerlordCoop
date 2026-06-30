@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using Coop.Core.Server.Services.Save;
 using GameInterface.CoopSessionData.Save.Data;
+using GameInterface.Services.Alleys;
 using GameInterface.Services.Caravans;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.Players.Data;
@@ -46,7 +47,7 @@ namespace Coop.Tests.Server.Services.Save
                 players,
                 new CraftingPlayerData(new(), new(), new()),
                 new WorkshopPlayerData(new()),
-                new CaravansPlayerData(new(), new(), new()),
+                new CaravansPlayerData(new(), new()),
                 new AlleyPlayerData(new()),
                 new InteractionsPlayerData(new(), new(), new(), new()));
 
@@ -86,7 +87,7 @@ namespace Coop.Tests.Server.Services.Save
                 players,
                 new CraftingPlayerData(new(), new(), new()),
                 new WorkshopPlayerData(new()),
-                new CaravansPlayerData(new(), new(), new()),
+                new CaravansPlayerData(new(), new()),
                 new AlleyPlayerData(new()),
                 new InteractionsPlayerData(new(), new(), new(), new()));
 
