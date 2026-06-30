@@ -2,6 +2,7 @@
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Library;
@@ -12,6 +13,7 @@ namespace E2E.Tests.Services.MobileParties;
 public class MobilePartyPropertyTests : SyncTestBase
 {
     private string MobilePartyId;
+    private string LordPartyId;
 
     public MobilePartyPropertyTests(ITestOutputHelper output) : base(output)
     {
@@ -54,5 +56,26 @@ public class MobilePartyPropertyTests : SyncTestBase
         TestEnvironment.AssertReferenceProperty<MobileParty, Hero>(nameof(MobileParty.Surgeon));
         TestEnvironment.AssertProperty<MobileParty, float>(nameof(MobileParty.RecentEventsMorale), 5f);
         TestEnvironment.AssertProperty<MobileParty, Vec2>(nameof(MobileParty.EventPositionAdder), new Vec2(2,2));
+    }
+
+    [Fact]
+    public void Server_MobileParty_LordPartyTradeGold()
+    {
+        Server.Call(() =>
+        {
+            var hero = GameObjectCreator.CreateInitializedObject<Hero>();
+            hero.Clan = GameObjectCreator.CreateInitializedObject<Clan>();
+            var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+            var party = LordPartyComponent.CreateLordParty(null, hero, new CampaignVec2(new Vec2(5, 5), true), 0, settlement, hero);
+            Server.ObjectManager.TryGetId(party, out LordPartyId);
+            party.PartyTradeGold = 500;
+        });
+
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(LordPartyId, out var clientParty));
+            Assert.Equal(500, clientParty.LeaderHero.Gold);
+            Assert.Equal(500, clientParty.PartyTradeGold);
+        }
     }
 }
