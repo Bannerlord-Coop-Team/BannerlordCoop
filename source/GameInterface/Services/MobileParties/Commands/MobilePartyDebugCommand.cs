@@ -87,7 +87,7 @@ internal class MobilePartyDebugCommand
     // Prints the network ObjectManager id THIS machine holds for a party and each of its non-MBObjectBase
     // attachments. Run on the server and on each client and compare: a party the client got via live create
     // matches the server's runtime "Created_N"/concrete-type ids, while a party re-derived at join carries
-    // "{Type}_{StringId}" ids that never reconcile with the server's. The divergence is the #1583 root cause.
+    // "{Type}_{StringId}" ids that never reconcile with the server's, so its synced updates fail to resolve.
     [CommandLineArgumentFunction("attachment_ids", "coop.debug.mobileparty")]
     public static string AttachmentIds(List<string> args)
     {
@@ -102,7 +102,7 @@ internal class MobilePartyDebugCommand
             return string.Format("ID: '{0}' not found", args[0]);
         }
 
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
         {
             return "Unable to resolve ObjectManager";
         }

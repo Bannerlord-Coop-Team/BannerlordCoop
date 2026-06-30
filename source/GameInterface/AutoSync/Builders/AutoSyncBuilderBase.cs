@@ -22,14 +22,7 @@ namespace GameInterface.AutoSync.Builders
         // Reference-sync anything the ObjectManager tracks by id (it must resolve by id on the receiver), and
         // only value-sync a genuine non-managed serializable type. CanSerialize alone wrongly value-syncs a
         // registered-but-serializable type (e.g. ItemRoster), deserializing an unregistered copy on the client.
-        protected bool SyncByValue(Type type) => RuntimeTypeModel.Default.CanSerialize(type) && !IsManaged(type);
-
-        private bool IsManaged(Type type)
-        {
-            for (var current = type; current != null; current = current.BaseType)
-                if (autoRegistryFactory.IsManaged(current)) return true;
-            return false;
-        }
+        protected bool SyncByValue(Type type) => RuntimeTypeModel.Default.CanSerialize(type) && !autoRegistryFactory.IsManaged(type);
 
         protected (string serialize,string deserialize) GetSerializerMethodNames(Type type)
         {

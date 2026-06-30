@@ -58,9 +58,8 @@ internal class GauntletMapEventVisaulHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<GauntletMapEventVisual>(instanceId, out var visual))
                 return;
 
-            // The visual's MapEvent syncs in separately; if that map event never resolved on this client its
-            // MapEvent stays null and vanilla Initialize dereferences it (nameplate setup) and throws. An
-            // un-synced visual has no battle to show, so skip the init.
+            // The visual's MapEvent syncs in separately; if it never resolved here it stays null and vanilla
+            // Initialize throws on it. An un-synced visual has no battle to show, so skip the init.
             if (visual.MapEvent == null)
             {
                 Logger.Warning("Skipping init of GauntletMapEventVisual {InstanceId}: its MapEvent did not resolve on this client", instanceId);
@@ -76,7 +75,7 @@ internal class GauntletMapEventVisaulHandler : IHandler
                     // visibility is local (see MapEventVisibilityClientPatch), and the vanilla IsVisible setter
                     // keeps the visual in lock-step, so seeding the visual from the local value keeps the icon
                     // and battle sound consistent here instead of starting in the server-visible state.
-                    visual.Initialize(position, visual.MapEvent?.IsVisible ?? false);
+                    visual.Initialize(position, visual.MapEvent.IsVisible);
                 }
                 catch (Exception ex)
                 {

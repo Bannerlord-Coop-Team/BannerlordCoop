@@ -57,7 +57,14 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
         Disposables.ForEach(disposable => disposable.Dispose());
     }
 
-    public bool IsManaged(Type type) => managedTypes.Contains(type) || Collection.RegistryMap.ContainsKey(type);
+    // True if the type or any of its base types is registry-managed (the ObjectManager tracks it by id). Walks
+    // the base chain so a concrete subclass of a registered base (e.g. a PartyComponent) is also caught.
+    public bool IsManaged(Type type)
+    {
+        for (var current = type; current != null; current = current.BaseType)
+            if (managedTypes.Contains(current) || Collection.RegistryMap.ContainsKey(current)) return true;
+        return false;
+    }
 
     public void AddRegistry<T>(AutoRegistryBase<T> autoRegistry) where T : class
     {
