@@ -87,11 +87,11 @@ internal class CaravansCampaignBehaviorHandler : IHandler
     private void Handle_NetworkCaravansKingdomDestroyed(MessagePayload<NetworkCaravansKingdomDestroyed> obj)
     {
         // Update data on all clients
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
+            if (!TryGetCaravansBehavior(out var caravansBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.DestroyedKingdomId, out var destroyedKingdom)) return;
 
-            var caravansBehavior = GetCaravansBehavior();
             if (caravansBehavior._prohibitedKingdomsForPlayerCaravans.Contains(destroyedKingdom))
             {
                 caravansBehavior._prohibitedKingdomsForPlayerCaravans.Remove(destroyedKingdom);
@@ -115,12 +115,12 @@ internal class CaravansCampaignBehaviorHandler : IHandler
 
     private void Handle_NetworkCaravanPartyDestroyed(MessagePayload<NetworkCaravanPartyDestroyed> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
-
         // Don't need to run the full OnMobilePartyDestroyed logic on clients, only need to update these two dictionaries
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
-            var caravansBehavior = GetCaravansBehavior();
+            if (!TryGetCaravansBehavior(out var caravansBehavior)) return;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
+
             if (caravansBehavior._interactedCaravans.ContainsKey(mobileParty))
             {
                 caravansBehavior._interactedCaravans.Remove(mobileParty);
@@ -142,10 +142,9 @@ internal class CaravansCampaignBehaviorHandler : IHandler
 
     private void Handle_NetworkDeleteExpiredTradeRumorTakenCaravans(MessagePayload<NetworkDeleteExpiredTradeRumorTakenCaravans> obj)
     {
-        var caravansBehavior = GetCaravansBehavior();
-
         GameThread.RunSafe(() =>
         {
+            if (!TryGetCaravansBehavior(out var caravansBehavior)) return;
             if (!objectManager.TryGetIdWithLogging(Hero.MainHero, out var mainHeroId)) return;
 
             foreach (var playerList in obj.What.PlayerExpiredCaravansRemovalLists)
@@ -165,9 +164,10 @@ internal class CaravansCampaignBehaviorHandler : IHandler
 
     private void Handle_DeleteExpiredLootedCaravans(MessagePayload<DeleteExpiredLootedCaravans> obj)
     {
-        var caravansBehavior = GetCaravansBehavior();
         GameThread.RunSafe(() =>
         {
+            if (!TryGetCaravansBehavior(out var caravansBehavior)) return;
+
             // Vanilla implementation, need to send list to clients
             List<MobileParty> list = new List<MobileParty>();
             foreach (KeyValuePair<MobileParty, CampaignTime> keyValuePair in caravansBehavior._lootedCaravans)
@@ -198,11 +198,13 @@ internal class CaravansCampaignBehaviorHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
+            if (!TryGetCaravansBehavior(out var caravansBehavior)) return;
+
             foreach (var deletedCaravanId in obj.What.DeletedLootedCaravansIdsList)
             {
                 if (!objectManager.TryGetObjectWithLogging<MobileParty>(deletedCaravanId, out var deletedCaravan)) continue;
 
-                GetCaravansBehavior()._lootedCaravans.Remove(deletedCaravan);
+                caravansBehavior._lootedCaravans.Remove(deletedCaravan);
             }
         });
     }
@@ -224,21 +226,22 @@ internal class CaravansCampaignBehaviorHandler : IHandler
 
     private void Handle_NetworkUpdateTradeActionLogsForParty(MessagePayload<NetworkUpdateTradeActionLogsForParty> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
-
         if (obj.What.TradeActionLogsData == null) return;
 
-        var tradeActionLogs = new List<CaravansCampaignBehavior.TradeActionLog>();
-        foreach (var tradeActionLogData in obj.What.TradeActionLogsData)
+        GameThread.RunSafe(() =>
         {
-            if (!UnpackTradeActionLogData(tradeActionLogData, out var tradeActionLog)) continue;
+            if (!TryGetCaravansBehavior(out var caravansBehavior)) return;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
 
-            tradeActionLogs.Add(tradeActionLog);
-        }
+            var tradeActionLogs = new List<CaravansCampaignBehavior.TradeActionLog>();
+            foreach (var tradeActionLogData in obj.What.TradeActionLogsData)
+            {
+                if (!UnpackTradeActionLogData(tradeActionLogData, out var tradeActionLog)) continue;
 
-        GameThread.Run(() =>
-        {
-            GetCaravansBehavior()._tradeActionLogs[mobileParty] = tradeActionLogs;
+                tradeActionLogs.Add(tradeActionLog);
+            }
+
+            caravansBehavior._tradeActionLogs[mobileParty] = tradeActionLogs;
         });
     }
 
@@ -246,9 +249,10 @@ internal class CaravansCampaignBehaviorHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
+            if (!TryGetCaravansBehavior(out var caravansBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.CaravanPartyId, out var caravanParty)) return;
 
-            GetCaravansBehavior()._lootedCaravans.Add(caravanParty, obj.What.CampaignTime);
+            caravansBehavior._lootedCaravans.Add(caravanParty, obj.What.CampaignTime);
         });
     }
 
@@ -296,8 +300,12 @@ internal class CaravansCampaignBehaviorHandler : IHandler
         return true;
     }
 
-    private CaravansCampaignBehavior GetCaravansBehavior()
+    private bool TryGetCaravansBehavior(out CaravansCampaignBehavior caravansBehavior)
     {
-        return Campaign.Current.GetCampaignBehavior<CaravansCampaignBehavior>();
+        caravansBehavior = Campaign.Current?.GetCampaignBehavior<CaravansCampaignBehavior>();
+        if (caravansBehavior != null) return true;
+
+        Logger.Debug("Skipping caravan update because the campaign behavior is unavailable");
+        return false;
     }
 }
