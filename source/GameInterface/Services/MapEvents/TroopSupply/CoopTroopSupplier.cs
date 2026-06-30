@@ -204,7 +204,7 @@ public class CoopTroopSupplier : IMissionTroopSupplier
         {
             foreach (var party in parties)
                 foreach (var entry in party.Entries)
-                    if (entry.IsHero && TryResolveCharacter(entry, out var character))
+                    if (TryResolveCharacter(entry, out var character) && character.IsHero)
                         return character;
         }
         return null;
@@ -260,8 +260,8 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     {
         if (!TryResolveCharacter(entry, out var character))
         {
-            Logger.Warning("[TroopSupply] {Side} could not resolve character {CharId} (isHero={Hero}, seed={Seed}) — not spawning",
-                Side, entry.CharacterId, entry.IsHero, entry.Seed);
+            Logger.Warning("[TroopSupply] {Side} could not resolve character {CharId} (seed={Seed}) — not spawning",
+                Side, entry.CharacterId, entry.Seed);
             return null;
         }
         // CoopAgentOrigin carries the troop's party for ALL troops (SimpleAgentOrigin gives non-heroes a null
@@ -270,26 +270,19 @@ public class CoopTroopSupplier : IMissionTroopSupplier
         var origin = new CoopAgentOrigin(character, party, -1, null, new UniqueTroopDescriptor(entry.Seed));
         if (party == null)
             Logger.Warning("[TroopSupply] {Side} origin char={Char} (isHero={Hero}) got NULL party — partyId {PartyId} unresolvable → no team / not player-commanded",
-                Side, entry.CharacterId, entry.IsHero, partyId);
-        else if (entry.IsHero)
+                Side, entry.CharacterId, character.IsHero, partyId);
+        else if (character.IsHero)
             Logger.Information("[TroopSupply] {Side} HERO origin char={Char} party={Party} isMainParty={Main} underPlayersCmd={Cmd}",
                 Side, entry.CharacterId, party.Name, party == PartyBase.MainParty, origin.IsUnderPlayersCommand);
         return origin;
     }
 
+    // Heroes and regular troops alike are keyed by their CharacterObject id (hero CharacterObjects are
+    // registered — CharacterObjectRegistry), so resolve uniformly; hero-ness is read from character.IsHero.
     private static bool TryResolveCharacter(TroopReserveEntry entry, out CharacterObject character)
     {
         character = null;
-        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
-            return false;
-
-        if (entry.IsHero)
-        {
-            if (objectManager.TryGetObject<Hero>(entry.CharacterId, out var hero))
-                character = hero?.CharacterObject;
-            return character != null;
-        }
-
-        return objectManager.TryGetObject<CharacterObject>(entry.CharacterId, out character);
+        return ContainerProvider.TryResolve<IObjectManager>(out var objectManager)
+            && objectManager.TryGetObject<CharacterObject>(entry.CharacterId, out character);
     }
 }

@@ -3,65 +3,40 @@ using GameInterface.Services.MapEvents;
 namespace E2E.Tests.Services.Missions;
 
 /// <summary>
-/// Unit tests for <see cref="BattleSpawnGate"/> — the static state that <c>BattleSpawnDisablePatch</c> reads
-/// to decide whether to run the vanilla troop spawner. Spawn itself can't run headlessly, so the gate's
-/// host/non-host/unknown decision is covered directly here.
+/// Unit tests for <see cref="BattleSpawnGate"/> — the static flag the (GameInterface) battle-spawn patches read
+/// to know a coop field battle is the active mission. It holds no host/ownership state (which client fields which
+/// troops is decided server-side by the reserve assignment), so only the active/map-event lifecycle is covered.
 /// </summary>
 public class BattleSpawnGateTests : IDisposable
 {
     public void Dispose() => BattleSpawnGate.EndBattle();
 
     [Fact]
-    public void NoActiveBattle_GateIsInactive_AndHostUnknown()
+    public void NoActiveBattle_GateIsInactive()
     {
         BattleSpawnGate.EndBattle();
 
         Assert.False(BattleSpawnGate.IsCoopBattleActive);
         Assert.Null(BattleSpawnGate.ActiveMapEventId);
-        Assert.Null(BattleSpawnGate.LocalIsHost);
     }
 
     [Fact]
-    public void BeginBattle_WithUnknownHost_IsActive_ButHostStaysNull()
+    public void BeginBattle_MarksActive_WithTheMapEvent()
     {
-        // Host election hasn't replied yet — the disable patch must withhold spawning (LocalIsHost == null).
-        BattleSpawnGate.BeginBattle("mapEvent-1", isHost: null);
+        BattleSpawnGate.BeginBattle("mapEvent-1");
 
         Assert.True(BattleSpawnGate.IsCoopBattleActive);
         Assert.Equal("mapEvent-1", BattleSpawnGate.ActiveMapEventId);
-        Assert.Null(BattleSpawnGate.LocalIsHost);
     }
 
     [Fact]
-    public void SetLocalHost_ForActiveBattle_RecordsHostResult()
+    public void EndBattle_ClearsActiveBattle()
     {
-        BattleSpawnGate.BeginBattle("mapEvent-1", isHost: null);
-
-        BattleSpawnGate.SetLocalHost("mapEvent-1", isHost: true);
-
-        Assert.Equal(true, BattleSpawnGate.LocalIsHost);
-    }
-
-    [Fact]
-    public void SetLocalHost_ForADifferentBattle_IsIgnored()
-    {
-        BattleSpawnGate.BeginBattle("mapEvent-1", isHost: null);
-
-        // An assignment for some other map event must not flip the active battle's host result.
-        BattleSpawnGate.SetLocalHost("mapEvent-2", isHost: true);
-
-        Assert.Null(BattleSpawnGate.LocalIsHost);
-    }
-
-    [Fact]
-    public void EndBattle_ClearsActiveBattle_AndHostResult()
-    {
-        BattleSpawnGate.BeginBattle("mapEvent-1", isHost: true);
+        BattleSpawnGate.BeginBattle("mapEvent-1");
 
         BattleSpawnGate.EndBattle();
 
         Assert.False(BattleSpawnGate.IsCoopBattleActive);
         Assert.Null(BattleSpawnGate.ActiveMapEventId);
-        Assert.Null(BattleSpawnGate.LocalIsHost);
     }
 }

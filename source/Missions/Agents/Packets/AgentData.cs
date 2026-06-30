@@ -63,7 +63,7 @@ namespace Missions.Agents.Packets
             AgentEquipment.Apply(agent);
 
             // Update actions
-            ActionData?.Apply(agent);
+            //ActionData?.Apply(agent);
 
             // Update mount
             if (agent.HasMount)

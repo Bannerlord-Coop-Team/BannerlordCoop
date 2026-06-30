@@ -53,9 +53,8 @@ internal class BattleMissionEntryPatch
         if (!ContainerProvider.TryResolve(out IObjectManager objectManager)) return;
         if (!objectManager.TryGetId(mapEvent, out var mapEventId)) return;
 
-        var isHost = BattleHostElection.IsLocalHost(mapEvent);
-        BattleSpawnGate.BeginBattle(mapEventId, isHost);
-        Logger.Information("[BattleSync] Engaged spawn gate before mission load: mapEvent={MapEventId} isHost={IsHost}", mapEventId, isHost);
+        BattleSpawnGate.BeginBattle(mapEventId);
+        Logger.Information("[BattleSync] Engaged spawn gate before mission load: mapEvent={MapEventId}", mapEventId);
     }
 
     [HarmonyPostfix]

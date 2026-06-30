@@ -15,7 +15,7 @@ public class BattleTroopLedgerTests
     {
         var entries = new TroopReserveEntry[count];
         for (int i = 0; i < count; i++)
-            entries[i] = new TroopReserveEntry(seed: 1000 + i, characterId: $"Char_{i}", isHero: i == 0, formationClass: i % 4);
+            entries[i] = new TroopReserveEntry(seed: 1000 + i, characterId: $"Char_{i}", formationClass: i % 4);
         return entries;
     }
 
@@ -31,7 +31,7 @@ public class BattleTroopLedgerTests
         Assert.Equal(5, stored.Count);
         Assert.Equal(0, supplied);
         Assert.Equal(1000, stored[0].Seed);
-        Assert.True(stored[0].IsHero);
+        Assert.Equal("Char_0", stored[0].CharacterId);
     }
 
     [Fact]

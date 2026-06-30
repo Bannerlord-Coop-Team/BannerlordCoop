@@ -6,6 +6,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.MapEvents.TroopSupply.Messages;
 using GameInterface.Services.ObjectManager;
@@ -81,6 +82,10 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
     private readonly object _pendingPuppetLock = new object();
     private readonly List<BattleAgentSpawnData> _pendingPuppets = new List<BattleAgentSpawnData>();
 
+    // [Host] Map-event party ids we have already fielded as mid-battle reinforcements, so a repeated involved-
+    // parties broadcast for the same party doesn't double-spawn it.
+    private readonly HashSet<string> _reinforcedParties = new HashSet<string>();
+
     public CoopBattleController(
         IBattleNetwork network,
         INetwork relayNetwork,
@@ -129,6 +134,9 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
         _revealGate = new BattleDeploymentRevealGate(this);
         messageBroker.Subscribe<NetworkBattleDeploymentFinished>(Handle_NetworkBattleDeploymentFinished);
         messageBroker.Subscribe<NetworkBattleActivated>(Handle_NetworkBattleActivated);
+
+        // [Host] A new AI party joining the live battle is fielded through our own spawn path (reinforcements).
+        messageBroker.Subscribe<NetworkAddInvolvedParties>(Handle_ReinforcementPartiesAdded);
     }
 
     public override void Dispose()
@@ -146,6 +154,7 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
         messageBroker.Unsubscribe<BattleHostMigrated>(Handle_BattleHostMigrated);
         messageBroker.Unsubscribe<NetworkBattleDeploymentFinished>(Handle_NetworkBattleDeploymentFinished);
         messageBroker.Unsubscribe<NetworkBattleActivated>(Handle_NetworkBattleActivated);
+        messageBroker.Unsubscribe<NetworkAddInvolvedParties>(Handle_ReinforcementPartiesAdded);
 
         base.Dispose();
     }
@@ -199,6 +208,17 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
         network.Send(controllerId, joinInfo);
         Logger.Information("[BattleSync] Sent join info to {Controller} for instance {Instance}", controllerId, instanceId);
 
+        // Catch a mid-battle joiner up on the ACTIVATION state. NetworkBattleActivated is a one-shot broadcast
+        // sent when the battle went live, so a client that joins afterward never heard it and would otherwise sit
+        // at activated=false — its puppets stay frozen through its own deployment (they aren't un-paused; see
+        // SpawnPuppet) and a later promotion to host wouldn't release the NPCs it adopts (OnPromotedToHost gates
+        // on activation). Any already-activated peer re-tells the joiner; OnBattleActivatedReceived is idempotent.
+        if (_activator.IsActivated)
+        {
+            network.Send(controllerId, new NetworkBattleActivated(instanceId));
+            Logger.Information("[BattleSync] Told joining {Controller} the battle is already activated", controllerId);
+        }
+
         // Catch the joiner up to the live battle. The per-spawn broadcasts (Handle_AgentSpawnedInBattle) only
         // reached peers already connected when each agent spawned, so a player entering after troops are on
         // the field — including a mid-battle joiner — would otherwise miss them. Each client replays the
@@ -237,15 +257,14 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
             if (agent == null || !agent.IsActive() || !(agent.Character is CharacterObject character)) continue;
             if (ownPartyOnly && !IsOwnPartyAgent(agent, character)) continue;
 
-            bool isHero = character.IsHero;
-            object toResolve = isHero ? (object)character.HeroObject : character;
-            if (toResolve == null || !objectManager.TryGetId(toResolve, out var characterId)) continue;
+            // Carried by CharacterObject id, uniform for heroes and troops (hero CharacterObjects are registered).
+            if (!objectManager.TryGetId(character, out var characterId)) continue;
 
             _casualtyInfo.TryGetValue(info.AgentId, out var attribution);
             var side = agent.Team != null ? agent.Team.Side : BattleSideEnum.None;
 
             records.Add(new BattleAgentSpawnData(
-                info.AgentId, characterId, isHero, agent.Position, side, agent.Health,
+                info.AgentId, characterId, agent.Position, side, agent.Health,
                 controllerIdProvider.ControllerId, attribution.mapEventPartyId, attribution.troopSeed));
         }
         return records;
@@ -455,13 +474,28 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
         if (mission == null) return;
 
         foreach (var team in mission.Teams)
-            Logger.Information("[BattleDiag] Team side={Side} isPlayerTeam={IsPlayer} activeAgents={Count}",
-                team.Side, team == mission.PlayerTeam, team.ActiveAgents.Count);
+        {
+            // List the HERO agents on each team — pinpoints where the player's own hero, the host hero and the
+            // AI-lord heroes actually land (PlayerTeam = controllable by us; ally team = not).
+            var heroes = new List<string>();
+            foreach (var agent in team.ActiveAgents)
+                if (agent.Character != null && agent.Character.IsHero)
+                    heroes.Add(agent.Character.StringId);
+
+            Logger.Information("[BattleDiag] Team side={Side} isPlayerTeam={IsPlayer} isPlayerAlly={IsAlly} activeAgents={Count} heroes=[{Heroes}]",
+                team.Side, team == mission.PlayerTeam, team == mission.PlayerAllyTeam, team.ActiveAgents.Count, string.Join(", ", heroes));
+        }
 
         var heroChar = Hero.MainHero?.CharacterObject;
         bool heroOnField = false;
         foreach (var agent in mission.Agents)
-            if (agent.Character == heroChar) { heroOnField = true; break; }
+            if (agent.Character == heroChar)
+            {
+                heroOnField = true;
+                Logger.Information("[BattleDiag] Player hero {Char} is on team side={Side} isPlayerTeam={IsPlayer} (controller={Ctrl})",
+                    heroChar.StringId, agent.Team?.Side, agent.Team == mission.PlayerTeam, agent.Controller);
+                break;
+            }
 
         var spawnLogic = mission.GetMissionBehavior<DefaultBattleMissionAgentSpawnLogic>();
         Logger.Information("[BattleDiag] AttackerTeam={Atk} DefenderTeam={Def} PlayerTeam={Player} MainAgent={Main} heroOnField={Hero} spawnEnabled(Def={SDef},Atk={SAtk}) playerSide={PSide}",
@@ -520,9 +554,8 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
 
         AttachPlayerAgent(agent, character);
 
-        bool isHero = character.IsHero;
-        object toResolve = isHero ? character.HeroObject : character;
-        if (toResolve == null || !objectManager.TryGetId(toResolve, out var characterId)) return;
+        // Carried by CharacterObject id, uniform for heroes and troops (hero CharacterObjects are registered).
+        if (!objectManager.TryGetId(character, out var characterId)) return;
 
         string owner = controllerIdProvider.ControllerId;
         var agentId = Guid.NewGuid();
@@ -543,13 +576,12 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
             if (mapEventParty != null && objectManager.TryGetId(mapEventParty, out var mepId))
                 mapEventPartyId = mepId;
         }
-        // Key the casualty on the troop's CHARACTER through the object manager (never a raw StringId). For a
-        // hero `characterId` above is the HeroObject's id, so resolve the character's own id here.
-        objectManager.TryGetId(character, out var troopCharacterId);
-        _casualtyInfo[agentId] = (mapEventPartyId, troopSeed, troopCharacterId);
+        // The casualty keys on the troop's CHARACTER — exactly `characterId`, the CharacterObject's object-manager
+        // id we also carry in the spawn data.
+        _casualtyInfo[agentId] = (mapEventPartyId, troopSeed, characterId);
 
         BattleSideEnum side = agent.Team != null ? agent.Team.Side : BattleSideEnum.None;
-        var data = new BattleAgentSpawnData(agentId, characterId, isHero, agent.Position, side, agent.Health, owner, mapEventPartyId, troopSeed);
+        var data = new BattleAgentSpawnData(agentId, characterId, agent.Position, side, agent.Health, owner, mapEventPartyId, troopSeed);
 
         // Requirement #4 "hidden everywhere until deployed": while we are still placing our own formations our
         // own-party troops are spawned locally (so we can deploy them) but NOT replicated, so other clients never
@@ -662,10 +694,14 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
                 agent.MakeDead(false, ActionIndexCache.act_none);
                 agent.FadeOut(false, true);
             }
-        });
 
-        registry.RemoveAgent(payload.What.AgentId);
-        _casualtyInfo.TryRemove(payload.What.AgentId, out _);
+            // Deregister AFTER the kill, INSIDE this game-thread action. We receive this on the network thread,
+            // so RunSafe queues the kill; removing on the network thread (outside the lambda) raced ahead of it,
+            // and the re-check above then found the agent already gone and bailed — so MakeDead never ran and the
+            // puppet stayed alive (removed but not killed → an invincible, unroutable agent).
+            registry.RemoveAgent(payload.What.AgentId);
+            _casualtyInfo.TryRemove(payload.What.AgentId, out _);
+        });
     }
 
     // [Attacker's node] A local troop hit a puppet (suppressed locally by BattleBlowInterceptPatch). Route the
@@ -750,11 +786,19 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
         var controllerId = payload.What.ControllerId;
         if (payload.What.InstanceId != null && payload.What.InstanceId != instanceId) return;
 
-        // Despawn the departing player's OWN troops (their player-side party). If they were the HOST, the AI
-        // they ran is NOT despawned (DespawnControllerTroops only touches player-side agents) — it migrates to
-        // the promoted successor, which adopts it via Handle_BattleHostMigrated. The server sends this leave
-        // before the host reassignment, so the player party is gone from the registry by the time the
-        // successor adopts, leaving it just the AI.
+        // EXCEPTION (see above): if the leaver was the battle HOST, a successor is promoted and adopts ALL of its
+        // agents (own party AND the AI it ran) via Handle_BattleHostMigrated — exactly like a disconnect. Do NOT
+        // also despawn here: the despawn and the adoption are independent queued game-thread actions, so on a host
+        // retreat they RACE, leaving agents half faded-out and half adopted/AI-converted, which the movement poller
+        // and the AI tick then dereference → a native crash. (A disconnect never despawns, which is why it migrates
+        // cleanly.) The leave arrives before the host reassignment, so the registry still names the departing host.
+        if (hostRegistry.TryGet(instanceId, out var assignment) && assignment.HostControllerId == controllerId)
+        {
+            Logger.Information("[BattleSync] Host {Controller} left — migration adopts its troops; skipping retreat despawn", controllerId);
+            return;
+        }
+
+        // A NON-host retreat: withdraw only that player's OWN player-side troops; the host keeps running the AI.
         DespawnControllerTroops(controllerId);
     }
 
@@ -943,7 +987,13 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
         if (Mission.Current == null) return true;                       // no mission — drop
         if (registry.TryGetAgentInfo(data.AgentId, out _)) return true; // already spawned — dedupe
 
-        var team = ResolveTeam(data.Side);
+        // While THIS client is still in its own Order-of-Battle phase, hold puppets OUT of the mission: a puppet
+        // populates a team the native spawn gate (DefaultBattleMissionAgentSpawnLogic.CheckDeployment) inspects, but
+        // with NO deployment plan (puppets aren't deployment-spawned) — which stalls the gate so this client's OWN
+        // party/hero never spawn. Buffer until our deployment commits; DrainPendingPuppets then fields them.
+        if (LocalDeploymentInProgress()) return false;                  // still deploying — buffer
+
+        var team = ResolvePuppetTeam(data);
         if (team == null) return false;                                 // teams not created yet — buffer
 
         if (!TryResolveCharacter(data, out var character))
@@ -992,7 +1042,19 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
 
         // Adopt our own hero as the controllable main agent of this mission.
         if (isOwnAgent)
+        {
             Mission.Current.MainAgent = agent;
+        }
+        else
+        {
+            // Keep the puppet un-paused so it follows its owner's movement even while THIS client is still in its
+            // own deployment freeze (native deployment sets Mission.AllowAiTicking=false and AI-pauses agents). A
+            // mid-battle joiner spawns these puppets while deploying into an ALREADY-LIVE battle; left paused, the
+            // puppet never walks the small per-tick deltas its owner sends (AgentData.Apply only teleports on >1u
+            // jumps), so the whole live battle looks frozen until the joiner clicks Start Battle. Mirrors the
+            // adopt (ConvertPuppetToHostAi) and reinforcement (SpawnReinforcementTroop) paths, which un-pause too.
+            agent.SetIsAIPaused(false);
+        }
 
         registry.TryRegisterAgent(data.OwnerControllerId, data.AgentId, agent);
         // Key the casualty on the troop's CHARACTER through the object manager (never a raw StringId).
@@ -1002,10 +1064,20 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
         return true;
     }
 
-    // [Game thread] Drain puppets buffered while the mission's teams did not yet exist, once they do.
+    // True while THIS client is still in its own Order-of-Battle deployment — a deployment controller is attached
+    // and we have not committed yet. Puppets are held until commit so they don't populate (plan-less) the teams the
+    // native spawn gate inspects, which would stop this client's own troops from spawning. The deployment-controller
+    // check keeps this false in the headless harness (no native controller there), so puppet tests are unaffected.
+    private bool LocalDeploymentInProgress()
+        => !_revealGate.IsCommitted
+           && Mission.Current?.GetMissionBehavior<DeploymentMissionController>() != null;
+
+    // [Game thread] Drain puppets buffered while the mission's teams did not yet exist (or while we were still
+    // deploying), once they do / once our deployment has committed.
     private void DrainPendingPuppets()
     {
         if (Mission.Current == null || Mission.Current.DefenderTeam == null) return;
+        if (LocalDeploymentInProgress()) return; // hold puppets until our own deployment commits
 
         BattleAgentSpawnData[] pending;
         lock (_pendingPuppetLock)
@@ -1053,6 +1125,159 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
         return null;
     }
 
+    // === Mid-battle reinforcements: field a newly-joined AI party through our own spawn path ===============
+
+    // [Host] A party was added to the live battle. If it is a new AI party we field — not a player's own party,
+    // and not one of the initial parties the troop supplier already spawns — field it now by spawning its troops
+    // at the side's default reinforcement frame. Gated on the battle being activated so the INITIAL involved-
+    // parties broadcast (pre-activation) is ignored: those parties spawn through the supplier, not here.
+    private void Handle_ReinforcementPartiesAdded(MessagePayload<NetworkAddInvolvedParties> payload)
+    {
+        if (!hostRegistry.IsLocalHost(instanceId)) return;
+        if (!_activator.IsActivated) return;
+
+        var partyIds = payload.What.MapEventPartyIds;
+        if (partyIds == null || partyIds.Length == 0) return;
+
+        GameThread.RunSafe(() =>
+        {
+            if (Mission.Current == null) return;
+
+            foreach (var partyId in partyIds)
+            {
+                if (_reinforcedParties.Contains(partyId)) continue;     // already fielded
+                if (IsSupplierParty(partyId)) continue;                 // an initial party — the supplier spawns it
+                if (!objectManager.TryGetObject<MapEventParty>(partyId, out var mapEventParty)) continue;
+
+                var party = mapEventParty?.Party;
+                if (party == null) continue;
+
+                // The broadcast is server -> all clients (every battle), so only field this battle's parties.
+                var mapEvent = party.MapEventSide?.MapEvent;
+                if (mapEvent == null || !objectManager.TryGetId(mapEvent, out var mapEventId) || mapEventId != instanceId)
+                    continue;
+
+                // A player's own party is fielded by that player (Phase E), not us — we only field AI parties.
+                if (party.LeaderHero?.IsPlayerHero() == true) continue;
+
+                _reinforcedParties.Add(partyId);
+                SpawnReinforcementParty(mapEventParty, party, partyId);
+            }
+        });
+    }
+
+    // Whether a party is one of the initial reserves the troop supplier already provides, so the native spawn
+    // logic spawns it and we must not also spawn it here.
+    private bool IsSupplierParty(string mapEventPartyId)
+    {
+        foreach (var supplier in CoopTroopSupplierRegistry.GetSuppliers(instanceId))
+            foreach (var (partyId, _) in supplier.GetSuppliedByParty())
+                if (partyId == mapEventPartyId) return true;
+        return false;
+    }
+
+    // [Host, game thread] Field a newly-joined AI party: spawn each of its able troops AI-controlled at the
+    // side's default reinforcement frame, then put the formations they land in on a charge. Capture is NOT
+    // suppressed, so each spawn flows through Handle_AgentSpawnedInBattle (registered under us, broadcast to
+    // peers as puppets, casualty attributed from the origin) — the same pipeline the initial troops use.
+    private void SpawnReinforcementParty(MapEventParty mapEventParty, PartyBase party, string mapEventPartyId)
+    {
+        var mission = Mission.Current;
+        var team = ResolveTeam(party.Side);
+        if (team == null)
+        {
+            Logger.Warning("[BattleSync] No team for side {Side}; cannot field reinforcement party {Party}", party.Side, mapEventPartyId);
+            return;
+        }
+
+        var formations = new HashSet<Formation>();
+        int spawned = 0;
+        foreach (var element in party.MemberRoster.GetTroopRoster())
+        {
+            var character = element.Character;
+            if (character == null) continue;
+
+            int able = element.Number - element.WoundedNumber;
+            for (int i = 0; i < able; i++)
+            {
+                var agent = SpawnReinforcementTroop(mission, team, character, party);
+                if (agent?.Formation != null) formations.Add(agent.Formation);
+                spawned++;
+            }
+        }
+
+        // A coop battle has no general commanding formations, so order each formation the reinforcements joined
+        // to engage — SetControlledByAI alone leaves them idle without an active behavior.
+        foreach (var formation in formations)
+        {
+            formation.SetControlledByAI(true);
+            formation.SetMovementOrder(MovementOrder.MovementOrderCharge);
+        }
+
+        Logger.Information("[BattleSync] Fielded reinforcement party {Party}: spawned {Count} troop(s)", mapEventPartyId, spawned);
+    }
+
+    // [Host, game thread] Spawn one reinforcement troop AI-controlled. With no InitialPosition set, the engine
+    // positions it at the side's reinforcement spawn frame; we then drop it into its troop-class formation.
+    private Agent SpawnReinforcementTroop(Mission mission, Team team, CharacterObject character, PartyBase party)
+    {
+        var origin = new CoopAgentOrigin(character, party, -1, null, new UniqueTroopDescriptor(MBRandom.RandomInt(int.MaxValue)));
+        var equipment = character.IsHero ? character.HeroObject.BattleEquipment : character.Equipment;
+
+        var buildData = new AgentBuildData(character);
+        buildData.Team(team);
+        buildData.TroopOrigin(origin);
+        buildData.Equipment(equipment);
+        buildData.BodyProperties(character.GetBodyPropertiesMax());
+        buildData.Controller(AgentControllerType.AI);
+        buildData.IsReinforcement(true);
+        buildData.ClothingColor1(origin.FactionColor);
+        buildData.ClothingColor2(origin.FactionColor2);
+
+        var agent = mission.SpawnAgent(buildData);
+        agent.FadeIn();
+
+        if (agent.Character != null && agent.Team != null)
+        {
+            var formation = agent.Team.GetFormation(agent.Character.GetFormationClass());
+            if (formation != null)
+                agent.Formation = formation;
+        }
+        agent.SetIsAIPaused(false);
+
+        return agent;
+    }
+
+    // The team a puppet joins. A puppet is ANOTHER owner's troop, so it must NOT land on our local PlayerTeam — the
+    // Order-of-Battle deployment lets the local player arrange/command EVERY formation on PlayerTeam, so a puppet
+    // there becomes deployable by us (the "non-host can deploy the host hero and NPC heroes" bug). Each client only
+    // spawns its OWN party into PlayerTeam (the rest arrive here as puppets), so keeping puppets off PlayerTeam means
+    // the local player only ever commands its own party. We put a puppet on a NON-player team for its side: the
+    // side's main team if that isn't ours, otherwise the side's ally team. Returns null only while the side's main
+    // team doesn't exist yet (mission still loading) so the caller buffers and retries.
+    private Team ResolvePuppetTeam(BattleAgentSpawnData data)
+    {
+        var mainTeam = ResolveTeam(data.Side);
+        if (mainTeam == null) return null;
+
+        // Our OWN troop replicated back to us (e.g. our own-party deployment broadcast echoed over the mesh) belongs
+        // on our own team — it is the one puppet we DO control.
+        if (data.OwnerControllerId == controllerIdProvider.ControllerId)
+            return mainTeam;
+
+        var playerTeam = Mission.Current.PlayerTeam;
+        if (mainTeam != playerTeam) return mainTeam;          // main team isn't ours (we're an ally) — safe to use
+
+        // The side's main team IS our PlayerTeam, so route to the side's ally team instead so we can't command it.
+        var allyTeam = data.Side == BattleSideEnum.Attacker
+            ? Mission.Current.AttackerAllyTeam
+            : Mission.Current.DefenderAllyTeam;
+        if (allyTeam != null && allyTeam != playerTeam) return allyTeam;
+
+        // No separate ally team on our side yet (only our own party present) — fall back to the main team.
+        return mainTeam;
+    }
+
     private static Team ResolveTeam(BattleSideEnum side)
     {
         return side switch
@@ -1063,16 +1288,8 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
         };
     }
 
+    // Heroes and troops alike are carried by their CharacterObject id (hero CharacterObjects are registered —
+    // CharacterObjectRegistry), so resolve uniformly. Hero-ness is recovered from the resolved character.IsHero.
     private bool TryResolveCharacter(BattleAgentSpawnData data, out CharacterObject character)
-    {
-        character = null;
-        if (data.IsHero)
-        {
-            if (!objectManager.TryGetObjectWithLogging<Hero>(data.CharacterId, out var hero)) return false;
-            character = hero.CharacterObject;
-            return character != null;
-        }
-
-        return objectManager.TryGetObjectWithLogging(data.CharacterId, out character);
-    }
+        => objectManager.TryGetObjectWithLogging(data.CharacterId, out character);
 }

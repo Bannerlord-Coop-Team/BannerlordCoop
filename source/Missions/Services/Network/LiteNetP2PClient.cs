@@ -301,6 +301,13 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         relayNetwork.SendAll(new RelayPacket(packet.DeliveryMethod, instanceId, controllerId, payload));
     }
 
+    // A conservative ceiling for a single non-fragmentable (Unreliable/Sequenced) send. netPeer
+    // .GetMaxSinglePacketSize() can read OPTIMISTICALLY high — it cleared a movement batch the send then
+    // rejected at ~1 KB (TooBigPacketException), which the Poller swallowed so movement silently stopped and
+    // every puppet froze. Capping the promote threshold here keeps the pre-check honest on links whose real
+    // single-packet limit sits near the minimum MTU; genuinely-smaller MTUs still win via the Math.Min below.
+    private const int SafeSinglePacketBytes = 1000;
+
     public void Send(NetPeer netPeer, IPacket packet)
     {
         byte[] data = serializer.Serialize(packet);
@@ -308,17 +315,26 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
 
         // Unreliable/Sequenced channels can't fragment: an oversized payload makes netPeer.Send throw
         // TooBigPacketException, which the Poller swallows (e.g. movement then silently stops). When a
-        // packet exceeds the peer's current MTU for its requested channel, promote it to a fragmentable
-        // reliable channel so LiteNetLib splits it instead of throwing. Senders chunk to keep the common
-        // case unreliable; this is the backstop for whatever still overflows (small early MTU, fat
-        // all-cavalry batches, large spawn bursts).
-        if (method != DeliveryMethod.ReliableOrdered && method != DeliveryMethod.ReliableUnordered
-            && data.Length > netPeer.GetMaxSinglePacketSize(method))
+        // packet exceeds the peer's single-packet limit, promote it to a fragmentable reliable channel so
+        // LiteNetLib splits it instead of throwing. Senders chunk to keep the common case unreliable; this is
+        // the backstop for whatever still overflows (small early MTU, fat all-cavalry batches, spawn bursts).
+        bool fragmentable = method == DeliveryMethod.ReliableOrdered || method == DeliveryMethod.ReliableUnordered;
+        if (!fragmentable && data.Length > Math.Min(netPeer.GetMaxSinglePacketSize(method), SafeSinglePacketBytes))
         {
             method = DeliveryMethod.ReliableUnordered;
+            fragmentable = true;
         }
 
-        netPeer.Send(data, method);
+        try
+        {
+            netPeer.Send(data, method);
+        }
+        catch (TooBigPacketException) when (!fragmentable)
+        {
+            // The size estimate still under-shot the peer's real cap — deliver via the fragmentable reliable
+            // channel rather than letting the Poller swallow the throw and drop the packet entirely.
+            netPeer.Send(data, DeliveryMethod.ReliableUnordered);
+        }
     }
 
     public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)

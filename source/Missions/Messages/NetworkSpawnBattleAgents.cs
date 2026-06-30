@@ -33,8 +33,6 @@ public class BattleAgentSpawnData
     public readonly Guid AgentId;
     [ProtoMember(2)]
     public readonly string CharacterId;
-    [ProtoMember(3)]
-    public readonly bool IsHero;
     [ProtoMember(4)]
     public readonly Vec3 Position;
     [ProtoMember(5)]
@@ -50,11 +48,10 @@ public class BattleAgentSpawnData
     [ProtoMember(9)]
     public readonly int TroopSeed;
 
-    public BattleAgentSpawnData(Guid agentId, string characterId, bool isHero, Vec3 position, BattleSideEnum side, float health, string ownerControllerId, string mapEventPartyId, int troopSeed)
+    public BattleAgentSpawnData(Guid agentId, string characterId, Vec3 position, BattleSideEnum side, float health, string ownerControllerId, string mapEventPartyId, int troopSeed)
     {
         AgentId = agentId;
         CharacterId = characterId;
-        IsHero = isHero;
         Position = position;
         Side = side;
         Health = health;

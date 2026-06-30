@@ -211,6 +211,13 @@ internal class BattleHostHandler : IHandler
                     Logger.Warning("[BattleHost] Host {Host} left battle {MapEventId} with no successors; clearing assignment",
                         controllerId, mapEventId);
                     hostRegistry.Remove(mapEventId);
+
+                    // The battle is fully abandoned (no one left to continue it). Forget the WHOLE map event's
+                    // reserves — not just the leaver's own party (ForgetController above) — so restarting the
+                    // SAME map event re-flattens the AI/enemy parties the host had been fielding. Otherwise their
+                    // supplied pointers stay at the end and only the host's own re-flattened party re-spawns.
+                    if (objectManager.TryGetObject<MapEvent>(mapEventId, out var abandonedEvent))
+                        reserveBuilder.ForgetMapEvent(abandonedEvent);
                     return;
                 }
 
@@ -252,10 +259,6 @@ internal class BattleHostHandler : IHandler
             message.HostControllerId,
             message.SuccessorControllerIds ?? Array.Empty<string>());
         hostRegistry.Set(message.MapEventId, assignment);
-
-        // Tell the spawn gate so the (GameInterface) spawn patches know whether to run the vanilla spawner
-        // for the active battle mission.
-        BattleSpawnGate.SetLocalHost(message.MapEventId, hostRegistry.IsLocalHost(message.MapEventId));
 
         Logger.Information("[BattleHost] Battle {MapEventId} host is {Host}{IsMe} (successors: {Successors})",
             message.MapEventId,

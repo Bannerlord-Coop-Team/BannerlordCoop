@@ -9,6 +9,7 @@ using Helpers;
 using SandBox.Missions.MissionLogics;
 using Serilog;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -75,7 +76,11 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
         // player deploys onto). PartyBase.MainParty.Side is the authoritative battle side — already used below
         // to drive the spawn logic's player side.
         bool isPlayerAttacker = PartyBase.MainParty.Side == BattleSideEnum.Attacker;
-        List<string> heroesOnPlayerSideByPriority = HeroHelper.OrderHeroesOnPlayerSideByPriority(false, false);
+        // In a coop battle each client deploys only its OWN party (the rest of the side arrives as host-owned
+        // puppets), so the deployment role/captain list must be scoped to the local player's party. The native
+        // HeroHelper.OrderHeroesOnPlayerSideByPriority returns the leader hero of EVERY party on the side, which
+        // would seat the host's and the AI lords' heroes in a non-host's Order of Battle.
+        List<string> heroesOnPlayerSideByPriority = OwnPartyHeroesByPriority();
 
         Hero attackerLeader = MapEvent.PlayerMapEvent.AttackerSide.LeaderParty.LeaderHero;
         TextObject attackerGeneralName = attackerLeader?.Name;
@@ -155,5 +160,22 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
         Logger.Information("[BattleSync] Opened coop field battle for {MapEventId} (player side {Side})",
             mapEventId, PartyBase.MainParty.Side);
         return mission;
+    }
+
+    // The local player's own deployable heroes (its party leader + any companion heroes in the party), highest
+    // sergeant-score first — the coop-scoped replacement for HeroHelper.OrderHeroesOnPlayerSideByPriority, which
+    // spans the whole side. Carried as CharacterObject string ids, matching the native list that
+    // AssignPlayerRoleInTeamMissionController consumes.
+    private static List<string> OwnPartyHeroesByPriority()
+    {
+        var heroes = new List<Hero>();
+        foreach (var member in MobileParty.MainParty.MemberRoster.GetTroopRoster())
+            if (member.Character?.HeroObject is Hero hero)
+                heroes.Add(hero);
+
+        return heroes
+            .OrderByDescending(h => Campaign.Current.Models.EncounterModel.GetCharacterSergeantScore(h))
+            .Select(h => h.CharacterObject.StringId)
+            .ToList();
     }
 }

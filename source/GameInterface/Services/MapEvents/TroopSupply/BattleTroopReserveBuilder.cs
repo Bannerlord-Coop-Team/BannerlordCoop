@@ -38,6 +38,12 @@ public interface IBattleTroopReserveBuilder : IGameAbstraction
     /// so that, if it rejoins, its party is re-flattened fresh (supplied pointer reset) and re-spawns. Do NOT
     /// call this on a disconnect — there the host adopts the troops, and resetting would double-spawn them.</summary>
     void ForgetController(MapEvent mapEvent, string controllerId);
+
+    /// <summary>Forget EVERY party of a battle (its whole ledger + built-set), so the next battle on the SAME
+    /// map event re-flattens all parties fresh. Use when a battle is fully ABANDONED — the host left with no
+    /// successors — otherwise the AI/enemy parties the host had been fielding keep their advanced supplied
+    /// pointers and never re-spawn on a restart (only the leaver's own re-flattened party would).</summary>
+    void ForgetMapEvent(MapEvent mapEvent);
 }
 
 /// <inheritdoc cref="IBattleTroopReserveBuilder"/>
@@ -129,6 +135,27 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
         }
     }
 
+    public void ForgetMapEvent(MapEvent mapEvent)
+    {
+        if (mapEvent == null) return;
+        if (!objectManager.TryGetId(mapEvent, out var mapEventId)) return;
+
+        lock (gate)
+        {
+            int forgotten = 0;
+            foreach (var party in EnumerateParties(mapEvent))
+            {
+                if (!objectManager.TryGetId(party, out var partyId)) continue;
+
+                ledger.RemoveParty(mapEventId, partyId);
+                builtParties.Remove(partyId);
+                forgotten++;
+            }
+            Logger.Information("[TroopSupply] Forgot ALL {Count} parties of abandoned battle {MapEventId} (re-flattens fresh on restart)",
+                forgotten, mapEventId);
+        }
+    }
+
     private static int CountEntries(List<PartyReserve> parties)
     {
         int total = 0;
@@ -179,23 +206,16 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
             if (character == null)
                 continue;
 
-            string characterId;
-            if (character.IsHero)
+            // Heroes and regular troops alike are keyed by their CharacterObject id (hero CharacterObjects are
+            // registered too — CharacterObjectRegistry), so resolve it uniformly.
+            if (!objectManager.TryGetId(character, out var characterId))
             {
-                if (character.HeroObject == null || !objectManager.TryGetId(character.HeroObject, out characterId))
-                {
-                    Logger.Warning("[TroopSupply] Skipped hero {Char} (HeroObject unresolvable on server) — player won't attach",
-                        character.StringId);
-                    continue;
-                }
-            }
-            else if (!objectManager.TryGetId(character, out characterId))
-            {
+                Logger.Warning("[TroopSupply] Skipped troop {Char} (CharacterObject unresolvable on server)", character.StringId);
                 continue;
             }
 
             entries.Add(new TroopReserveEntry(
-                element.Descriptor.UniqueSeed, characterId, character.IsHero, (int)character.GetFormationClass()));
+                element.Descriptor.UniqueSeed, characterId, (int)character.GetFormationClass()));
         }
         return entries;
     }

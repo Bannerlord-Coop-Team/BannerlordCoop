@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Common.Util;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace E2E.Tests.Environment.MockEngine;
@@ -19,6 +20,11 @@ public sealed class MockMission
     public Mission Shell { get; }
 
     public Agent MainAgent { get; set; }
+
+    /// <summary>Per-side teams, returned by the <c>Mission.AttackerTeam</c>/<c>DefenderTeam</c> shims so the
+    /// reinforcement spawn (which resolves the team by side) can field troops into them headless.</summary>
+    public MockTeam AttackerTeam { get; } = new MockTeam(BattleSideEnum.Attacker);
+    public MockTeam DefenderTeam { get; } = new MockTeam(BattleSideEnum.Defender);
 
     private readonly Dictionary<int, Agent> agentsByIndex = new();
     private int nextIndex;

@@ -307,15 +307,14 @@ internal class BattleMissionStartHandler : IHandler
 
             // Engage the spawn gate BEFORE OpenBattleMission builds the mission — the deployment controller
             // spawns the initial wave during mission setup (inside OpenBattleMission), earlier than the
-            // CoopBattleController attach. The host is computed locally (deterministic lowest controller id);
-            // the server's authoritative assignment reconciles the gate later (BattleHostHandler).
+            // CoopBattleController attach. The gate only marks "a coop battle is active" for the spawn patches;
+            // who fields which troops is decided by the server-fed reserves (CoopTroopSupplier).
             if (BattleSpawnConfig.Enabled
                 && ContainerProvider.TryResolve(out IObjectManager battleObjectManager)
                 && battleObjectManager.TryGetId(battle, out var battleMapEventId))
             {
-                var isLocalHost = BattleHostElection.IsLocalHost(battle);
-                BattleSpawnGate.BeginBattle(battleMapEventId, isLocalHost);
-                Logger.Information("[BattleSync] Engaged spawn gate in OpenAttackMission: mapEvent={MapEventId} isHost={IsHost}", battleMapEventId, isLocalHost);
+                BattleSpawnGate.BeginBattle(battleMapEventId);
+                Logger.Information("[BattleSync] Engaged spawn gate in OpenAttackMission: mapEvent={MapEventId}", battleMapEventId);
             }
 
             // Coop opens a custom field-battle mission (per-client troop suppliers, no deployment phase) instead

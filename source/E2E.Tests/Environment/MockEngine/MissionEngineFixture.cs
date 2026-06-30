@@ -36,6 +36,10 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Mission), "get_MainAgent", nameof(Mission_get_MainAgent));
         Prefix(typeof(Mission), "set_MainAgent", nameof(Mission_set_MainAgent));
         Prefix(typeof(Mission), nameof(Mission.FindAgentWithIndex), nameof(Mission_FindAgentWithIndex));
+        // Per-side teams — the reinforcement spawn resolves the side's team to field a new party into.
+        Prefix(typeof(Mission), "get_AttackerTeam", nameof(Mission_get_AttackerTeam));
+        Prefix(typeof(Mission), "get_DefenderTeam", nameof(Mission_get_DefenderTeam));
+        Prefix(typeof(Mission), "get_PlayerEnemyTeam", nameof(Mission_get_PlayerEnemyTeam));
 
         // Agent members
         Prefix(typeof(Agent), "get_Controller", nameof(Agent_get_Controller));
@@ -58,6 +62,7 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), "get_Formation", nameof(Agent_get_Formation));
         Prefix(typeof(Agent), "set_Formation", nameof(Agent_set_Formation));
         Prefix(typeof(Agent), nameof(Agent.SetIsAIPaused), nameof(Agent_SetIsAIPaused));
+        Prefix(typeof(Agent), nameof(Agent.FadeIn), nameof(Agent_FadeIn));
         Prefix(typeof(Team), nameof(Team.GetFormation), nameof(Team_GetFormation));
         Prefix(typeof(Formation), nameof(Formation.SetControlledByAI), nameof(Formation_SetControlledByAI));
         Prefix(typeof(Formation), nameof(Formation.SetMovementOrder), nameof(Formation_SetMovementOrder));
@@ -130,6 +135,29 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!MockMission.ForShell(__instance, out var mock)) return true;
         __result = mock.FindAgentWithIndex(agentId);
+        return false;
+    }
+
+    private static bool Mission_get_AttackerTeam(Mission __instance, ref Team __result)
+    {
+        if (!MockMission.ForShell(__instance, out var mock)) return true;
+        __result = mock.AttackerTeam.Shell;
+        return false;
+    }
+
+    private static bool Mission_get_DefenderTeam(Mission __instance, ref Team __result)
+    {
+        if (!MockMission.ForShell(__instance, out var mock)) return true;
+        __result = mock.DefenderTeam.Shell;
+        return false;
+    }
+
+    // ResolveTeam only falls back to PlayerEnemyTeam for BattleSideEnum.None; map it to a real side team so the
+    // shim never returns null.
+    private static bool Mission_get_PlayerEnemyTeam(Mission __instance, ref Team __result)
+    {
+        if (!MockMission.ForShell(__instance, out var mock)) return true;
+        __result = mock.AttackerTeam.Shell;
         return false;
     }
 
@@ -239,6 +267,12 @@ public sealed class MissionEngineFixture : IDisposable
     private static bool Agent_SetIsAIPaused(Agent __instance)
     {
         // No AI loop headless — accept the call so ConvertPuppetToHostAi doesn't deref the native agent.
+        return !AgentMirror.TryGet(__instance, out _);
+    }
+
+    private static bool Agent_FadeIn(Agent __instance)
+    {
+        // No visual loop headless — accept the call so freshly spawned (reinforcement) agents don't deref natives.
         return !AgentMirror.TryGet(__instance, out _);
     }
 

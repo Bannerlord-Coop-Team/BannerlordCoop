@@ -16,7 +16,7 @@ public class CoopTroopSupplierTests
     {
         var entries = new TroopReserveEntry[count];
         for (int i = 0; i < count; i++)
-            entries[i] = new TroopReserveEntry(seedBase + i, $"Char_{i}", isHero: i == 0, formationClass: 0);
+            entries[i] = new TroopReserveEntry(seedBase + i, $"Char_{i}", formationClass: 0);
         return entries;
     }
 

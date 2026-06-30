@@ -13,23 +13,15 @@ using TaleWorlds.Localization;
 namespace GameInterface.Services.MapEvents.Patches;
 
 /// <summary>
-/// Enforces mission-XOR-simulation on the encounter menu: a map event shared by several players is resolved either
-/// as a live battle mission or as an auto-resolve simulation, never both at once.
-/// <list type="bullet">
-/// <item>Once the server claims the event for a live mission (<see cref="BattleModeRegistry.IsMission"/>, set from the
-/// server's <see cref="Messages.Start.NetworkBattleModeSet"/> broadcast), the auto-resolve options are greyed out for
-/// everyone still at the menu.</item>
-/// <item>Once it claims the event for an auto-resolve (<see cref="BattleModeRegistry.IsSimulation"/>), the
-/// mission-start options are greyed out.</item>
-/// </list>
-/// Every other option (join the mission, leave, talk, surrender) is left untouched, so a joiner can still act —
-/// only the wrong-mode battle-start is blocked.
+/// Enforces mission-XOR-simulation on the encounter menu of a shared map event: while it is claimed for a live
+/// mission (<see cref="BattleModeRegistry.IsMission"/>) the auto-resolve options grey out, and while claimed for an
+/// auto-resolve (<see cref="BattleModeRegistry.IsSimulation"/>) the mission-start options grey out. The mode comes
+/// from the server's <see cref="Messages.Start.NetworkBattleModeSet"/>. Other options (join, leave, talk) are
+/// untouched — only the wrong-mode battle-start is blocked.
 /// </summary>
 /// <remarks>
-/// One shared postfix is applied to each option-condition callback in <see cref="MissionStartConditions"/> and
-/// <see cref="SimulationStartConditions"/> on <see cref="EncounterGameMenuBehavior"/>; the patched method name tells
-/// the postfix which bucket the option is in. Move an entry between the lists (or drop it) to re-classify an option.
-/// Complements <see cref="DisablePvpEncounterAttackPatch"/>.
+/// One shared postfix per option-condition in <see cref="MissionStartConditions"/> / <see cref="SimulationStartConditions"/>;
+/// the patched method name selects the bucket.
 /// </remarks>
 [HarmonyPatch]
 internal class BattleModeEncounterOptionsPatch
@@ -37,9 +29,8 @@ internal class BattleModeEncounterOptionsPatch
     private static readonly TextObject MissionUnderwayTooltip = new("{=!}A battle is already underway.");
     private static readonly TextObject SimulationUnderwayTooltip = new("{=!}A battle simulation is already underway.");
 
-    // Options that launch the live battle mission — greyed out while an auto-resolve simulation is underway for the
-    // event. launch_mission is the shared final launch every mission path funnels through (the robust catch-all).
-    // (Trailing comment is the in-game option label.)
+    // Live-mission launch options, greyed while a simulation runs (launch_mission is the shared catch-all every
+    // mission path funnels through). Trailing comment = in-game label.
     private static readonly HashSet<string> MissionStartConditions = new()
     {
         "game_menu_encounter_attack_on_condition",        // Attack!
@@ -51,7 +42,7 @@ internal class BattleModeEncounterOptionsPatch
         "launch_mission_on_condition",                    // (shared: launches the battle mission)
     };
 
-    // Options that start the auto-resolve simulation — greyed out while a live mission is underway for the event.
+    // Auto-resolve options, greyed while a live mission runs.
     private static readonly HashSet<string> SimulationStartConditions = new()
     {
         "game_menu_encounter_order_attack_on_condition",  // Send your troops to attack
@@ -77,10 +68,10 @@ internal class BattleModeEncounterOptionsPatch
     [HarmonyPostfix]
     static void Postfix(MenuCallbackArgs __0, bool __result, MethodBase __originalMethod)
     {
-        // The option is already hidden/unavailable; nothing to do.
+        // Already unavailable — nothing to do.
         if (__result == false) return;
 
-        // The headless server never opens the encounter menu; the mode trackers are client state.
+        // Server never opens the menu; mode trackers are client state.
         if (ModInformation.IsServer) return;
 
         var mapEvent = PlayerEncounter.Battle ?? MobileParty.MainParty?.MapEvent;
@@ -91,7 +82,7 @@ internal class BattleModeEncounterOptionsPatch
 
         var name = __originalMethod.Name;
 
-        // A live mission is underway for this event → block starting an auto-resolve simulation.
+        // Live mission underway → block starting a simulation.
         if (SimulationStartConditions.Contains(name) && BattleModeRegistry.IsMission(mapEventId))
         {
             __0.IsEnabled = false;
@@ -99,7 +90,7 @@ internal class BattleModeEncounterOptionsPatch
             return;
         }
 
-        // An auto-resolve simulation is underway for this event → block starting a live mission.
+        // Simulation underway → block starting a live mission.
         if (MissionStartConditions.Contains(name) && BattleModeRegistry.IsSimulation(mapEventId))
         {
             __0.IsEnabled = false;

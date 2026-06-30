@@ -1,22 +1,20 @@
 namespace GameInterface.Services.MapEvents;
 
 /// <summary>
-/// Static bridge that lets the (GameInterface) battle-spawn Harmony patches know, for the battle mission
-/// currently open, whether this client is the elected host. The Missions battle stack pushes state in:
-/// the controller marks a coop battle active on entry (<see cref="BeginBattle"/>) and clears it on exit
-/// (<see cref="EndBattle"/>); the host handler sets the host result once the server's assignment arrives
-/// (<see cref="SetLocalHost"/>). The patches can't resolve DI services, hence this static.
+/// Static bridge that lets the (GameInterface) battle-spawn Harmony patches know whether a coop field battle is
+/// the active mission (and which map event it is): the Missions battle stack marks one active on entry
+/// (<see cref="BeginBattle"/>) and clears it on exit (<see cref="EndBattle"/>). The patches are static methods
+/// that cannot resolve DI services, hence this static bridge.
 /// <para>
-/// <see cref="LocalIsHost"/> is a tri-state: null until the host is known. The disable patch treats null
-/// as "not host yet" and withholds spawning, so a non-host never spawns its own copy of the battle and the
-/// host only begins once it knows it is the host.
+/// It holds NO host/ownership state: which client fields (spawns) a party is decided server-side by the troop
+/// reserve assignment — each client's <c>CoopTroopSupplier</c> only contains the troops it owns, so there is no
+/// host-based spawn suppression to gate here. The live host source for the controller is <c>IBattleHostRegistry</c>.
 /// </para>
 /// </summary>
 public static class BattleSpawnGate
 {
     private static readonly object Gate = new object();
     private static string _activeMapEventId;
-    private static bool? _localIsHost;
 
     [System.ThreadStatic]
     private static bool _suppressCapture;
@@ -38,34 +36,17 @@ public static class BattleSpawnGate
         get { lock (Gate) { return _activeMapEventId != null; } }
     }
 
-    /// <summary>Whether this client is the host of the active battle; null until the assignment is known.</summary>
-    public static bool? LocalIsHost
-    {
-        get { lock (Gate) { return _localIsHost; } }
-    }
-
     public static string ActiveMapEventId
     {
         get { lock (Gate) { return _activeMapEventId; } }
     }
 
-    /// <summary>[Controller] Mark a coop battle active, seeding the host result if it is already known.</summary>
-    public static void BeginBattle(string mapEventId, bool? isHost)
+    /// <summary>[Controller] Mark a coop battle active.</summary>
+    public static void BeginBattle(string mapEventId)
     {
         lock (Gate)
         {
             _activeMapEventId = mapEventId;
-            _localIsHost = isHost;
-        }
-    }
-
-    /// <summary>[Host handler] Record the host result once the server's assignment arrives.</summary>
-    public static void SetLocalHost(string mapEventId, bool isHost)
-    {
-        lock (Gate)
-        {
-            if (mapEventId != null && mapEventId == _activeMapEventId)
-                _localIsHost = isHost;
         }
     }
 
@@ -75,7 +56,6 @@ public static class BattleSpawnGate
         lock (Gate)
         {
             _activeMapEventId = null;
-            _localIsHost = null;
         }
     }
 }
