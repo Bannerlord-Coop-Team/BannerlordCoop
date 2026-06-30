@@ -1,10 +1,14 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Network;
+using Common.Network.Coalescing;
 using Coop.Core.Common.Network.Packets;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
+using Serilog;
+using System;
 
 namespace Coop.Core.Server.Connections.States;
 
@@ -14,13 +18,16 @@ namespace Coop.Core.Server.Connections.States;
 /// </summary>
 public class TransferSaveState : ConnectionStateBase
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<TransferSaveState>();
+
     public TransferSaveState(
         IConnectionLogic connectionLogic,
         INetwork network,
         ICoopSessionProvider coopSessionProvider,
         ISaveInterface saveInterface,
         ITimeControlInterface timeControlInterface,
-        IConnectionMessageQueue connectionMessageQueue)
+        IConnectionMessageQueue connectionMessageQueue,
+        ISendCoalescer coalescer)
         : base(connectionLogic)
     {
         GameThread.Run(() =>
@@ -30,6 +37,21 @@ public class TransferSaveState : ConnectionStateBase
             // the registry's loading lock; ConnectionCollection drives the broadcast loading pause once
             // the transition completes (see IsLoading below).
             timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
+
+            // Drain the coalescer before the snapshot, while this peer is still Dropping. A coalesced delta is
+            // applied immediately but its send is deferred to a later game-thread flush, so left pending it
+            // would be both captured in the snapshot and flushed after BeginQueueing, then queued for this peer
+            // and replayed on campaign entry (double-apply). Flushing here drops it for this Dropping peer.
+            // Guard the flush because this runs in a blocking GameThread.Run, so a throwing coalesced send
+            // must not strand the join until the blocking timeout.
+            try
+            {
+                coalescer.Flush(network);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Failed to flush coalesced sends before the join save snapshot");
+            }
 
             var saveResults = saveInterface.SaveCurrentGame();
 
