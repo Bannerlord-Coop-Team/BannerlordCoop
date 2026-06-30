@@ -898,6 +898,11 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
             GameThread.RunSafe(() =>
             {
                 if (Mission.Current == null) return;
+
+                // A migration can promote us while AI ticking is gated off (e.g. mid-deployment); turn it back on so
+                // the adopted agents actually tick, exactly as ActivateNpcAi does.
+                Mission.Current.AllowAiTicking = true;
+
                 var formations = new HashSet<Formation>();
                 int aiCount = 0;
                 foreach (var info in adopted)
@@ -961,6 +966,16 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
 
         agent.Controller = AgentControllerType.AI;
         agent.SetIsAIPaused(false);
+
+        // Wake the AI the same way ActivateNpcAi does for the enemy side. Without this an adopted agent is
+        // AI-controlled but NOT alarmed and holds stale enemy caches, so it ignores its formation's Charge order and
+        // stands idle — the "allied NPCs don't move after host migration" bug. The ally side never goes through
+        // ActivateNpcAi (which only releases the ENEMY side), so the adopt path must do the wake itself; adopted
+        // agents are combat troops (the registry only holds riders, never mounts), so the CanWieldWeapon guard
+        // ActivateNpcAi uses is unnecessary here.
+        agent.SetAlarmState(Agent.AIStateFlag.Alarmed);
+        agent.ResetEnemyCaches();
+        agent.HumanAIComponent?.SyncBehaviorParamsIfNecessary();
     }
 
     private void SpawnPuppet(BattleAgentSpawnData data)

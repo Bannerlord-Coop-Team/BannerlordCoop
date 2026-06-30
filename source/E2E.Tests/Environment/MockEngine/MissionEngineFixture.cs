@@ -62,6 +62,8 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), "get_Formation", nameof(Agent_get_Formation));
         Prefix(typeof(Agent), "set_Formation", nameof(Agent_set_Formation));
         Prefix(typeof(Agent), nameof(Agent.SetIsAIPaused), nameof(Agent_SetIsAIPaused));
+        Prefix(typeof(Agent), nameof(Agent.SetAlarmState), nameof(Agent_SetAlarmState));
+        Prefix(typeof(Agent), nameof(Agent.ResetEnemyCaches), nameof(Agent_ResetEnemyCaches));
         Prefix(typeof(Agent), nameof(Agent.FadeIn), nameof(Agent_FadeIn));
         Prefix(typeof(Team), nameof(Team.GetFormation), nameof(Team_GetFormation));
         Prefix(typeof(Formation), nameof(Formation.SetControlledByAI), nameof(Formation_SetControlledByAI));
@@ -267,6 +269,19 @@ public sealed class MissionEngineFixture : IDisposable
     private static bool Agent_SetIsAIPaused(Agent __instance)
     {
         // No AI loop headless — accept the call so ConvertPuppetToHostAi doesn't deref the native agent.
+        return !AgentMirror.TryGet(__instance, out _);
+    }
+
+    private static bool Agent_SetAlarmState(Agent __instance, ref bool __result)
+    {
+        // No AI loop headless — accept ConvertPuppetToHostAi's AI wake-up without dereffing the native agent.
+        if (!AgentMirror.TryGet(__instance, out _)) return true;
+        __result = true;
+        return false;
+    }
+
+    private static bool Agent_ResetEnemyCaches(Agent __instance)
+    {
         return !AgentMirror.TryGet(__instance, out _);
     }
 
