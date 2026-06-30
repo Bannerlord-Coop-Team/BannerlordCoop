@@ -17,8 +17,6 @@ namespace GameInterface.Services.PartyVisuals.Patches
         [HarmonyPrefix]
         private static bool Prefix(MobilePartyVisualManager __instance, float realDt, float dt)
         {
-            // Co-op keeps map time running during a mission, so without this the (invisible) party-icon
-            // agent-visuals contend with the mission's on the engine's shared mesh pool and crash natively.
             if (Mission.Current != null) return false;
 
             __instance._dirtyPartyVisualCount = -1;
