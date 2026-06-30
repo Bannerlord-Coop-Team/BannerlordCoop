@@ -49,6 +49,9 @@ internal class AlleySessionSeedHandler : IHandler
 
         foreach (var (alley, overseer, garrison) in behaviorInterface.GetPlayerOwnedAlleys())
         {
+            // The host's _playerOwnedCommonAreaData is a frozen load snapshot that abandon doesn't clean,
+            // so an ownerless entry is a stale abandoned alley; don't resurrect its management data.
+            if (alley.Owner == null) continue;
             if (!objectManager.TryGetIdWithLogging(alley, out var alleyId)) continue;
 
             // Only fill alleys the session doesn't know about yet, so a co-op save's transferred data
