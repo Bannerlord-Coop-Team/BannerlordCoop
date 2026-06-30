@@ -38,12 +38,9 @@ public class TransferSaveState : ConnectionStateBase
             // the transition completes (see IsLoading below).
             timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
 
-            // Drain the coalescer before the snapshot, while this peer is still Dropping. A coalesced delta is
-            // applied immediately but its send is deferred to a later game-thread flush, so left pending it
-            // would be both captured in the snapshot and flushed after BeginQueueing, then queued for this peer
-            // and replayed on campaign entry (double-apply). Flushing here drops it for this Dropping peer.
-            // Guard the flush because this runs in a blocking GameThread.Run, so a throwing coalesced send
-            // must not strand the join until the blocking timeout.
+            // Flush pending coalesced sends before the snapshot, while this peer is still Dropping: a deferred
+            // delta would otherwise be both captured in the snapshot and replayed to this peer after BeginQueueing
+            // (double-apply). Guarded so a throwing send can't strand this blocking GameThread.Run.
             try
             {
                 coalescer.Flush(network);
