@@ -1,5 +1,6 @@
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Coalescing;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.Heroes.Interaces;
@@ -30,7 +31,8 @@ public class ConnectionContext
         ICoopSessionProvider coopSessionProvider,
         ISaveInterface saveInterface,
         ITimeControlInterface timeControlInterface,
-        IConnectionMessageQueue connectionMessageQueue)
+        IConnectionMessageQueue connectionMessageQueue,
+        ISendCoalescer coalescer)
     {
         MessageBroker = messageBroker;
         Network = network;
@@ -44,6 +46,7 @@ public class ConnectionContext
         SaveInterface = saveInterface;
         TimeControlInterface = timeControlInterface;
         ConnectionMessageQueue = connectionMessageQueue;
+        Coalescer = coalescer;
     }
 
     public IMessageBroker MessageBroker { get; }
@@ -58,4 +61,5 @@ public class ConnectionContext
     public ISaveInterface SaveInterface { get; }
     public ITimeControlInterface TimeControlInterface { get; }
     public IConnectionMessageQueue ConnectionMessageQueue { get; }
+    public ISendCoalescer Coalescer { get; }
 }
