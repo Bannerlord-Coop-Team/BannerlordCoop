@@ -40,20 +40,119 @@ internal class DefaultNotificationsHandler : IHandler
         this.network = network;
         this.troopRosterInterface = troopRosterInterface;
 
+        messageBroker.Subscribe<NotifyAllianceStarted>(Handle_NotifyAllianceStarted);
+        messageBroker.Subscribe<NetworkNotifyAllianceStarted>(Handle_NetworkNotifyAllianceStarted);
+
+        messageBroker.Subscribe<NotifyAllianceEnded>(Handle_NotifyAllianceEnded);
+        messageBroker.Subscribe<NetworkNotifyAllianceEnded>(Handle_NetworkNotifyAllianceEnded);
+
+        messageBroker.Subscribe<NotifyCallWarToWarAgreementStarted>(Handle_NotifyCallWarToWarAgreementStarted);
+        messageBroker.Subscribe<NetworkNotifyCallWarToWarAgreementStarted>(Handle_NetworkNotifyCallWarToWarAgreementStarted);
+
+        messageBroker.Subscribe<NotifyCallWarToWarAgreementEnded>(Handle_NotifyCallWarToWarAgreementEnded);
+        messageBroker.Subscribe<NetworkNotifyCallWarToWarAgreementEnded>(Handle_NetworkNotifyCallWarToWarAgreementEnded);
+
+        messageBroker.Subscribe<NotifySettlementEntered>(Handle_NotifySettlementEntered);
+        messageBroker.Subscribe<NetworkNotifySettlementEntered>(Handle_NetworkNotifySettlementEntered);
+
+        messageBroker.Subscribe<NotifyPartyAddedToMapEvent>(Handle_NotifyPartyAddedToMapEvent);
+        messageBroker.Subscribe<NetworkNotifyPartyAddedToMapEvent>(Handle_NetworkNotifyPartyAddedToMapEvent);
+
         messageBroker.Subscribe<NotifyCompanionRemoved>(Handle_NotifyCompanionRemoved);
         messageBroker.Subscribe<NetworkNotifyCompanionRemoved>(Handle_NetworkNotifyCompanionRemoved);
+
+        messageBroker.Subscribe<NotifyRenownGained>(Handle_NotifyRenownGained);
+        messageBroker.Subscribe<NetworkNotifyRenownGained>(Handle_NetworkNotifyRenownGained);
+
+        messageBroker.Subscribe<NotifyHideoutSpotted>(Handle_NotifyHideoutSpotted);
+        messageBroker.Subscribe<NetworkNotifyHideoutSpotted>(Handle_NetworkNotifyHideoutSpotted);
+
+        messageBroker.Subscribe<NotifyHeroBecameFugitive>(Handle_NotifyHeroBecameFugitive);
+        messageBroker.Subscribe<NetworkNotifyHeroBecameFugitive>(Handle_NetworkNotifyHeroBecameFugitive);
+
+        messageBroker.Subscribe<NotifyPrisonerTaken>(Handle_NotifyPrisonerTaken);
+        messageBroker.Subscribe<NetworkNotifyPrisonerTaken>(Handle_NetworkNotifyPrisonerTaken);
+
+        messageBroker.Subscribe<NotifyHeroPrisonerReleased>(Handle_NotifyHeroPrisonerReleased);
+        messageBroker.Subscribe<NetworkNotifyHeroPrisonerReleased>(Handle_NetworkNotifyHeroPrisonerReleased);
+
+        messageBroker.Subscribe<NotifyBattleStarted>(Handle_NotifyBattleStarted);
+        messageBroker.Subscribe<NetworkNotifyBattleStarted>(Handle_NetworkNotifyBattleStarted);
+
+        messageBroker.Subscribe<NotifySiegeEventStarted>(Handle_NotifySiegeEventStarted);
+        messageBroker.Subscribe<NetworkNotifySiegeEventStarted>(Handle_NetworkNotifySiegeEventStarted);
 
         messageBroker.Subscribe<NotifyClanTierIncreased>(Handle_NotifyClanTierIncreased);
         messageBroker.Subscribe<NetworkNotifyClanTierIncreased>(Handle_NetworkNotifyClanTierIncreased);
 
+        messageBroker.Subscribe<NotifyItemsLooted>(Handle_NotifyItemsLooted);
+        messageBroker.Subscribe<NetworkNotifyItemsLooted>(Handle_NetworkNotifyItemsLooted);
+
         messageBroker.Subscribe<NotifyRelationChanged>(Handle_NotifyRelationChanged);
         messageBroker.Subscribe<NetworkNotifyRelationChanged>(Handle_NetworkNotifyRelationChanged);
+
+        messageBroker.Subscribe<NotifyHeroLevelledUp>(Handle_NotifyHeroLevelledUp);
+        messageBroker.Subscribe<NetworkNotifyHeroLevelledUp>(Handle_NetworkNotifyHeroLevelledUp);
+
+        messageBroker.Subscribe<NotifyHeroGainedSkill>(Handle_NotifyHeroGainedSkill);
+        messageBroker.Subscribe<NetworkNotifyHeroGainedSkill>(Handle_NetworkNotifyHeroGainedSkill);
 
         messageBroker.Subscribe<NotifyTroopsDeserted>(Handle_NotifyTroopsDeserted);
         messageBroker.Subscribe<NetworkNotifyTroopsDeserted>(Handle_NetworkNotifyTroopsDeserted);
 
+        messageBroker.Subscribe<NotifyClanChangedFaction>(Handle_NotifyClanChangedFaction);
+        messageBroker.Subscribe<NetworkNotifyClanChangedFaction>(Handle_NetworkNotifyClanChangedFaction);
+
+        messageBroker.Subscribe<NotifyArmyCreated>(Handle_NotifyArmyCreated);
+        messageBroker.Subscribe<NetworkNotifyArmyCreated>(Handle_NetworkNotifyArmyCreated);
+
+        messageBroker.Subscribe<NotifySiegeBombardmentHit>(Handle_NotifySiegeBombardmentHit);
+        messageBroker.Subscribe<NetworkNotifySiegeBombardmentHit>(Handle_NetworkNotifySiegeBombardmentHit);
+
+        messageBroker.Subscribe<NotifySiegeBombardmentWallHit>(Handle_NotifySiegeBombardmentWallHit);
+        messageBroker.Subscribe<NetworkNotifySiegeBombardmentWallHit>(Handle_NetworkNotifySiegeBombardmentWallHit);
+
+        messageBroker.Subscribe<NotifySiegeEngineDestroyed>(Handle_NotifySiegeEngineDestroyed);
+        messageBroker.Subscribe<NetworkNotifySiegeEngineDestroyed>(Handle_NetworkNotifySiegeEngineDestroyed);
+
+        messageBroker.Subscribe<NotifyPartyJoinedArmy>(Handle_NotifyPartyJoinedArmy);
+        messageBroker.Subscribe<NetworkNotifyPartyJoinedArmy>(Handle_NetworkNotifyPartyJoinedArmy);
+
+        messageBroker.Subscribe<NotifyPartyAttachedAnotherParty>(Handle_NotifyPartyAttachedAnotherParty);
+        messageBroker.Subscribe<NetworkNotifyPartyAttachedAnotherParty>(Handle_NetworkNotifyPartyAttachedAnotherParty);
+
+        messageBroker.Subscribe<NotifyPartyRemovedFromArmy>(Handle_NotifyPartyRemovedFromArmy);
+        messageBroker.Subscribe<NetworkNotifyPartyRemovedFromArmy>(Handle_NetworkNotifyPartyRemovedFromArmy);
+
+        messageBroker.Subscribe<ArmyDispersed>(Handle_ArmyDispersed);
+        messageBroker.Subscribe<NetworkArmyDispersed>(Handle_NetworkArmyDispersed);
+
+        messageBroker.Subscribe<NotifyHeroesMarried>(Handle_NotifyHeroesMarried);
+        messageBroker.Subscribe<NetworkNotifyHeroesMarried>(Handle_NetworkNotifyHeroesMarried);
+
+        messageBroker.Subscribe<NotifyChildConceived>(Handle_NotifyChildConceived);
+        messageBroker.Subscribe<NetworkNotifyChildConceived>(Handle_NetworkNotifyChildConceived);
+
+        messageBroker.Subscribe<NotifyGivenBirth>(Handle_NotifyGivenBirth);
+        messageBroker.Subscribe<NetworkNotifyGivenBirth>(Handle_NetworkNotifyGivenBirth);
+
+        messageBroker.Subscribe<NotifyHeroKilled>(Handle_NotifyHeroKilled);
+        messageBroker.Subscribe<NetworkNotifyHeroKilled>(Handle_NetworkNotifyHeroKilled);
+
+        messageBroker.Subscribe<HeroSharedFoodWithAnotherHero>(Handle_HeroSharedFoodWithAnotherHero);
+        messageBroker.Subscribe<NetworkHeroSharedFoodWithAnotherHero>(Handle_NetworkHeroSharedFoodWithAnotherHero);
+
         messageBroker.Subscribe<NotifyClanDestroyed>(Handle_NotifyClanDestroyed);
         messageBroker.Subscribe<NetworkNotifyClanDestroyed>(Handle_NetworkNotifyClanDestroyed);
+
+        messageBroker.Subscribe<NotifyHeroOrPartyGaveItem>(Handle_NotifyHeroOrPartyGaveItem);
+        messageBroker.Subscribe<NetworkNotifyHeroOrPartyGaveItem>(Handle_NetworkNotifyHeroOrPartyGaveItem);
+
+        messageBroker.Subscribe<NotifyRebellionFinished>(Handle_NotifyRebellionFinished);
+        messageBroker.Subscribe<NetworkNotifyRebellionFinished>(Handle_NetworkNotifyRebellionFinished);
+
+        messageBroker.Subscribe<NotifyTournamentFinished>(Handle_NotifyTournamentFinished);
+        messageBroker.Subscribe<NetworkNotifyTournamentFinished>(Handle_NetworkNotifyTournamentFinished);
 
         messageBroker.Subscribe<NotifyBuildingLevelChanged>(Handle_NotifyBuildingLevelChanged);
         messageBroker.Subscribe<NetworkNotifyBuildingLevelChanged>(Handle_NetworkNotifyBuildingLevelChanged);
@@ -64,26 +163,205 @@ internal class DefaultNotificationsHandler : IHandler
 
     public void Dispose()
     {
+        messageBroker.Unsubscribe<NotifyAllianceStarted>(Handle_NotifyAllianceStarted);
+        messageBroker.Unsubscribe<NetworkNotifyAllianceStarted>(Handle_NetworkNotifyAllianceStarted);
+
+        messageBroker.Unsubscribe<NotifyAllianceEnded>(Handle_NotifyAllianceEnded);
+        messageBroker.Unsubscribe<NetworkNotifyAllianceEnded>(Handle_NetworkNotifyAllianceEnded);
+
+        messageBroker.Unsubscribe<NotifyCallWarToWarAgreementStarted>(Handle_NotifyCallWarToWarAgreementStarted);
+        messageBroker.Unsubscribe<NetworkNotifyCallWarToWarAgreementStarted>(Handle_NetworkNotifyCallWarToWarAgreementStarted);
+
+        messageBroker.Unsubscribe<NotifyCallWarToWarAgreementEnded>(Handle_NotifyCallWarToWarAgreementEnded);
+        messageBroker.Unsubscribe<NetworkNotifyCallWarToWarAgreementEnded>(Handle_NetworkNotifyCallWarToWarAgreementEnded);
+
+        messageBroker.Unsubscribe<NotifySettlementEntered>(Handle_NotifySettlementEntered);
+        messageBroker.Unsubscribe<NetworkNotifySettlementEntered>(Handle_NetworkNotifySettlementEntered);
+
+        messageBroker.Unsubscribe<NotifyPartyAddedToMapEvent>(Handle_NotifyPartyAddedToMapEvent);
+        messageBroker.Unsubscribe<NetworkNotifyPartyAddedToMapEvent>(Handle_NetworkNotifyPartyAddedToMapEvent);
+
         messageBroker.Unsubscribe<NotifyCompanionRemoved>(Handle_NotifyCompanionRemoved);
         messageBroker.Unsubscribe<NetworkNotifyCompanionRemoved>(Handle_NetworkNotifyCompanionRemoved);
+
+        messageBroker.Unsubscribe<NotifyRenownGained>(Handle_NotifyRenownGained);
+        messageBroker.Unsubscribe<NetworkNotifyRenownGained>(Handle_NetworkNotifyRenownGained);
+
+        messageBroker.Unsubscribe<NotifyHideoutSpotted>(Handle_NotifyHideoutSpotted);
+        messageBroker.Unsubscribe<NetworkNotifyHideoutSpotted>(Handle_NetworkNotifyHideoutSpotted);
+
+        messageBroker.Unsubscribe<NotifyHeroBecameFugitive>(Handle_NotifyHeroBecameFugitive);
+        messageBroker.Unsubscribe<NetworkNotifyHeroBecameFugitive>(Handle_NetworkNotifyHeroBecameFugitive);
+
+        messageBroker.Unsubscribe<NotifyPrisonerTaken>(Handle_NotifyPrisonerTaken);
+        messageBroker.Unsubscribe<NetworkNotifyPrisonerTaken>(Handle_NetworkNotifyPrisonerTaken);
+
+        messageBroker.Unsubscribe<NotifyHeroPrisonerReleased>(Handle_NotifyHeroPrisonerReleased);
+        messageBroker.Unsubscribe<NetworkNotifyHeroPrisonerReleased>(Handle_NetworkNotifyHeroPrisonerReleased);
+
+        messageBroker.Unsubscribe<NotifyBattleStarted>(Handle_NotifyBattleStarted);
+        messageBroker.Unsubscribe<NetworkNotifyBattleStarted>(Handle_NetworkNotifyBattleStarted);
+
+        messageBroker.Unsubscribe<NotifySiegeEventStarted>(Handle_NotifySiegeEventStarted);
+        messageBroker.Unsubscribe<NetworkNotifySiegeEventStarted>(Handle_NetworkNotifySiegeEventStarted);
 
         messageBroker.Unsubscribe<NotifyClanTierIncreased>(Handle_NotifyClanTierIncreased);
         messageBroker.Unsubscribe<NetworkNotifyClanTierIncreased>(Handle_NetworkNotifyClanTierIncreased);
 
+        messageBroker.Unsubscribe<NotifyItemsLooted>(Handle_NotifyItemsLooted);
+        messageBroker.Unsubscribe<NetworkNotifyItemsLooted>(Handle_NetworkNotifyItemsLooted);
+
         messageBroker.Unsubscribe<NotifyRelationChanged>(Handle_NotifyRelationChanged);
         messageBroker.Unsubscribe<NetworkNotifyRelationChanged>(Handle_NetworkNotifyRelationChanged);
+
+        messageBroker.Unsubscribe<NotifyHeroLevelledUp>(Handle_NotifyHeroLevelledUp);
+        messageBroker.Unsubscribe<NetworkNotifyHeroLevelledUp>(Handle_NetworkNotifyHeroLevelledUp);
+
+        messageBroker.Unsubscribe<NotifyHeroGainedSkill>(Handle_NotifyHeroGainedSkill);
+        messageBroker.Unsubscribe<NetworkNotifyHeroGainedSkill>(Handle_NetworkNotifyHeroGainedSkill);
 
         messageBroker.Unsubscribe<NotifyTroopsDeserted>(Handle_NotifyTroopsDeserted);
         messageBroker.Unsubscribe<NetworkNotifyTroopsDeserted>(Handle_NetworkNotifyTroopsDeserted);
 
+        messageBroker.Unsubscribe<NotifyClanChangedFaction>(Handle_NotifyClanChangedFaction);
+        messageBroker.Unsubscribe<NetworkNotifyClanChangedFaction>(Handle_NetworkNotifyClanChangedFaction);
+
+        messageBroker.Unsubscribe<NotifyArmyCreated>(Handle_NotifyArmyCreated);
+        messageBroker.Unsubscribe<NetworkNotifyArmyCreated>(Handle_NetworkNotifyArmyCreated);
+
+        messageBroker.Unsubscribe<NotifySiegeBombardmentHit>(Handle_NotifySiegeBombardmentHit);
+        messageBroker.Unsubscribe<NetworkNotifySiegeBombardmentHit>(Handle_NetworkNotifySiegeBombardmentHit);
+
+        messageBroker.Unsubscribe<NotifySiegeBombardmentWallHit>(Handle_NotifySiegeBombardmentWallHit);
+        messageBroker.Unsubscribe<NetworkNotifySiegeBombardmentWallHit>(Handle_NetworkNotifySiegeBombardmentWallHit);
+
+        messageBroker.Unsubscribe<NotifySiegeEngineDestroyed>(Handle_NotifySiegeEngineDestroyed);
+        messageBroker.Unsubscribe<NetworkNotifySiegeEngineDestroyed>(Handle_NetworkNotifySiegeEngineDestroyed);
+
+        messageBroker.Unsubscribe<NotifyPartyJoinedArmy>(Handle_NotifyPartyJoinedArmy);
+        messageBroker.Unsubscribe<NetworkNotifyPartyJoinedArmy>(Handle_NetworkNotifyPartyJoinedArmy);
+
+        messageBroker.Unsubscribe<NotifyPartyAttachedAnotherParty>(Handle_NotifyPartyAttachedAnotherParty);
+        messageBroker.Unsubscribe<NetworkNotifyPartyAttachedAnotherParty>(Handle_NetworkNotifyPartyAttachedAnotherParty);
+
+        messageBroker.Unsubscribe<NotifyPartyRemovedFromArmy>(Handle_NotifyPartyRemovedFromArmy);
+        messageBroker.Unsubscribe<NetworkNotifyPartyRemovedFromArmy>(Handle_NetworkNotifyPartyRemovedFromArmy);
+
+        messageBroker.Unsubscribe<ArmyDispersed>(Handle_ArmyDispersed);
+        messageBroker.Unsubscribe<NetworkArmyDispersed>(Handle_NetworkArmyDispersed);
+
+        messageBroker.Unsubscribe<NotifyHeroesMarried>(Handle_NotifyHeroesMarried);
+        messageBroker.Unsubscribe<NetworkNotifyHeroesMarried>(Handle_NetworkNotifyHeroesMarried);
+
+        messageBroker.Unsubscribe<NotifyChildConceived>(Handle_NotifyChildConceived);
+        messageBroker.Unsubscribe<NetworkNotifyChildConceived>(Handle_NetworkNotifyChildConceived);
+
+        messageBroker.Unsubscribe<NotifyGivenBirth>(Handle_NotifyGivenBirth);
+        messageBroker.Unsubscribe<NetworkNotifyGivenBirth>(Handle_NetworkNotifyGivenBirth);
+
+        messageBroker.Unsubscribe<NotifyHeroKilled>(Handle_NotifyHeroKilled);
+        messageBroker.Unsubscribe<NetworkNotifyHeroKilled>(Handle_NetworkNotifyHeroKilled);
+
+        messageBroker.Unsubscribe<HeroSharedFoodWithAnotherHero>(Handle_HeroSharedFoodWithAnotherHero);
+        messageBroker.Unsubscribe<NetworkHeroSharedFoodWithAnotherHero>(Handle_NetworkHeroSharedFoodWithAnotherHero);
+
         messageBroker.Unsubscribe<NotifyClanDestroyed>(Handle_NotifyClanDestroyed);
         messageBroker.Unsubscribe<NetworkNotifyClanDestroyed>(Handle_NetworkNotifyClanDestroyed);
+
+        messageBroker.Unsubscribe<NotifyHeroOrPartyGaveItem>(Handle_NotifyHeroOrPartyGaveItem);
+        messageBroker.Unsubscribe<NetworkNotifyHeroOrPartyGaveItem>(Handle_NetworkNotifyHeroOrPartyGaveItem);
+
+        messageBroker.Unsubscribe<NotifyRebellionFinished>(Handle_NotifyRebellionFinished);
+        messageBroker.Unsubscribe<NetworkNotifyRebellionFinished>(Handle_NetworkNotifyRebellionFinished);
+
+        messageBroker.Unsubscribe<NotifyTournamentFinished>(Handle_NotifyTournamentFinished);
+        messageBroker.Unsubscribe<NetworkNotifyTournamentFinished>(Handle_NetworkNotifyTournamentFinished);
 
         messageBroker.Unsubscribe<NotifyBuildingLevelChanged>(Handle_NotifyBuildingLevelChanged);
         messageBroker.Unsubscribe<NetworkNotifyBuildingLevelChanged>(Handle_NetworkNotifyBuildingLevelChanged);
 
         messageBroker.Unsubscribe<NotifyHeroTeleportation>(Handle_NotifyHeroTeleportation);
         messageBroker.Unsubscribe<NetworkNotifyHeroTeleportation>(Handle_NetworkNotifyHeroTeleportation);
+    }
+
+    private void Handle_NotifyAllianceStarted(MessagePayload<NotifyAllianceStarted> obj)
+    {
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(data.Kingdom1, out var kingdom1Id)) return;
+            if (!objectManager.TryGetIdWithLogging(data.Kingdom2, out var kingdom2Id)) return;
+
+            network.SendAll(new NetworkNotifyAllianceStarted(kingdom1Id, kingdom2Id));
+        });
+    }
+
+    private void Handle_NetworkNotifyAllianceStarted(MessagePayload<NetworkNotifyAllianceStarted> obj)
+    {
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(data.Kingdom1Id, out var kingdom1)) return;
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(data.Kingdom2Id, out var kingdom2)) return;
+
+            CampaignEventDispatcher.Instance.OnAllianceStarted(kingdom1, kingdom2);
+        });
+    }
+
+    private void Handle_NotifyAllianceEnded(MessagePayload<NotifyAllianceEnded> obj)
+    {
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(data.Kingdom1, out var kingdom1Id)) return;
+            if (!objectManager.TryGetIdWithLogging(data.Kingdom2, out var kingdom2Id)) return;
+
+            network.SendAll(new NetworkNotifyAllianceEnded(kingdom1Id, kingdom2Id));
+        });
+    }
+
+    private void Handle_NetworkNotifyAllianceEnded(MessagePayload<NetworkNotifyAllianceEnded> obj)
+    {
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(data.Kingdom1Id, out var kingdom1)) return;
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(data.Kingdom2Id, out var kingdom2)) return;
+
+            CampaignEventDispatcher.Instance.OnAllianceEnded(kingdom1, kingdom2);
+        });
+    }
+
+    private void Handle_NotifyCallWarToWarAgreementStarted(MessagePayload<NotifyCallWarToWarAgreementStarted> obj)
+    {
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(data.CallingKingdom, out var callingKingdomId)) return;
+            if (!objectManager.TryGetIdWithLogging(data.CalledKingdom, out var calledKingdomId)) return;
+            if (!objectManager.TryGetIdWithLogging(data.KingdomToCallToWarAgainst, out var kingdomToCallToWarAgainst)) return;
+
+            network.SendAll(new NetworkNotifyCallWarToWarAgreementStarted(callingKingdomId, calledKingdomId, kingdomToCallToWarAgainst));
+        });
+    }
+
+    private void Handle_NetworkNotifyCallWarToWarAgreementStarted(MessagePayload<NetworkNotifyCallWarToWarAgreementStarted> obj)
+    {
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(data.CallingKingdomId, out var callingKingdom)) return;
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(data.CalledKingdomId, out var calledKingdom)) return;
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(data.KingdomToCallToWarAgainstId, out var kingdomToCallToWarAgainst)) return;
+
+            CampaignEventDispatcher.Instance.OnCallToWarAgreementStarted(callingKingdom, calledKingdom, kingdomToCallToWarAgainst);
+        });
     }
 
     private void Handle_NotifyCompanionRemoved(MessagePayload<NotifyCompanionRemoved> obj)
