@@ -48,20 +48,16 @@ namespace Missions.Agents.Packets
                 return;
             }
 
-            Vec3 pos = Position;
-
-            // if the distance between the local agent and the info passed from the server is greater than 1 unit, teleport the agent
-            if (agent.GetPathDistanceToPoint(ref pos) > 1f)
-            {
-                agent.TeleportToPosition(pos);
-            }
+            // NOTE: position is NOT applied here. It is reconciled per-frame by AgentPositionInterpolator (fed
+            // this packet's Position by AgentMovementHandler), so the ease is decoupled from the packet cadence.
+            // Everything below is per-packet state that drives the puppet's own walk + animation.
 
             agent.SetMovementDirection(MovementDirection);
 
             // apply the agent's look direction
             agent.LookDirection = LookDirection;
 
-            // apply the agent's movement input vector...Is this necessary?
+            // Input drives the puppet's own walk + animation; the position tween above only eases residual drift.
             agent.MovementInputVector = InputVector;
 
             // Update equipment

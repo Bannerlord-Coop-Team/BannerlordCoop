@@ -43,6 +43,17 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
     }
 
+    public override void OnMissionTick(float dt)
+    {
+        base.OnMissionTick(dt);
+
+        // Smoothly reconcile received puppets toward their owners' last-reported positions every frame; the
+        // per-packet correction was bound to the bursty ~10ms poll cadence and looked stepped. Subclasses that
+        // override OnMissionTick call base (CoopBattleController does), and CoopLocationsController does not
+        // override it, so this runs for both battle and location missions.
+        coopMissionComponent.AgentMovementHandler.Interpolator.Tick(dt);
+    }
+
     public virtual void Dispose()
     {
         messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_MissionPeerEntered);
