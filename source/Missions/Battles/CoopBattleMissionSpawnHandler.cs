@@ -122,7 +122,7 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
     }
 
     // Zero phases so the first tick has active phases to read (else DefenderActivePhase NREs), without feeding Init
-    // a 0/0 total (its battle-size split divides by zero, giving a negative sentinel under Mono).
+    // a 0/0 total: its float battle-size split yields NaN, which Mono casts to int.MinValue (desktop .NET gives 0).
     private void AddHeldPhases()
     {
         _missionAgentSpawnLogic._phases[(int)BattleSideEnum.Defender].Add(new MissionSpawnPhase());
