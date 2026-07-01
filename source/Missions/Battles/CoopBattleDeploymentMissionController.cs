@@ -1,6 +1,3 @@
-using Common.Logging;
-using Serilog;
-using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Battles;
@@ -15,8 +12,6 @@ namespace Missions.Battles;
 /// </summary>
 public class CoopBattleDeploymentMissionController : BattleDeploymentMissionController
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<CoopBattleDeploymentMissionController>();
-
     private CoopBattleMissionSpawnHandler _spawnHandler;
 
     public CoopBattleDeploymentMissionController(bool isPlayerAttacker)
@@ -33,32 +28,10 @@ public class CoopBattleDeploymentMissionController : BattleDeploymentMissionCont
     public override void OnMissionTick(float dt)
     {
         // Hold SetupTeams until the sides are sized. Gate on the handler's game-thread IsSized, not the suppliers'
-        // network-thread IsPopulated (which could read true mid-frame before Init has sized).
+        // network-thread IsPopulated (which could read true mid-frame before Init has sized). The handler bounds the
+        // wait with its own deadline, so IsSized always latches and this never defers SetupTeams indefinitely.
         if (_spawnHandler != null && !_spawnHandler.IsSized) return;
 
-        bool setupWasOver = TeamSetupOver;
         base.OnMissionTick(dt);
-
-        // Re-pause every agent when the deferred SetupTeams first completes. The joint re-Init enters SetupTeams
-        // with both sides spawn-active, so the first side's spawn puts the other side on the field before its own
-        // pause pass, and the native per-formation freeze can miss agents, which then drift once AI ticks. Skip if
-        // SetupTeams released the field outright (no Order of Battle).
-        if (!setupWasOver && TeamSetupOver && !base.Mission.AllowAiTicking)
-            FreezeDeployedAgents();
-    }
-
-    // The native deployment freeze applied over every agent, not just the ones each per-side pass covered.
-    private void FreezeDeployedAgents()
-    {
-        int def = 0, atk = 0;
-        foreach (Agent agent in base.Mission.Agents)
-        {
-            if (!agent.IsHuman || !agent.IsActive() || !agent.IsAIControlled) continue;
-            agent.SetAlarmState(Agent.AIStateFlag.None);
-            agent.SetIsAIPaused(isPaused: true);
-            if (agent.Team?.Side == BattleSideEnum.Defender) def++;
-            else if (agent.Team?.Side == BattleSideEnum.Attacker) atk++;
-        }
-        Logger.Information("[BattleSync] Deferred deployment freeze: re-paused Defender={Def}, Attacker={Atk} AI agents", def, atk);
     }
 }
