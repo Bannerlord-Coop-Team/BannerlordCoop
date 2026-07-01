@@ -22,12 +22,8 @@ namespace Missions.Agents.Packets
 
         public void ApplyMount(Agent mountAgent)
         {
-            Vec3 mountPos = MountPosition;
-
-            if (mountAgent.GetPathDistanceToPoint(ref mountPos) > 5f)
-            {
-                mountAgent.TeleportToPosition(mountPos);
-            }
+            // NOTE: mount position is NOT applied here — it is reconciled per-frame by AgentPositionInterpolator
+            // (fed MountPosition by AgentMovementHandler). Everything below is per-packet mount state/animation.
             mountAgent.SetMovementDirection(MountMovementDirection);
 
             //Currently not doing anything afaik

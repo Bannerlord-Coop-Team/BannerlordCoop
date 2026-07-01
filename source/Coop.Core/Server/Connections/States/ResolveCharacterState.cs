@@ -1,6 +1,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Coop.Core.Client.Services.Heroes.Messages;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
@@ -8,6 +9,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
 using Serilog;
+using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
@@ -78,14 +80,25 @@ public class ResolveCharacterState : ConnectionStateBase
             network.SendImmediate(peer, new NetworkClientValidated(true, player));
             ConnectionLogic.TransferSave();
 
-            // TransferSave has taken the save snapshot and begun queueing this peer's broadcasts, so a
-            // reconnecting player is told about every other existing player too, not just itself.
-            JoiningPlayerSync.SendExistingPlayers(network, playerManager, peer, obj.What.PlayerId);
+            SendExistingPlayers(peer, obj.What.PlayerId);
         }
         else
         {
             network.SendImmediate(peer, new NetworkClientValidated(false, null));
             ConnectionLogic.CreateCharacter();
+        }
+    }
+
+    private void SendExistingPlayers(NetPeer joiner, string joinerControllerId)
+    {
+        foreach (var player in playerManager.Players)
+        {
+            // Skip the joiner's own player (it registers itself on load) and the host (the server is not a
+            // controlled player on clients).
+            if (player.ControllerId == joinerControllerId) continue;
+            if (player.ControllerId == CoopServer.ServerControllerId) continue;
+
+            network.Send(joiner, new NetworkNewPlayerHeroCreated(player.ControllerId, player, Array.Empty<byte>()));
         }
     }
 

@@ -11,6 +11,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
 
 namespace Coop.Core.Server.Connections.States;
@@ -25,7 +26,7 @@ public class CreateCharacterState : ConnectionStateBase
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IHeroInterface heroInterface;
-    private readonly IPlayerManager playerRegistry;
+    private readonly IPlayerManager playerManager;
     private readonly IGameStateInterface gameStateInterface;
 
     public CreateCharacterState(
@@ -34,7 +35,7 @@ public class CreateCharacterState : ConnectionStateBase
         IMessageBroker messageBroker,
         INetwork network,
         IHeroInterface heroInterface,
-        IPlayerManager playerRegistry,
+        IPlayerManager playerManager,
         IGameStateInterface gameStateInterface)
         : base(connectionLogic)
     {
@@ -42,7 +43,7 @@ public class CreateCharacterState : ConnectionStateBase
         this.messageBroker = messageBroker;
         this.network = network;
         this.heroInterface = heroInterface;
-        this.playerRegistry = playerRegistry;
+        this.playerManager = playerManager;
         this.gameStateInterface = gameStateInterface;
         messageBroker.Subscribe<NetworkTransferNewHero>(Handle_NetworkTransferNewHero);
     }
@@ -72,7 +73,7 @@ public class CreateCharacterState : ConnectionStateBase
             return;
         }
 
-        if (!playerRegistry.AddPlayer(player))
+        if (!playerManager.AddPlayer(player))
             Logger.Error("Player has been already added.");
 
         // Send created to all other clients
@@ -86,7 +87,20 @@ public class CreateCharacterState : ConnectionStateBase
 
         // TransferSave has taken the save snapshot and begun queueing this peer's broadcasts, so tell the
         // joiner about every other existing player. These queue and replay once it enters its campaign.
-        JoiningPlayerSync.SendExistingPlayers(network, playerRegistry, netPeer, controllerId);
+        SendExistingPlayers(netPeer, controllerId);
+    }
+
+    private void SendExistingPlayers(NetPeer joiner, string joinerControllerId)
+    {
+        foreach (var player in playerManager.Players)
+        {
+            // Skip the joiner's own player (it registers itself on load) and the host (the server is not a
+            // controlled player on clients).
+            if (player.ControllerId == joinerControllerId) continue;
+            if (player.ControllerId == CoopServer.ServerControllerId) continue;
+
+            network.Send(joiner, new NetworkNewPlayerHeroCreated(player.ControllerId, player, Array.Empty<byte>()));
+        }
     }
 
     private bool TryCreatePlayer(string controllerId, Hero hero, out Player player)
