@@ -4,48 +4,54 @@ using Xunit;
 namespace E2E.Tests.Services.Missions;
 
 /// <summary>
-/// Unit tests (game-independent) for <see cref="CoopBattleMissionSpawnHandler.ResolvePendingSide"/> — the
-/// per-tick decision that grows a coop battle side once its reserve lands after AfterStart sized it to zero.
-/// Covers the reserve not yet arrived, an owned reserve arriving late, and an empty non-owned side.
+/// Unit tests (game-independent) for <see cref="CoopBattleMissionSpawnHandler.DecideJointSizing"/> — the pure
+/// decision that gates the single joint sizing pass. Sizing is deferred until BOTH sides' reserves have landed
+/// (both suppliers populated), because the engine's battle-size cap and wave split are joint; and it runs the
+/// real Init only when the combined total is positive, so Init never divides by a zero total.
 /// </summary>
 public class CoopBattleMissionSpawnHandlerSizingTests
 {
     [Fact]
-    public void ReserveNotArrived_StaysPending_NoResize()
+    public void OneSideNotPopulated_NotReady_HoldsBothSides()
     {
-        var (stillPending, resize, _) = CoopBattleMissionSpawnHandler.ResolvePendingSide(populated: false, ownedTotal: 0);
+        // Own side already has its reserve but the enemy side's (empty) reserve is still in flight: not ready,
+        // so both sides stay held at zero until the second reserve lands.
+        var decision = CoopBattleMissionSpawnHandler.DecideJointSizing(
+            defenderPopulated: true, attackerPopulated: false, defenderOwned: 7, attackerOwned: 0);
 
-        Assert.True(stillPending);
-        Assert.False(resize);
+        Assert.False(decision.Ready);
+        Assert.False(decision.SizeNow);
     }
 
     [Fact]
-    public void OwnedReserveArrivedLate_Settles_AndResizesToOwnedTotal()
+    public void NeitherPopulated_NotReady()
     {
-        var (stillPending, resize, newTotal) = CoopBattleMissionSpawnHandler.ResolvePendingSide(populated: true, ownedTotal: 7);
+        var decision = CoopBattleMissionSpawnHandler.DecideJointSizing(
+            defenderPopulated: false, attackerPopulated: false, defenderOwned: 0, attackerOwned: 0);
 
-        Assert.False(stillPending);
-        Assert.True(resize);
-        Assert.Equal(7, newTotal);
+        Assert.False(decision.Ready);
+        Assert.False(decision.SizeNow);
     }
 
     [Fact]
-    public void EmptyNonOwnedSide_Settles_WithoutResize()
+    public void BothPopulated_WithTroops_SizesJointly()
     {
-        // A side this client owns nothing on gets an empty reserve; it settles at zero and its troops arrive as puppets.
-        var (stillPending, resize, _) = CoopBattleMissionSpawnHandler.ResolvePendingSide(populated: true, ownedTotal: 0);
+        // A non-host: own defender side owns troops, enemy attacker side is an empty (but populated) reserve.
+        var decision = CoopBattleMissionSpawnHandler.DecideJointSizing(
+            defenderPopulated: true, attackerPopulated: true, defenderOwned: 7, attackerOwned: 0);
 
-        Assert.False(stillPending);
-        Assert.False(resize);
+        Assert.True(decision.Ready);
+        Assert.True(decision.SizeNow);
     }
 
     [Fact]
-    public void NotPopulated_IgnoresTransientTotal_StaysPending()
+    public void BothPopulated_BothEmpty_ReadyButDoesNotRunInit()
     {
-        // populated gates everything: a count seen before the supplier flips populated is not acted on.
-        var (stillPending, resize, _) = CoopBattleMissionSpawnHandler.ResolvePendingSide(populated: false, ownedTotal: 5);
+        // Defensive: both sides owning nothing must not hand Init a 0/0 total (which would divide by zero).
+        var decision = CoopBattleMissionSpawnHandler.DecideJointSizing(
+            defenderPopulated: true, attackerPopulated: true, defenderOwned: 0, attackerOwned: 0);
 
-        Assert.True(stillPending);
-        Assert.False(resize);
+        Assert.True(decision.Ready);
+        Assert.False(decision.SizeNow);
     }
 }
