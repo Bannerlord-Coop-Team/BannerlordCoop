@@ -64,7 +64,8 @@ public class Poller
         }
 
         cts = new CancellationTokenSource();
-        pollingTask = Task.Factory.StartNew(PollAsync);
+        // Task.Run unwraps PollAsync so pollingTask completes when the loop exits (not at the first await), which StopAndWait joins on.
+        pollingTask = Task.Run(PollAsync);
     }
 
     private async Task PollAsync()
@@ -124,5 +125,23 @@ public class Poller
     {
         // Cancel the cancellation token
         cts?.Cancel();
+    }
+
+    /// <summary>
+    /// Cancels polling and blocks until any in-flight poll iteration has finished, so the caller can rely
+    /// on the polling function no longer running once this returns. Bounded by <paramref name="timeout"/>
+    /// so a stuck poll can't strand the caller. Use this instead of <see cref="Stop"/> when the state the
+    /// poll reads is about to become invalid (e.g. mission teardown freeing the agents PollAgents reads).
+    /// </summary>
+    public void StopAndWait(TimeSpan timeout)
+    {
+        var task = pollingTask;
+        Stop();
+
+        if (task == null) return;
+
+        // A timeout means the in-flight poll didn't finish, so the join failed and the caller's state isn't safe yet.
+        if (!task.Wait(timeout))
+            Logger.Warning("Polling task did not stop within {Timeout}", timeout);
     }
 }

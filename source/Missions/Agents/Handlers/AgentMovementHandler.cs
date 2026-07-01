@@ -36,6 +36,9 @@ public class AgentMovementHandler : IAgentMovementHandler
     // the send path promotes any chunk that still overflows to a fragmentable reliable channel.
     private const int MaxAgentsPerMovementPacket = 4;
 
+    // Cap on how long Dispose blocks joining the poll thread; matches the game's 30s BlockingTimeout so it only trips if a poll is genuinely wedged.
+    private static readonly TimeSpan PollerStopTimeout = TimeSpan.FromSeconds(30);
+
     private readonly Poller poller;
     private readonly IPacketManager packetManager;
     private readonly IBattleNetwork client;
@@ -47,6 +50,8 @@ public class AgentMovementHandler : IAgentMovementHandler
     // same one. Touched only on the game thread (inside HandlePacket's apply), so no lock; per-mission
     // (this handler is transient), so it can't leak across missions.
     private readonly Dictionary<Agent, Agent> _dismountedHorses = new Dictionary<Agent, Agent>();
+
+    private bool _disposed;
 
     public AgentMovementHandler(
         IBattleNetwork client,
@@ -82,13 +87,19 @@ public class AgentMovementHandler : IAgentMovementHandler
 
     public void Dispose()
     {
+        if (_disposed) return;
+        _disposed = true;
+
         Logger.Verbose("Disposing {handlerType}", typeof(AgentMovementHandler));
 
         packetManager.RemovePacketHandler(this);
         messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
         messageBroker.Unsubscribe<MissionPeerLeft>(Handle_PeerLeft);
         messageBroker.Unsubscribe<MissionPeerDisconnected>(Handle_PeerDisconnected);
-        poller.Stop();
+
+        // Join the poll thread, not just cancel it: an in-flight PollAgents must finish before teardown frees the agents it reads.
+        poller.StopAndWait(PollerStopTimeout);
+        GC.SuppressFinalize(this);
     }
 
     public PacketType PacketType => PacketType.Movement;

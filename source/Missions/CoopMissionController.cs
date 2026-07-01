@@ -47,6 +47,9 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
     {
         messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_MissionPeerEntered);
         messageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
+
+        // Stop and join the movement poller before the mission frees its agents, otherwise PollAgents can read a freed native agent on its background thread.
+        coopMissionComponent.AgentMovementHandler.Dispose();
     }
 
     private void Handle_MissionPeerEntered(MessagePayload<NetworkMissionPeerEntered> payload)
