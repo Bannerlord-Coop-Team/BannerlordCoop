@@ -98,7 +98,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         PartyBase initiatorParty,
         PartyBase responderParty)
     {
-        if (!ModInformation.IsServer) return false;
+        if (ModInformation.IsClient) return false;
 
         if (IsPartyBusy(request.AttackerId, request.DefenderId) || IsPartyBusy(request.DefenderId, request.AttackerId))
         {
@@ -199,7 +199,7 @@ internal class PlayerPartyInteractionHandler : IHandler
 
     private void Handle_NetworkSubmitPlayerPartyInteractionOption(MessagePayload<NetworkSubmitPlayerPartyInteractionOption> payload)
     {
-        if (!ModInformation.IsServer) return;
+        if (ModInformation.IsClient) return;
         if (!(payload.Who is NetPeer peer)) return;
 
         var message = payload.What;
@@ -221,7 +221,7 @@ internal class PlayerPartyInteractionHandler : IHandler
 
     private void Handle_NetworkPlayerPartyInteractionShown(MessagePayload<NetworkPlayerPartyInteractionShown> payload)
     {
-        if (!ModInformation.IsServer) return;
+        if (ModInformation.IsClient) return;
         if (!(payload.Who is NetPeer peer)) return;
 
         var message = payload.What;
@@ -311,7 +311,7 @@ internal class PlayerPartyInteractionHandler : IHandler
 
     private void Handle_NetworkPlayerPartyTradeOfferUpdated(MessagePayload<NetworkPlayerPartyTradeOfferUpdated> payload)
     {
-        if (!ModInformation.IsServer)
+        if (ModInformation.IsClient)
         {
             var clientMessage = payload.What;
             GameThread.RunSafe(
@@ -349,7 +349,7 @@ internal class PlayerPartyInteractionHandler : IHandler
 
     private void Handle_NetworkPlayerPartyTradeAcceptChanged(MessagePayload<NetworkPlayerPartyTradeAcceptChanged> payload)
     {
-        if (!ModInformation.IsServer) return;
+        if (ModInformation.IsClient) return;
         if (!(payload.Who is NetPeer peer)) return;
 
         var message = payload.What;
@@ -371,7 +371,7 @@ internal class PlayerPartyInteractionHandler : IHandler
 
     private void Handle_PlayerDisconnected(MessagePayload<PlayerDisconnected> payload)
     {
-        if (!ModInformation.IsServer) return;
+        if (ModInformation.IsClient) return;
 
         var peer = payload.What.PlayerId;
         foreach (var session in sessionsById.Values.ToArray())

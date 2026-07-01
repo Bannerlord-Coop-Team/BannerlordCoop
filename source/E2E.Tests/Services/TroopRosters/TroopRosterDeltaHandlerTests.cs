@@ -1,7 +1,9 @@
 using System;
+using Common.Messaging;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Services.TroopRosters.Messages;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Roster;
 using Xunit.Abstractions;
@@ -236,6 +238,40 @@ namespace E2E.Tests.Services.TroopRosters
                 Resolve(client, out var roster, out _, CharacterId1);
                 Assert.Equal(0, roster.Count);
             }
+        }
+
+        [Fact]
+        public void Client_OverSubtractRemove_ClampsToZero_NeverGoesNegative()
+        {
+            // The authority adds 2 of a troop; the client receives them.
+            Server.Call(() =>
+            {
+                Resolve(Server, out var roster, out var character, CharacterId1);
+                roster.AddToCounts(character, 2);
+            });
+
+            var client = Clients.First();
+
+            // An over-subtract lands on the client: a remove of -5 against an element of 2 would drive the count
+            // to -3. In the live bug this is a DUPLICATE / double-counted remove from the authority (e.g. a battle
+            // casualty/capture sending the same remove twice, or a host-migration replay). The handler's guard
+            // must clamp to zero - apply only what is actually there - so the roster can never go negative, and
+            // log an error naming the over-subtract. The guard is a safety net; the real fix is upstream not
+            // sending the remove twice.
+            client.Call(() =>
+            {
+                var broker = client.Resolve<IMessageBroker>();
+                broker.Publish(this, new NetworkTroopRosterAddCounts(TroopRosterId, CharacterId1, -5, 0, 0, false));
+            });
+
+            client.Call(() =>
+            {
+                Resolve(client, out var roster, out var character, CharacterId1);
+                int index = roster.FindIndexOfTroop(character);
+                int number = index >= 0 ? roster.GetElementCopyAtIndex(index).Number : 0;
+                Assert.Equal(0, number);
+                Assert.True(roster.TotalManCount >= 0, $"roster TotalManCount went negative: {roster.TotalManCount}");
+            });
         }
 
         private void Resolve(EnvironmentInstance instance, out TroopRoster roster, out CharacterObject character, string characterId)

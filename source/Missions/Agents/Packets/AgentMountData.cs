@@ -7,15 +7,17 @@ namespace Missions.Agents.Packets
     [ProtoContract(SkipConstructor = true)]
     public class AgentMountData
     {
-        public AgentMountData(Agent agent)
+        // The parameter is the MOUNT agent itself (callers pass rider.MountAgent), so read it directly —
+        // mirroring ApplyMount. Dereferencing .MountAgent here was reading the mount's own (null) mount → NRE.
+        public AgentMountData(Agent mountAgent)
         {
-            MountInputVector = agent.MountAgent.MovementInputVector;
-            MountAction1Flag = (ulong)agent.MountAgent.GetCurrentAnimationFlag(1);
-            MountAction1Progress = agent.MountAgent.GetCurrentActionProgress(1);
-            MountAction1Index = agent.MountAgent.GetCurrentAction(1).Index;
-            MountLookDirection = agent.MountAgent.LookDirection;
-            MountMovementDirection = agent.MountAgent.GetMovementDirection();
-            MountPosition = agent.MountAgent.Position;
+            MountInputVector = mountAgent.MovementInputVector;
+            MountAction1Flag = (ulong)mountAgent.GetCurrentAnimationFlag(1);
+            MountAction1Progress = mountAgent.GetCurrentActionProgress(1);
+            MountAction1Index = mountAgent.GetCurrentAction(1).Index;
+            MountLookDirection = mountAgent.LookDirection;
+            MountMovementDirection = mountAgent.GetMovementDirection();
+            MountPosition = mountAgent.Position;
         }
 
         public void ApplyMount(Agent mountAgent)

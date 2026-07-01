@@ -1,5 +1,5 @@
 ﻿using GameInterface.AutoSync.Templates;
-using ProtoBuf.Meta;
+using GameInterface.Registry.Auto;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -9,8 +9,9 @@ namespace GameInterface.AutoSync.Builders;
 public class AutoSyncFieldArrayBuilder : AutoSyncBuilderBase
 {
     public AutoSyncFieldArrayBuilder(
+        IAutoRegistryFactory autoRegistryFactory,
         AutoSyncRegistry autoSyncRegistry,
-        AutoSyncConstantsBuilder autoSyncConstantsBuilder) : base(autoSyncRegistry, autoSyncConstantsBuilder)
+        AutoSyncConstantsBuilder autoSyncConstantsBuilder) : base(autoSyncRegistry, autoSyncConstantsBuilder, autoRegistryFactory)
     {
     }
 
@@ -37,7 +38,7 @@ public class AutoSyncFieldArrayBuilder : AutoSyncBuilderBase
 
         string networkMessage;
         string networkChangeMessage;
-        if (RuntimeTypeModel.Default.CanSerialize(fieldInfo.FieldType.GetElementType()))
+        if (SyncByValue(fieldInfo.FieldType.GetElementType()))
         {
             networkMessage = TemplateParser.Parse("Messages.NetworkArraySetValueMessageTemplate", templateData);
             networkChangeMessage = TemplateParser.Parse("Messages.NetworkArrayChangeValueMessageTemplate", templateData);
@@ -65,7 +66,7 @@ public class AutoSyncFieldArrayBuilder : AutoSyncBuilderBase
         var fieldInfo = fieldItem.Value;
 
         var templateData = GetTemplateData(fieldInfo, fieldItem.Debug);
-        if (RuntimeTypeModel.Default.CanSerialize(fieldInfo.FieldType.GetElementType()))
+        if (SyncByValue(fieldInfo.FieldType.GetElementType()))
             return TemplateParser.Parse("Handlers.SubscribeArrayValueTemplate", templateData);
         else
             return TemplateParser.Parse("Handlers.SubscribeArrayReferenceTemplate", templateData);

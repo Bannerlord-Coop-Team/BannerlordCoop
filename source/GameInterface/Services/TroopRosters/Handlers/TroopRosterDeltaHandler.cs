@@ -132,15 +132,40 @@ internal class TroopRosterDeltaHandler : IHandler
         var m = payload.What;
         Apply(m.RosterId, m.CharacterId, nameof(NetworkTroopRosterAddCounts), (roster, character) =>
         {
+            int index = roster.FindIndexOfTroop(character);
+
             // A subtract for a troop this client doesn't have yet can't apply: vanilla AddToCounts asserts and
             // does nothing when the element is absent and the net change is <= 0. The add that creates the
             // element is its own earlier delta, so skip rather than trip the assert.
-            if (m.Count + m.WoundedCount <= 0 && roster.FindIndexOfTroop(character) < 0)
+            if (m.Count + m.WoundedCount <= 0 && index < 0)
             {
                 Logger.Debug("Skipped {Message}: {Character} is not in roster {Roster} yet", nameof(NetworkTroopRosterAddCounts), m.CharacterId, m.RosterId);
                 return;
             }
-            roster.AddToCounts(character, m.Count, false, m.WoundedCount, m.XpChange, m.RemoveDepleted);
+
+            int count = m.Count;
+            int woundedCount = m.WoundedCount;
+
+            // Safety net (NOT the root fix): a subtract must never drive an element's count below zero. If it
+            // would, this client received a DUPLICATE / over-subtract remove for a troop already at that count -
+            // apply only what is actually there (clamp to zero) so the roster can never go negative, and log it
+            // loudly. The authority is expected to send each remove exactly once; a hit here means a double-call
+            // upstream (battle casualty/capture sending the same remove twice, a host-migration replay, etc.).
+            // The error names the roster, troop and the over-subtract so that upstream double-send can be traced.
+            if (index >= 0)
+            {
+                var current = roster.GetElementCopyAtIndex(index);
+                if (current.Number + count < 0 || current.WoundedNumber + woundedCount < 0)
+                {
+                    Logger.Error("Over-subtract {Message} for {Character} in roster {Roster}: have (number={Number}, wounded={Wounded}), requested delta (number={Count}, wounded={WoundedCount}). Clamping to zero - the authority sent a duplicate remove (double-call upstream).",
+                        nameof(NetworkTroopRosterAddCounts), m.CharacterId, m.RosterId, current.Number, current.WoundedNumber, count, woundedCount);
+
+                    if (current.Number + count < 0) count = -current.Number;
+                    if (current.WoundedNumber + woundedCount < 0) woundedCount = -current.WoundedNumber;
+                }
+            }
+
+            roster.AddToCounts(character, count, false, woundedCount, m.XpChange, m.RemoveDepleted);
         });
     }
 

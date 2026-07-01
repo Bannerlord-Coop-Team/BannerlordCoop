@@ -1,5 +1,5 @@
 ﻿using GameInterface.AutoSync.Templates;
-using ProtoBuf.Meta;
+using GameInterface.Registry.Auto;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -9,8 +9,9 @@ namespace GameInterface.AutoSync.Builders;
 public class AutoSyncPropertyArrayBuilder : AutoSyncBuilderBase
 {
     public AutoSyncPropertyArrayBuilder(
+        IAutoRegistryFactory autoRegistryFactory,
         AutoSyncRegistry autoSyncRegistry,
-        AutoSyncConstantsBuilder autoSyncConstantsBuilder) : base(autoSyncRegistry, autoSyncConstantsBuilder)
+        AutoSyncConstantsBuilder autoSyncConstantsBuilder) : base(autoSyncRegistry, autoSyncConstantsBuilder, autoRegistryFactory)
     {
     }
     public string GetPrefix(Debuggable<PropertyInfo> propertyInfo) => AutoSyncUtils.GetPrefix(propertyInfo);
@@ -44,7 +45,7 @@ public class AutoSyncPropertyArrayBuilder : AutoSyncBuilderBase
 
         string networkMessage;
         string networkChangeMessage;
-        if(RuntimeTypeModel.Default.CanSerialize(propertyInfo.PropertyType.GetElementType()))
+        if(SyncByValue(propertyInfo.PropertyType.GetElementType()))
         {
             networkMessage = TemplateParser.Parse("Messages.NetworkArraySetValueMessageTemplate", templateData);
             networkChangeMessage = TemplateParser.Parse("Messages.NetworkArrayChangeValueMessageTemplate", templateData);
@@ -72,7 +73,7 @@ public class AutoSyncPropertyArrayBuilder : AutoSyncBuilderBase
         var propertyInfo = propertyItem.Value;
 
         var templateData = GetTemplateData(propertyItem);
-        if (RuntimeTypeModel.Default.CanSerialize(propertyInfo.PropertyType.GetElementType()))
+        if (SyncByValue(propertyInfo.PropertyType.GetElementType()))
         {
             return TemplateParser.Parse("Handlers.SubscribeArrayValueTemplate", templateData);
         }

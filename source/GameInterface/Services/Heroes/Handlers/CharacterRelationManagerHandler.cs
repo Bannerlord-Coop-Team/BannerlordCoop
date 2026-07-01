@@ -79,7 +79,7 @@ namespace GameInterface.Services.Heroes.Handlers
             text.SetTextVariable("HERO", other.Name);
             text.SetTextVariable("AMOUNT", (delta > 0 ? "+" : "") + delta);
             text.SetTextVariable("TOTAL", newValue);
-            MBInformationManager.AddQuickInformation(text, 0, other.CharacterObject);
+            MBInformationManager.AddQuickInformation(text, 0, other.CharacterObject, null, "event:/ui/notification/relation");
         }
     }
 }
