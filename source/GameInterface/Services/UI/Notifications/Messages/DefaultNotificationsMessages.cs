@@ -553,12 +553,12 @@ public readonly struct HeroSharedFoodWithAnotherHero : IEvent
 
 public readonly struct NotifyClanDestroyed : IEvent
 {
-    public readonly TextObject DestroyedClanName;
+    public readonly Clan DestroyedClan;
 
     public NotifyClanDestroyed(
-        TextObject destroyedClanName)
+        Clan destroyedClan)
     {
-        DestroyedClanName = destroyedClanName;
+        DestroyedClan = destroyedClan;
     }
 }
 

@@ -30,6 +30,7 @@ internal class GoldNotificationHandler : IHandler
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+
         messageBroker.Subscribe<NotifyGoldChanged>(Handle_NotifyGoldChanged);
         messageBroker.Subscribe<NetworkNotifyGoldChanged>(Handle_NetworkNotifyGoldChanged);
 

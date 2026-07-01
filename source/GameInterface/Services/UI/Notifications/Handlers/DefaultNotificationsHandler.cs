@@ -15,6 +15,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
+using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 
@@ -286,12 +287,10 @@ internal class DefaultNotificationsHandler : IHandler
 
     private void Handle_NotifyAllianceStarted(MessagePayload<NotifyAllianceStarted> obj)
     {
-        var data = obj.What;
-
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetIdWithLogging(data.Kingdom1, out var kingdom1Id)) return;
-            if (!objectManager.TryGetIdWithLogging(data.Kingdom2, out var kingdom2Id)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.Kingdom1, out var kingdom1Id)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.Kingdom2, out var kingdom2Id)) return;
 
             network.SendAll(new NetworkNotifyAllianceStarted(kingdom1Id, kingdom2Id));
         });
@@ -299,12 +298,10 @@ internal class DefaultNotificationsHandler : IHandler
 
     private void Handle_NetworkNotifyAllianceStarted(MessagePayload<NetworkNotifyAllianceStarted> obj)
     {
-        var data = obj.What;
-
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging<Kingdom>(data.Kingdom1Id, out var kingdom1)) return;
-            if (!objectManager.TryGetObjectWithLogging<Kingdom>(data.Kingdom2Id, out var kingdom2)) return;
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.Kingdom1Id, out var kingdom1)) return;
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.Kingdom2Id, out var kingdom2)) return;
 
             CampaignEventDispatcher.Instance.OnAllianceStarted(kingdom1, kingdom2);
         });
@@ -312,12 +309,10 @@ internal class DefaultNotificationsHandler : IHandler
 
     private void Handle_NotifyAllianceEnded(MessagePayload<NotifyAllianceEnded> obj)
     {
-        var data = obj.What;
-
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetIdWithLogging(data.Kingdom1, out var kingdom1Id)) return;
-            if (!objectManager.TryGetIdWithLogging(data.Kingdom2, out var kingdom2Id)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.Kingdom1, out var kingdom1Id)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.Kingdom2, out var kingdom2Id)) return;
 
             network.SendAll(new NetworkNotifyAllianceEnded(kingdom1Id, kingdom2Id));
         });
@@ -325,12 +320,10 @@ internal class DefaultNotificationsHandler : IHandler
 
     private void Handle_NetworkNotifyAllianceEnded(MessagePayload<NetworkNotifyAllianceEnded> obj)
     {
-        var data = obj.What;
-
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging<Kingdom>(data.Kingdom1Id, out var kingdom1)) return;
-            if (!objectManager.TryGetObjectWithLogging<Kingdom>(data.Kingdom2Id, out var kingdom2)) return;
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.Kingdom1Id, out var kingdom1)) return;
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.Kingdom2Id, out var kingdom2)) return;
 
             CampaignEventDispatcher.Instance.OnAllianceEnded(kingdom1, kingdom2);
         });
@@ -338,13 +331,11 @@ internal class DefaultNotificationsHandler : IHandler
 
     private void Handle_NotifyCallWarToWarAgreementStarted(MessagePayload<NotifyCallWarToWarAgreementStarted> obj)
     {
-        var data = obj.What;
-
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetIdWithLogging(data.CallingKingdom, out var callingKingdomId)) return;
-            if (!objectManager.TryGetIdWithLogging(data.CalledKingdom, out var calledKingdomId)) return;
-            if (!objectManager.TryGetIdWithLogging(data.KingdomToCallToWarAgainst, out var kingdomToCallToWarAgainst)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.CallingKingdom, out var callingKingdomId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.CalledKingdom, out var calledKingdomId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.KingdomToCallToWarAgainst, out var kingdomToCallToWarAgainst)) return;
 
             network.SendAll(new NetworkNotifyCallWarToWarAgreementStarted(callingKingdomId, calledKingdomId, kingdomToCallToWarAgainst));
         });
@@ -352,115 +343,370 @@ internal class DefaultNotificationsHandler : IHandler
 
     private void Handle_NetworkNotifyCallWarToWarAgreementStarted(MessagePayload<NetworkNotifyCallWarToWarAgreementStarted> obj)
     {
-        var data = obj.What;
-
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging<Kingdom>(data.CallingKingdomId, out var callingKingdom)) return;
-            if (!objectManager.TryGetObjectWithLogging<Kingdom>(data.CalledKingdomId, out var calledKingdom)) return;
-            if (!objectManager.TryGetObjectWithLogging<Kingdom>(data.KingdomToCallToWarAgainstId, out var kingdomToCallToWarAgainst)) return;
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.CallingKingdomId, out var callingKingdom)) return;
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.CalledKingdomId, out var calledKingdom)) return;
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.KingdomToCallToWarAgainstId, out var kingdomToCallToWarAgainst)) return;
 
             CampaignEventDispatcher.Instance.OnCallToWarAgreementStarted(callingKingdom, calledKingdom, kingdomToCallToWarAgainst);
         });
     }
 
-    private void Handle_NotifyCompanionRemoved(MessagePayload<NotifyCompanionRemoved> obj)
+    private void Handle_NotifyCallWarToWarAgreementEnded(MessagePayload<NotifyCallWarToWarAgreementEnded> obj)
     {
-        var data = obj.What;
-
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetIdWithLogging(data.Clan, out var clanId)) return;
-            if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.CallingKingdom, out var callingKingdomId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.CalledKingdom, out var calledKingdomId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.KingdomToCallToWarAgainst, out var kingdomToCallToWarAgainst)) return;
 
-            network.SendAll(new NetworkNotifyCompanionRemoved(clanId, heroId, data.Detail));
+            network.SendAll(new NetworkNotifyCallWarToWarAgreementEnded(callingKingdomId, calledKingdomId, kingdomToCallToWarAgainst));
+        });
+    }
+
+    private void Handle_NetworkNotifyCallWarToWarAgreementEnded(MessagePayload<NetworkNotifyCallWarToWarAgreementEnded> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.CallingKingdomId, out var callingKingdom)) return;
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.CalledKingdomId, out var calledKingdom)) return;
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.KingdomToCallToWarAgainstId, out var kingdomToCallToWarAgainst)) return;
+
+            CampaignEventDispatcher.Instance.OnCallToWarAgreementEnded(callingKingdom, calledKingdom, kingdomToCallToWarAgainst);
+        });
+    }
+
+    private void Handle_NotifySettlementEntered(MessagePayload<NotifySettlementEntered> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.Settlement, out var settlementId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.Hero, out var heroId)) return;
+
+            network.SendAll(new NetworkNotifySettlementEntered(mobilePartyId, settlementId, heroId));
+        });
+    }
+
+    private void Handle_NetworkNotifySettlementEntered(MessagePayload<NetworkNotifySettlementEntered> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.SettlementId, out var settlement)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
+
+            CampaignEventDispatcher.Instance.OnSettlementEntered(mobileParty, settlement, hero);
+        });
+    }
+
+    private void Handle_NotifyPartyAddedToMapEvent(MessagePayload<NotifyPartyAddedToMapEvent> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.InvolvedParty, out var involvedPartyId)) return;
+
+            network.SendAll(new NetworkNotifyPartyAddedToMapEvent(involvedPartyId));
+        });
+    }
+
+    private void Handle_NetworkNotifyPartyAddedToMapEvent(MessagePayload<NetworkNotifyPartyAddedToMapEvent> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<PartyBase>(obj.What.InvolvedPartyId, out var involvedParty)) return;
+
+            CampaignEventDispatcher.Instance.OnPartyAddedToMapEvent(involvedParty);
+        });
+    }
+
+    private void Handle_NotifyCompanionRemoved(MessagePayload<NotifyCompanionRemoved> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.Clan, out var clanId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.Hero, out var heroId)) return;
+
+            network.SendAll(new NetworkNotifyCompanionRemoved(clanId, heroId, obj.What.Detail));
         });
     }
 
     private void Handle_NetworkNotifyCompanionRemoved(MessagePayload<NetworkNotifyCompanionRemoved> obj)
     {
-        var data = obj.What;
-
         GameThread.RunSafe(() =>
         {
-            if (!TryGetNotificationsBehavior(out var notificationsBehavior)) return;
-            if (!objectManager.TryGetObjectWithLogging<Clan>(data.ClanId, out var clan)) return;
-            if (!objectManager.TryGetObjectWithLogging<Hero>(data.HeroId, out var hero)) return;
+            if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
 
-            // Only notify player(s) in the same clan the companion was removed from
             if (clan != Clan.PlayerClan) return;
 
-            CampaignEventDispatcher.Instance.OnCompanionRemoved(hero, data.Detail);
+            CampaignEventDispatcher.Instance.OnCompanionRemoved(hero, obj.What.Detail);
+        });
+    }
+
+    private void Handle_NotifyRenownGained(MessagePayload<NotifyRenownGained> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.Hero, out var heroId)) return;
+
+            network.SendAll(new NetworkNotifyRenownGained(heroId, obj.What.GainedRenown, obj.What.DoNotNotifyPlayer));
+        });
+    }
+
+    private void Handle_NetworkNotifyRenownGained(MessagePayload<NetworkNotifyRenownGained> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
+
+            CampaignEventDispatcher.Instance.OnRenownGained(hero, obj.What.GainedRenown, obj.What.DoNotNotifyPlayer);
+        });
+    }
+
+    private void Handle_NotifyHideoutSpotted(MessagePayload<NotifyHideoutSpotted> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.SpottingParty, out var spottingPartyId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.HideoutParty, out var hideoutPartyId)) return;
+
+            network.SendAll(new NetworkNotifyHideoutSpotted(spottingPartyId, hideoutPartyId));
+        });
+    }
+
+    private void Handle_NetworkNotifyHideoutSpotted(MessagePayload<NetworkNotifyHideoutSpotted> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<PartyBase>(obj.What.SpottingPartyId, out var spottingParty)) return;
+            if (!objectManager.TryGetObjectWithLogging<PartyBase>(obj.What.HideoutPartyId, out var hideoutParty)) return;
+
+            CampaignEventDispatcher.Instance.OnHideoutSpotted(spottingParty, hideoutParty);
+        });
+    }
+
+    private void Handle_NotifyHeroBecameFugitive(MessagePayload<NotifyHeroBecameFugitive> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.Hero, out var heroId)) return;
+
+            network.SendAll(new NetworkNotifyHeroBecameFugitive(heroId, obj.What.ShowNotification));
+        });
+    }
+
+    private void Handle_NetworkNotifyHeroBecameFugitive(MessagePayload<NetworkNotifyHeroBecameFugitive> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
+
+            CampaignEventDispatcher.Instance.OnCharacterBecameFugitive(hero, obj.What.ShowNotification);
+        });
+    }
+
+    private void Handle_NotifyPrisonerTaken(MessagePayload<NotifyPrisonerTaken> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.Capturer, out var capturerId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.Prisoner, out var prisonerId)) return;
+
+            network.SendAll(new NetworkNotifyPrisonerTaken(capturerId, prisonerId));
+        });
+    }
+
+    private void Handle_NetworkNotifyPrisonerTaken(MessagePayload<NetworkNotifyPrisonerTaken> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<PartyBase>(obj.What.CapturerId, out var capturer)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.PrisonerId, out var prisoner)) return;
+
+            CampaignEventDispatcher.Instance.OnHeroPrisonerTaken(capturer, prisoner);
+        });
+    }
+
+    private void Handle_NotifyHeroPrisonerReleased(MessagePayload<NotifyHeroPrisonerReleased> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.Hero, out var heroId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.Party, out var partyId)) return;
+
+            // Unsure how to send factions over the network
+            string factionStringId = obj.What.CapturerFaction.StringId;
+
+            network.SendAll(new NetworkNotifyHeroPrisonerReleased(heroId, partyId, factionStringId, obj.What.Detail, obj.What.ShowNotification));
+        });
+    }
+
+    private void Handle_NetworkNotifyHeroPrisonerReleased(MessagePayload<NetworkNotifyHeroPrisonerReleased> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
+            if (!objectManager.TryGetObjectWithLogging<PartyBase>(obj.What.PartyId, out var party)) return;
+
+            IFaction capturerFaction = null;
+            foreach (var faction in Campaign.Current.Factions)
+            {
+                if (faction.StringId == obj.What.FactionId)
+                {
+                    capturerFaction = faction;
+                    break;
+                }
+            }
+
+            CampaignEventDispatcher.Instance.OnHeroPrisonerReleased(hero, party, capturerFaction, obj.What.Detail, obj.What.ShowNotification);
+        });
+    }
+
+    private void Handle_NotifyBattleStarted(MessagePayload<NotifyBattleStarted> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.AttackerParty, out var attackerPartyId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.DefenderParty, out var defenderPartyId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.Subject, out var settlementId)) return;
+
+            network.SendAll(new NetworkNotifyBattleStarted(attackerPartyId, defenderPartyId, settlementId, obj.What.ShowNotification));
+        });
+    }
+
+    private void Handle_NetworkNotifyBattleStarted(MessagePayload<NetworkNotifyBattleStarted> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<PartyBase>(obj.What.AttackerPartyId, out var attackerParty)) return;
+            if (!objectManager.TryGetObjectWithLogging<PartyBase>(obj.What.DefenderPartyId, out var defenderParty)) return;
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.SettlementId, out var subject)) return;
+
+            CampaignEventDispatcher.Instance.OnStartBattle(attackerParty, defenderParty, subject, obj.What.ShowNotification);
+        });
+    }
+
+    private void Handle_NotifySiegeEventStarted(MessagePayload<NotifySiegeEventStarted> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.SiegeEvent, out var siegeEventId)) return;
+
+            network.SendAll(new NetworkNotifySiegeEventStarted(siegeEventId));
+        });
+    }
+
+    private void Handle_NetworkNotifySiegeEventStarted(MessagePayload<NetworkNotifySiegeEventStarted> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<SiegeEvent>(obj.What.SiegeEventId, out var siegeEvent)) return;
+
+            CampaignEventDispatcher.Instance.OnSiegeEventStarted(siegeEvent);
         });
     }
 
     private void Handle_NotifyClanTierIncreased(MessagePayload<NotifyClanTierIncreased> obj)
     {
-        var data = obj.What;
-
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetIdWithLogging(data.Clan, out var clanId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.Clan, out var clanId)) return;
 
-            network.SendAll(new NetworkNotifyClanTierIncreased(clanId, data.ShouldNotify));
+            network.SendAll(new NetworkNotifyClanTierIncreased(clanId, obj.What.ShouldNotify));
         });
     }
 
     private void Handle_NetworkNotifyClanTierIncreased(MessagePayload<NetworkNotifyClanTierIncreased> obj)
     {
-        var data = obj.What;
-
         GameThread.RunSafe(() =>
         {
-            if (!TryGetNotificationsBehavior(out var notificationsBehavior)) return;
-            if (!objectManager.TryGetObjectWithLogging<Clan>(data.ClanId, out var clan)) return;
+            if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
 
-            if (clan != Clan.PlayerClan) return;
+            CampaignEventDispatcher.Instance.OnClanTierChanged(clan, obj.What.ShouldNotify);
+        });
+    }
 
-            CampaignEventDispatcher.Instance.OnClanTierChanged(clan, data.ShouldNotify);
+    private void Handle_NotifyItemsLooted(MessagePayload<NotifyItemsLooted> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
+
+            network.SendAll(new NetworkNotifyItemsLooted(mobilePartyId, obj.What.ItemRosterData));
+        });
+    }
+
+    private void Handle_NetworkNotifyItemsLooted(MessagePayload<NetworkNotifyItemsLooted> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
+
+            using (new AllowedThread())
+            {
+                ItemRoster lootedItems = new();
+                lootedItems.Add(obj.What.ItemRosterData);
+
+                CampaignEventDispatcher.Instance.OnItemsLooted(mobileParty, lootedItems);
+            }
         });
     }
 
     private void Handle_NotifyRelationChanged(MessagePayload<NotifyRelationChanged> obj)
     {
-        var data = obj.What;
-
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetIdWithLogging(data.EffectiveHero, out var effectiveHeroId)) return;
-            if (!objectManager.TryGetIdWithLogging(data.EffectiveHeroGainedRelationWith, out var effectiveHeroGainedRelationWithId)) return;
-            if (!objectManager.TryGetIdWithLogging(data.OriginalHero, out var originalHeroId)) return;
-            if (!objectManager.TryGetIdWithLogging(data.OriginalGainedRelationWith, out var originalGainedRelationWithId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.EffectiveHero, out var effectiveHeroId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.EffectiveHeroGainedRelationWith, out var effectiveHeroGainedRelationWithId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.OriginalHero, out var originalHeroId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.OriginalGainedRelationWith, out var originalGainedRelationWithId)) return;
 
-            network.SendAll(new NetworkNotifyRelationChanged(effectiveHeroId, effectiveHeroGainedRelationWithId, data.RelationChange, data.ShowNotification, data.Detail, originalHeroId, originalGainedRelationWithId));
+            network.SendAll(new NetworkNotifyRelationChanged(effectiveHeroId, effectiveHeroGainedRelationWithId, obj.What.RelationChange, obj.What.ShowNotification, obj.What.Detail, originalHeroId, originalGainedRelationWithId));
         });
     }
 
     private void Handle_NetworkNotifyRelationChanged(MessagePayload<NetworkNotifyRelationChanged> obj)
     {
-        var data = obj.What;
-
         GameThread.RunSafe(() =>
         {
-            if (!TryGetNotificationsBehavior(out var notificationsBehavior)) return;
-            if (!objectManager.TryGetObjectWithLogging<Hero>(data.EffectiveHeroId, out var effectiveHero)) return;
-            if (!objectManager.TryGetObjectWithLogging<Hero>(data.EffectiveHeroGainedRelationWithId, out var effectiveHeroGainedRelationWith)) return;
-            if (!objectManager.TryGetObjectWithLogging<Hero>(data.OriginalHeroId, out var originalHero)) return;
-            if (!objectManager.TryGetObjectWithLogging<Hero>(data.OriginalGainedRelationWithId, out var originalGainedRelationWith)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.EffectiveHeroId, out var effectiveHero)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.EffectiveHeroGainedRelationWithId, out var effectiveHeroGainedRelationWith)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.OriginalHeroId, out var originalHero)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.OriginalGainedRelationWithId, out var originalGainedRelationWith)) return;
 
-            CampaignEventDispatcher.Instance.OnHeroRelationChanged(effectiveHero, effectiveHeroGainedRelationWith, data.RelationChange, data.ShowNotification, data.Detail, originalHero, originalGainedRelationWith);
+            CampaignEventDispatcher.Instance.OnHeroRelationChanged(effectiveHero, effectiveHeroGainedRelationWith, obj.What.RelationChange, obj.What.ShowNotification, obj.What.Detail, originalHero, originalGainedRelationWith);
+        });
+    }
+
+    private void Handle_NotifyHeroLevelledUp(MessagePayload<NotifyHeroLevelledUp> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.Hero, out var heroId)) return;
+
+            network.SendAll(new NetworkNotifyHeroLevelledUp(heroId, obj.What.ShouldNotify));
+        });
+    }
+
+    private void Handle_NetworkNotifyHeroLevelledUp(MessagePayload<NetworkNotifyHeroLevelledUp> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
+
+            CampaignEventDispatcher.Instance.OnHeroLevelledUp(hero, obj.What.ShouldNotify);
         });
     }
 
     private void Handle_NotifyTroopsDeserted(MessagePayload<NotifyTroopsDeserted> obj)
     {
-        var data = obj.What;
-
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetIdWithLogging(data.MobileParty, out var mobilePartyId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
 
-            var desertedTroopsData = troopRosterInterface.PackTroopRosterData(data.DesertedTroops);
+            var desertedTroopsData = troopRosterInterface.PackTroopRosterData(obj.What.DesertedTroops);
 
             network.SendAll(new NetworkNotifyTroopsDeserted(mobilePartyId, desertedTroopsData));
         });
@@ -468,17 +714,14 @@ internal class DefaultNotificationsHandler : IHandler
 
     private void Handle_NetworkNotifyTroopsDeserted(MessagePayload<NetworkNotifyTroopsDeserted> obj)
     {
-        var data = obj.What;
-
         GameThread.RunSafe(() =>
         {
-            if (!TryGetNotificationsBehavior(out var notificationsBehavior)) return;
-            if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MobilePartyId, out var mobileParty)) return;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
 
             using (new AllowedThread())
             {
                 TroopRoster desertedTroops = new();
-                foreach (var troop in troopRosterInterface.UnpackTroopRosterData(data.DesertedTroopsData))
+                foreach (var troop in troopRosterInterface.UnpackTroopRosterData(obj.What.DesertedTroopsData))
                 {
                     desertedTroops.Add(troop);
                 }
@@ -490,87 +733,76 @@ internal class DefaultNotificationsHandler : IHandler
 
     private void Handle_NotifyClanDestroyed(MessagePayload<NotifyClanDestroyed> obj)
     {
-        var data = obj.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.DestroyedClan, out var destroyedClanId)) return;
 
-        network.SendAll(new NetworkNotifyClanDestroyed(data.DestroyedClanName));
+            network.SendAll(new NetworkNotifyClanDestroyed(destroyedClanId));
+        });
     }
 
     private void Handle_NetworkNotifyClanDestroyed(MessagePayload<NetworkNotifyClanDestroyed> obj)
     {
-        var data = obj.What;
-
-        // Clan may no longer be registered when this notification needs to be sent.
-        // Use the destroyed clan name directly instead of trying to resolve a potentially removed Clan by network id.
         GameThread.RunSafe(() =>
         {
-            TextObject textObject = new TextObject("{=PBq1FyrJ}{CLAN_NAME} clan was destroyed.", null);
-            textObject.SetTextVariable("CLAN_NAME", data.DestroyedClanName);
-            MBInformationManager.AddQuickInformation(textObject, 0, null, null, "");
+            if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.DestroyedClanId, out var destroyedClan)) return;
+
+            CampaignEventDispatcher.Instance.OnClanDestroyed(destroyedClan);
         });
     }
 
     private void Handle_NotifyBuildingLevelChanged(MessagePayload<NotifyBuildingLevelChanged> obj)
     {
-        var data = obj.What;
-
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetIdWithLogging(data.Town, out var townId)) return;
-            if (!objectManager.TryGetIdWithLogging(data.Building, out var buildingId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.Town, out var townId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.Building, out var buildingId)) return;
 
-            network.SendAll(new NetworkNotifyBuildingLevelChanged(townId, buildingId, data.LevelChange));
+            network.SendAll(new NetworkNotifyBuildingLevelChanged(townId, buildingId, obj.What.LevelChange));
         });
     }
 
     private void Handle_NetworkNotifyBuildingLevelChanged(MessagePayload<NetworkNotifyBuildingLevelChanged> obj)
     {
-        var data = obj.What;
-
         GameThread.RunSafe(() =>
         {
-            if (!TryGetNotificationsBehavior(out var notificationsBehavior)) return;
-            if (!objectManager.TryGetObjectWithLogging<Town>(data.TownId, out var town)) return;
-            if (!objectManager.TryGetObjectWithLogging<Building>(data.BuildingId, out var building)) return;
+            if (!objectManager.TryGetObjectWithLogging<Town>(obj.What.TownId, out var town)) return;
+            if (!objectManager.TryGetObjectWithLogging<Building>(obj.What.BuildingId, out var building)) return;
 
-            CampaignEventDispatcher.Instance.OnBuildingLevelChanged(town, building, data.LevelChange);
+            CampaignEventDispatcher.Instance.OnBuildingLevelChanged(town, building, obj.What.LevelChange);
         });
     }
 
     private void Handle_NotifyHeroTeleportation(MessagePayload<NotifyHeroTeleportation> obj)
     {
-        var data = obj.What;
-
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.Hero, out var heroId)) return;
 
             string targetSettlementId = null;
-            if (data.TargetSettlement != null && !objectManager.TryGetIdWithLogging(data.TargetSettlement, out targetSettlementId)) return;
+            if (obj.What.TargetSettlement != null && !objectManager.TryGetIdWithLogging(obj.What.TargetSettlement, out targetSettlementId)) return;
 
             string targetPartyId = null;
-            if (data.TargetParty != null && !objectManager.TryGetIdWithLogging(data.TargetParty, out targetPartyId)) return;
+            if (obj.What.TargetParty != null && !objectManager.TryGetIdWithLogging(obj.What.TargetParty, out targetPartyId)) return;
 
-            network.SendAll(new NetworkNotifyHeroTeleportation(heroId, targetSettlementId, targetPartyId, data.Detail));
+            network.SendAll(new NetworkNotifyHeroTeleportation(heroId, targetSettlementId, targetPartyId, obj.What.Detail));
         });
     }
 
     private void Handle_NetworkNotifyHeroTeleportation(MessagePayload<NetworkNotifyHeroTeleportation> obj)
     {
-        var data = obj.What;
-
         GameThread.RunSafe(() =>
         {
-            if (!TryGetNotificationsBehavior(out var notificationsBehavior)) return;
-            if (!objectManager.TryGetObjectWithLogging<Hero>(data.HeroId, out var hero)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
 
             Settlement targetSettlement = null;
-            if (data.TargetSettlementId != null && !objectManager.TryGetObjectWithLogging(data.TargetSettlementId, out targetSettlement)) return;
+            if (obj.What.TargetSettlementId != null && !objectManager.TryGetObjectWithLogging(obj.What.TargetSettlementId, out targetSettlement)) return;
 
             MobileParty targetParty = null;
-            if (data.TargetPartyId != null && !objectManager.TryGetObjectWithLogging(data.TargetPartyId, out targetParty)) return;
+            if (obj.What.TargetPartyId != null && !objectManager.TryGetObjectWithLogging(obj.What.TargetPartyId, out targetParty)) return;
 
-            // Skip check for hero travelling as when client runs this check the hero state has already changed
-            if (data.Detail == TeleportHeroAction.TeleportationDetail.ImmediateTeleportToSettlement && hero.Clan == Clan.PlayerClan && targetSettlement.IsFortification && targetSettlement.Town.Governor == hero)
+            // Skip check for hero travelling as when client runs this check the hero state has already changed to active from travelling
+            if (obj.What.Detail == TeleportHeroAction.TeleportationDetail.ImmediateTeleportToSettlement && hero.Clan == Clan.PlayerClan && targetSettlement.IsFortification && targetSettlement.Town.Governor == hero)
             {
                 TextObject textObject3 = new TextObject("{=btynhBAn}The new governor of {SETTLEMENT}, {HERO.NAME}, has arrived and taken up the reins of office.", null);
                 textObject3.SetCharacterProperties("HERO", hero.CharacterObject, false);
@@ -579,7 +811,7 @@ internal class DefaultNotificationsHandler : IHandler
                 return;
             }
 
-            CampaignEventDispatcher.Instance.OnHeroTeleportationRequested(hero, targetSettlement, targetParty, data.Detail);
+            CampaignEventDispatcher.Instance.OnHeroTeleportationRequested(hero, targetSettlement, targetParty, obj.What.Detail);
         });
     }
 

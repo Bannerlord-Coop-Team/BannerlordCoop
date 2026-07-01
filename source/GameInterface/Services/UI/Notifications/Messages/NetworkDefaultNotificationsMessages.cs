@@ -239,7 +239,7 @@ internal readonly struct NetworkNotifyHeroPrisonerReleased : ICommand
     public readonly string PartyId;
 
     [ProtoMember(3)]
-    public readonly IFaction Faction;
+    public readonly string FactionId;
 
     [ProtoMember(4)]
     public readonly EndCaptivityDetail Detail;
@@ -250,13 +250,13 @@ internal readonly struct NetworkNotifyHeroPrisonerReleased : ICommand
     public NetworkNotifyHeroPrisonerReleased(
         string heroId,
         string partyId,
-        IFaction faction,
+        string factionId,
         EndCaptivityDetail detail,
         bool showNotification)
     {
         HeroId = heroId;
         PartyId = partyId;
-        Faction = faction;
+        FactionId = factionId;
         Detail = detail;
         ShowNotification = showNotification;
     }
@@ -388,14 +388,14 @@ internal readonly struct NetworkNotifyHeroLevelledUp : ICommand
     public readonly string HeroId;
 
     [ProtoMember(2)]
-    public readonly ItemRosterElement[] ItemRosterData;
+    public readonly bool ShouldNotify;
 
     public NetworkNotifyHeroLevelledUp(
         string heroId,
-        ItemRosterElement[] itemRosterData)
+        bool shouldNotify)
     {
         HeroId = heroId;
-        ItemRosterData = itemRosterData;
+        ShouldNotify = shouldNotify;
     }
 }
 
@@ -736,12 +736,12 @@ internal readonly struct NetworkHeroSharedFoodWithAnotherHero : ICommand
 internal readonly struct NetworkNotifyClanDestroyed : ICommand
 {
     [ProtoMember(1)]
-    public readonly TextObject DestroyedClanName;
+    public readonly string DestroyedClanId;
 
     public NetworkNotifyClanDestroyed(
-        TextObject destroyedClanName)
+        string destroyedClanId)
     {
-        DestroyedClanName = destroyedClanName;
+        DestroyedClanId = destroyedClanId;
     }
 }
 

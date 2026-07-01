@@ -389,7 +389,7 @@ internal class DefaultNotificationsCampaignBehaviorPatches
     {
         if (ModInformation.IsClient) return;
 
-        var message = new NotifyClanDestroyed(destroyedClan.Name);
+        var message = new NotifyClanDestroyed(destroyedClan);
         MessageBroker.Instance.Publish(__instance, message);
     }
 
