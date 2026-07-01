@@ -1,11 +1,11 @@
-using Missions.Battles;
+﻿using Missions.Battles;
 using Xunit;
 
 namespace E2E.Tests.Services.Missions;
 
 /// <summary>
-/// Game-independent tests for <see cref="CoopBattleMissionSpawnHandler.DecideJointSizing"/>: sizing waits until
-/// both reserves land (the joint cap needs both totals) and only runs Init on a positive combined total.
+/// Game-independent tests for <see cref="CoopBattleMissionSpawnHandler.SideSizing"/>: sizing waits until both
+/// reserves land (the joint cap needs both totals) and only runs Init on a positive combined total.
 /// </summary>
 public class CoopBattleMissionSpawnHandlerSizingTests
 {
@@ -14,42 +14,42 @@ public class CoopBattleMissionSpawnHandlerSizingTests
     {
         // Own side already has its reserve but the enemy side's (empty) reserve is still in flight: not ready,
         // so both sides stay held at zero until the second reserve lands.
-        var decision = CoopBattleMissionSpawnHandler.DecideJointSizing(
+        var sizing = new CoopBattleMissionSpawnHandler.SideSizing(
             defenderPopulated: true, attackerPopulated: false, defenderOwned: 7, attackerOwned: 0);
 
-        Assert.False(decision.Ready);
-        Assert.False(decision.SizeNow);
+        Assert.False(sizing.Ready);
+        Assert.False(sizing.SizeNow);
     }
 
     [Fact]
     public void NeitherPopulated_NotReady()
     {
-        var decision = CoopBattleMissionSpawnHandler.DecideJointSizing(
+        var sizing = new CoopBattleMissionSpawnHandler.SideSizing(
             defenderPopulated: false, attackerPopulated: false, defenderOwned: 0, attackerOwned: 0);
 
-        Assert.False(decision.Ready);
-        Assert.False(decision.SizeNow);
+        Assert.False(sizing.Ready);
+        Assert.False(sizing.SizeNow);
     }
 
     [Fact]
     public void BothPopulated_WithTroops_SizesJointly()
     {
         // A non-host: own defender side owns troops, enemy attacker side is an empty (but populated) reserve.
-        var decision = CoopBattleMissionSpawnHandler.DecideJointSizing(
+        var sizing = new CoopBattleMissionSpawnHandler.SideSizing(
             defenderPopulated: true, attackerPopulated: true, defenderOwned: 7, attackerOwned: 0);
 
-        Assert.True(decision.Ready);
-        Assert.True(decision.SizeNow);
+        Assert.True(sizing.Ready);
+        Assert.True(sizing.SizeNow);
     }
 
     [Fact]
     public void BothPopulated_BothEmpty_ReadyButDoesNotRunInit()
     {
         // Defensive: both sides owning nothing must not hand Init a 0/0 total (which would divide by zero).
-        var decision = CoopBattleMissionSpawnHandler.DecideJointSizing(
+        var sizing = new CoopBattleMissionSpawnHandler.SideSizing(
             defenderPopulated: true, attackerPopulated: true, defenderOwned: 0, attackerOwned: 0);
 
-        Assert.True(decision.Ready);
-        Assert.False(decision.SizeNow);
+        Assert.True(sizing.Ready);
+        Assert.False(sizing.SizeNow);
     }
 }

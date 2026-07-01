@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using GameInterface.Services.MapEvents.TroopSupply;
 using SandBox.Missions.MissionLogics;
 using Serilog;
@@ -47,24 +47,24 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
         _missionAgentSpawnLogic.SetSpawnHorses(BattleSideEnum.Defender, !_mapEvent.IsSiegeAssault);
         _missionAgentSpawnLogic.SetSpawnHorses(BattleSideEnum.Attacker, !_mapEvent.IsSiegeAssault);
 
-        var (defenderPopulated, attackerPopulated, defenderOwned, attackerOwned, decision) = ReadSizing();
+        var sizing = ReadSizing();
 
-        if (decision.Ready)
+        if (sizing.Ready)
         {
             // On-time (common): both reserves present, so size via Init before the first tick.
-            if (decision.SizeNow)
-                RunJointInit(defenderOwned, attackerOwned);
+            if (sizing.SizeNow)
+                RunJointInit(sizing.DefenderOwned, sizing.AttackerOwned);
             else
                 AddHeldPhases(); // both sides own nothing: keep phases so ticks don't NRE, spawn nothing
             _sized = true;
-            Logger.Information("[BattleSync] Coop spawn sized on start: Defender={Def}, Attacker={Atk}", defenderOwned, attackerOwned);
+            Logger.Information("[BattleSync] Coop spawn sized on start: Defender={Def}, Attacker={Atk}", sizing.DefenderOwned, sizing.AttackerOwned);
             return;
         }
 
         // A reserve is still in flight — hold both sides at zero until OnMissionTick sizes them (or the deadline).
         AddHeldPhases();
         Logger.Warning("[BattleSync] Coop spawn handler started before reserves arrived (Def populated={Def}, Atk populated={Atk}) — sizing on tick once both land",
-            defenderPopulated, attackerPopulated);
+            sizing.DefenderPopulated, sizing.AttackerPopulated);
     }
 
     // Size once both suppliers populate, then latch. If a reserve never lands, force-size with whatever arrived
@@ -76,33 +76,32 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
         if (_sized) return;
 
         _heldSeconds += dt;
-        var (defenderPopulated, attackerPopulated, defenderOwned, attackerOwned, decision) = ReadSizing();
-        if (!decision.Ready && _heldSeconds < ReserveHoldDeadlineSeconds) return;
+        var sizing = ReadSizing();
+        if (!sizing.Ready && _heldSeconds < ReserveHoldDeadlineSeconds) return;
 
         // Ready, or the deadline expired with a partial/missing reserve. Size with what landed when anything did
         // (a positive total keeps Init off its 0/0 split); if nothing landed, leave the held zero phases — latching
         // still lets the deployment controller run SetupTeams so the client isn't stuck on the loading screen.
-        if (defenderOwned + attackerOwned > 0)
-            RunJointInit(defenderOwned, attackerOwned);
+        if (sizing.DefenderOwned + sizing.AttackerOwned > 0)
+            RunJointInit(sizing.DefenderOwned, sizing.AttackerOwned);
 
-        if (decision.Ready)
-            Logger.Information("[BattleSync] Reserves landed after start; sized sides jointly: Defender={Def}, Attacker={Atk}", defenderOwned, attackerOwned);
+        if (sizing.Ready)
+            Logger.Information("[BattleSync] Reserves landed after start; sized sides jointly: Defender={Def}, Attacker={Atk}", sizing.DefenderOwned, sizing.AttackerOwned);
         else
             Logger.Warning("[BattleSync] Reserves incomplete after {Sec}s hold (Def populated={DefP}, Atk populated={AtkP}) — sizing with what landed: Defender={Def}, Attacker={Atk}",
-                ReserveHoldDeadlineSeconds, defenderPopulated, attackerPopulated, defenderOwned, attackerOwned);
+                ReserveHoldDeadlineSeconds, sizing.DefenderPopulated, sizing.AttackerPopulated, sizing.DefenderOwned, sizing.AttackerOwned);
         _sized = true;
     }
 
-    // Read the suppliers (populated before owned so the pair can't tear: SetReserve commits the entries then flips
-    // populated under one lock) and compute the joint sizing decision. Shared by AfterStart and OnMissionTick.
-    private (bool defenderPopulated, bool attackerPopulated, int defenderOwned, int attackerOwned, JointSizingDecision decision) ReadSizing()
+    // Snapshot both suppliers into a SideSizing. Read populated before owned so the pair can't tear: SetReserve
+    // commits the entries then flips populated under one lock. Shared by AfterStart and OnMissionTick.
+    private SideSizing ReadSizing()
     {
         bool defenderPopulated = _defenderSupplier.IsPopulated;
         bool attackerPopulated = _attackerSupplier.IsPopulated;
         int defenderOwned = _defenderSupplier.TotalTroops;
         int attackerOwned = _attackerSupplier.TotalTroops;
-        return (defenderPopulated, attackerPopulated, defenderOwned, attackerOwned,
-            DecideJointSizing(defenderPopulated, attackerPopulated, defenderOwned, attackerOwned));
+        return new SideSizing(defenderPopulated, attackerPopulated, defenderOwned, attackerOwned);
     }
 
     // Re-run the engine's Init with the real totals (initial == total; Init applies the joint cap, wave split and
@@ -131,26 +130,29 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
     }
 
     /// <summary>
-    /// Pure sizing decision (unit-testable). Ready = both reserves landed; SizeNow additionally requires a positive
-    /// combined total, so Init is never handed a 0/0 battle-size split.
+    /// Snapshot of both suppliers plus the joint sizing derived from it (unit-testable — pure over its readings).
+    /// Ready = both reserves landed; SizeNow additionally requires a positive combined total, so Init is never
+    /// handed a 0/0 battle-size split.
     /// </summary>
-    public static JointSizingDecision DecideJointSizing(bool defenderPopulated, bool attackerPopulated, int defenderOwned, int attackerOwned)
+    public readonly struct SideSizing
     {
-        bool ready = defenderPopulated && attackerPopulated;
-        return new JointSizingDecision(ready, ready && defenderOwned + attackerOwned > 0);
-    }
+        public readonly bool DefenderPopulated;
+        public readonly bool AttackerPopulated;
+        public readonly int DefenderOwned;
+        public readonly int AttackerOwned;
 
-    public readonly struct JointSizingDecision
-    {
-        // Both reserves landed: commit the joint sizing now (else keep holding both sides at zero).
-        public readonly bool Ready;
-        // Ready and at least one side owns troops: run the real Init (a positive sum avoids Init's 0/0 NaN).
-        public readonly bool SizeNow;
-
-        public JointSizingDecision(bool ready, bool sizeNow)
+        public SideSizing(bool defenderPopulated, bool attackerPopulated, int defenderOwned, int attackerOwned)
         {
-            Ready = ready;
-            SizeNow = sizeNow;
+            DefenderPopulated = defenderPopulated;
+            AttackerPopulated = attackerPopulated;
+            DefenderOwned = defenderOwned;
+            AttackerOwned = attackerOwned;
         }
+
+        // Both reserves landed: commit the joint sizing now (else keep holding both sides at zero).
+        public bool Ready => DefenderPopulated && AttackerPopulated;
+
+        // Ready and at least one side owns troops: run the real Init (a positive sum avoids Init's 0/0 NaN).
+        public bool SizeNow => Ready && DefenderOwned + AttackerOwned > 0;
     }
 }
