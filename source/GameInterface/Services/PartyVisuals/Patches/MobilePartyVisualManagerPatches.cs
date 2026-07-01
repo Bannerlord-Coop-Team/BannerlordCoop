@@ -4,6 +4,7 @@ using SandBox.View.Map.Managers;
 using Serilog;
 using System;
 using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.PartyVisuals.Patches
 {
@@ -16,6 +17,8 @@ namespace GameInterface.Services.PartyVisuals.Patches
         [HarmonyPrefix]
         private static bool Prefix(MobilePartyVisualManager __instance, float realDt, float dt)
         {
+            if (Mission.Current != null) return false;
+
             __instance._dirtyPartyVisualCount = -1;
             TWParallel.For(0, __instance._visualsFlattened.Count, delegate (int startInclusive, int endExclusive)
             {

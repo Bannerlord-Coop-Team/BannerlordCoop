@@ -16,7 +16,7 @@ internal class DisableVillagerCampaignBehaviorPatch
     private static IEnumerable<MethodBase> TargetMethods() => new MethodBase[]
     {
         AccessTools.Method(typeof(VillagerCampaignBehavior), nameof(VillagerCampaignBehavior.HourlyTickSettlement)),
-        AccessTools.Method(typeof(VillagerCampaignBehavior), nameof(VillagerCampaignBehavior.HourlyTickParty)),
+        //AccessTools.Method(typeof(VillagerCampaignBehavior), nameof(VillagerCampaignBehavior.HourlyTickParty)),
         //AccessTools.Method(typeof(VillagerCampaignBehavior), nameof(VillagerCampaignBehavior.OnSessionLaunched)), // Needed on client to load dialogue
         AccessTools.Method(typeof(VillagerCampaignBehavior), nameof(VillagerCampaignBehavior.OnSettlementEntered)),
         AccessTools.Method(typeof(VillagerCampaignBehavior), nameof(VillagerCampaignBehavior.DailyTick)),
@@ -38,6 +38,9 @@ internal class VillagerCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool DeleteExpiredLootedVillagersPrefix(ref VillagerCampaignBehavior __instance)
     {
+        if (ModInformation.IsClient)
+            return false;
+        
         var message = new DeleteExpiredLootedVillagers();
         MessageBroker.Instance.Publish(__instance, message);
 
@@ -52,6 +55,9 @@ internal class VillagerCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool HourlyTickPartyPrefix(ref VillagerCampaignBehavior __instance, MobileParty villagerParty)
     {
+        if (ModInformation.IsClient)
+            return false;
+        
         // Block checks for parties that are invalid in the vanilla method
         if (!villagerParty.IsVillager || villagerParty.MapEvent != null || !villagerParty.HasLandNavigationCapability) return false;
 
