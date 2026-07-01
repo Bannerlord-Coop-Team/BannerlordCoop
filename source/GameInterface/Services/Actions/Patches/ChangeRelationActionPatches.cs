@@ -1,8 +1,8 @@
 ﻿using Common;
 using Common.Logging;
+using GameInterface.Services.Heroes.Patches;
 using HarmonyLib;
 using Serilog;
-using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 
@@ -22,9 +22,7 @@ internal class ChangeRelationActionPatches
     [HarmonyPrefix]
     public static bool ApplyPlayerRelationPrefix(Hero gainedRelationWith, int relation, bool affectRelatives = true, bool showQuickNotification = true)
     {
-        ChangeRelationAction.ApplyInternal(ResolvedMainHero, gainedRelationWith, relation, showQuickNotification, ChangeRelationAction.ChangeRelationDetail.Default);
+        ChangeRelationAction.ApplyInternal(ResolvedMainHeroContext.ResolvedMainHero, gainedRelationWith, relation, showQuickNotification, ChangeRelationAction.ChangeRelationDetail.Default);
         return false;
     }
-    [ThreadStatic]
-    public static Hero ResolvedMainHero;
 }

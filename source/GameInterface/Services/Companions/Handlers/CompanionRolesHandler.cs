@@ -2,10 +2,8 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using GameInterface.Services.Actions.Patches;
-using GameInterface.Services.Clans.Patches;
 using GameInterface.Services.Companions.Messages;
-using GameInterface.Services.Companions.Patches;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
@@ -103,9 +101,11 @@ internal class CompanionRolesHandler : IHandler
             oneToOneConversationHero.SetNewOccupation(Occupation.Lord);
             TextObject textObject = GameTexts.FindText("str_generic_clan_name", null);
             textObject.SetTextVariable("CLAN_NAME", new TextObject(data.ClanName, null));
-            CompanionRolesPatches.ResolvedMainHero = mainHero;
-            ChangeRelationActionPatches.ResolvedMainHero = mainHero;
-            ClanPatches.ResolvedMainHero = mainHero;
+            // Set ResolvedMainHero for the duration of these calls so ChangeRelationActionPatches
+            // ,CompanionRolesPatches and ClanPatches can resolve the correct mainhero via the Harmony prefix instead of
+            // Hero.MainHero which is different on the server compared to the client. Wrapped in try/finally so the static fields
+            // are always cleared even if something below throws
+            ResolvedMainHeroContext.ResolvedMainHero = mainHero;
             try
             { 
                 int randomBannerIdForNewClan = companionRolesCampaignBehavior.GetRandomBannerIdForNewClan();
@@ -127,10 +127,6 @@ internal class CompanionRolesHandler : IHandler
                     partyBelongedTo.Party.SetVisualAsDirty();
                 }
                 companionRolesCampaignBehavior.AdjustCompanionsEquipment(oneToOneConversationHero);
-                // Set ResolvedMainHero for the duration of these calls so ChangeRelationActionPatches
-                // ,CompanionRolesPatches and ClanPatches can resolve the correct mainhero via the Harmony prefix instead of
-                // Hero.MainHero which is different on the server compared to the client. Wrapped in try/finally so the static fields
-                // are always cleared even if something below throws
                 companionRolesCampaignBehavior.SpawnNewHeroesForNewCompanionClan(oneToOneConversationHero, clan, selectedFief);
                 GiveGoldAction.ApplyBetweenCharacters(mainHero, oneToOneConversationHero, 20000, false);
                 GainKingdomInfluenceAction.ApplyForDefault(mainHero, -500f);
@@ -138,9 +134,7 @@ internal class CompanionRolesHandler : IHandler
             }
             finally
             {
-                CompanionRolesPatches.ResolvedMainHero = null;
-                ChangeRelationActionPatches.ResolvedMainHero = null;
-                ClanPatches.ResolvedMainHero = null;
+                ResolvedMainHeroContext.ResolvedMainHero = null;
             }
         });
     }

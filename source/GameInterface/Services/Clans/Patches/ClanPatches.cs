@@ -1,5 +1,5 @@
-﻿using HarmonyLib;
-using System;
+﻿using GameInterface.Services.Heroes.Patches;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -26,11 +26,11 @@ namespace GameInterface.Services.Clans.Patches
         [HarmonyPrefix]
         public static bool CreateCompanionToLordClanPrefix(Hero hero, Settlement settlement, TextObject clanName, int newClanIconId, ref Clan __result)
         {
-            Clan clan = Clan.CreateClan(ResolvedMainHero.MapFaction.StringId + "_companion_clan");
+            Clan clan = Clan.CreateClan(ResolvedMainHeroContext.ResolvedMainHero.MapFaction.StringId + "_companion_clan");
             clan.ChangeClanName(clanName, clanName);
             clan.Culture = settlement.Culture;
             clan.Banner = Banner.CreateOneColoredBannerWithOneIcon(settlement.MapFaction.Banner.GetFirstIconColor(), settlement.MapFaction.Banner.GetPrimaryColor(), newClanIconId);
-            clan.Kingdom = ResolvedMainHero.Clan.Kingdom;
+            clan.Kingdom = ResolvedMainHeroContext.ResolvedMainHero.Clan.Kingdom;
             clan.Tier = Campaign.Current.Models.ClanTierModel.CompanionToLordClanStartingTier;
             clan.SetInitialHomeSettlement(settlement);
             hero.Clan = clan;
@@ -41,7 +41,5 @@ namespace GameInterface.Services.Clans.Patches
             __result = clan;
             return false;
         }
-        [ThreadStatic]
-        public static Hero ResolvedMainHero;
     }
 }

@@ -2,9 +2,9 @@
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Companions.Messages;
+using GameInterface.Services.Heroes.Patches;
 using HarmonyLib;
 using Serilog;
-using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -195,7 +195,7 @@ internal class CompanionRolesPatches
         {
             hero.Clan = clan;
             hero.ChangeState(Hero.CharacterStates.Active);
-            ChangeRelationAction.ApplyRelationChangeBetweenHeroes(hero, ResolvedMainHero, MBRandom.RandomInt(5, 10), false);
+            ChangeRelationAction.ApplyRelationChangeBetweenHeroes(hero, ResolvedMainHeroContext.ResolvedMainHero, MBRandom.RandomInt(5, 10), false);
             if (hero != companionHero)
             {
                 EnterSettlementAction.ApplyForCharacterOnly(hero, settlement);
@@ -216,7 +216,7 @@ internal class CompanionRolesPatches
     [HarmonyPrefix]
     public static bool GetRandomBannerIdForNewClanPrefix(CompanionRolesCampaignBehavior __instance, ref int __result)
     {
-        MBReadOnlyList<int> possibleClanBannerIconsIDs = ResolvedMainHero.MapFaction.Culture.PossibleClanBannerIconsIDs;
+        MBReadOnlyList<int> possibleClanBannerIconsIDs = ResolvedMainHeroContext.ResolvedMainHero.MapFaction.Culture.PossibleClanBannerIconsIDs;
         int num = possibleClanBannerIconsIDs.GetRandomElement<int>();
         if (__instance.CurrentBehavior._alreadyUsedIconIdsForNewClans.Contains(num))
         {
@@ -252,6 +252,4 @@ internal class CompanionRolesPatches
         __result = num;
         return false;
     }
-    [ThreadStatic] 
-    public static Hero ResolvedMainHero;
 }
