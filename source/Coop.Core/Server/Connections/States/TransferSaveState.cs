@@ -7,6 +7,7 @@ using GameInterface.CoopSessionData;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
 
@@ -27,7 +28,8 @@ public class TransferSaveState : ConnectionStateBase
         ISaveInterface saveInterface,
         ITimeControlInterface timeControlInterface,
         IConnectionMessageQueue connectionMessageQueue,
-        ISendCoalescer coalescer)
+        ISendCoalescer coalescer,
+        IAttachmentIdMapper attachmentIdMapper)
         : base(connectionLogic)
     {
         GameThread.Run(() =>
@@ -59,7 +61,8 @@ public class TransferSaveState : ConnectionStateBase
                 coopSessionProvider.CoopSession?.WorkshopPlayerData,
                 coopSessionProvider.CoopSession?.CaravansPlayerData,
                 coopSessionProvider.CoopSession?.AlleyPlayerData,
-                coopSessionProvider.CoopSession?.InteractionsPlayerData);
+                coopSessionProvider.CoopSession?.InteractionsPlayerData,
+                attachmentIdMapper.BuildServerMap());
 
             // Disconnect peer on failure
             if (!saveResults.Success)

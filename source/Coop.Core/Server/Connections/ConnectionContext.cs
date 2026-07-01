@@ -32,7 +32,8 @@ public class ConnectionContext
         ISaveInterface saveInterface,
         ITimeControlInterface timeControlInterface,
         IConnectionMessageQueue connectionMessageQueue,
-        ISendCoalescer coalescer)
+        ISendCoalescer coalescer,
+        IAttachmentIdMapper attachmentIdMapper)
     {
         MessageBroker = messageBroker;
         Network = network;
@@ -47,6 +48,7 @@ public class ConnectionContext
         TimeControlInterface = timeControlInterface;
         ConnectionMessageQueue = connectionMessageQueue;
         Coalescer = coalescer;
+        AttachmentIdMapper = attachmentIdMapper;
     }
 
     public IMessageBroker MessageBroker { get; }
@@ -62,4 +64,5 @@ public class ConnectionContext
     public ITimeControlInterface TimeControlInterface { get; }
     public IConnectionMessageQueue ConnectionMessageQueue { get; }
     public ISendCoalescer Coalescer { get; }
+    public IAttachmentIdMapper AttachmentIdMapper { get; }
 }
