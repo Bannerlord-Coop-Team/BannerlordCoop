@@ -1,5 +1,6 @@
 ﻿using Autofac;
 using Common;
+using Common.Logging;
 using Common.LogicStates;
 using Common.Messaging;
 using Common.Network;
@@ -10,16 +11,22 @@ using Coop.Core.Server;
 using GameInterface;
 using GameInterface.AutoSync;
 using GameInterface.Services.GameState.Interfaces;
+using GameInterface.Services.UI.Interfaces;
 using GameInterface.Services.UI.Messages;
+using Serilog;
 using System;
+using System.Threading.Tasks;
 
 namespace Coop.Core
 {
     public class CoopartiveMultiplayerExperience : IDisposable
     {
+        private static readonly ILogger Logger = LogManager.GetLogger<CoopartiveMultiplayerExperience>();
+
         private IMessageBroker messageBroker;
         private INetworkConfig configuration;
         private IContainer container;
+        private volatile bool serverStarting;
 
         public CoopartiveMultiplayerExperience()
         {
@@ -59,11 +66,11 @@ namespace Coop.Core
 
         private void Handle(MessagePayload<HostSaveGame> obj)
         {
-            StartAsServer();
+            var saveName = obj.What.SaveName;
 
-            container
+            StartAsServer(() => container
                 .Resolve<IGameStateInterface>()
-                .LoadGame(obj.What.SaveName);
+                .LoadGame(saveName));
         }
 
         private void Handle(MessagePayload<EndCoopMode> payload)
@@ -75,8 +82,11 @@ namespace Coop.Core
 
         public int Priority => 0;
 
-        public void StartAsServer()
+        public void StartAsServer(Action afterStart = null)
         {
+            // A second Host click while patches are still applying would tear down the in-flight start
+            if (serverStarting) return;
+
             DestroyContainer();
 
             ModInformation.IsServer = true;
@@ -88,11 +98,63 @@ namespace Coop.Core
 
             GameInterface.ContainerProvider.SetContainer(container);
 
-            // Create harmony patches
-            container.Resolve<IGameInterface>().PatchAll();
+            var gameInterface = container.Resolve<IGameInterface>();
+            var loadingInterface = container.Resolve<ILoadingInterface>();
 
-            var logic = container.Resolve<ILogic>();
-            logic.Start();
+            // Headless server has no loading window to keep alive; patch synchronously
+            if (!loadingInterface.IsLoadingScreenAvailable)
+            {
+                gameInterface.PatchAll();
+                container.Resolve<ILogic>().Start();
+                afterStart?.Invoke();
+                return;
+            }
+
+            loadingInterface.ShowLoadingScreen("Hosting Coop Server", "Applying patches...");
+            serverStarting = true;
+            var startedContainer = container;
+
+            // The ~30s patch compile must stay off the game thread so the loading window keeps drawing, like the client patching on its network thread
+            Task.Factory.StartNew(() =>
+            {
+                try
+                {
+                    gameInterface.PatchAll();
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Applying patches failed while starting the coop server");
+                    serverStarting = false;
+                    GameThread.RunSafe(loadingInterface.HideLoadingScreen);
+                    return;
+                }
+
+                GameThread.RunSafe(() =>
+                {
+                    try
+                    {
+                        // Torn down or replaced while patching; only hide the window when nothing replaced this start
+                        if (container != startedContainer)
+                        {
+                            if (container == null) loadingInterface.HideLoadingScreen();
+                            return;
+                        }
+
+                        loadingInterface.SetLoadingMessage("Hosting Coop Server", "Loading campaign save...");
+                        container.Resolve<ILogic>().Start();
+                        afterStart?.Invoke();
+                    }
+                    catch
+                    {
+                        loadingInterface.HideLoadingScreen();
+                        throw;
+                    }
+                    finally
+                    {
+                        serverStarting = false;
+                    }
+                });
+            }, TaskCreationOptions.LongRunning);
         }
 
         public void StartAsClient(INetworkConfig configuration = null)
