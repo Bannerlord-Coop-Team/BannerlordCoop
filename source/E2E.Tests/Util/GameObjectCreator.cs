@@ -66,7 +66,6 @@ internal class GameObjectCreator
         { typeof(PropertyOwner<TraitObject>), new PropertyOwnerBuilder() },
         { typeof(SiegeEngineType), new SiegeEngineTypeBuilder() },
         { typeof(SiegeEngineConstructionProgress), new SiegeEngineConstructionProgressBuilder()  },
-        { typeof(SkillObject), new SkillObjectBuilder() },
     };
 
     public static T CreateInitializedObject<T>()

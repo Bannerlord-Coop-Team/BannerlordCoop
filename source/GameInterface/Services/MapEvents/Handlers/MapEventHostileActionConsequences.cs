@@ -1,5 +1,5 @@
 using Common.Logging;
-using GameInterface.Services.Stances;
+using GameInterface.Services.Villages.Interfaces;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
@@ -49,7 +49,7 @@ internal static class MapEventHostileActionConsequences
 
             // Already hostile: nothing to declare, and this is what makes the consequence idempotent
             // across duplicate attack/join requests a client can send during the server round-trip.
-            if (FactionManager.IsAtWarAgainstFaction(attackerFaction, defenderFaction))
+            if (VillageHostileFactionStanceHelper.HasWarStance(attackerFaction, defenderFaction))
                 return;
 
             if (attackerParty.LeaderHero != null && defenderFaction.Leader != null)
@@ -59,7 +59,7 @@ internal static class MapEventHostileActionConsequences
 
             Logger.Debug("Applying {Source} hostile-action war between {AttackerFaction} and {DefenderFaction}", source, attackerFaction.Name, defenderFaction.Name);
             DeclareWarAction.ApplyByPlayerHostility(attackerFaction, defenderFaction);
-            FactionStanceHelper.ApplyWarStance(attackerFaction, defenderFaction);
+            VillageHostileFactionStanceHelper.ApplyWarStance(attackerFaction, defenderFaction);
         }
         catch (Exception e)
         {

@@ -17,7 +17,6 @@ internal class MapEventSync : IAutoSync
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.Position)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.State)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.TroopUpgradeTracker)), debug: true);
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.WasEverInLootingPhase)));
 
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), nameof(MapEvent.MapEventVisual)), debug: true);
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), nameof(MapEvent.DiplomaticallyFinished)));

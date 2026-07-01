@@ -80,8 +80,6 @@ public class CreateCharacterState : ConnectionStateBase
 
         // First join: associate this peer with the player it just created.
         playerManager.SetPeer(controllerId, netPeer);
-        ConnectionLogic.PlayerId = controllerId;
-
         // Send created to all other clients
         var message = new NetworkNewPlayerHeroCreated(controllerId, player, data);
         network.SendAllBut(netPeer, message);

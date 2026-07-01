@@ -2,7 +2,6 @@ using Common;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
-using GameInterface.Services.Stances;
 using GameInterface.Services.Stances.Messages;
 using HarmonyLib;
 using Serilog;
@@ -35,14 +34,6 @@ namespace GameInterface.Services.Stances.Patches
 
             MessageBroker.Instance.Publish(faction1, new FactionWarDeclared(faction1, faction2, (int)declareWarDetail));
             return true;
-        }
-
-        public static void Postfix(IFaction faction1, IFaction faction2)
-        {
-            if (ModInformation.IsClient && CallOriginalPolicy.IsOriginalAllowed() == false)
-                return;
-
-            FactionStanceHelper.ApplyWarStance(faction1, faction2);
         }
     }
 }

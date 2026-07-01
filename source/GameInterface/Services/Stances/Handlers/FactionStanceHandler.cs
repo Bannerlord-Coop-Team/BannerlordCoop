@@ -3,7 +3,6 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Stances;
 using GameInterface.Services.Stances.Messages;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -43,7 +42,6 @@ namespace GameInterface.Services.Stances.Handlers
                 using (new AllowedThread())
                 {
                     DeclareWarAction.ApplyInternal(faction1, faction2, (DeclareWarAction.DeclareWarDetail)payload.Detail);
-                    FactionStanceHelper.ApplyWarStance(faction1, faction2);
                 }
             }, true);
         }

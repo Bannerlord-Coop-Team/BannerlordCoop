@@ -7,7 +7,6 @@ using Coop.Core.Server.Services.ItemRosters.Messages;
 using Coop.Core.Server.Services.Stances.Messages;
 using Coop.Core.Server.Services.Time.Messages;
 using Common.Util;
-using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using E2E.Tests.Environment.Instance;
@@ -30,6 +29,8 @@ using GameInterface.Services.Villages.Data;
 using GameInterface.Services.Villages.Interfaces;
 using GameInterface.Services.Villages.Messages;
 using HarmonyLib;
+using System.Net;
+using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -49,6 +50,8 @@ namespace E2E.Tests.Services.Villages;
 
 public class VillageHostileActionTests : MapEventTestBase
 {
+    private static int peerPortCounter;
+
     public VillageHostileActionTests(ITestOutputHelper output) : base(output)
     {
     }
@@ -1149,7 +1152,7 @@ public class VillageHostileActionTests : MapEventTestBase
 
             client.Call(() =>
             {
-                var result = MapEventDebugCommands.AllowRaidAiIntervention(new List<string> { "off" });
+                var result = RaidDebugCommands.AllowRaidAiIntervention(new List<string> { "off" });
                 Assert.Contains("server update requested", result);
             });
 
@@ -2071,7 +2074,7 @@ public class VillageHostileActionTests : MapEventTestBase
             var shallowStance = Campaign.Current.Models.DiplomacyModel.GetShallowDiplomaticStance(attackerFaction, defenderMapFaction);
             var stanceLink = FactionManager.Instance.GetStanceLinkInternal(attackerFaction, defenderMapFaction);
             Assert.True(
-                FactionManager.IsAtWarAgainstFaction(attackerFaction, defenderMapFaction),
+                VillageHostileFactionStanceHelper.HasWarStance(attackerFaction, defenderMapFaction),
                 $"Expected {GetFactionDebugName(instance, attackerFaction)} to be at war with {GetFactionDebugName(instance, defenderMapFaction)}. AttackerEliminated={attackerFaction.IsEliminated}, DefenderEliminated={defenderMapFaction.IsEliminated}, Shallow={shallowStance?.ToString() ?? "null"}, LinkWar={stanceLink.IsAtWar}, LinkStance={stanceLink.StanceType}, AttackerWarsContainsDefender={attackerFaction.FactionsAtWarWith?.Contains(defenderMapFaction) == true}, DefenderWarsContainsAttacker={defenderMapFaction.FactionsAtWarWith?.Contains(attackerFaction) == true}");
         });
     }
@@ -2180,11 +2183,19 @@ public class VillageHostileActionTests : MapEventTestBase
 
     private void RegisterPeer(EnvironmentInstance client, string controllerId)
     {
+        EnsurePeerEndpoint(client);
         Server.SimulateMessage(this, new PlayerConnected(client.NetPeer));
+        Server.SimulateMessage(client.NetPeer, new NetworkClientValidate(controllerId));
+    }
 
-        var connections = Server.Resolve<ConnectionCollection>();
-        Assert.True(connections.ConnectionStates.TryGetValue(client.NetPeer, out var connection));
-        connection.PlayerId = controllerId;
+    private static void EnsurePeerEndpoint(EnvironmentInstance client)
+    {
+        var endPoint = (IPEndPoint)client.NetPeer;
+        if (endPoint.Address != null)
+            return;
+
+        endPoint.Address = IPAddress.Loopback;
+        endPoint.Port = 1 + Interlocked.Increment(ref peerPortCounter) % 60000;
     }
 
     private VillageTarget CreateVillageTarget()

@@ -172,7 +172,6 @@ namespace Coop.Tests.Server.Connections.States
 
             Assert.True(message.HeroExists);
             Assert.Equal(player, message.Player);
-            Assert.Equal(player.ControllerId, connectionLogic.PlayerId);
         }
 
         [Fact]

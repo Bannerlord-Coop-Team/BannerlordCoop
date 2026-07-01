@@ -5,10 +5,7 @@ using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using Coop.Tests.Mocks;
-using GameInterface.Services.Players;
-using GameInterface.Services.Players.Data;
 using LiteNetLib;
-using Moq;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -77,48 +74,6 @@ namespace Coop.Tests.Server.Connections.States
             // Assert
             var connectionState = Assert.Single(connectionCollection.ConnectionStates).Value;
             Assert.IsType<ResolveCharacterState>(connectionState.State);
-        }
-
-        [Fact]
-        public void TryGetPlayer_WithConnectedPlayerId_ReturnsRegisteredPlayer()
-        {
-            // Arrange
-            var connectPayload = new MessagePayload<PlayerConnected>(this, new PlayerConnected(playerPeer));
-            var player = new Player("MyPlayer", "MyHero", "MyParty", "MyClan", "MyCharacter");
-
-            connectionCollection.PlayerJoiningHandler(connectPayload);
-            connectionCollection.ConnectionStates[playerPeer].PlayerId = player.ControllerId;
-
-            serverComponent.Container
-                .Resolve<Mock<IPlayerManager>>()
-                .Setup(i => i.TryGetPlayer(player.ControllerId, out It.Ref<Player>.IsAny))
-                .Callback((string id, out Player returnedPlayer) =>
-                {
-                    returnedPlayer = player;
-                })
-                .Returns(true);
-
-            // Act
-            var result = connectionCollection.TryGetPlayer(playerPeer, out var returnedPlayer);
-
-            // Assert
-            Assert.True(result);
-            Assert.Same(player, returnedPlayer);
-        }
-
-        [Fact]
-        public void TryGetPlayer_WithoutPlayerId_ReturnsFalse()
-        {
-            // Arrange
-            var connectPayload = new MessagePayload<PlayerConnected>(this, new PlayerConnected(playerPeer));
-            connectionCollection.PlayerJoiningHandler(connectPayload);
-
-            // Act
-            var result = connectionCollection.TryGetPlayer(playerPeer, out var returnedPlayer);
-
-            // Assert
-            Assert.False(result);
-            Assert.Null(returnedPlayer);
         }
 
         [Fact]

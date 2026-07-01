@@ -1,24 +1,24 @@
-﻿Subscribe<{{MemberType}}, {{ MemberDeclaringTypeName}}_{{ MemberIdentifier }}_SetLocalMessage>((instanceId, data) =>
+﻿Subscribe<{{MemberType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetLocalMessage>((instanceId, data) => 
 {
 {{~ if Debug ~}}
 	Logger.Debug("[Server] Sending network message for {type}", "{{MemberName}}");
 {{~ end ~}}
-	network.SendAll(new {{ MemberDeclaringTypeName}}_{{ MemberIdentifier }}_SetNetworkMessage(instanceId, RawSerializer.Serialize(data.Value)));
+	network.SendAll(new {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage(instanceId, RawSerializer.Serialize(data.Value)));
 });
 
-{{~ if ReflectionAssignment ~}}
-var {{MemberIdentifier}}FieldInfo = AccessTools.Field(typeof({{MemberDeclaringType}}), "{{MemberName}}");
+{{~ if ReadOnly ~}}
+var {{MemberName}}FieldInfo = AccessTools.Field(typeof({{MemberDeclaringType}}), "{{MemberName}}");
 {{~ end ~}}
 
-SubscribeNetwork<byte[], {{ MemberDeclaringTypeName}}_{{ MemberIdentifier }}_SetNetworkMessage>((instance, data) =>
+SubscribeNetwork<byte[], {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage>((instance, data) => 
 {
 {{~ if Debug ~}}
 	Logger.Debug("[Client] Received network set message for {type}", "{{MemberName}}");
 {{~ end ~}}
 
-{{~ if ReflectionAssignment ~}}
+{{~ if ReadOnly ~}}
 	var value = {{DeserializeMethod}}(data.Value);
-	{{MemberIdentifier}}FieldInfo.SetValue(instance, value);
+	{{MemberName}}FieldInfo.SetValue(instance, value);
 {{~ else ~}}
 	using (new AllowedThread())
 	{

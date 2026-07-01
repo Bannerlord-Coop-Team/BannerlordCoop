@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Text;
 
 namespace GameInterface.AutoSync.Builders;
 
@@ -55,38 +54,11 @@ public static class AutoSyncUtils
                 MemberDeclaringType = GetSimpleTypeName(memberInfo.DeclaringType),
                 MemberDeclaringTypeName = GetSimpleTypeName(memberInfo.DeclaringType).Replace(".", "_"),
                 MemberName = memberName,
-                MemberIdentifier = GetMemberIdentifier(memberName),
                 MemberType = GetMemberTypeName(memberType),
                 Libraries = libraries
             });
     }
 
-    public static string GetMemberIdentifier(string memberName)
-    {
-        var builder = new StringBuilder();
-        foreach (var character in memberName)
-        {
-            if ((character >= 'a' && character <= 'z') ||
-                (character >= 'A' && character <= 'Z') ||
-                (character >= '0' && character <= '9') ||
-                character == '_')
-            {
-                builder.Append(character);
-            }
-            else
-            {
-                builder.Append('_');
-            }
-        }
-
-        if (builder.Length == 0)
-            return "Member";
-
-        if (builder[0] >= '0' && builder[0] <= '9')
-            builder.Insert(0, '_');
-
-        return builder.ToString();
-    }
     public static string GetMemberTypeName(Type type)
     {
         if (type.IsArray)

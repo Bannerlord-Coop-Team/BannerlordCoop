@@ -3,17 +3,18 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
-using GameInterface.Services.ItemObjects;
 using GameInterface.Services.MapEventComponents.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.MapEventComponents.Handlers;
 
@@ -21,21 +22,20 @@ internal class RaidProductionRewardsHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<RaidProductionRewardsHandler>();
 
+    private const string ItemIdPrefix = nameof(ItemObject) + "_";
+
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
-    private readonly ItemObjectRegistry itemObjectRegistry;
 
     public RaidProductionRewardsHandler(
         IMessageBroker messageBroker,
         INetwork network,
-        IObjectManager objectManager,
-        ItemObjectRegistry itemObjectRegistry)
+        IObjectManager objectManager)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
-        this.itemObjectRegistry = itemObjectRegistry;
 
         messageBroker.Subscribe<RaidProductionRewardsUpdated>(Handle_RaidProductionRewardsUpdated);
         messageBroker.Subscribe<RaidLootedItemsUpdated>(Handle_RaidLootedItemsUpdated);
@@ -74,7 +74,16 @@ internal class RaidProductionRewardsHandler : IHandler
             }
         }
 
-        network.SendAll(new NetworkRaidProductionRewardsUpdated(componentId, itemIds.ToArray(), values.ToArray()));
+        var settlement = component.MapEvent?.MapEventSettlement;
+        network.SendAll(new NetworkRaidProductionRewardsUpdated(
+            componentId,
+            itemIds.ToArray(),
+            values.ToArray(),
+            component.MapEvent?.WasEverInLootingPhase == true,
+            component.RaidDamage,
+            settlement != null,
+            settlement?.SettlementHitPoints ?? 0f,
+            settlement?.Village?.Hearth ?? 0f));
     }
 
     private void Handle_RaidLootedItemsUpdated(MessagePayload<RaidLootedItemsUpdated> payload)
@@ -150,6 +159,16 @@ internal class RaidProductionRewardsHandler : IHandler
             using (new AllowedThread())
             {
                 component._raidProductionRewards = rewards;
+                component.RaidDamage = data.RaidDamage;
+                if (data.HasSettlementState && component.MapEvent?.MapEventSettlement != null)
+                {
+                    var settlement = component.MapEvent.MapEventSettlement;
+                    settlement.SettlementHitPoints = data.SettlementHitPoints;
+                    if (settlement.Village != null)
+                        settlement.Village.Hearth = data.VillageHearth;
+                }
+                if (data.WasEverInLootingPhase && component.MapEvent != null)
+                    component.MapEvent.WasEverInLootingPhase = true;
             }
         }
         catch (Exception e)
@@ -194,7 +213,7 @@ internal class RaidProductionRewardsHandler : IHandler
         if (objectManager.TryGetId(item, out itemId))
             return true;
 
-        if (itemObjectRegistry.TryRegisterExistingItem(item, out itemId))
+        if (TryRegisterRewardItem(item, out itemId))
             return true;
 
         return objectManager.TryGetIdWithLogging(item, out itemId);
@@ -205,9 +224,77 @@ internal class RaidProductionRewardsHandler : IHandler
         if (objectManager.TryGetObject(itemId, out item))
             return true;
 
-        if (itemObjectRegistry.TryGetRegisteredItem(itemId, out item))
+        if (TryGetRegisteredRewardItem(itemId, out item))
             return true;
 
         return objectManager.TryGetObjectWithLogging(itemId, out item);
+    }
+
+    private bool TryRegisterRewardItem(ItemObject item, out string itemId)
+    {
+        itemId = null;
+
+        if (item == null || string.IsNullOrEmpty(item.StringId))
+            return false;
+
+        itemId = ItemIdPrefix + item.StringId;
+        if (objectManager.Contains(itemId))
+        {
+            if (objectManager.TryGetObject<ItemObject>(itemId, out var registeredItem) &&
+                registeredItem != item &&
+                registeredItem.StringId == item.StringId)
+            {
+                objectManager.Remove(registeredItem);
+                if (objectManager.AddExisting(itemId, item))
+                    return objectManager.TryGetId(item, out itemId);
+            }
+
+            return objectManager.TryGetId(item, out itemId);
+        }
+
+        if (objectManager.AddExisting(itemId, item) == false)
+            return false;
+
+        return objectManager.TryGetId(item, out itemId);
+    }
+
+    private bool TryGetRegisteredRewardItem(string itemId, out ItemObject item)
+    {
+        var stringId = GetRewardItemStringId(itemId);
+        if (string.IsNullOrEmpty(stringId))
+        {
+            item = null;
+            return false;
+        }
+
+        var mbObjectManager = MBObjectManager.Instance;
+        if (mbObjectManager == null)
+        {
+            item = null;
+            return false;
+        }
+
+        item = mbObjectManager.GetObject<ItemObject>(stringId) ??
+               mbObjectManager.GetObjectTypeList<ItemObject>().FirstOrDefault(i => i.StringId == stringId);
+        if (item == null)
+            return false;
+
+        if (TryRegisterRewardItem(item, out var registeredItemId) == false)
+            return false;
+
+        if (objectManager.TryGetObject(itemId, out item))
+            return true;
+
+        return objectManager.TryGetObject(registeredItemId, out item);
+    }
+
+    private static string GetRewardItemStringId(string itemId)
+    {
+        if (string.IsNullOrEmpty(itemId))
+            return null;
+
+        return itemId.StartsWith(ItemIdPrefix, StringComparison.Ordinal)
+            ? itemId.Substring(ItemIdPrefix.Length)
+            : itemId;
     }
 }

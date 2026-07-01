@@ -4,7 +4,6 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Stances;
 using GameInterface.Services.Villages.Data;
 using GameInterface.Services.Villages.Messages;
 using Serilog;
@@ -481,14 +480,14 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface
         if (Campaign.Current.Models.EncounterModel.IsEncounterExemptFromHostileActions(attackerParty, defenderParty))
             return;
 
-        if (FactionManager.IsAtWarAgainstFaction(attackerFaction, defenderFaction))
+        if (VillageHostileFactionStanceHelper.HasWarStance(attackerFaction, defenderFaction))
             return;
 
         if (attackerParty.LeaderHero != null && defenderFaction.Leader != null)
             ChangeRelationAction.ApplyRelationChangeBetweenHeroes(attackerParty.LeaderHero, defenderFaction.Leader, PlayerHostilityRelationPenalty);
 
         DeclareWarAction.ApplyByPlayerHostility(attackerFaction, defenderFaction);
-        FactionStanceHelper.ApplyWarStance(attackerFaction, defenderFaction);
+        VillageHostileFactionStanceHelper.ApplyWarStance(attackerFaction, defenderFaction);
     }
 
     private static IFaction GetMapFaction(IFaction faction)

@@ -60,10 +60,8 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
 
         private void Handle(MessagePayload<NetworkSetSkillXpServer> obj)
         {
-            if (!ModInformation.IsServer) return;
-
             // Send to all clients and apply on server
-            GameThread.RunSafe(() =>
+            GameThread.Run(() =>
             {
                 using (new AllowedThread())
                 {
@@ -78,7 +76,7 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
         {
             var data = obj.What;
 
-            GameThread.RunSafe(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
@@ -97,10 +95,8 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
         }
         private void Handle(MessagePayload<NetworkSkillLevelChangeServer> obj)
         {
-            if (!ModInformation.IsServer) return;
-
             // Send to all clients and apply on server
-            GameThread.RunSafe(() =>
+            GameThread.Run(() =>
             {
                 using (new AllowedThread())
                 {
@@ -115,7 +111,7 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
         {
             var data = obj.What;
 
-            GameThread.RunSafe(() =>
+            GameThread.Run(() =>
             {
                 try
                 {
@@ -134,20 +130,12 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
         }
         private void Handle(MessagePayload<NetworkRawXpGainServer> obj)
         {
-            if (!ModInformation.IsServer) return;
-
             // Send to all clients and apply on server
             GameThread.RunSafe(() =>
             {
                 using (new AllowedThread())
                 {
-                    if (!objectManager.TryGetObject(obj.What.HeroId, out Hero hero))
-                    {
-                        Logger.Error("Unable to get object for hero id {id}", obj.What.HeroId);
-                        return;
-                    }
-
-                    NetworkRawXpGainClients changes = new(obj.What, GetTotalXpAfterRawGain(hero, obj.What.RawXp));
+                    NetworkRawXpGainClients changes = new(obj.What);
                     network.SendAll(changes);
                     ChangeRawXp(changes);
                 }
@@ -158,17 +146,9 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
         {
             var data = obj.What;
 
-            GameThread.RunSafe(() =>
-            {
-                try
-                {
-                    ChangeRawXp(data);
-                }
-                catch (Exception e)
-                {
-                    Logger.Error(e, "Failed to apply NetworkRawXpGainClients");
-                }
-            }, context: nameof(HeroDeveloperHandler));
+            GameThread.RunSafe(
+                () => ChangeRawXp(data),
+                context: nameof(HeroDeveloperHandler));
         }
 
         private void SendSkillXp(SkillXpSet obj)
@@ -187,24 +167,12 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
                 return;
             }
 
+            // Send to server from client
             NetworkSetSkillXpServer message = new(
                 heroId,
                 skillObjectId,
                 obj.Value
             );
-
-            if (ModInformation.IsServer)
-            {
-                NetworkSetSkillXpClients changes = new(message);
-                network.SendAll(changes);
-                using (new AllowedThread())
-                {
-                    SetSkillXp(changes);
-                }
-                return;
-            }
-
-            // Send to server from client
             network.SendAll(message);
         }
 
@@ -250,22 +218,13 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
                 return;
             }
 
+            // Send to server from client
             NetworkSkillLevelChangeServer message = new(
                 heroId,
                 skillObjectId,
                 obj.ChangeAmount,
                 obj.ShouldNotify
             );
-
-            if (ModInformation.IsServer)
-            {
-                NetworkSkillLevelChangeClients changes = new(message);
-                network.SendAll(changes);
-                ChangeSkillLevel(changes);
-                return;
-            }
-
-            // Send to server from client
             network.SendAll(message);
         }
 
@@ -310,35 +269,13 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
                 return;
             }
 
+            // Send to server from client
             NetworkRawXpGainServer message = new(
                 heroId,
                 obj.RawXp,
                 obj.ShouldNotify
             );
-
-            if (ModInformation.IsServer)
-            {
-                NetworkRawXpGainClients changes = new(message, GetTotalXpAfterRawGain(obj.HeroDeveloper.Hero, obj.RawXp));
-                network.SendAll(changes);
-                ChangeRawXp(changes);
-                return;
-            }
-
-            // Send to server from client
             network.SendAll(message);
-        }
-
-        private static int GetTotalXpAfterRawGain(Hero hero, float rawXp)
-        {
-            var totalXp = (long)hero.HeroDeveloper._totalXp + (long)MathF.Round(rawXp);
-            var maxSkillPoint = Campaign.Current.Models.CharacterDevelopmentModel.GetMaxSkillPoint();
-
-            if (totalXp < (long)maxSkillPoint)
-            {
-                return (int)totalXp;
-            }
-
-            return maxSkillPoint;
         }
 
         private void ChangeRawXp(NetworkRawXpGainClients obj)
@@ -352,20 +289,25 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
             var heroDeveloper = hero.HeroDeveloper;
             if (heroDeveloper == null) return;
 
+            int maxSkillPoint = campaign.Models.CharacterDevelopmentModel.GetMaxSkillPoint();
+
             // Replace original TaleWorlds implementation
             // HeroDeveloper.CheckLevel is patched and only runs the original on a client when the
             // thread is allowed, so the vanilla level-up must be marked as allowed here.
             using (new AllowedThread())
             {
-                var previousTotalXp = heroDeveloper._totalXp;
-                heroDeveloper._totalXp = obj.TotalXp;
+                if ((long)heroDeveloper._totalXp + (long)MathF.Round(obj.RawXp) < (long)maxSkillPoint)
+                {
+                    heroDeveloper._totalXp += MathF.Round(obj.RawXp);
 
-                if (previousTotalXp == heroDeveloper._totalXp) return;
+                    // Only notify if running on client where the updated hero is their main hero
+                    bool shouldNotify = (hero == Hero.MainHero) && obj.ShouldNotify;
 
-                // Only notify if running on client where the updated hero is their main hero
-                bool shouldNotify = (hero == Hero.MainHero) && obj.ShouldNotify;
-
-                heroDeveloper.CheckLevel(shouldNotify);
+                    heroDeveloper.CheckLevel(shouldNotify);
+                    return;
+                }
+                heroDeveloper._totalXp = maxSkillPoint;
             }
-        }    }
+        }
+    }
 }

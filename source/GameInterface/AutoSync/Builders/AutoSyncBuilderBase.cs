@@ -45,12 +45,8 @@ namespace GameInterface.AutoSync.Builders
                 MemberDeclaringType = AutoSyncUtils.GetSimpleTypeName(fieldInfo.DeclaringType),
                 MemberDeclaringTypeName = AutoSyncUtils.GetSimpleTypeName(fieldInfo.DeclaringType).Replace(".", "_"),
                 MemberName = fieldInfo.Name,
-                MemberIdentifier = AutoSyncUtils.GetMemberIdentifier(fieldInfo.Name),
                 MemberType = AutoSyncUtils.GetMemberTypeName(fieldInfo.FieldType),
                 ReadOnly = fieldInfo.IsInitOnly,
-                DirectAccess = fieldInfo.Name == AutoSyncUtils.GetMemberIdentifier(fieldInfo.Name),
-                DirectAssignment = fieldInfo.IsInitOnly == false && fieldInfo.Name == AutoSyncUtils.GetMemberIdentifier(fieldInfo.Name),
-                ReflectionAssignment = fieldInfo.IsInitOnly || fieldInfo.Name != AutoSyncUtils.GetMemberIdentifier(fieldInfo.Name),
                 ReadOnlySetterIndex = fieldInfo.IsInitOnly ? GetReadOnlyFieldSetter(fieldInfo) : (int?)null,
                 Debug = fieldItem.Debug
             });

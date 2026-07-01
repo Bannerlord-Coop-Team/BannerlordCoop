@@ -29,7 +29,7 @@ internal static class NetPeerExtensions
         // endpoint so mocks behave like real, distinct connections.
         var endPoint = (IPEndPoint)peer;
         endPoint.Address = IPAddress.Loopback;
-        endPoint.Port = 1 + (Interlocked.Increment(ref _portCounter) % 60000);
+        endPoint.Port = 1 + Interlocked.Increment(ref _portCounter) % 60000;
 
         return peer;
     }

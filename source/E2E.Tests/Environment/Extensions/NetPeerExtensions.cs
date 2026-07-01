@@ -1,5 +1,4 @@
 ﻿using LiteNetLib;
-using System.Net;
 using System.Reflection;
 using System.Runtime.Serialization;
 
@@ -11,9 +10,6 @@ namespace E2E.Tests.Environment.Extensions;
 internal static class NetPeerExtensions
 {
     private static readonly FieldInfo Id = typeof(NetPeer).GetField(nameof(NetPeer.Id))!;
-
-    private static int _portCounter;
-
     public static void SetId(this NetPeer peer, int id)
     {
         Id.SetValue(peer, id);
@@ -21,17 +17,7 @@ internal static class NetPeerExtensions
 
     public static NetPeer CreatePeer()
     {
-        var peer = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
-
-        // NetPeer derives from IPEndPoint, and its equality/hash come from the endpoint's Address+Port.
-        // An uninitialized mock has a null Address and throws inside IPEndPoint.Equals when used as a
-        // dictionary key (e.g. MissionInstance's controller<->peer maps). Give each a distinct loopback
-        // endpoint so mocks behave like real, distinct connections.
-        var endPoint = (IPEndPoint)peer;
-        endPoint.Address = IPAddress.Loopback;
-        endPoint.Port = 1 + Interlocked.Increment(ref _portCounter) % 60000;
-
-        return peer;
+        return (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
     }
 
     public static NetPeer CreatePeer(int id)

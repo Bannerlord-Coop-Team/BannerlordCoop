@@ -21,7 +21,6 @@ public class AutoSyncFieldBuilder : AutoSyncBuilderBase
     public IEnumerable<string> GetMessages(Debuggable<FieldInfo> fieldItem)
     {
         var fieldInfo = fieldItem.Value;
-        var memberIdentifier = AutoSyncUtils.GetMemberIdentifier(fieldInfo.Name);
 
         var templateData = GetTemplateData(fieldInfo, fieldItem.Debug);
         string localMessage = AutoSyncUtils.GetLocalSetMessage(fieldInfo);
@@ -35,8 +34,8 @@ public class AutoSyncFieldBuilder : AutoSyncBuilderBase
             networkMessage = TemplateParser.Parse("Messages.NetworkSetReferenceMessageTemplate", templateData);
         }
 
-        AutoSyncConfiguration.ExportFile($"{fieldInfo.DeclaringType.Name}/{fieldInfo.DeclaringType.Name}_{memberIdentifier}_SetLocalMessage.cs", localMessage);
-        AutoSyncConfiguration.ExportFile($"{fieldInfo.DeclaringType.Name}/{fieldInfo.DeclaringType.Name}_{memberIdentifier}_SetNetworkMessage.cs", networkMessage);
+        AutoSyncConfiguration.ExportFile($"{fieldInfo.DeclaringType.Name}/{fieldInfo.DeclaringType.Name}_{fieldInfo.Name}_SetLocalMessage.cs", localMessage);
+        AutoSyncConfiguration.ExportFile($"{fieldInfo.DeclaringType.Name}/{fieldInfo.DeclaringType.Name}_{fieldInfo.Name}_SetNetworkMessage.cs", networkMessage);
 
         yield return localMessage;
         yield return networkMessage;
@@ -45,7 +44,6 @@ public class AutoSyncFieldBuilder : AutoSyncBuilderBase
     public string GetSubscription(Debuggable<FieldInfo> fieldItem)
     {
         var fieldInfo = fieldItem.Value;
-        var memberIdentifier = AutoSyncUtils.GetMemberIdentifier(fieldInfo.Name);
 
         var templateData = GetTemplateData(fieldInfo, fieldItem.Debug);
         if (SyncByValue(fieldInfo.FieldType))
@@ -62,15 +60,11 @@ public class AutoSyncFieldBuilder : AutoSyncBuilderBase
             MemberDeclaringType = AutoSyncUtils.GetSimpleTypeName(fieldInfo.DeclaringType),
             MemberDeclaringTypeName = AutoSyncUtils.GetSimpleTypeName(fieldInfo.DeclaringType).Replace(".", "_"),
             MemberName = fieldInfo.Name,
-            MemberIdentifier = AutoSyncUtils.GetMemberIdentifier(fieldInfo.Name),
             MemberType = AutoSyncUtils.GetSimpleTypeName(fieldInfo.FieldType),
             Libraries = AutoSyncUtils.GetLibraries(fieldInfo),
             SerializeMethod = serializerNames.serialize,
             DeserializeMethod = serializerNames.deserialize,
             ReadOnly = fieldInfo.IsInitOnly,
-            DirectAccess = fieldInfo.Name == AutoSyncUtils.GetMemberIdentifier(fieldInfo.Name),
-            DirectAssignment = fieldInfo.IsInitOnly == false && fieldInfo.Name == AutoSyncUtils.GetMemberIdentifier(fieldInfo.Name),
-            ReflectionAssignment = fieldInfo.IsInitOnly || fieldInfo.Name != AutoSyncUtils.GetMemberIdentifier(fieldInfo.Name),
             ReadOnlySetterIndex = fieldInfo.IsInitOnly ? GetReadOnlyFieldSetter(fieldInfo) : (int?)null,
             Debug = debug
         };

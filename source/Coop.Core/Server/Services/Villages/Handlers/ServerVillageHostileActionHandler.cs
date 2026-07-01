@@ -2,10 +2,13 @@ using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Messages;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.Villages.Data;
 using GameInterface.Services.Villages.Interfaces;
@@ -13,6 +16,9 @@ using GameInterface.Services.Villages.Messages;
 using LiteNetLib;
 using Serilog;
 using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -26,14 +32,17 @@ internal class ServerVillageHostileActionHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly IConnectionCollection connections;
+    private readonly IPlayerManager playerManager;
     private readonly ISettlementInterface settlementInterface;
     private readonly IVillageHostileActionInterface villageHostileActionInterface;
+    private readonly ConcurrentDictionary<NetPeer, string> playerIdsByPeer = new ConcurrentDictionary<NetPeer, string>(NetPeerReferenceComparer.Instance);
 
     public ServerVillageHostileActionHandler(
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
         IConnectionCollection connections,
+        IPlayerManager playerManager,
         ISettlementInterface settlementInterface,
         IVillageHostileActionInterface villageHostileActionInterface)
     {
@@ -41,9 +50,13 @@ internal class ServerVillageHostileActionHandler : IHandler
         this.network = network;
         this.objectManager = objectManager;
         this.connections = connections;
+        this.playerManager = playerManager;
         this.settlementInterface = settlementInterface;
         this.villageHostileActionInterface = villageHostileActionInterface;
 
+        messageBroker.Subscribe<NetworkClientValidate>(Handle_NetworkClientValidate);
+        messageBroker.Subscribe<NetworkTransferNewHero>(Handle_NetworkTransferNewHero);
+        messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
         messageBroker.Subscribe<NetworkRequestVillageHostileAction>(Handle_NetworkRequestVillageHostileAction);
         messageBroker.Subscribe<VillageHostileActionCooldownsChanged>(Handle_VillageHostileActionCooldownsChanged);
         messageBroker.Subscribe<PlayerCampaignEntered>(Handle_PlayerCampaignEntered);
@@ -51,9 +64,35 @@ internal class ServerVillageHostileActionHandler : IHandler
 
     public void Dispose()
     {
+        messageBroker.Unsubscribe<NetworkClientValidate>(Handle_NetworkClientValidate);
+        messageBroker.Unsubscribe<NetworkTransferNewHero>(Handle_NetworkTransferNewHero);
+        messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
         messageBroker.Unsubscribe<NetworkRequestVillageHostileAction>(Handle_NetworkRequestVillageHostileAction);
         messageBroker.Unsubscribe<VillageHostileActionCooldownsChanged>(Handle_VillageHostileActionCooldownsChanged);
         messageBroker.Unsubscribe<PlayerCampaignEntered>(Handle_PlayerCampaignEntered);
+    }
+
+    private void Handle_NetworkClientValidate(MessagePayload<NetworkClientValidate> payload)
+    {
+        TrackPeerPlayer(payload.Who as NetPeer, payload.What.PlayerId);
+    }
+
+    private void Handle_NetworkTransferNewHero(MessagePayload<NetworkTransferNewHero> payload)
+    {
+        TrackPeerPlayer(payload.Who as NetPeer, payload.What.PlayerId);
+    }
+
+    private void Handle_PlayerDisconnected(MessagePayload<PlayerDisconnected> payload)
+    {
+        playerIdsByPeer.TryRemove(payload.What.PlayerId, out _);
+    }
+
+    private void TrackPeerPlayer(NetPeer peer, string playerId)
+    {
+        if (peer == null || string.IsNullOrWhiteSpace(playerId))
+            return;
+
+        playerIdsByPeer[peer] = playerId;
     }
 
     private void Handle_NetworkRequestVillageHostileAction(MessagePayload<NetworkRequestVillageHostileAction> payload)
@@ -78,10 +117,23 @@ internal class ServerVillageHostileActionHandler : IHandler
 
     private bool TryValidateRequester(NetPeer peer, string mobilePartyId)
     {
-        if (!connections.TryGetPlayer(peer, out var player))
+        if (!TryGetPeerPlayer(peer, out var player))
             return false;
 
         return player.MobilePartyId == mobilePartyId;
+    }
+
+    private bool TryGetPeerPlayer(NetPeer peer, out Player player)
+    {
+        player = null;
+
+        if (peer == null)
+            return false;
+
+        if (!playerIdsByPeer.TryGetValue(peer, out var playerId))
+            return false;
+
+        return playerManager.TryGetPlayer(playerId, out player);
     }
 
     private void TryStartHostileAction(NetPeer peer, NetworkRequestVillageHostileAction request)
@@ -129,7 +181,7 @@ internal class ServerVillageHostileActionHandler : IHandler
             if (peer == requestingPeer)
                 continue;
 
-            if (!connections.TryGetPlayer(peer, out var player))
+            if (!TryGetPeerPlayer(peer, out var player))
                 continue;
 
             if (!objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty))
@@ -173,5 +225,20 @@ internal class ServerVillageHostileActionHandler : IHandler
             return;
 
         network.Send(peer, new NetworkVillageHostileActionCooldowns(cooldowns));
+    }
+
+    private sealed class NetPeerReferenceComparer : IEqualityComparer<NetPeer>
+    {
+        public static readonly NetPeerReferenceComparer Instance = new NetPeerReferenceComparer();
+
+        public bool Equals(NetPeer x, NetPeer y)
+        {
+            return ReferenceEquals(x, y);
+        }
+
+        public int GetHashCode(NetPeer obj)
+        {
+            return RuntimeHelpers.GetHashCode(obj);
+        }
     }
 }

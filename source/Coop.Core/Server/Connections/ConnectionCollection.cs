@@ -1,7 +1,6 @@
 using Common.Messaging;
 using Common.Network.Messages;
 using Coop.Core.Server.Connections.Messages;
-using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using System;
 using System.Collections;
@@ -19,7 +18,6 @@ namespace Coop.Core.Server.Connections;
 public interface IConnectionCollection : IEnumerable<IConnectionLogic>, IDisposable
 {
     IEnumerable<IConnectionLogic> LoadingPeers { get; }
-    bool TryGetPlayer(NetPeer peer, out Player player);
 }
 
 /// <inheritdoc cref="IConnectionCollection"/>
@@ -94,20 +92,4 @@ public class ConnectionCollection : IConnectionCollection
     public IEnumerator<IConnectionLogic> GetEnumerator() => ConnectionStates.Values.GetEnumerator();
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-
-    public bool TryGetPlayer(NetPeer peer, out Player player)
-    {
-        player = null;
-
-        if (peer == null)
-            return false;
-
-        if (!ConnectionStates.TryGetValue(peer, out var logic))
-            return false;
-
-        if (string.IsNullOrEmpty(logic.PlayerId))
-            return false;
-
-        return connectionContext.PlayerManager.TryGetPlayer(logic.PlayerId, out player);
-    }
 }

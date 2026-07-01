@@ -2,10 +2,8 @@
 using Common.Network;
 using Common.Network.Coalescing;
 using Coop.Core.Server.Services.ItemRosters.Messages;
-using GameInterface.Services.ItemObjects;
 using GameInterface.Services.ItemRosters.Messages;
 using GameInterface.Services.ObjectManager;
-using TaleWorlds.Core;
 
 namespace Coop.Core.Server.Services.ItemRosters.Handlers;
 
@@ -21,20 +19,13 @@ public class ItemRosterMessageHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly ISendCoalescer coalescer;
-    private readonly ItemObjectRegistry itemObjectRegistry;
 
-    public ItemRosterMessageHandler(
-        IMessageBroker broker,
-        INetwork network,
-        IObjectManager objectManager,
-        ISendCoalescer coalescer,
-        ItemObjectRegistry itemObjectRegistry)
+    public ItemRosterMessageHandler(IMessageBroker broker, INetwork network, IObjectManager objectManager, ISendCoalescer coalescer)
     {
         messageBroker = broker;
         this.network = network;
         this.objectManager = objectManager;
         this.coalescer = coalescer;
-        this.itemObjectRegistry = itemObjectRegistry;
         messageBroker.Subscribe<ItemRosterUpdated>(Handle);
         messageBroker.Subscribe<ItemRosterCleared>(Handle);
     }
@@ -44,7 +35,7 @@ public class ItemRosterMessageHandler : IHandler
         var message = payload.What;
 
         if (!objectManager.TryGetIdWithLogging(message.Instance, out var itemRosterId)) return;
-        if (!TryGetItemId(message.Item, out var itemId)) return;
+        if (!objectManager.TryGetIdWithLogging(message.Item, out var itemId)) return;
 
         string itemModifierId = null;
         if (message.ItemModifier != null &&
@@ -59,17 +50,6 @@ public class ItemRosterMessageHandler : IHandler
             message.Amount,
             (running, next) => running + next,
             total => new NetworkItemRosterUpdate(itemRosterId, itemId, itemModifierId, total)));
-    }
-
-    private bool TryGetItemId(ItemObject item, out string itemId)
-    {
-        if (objectManager.TryGetId(item, out itemId))
-            return true;
-
-        if (itemObjectRegistry.TryRegisterExistingItem(item, out itemId))
-            return true;
-
-        return objectManager.TryGetIdWithLogging(item, out itemId);
     }
 
     public void Handle(MessagePayload<ItemRosterCleared> payload)

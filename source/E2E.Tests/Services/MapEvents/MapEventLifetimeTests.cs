@@ -22,24 +22,6 @@ public class MapEventLifetimeTests : MapEventTestBase
     }
 
     [Fact]
-    public void Server_MapEvent_WasEverInLootingPhase_SyncAllClients()
-    {
-        var mapEventCtx = CreateServerMapEvent();
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out var mapEvent));
-            mapEvent.WasEverInLootingPhase = true;
-        });
-
-        foreach (var client in Clients)
-        {
-            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out var mapEvent));
-            Assert.True(mapEvent.WasEverInLootingPhase);
-        }
-    }
-
-    [Fact]
     public void ClientCreate_MapEvent_DoesNothing()
     {
         // Arrange
