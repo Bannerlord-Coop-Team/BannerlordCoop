@@ -86,7 +86,7 @@ internal class BattleMissionStartHandler : IHandler
     /// mission-ready, send the requester the mission start, and reply. Requests for other modes are ignored here.</summary>
     private void Handle_NetworkBattleStartRequest(MessagePayload<NetworkBattleStartRequest> payload)
     {
-        if (!ModInformation.IsServer)
+        if (ModInformation.IsClient)
             return;
 
         if (payload.What.Mode != (int)BattleStartMode.Mission)

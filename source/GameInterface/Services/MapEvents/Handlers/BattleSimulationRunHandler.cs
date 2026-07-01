@@ -106,7 +106,7 @@ internal class BattleSimulationRunHandler : IHandler
     /// (no rounds yet; the client paces it via advances), and reply. Requests for other modes are ignored here.</summary>
     private void Handle_NetworkBattleStartRequest(MessagePayload<NetworkBattleStartRequest> payload)
     {
-        if (!ModInformation.IsServer)
+        if (ModInformation.IsClient)
             return;
 
         if (payload.What.Mode != (int)BattleStartMode.Simulation)
@@ -184,7 +184,7 @@ internal class BattleSimulationRunHandler : IHandler
     /// </summary>
     private void Handle_MapEventPartyBattlePartyAdded(MessagePayload<MapEventPartyBattlePartyAdded> payload)
     {
-        if (!ModInformation.IsServer)
+        if (ModInformation.IsClient)
             return;
 
         var side = payload.What.MapEventSide;
@@ -263,7 +263,7 @@ internal class BattleSimulationRunHandler : IHandler
     /// <summary>[Server] Resolve the requested number of rounds, streaming each round back.</summary>
     private void Handle_NetworkAdvanceBattleSimulation(MessagePayload<NetworkAdvanceBattleSimulation> payload)
     {
-        if (!ModInformation.IsServer)
+        if (ModInformation.IsClient)
             return;
 
         var mapEventId = payload.What.MapEventId;
@@ -550,7 +550,7 @@ internal class BattleSimulationRunHandler : IHandler
     /// </summary>
     private void Handle_NetworkOpenBattleSimulation(MessagePayload<NetworkOpenBattleSimulation> payload)
     {
-        if (!ModInformation.IsClient)
+        if (ModInformation.IsServer)
             return;
 
         var mapEventId = payload.What.MapEventId;
@@ -595,7 +595,7 @@ internal class BattleSimulationRunHandler : IHandler
     /// </summary>
     private void Handle_PlayerDisconnected(MessagePayload<PlayerDisconnected> payload)
     {
-        if (!ModInformation.IsServer)
+        if (ModInformation.IsClient)
             return;
 
         var peer = payload.What.PlayerId;

@@ -66,7 +66,7 @@ internal class BattleJoinLeaveHandler : IHandler
     {
         var message = payload.What;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             try
             {
@@ -132,11 +132,11 @@ internal class BattleJoinLeaveHandler : IHandler
     /// <summary>[Server] Perform the authoritative join; the native add replicates to all clients.</summary>
     private void Handle_NetworkRequestJoinBattle(MessagePayload<NetworkRequestJoinBattle> payload)
     {
-        if (!ModInformation.IsServer) return;
+        if (ModInformation.IsClient) return;
 
         var data = payload.What;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.MapEventId, out var mapEvent)) return;
             if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.PartyId, out var party)) return;
@@ -174,7 +174,7 @@ internal class BattleJoinLeaveHandler : IHandler
     /// <summary>[Server] A client asked to leave a battle without ending it.</summary>
     private void Handle_NetworkRequestLeaveBattle(MessagePayload<NetworkRequestLeaveBattle> payload)
     {
-        if (!ModInformation.IsServer) return;
+        if (ModInformation.IsClient) return;
 
         RemovePartyFromBattleAndBroadcast(payload.What.PartyId);
     }
@@ -183,7 +183,7 @@ internal class BattleJoinLeaveHandler : IHandler
     // collection sync), so remove authoritatively and broadcast the removal explicitly.
     private void RemovePartyFromBattleAndBroadcast(string partyId)
     {
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<PartyBase>(partyId, out var party)) return;
 
@@ -197,7 +197,7 @@ internal class BattleJoinLeaveHandler : IHandler
     {
         var partyId = payload.What.PartyId;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             if (Campaign.Current == null) return;
             if (!objectManager.TryGetObjectWithLogging<PartyBase>(partyId, out var party)) return;

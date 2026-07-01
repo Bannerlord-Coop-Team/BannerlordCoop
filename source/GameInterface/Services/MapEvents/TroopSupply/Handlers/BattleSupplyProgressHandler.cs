@@ -28,7 +28,7 @@ internal class BattleSupplyProgressHandler : IHandler
 
     private void Handle_NetworkBattleSupplyProgress(MessagePayload<NetworkBattleSupplyProgress> payload)
     {
-        if (!ModInformation.IsServer) return;
+        if (ModInformation.IsClient) return;
 
         var message = payload.What;
         if (message.Entries == null) return;

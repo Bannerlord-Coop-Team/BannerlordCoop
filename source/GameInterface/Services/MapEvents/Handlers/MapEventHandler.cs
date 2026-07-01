@@ -106,7 +106,7 @@ internal class MapEventHandler : IHandler
 
     private void Handle_NetworkMapEventSurrender(MessagePayload<NetworkMapEventSurrender> payload)
     {
-        if (!ModInformation.IsServer)
+        if (ModInformation.IsClient)
             return;
 
         var mapEventId = payload.What.MapEventId;

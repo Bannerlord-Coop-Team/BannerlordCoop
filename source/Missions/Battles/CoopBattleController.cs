@@ -636,39 +636,43 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
     private void Handle_BattleAgentDied(MessagePayload<BattleAgentDied> payload)
     {
         var registry = coopMissionComponent.AgentRegistry;
-        if (!registry.TryGetAgentInfo(payload.What.Agent, out var info))
+
+        GameThread.RunSafe(() =>
         {
-            Logger.Information("[DeathDiag] An agent died but is not in our registry — not ours to broadcast (a puppet or an uncaptured agent)");
-            return;
-        }
-        if (info.CurrentAuthority != controllerIdProvider.ControllerId)
-        {
-            Logger.Information("[DeathDiag] Agent {AgentId} died but its authority is {Auth}, not us ({Us}) — not broadcasting", info.AgentId, info.CurrentAuthority, controllerIdProvider.ControllerId);
-            return;
-        }
+            if (!registry.TryGetAgentInfo(payload.What.Agent, out var info))
+            {
+                Logger.Information("[DeathDiag] An agent died but is not in our registry — not ours to broadcast (a puppet or an uncaptured agent)");
+                return;
+            }
+            if (info.CurrentAuthority != controllerIdProvider.ControllerId)
+            {
+                Logger.Information("[DeathDiag] Agent {AgentId} died but its authority is {Auth}, not us ({Us}) — not broadcasting", info.AgentId, info.CurrentAuthority, controllerIdProvider.ControllerId);
+                return;
+            }
 
-        _casualtyInfo.TryGetValue(info.AgentId, out var attribution);
+            _casualtyInfo.TryGetValue(info.AgentId, out var attribution);
 
-        // Only wound player heros
-        bool wounded = payload.What.Wounded;
-        if (attribution.troopCharacterId != null
-            && objectManager.TryGetObject<CharacterObject>(attribution.troopCharacterId, out var troop)
-            && troop.HeroObject?.IsPlayerHero() == true)
-        {
-            wounded = true;
-        }
+            // Only wound player heros
+            bool wounded = payload.What.Wounded;
+            if (attribution.troopCharacterId != null
+                && objectManager.TryGetObject<CharacterObject>(attribution.troopCharacterId, out var troop)
+                && troop.HeroObject?.IsPlayerHero() == true)
+            {
+                wounded = true;
+            }
 
-        Logger.Information("[DeathDiag] Broadcasting death of agent {AgentId} (wounded={Wounded}) to the battle mesh", info.AgentId, wounded);
-        network.SendAll(new NetworkBattleAgentDied(info.AgentId, wounded));
+            Logger.Information("[DeathDiag] Broadcasting death of agent {AgentId} (wounded={Wounded}) to the battle mesh", info.AgentId, wounded);
+            network.SendAll(new NetworkBattleAgentDied(info.AgentId, wounded));
 
-        // Owner-authoritative casualty: tell the server to account this troop's death/wound against its
-        // map-event party roster. The host's own mission accounting is suppressed during a coop battle
-        // (MapEventPartyPatches), so this is the single source. On a client, SendAll targets the server.
-        if (attribution.mapEventPartyId != null)
-            relayNetwork.SendAll(new NetworkRequestBattleCasualty(attribution.mapEventPartyId, attribution.troopCharacterId, wounded));
+            // Owner-authoritative casualty: tell the server to account this troop's death/wound against its
+            // map-event party roster. The host's own mission accounting is suppressed during a coop battle
+            // (MapEventPartyPatches), so this is the single source. On a client, SendAll targets the server.
+            if (attribution.mapEventPartyId != null)
+                relayNetwork.SendAll(new NetworkRequestBattleCasualty(attribution.mapEventPartyId, attribution.troopCharacterId, wounded));
 
-        _casualtyInfo.TryRemove(info.AgentId, out _);
-        registry.RemoveAgent(info.AgentId);
+            _casualtyInfo.TryRemove(info.AgentId, out _);
+            registry.RemoveAgent(info.AgentId);
+        });
     }
 
     // [Peer] The owner reported one of its agents died — kill our puppet of it and deregister.
@@ -676,14 +680,16 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
     {
         var registry = coopMissionComponent.AgentRegistry;
         Logger.Information("[DeathDiag] Received death broadcast for agent {AgentId}", payload.What.AgentId);
-        if (!registry.TryGetAgentInfo(payload.What.AgentId, out _))
-        {
-            Logger.Information("[DeathDiag] No registered puppet for {AgentId} — cannot kill it (its spawn was missed, or the id does not match)", payload.What.AgentId);
-            return;
-        }
+
 
         GameThread.RunSafe(() =>
         {
+            if (!registry.TryGetAgentInfo(payload.What.AgentId, out _))
+            {
+                Logger.Information("[DeathDiag] No registered puppet for {AgentId} — cannot kill it (its spawn was missed, or the id does not match)", payload.What.AgentId);
+                return;
+            }
+
             if (!registry.TryGetAgentInfo(payload.What.AgentId, out var info)) return;
 
             Agent agent = info.Agent;
@@ -710,18 +716,22 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
     private void Handle_BattlePuppetHit(MessagePayload<BattlePuppetHit> payload)
     {
         var registry = coopMissionComponent.AgentRegistry;
-        if (!registry.TryGetAgentInfo(payload.What.Victim, out var victimInfo))
+
+        GameThread.RunSafe(() =>
         {
-            Logger.Information("[DeathDiag] Local hit on a puppet that is not in our registry — cannot route it");
-            return;
-        }
+            if (!registry.TryGetAgentInfo(payload.What.Victim, out var victimInfo))
+            {
+                Logger.Information("[DeathDiag] Local hit on a puppet that is not in our registry — cannot route it");
+                return;
+            }
 
-        Guid attackerId = Guid.Empty;
-        if (payload.What.Attacker != null && registry.TryGetAgentInfo(payload.What.Attacker, out var attackerInfo))
-            attackerId = attackerInfo.AgentId;
+            Guid attackerId = Guid.Empty;
+            if (payload.What.Attacker != null && registry.TryGetAgentInfo(payload.What.Attacker, out var attackerInfo))
+                attackerId = attackerInfo.AgentId;
 
-        Logger.Information("[DeathDiag] Routing puppet hit to owner {Owner}: victim={Victim}, dmg={Dmg}", victimInfo.CurrentAuthority, victimInfo.AgentId, payload.What.Blow.InflictedDamage);
-        network.SendAll(new NetworkApplyBattleDamage(victimInfo.AgentId, attackerId, payload.What.Blow, payload.What.CollisionData));
+            Logger.Information("[DeathDiag] Routing puppet hit to owner {Owner}: victim={Victim}, dmg={Dmg}", victimInfo.CurrentAuthority, victimInfo.AgentId, payload.What.Blow.InflictedDamage);
+            network.SendAll(new NetworkApplyBattleDamage(victimInfo.AgentId, attackerId, payload.What.Blow, payload.What.CollisionData));
+        });
     }
 
     // [Owner] Another client's troop hit one of OUR agents. Re-apply the real blow through Agent.RegisterBlow so
@@ -890,13 +900,13 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
         var registry = coopMissionComponent.AgentRegistry;
         var adopted = registry.GetAgents(controllerId);
 
-        if (adopted.Count > 0)
+        GameThread.RunSafe(() =>
         {
-            foreach (var info in adopted)
-                registry.TryTransferAuthority(controllerIdProvider.ControllerId, info.AgentId);
-
-            GameThread.RunSafe(() =>
+            if (adopted.Count > 0)
             {
+                foreach (var info in adopted)
+                    registry.TryTransferAuthority(controllerIdProvider.ControllerId, info.AgentId);
+
                 if (Mission.Current == null) return;
 
                 // A migration can promote us while AI ticking is gated off (e.g. mid-deployment); turn it back on so
@@ -927,11 +937,11 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
                 // BattleMigrationMirror E2E test.
                 Logger.Information("[BattleSync] Adopt-AI: {AI}/{Total} now AI-controlled across {Forms} formation(s)",
                     aiCount, adopted.Count, formations.Count);
-            });
-
+            
             Logger.Information("[BattleSync] Adopted {Count} agent(s) from {Controller} ({Reason})",
                 adopted.Count, controllerId, reason);
-        }
+            }
+        });
 
         // We now own the departed controller's parties — pull our updated reserve from the server (the full
         // owned set at the current ledger pointers) so we can spawn their reinforcements from where the
@@ -1011,7 +1021,7 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
         var team = ResolvePuppetTeam(data);
         if (team == null) return false;                                 // teams not created yet — buffer
 
-        if (!TryResolveCharacter(data, out var character))
+        if (!objectManager.TryGetObjectWithLogging(data.CharacterId, out CharacterObject character))
         {
             Logger.Warning("[BattleSync] Puppet skipped: unresolved character {Char} for agent {AgentId}", data.CharacterId, data.AgentId);
             return true;
@@ -1302,9 +1312,4 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
             _ => Mission.Current.PlayerEnemyTeam
         };
     }
-
-    // Heroes and troops alike are carried by their CharacterObject id (hero CharacterObjects are registered —
-    // CharacterObjectRegistry), so resolve uniformly. Hero-ness is recovered from the resolved character.IsHero.
-    private bool TryResolveCharacter(BattleAgentSpawnData data, out CharacterObject character)
-        => objectManager.TryGetObjectWithLogging(data.CharacterId, out character);
 }

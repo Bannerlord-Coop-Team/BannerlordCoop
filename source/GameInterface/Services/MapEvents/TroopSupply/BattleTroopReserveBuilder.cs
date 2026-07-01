@@ -39,10 +39,11 @@ public interface IBattleTroopReserveBuilder : IGameAbstraction
     /// call this on a disconnect — there the host adopts the troops, and resetting would double-spawn them.</summary>
     void ForgetController(MapEvent mapEvent, string controllerId);
 
-    /// <summary>Forget EVERY party of a battle (its whole ledger + built-set), so the next battle on the SAME
-    /// map event re-flattens all parties fresh. Use when a battle is fully ABANDONED — the host left with no
-    /// successors — otherwise the AI/enemy parties the host had been fielding keep their advanced supplied
-    /// pointers and never re-spawn on a restart (only the leaver's own re-flattened party would).</summary>
+    /// <summary>Forget EVERY reserve of a battle (its whole ledger entry + flatten cache). Called when a battle
+    /// ENDS — concluded (victory) or fully ABANDONED (host left with no successors) — so the server stops
+    /// holding the battle's reserves and a later battle on the SAME map event re-flattens all parties fresh
+    /// (otherwise the AI/enemy parties the host had been fielding keep their advanced supplied pointers and
+    /// never re-spawn on a restart).</summary>
     void ForgetMapEvent(MapEvent mapEvent);
 }
 
@@ -87,8 +88,8 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
             // leader (#3 "army leader deploys the army"); or, when no player does, the host.
             TryGetOwningPlayer(party, out var partyOwnerController);
             TryGetArmyLeaderPlayer(party, out var armyLeaderController);
-            var owningController = BattleDeploymentAuthority.ResolveOwningController(partyOwnerController, armyLeaderController);
-            if (!BattleDeploymentAuthority.IsOwnedByRequester(owningController, controllerId, isHost))
+            var owningController = ResolveOwningController(partyOwnerController, armyLeaderController);
+            if (!IsOwnedByRequester(owningController, controllerId, isHost))
                 continue;
 
             if (!ledger.TryGetReserve(mapEventId, partyId, out var entries, out var supplied))
@@ -144,15 +145,14 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
         {
             int forgotten = 0;
             foreach (var party in EnumerateParties(mapEvent))
-            {
-                if (!objectManager.TryGetId(party, out var partyId)) continue;
+                if (objectManager.TryGetId(party, out var partyId) && builtParties.Remove(partyId))
+                    forgotten++;
 
-                ledger.RemoveParty(mapEventId, partyId);
-                builtParties.Remove(partyId);
-                forgotten++;
-            }
-            Logger.Information("[TroopSupply] Forgot ALL {Count} parties of abandoned battle {MapEventId} (re-flattens fresh on restart)",
-                forgotten, mapEventId);
+            // Drop the whole battle's reserves in one shot — covers every party (including any no longer
+            // enumerable) and leaves no empty per-battle entry behind, so a restart re-flattens fresh.
+            ledger.Remove(mapEventId);
+            Logger.Information("[TroopSupply] Forgot ALL reserves of battle {MapEventId} ({Count} flatten-cache entries cleared)",
+                mapEventId, forgotten);
         }
     }
 
@@ -219,6 +219,20 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
         }
         return entries;
     }
+
+    /// <summary>
+    /// The controller that owns a party's reserve, or null if no connected player does (so the host fields it).
+    /// A party's own player wins; an AI party (no own player) in a player-led army falls to that army leader.
+    /// </summary>
+    internal static string ResolveOwningController(string partyOwnerController, string armyLeaderController)
+        => partyOwnerController ?? armyLeaderController;
+
+    /// <summary>
+    /// Whether <paramref name="requesterController"/> fields the party: it is the owning controller, or — when
+    /// no player owns it — the requester is the host.
+    /// </summary>
+    internal static bool IsOwnedByRequester(string owningController, string requesterController, bool requesterIsHost)
+        => owningController != null ? owningController == requesterController : requesterIsHost;
 
     private bool TryGetOwningPlayer(MapEventParty party, out string controllerId)
     {

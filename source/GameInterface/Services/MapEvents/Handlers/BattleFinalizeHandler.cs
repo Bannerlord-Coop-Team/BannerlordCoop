@@ -6,6 +6,7 @@ using Common.Util;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
+using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
@@ -46,17 +47,20 @@ internal class BattleFinalizeHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IMapEventLogger mapEventLogger;
+    private readonly IBattleTroopReserveBuilder reserveBuilder;
 
     public BattleFinalizeHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        IMapEventLogger mapEventLogger)
+        IMapEventLogger mapEventLogger,
+        IBattleTroopReserveBuilder reserveBuilder)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.mapEventLogger = mapEventLogger;
+        this.reserveBuilder = reserveBuilder;
 
         messageBroker.Subscribe<MapEventFinalizeAttempted>(Handle_MapEventFinalizeAttempted);
         messageBroker.Subscribe<NetworkMapEventFinalizeAttempted>(Handle_NetworkMapEventFinalizeAttempted);
@@ -108,7 +112,7 @@ internal class BattleFinalizeHandler : IHandler
     /// </summary>
     private void Handle_MapEventConcluded(MessagePayload<MapEventConcluded> payload)
     {
-        if (!ModInformation.IsServer) return;
+        if (ModInformation.IsClient) return;
 
         if (!objectManager.TryGetObjectWithLogging(payload.What.MapEventId, out MapEvent mapEvent))
             return;
@@ -162,9 +166,15 @@ internal class BattleFinalizeHandler : IHandler
             ServerBattleModeArbiter.Release(mapEventIdForRelease);
 
         string[] playerPartyIds = null;
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             playerPartyIds = CollectPlayerPartyIds(mapEvent);
+
+            // The battle is over — drop its server-side troop reserves (ledger entry + flatten cache) so they
+            // don't leak per battle. Done before FinalizeEventAux clears the parties, so the flatten-cache
+            // cleanup can still enumerate them. No-op on a client (its ledger is never populated).
+            reserveBuilder.ForgetMapEvent(mapEvent);
+
             mapEvent.FinalizeEventAux();
         }, blocking: true);
         return playerPartyIds ?? Array.Empty<string>();
@@ -187,7 +197,7 @@ internal class BattleFinalizeHandler : IHandler
 
     private void Handle_NetworkMapEventFinalized(MessagePayload<NetworkMapEventFinalized> payload)
     {
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             if (Campaign.Current == null) return;
 

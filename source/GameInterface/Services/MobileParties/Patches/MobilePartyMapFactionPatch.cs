@@ -31,7 +31,7 @@ internal class MobilePartyMapFactionPatch
         // yet applied, so the vanilla getter dereferences null. On a client this is a transient sync
         // state, not a real fault: swallow it and report no faction. The server runs with complete
         // state, so let a genuine failure there surface.
-        if (!ModInformation.IsClient) return __exception;
+        if (ModInformation.IsServer) return __exception;
 
         Logger.Debug("MobileParty.MapFaction threw during a sync transition (MobileParty: {Party}); returning null. {Message}",
             __instance?.StringId ?? "null",

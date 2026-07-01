@@ -99,12 +99,12 @@ internal class BattleHandler : IHandler
     /// </summary>
     private void Handle_NetworkBattleModeSet(MessagePayload<NetworkBattleModeSet> payload)
     {
-        if (!ModInformation.IsClient) return;
+        if (ModInformation.IsServer) return;
 
         var mapEventId = payload.What.MapEventId;
         var mode = (BattleStartMode)payload.What.Mode;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObject(mapEventId, out MapEvent mapEvent) || mapEvent == null)
                 return;

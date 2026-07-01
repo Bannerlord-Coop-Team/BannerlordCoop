@@ -1,5 +1,6 @@
 using Common.Logging;
 using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -36,11 +37,15 @@ internal class BattleTroopSupplierInjectionPatch
         // for any spawn logic the native path constructs while a coop battle is active.
         if (suppliers.Length > 0 && suppliers[0] is CoopTroopSupplier) return;
 
+        // No DI here (static patch), so resolve the object manager ONCE and hand it to the suppliers (they no
+        // longer hit the service locator per agent on the supply path).
+        ContainerProvider.TryResolve<IObjectManager>(out var objectManager);
+
         // The array is indexed by BattleSideEnum (0 = Defender, 1 = Attacker), matching how the campaign and
         // the constructor build/consume it.
         for (int i = 0; i < suppliers.Length; i++)
         {
-            var supplier = new CoopTroopSupplier(mapEventId, (BattleSideEnum)i);
+            var supplier = new CoopTroopSupplier(mapEventId, (BattleSideEnum)i, objectManager);
             suppliers[i] = supplier;
             CoopTroopSupplierRegistry.Register(supplier);
             Logger.Information("[TroopSupply] Installed CoopTroopSupplier for {MapEvent} side {Side}", mapEventId, (BattleSideEnum)i);

@@ -41,7 +41,7 @@ internal class BattleSimulationStartPatch
     private static bool Prefix()
     {
         // Server / single-player: run the consequence normally.
-        if (!ModInformation.IsClient)
+        if (ModInformation.IsServer)
             return true;
 
         var coordinator = BattleStartCoordinator.Instance;

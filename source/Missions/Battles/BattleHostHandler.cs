@@ -103,7 +103,7 @@ internal class BattleHostHandler : IHandler
         // Reads campaign collections and the shared assignment, so run on the main thread. That also
         // serializes requests for one battle: the first the server processes becomes the host, the rest
         // append in arrival (= join) order, so concurrent requests cannot double-elect.
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<MapEvent>(mapEventId, out var mapEvent))
                 return;
@@ -157,7 +157,7 @@ internal class BattleHostHandler : IHandler
         var requesterId = payload.What.ControllerId;
         var requester = payload.Who as NetPeer;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<MapEvent>(mapEventId, out var mapEvent))
                 return;
@@ -191,7 +191,7 @@ internal class BattleHostHandler : IHandler
         var mapEventId = payload.What.InstanceId;
 
         // Mutates the shared assignment, so run on the main thread (serializes with election).
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             if (!hostRegistry.TryGet(mapEventId, out var assignment))
                 return; // no host assignment for this instance — not a battle

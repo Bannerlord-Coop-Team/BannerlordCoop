@@ -38,39 +38,63 @@ public class CoopTroopSupplier : IMissionTroopSupplier
 
     private readonly object gate = new object();
     private readonly List<PartyState> parties = new List<PartyState>();
+    // seed -> partyId, rebuilt alongside `parties` in SetReserve, so GetParty/FindPartyId is O(1) instead of
+    // scanning every party's entries per agent. Entry seeds are server-unique, so one seed maps to one party.
+    private readonly Dictionary<int, string> seedToPartyId = new Dictionary<int, string>();
     private bool populated;
     private int numWounded, numKilled, numRouted;
+    // Injected at construction (a stable per-session singleton) so the per-agent supply path resolves troop/party
+    // objects without hitting the service locator each call. Null only in tests that don't exercise that path.
+    private readonly IObjectManager objectManager;
 
     public string MapEventId { get; }
     public BattleSideEnum Side { get; }
 
-    public CoopTroopSupplier(string mapEventId, BattleSideEnum side)
+    public CoopTroopSupplier(string mapEventId, BattleSideEnum side, IObjectManager objectManager)
     {
         MapEventId = mapEventId;
         Side = side;
+        this.objectManager = objectManager;
     }
 
     /// <summary>
     /// [Network thread] Replace this side's reserve with the server's authoritative set (each party with its
     /// current supplied pointer — 0 at battle start, the server's pointer on migration). Marks us populated,
     /// so a side this client owns nothing on (empty set) reports "done" instead of blocking deployment.
+    /// A party's pointer never rewinds: if we have already supplied further than a (possibly stale) resend
+    /// carries, we keep our local pointer — see the monotonic resume below.
     /// </summary>
     public void SetReserve(IReadOnlyList<PartyReserve> reserve)
     {
         lock (gate)
         {
+            // Capture the current per-party pointers before rebuilding. A resend can carry a STALE pointer: the
+            // server's ledger lags our local supply by up to one report interval, and on migration it re-sends
+            // our OWN party at that lagging value. Resuming from the server value alone would rewind a party we
+            // have already supplied further and re-spawn troops already on the field (with duplicate seeds). So
+            // resume from max(local, server), mirroring the server ledger's own monotonic ReportSupplied.
+            var priorSupplied = new Dictionary<string, int>(parties.Count);
+            foreach (var existing in parties)
+                priorSupplied[existing.PartyId] = existing.Supplied;
+
             parties.Clear();
+            seedToPartyId.Clear();
             if (reserve != null)
             {
                 foreach (var party in reserve)
                 {
                     var entries = party.Entries ?? Array.Empty<TroopReserveEntry>();
+                    int supplied = Math.Min(Math.Max(0, party.SuppliedCount), entries.Length);
+                    if (priorSupplied.TryGetValue(party.PartyId, out var local) && local > supplied)
+                        supplied = Math.Min(local, entries.Length);
                     parties.Add(new PartyState
                     {
                         PartyId = party.PartyId,
                         Entries = entries,
-                        Supplied = Math.Min(Math.Max(0, party.SuppliedCount), entries.Length),
+                        Supplied = supplied,
                     });
+                    foreach (var entry in entries)
+                        seedToPartyId[entry.Seed] = party.PartyId;
                 }
             }
             populated = true;
@@ -224,15 +248,19 @@ public class CoopTroopSupplier : IMissionTroopSupplier
 
     public PartyBase GetParty(UniqueTroopDescriptor troopDescriptor)
     {
-        return ResolveParty(FindPartyId(troopDescriptor.UniqueSeed));
+        string partyId;
+        lock (gate)
+            seedToPartyId.TryGetValue(troopDescriptor.UniqueSeed, out partyId);
+
+        return ResolveParty(partyId);
     }
 
     // partyId is a MapEventParty object id (what the builder stored), not a MobileParty id. MapEventParty.Party
     // is the PartyBase the engine needs for the agent's team/combatant and player-command checks.
-    private static PartyBase ResolveParty(string partyId)
+    private PartyBase ResolveParty(string partyId)
     {
         if (partyId != null
-            && ContainerProvider.TryResolve<IObjectManager>(out var objectManager)
+            && objectManager != null
             && objectManager.TryGetObject<MapEventParty>(partyId, out var mapEventParty))
             return mapEventParty?.Party;
 
@@ -243,18 +271,6 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     public void OnTroopKilled(UniqueTroopDescriptor troopDescriptor) { numKilled++; }
     public void OnTroopRouted(UniqueTroopDescriptor troopDescriptor, bool isOrderRetreat) { numRouted++; }
     public void OnTroopScoreHit(UniqueTroopDescriptor descriptor, BasicCharacterObject attackedCharacter, int damage, bool isFatal, bool isTeamKill, WeaponComponentData attackerWeapon) { }
-
-    private string FindPartyId(int seed)
-    {
-        lock (gate)
-        {
-            foreach (var party in parties)
-                foreach (var entry in party.Entries)
-                    if (entry.Seed == seed)
-                        return party.PartyId;
-        }
-        return null;
-    }
 
     private IAgentOriginBase CreateOrigin(TroopReserveEntry entry, string partyId)
     {
@@ -279,10 +295,9 @@ public class CoopTroopSupplier : IMissionTroopSupplier
 
     // Heroes and regular troops alike are keyed by their CharacterObject id (hero CharacterObjects are
     // registered — CharacterObjectRegistry), so resolve uniformly; hero-ness is read from character.IsHero.
-    private static bool TryResolveCharacter(TroopReserveEntry entry, out CharacterObject character)
+    private bool TryResolveCharacter(TroopReserveEntry entry, out CharacterObject character)
     {
         character = null;
-        return ContainerProvider.TryResolve<IObjectManager>(out var objectManager)
-            && objectManager.TryGetObject<CharacterObject>(entry.CharacterId, out character);
+        return objectManager != null && objectManager.TryGetObject<CharacterObject>(entry.CharacterId, out character);
     }
 }

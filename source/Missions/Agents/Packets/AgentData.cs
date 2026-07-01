@@ -25,9 +25,14 @@ namespace Missions.Agents.Packets
                 ActionData = null;
             }
 
-            if (agent.HasMount)
+            // The rider can be active while its mount is mid-teardown (e.g. right after a battle concludes):
+            // reading the mount's native state (MovementInputVector, etc.) then access-violates. Only capture
+            // the mount while it is itself active — mirrors the rider guard in AgentMovementHandler.PollAgents
+            // and the horse.IsActive() check in SyncMountState.
+            Agent mount = agent.MountAgent;
+            if (agent.HasMount && mount != null && mount.IsActive())
             {
-                MountData = new AgentMountData(agent.MountAgent);
+                MountData = new AgentMountData(mount);
             }
             else
             {
