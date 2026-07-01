@@ -51,7 +51,7 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
 
         if (sizing.Ready)
         {
-            // On-time (common): both reserves present, so size via Init before the first tick.
+            // On-time (common): both reserves present, so size before the first tick.
             if (sizing.SizeNow)
                 RunJointInit(sizing.DefenderOwned, sizing.AttackerOwned);
             else
