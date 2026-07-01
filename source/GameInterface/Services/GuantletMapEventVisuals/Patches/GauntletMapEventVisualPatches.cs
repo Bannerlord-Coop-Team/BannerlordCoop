@@ -32,6 +32,18 @@ internal class GauntletMapEventVisualPatches
         MessageBroker.Instance.Publish(__instance, message);
     }
 
+    [HarmonyPatch(nameof(GauntletMapEventVisual.OnMapEventEnd))]
+    [HarmonyPrefix]
+    private static bool PrefixOnMapEventEnd(GauntletMapEventVisual __instance)
+    {
+        // Skip vanilla teardown when the map event never synced (null MapEvent): nothing was initialized to tear
+        // down and vanilla's end path throws on the unresolved event. Only fires on a client; the server's is never null.
+        if (__instance.MapEvent != null) return true;
+
+        Logger.Warning("Skipping OnMapEventEnd for GauntletMapEventVisual: its MapEvent did not resolve on this client");
+        return false;
+    }
+
     [HarmonyPatch("GetBattleSizeValue")]
     [HarmonyPrefix]
     private static bool PrefixGetBattleSizeValue(GauntletMapEventVisual __instance, ref int __result)

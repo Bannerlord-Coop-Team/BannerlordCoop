@@ -133,7 +133,7 @@ internal class CaravansConversationsPatches
     [HarmonyPrefix]
     public static bool ConversationCaravanLootedLeaveOnConsequencePrefix(ref CaravansCampaignBehavior __instance)
     {
-        // Locally calculate bribe amount with allowed thread added by CaravansAllowedThreadPatches to handle itemRoster
+        // Locally calculate bribe amount with allowed thread added by AllowItemRostersInGUI to handle itemRoster
         __instance.BribeAmount(MobileParty.ConversationParty.Party, out int amount, out ItemRoster itemRoster);
 
         // Locally set player interaction, and then save in CoopSession on server
@@ -174,7 +174,7 @@ internal class CaravansConversationsPatches
         // Call helper function to implement vanilla open loot screen logic
         OpenLootScreen(encounteredMobileParty, out var caravanHasItems, out var itemRosterElements);
 
-        // Open prisoner transfer screne
+        // Open prisoner transfer screen
         using (new AllowedThread())
         {
             TroopRoster troopRoster = TroopRoster.CreateDummyTroopRoster();
