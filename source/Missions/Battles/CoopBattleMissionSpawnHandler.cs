@@ -123,6 +123,13 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
 
         var settings = CreateSandBoxBattleWaveSpawnSettings();
         _missionAgentSpawnLogic.InitWithSinglePhase(defenderOwned, attackerOwned, defenderOwned, attackerOwned, spawnDefenders: true, spawnAttackers: true, in settings);
+
+        // Init's tail leaves both sides' TroopSpawnActive true. On the on-time path the deployment controller's
+        // OnAfterStart runs after this and clears them, so SetupTeams enables, spawns and AI-pauses each side one at
+        // a time. On this deferred path nothing runs after us to clear them, so the first OnSetupTeamsOfSide would
+        // spawn BOTH sides at once and the per-side freeze could miss the other side. Restore the native invariant.
+        _missionAgentSpawnLogic.SetSpawnTroops(BattleSideEnum.Defender, spawnTroops: false);
+        _missionAgentSpawnLogic.SetSpawnTroops(BattleSideEnum.Attacker, spawnTroops: false);
     }
 
     // Zero phases so the first CheckDeployment tick has active phases to read (else DefenderActivePhase NREs)
