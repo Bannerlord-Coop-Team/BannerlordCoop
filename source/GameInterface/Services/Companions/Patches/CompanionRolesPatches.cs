@@ -4,11 +4,17 @@ using GameInterface.Policies;
 using GameInterface.Services.Companions.Messages;
 using HarmonyLib;
 using Serilog;
+using System;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.Companions.Patches;
 
@@ -138,4 +144,72 @@ internal class CompanionRolesPatches
 
         return true;
     }
+    // Patch for server to use passed down ClientHero instead of server's MainHero
+    // which is null for server
+    [HarmonyPatch(nameof(CompanionRolesCampaignBehavior.SpawnNewHeroesForNewCompanionClan))]
+    [HarmonyPrefix]
+    public static bool SpawnNewHeroesForNewCompanionClanPrefix(CompanionRolesCampaignBehavior __instance, Hero companionHero, Clan clan, Settlement settlement)
+    {
+        MBReadOnlyList<CharacterObject> lordTemplates = companionHero.Culture.LordTemplates;
+        List<Hero> list = new List<Hero>();
+        list.Add(__instance.CreateNewHeroForNewCompanionClan(lordTemplates.GetRandomElement<CharacterObject>(), settlement, new Dictionary<SkillObject, int>
+            {
+                {
+                    DefaultSkills.Steward,
+                    MBRandom.RandomInt(100, 175)
+                },
+                {
+                    DefaultSkills.Leadership,
+                    MBRandom.RandomInt(125, 175)
+                },
+                {
+                    DefaultSkills.OneHanded,
+                    MBRandom.RandomInt(125, 175)
+                },
+                {
+                    DefaultSkills.Medicine,
+                    MBRandom.RandomInt(125, 175)
+                }
+            }));
+        list.Add(__instance.CreateNewHeroForNewCompanionClan(lordTemplates.GetRandomElement<CharacterObject>(), settlement, new Dictionary<SkillObject, int>
+            {
+                {
+                    DefaultSkills.OneHanded,
+                    MBRandom.RandomInt(100, 175)
+                },
+                {
+                    DefaultSkills.Leadership,
+                    MBRandom.RandomInt(125, 175)
+                },
+                {
+                    DefaultSkills.Tactics,
+                    MBRandom.RandomInt(125, 175)
+                },
+                {
+                    DefaultSkills.Engineering,
+                    MBRandom.RandomInt(125, 175)
+                }
+            }));
+        list.Add(companionHero);
+        foreach (Hero hero in list)
+        {
+            hero.Clan = clan;
+            hero.ChangeState(Hero.CharacterStates.Active);
+            ChangeRelationAction.ApplyRelationChangeBetweenHeroes(hero, ResolvedMainHero, MBRandom.RandomInt(5, 10), false);
+            if (hero != companionHero)
+            {
+                EnterSettlementAction.ApplyForCharacterOnly(hero, settlement);
+            }
+            foreach (Hero hero2 in list)
+            {
+                if (hero != hero2)
+                {
+                    ChangeRelationAction.ApplyRelationChangeBetweenHeroes(hero, hero2, MBRandom.RandomInt(5, 10), false);
+                }
+            }
+        }
+        return false;
+    }
+    [ThreadStatic] 
+    public static Hero ResolvedMainHero;
 }

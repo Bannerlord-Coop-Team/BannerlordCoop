@@ -2,7 +2,9 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.Actions.Patches;
 using GameInterface.Services.Companions.Messages;
+using GameInterface.Services.Companions.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
@@ -87,48 +89,55 @@ internal class CompanionRolesHandler : IHandler
     {
         var data = obj.What;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.OneToOneConversationHeroId, out var oneToOneConversationHero)) return;
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(data.SelectedFiefId, out var selectedFief)) return;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty)) return;
+
+            var companionRolesCampaignBehavior = Campaign.Current.GetCampaignBehavior<CompanionRolesCampaignBehavior>();
+
+            RemoveCompanionAction.ApplyByByTurningToLord(mainHero.Clan, oneToOneConversationHero);
+            oneToOneConversationHero.SetNewOccupation(Occupation.Lord);
+            TextObject textObject = GameTexts.FindText("str_generic_clan_name", null);
+            textObject.SetTextVariable("CLAN_NAME", new TextObject(data.ClanName, null));
+            int randomBannerIdForNewClan = companionRolesCampaignBehavior.GetRandomBannerIdForNewClan();
+            Clan clan = Clan.CreateCompanionToLordClan(oneToOneConversationHero, selectedFief, textObject, randomBannerIdForNewClan);
+            if (oneToOneConversationHero.PartyBelongedTo == mainParty)
+            {
+                mainParty.MemberRoster.AddToCounts(oneToOneConversationHero.CharacterObject, -1, false, 0, 0, true, -1);
+            }
+            MobileParty partyBelongedTo = oneToOneConversationHero.PartyBelongedTo;
+            if (partyBelongedTo == null)
+            {
+                MobileParty mobileParty = LordPartyComponent.CreateLordParty(oneToOneConversationHero.CharacterObject.StringId, oneToOneConversationHero, mainParty.Position, 3f, selectedFief, oneToOneConversationHero);
+                mobileParty.MemberRoster.AddToCounts(clan.Culture.BasicTroop, MBRandom.RandomInt(12, 15), false, 0, 0, true, -1);
+                mobileParty.MemberRoster.AddToCounts(clan.Culture.EliteBasicTroop, MBRandom.RandomInt(10, 15), false, 0, 0, true, -1);
+            }
+            else
+            {
+                partyBelongedTo.ActualClan = clan;
+                partyBelongedTo.Party.SetVisualAsDirty();
+            }
+            companionRolesCampaignBehavior.AdjustCompanionsEquipment(oneToOneConversationHero);
+            // Set ResolvedMainHero for the duration of these calls so ChangeRelationActionPatches
+            // and CompanionRolesPatches can resolve the correct mainhero via the Harmony prefix instead of
+            // Hero.MainHero which is null on the host. Wrapped in try/finally so the static fields
+            // are always cleared even if something below throws
+            CompanionRolesPatches.ResolvedMainHero = mainHero;
+            ChangeRelationActionPatches.ResolvedMainHero = mainHero;
             try
             {
-                if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
-                if (!objectManager.TryGetObjectWithLogging<Hero>(data.OneToOneConversationHeroId, out var oneToOneConversationHero)) return;
-                if (!objectManager.TryGetObjectWithLogging<Settlement>(data.SelectedFiefId, out var selectedFief)) return;
-                if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty)) return;
-
-                var companionRolesCampaignBehavior = Campaign.Current.GetCampaignBehavior<CompanionRolesCampaignBehavior>();
-
-                RemoveCompanionAction.ApplyByByTurningToLord(mainHero.Clan, oneToOneConversationHero);
-                oneToOneConversationHero.SetNewOccupation(Occupation.Lord);
-                TextObject textObject = GameTexts.FindText("str_generic_clan_name", null);
-                textObject.SetTextVariable("CLAN_NAME", new TextObject(data.ClanName, null));
-                int randomBannerIdForNewClan = companionRolesCampaignBehavior.GetRandomBannerIdForNewClan();
-                Clan clan = Clan.CreateCompanionToLordClan(oneToOneConversationHero, selectedFief, textObject, randomBannerIdForNewClan);
-                if (oneToOneConversationHero.PartyBelongedTo == mainParty)
-                {
-                    mainParty.MemberRoster.AddToCounts(oneToOneConversationHero.CharacterObject, -1, false, 0, 0, true, -1);
-                }
-                MobileParty partyBelongedTo = oneToOneConversationHero.PartyBelongedTo;
-                if (partyBelongedTo == null)
-                {
-                    MobileParty mobileParty = LordPartyComponent.CreateLordParty(oneToOneConversationHero.CharacterObject.StringId, oneToOneConversationHero, mainParty.Position, 3f, selectedFief, oneToOneConversationHero);
-                    mobileParty.MemberRoster.AddToCounts(clan.Culture.BasicTroop, MBRandom.RandomInt(12, 15), false, 0, 0, true, -1);
-                    mobileParty.MemberRoster.AddToCounts(clan.Culture.EliteBasicTroop, MBRandom.RandomInt(10, 15), false, 0, 0, true, -1);
-                }
-                else
-                {
-                    partyBelongedTo.ActualClan = clan;
-                    partyBelongedTo.Party.SetVisualAsDirty();
-                }
-                companionRolesCampaignBehavior.AdjustCompanionsEquipment(oneToOneConversationHero);
-                companionRolesCampaignBehavior.SpawnNewHeroesForNewCompanionClan(oneToOneConversationHero, clan, selectedFief); // Gives relation with Hero.MainHero, need to expand this to work for mainHero
+                companionRolesCampaignBehavior.SpawnNewHeroesForNewCompanionClan(oneToOneConversationHero, clan, selectedFief);
                 GiveGoldAction.ApplyBetweenCharacters(mainHero, oneToOneConversationHero, 20000, false);
                 GainKingdomInfluenceAction.ApplyForDefault(mainHero, -500f);
                 ChangeRelationAction.ApplyPlayerRelation(oneToOneConversationHero, 50, true, true);
             }
-            catch (Exception e)
+            finally
             {
-                logger.Error(e, "Failed to apply {Message}", nameof(DoClanNameSelection));
+                CompanionRolesPatches.ResolvedMainHero = null;
+                ChangeRelationActionPatches.ResolvedMainHero = null;
             }
         });
     }
