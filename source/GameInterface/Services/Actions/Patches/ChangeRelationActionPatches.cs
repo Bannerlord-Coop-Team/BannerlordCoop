@@ -17,7 +17,7 @@ internal class ChangeRelationActionPatches
     static bool Prefix() => ModInformation.IsServer;
 
     // Patch for server to use passed down ClientHero instead of server's MainHero
-    // which is null for server
+    // which is a different hero
     [HarmonyPatch(nameof(ChangeRelationAction.ApplyPlayerRelation))]
     [HarmonyPrefix]
     public static bool ApplyPlayerRelationPrefix(Hero gainedRelationWith, int relation, bool affectRelatives = true, bool showQuickNotification = true)

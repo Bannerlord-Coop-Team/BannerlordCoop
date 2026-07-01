@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Actions.Patches;
+using GameInterface.Services.Clans.Patches;
 using GameInterface.Services.Companions.Messages;
 using GameInterface.Services.Companions.Patches;
 using GameInterface.Services.ObjectManager;
@@ -102,33 +103,34 @@ internal class CompanionRolesHandler : IHandler
             oneToOneConversationHero.SetNewOccupation(Occupation.Lord);
             TextObject textObject = GameTexts.FindText("str_generic_clan_name", null);
             textObject.SetTextVariable("CLAN_NAME", new TextObject(data.ClanName, null));
-            int randomBannerIdForNewClan = companionRolesCampaignBehavior.GetRandomBannerIdForNewClan();
-            Clan clan = Clan.CreateCompanionToLordClan(oneToOneConversationHero, selectedFief, textObject, randomBannerIdForNewClan);
-            if (oneToOneConversationHero.PartyBelongedTo == mainParty)
-            {
-                mainParty.MemberRoster.AddToCounts(oneToOneConversationHero.CharacterObject, -1, false, 0, 0, true, -1);
-            }
-            MobileParty partyBelongedTo = oneToOneConversationHero.PartyBelongedTo;
-            if (partyBelongedTo == null)
-            {
-                MobileParty mobileParty = LordPartyComponent.CreateLordParty(oneToOneConversationHero.CharacterObject.StringId, oneToOneConversationHero, mainParty.Position, 3f, selectedFief, oneToOneConversationHero);
-                mobileParty.MemberRoster.AddToCounts(clan.Culture.BasicTroop, MBRandom.RandomInt(12, 15), false, 0, 0, true, -1);
-                mobileParty.MemberRoster.AddToCounts(clan.Culture.EliteBasicTroop, MBRandom.RandomInt(10, 15), false, 0, 0, true, -1);
-            }
-            else
-            {
-                partyBelongedTo.ActualClan = clan;
-                partyBelongedTo.Party.SetVisualAsDirty();
-            }
-            companionRolesCampaignBehavior.AdjustCompanionsEquipment(oneToOneConversationHero);
-            // Set ResolvedMainHero for the duration of these calls so ChangeRelationActionPatches
-            // and CompanionRolesPatches can resolve the correct mainhero via the Harmony prefix instead of
-            // Hero.MainHero which is null on the host. Wrapped in try/finally so the static fields
-            // are always cleared even if something below throws
             CompanionRolesPatches.ResolvedMainHero = mainHero;
             ChangeRelationActionPatches.ResolvedMainHero = mainHero;
+            ClanPatches.ResolvedMainHero = mainHero;
             try
-            {
+            { 
+                int randomBannerIdForNewClan = companionRolesCampaignBehavior.GetRandomBannerIdForNewClan();
+                Clan clan = Clan.CreateCompanionToLordClan(oneToOneConversationHero, selectedFief, textObject, randomBannerIdForNewClan);
+                if (oneToOneConversationHero.PartyBelongedTo == mainParty)
+                {
+                    mainParty.MemberRoster.AddToCounts(oneToOneConversationHero.CharacterObject, -1, false, 0, 0, true, -1);
+                }
+                MobileParty partyBelongedTo = oneToOneConversationHero.PartyBelongedTo;
+                if (partyBelongedTo == null)
+                {
+                    MobileParty mobileParty = LordPartyComponent.CreateLordParty(oneToOneConversationHero.CharacterObject.StringId, oneToOneConversationHero, mainParty.Position, 3f, selectedFief, oneToOneConversationHero);
+                    mobileParty.MemberRoster.AddToCounts(clan.Culture.BasicTroop, MBRandom.RandomInt(12, 15), false, 0, 0, true, -1);
+                    mobileParty.MemberRoster.AddToCounts(clan.Culture.EliteBasicTroop, MBRandom.RandomInt(10, 15), false, 0, 0, true, -1);
+                }
+                else
+                {
+                    partyBelongedTo.ActualClan = clan;
+                    partyBelongedTo.Party.SetVisualAsDirty();
+                }
+                companionRolesCampaignBehavior.AdjustCompanionsEquipment(oneToOneConversationHero);
+                // Set ResolvedMainHero for the duration of these calls so ChangeRelationActionPatches
+                // ,CompanionRolesPatches and ClanPatches can resolve the correct mainhero via the Harmony prefix instead of
+                // Hero.MainHero which is different on the server compared to the client. Wrapped in try/finally so the static fields
+                // are always cleared even if something below throws
                 companionRolesCampaignBehavior.SpawnNewHeroesForNewCompanionClan(oneToOneConversationHero, clan, selectedFief);
                 GiveGoldAction.ApplyBetweenCharacters(mainHero, oneToOneConversationHero, 20000, false);
                 GainKingdomInfluenceAction.ApplyForDefault(mainHero, -500f);
@@ -138,6 +140,7 @@ internal class CompanionRolesHandler : IHandler
             {
                 CompanionRolesPatches.ResolvedMainHero = null;
                 ChangeRelationActionPatches.ResolvedMainHero = null;
+                ClanPatches.ResolvedMainHero = null;
             }
         });
     }

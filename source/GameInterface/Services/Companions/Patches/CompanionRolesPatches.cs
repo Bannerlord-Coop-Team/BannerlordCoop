@@ -145,7 +145,7 @@ internal class CompanionRolesPatches
         return true;
     }
     // Patch for server to use passed down ClientHero instead of server's MainHero
-    // which is null for server
+    // which leads to a different hero
     [HarmonyPatch(nameof(CompanionRolesCampaignBehavior.SpawnNewHeroesForNewCompanionClan))]
     [HarmonyPrefix]
     public static bool SpawnNewHeroesForNewCompanionClanPrefix(CompanionRolesCampaignBehavior __instance, Hero companionHero, Clan clan, Settlement settlement)
@@ -208,6 +208,48 @@ internal class CompanionRolesPatches
                 }
             }
         }
+        return false;
+    }
+    // Patch for server to use passed down ClientHero instead of server's MainHero
+    // which leads to a different hero
+    [HarmonyPatch(nameof(CompanionRolesCampaignBehavior.GetRandomBannerIdForNewClan))]
+    [HarmonyPrefix]
+    public static bool GetRandomBannerIdForNewClanPrefix(CompanionRolesCampaignBehavior __instance, ref int __result)
+    {
+        MBReadOnlyList<int> possibleClanBannerIconsIDs = ResolvedMainHero.MapFaction.Culture.PossibleClanBannerIconsIDs;
+        int num = possibleClanBannerIconsIDs.GetRandomElement<int>();
+        if (__instance.CurrentBehavior._alreadyUsedIconIdsForNewClans.Contains(num))
+        {
+            int num2 = 0;
+            do
+            {
+                num = possibleClanBannerIconsIDs.GetRandomElement<int>();
+                num2++;
+            }
+            while (__instance.CurrentBehavior._alreadyUsedIconIdsForNewClans.Contains(num) && num2 < 20);
+            bool flag = num2 != 20;
+            if (!flag)
+            {
+                for (int i = 0; i < possibleClanBannerIconsIDs.Count; i++)
+                {
+                    if (!__instance.CurrentBehavior._alreadyUsedIconIdsForNewClans.Contains(possibleClanBannerIconsIDs[i]))
+                    {
+                        num = possibleClanBannerIconsIDs[i];
+                        flag = true;
+                        break;
+                    }
+                }
+            }
+            if (!flag)
+            {
+                num = possibleClanBannerIconsIDs.GetRandomElement<int>();
+            }
+        }
+        if (!__instance.CurrentBehavior._alreadyUsedIconIdsForNewClans.Contains(num))
+        {
+            __instance.CurrentBehavior._alreadyUsedIconIdsForNewClans.Add(num);
+        }
+        __result = num;
         return false;
     }
     [ThreadStatic] 
