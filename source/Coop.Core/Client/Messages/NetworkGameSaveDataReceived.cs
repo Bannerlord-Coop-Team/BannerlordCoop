@@ -4,6 +4,7 @@ using Common.Messaging;
 using GameInterface.Services.Alleys;
 using GameInterface.Services.Caravans;
 using GameInterface.Services.MobileParties;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.Workshops;
 using ProtoBuf;
@@ -30,6 +31,8 @@ public record NetworkGameSaveDataReceived : IEvent
     public AlleyPlayerData AlleyPlayerData { get; }
     [ProtoMember(7)]
     public InteractionsPlayerData InteractionsPlayerData { get; }
+    [ProtoMember(8)]
+    public AttachmentIdMap AttachmentIdMap { get; }
 
     public NetworkGameSaveDataReceived(
         byte[] gameSaveData,
@@ -38,7 +41,8 @@ public record NetworkGameSaveDataReceived : IEvent
         WorkshopPlayerData workshopPlayerData,
         CaravansPlayerData caravansPlayerData,
         AlleyPlayerData alleyPlayerData,
-        InteractionsPlayerData interactionsPlayerData)
+        InteractionsPlayerData interactionsPlayerData,
+        AttachmentIdMap attachmentIdMap)
     {
         GameSaveData = gameSaveData;
         CampaignID = campaignID;
@@ -47,5 +51,6 @@ public record NetworkGameSaveDataReceived : IEvent
         CaravansPlayerData = caravansPlayerData;
         AlleyPlayerData = alleyPlayerData;
         InteractionsPlayerData = interactionsPlayerData;
+        AttachmentIdMap = attachmentIdMap;
     }
 }
