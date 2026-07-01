@@ -1,16 +1,13 @@
 using Common;
 using Common.Logging;
-using Common.Messaging;
 using GameInterface.Policies;
-using GameInterface.Services.MapEvents.Messages.Start;
-using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Helpers;
 using Serilog;
 using TaleWorlds.CampaignSystem.Encounters;
-using TaleWorlds.CampaignSystem.MapEvents;
-using TaleWorlds.Library;
-using TaleWorlds.Localization;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
@@ -19,21 +16,10 @@ internal class EncounterAttackConsequencePatch
 {
     private static readonly ILogger Logger = LogManager.GetLogger<EncounterAttackConsequencePatch>();
 
-    private static readonly TextObject PvpNotSupported = new("{=!}Player-vs-player battles are not yet supported in Co-op.");
-
     [HarmonyPatch(nameof(MenuHelper.EncounterAttackConsequence))]
     [HarmonyPrefix]
     private static bool Prefix()
     {
-        // Player-vs-player battles are not yet functional. When the player's map event involves more than one
-        // player party, swallow the attack so nothing happens — on the host and every client. The encounter menu
-        // stays open, so the player can still Leave. This runs before the normal client/server handling below.
-        if (IsPlayerVsPlayerMapEvent(MapEvent.PlayerMapEvent))
-        {
-            InformationManager.DisplayMessage(new InformationMessage(PvpNotSupported.ToString()));
-            return false;
-        }
-
         if (CallOriginalPolicy.IsOriginalAllowed())
             return true;
 
@@ -41,44 +27,29 @@ internal class EncounterAttackConsequencePatch
         if (ModInformation.IsServer)
             return true;
 
-        var battle = PlayerEncounter.Battle;
+        var coordinator = BattleStartCoordinator.Instance;
+        if (coordinator == null)
+            return true;
 
+        var battle = PlayerEncounter.Battle;
         if (battle == null)
         {
             Logger.Warning("Client tried to start attack mission, but PlayerEncounter.Battle was null");
             return false;
         }
 
-        // Ask the server for the authoritative map event state / mission start.
-        MessageBroker.Instance.Publish(
-            battle,
-            new AttackMissionAttempted(battle));
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+            return true;
+        if (!objectManager.TryGetId(battle, out var mapEventId))
+            return false;
 
+        // Carry the attacking party so the server can apply the attack's hostile-action consequences.
+        objectManager.TryGetId(MobileParty.MainParty, out var attackerPartyId);
+
+        // Block on the server's accept — the consequence frozen mid-call keeps the encounter menu in place during
+        // the round trip. On accept the server makes the sides mission-ready and sends NetworkStartAttackMission to
+        // open the mission; on reject (an auto-resolve already owns the event) nothing opens and the menu stays.
+        coordinator.RequestBlocking(BattleStartMode.Mission, mapEventId, attackerPartyId);
         return false;
-    }
-
-    /// <summary>True when the map event involves more than one player party (PvP).</summary>
-    private static bool IsPlayerVsPlayerMapEvent(MapEvent mapEvent)
-    {
-        if (mapEvent?.AttackerSide == null || mapEvent.DefenderSide == null) return false;
-
-        int playerParties = 0;
-        foreach (var party in mapEvent.AttackerSide.Parties)
-        {
-            if (party.Party.MobileParty.IsPlayerParty())
-            {
-                playerParties++;
-            }
-        }
-
-        foreach (var party in mapEvent.DefenderSide.Parties)
-        {
-            if (party.Party.MobileParty.IsPlayerParty())
-            {
-                playerParties++;
-            }
-        }
-
-        return playerParties > 1;
     }
 }

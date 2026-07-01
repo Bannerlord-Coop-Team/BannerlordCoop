@@ -15,19 +15,30 @@ namespace Missions.Agents.Packets
 
         public void Apply(Agent agent)
         {
-            // Check if there is a change on the right hand
-            if ((EquipmentIndex)MainHandIndex != agent.GetPrimaryWieldedItemIndex())
-            {
-                // set the weapon to whatever index the server passed
-                agent.SetWieldedItemIndexAsClient(Agent.HandIndex.MainHand, (EquipmentIndex)MainHandIndex, false, false, agent.WieldedWeapon.CurrentUsageIndex);
-            }
-            // check if there is a change on the left hand
+            // Only wield an index this agent actually has a weapon in RIGHT NOW. The sender's wielded index can point
+            // to a slot that is EMPTY on this puppet — its loadout differs, its weapon depleted/broke, or this is a
+            // stale packet landing as the mission tears down (the wielded weapon has already been put away). Wielding
+            // an empty slot leaves a wielded index whose equipment[index].Item is null, and
+            // SandboxAgentStatCalculateModel.UpdateHumanStats then dereferences item.WeaponComponent → NRE on every
+            // following Formation.Tick (notably right after a battle / on host-migration adopt). Validating the slot
+            // here covers both the wrong-index case and the end-of-battle race, since it reads the live equipment.
+            var mainHand = (EquipmentIndex)MainHandIndex;
+            if (mainHand != agent.GetPrimaryWieldedItemIndex() && CanWield(agent, mainHand))
+                agent.SetWieldedItemIndexAsClient(Agent.HandIndex.MainHand, mainHand, false, false, agent.WieldedWeapon.CurrentUsageIndex);
 
-            if ((EquipmentIndex)OffHandIndex != agent.GetOffhandWieldedItemIndex())
-            {
-                // set the index to the weapon wielded
-                agent.SetWieldedItemIndexAsClient(Agent.HandIndex.OffHand, (EquipmentIndex)OffHandIndex, false, false, agent.WieldedOffhandWeapon.CurrentUsageIndex);
-            }
+            var offHand = (EquipmentIndex)OffHandIndex;
+            if (offHand != agent.GetOffhandWieldedItemIndex() && CanWield(agent, offHand))
+                agent.SetWieldedItemIndexAsClient(Agent.HandIndex.OffHand, offHand, false, false, agent.WieldedOffhandWeapon.CurrentUsageIndex);
+        }
+
+        // True when it is safe to wield this index on this agent: -1 (None) unwields (UpdateHumanStats guards the -1
+        // case), and a weapon slot is only safe when it actually holds a weapon on this agent right now.
+        private static bool CanWield(Agent agent, EquipmentIndex index)
+        {
+            if (index == EquipmentIndex.None) return true;
+            return index >= EquipmentIndex.WeaponItemBeginSlot
+                && index < EquipmentIndex.NumAllWeaponSlots
+                && !agent.Equipment[index].IsEmpty;
         }
 
         [ProtoMember(1)]

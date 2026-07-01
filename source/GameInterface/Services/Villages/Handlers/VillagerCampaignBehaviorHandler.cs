@@ -97,6 +97,9 @@ internal class VillagerCampaignBehaviorHandler : IHandler
         {
             if (!TryGetVillagerBehavior(out var villagerBehavior)) return;
 
+            // If list is empty the client will receive a null object. Guard to prevent a NRE
+            if (obj.What.DeletedLootedVillagersIdsList == null) return;
+
             foreach (var deletedVillagerId in obj.What.DeletedLootedVillagersIdsList)
             {
                 if (!objectManager.TryGetObjectWithLogging<MobileParty>(deletedVillagerId, out var deletedVillager)) continue;

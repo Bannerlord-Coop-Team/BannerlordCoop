@@ -1,4 +1,4 @@
-﻿using Common.PacketHandlers;
+using Common.PacketHandlers;
 using LiteNetLib;
 using ProtoBuf;
 using System;
@@ -6,6 +6,11 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Agents.Packets
 {
+    /// <summary>
+    /// A batch of agent movement snapshots for one poll tick: one packet carrying every agent the sender
+    /// currently has authority over, instead of one packet per agent. At battle scale (dozens of agents at
+    /// ~100 Hz) per-agent packets flood the mesh and the receiver's game-thread queue.
+    /// </summary>
     [ProtoContract]
     public readonly struct MovementPacket : IPacket
     {
@@ -14,19 +19,14 @@ namespace Missions.Agents.Packets
         public PacketType PacketType => PacketType.Movement;
 
         [ProtoMember(1)]
-        public AgentData Agent { get; }
+        public Guid[] AgentIds { get; }
         [ProtoMember(2)]
-        public Guid AgentId { get; }
+        public AgentData[] Agents { get; }
 
-        public MovementPacket(Guid agentId, Agent agent)
+        public MovementPacket(Guid[] agentIds, AgentData[] agents)
         {
-            AgentId = agentId;
-            Agent = new AgentData(agent);
-        }
-
-        public void Apply(Agent agent)
-        {
-            Agent.Apply(agent);
+            AgentIds = agentIds;
+            Agents = agents;
         }
     }
 }
