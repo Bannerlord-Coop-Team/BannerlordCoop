@@ -38,6 +38,12 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
     // this stays false; OnMissionTick runs the single joint Init the moment both are populated, then latches.
     private bool _sized;
 
+    // Set on the game thread right after the joint sizing commits. CoopBattleDeploymentMissionController gates its
+    // one-time team/command setup on this so that setup runs only once the sides are sized. A raw supplier
+    // IsPopulated check wouldn't be safe there: SetReserve flips populated on the network thread, so it can read
+    // true between this handler's tick and the controller's tick in the same frame, before Init has sized.
+    public bool IsSized => _sized;
+
     public CoopBattleMissionSpawnHandler(CoopTroopSupplier defenderSupplier, CoopTroopSupplier attackerSupplier)
     {
         _defenderSupplier = defenderSupplier;
