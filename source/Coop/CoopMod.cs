@@ -110,6 +110,12 @@ namespace Coop
 #endif
 
             Logger = LogManager.GetLogger<CoopMod>();
+
+            var informationalVersion = typeof(ModInformation).Assembly
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+                ?.InformationalVersion ?? "unknown";
+            Logger.Information("BannerlordCoop build {Build}", informationalVersion);
+
             Logger.Verbose("Coop Mod Module Started");
         }
 

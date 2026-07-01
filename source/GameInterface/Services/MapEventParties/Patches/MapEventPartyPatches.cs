@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEventParties.Messages;
 using HarmonyLib;
 using Helpers;
@@ -27,6 +28,11 @@ internal class MapEventPartyPatches
 
         if (ModInformation.IsServer) return true;
 
+        // Coop battle: casualties flow owner→server (BattleCasualtyHandler); suppress the host's mission
+        // auto-accounting so the troop isn't decremented twice. The server-applied path runs under
+        // AllowedThread, so the IsOriginalAllowed check above already lets it through.
+        if (BattleSpawnConfig.Enabled && BattleSpawnGate.IsCoopBattleActive) return false;
+
         __instance._roster.OnTroopKilled(troopSeed);
         MessageBroker.Instance.Publish(__instance, new OnTroopKilledAttempted(__instance, troopSeed.UniqueSeed));
 
@@ -42,6 +48,9 @@ internal class MapEventPartyPatches
 
         if (ModInformation.IsServer) return true;
 
+        // Coop battle: casualties flow owner→server; suppress the host's mission auto-accounting (see OnTroopKilled).
+        if (BattleSpawnConfig.Enabled && BattleSpawnGate.IsCoopBattleActive) return false;
+
         __instance._roster.OnTroopWounded(troopSeed);
         MessageBroker.Instance.Publish(__instance, new OnTroopWoundedAttempted(__instance, troopSeed.UniqueSeed));
 
@@ -56,6 +65,9 @@ internal class MapEventPartyPatches
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsServer) return true;
+
+        // Coop battle: casualties flow owner→server; suppress the host's mission auto-accounting (see OnTroopKilled).
+        if (BattleSpawnConfig.Enabled && BattleSpawnGate.IsCoopBattleActive) return false;
 
         __instance._roster.OnTroopRouted(troopSeed);
         MessageBroker.Instance.Publish(__instance, new OnTroopRoutedAttempted(__instance, troopSeed.UniqueSeed));

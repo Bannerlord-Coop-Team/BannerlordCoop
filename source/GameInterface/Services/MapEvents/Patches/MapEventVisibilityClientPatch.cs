@@ -23,7 +23,7 @@ internal class MapEventVisibilityClientPatch
     [HarmonyPostfix]
     private static void Postfix_RealTick()
     {
-        if (!ModInformation.IsClient) return;
+        if (ModInformation.IsServer) return;
 
         var mapEventManager = Campaign.Current?.MapEventManager;
         if (mapEventManager == null) return;

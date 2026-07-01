@@ -13,6 +13,7 @@ using Coop.Core.Server.Services.Time;
 using Coop.Core.Server.States;
 using GameInterface.Policies;
 using LiteNetLib;
+using Missions;
 
 namespace Coop.Core.Server;
 
@@ -26,6 +27,12 @@ public class ServerModule : CommonModule
         base.Load(builder);
 
         builder.RegisterModule<ConnectionModule>();
+
+        // The mission/P2P stack is composed into the server container too (it is also in ClientModule) so the
+        // server-authoritative battle classes — notably BattleHostHandler, which elects the battle host — run
+        // here. The client-only pieces (mesh client, location/battle controllers) stay lazy: nothing on the
+        // server resolves IBattleNetwork, so no P2P socket is opened. See MissionModule for what activates.
+        builder.RegisterModule<MissionModule>();
 
         builder.RegisterType<ServerContext>().AsSelf().InstancePerLifetimeScope();
         builder.RegisterType<ServerLogic>().As<IServerLogic>().As<ILogic>().InstancePerLifetimeScope();

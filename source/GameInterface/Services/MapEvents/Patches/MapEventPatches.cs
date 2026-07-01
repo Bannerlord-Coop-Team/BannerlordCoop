@@ -27,25 +27,29 @@ internal class MapEventPatches
     [HarmonyPrefix]
     private static void Prefix_AddInvolvedPartyInternal(MapEvent __instance, MapEventParty mapEventParty)
     {
-        // Parties not controlled by the server are player parties
-        if (mapEventParty.Party.MobileParty?.IsPlayerParty() == true)
+        // Broadcast the involved parties to clients when a player joins, OR when an AI party joins as a
+        // reinforcement while the join window is still open (InteractionPatches.IsWithinAiJoinWindow). Parties
+        // not controlled by the server are player parties. The window is only ever populated on the server, so
+        // an AI join broadcast stays server-driven; AI joins after the window simply aren't propagated.
+        bool isPlayerJoin = mapEventParty.Party.MobileParty?.IsPlayerParty() == true;
+        if (!isPlayerJoin && !InteractionPatches.IsWithinAiJoinWindow(__instance))
+            return;
+
+        var partiesAdded = new List<MapEventParty>();
+
+        __instance.TroopUpgradeTracker = new TroopUpgradeTracker();
+        MapEventSide[] sides = __instance._sides;
+        for (int i = 0; i < sides.Length; i++)
         {
-            var partiesAdded = new List<MapEventParty>();
-
-            __instance.TroopUpgradeTracker = new TroopUpgradeTracker();
-            MapEventSide[] sides = __instance._sides;
-            for (int i = 0; i < sides.Length; i++)
+            foreach (var existingParty in sides[i].Parties)
             {
-                foreach (var existingParty in sides[i].Parties)
-                {
-                    __instance.TroopUpgradeTracker.AddParty(existingParty);
-                    partiesAdded.Add(existingParty);
-                }
+                __instance.TroopUpgradeTracker.AddParty(existingParty);
+                partiesAdded.Add(existingParty);
             }
-
-            var message = new MapEventInvolvedPartiesAdded(__instance, partiesAdded);
-            MessageBroker.Instance.Publish(__instance, message);
         }
+
+        var message = new MapEventInvolvedPartiesAdded(__instance, partiesAdded);
+        MessageBroker.Instance.Publish(__instance, message);
     }
 
     [HarmonyPatch(nameof(MapEvent.FinalizeEventAux))]
@@ -244,6 +248,12 @@ internal class InteractionPatches
 
     private static readonly ConditionalWeakTable<MapEvent, PlayerBattleAiJoinWindow> playerBattleAiJoinWindows = new();
 
+    /// <summary>True while a player's battle is still within its post-start window for AI parties to join as
+    /// reinforcements (<see cref="MapEventConfig.PlayerBattleAiJoinWindowHours"/>). The window is opened in
+    /// <see cref="Postfix_Initialize"/>; only the server ever populates it, so this is a server-side query.</summary>
+    internal static bool IsWithinAiJoinWindow(MapEvent mapEvent)
+        => playerBattleAiJoinWindows.TryGetValue(mapEvent, out var window) && !window.Expired;
+
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.CanPartyJoinBattle))]
     [HarmonyPrefix]
     private static bool Prefix_CanPartyJoinBattle(MapEvent __instance, PartyBase party, ref bool __result)
@@ -308,7 +318,12 @@ internal class InteractionPatches
         if (!__instance.ContainsPlayerParty())
             return;
 
-        // Prevent any AI party from joining a battle that involves a player
+        // A player's battle stays open to AI reinforcements for a campaign day after it begins (the join
+        // window is opened in Postfix_Initialize). While it is open, AI may keep joining; once it expires —
+        // or if no window was opened for this event — no more AI may join a player's battle.
+        if (IsWithinAiJoinWindow(__instance))
+            return;
+
         __result = false;
     }
 

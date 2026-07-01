@@ -20,7 +20,8 @@ internal class AllowItemRostersInGUI
         AccessTools.Method(typeof(GauntletInformationView), "OnShowTooltip"),
         AccessTools.Method(typeof(TooltipRefresherCollection), "RefreshSettlementTooltip"),
         AccessTools.Method(typeof(PartyScreenHelper), nameof(PartyScreenHelper.OpenPartyScreen)),
-        AccessTools.Method(typeof(CaravansCampaignBehavior), nameof(CaravansCampaignBehavior.BribeAmount))
+        AccessTools.Method(typeof(CaravansCampaignBehavior), nameof(CaravansCampaignBehavior.BribeAmount)),
+        AccessTools.Method(typeof(VillagerCampaignBehavior), nameof(VillagerCampaignBehavior.CalculateConversationPartyBribeAmount))
     };
 
     [HarmonyPrefix]

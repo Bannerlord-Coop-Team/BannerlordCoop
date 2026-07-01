@@ -28,7 +28,8 @@ namespace GameInterface.Services.MapEvents.Handlers;
 /// Runs auto-resolve battle simulations authoritatively on the server, paced by the requesting client.
 /// </summary>
 /// <remarks>
-/// Client: opening the screen (<see cref="BattleSimulationStarted"/>) sends <see cref="NetworkRequestRunBattleSimulation"/>;
+/// Client: the send-troops consequence prefix asks <c>BattleStartCoordinator</c> to start the auto-resolve, which
+/// blocks on the server's accept before the scoreboard opens;
 /// the local engine is disabled and <see cref="BattleSimulationReplay"/> instead drives the playback off
 /// <c>_numTicks</c>, emitting <see cref="RequestAdvanceBattleSimulation"/> each round.
 /// Server: on the request it only sets the simulation up; each advance resolves that many rounds, syncing
@@ -71,9 +72,8 @@ internal class BattleSimulationRunHandler : IHandler
         this.objectManager = objectManager;
         this.mapEventLogger = mapEventLogger;
 
-        messageBroker.Subscribe<BattleSimulationStarted>(Handle_BattleSimulationStarted);
         messageBroker.Subscribe<RequestAdvanceBattleSimulation>(Handle_RequestAdvanceBattleSimulation);
-        messageBroker.Subscribe<NetworkRequestRunBattleSimulation>(Handle_NetworkRequestRunBattleSimulation);
+        messageBroker.Subscribe<NetworkBattleStartRequest>(Handle_NetworkBattleStartRequest);
         messageBroker.Subscribe<NetworkAdvanceBattleSimulation>(Handle_NetworkAdvanceBattleSimulation);
         messageBroker.Subscribe<NetworkBattleSimulationRound>(Handle_NetworkBattleSimulationRound);
         messageBroker.Subscribe<NetworkBattleSimulationLoot>(Handle_NetworkBattleSimulationLoot);
@@ -85,9 +85,8 @@ internal class BattleSimulationRunHandler : IHandler
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<BattleSimulationStarted>(Handle_BattleSimulationStarted);
         messageBroker.Unsubscribe<RequestAdvanceBattleSimulation>(Handle_RequestAdvanceBattleSimulation);
-        messageBroker.Unsubscribe<NetworkRequestRunBattleSimulation>(Handle_NetworkRequestRunBattleSimulation);
+        messageBroker.Unsubscribe<NetworkBattleStartRequest>(Handle_NetworkBattleStartRequest);
         messageBroker.Unsubscribe<NetworkAdvanceBattleSimulation>(Handle_NetworkAdvanceBattleSimulation);
         messageBroker.Unsubscribe<NetworkBattleSimulationRound>(Handle_NetworkBattleSimulationRound);
         messageBroker.Unsubscribe<NetworkBattleSimulationLoot>(Handle_NetworkBattleSimulationLoot);
@@ -97,35 +96,25 @@ internal class BattleSimulationRunHandler : IHandler
         messageBroker.Unsubscribe<MapEventPartyBattlePartyAdded>(Handle_MapEventPartyBattlePartyAdded);
     }
 
-    /// <summary>[Client] Begin local playback and ask the server to set the simulation up.</summary>
-    private void Handle_BattleSimulationStarted(MessagePayload<BattleSimulationStarted> payload)
-    {
-        if (!objectManager.TryGetIdWithLogging(payload.What.MapEvent, out var mapEventId))
-            return;
-
-        BattleSimulationReplay.Begin(mapEventId);
-
-        mapEventLogger.DebugMapEvent(payload.What.MapEvent, "Requesting server-side battle simulation");
-
-        // On a client, SendAll targets the server (its only connected peer).
-        network.SendAll(new NetworkRequestRunBattleSimulation(mapEventId));
-    }
-
     /// <summary>[Client] Forward a playback-paced advance to the server.</summary>
     private void Handle_RequestAdvanceBattleSimulation(MessagePayload<RequestAdvanceBattleSimulation> payload)
     {
         network.SendAll(new NetworkAdvanceBattleSimulation(payload.What.MapEventId, payload.What.Rounds));
     }
 
-    /// <summary>[Server] Set the simulation up (no rounds yet); the client paces it via advances.</summary>
-    private void Handle_NetworkRequestRunBattleSimulation(MessagePayload<NetworkRequestRunBattleSimulation> payload)
+    /// <summary>[Server] Handle a battle-start request for the auto-resolve mode: gate it, set the simulation up
+    /// (no rounds yet; the client paces it via advances), and reply. Requests for other modes are ignored here.</summary>
+    private void Handle_NetworkBattleStartRequest(MessagePayload<NetworkBattleStartRequest> payload)
     {
-        if (!ModInformation.IsServer)
+        if (ModInformation.IsClient)
+            return;
+
+        if (payload.What.Mode != (int)BattleStartMode.Simulation)
             return;
 
         if (!(payload.Who is NetPeer requestingPeer))
         {
-            Logger.Error("Received {Message} with no originating peer", nameof(NetworkRequestRunBattleSimulation));
+            Logger.Error("Received {Message} with no originating peer", nameof(NetworkBattleStartRequest));
             return;
         }
 
@@ -136,9 +125,36 @@ internal class BattleSimulationRunHandler : IHandler
 
         if (mapEvent.HasWinner)
         {
-            mapEventLogger.DebugMapEvent(mapEvent, "Battle simulation requested for an already finished map event; replying immediately");
-            network.Send(requestingPeer, new NetworkBattleSimulationFinished(mapEventId));
+            mapEventLogger.DebugMapEvent(mapEvent, "Battle simulation requested for an already finished map event; rejecting");
+            network.Send(requestingPeer, new NetworkBattleStartReply(payload.What.RequestId, false));
             return;
+        }
+
+        // Server-authoritative mode gate: accept the auto-resolve only if no live mission already owns this event.
+        // On reject the requesting client never opened its scoreboard (the prefix deferred it), so there is nothing
+        // to tear down — the request is simply dropped.
+        if (!ServerBattleModeArbiter.TryClaimSimulation(mapEventId))
+        {
+            mapEventLogger.DebugMapEvent(mapEvent, "Rejecting battle simulation: a live mission is already underway for this event");
+            network.Send(requestingPeer, new NetworkBattleStartReply(payload.What.RequestId, false));
+            return;
+        }
+
+        // Guard against a double-start: two clients can both click auto-resolve for the same event inside the
+        // broadcast-latency window, and TryClaimSimulation lets the second through — it only rejects the OTHER
+        // mode, so an already-simulation claim still succeeds. Without this the second request would set the
+        // simulation up again (overwriting the first's activeSimulations entry, orphaning its observer) and its
+        // requester would also become a pacer. Reject the duplicate so the first stays the sole pacer; the
+        // arbiter claim is left intact (the first still owns it). Reliable on the single network thread: the
+        // first request only returns after its blocking GameThread.Run below has populated activeSimulations.
+        lock (simLock)
+        {
+            if (activeSimulations.ContainsKey(mapEventId))
+            {
+                mapEventLogger.DebugMapEvent(mapEvent, "Battle simulation already active for this event; rejecting duplicate start");
+                network.Send(requestingPeer, new NetworkBattleStartReply(payload.What.RequestId, false));
+                return;
+            }
         }
 
         var observer = new ForwardingBattleObserver(objectManager);
@@ -167,7 +183,11 @@ internal class BattleSimulationRunHandler : IHandler
         // Mirror the simulation onto every other client in this map event. Each client opens the window only if its
         // own party is in the event; the requesting client and uninvolved clients ignore it. The requester keeps
         // pacing; spectators replay passively.
-        network.SendAll(new NetworkOpenBattleSimulation(mapEventId));
+        // Claim the event for the simulation mode on every client (greys the mission option for anyone at the menu),
+        // then open the spectator scoreboards and accept the requester.
+        network.SendAll(new NetworkBattleModeSet(mapEventId, (int)BattleStartMode.Simulation));
+        network.SendAllBut(requestingPeer, new NetworkOpenBattleSimulation(mapEventId));
+        network.Send(requestingPeer, new NetworkBattleStartReply(payload.What.RequestId, true));
 
         mapEventLogger.DebugMapEvent(mapEvent, "Battle simulation set up; awaiting client-paced advances");
     }
@@ -181,7 +201,7 @@ internal class BattleSimulationRunHandler : IHandler
     /// </summary>
     private void Handle_MapEventPartyBattlePartyAdded(MessagePayload<MapEventPartyBattlePartyAdded> payload)
     {
-        if (!ModInformation.IsServer)
+        if (ModInformation.IsClient)
             return;
 
         var side = payload.What.MapEventSide;
@@ -260,7 +280,7 @@ internal class BattleSimulationRunHandler : IHandler
     /// <summary>[Server] Resolve the requested number of rounds, streaming each round back.</summary>
     private void Handle_NetworkAdvanceBattleSimulation(MessagePayload<NetworkAdvanceBattleSimulation> payload)
     {
-        if (!ModInformation.IsServer)
+        if (ModInformation.IsClient)
             return;
 
         var mapEventId = payload.What.MapEventId;
@@ -547,14 +567,15 @@ internal class BattleSimulationRunHandler : IHandler
     /// </summary>
     private void Handle_NetworkOpenBattleSimulation(MessagePayload<NetworkOpenBattleSimulation> payload)
     {
-        if (!ModInformation.IsClient)
+        if (ModInformation.IsServer)
             return;
 
         var mapEventId = payload.What.MapEventId;
 
         GameThread.Run(() =>
         {
-            // Initiator already has it open and is pacing it.
+            // The initiator already has it open and is pacing it — it opened synchronously when the server accepted
+            // its blocking request, marking the replay active.
             if (BattleSimulationReplay.IsActiveFor(mapEventId))
                 return;
 
@@ -575,9 +596,8 @@ internal class BattleSimulationRunHandler : IHandler
                 return;
             }
 
-            // Spectator mode must be set before StartBattleSimulation: its postfix checks it to avoid requesting a
-            // second authoritative run. InitSimulation(null, null) builds the scoreboard from the event's parties
-            // (full battle); the streamed rounds then drive it.
+            // Begin (which marks the replay active) must precede StartBattleSimulation. InitSimulation(null, null)
+            // builds the scoreboard from the event's full parties; the server-streamed rounds then drive it.
             BattleSimulationReplay.Begin(mapEventId, spectator: true);
             PlayerEncounter.InitSimulation(null, null);
             mapState.StartBattleSimulation();
@@ -592,7 +612,7 @@ internal class BattleSimulationRunHandler : IHandler
     /// </summary>
     private void Handle_PlayerDisconnected(MessagePayload<PlayerDisconnected> payload)
     {
-        if (!ModInformation.IsServer)
+        if (ModInformation.IsClient)
             return;
 
         var peer = payload.What.PlayerId;

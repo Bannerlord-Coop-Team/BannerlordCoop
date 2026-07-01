@@ -149,7 +149,7 @@ internal class MapEventCreationCoordinator : IHandler
     /// <summary>[Server] Create the MapEvent authoritatively and reply to the requesting client with its id.</summary>
     private void Handle_NetworkRequestCreateMapEvent(MessagePayload<NetworkRequestCreateMapEvent> payload)
     {
-        if (!ModInformation.IsServer) return;
+        if (ModInformation.IsClient) return;
 
         var request = payload.What;
 

@@ -3,6 +3,7 @@ using GameInterface.Services.Entity;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions;
@@ -166,18 +167,24 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
 
     public bool IsLocallyControlled(Guid agentId)
     {
-        if (!IdToInfo.TryGetValue(agentId, out var stored))
-            return false;
+        lock (gate)
+        {
+            if (!IdToInfo.TryGetValue(agentId, out var stored))
+                return false;
 
-        return stored.CurrentAuthority == controllerIdProvider.ControllerId;
+            return stored.CurrentAuthority == controllerIdProvider.ControllerId;
+        }
     }
 
     public bool IsLocallyControlled(Agent agent)
     {
-        if (!AgentToInfo.TryGetValue(agent, out var stored))
-            return false;
+        lock (gate)
+        {
+            if (!AgentToInfo.TryGetValue(agent, out var stored))
+                return false;
 
-        return stored.CurrentAuthority == controllerIdProvider.ControllerId;
+            return stored.CurrentAuthority == controllerIdProvider.ControllerId;
+        }
     }
 
     public bool RemoveController(string controllerId)
