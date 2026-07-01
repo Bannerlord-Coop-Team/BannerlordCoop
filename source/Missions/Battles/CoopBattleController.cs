@@ -898,10 +898,11 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
         if (controllerId == controllerIdProvider.ControllerId) return;
 
         var registry = coopMissionComponent.AgentRegistry;
-        var adopted = registry.GetAgents(controllerId);
 
         GameThread.RunSafe(() =>
         {
+            var adopted = registry.GetAgents(controllerId);
+
             if (adopted.Count > 0)
             {
                 foreach (var info in adopted)

@@ -39,7 +39,7 @@ internal class BattleCasualtyHandler : IHandler
 
     private void Handle_NetworkRequestBattleCasualty(MessagePayload<NetworkRequestBattleCasualty> payload)
     {
-        if (!ModInformation.IsServer) return;
+        if (ModInformation.IsClient) return;
 
         var msg = payload.What;
 
@@ -65,8 +65,8 @@ internal class BattleCasualtyHandler : IHandler
             {
                 foreach (var element in roster)
                 {
-                    if (element.IsKilled) continue;
-                    if (msg.Wounded && element.IsWounded) continue;     // a wound shouldn't target a man already down
+                    // Skip already killed or wounded troops
+                    if (element.IsKilled || element.IsWounded) continue;
                     if (element.Troop != troop) continue;
 
                     if (msg.Wounded)

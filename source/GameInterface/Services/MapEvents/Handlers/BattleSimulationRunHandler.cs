@@ -140,6 +140,23 @@ internal class BattleSimulationRunHandler : IHandler
             return;
         }
 
+        // Guard against a double-start: two clients can both click auto-resolve for the same event inside the
+        // broadcast-latency window, and TryClaimSimulation lets the second through — it only rejects the OTHER
+        // mode, so an already-simulation claim still succeeds. Without this the second request would set the
+        // simulation up again (overwriting the first's activeSimulations entry, orphaning its observer) and its
+        // requester would also become a pacer. Reject the duplicate so the first stays the sole pacer; the
+        // arbiter claim is left intact (the first still owns it). Reliable on the single network thread: the
+        // first request only returns after its blocking GameThread.Run below has populated activeSimulations.
+        lock (simLock)
+        {
+            if (activeSimulations.ContainsKey(mapEventId))
+            {
+                mapEventLogger.DebugMapEvent(mapEvent, "Battle simulation already active for this event; rejecting duplicate start");
+                network.Send(requestingPeer, new NetworkBattleStartReply(payload.What.RequestId, false));
+                return;
+            }
+        }
+
         var observer = new ForwardingBattleObserver(objectManager);
 
         GameThread.Run(() =>
