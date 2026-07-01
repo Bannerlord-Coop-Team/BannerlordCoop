@@ -6,6 +6,7 @@ using Coop.UI.LoadGameUI;
 using GameInterface;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.UI;
+using GameInterface.Utils;
 using Serilog;
 using System;
 using System.IO;
@@ -269,7 +270,14 @@ namespace Coop
             if(m_IsFirstTick)
             {
                 GameThread.Instance.MarkGameThread();
-                
+
+#if DEBUG
+                // Label this instance's taskbar window (Coop Server / Coop Client N) so multiple
+                // test instances launched together are tellable apart. isServer is the arg-parsed
+                // role; ModInformation.IsServer isn't set until a session actually starts.
+                WindowTitle.Apply(isServer);
+#endif
+
                 m_IsFirstTick = false;
             }
 
