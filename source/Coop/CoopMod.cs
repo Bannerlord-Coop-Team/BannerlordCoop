@@ -272,9 +272,6 @@ namespace Coop
                 GameThread.Instance.MarkGameThread();
 
 #if DEBUG
-                // Label this instance's taskbar window (Coop Server / Coop Client N) so multiple
-                // test instances launched together are tellable apart. isServer is the arg-parsed
-                // role; ModInformation.IsServer isn't set until a session actually starts.
                 WindowTitle.Apply(isServer);
 #endif
 
