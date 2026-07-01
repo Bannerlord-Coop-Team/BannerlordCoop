@@ -83,6 +83,44 @@ internal class MobilePartyDebugCommand
         return stringBuilder.ToString();
     }
 
+    // coop.debug.mobileparty.change_leader <PartyStringID> <HeroStringID>
+    // Run on the server: drives ChangePartyLeader so the leader-change sync fires to clients. The new
+    // leader must already be a member of the party's roster (vanilla no-ops otherwise).
+    [CommandLineArgumentFunction("change_leader", "coop.debug.mobileparty")]
+    public static string ChangeLeader(List<string> args)
+    {
+        if (ModInformation.IsClient)
+        {
+            return "Change leader is only to be called on the server";
+        }
+
+        if (args.Count < 2)
+        {
+            return "Usage: coop.debug.mobileparty.change_leader <PartyStringID> <HeroStringID>";
+        }
+
+        MobileParty mobileParty = Campaign.Current.CampaignObjectManager.Find<MobileParty>(args[0]);
+        if (mobileParty == null)
+        {
+            return string.Format("Argument1: MobileParty not found by ID: {0}", args[0]);
+        }
+
+        Hero newLeader = Campaign.Current.CampaignObjectManager.Find<Hero>(args[1]);
+        if (newLeader == null)
+        {
+            return string.Format("Argument2: Hero not found by ID: {0}", args[1]);
+        }
+
+        if (!mobileParty.MemberRoster.Contains(newLeader.CharacterObject))
+        {
+            return $"{newLeader.Name} is not a member of {mobileParty.Name}; pick a hero from its member roster.";
+        }
+
+        mobileParty.ChangePartyLeader(newLeader);
+
+        return $"{mobileParty.Name} leader set to {newLeader.Name}";
+    }
+
     // coop.debug.mobileparty.attachment_ids <PartyStringID>
     // Prints the network ObjectManager id THIS machine holds for a party and each of its non-MBObjectBase
     // attachments. Run on the server and on each client and compare: a party the client got via live create

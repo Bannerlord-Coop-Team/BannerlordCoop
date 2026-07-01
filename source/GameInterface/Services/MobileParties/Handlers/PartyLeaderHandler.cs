@@ -65,13 +65,16 @@ internal class PartyLeaderHandler : IHandler
             if (payload.What.LeaderHeroId != null && !objectManager.TryGetObjectWithLogging(payload.What.LeaderHeroId, out newLeader))
                 return;
 
+            var previousLeader = mobileParty.LeaderHero;
+
             using (new AllowedThread())
             {
                 mobileParty.ChangePartyLeader(newLeader);
             }
 
-            // The leader drives the party's map figure; rebuild it so the change is reflected visually.
-            mobileParty.Party.SetVisualAsDirty();
+            // Rebuild the map figure only when the leader actually changed; nothing else marks it dirty.
+            if (mobileParty.LeaderHero != previousLeader)
+                mobileParty.Party.SetVisualAsDirty();
         });
     }
 }

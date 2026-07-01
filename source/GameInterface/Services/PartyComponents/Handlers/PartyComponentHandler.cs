@@ -266,8 +266,12 @@ internal class PartyComponentHandler : IHandler
 
                 using (new AllowedThread())
                 {
+                    var previousLeader = partyComponent.Leader;
                     partyComponent.OnChangePartyLeader(newLeader);
-                    partyComponent.Party?.SetVisualAsDirty();
+
+                    // Rebuild the map figure only when the leader actually changed; nothing else marks it dirty.
+                    if (partyComponent.Leader != previousLeader)
+                        partyComponent.Party?.SetVisualAsDirty();
                 }
             }
             catch (Exception e)
