@@ -1,13 +1,10 @@
 ﻿using Common;
-using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
-using Serilog;
-using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 
@@ -15,8 +12,6 @@ namespace GameInterface.Services.MobileParties.Handlers;
 
 internal class VolunteerTypesHandler : IHandler
 {
-    private static readonly ILogger logger = LogManager.GetLogger<VolunteerTypesHandler>();
-
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
@@ -57,22 +52,15 @@ internal class VolunteerTypesHandler : IHandler
         var individualId = obj.What.IndividualId;
         var bitCode = obj.What.BitCode;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
-            try
-            {
-                if (!objectManager.TryGetObjectWithLogging<Hero>(individualId, out var individual)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(individualId, out var individual)) return;
 
-                using (new AllowedThread())
-                {
-                    individual.VolunteerTypes[bitCode] = null;
-                }
-            }
-            catch (Exception e)
+            using (new AllowedThread())
             {
-                logger.Error(e, "Failed to apply RemoveVolunteer for hero ({individualId})", individualId);
+                individual.VolunteerTypes[bitCode] = null;
             }
-        });
+        }, context: $"RemoveVolunteer for hero ({individualId})");
     }
 
     private void Handle_VolunteersUpdated(MessagePayload<VolunteersUpdated> obj)
@@ -82,15 +70,21 @@ internal class VolunteerTypesHandler : IHandler
         {
             if (!objectManager.TryGetIdWithLogging(keyValuePair.Key, out var currentHeroId)) continue;
 
-            updatedVolunteerTypeIds[currentHeroId] = new string[] {};
-            foreach (CharacterObject character in keyValuePair.Value)
+            CharacterObject[] volunteerTypes = keyValuePair.Value;
+            string[] volunteerTypeIds = new string[volunteerTypes.Length];
+            for (int i = 0; i < volunteerTypes.Length; i++)
             {
-                if (character is null) continue;
-
-                if (!objectManager.TryGetIdWithLogging(character, out var currentCharacterId)) continue;
-
-                updatedVolunteerTypeIds[currentHeroId].AddItem(currentCharacterId);
+                CharacterObject character = volunteerTypes[i];
+                if (character != null && objectManager.TryGetIdWithLogging(character, out var currentCharacterId))
+                {
+                    volunteerTypeIds[i] = currentCharacterId;
+                }
+                else
+                {
+                    volunteerTypeIds[i] = string.Empty;
+                }
             }
+            updatedVolunteerTypeIds[currentHeroId] = volunteerTypeIds;
         }
         
         var message = new UpdateVolunteers(updatedVolunteerTypeIds);
@@ -101,30 +95,28 @@ internal class VolunteerTypesHandler : IHandler
     {
         var updatedVolunteerTypeIds = obj.What.UpdatedVolunteerTypeIds;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
-            try
+            foreach (KeyValuePair<string, string[]> keyValuePair in updatedVolunteerTypeIds)
             {
-                Dictionary<Hero, CharacterObject[]> updatedVolunteerTypes = new();
-                foreach (KeyValuePair<string, string[]> keyValuePair in updatedVolunteerTypeIds)
+                if (!objectManager.TryGetObjectWithLogging<Hero>(keyValuePair.Key, out var currentHero)) continue;
+
+                string[] volunteerTypeIds = keyValuePair.Value;
+                using (new AllowedThread())
                 {
-                    if (!objectManager.TryGetObjectWithLogging<Hero>(keyValuePair.Key, out var currentHero)) continue;
-
-                    for (int i = 0; i < keyValuePair.Value.Length; i++)
+                    for (int i = 0; i < volunteerTypeIds.Length && i < currentHero.VolunteerTypes.Length; i++)
                     {
-                        if (!objectManager.TryGetObjectWithLogging<CharacterObject>(keyValuePair.Value[i], out var currentCharacter)) continue;
-
-                        using (new AllowedThread())
+                        if (string.IsNullOrEmpty(volunteerTypeIds[i]))
+                        {
+                            currentHero.VolunteerTypes[i] = null;
+                        }
+                        else if (objectManager.TryGetObjectWithLogging<CharacterObject>(volunteerTypeIds[i], out var currentCharacter))
                         {
                             currentHero.VolunteerTypes[i] = currentCharacter;
                         }
                     }
                 }
             }
-            catch (Exception e)
-            {
-                logger.Error(e, "Failed to apply UpdateVolunteers");
-            }
-        });
+        }, context: "UpdateVolunteers");
     }
 }
