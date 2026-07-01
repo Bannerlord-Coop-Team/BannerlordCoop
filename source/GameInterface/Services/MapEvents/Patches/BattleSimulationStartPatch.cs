@@ -1,36 +1,69 @@
 using Common;
-using Common.Messaging;
-using GameInterface.Services.MapEvents.Messages.Start;
+using Common.Logging;
+using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
+using Serilog;
+using System.Collections.Generic;
+using System.Reflection;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
-using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
-[HarmonyPatch(typeof(MapState))]
+/// <summary>
+/// [Client] Gates the "send your troops to attack" auto-resolve behind the server. Hooks the menu option's
+/// consequence (the click) and blocks on the server's accept before letting the scoreboard open — the consequence
+/// frozen mid-call keeps the encounter menu in place during the round trip (the same shape as the attack's blocking
+/// StartBattleInternal). The server accepts only if no live mission already owns the event
+/// (<see cref="ServerBattleModeArbiter"/>); on accept this client becomes the pacer and the native consequence opens
+/// the scoreboard, on reject nothing happens and the menu stays open. Other clients open as spectators via the
+/// server's open broadcast.
+/// </summary>
+[HarmonyPatch]
 internal class BattleSimulationStartPatch
 {
-    /// <summary>
-    /// [Client] Fires when the player opens the auto-resolve simulation screen. The simulation
-    /// itself is disabled on clients (see <see cref="BattleSimulationUpdatePatch"/>); we instead
-    /// ask the server to run it authoritatively for this map event.
-    /// </summary>
-    [HarmonyPatch(nameof(MapState.StartBattleSimulation))]
-    [HarmonyPostfix]
-    private static void Postfix_StartBattleSimulation()
+    private static readonly ILogger Logger = LogManager.GetLogger<BattleSimulationStartPatch>();
+
+    private const string ConsequenceName = "game_menu_encounter_order_attack_on_consequence";
+
+    static IEnumerable<MethodBase> TargetMethods()
     {
-        if (!ModInformation.IsClient)
-            return;
+        var method = AccessTools.Method(typeof(EncounterGameMenuBehavior), ConsequenceName);
+        if (method == null)
+            Logger.Error("Could not find {Method} to patch; the auto-resolve will not be gated by the server", ConsequenceName);
+        else
+            yield return method;
+    }
 
-        var simulation = PlayerEncounter.CurrentBattleSimulation;
-        if (simulation?.MapEvent == null)
-            return;
+    [HarmonyPrefix]
+    private static bool Prefix()
+    {
+        // Server / single-player: run the consequence normally.
+        if (ModInformation.IsServer)
+            return true;
 
-        // A spectator opens this same screen in response to the server's NetworkOpenBattleSimulation; it must not
-        // ask the server to run a second simulation. Only the initiating player requests the authoritative run.
-        if (BattleSimulationReplay.IsSpectator)
-            return;
+        var coordinator = BattleStartCoordinator.Instance;
+        if (coordinator == null)
+            return true; // not wired (shouldn't happen in a live session) — fall back to native behavior
 
-        MessageBroker.Instance.Publish(simulation, new BattleSimulationStarted(simulation.MapEvent));
+        var mapEvent = PlayerEncounter.Battle ?? MobileParty.MainParty?.MapEvent;
+        if (mapEvent == null)
+            return true;
+
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+            return true;
+        if (!objectManager.TryGetId(mapEvent, out var mapEventId))
+            return true;
+
+        // Block until the server accepts/rejects. The menu stays open during the wait (the consequence is frozen
+        // mid-call). On reject, skip the native consequence so nothing opens and the menu stays.
+        if (!coordinator.RequestBlocking(BattleStartMode.Simulation, mapEventId, null))
+            return false;
+
+        // Accepted: become the pacer before the scoreboard opens, then let the native consequence open it.
+        BattleSimulationReplay.Begin(mapEventId, spectator: false);
+        return true;
     }
 }

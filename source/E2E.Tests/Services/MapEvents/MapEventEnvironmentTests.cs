@@ -109,6 +109,48 @@ public class MapEventEnvironmentTests : MapEventTestBase
     }
 
     [Fact]
+    public void TwoAlliedPlayersLoseBattle_BothTakenCaptive_SyncAllClients()
+    {
+        // Arrange — two allied players share the losing side; an AI captor wins the battle.
+        var (hero1, party1) = CreatePlayerHeroParty("player1");
+        var (hero2, party2) = CreatePlayerHeroParty("player2");
+        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        // Act — the captor wins; the result is committed the live way (a client sets the victory BattleState,
+        // the server applies it authoritatively and captures both losers there).
+        DefeatAlliedPlayersByBattleStateSync(captorPartyId, playersAreAttackers: false, (hero1, party1), (hero2, party2));
+
+        // Assert — both defeated players are prisoners of the captor on every instance.
+        foreach (var heroId in new[] { hero1, hero2 })
+        {
+            AssertCaptivity(Server, heroId, captorPartyId);
+            foreach (var client in Clients)
+                AssertCaptivity(client, heroId, captorPartyId);
+        }
+    }
+
+    [Fact]
+    public void TwoAlliedPlayersAttackAiAndLose_BothTakenCaptive_SyncAllClients()
+    {
+        // The live coop scenario: two allied players ATTACK an AI party and LOSE, so the AI defender wins
+        // (DefenderVictory) — the mirror of the test above (where the players defend). Reported manually as a bug:
+        // the losers are left with just their hero and NOT taken captive, with the PlayerEncounter still open.
+        var (hero1, party1) = CreatePlayerHeroParty("player1");
+        var (hero2, party2) = CreatePlayerHeroParty("player2");
+        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        DefeatAlliedPlayersByBattleStateSync(captorPartyId, playersAreAttackers: true, (hero1, party1), (hero2, party2));
+
+        // Both defeated attacker-players should be prisoners of the captor on every instance.
+        foreach (var heroId in new[] { hero1, hero2 })
+        {
+            AssertCaptivity(Server, heroId, captorPartyId);
+            foreach (var client in Clients)
+                AssertCaptivity(client, heroId, captorPartyId);
+        }
+    }
+
+    [Fact]
     public void PlayerLosesBattle_CaptureSyncs_ViaBattleStateResult()
     {
         // Arrange
@@ -300,6 +342,47 @@ public class MapEventEnvironmentTests : MapEventTestBase
             AssertCaptivity(client, heroId, null);
             AssertHeroInPartyRoster(client, heroId, partyId);
             AssertPartyPrisonerCount(client, captorPartyId, 0);
+        }
+    }
+
+    [Fact]
+    public void PlayerCapturedViaBattleResult_RosterIsZeroNotNegative_AndReleaseRestoresOne()
+    {
+        // Reproduces the live bug: a party captured via the battle-RESULT path (BattleState victory -> OnBattleWon
+        // -> capture, the path the coop commit-on-conclusion now drives) ends with a NEGATIVE roster (-1), and a
+        // release only brings it back to 0 instead of restoring the hero (1). The direct-capture path
+        // (EscapeFromCaptivity_...) gets this right; this asserts the result path matches.
+        var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
+        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        DefeatPlayerByBattleStateSync(heroId, partyId, captorPartyId);
+
+        // The captured party's roster must be empty (0) — not -1.
+        AssertPartyManCount(Server, partyId, 0);
+        foreach (var client in Clients)
+            AssertPartyManCount(client, partyId, 0);
+
+        // On release the hero is restored — exactly 1, not 0.
+        ReleasePlayerAfterCaptorDefeated(heroId);
+        AssertPartyManCount(Server, partyId, 1);
+    }
+
+    [Fact]
+    public void TwoAlliedPlayersCaptured_EachRosterIsZeroNotNegative()
+    {
+        // The live coop case: two allied players share the losing side and are both captured. Reported bug: a
+        // captured party's roster goes to -1 (then 0 on release). Asserts each captured party's roster is 0.
+        var (hero1, party1) = CreatePlayerHeroParty("player1");
+        var (hero2, party2) = CreatePlayerHeroParty("player2");
+        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        DefeatAlliedPlayersByBattleStateSync(captorPartyId, playersAreAttackers: true, (hero1, party1), (hero2, party2));
+
+        foreach (var partyId in new[] { party1, party2 })
+        {
+            AssertPartyManCount(Server, partyId, 0);
+            foreach (var client in Clients)
+                AssertPartyManCount(client, partyId, 0);
         }
     }
 

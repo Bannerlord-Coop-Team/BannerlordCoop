@@ -2,5 +2,5 @@
 
 public static class TroopRosterConfig
 {
-    public const bool Debug = true;
+    public const bool Debug = false;
 }

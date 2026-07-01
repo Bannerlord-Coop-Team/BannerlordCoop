@@ -9,6 +9,7 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.Mock;
 using GameInterface;
 using GameInterface.Policies;
+using Missions;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Environment;
@@ -26,6 +27,7 @@ public class TestEnvironment
     public IContainer Container => container;
 
     private readonly TestNetworkRouter networkOrchestrator = new();
+    private readonly MeshNetworkRouter meshOrchestrator = new();
 
     private readonly bool registerGameInterface;
 
@@ -57,6 +59,12 @@ public class TestEnvironment
 
         builder.RegisterModule<ClientModule>();
         builder.RegisterType<MockClient>().AsSelf().As<INetwork>().As<ICoopClient>().InstancePerLifetimeScope();
+
+        // Override the real LiteNetP2PClient mesh with the in-process mock so battle (spawn / control) mesh
+        // traffic routes between client instances. Inert for campaign tests, which never resolve IBattleNetwork.
+        builder.RegisterInstance(meshOrchestrator).AsSelf().SingleInstance();
+        builder.RegisterType<MockBattleNetwork>().AsSelf().As<IBattleNetwork>().InstancePerLifetimeScope();
+
         builder.RegisterType<ClientInstance>().AsSelf();
 
         AddSharedDependencies(builder);
@@ -66,6 +74,7 @@ public class TestEnvironment
         var instance = container.Resolve<ClientInstance>()!;
 
         networkOrchestrator.AddClient(instance);
+        meshOrchestrator.AddClient(instance, (MockBattleNetwork)instance.Resolve<IBattleNetwork>());
 
         return instance;
     }
