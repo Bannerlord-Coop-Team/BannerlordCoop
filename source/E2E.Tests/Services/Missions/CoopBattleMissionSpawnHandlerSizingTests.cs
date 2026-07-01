@@ -4,10 +4,8 @@ using Xunit;
 namespace E2E.Tests.Services.Missions;
 
 /// <summary>
-/// Unit tests (game-independent) for <see cref="CoopBattleMissionSpawnHandler.DecideJointSizing"/> — the pure
-/// decision that gates the single joint sizing pass. Sizing is deferred until BOTH sides' reserves have landed
-/// (both suppliers populated), because the engine's battle-size cap and wave split are joint; and it runs the
-/// real Init only when the combined total is positive, so Init never divides by a zero total.
+/// Game-independent tests for <see cref="CoopBattleMissionSpawnHandler.DecideJointSizing"/>: sizing waits until
+/// both reserves land (the joint cap needs both totals) and only runs Init on a positive combined total.
 /// </summary>
 public class CoopBattleMissionSpawnHandlerSizingTests
 {
