@@ -1,8 +1,12 @@
 ﻿using Common;
 using GameInterface.Policies;
 using HarmonyLib;
+using SandBox.Missions.AgentBehaviors;
 using SandBox.Missions.MissionLogics;
+using SandBox.Objects;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements.Locations;
+using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.Locations.Patches;
 
@@ -36,5 +40,38 @@ internal class LocationCharacterGuardPatches
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         return ModInformation.IsServer;
+    }
+
+    // On clients an ambient NPC's origin isn't always in the location's character list, so vanilla's
+    // GetLocationCharacter returns null and the door-picking AI NREs on locationCharacter.FixedLocation.
+    // Report the passage as unavailable so the agent just skips the door this tick.
+    [HarmonyPatch(typeof(ChangeLocationBehavior), nameof(ChangeLocationBehavior.GetAvailability))]
+    [HarmonyPrefix]
+    static bool GetAvailabilityPrefix(ChangeLocationBehavior __instance, ref float __result)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (ModInformation.IsServer) return true;
+
+        if (CampaignMission.Current?.Location?.GetLocationCharacter(__instance.OwnerAgent.Origin) != null) return true;
+
+        __result = 0f;
+        return false;
+    }
+
+    // Same null location-character on the client reaches the passage AI, which hands it to
+    // LocationComplex.CanIfMaleOrHero and NREs on locationCharacter.Character. Treat the passage as
+    // disabled for that agent so it doesn't path through the door.
+    [HarmonyPatch(typeof(PassageUsePoint), nameof(PassageUsePoint.IsDisabledForAgent))]
+    [HarmonyPrefix]
+    static bool IsDisabledForAgentPrefix(PassageUsePoint __instance, Agent agent, ref bool __result)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (ModInformation.IsServer) return true;
+
+        if (!agent.IsAIControlled || __instance.IsMissionExit || __instance.ToLocation == null) return true;
+        if (CampaignMission.Current?.Location?.GetLocationCharacter(agent.Origin) != null) return true;
+
+        __result = true;
+        return false;
     }
 }
