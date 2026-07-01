@@ -1042,7 +1042,7 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
             return false;
         }
 
-        var origin = new CoopAgentOrigin(character, party, -1, null, new UniqueTroopDescriptor(data.TroopSeed))
+        var origin = new CoopAgentOrigin(character, party, -1, null, new UniqueTroopDescriptor(data.TroopSeed));
 
         var buildData = new AgentBuildData(character);
         buildData.BodyProperties(character.GetBodyPropertiesMax());
