@@ -13,11 +13,14 @@ public readonly struct NetworkRequestVillageHostileAction : ICommand
     public readonly string MobilePartyId;
     [ProtoMember(3)]
     public readonly string SettlementId;
+    [ProtoMember(4)]
+    public readonly string ControllerId;
 
-    public NetworkRequestVillageHostileAction(VillageHostileAction action, string mobilePartyId, string settlementId)
+    public NetworkRequestVillageHostileAction(VillageHostileAction action, string mobilePartyId, string settlementId, string controllerId)
     {
         Action = action;
         MobilePartyId = mobilePartyId;
         SettlementId = settlementId;
+        ControllerId = controllerId;
     }
 }

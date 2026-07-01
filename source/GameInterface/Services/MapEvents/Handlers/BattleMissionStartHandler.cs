@@ -13,7 +13,6 @@ using System;
 using System.Collections.Concurrent;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
-using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -25,9 +24,9 @@ namespace GameInterface.Services.MapEvents.Handlers;
 /// <summary>
 /// Owns the live battle-mission start flow (split out of <see cref="BattleHandler"/>). On the server it answers the
 /// mission-mode <see cref="NetworkBattleStartRequest"/>: gate it against <see cref="ServerBattleModeArbiter"/>, apply
-/// the attack's hostile consequences, make the sides mission-ready, reply, tell the requester to open the mission
+/// the attack's hostile consequences, make the sides mission-ready, reply, broadcast the mission start
 /// (<see cref="NetworkStartAttackMission"/>), and claim the mission mode on every client
-/// (<see cref="NetworkBattleModeSet"/>). On the requesting client it opens the coop field-battle mission.
+/// (<see cref="NetworkBattleModeSet"/>). Clients in the map event open the coop field-battle mission.
 /// </summary>
 internal class BattleMissionStartHandler : IHandler
 {
@@ -41,6 +40,7 @@ internal class BattleMissionStartHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IMapEventLogger mapEventLogger;
+    private readonly IBattleMissionInitializerResolver missionInitializerResolver;
 
     // Server-side: terrain seed chosen once per map event and reused for every client that opens the same battle,
     // so they all use the same terrain seed. Keyed by map event id.
@@ -51,12 +51,14 @@ internal class BattleMissionStartHandler : IHandler
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        IMapEventLogger mapEventLogger)
+        IMapEventLogger mapEventLogger,
+        IBattleMissionInitializerResolver missionInitializerResolver)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.mapEventLogger = mapEventLogger;
+        this.missionInitializerResolver = missionInitializerResolver;
 
         messageBroker.Subscribe<NetworkBattleStartRequest>(Handle_NetworkBattleStartRequest);
         messageBroker.Subscribe<NetworkStartAttackMission>(Handle_NetworkStartAttackMission);
@@ -78,7 +80,7 @@ internal class BattleMissionStartHandler : IHandler
     }
 
     /// <summary>[Server] Handle a battle-start request for the live-mission mode: gate it, make the sides
-    /// mission-ready, send the requester the mission start, and reply. Requests for other modes are ignored here.</summary>
+    /// mission-ready, broadcast the mission start, and reply. Requests for other modes are ignored here.</summary>
     private void Handle_NetworkBattleStartRequest(MessagePayload<NetworkBattleStartRequest> payload)
     {
         if (ModInformation.IsClient)
@@ -108,9 +110,9 @@ internal class BattleMissionStartHandler : IHandler
                 if (!objectManager.TryGetObject(payload.What.MapEventId, out MapEvent mapEvent))
                     return;
 
-                if (mapEvent.IsVillageHostileActionWithMultiplePlayerParties())
+                if (mapEvent.IsUnsupportedMultiPlayerHostileAction())
                 {
-                    Logger.Warning("Rejecting attack mission start for map event {MapEventId}: multiple player parties are involved", payload.What.MapEventId);
+                    Logger.Warning("Rejecting attack mission start for map event {MapEventId}: this hostile action does not support multiple player parties", payload.What.MapEventId);
                     network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
                     return;
                 }
@@ -142,7 +144,8 @@ internal class BattleMissionStartHandler : IHandler
                 // flow, rather than re-entrantly during the blocking wait.
                 network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, true));
 
-                network.Send(requester, new NetworkStartAttackMission(randomTerrainSeed));
+                AtmosphereInfo atmosphereOnCampaign = Campaign.Current.Models.MapWeatherModel.GetAtmosphereModel(mapEvent.Position);
+                network.SendAll(new NetworkStartAttackMission(payload.What.MapEventId, randomTerrainSeed, atmosphereOnCampaign));
 
                 // Claim the event for the mission mode on every client, so one still sitting at the encounter menu
                 // greys out the auto-resolve option — a map event is fought as a live mission XOR an auto-resolve,
@@ -191,13 +194,13 @@ internal class BattleMissionStartHandler : IHandler
         // Opening a mission pushes a screen, and ScreenManager only tolerates screen
         // changes from the main thread; doing it from the network thread races its
         // layer lists and crashes the game.
-        var randomTerrainSeed = payload.What.RandomTerrainSeed;
+        var message = payload.What;
         GameThread.RunSafe(
-            () => OpenAttackMission(randomTerrainSeed),
+            () => OpenAttackMission(message.MapEventId, message.RandomTerrainSeed, message.AtmosphereOnCampaign),
             context: nameof(Handle_NetworkStartAttackMission));
     }
 
-    private static void OpenAttackMission(int randomTerrainSeed)
+    private void OpenAttackMission(string mapEventId, int randomTerrainSeed, AtmosphereInfo atmosphereOnCampaign)
     {
         try
         {
@@ -214,6 +217,14 @@ internal class BattleMissionStartHandler : IHandler
             if (battle == null)
             {
                 Logger.Warning("Received {Message} but PlayerEncounter.Battle was null, not opening battle mission", nameof(NetworkStartAttackMission));
+                return;
+            }
+
+            if (!ContainerProvider.TryResolve(out IObjectManager objectManager) ||
+                !objectManager.TryGetId(battle, out var battleMapEventId) ||
+                battleMapEventId != mapEventId)
+            {
+                Logger.Warning("Received {Message} for map event {MapEventId}, but the local player is not in that battle; not opening battle mission", nameof(NetworkStartAttackMission), mapEventId);
                 return;
             }
 
@@ -236,48 +247,21 @@ internal class BattleMissionStartHandler : IHandler
                 return;
             }
 
-            bool isNavalEncounter = PlayerEncounter.IsNavalEncounter();
-            CampaignVec2 position = MobileParty.MainParty.Position;
-
-            IMapScene mapSceneWrapper = Campaign.Current.MapSceneWrapper;
-            MapPatchData mapPatchAtPosition = mapSceneWrapper.GetMapPatchAtPosition(position);
-
-            string battleScene = Campaign.Current.Models.SceneModel.GetBattleSceneForMapPatch(mapPatchAtPosition, isNavalEncounter);
-            MissionInitializerRecord rec2 = new MissionInitializerRecord(battleScene);
-            TerrainType faceTerrainType2 = Campaign.Current.MapSceneWrapper.GetFaceTerrainType(MobileParty.MainParty.CurrentNavigationFace);
-            rec2.TerrainType = (int)faceTerrainType2;
-            rec2.DamageToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier();
-            rec2.DamageFromPlayerToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier();
-            rec2.NeedsRandomTerrain = false;
-            rec2.PlayingInCampaignMode = true;
-
-            // Seed chosen server-side and carried in NetworkStartAttackMission so every
-            // client uses the same terrain seed for this battle.
-            rec2.RandomTerrainSeed = randomTerrainSeed;
-            rec2.AtmosphereOnCampaign = Campaign.Current.Models.MapWeatherModel.GetAtmosphereModel(MobileParty.MainParty.Position);
-            rec2.SceneHasMapPatch = true;
-            rec2.DecalAtlasGroup = 2;
-            rec2.PatchCoordinates = mapPatchAtPosition.normalizedCoordinates;
-            position = battle.AttackerSide.LeaderParty.Position;
-            Vec2 v2 = position.ToVec2();
-            position = battle.DefenderSide.LeaderParty.Position;
-            rec2.PatchEncounterDir = (v2 - position.ToVec2()).Normalized();
+            MissionInitializerRecord rec2 = missionInitializerResolver.Create(battle, randomTerrainSeed, atmosphereOnCampaign);
 
             // Engage the spawn gate BEFORE OpenBattleMission builds the mission — the deployment controller
             // spawns the initial wave during mission setup (inside OpenBattleMission), earlier than the
             // CoopBattleController attach. The gate only marks "a coop battle is active" for the spawn patches;
             // who fields which troops is decided by the server-fed reserves (CoopTroopSupplier).
-            if (BattleSpawnConfig.Enabled
-                && ContainerProvider.TryResolve(out IObjectManager battleObjectManager)
-                && battleObjectManager.TryGetId(battle, out var battleMapEventId))
+            if (BattleSpawnConfig.Enabled)
             {
                 BattleSpawnGate.BeginBattle(battleMapEventId);
                 Logger.Information("[BattleSync] Engaged spawn gate in OpenAttackMission: mapEvent={MapEventId}", battleMapEventId);
             }
 
-            // Coop opens a custom field-battle mission (per-client troop suppliers, no deployment phase) instead
-            // of the native one; the launcher lives in Missions and is resolved from the container. Fall back to
-            // the native mission only if it is somehow unavailable, so a misconfiguration still yields a battle.
+            // Coop opens a custom battle mission (per-client troop suppliers) instead of the native one; the
+            // launcher lives in Missions and is resolved from the container. Fall back to the native mission only
+            // if it is somehow unavailable, so a misconfiguration still yields a battle.
             if (ContainerProvider.TryResolve(out ICoopFieldBattleLauncher battleLauncher))
             {
                 battleLauncher.OpenCoopFieldBattle(rec2);

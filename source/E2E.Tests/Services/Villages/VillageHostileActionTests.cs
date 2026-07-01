@@ -182,8 +182,11 @@ public class VillageHostileActionTests : MapEventTestBase
 
         RequestHostileAction(requester, VillageHostileAction.Raid, raiderMobilePartyId, target.SettlementId);
 
-        Assert.Empty(requester.InternalMessages.GetMessages<NetworkEndSettlementEncounter>());
-        Assert.Single(otherClient.InternalMessages.GetMessages<NetworkEndSettlementEncounter>());
+        Assert.All(
+            requester.InternalMessages.GetMessages<NetworkEndSettlementEncounter>(),
+            message => Assert.Equal(otherMobilePartyId, message.PartyId));
+        var endEncounter = Assert.Single(otherClient.InternalMessages.GetMessages<NetworkEndSettlementEncounter>());
+        Assert.Equal(otherMobilePartyId, endEncounter.PartyId);
         Assert.All(
             Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>(),
             message => Assert.Equal(otherMobilePartyId, message.PartyId));
@@ -1571,7 +1574,8 @@ public class VillageHostileActionTests : MapEventTestBase
             hostileAction.MapEventId,
             hostileAction.AttackerPartyId)), MapEventDisabledMethods);
 
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkStartAttackMission>());
+        var start = Server.NetworkSentMessages.GetMessages<NetworkStartAttackMission>().Single();
+        Assert.Equal(hostileAction.MapEventId, start.MapEventId);
 
         Server.Call(() =>
         {
@@ -1583,11 +1587,45 @@ public class VillageHostileActionTests : MapEventTestBase
         ServerBattleModeArbiter.Release(hostileAction.MapEventId);
     }
 
+    [Fact]
+    public void MultiPlayerRaid_AttackMissionStart_IsAllowed()
+    {
+        var client = Clients.First();
+        var hostileAction = CreateHostileActionWithTwoPlayerParties(VillageHostileAction.Raid);
+
+        Server.NetworkSentMessages.Clear();
+
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkBattleStartRequest(
+            Guid.NewGuid().ToString(),
+            (int)BattleStartMode.Mission,
+            hostileAction.MapEventId,
+            hostileAction.AttackerPartyId)), MapEventDisabledMethods);
+
+        var start = Server.NetworkSentMessages.GetMessages<NetworkStartAttackMission>().Single();
+        Assert.Equal(hostileAction.MapEventId, start.MapEventId);
+
+        var mode = Server.NetworkSentMessages.GetMessages<NetworkBattleModeSet>().Single();
+        Assert.Equal(hostileAction.MapEventId, mode.MapEventId);
+        Assert.Equal((int)BattleStartMode.Mission, mode.Mode);
+
+        var reply = Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>().Single();
+        Assert.True(reply.Accepted);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(hostileAction.MapEventId, out var mapEvent));
+            Assert.True(mapEvent.IsRaidHostileAction());
+            Assert.True(mapEvent.IsVillageHostileActionWithMultiplePlayerParties());
+            Assert.False(mapEvent.IsUnsupportedMultiPlayerHostileAction());
+        }, MapEventDisabledMethods);
+
+        ServerBattleModeArbiter.Release(hostileAction.MapEventId);
+    }
+
     [Theory]
-    [InlineData(VillageHostileAction.Raid)]
     [InlineData(VillageHostileAction.ForceVolunteers)]
     [InlineData(VillageHostileAction.ForceSupplies)]
-    public void MultiPlayerHostileAction_AttackMissionStart_IsRejected(VillageHostileAction action)
+    public void MultiPlayerNonRaidHostileAction_AttackMissionStart_IsRejected(VillageHostileAction action)
     {
         var client = Clients.First();
         var hostileAction = CreateHostileActionWithTwoPlayerParties(action);
@@ -1602,10 +1640,14 @@ public class VillageHostileActionTests : MapEventTestBase
 
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkStartAttackMission>());
 
+        var reply = Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>().Single();
+        Assert.False(reply.Accepted);
+
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(hostileAction.MapEventId, out var mapEvent));
             Assert.True(mapEvent.IsVillageHostileActionWithMultiplePlayerParties());
+            Assert.True(mapEvent.IsUnsupportedMultiPlayerHostileAction());
         }, MapEventDisabledMethods);
     }
 
@@ -2184,6 +2226,7 @@ public class VillageHostileActionTests : MapEventTestBase
     private void RegisterPeer(EnvironmentInstance client, string controllerId)
     {
         EnsurePeerEndpoint(client);
+        client.Resolve<IControllerIdProvider>().SetControllerId(controllerId);
         Server.SimulateMessage(this, new PlayerConnected(client.NetPeer));
         Server.SimulateMessage(client.NetPeer, new NetworkClientValidate(controllerId));
     }
@@ -2195,7 +2238,7 @@ public class VillageHostileActionTests : MapEventTestBase
             return;
 
         endPoint.Address = IPAddress.Loopback;
-        endPoint.Port = 1 + Interlocked.Increment(ref peerPortCounter) % 60000;
+        endPoint.Port = 1 + (Interlocked.Increment(ref peerPortCounter) % 60000);
     }
 
     private VillageTarget CreateVillageTarget()
@@ -2303,7 +2346,8 @@ public class VillageHostileActionTests : MapEventTestBase
         client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkRequestVillageHostileAction(
             action,
             mobilePartyId,
-            settlementId)), disabledMethods);
+            settlementId,
+            client.Resolve<IControllerIdProvider>().ControllerId)), disabledMethods);
     }
 
     private void AssertCanStartHostileAction(string mobilePartyId, string settlementId, VillageHostileAction action)

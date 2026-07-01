@@ -139,6 +139,11 @@ public class ClientSettlementExitEnterHandler : IHandler
             {
                 var mainParty = MobileParty.MainParty;
                 objectManager.TryGetId(mainParty, out var partyId);
+                if (string.IsNullOrEmpty(obj.What.PartyId) == false && obj.What.PartyId != partyId)
+                {
+                    return;
+                }
+
                 if (settlementTracker.TryConsumeLeave(mainParty, partyId))
                 {
                     return;

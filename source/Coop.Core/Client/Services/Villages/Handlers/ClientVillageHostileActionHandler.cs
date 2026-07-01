@@ -1,6 +1,7 @@
 using Common;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Villages.Data;
@@ -14,17 +15,20 @@ internal class ClientVillageHostileActionHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
+    private readonly IControllerIdProvider controllerIdProvider;
     private readonly IVillageHostileActionInterface villageHostileActionInterface;
 
     public ClientVillageHostileActionHandler(
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
+        IControllerIdProvider controllerIdProvider,
         IVillageHostileActionInterface villageHostileActionInterface)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
+        this.controllerIdProvider = controllerIdProvider;
         this.villageHostileActionInterface = villageHostileActionInterface;
 
         messageBroker.Subscribe<VillageHostileActionAttempted>(Handle_VillageHostileActionAttempted);
@@ -48,7 +52,7 @@ internal class ClientVillageHostileActionHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(message.MobileParty, out var mobilePartyId)) return;
         if (!objectManager.TryGetIdWithLogging(message.Settlement, out var settlementId)) return;
 
-        network.SendAll(new NetworkRequestVillageHostileAction(message.Action, mobilePartyId, settlementId));
+        network.SendAll(new NetworkRequestVillageHostileAction(message.Action, mobilePartyId, settlementId, controllerIdProvider.ControllerId));
     }
 
     private void Handle_NetworkVillageHostileActionStarted(MessagePayload<NetworkVillageHostileActionStarted> payload)
