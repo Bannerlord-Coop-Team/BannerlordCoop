@@ -112,7 +112,7 @@ internal class DefaultNotificationsHandler : IHandler
             // Only notify player(s) in the same clan the companion was removed from
             if (clan != Clan.PlayerClan) return;
 
-            notificationsBehavior.OnCompanionRemoved(hero, data.Detail);
+            CampaignEventDispatcher.Instance.OnCompanionRemoved(hero, data.Detail);
         });
     }
 
@@ -139,7 +139,7 @@ internal class DefaultNotificationsHandler : IHandler
 
             if (clan != Clan.PlayerClan) return;
 
-            notificationsBehavior.OnClanTierIncreased(clan, data.ShouldNotify);
+            CampaignEventDispatcher.Instance.OnClanTierChanged(clan, data.ShouldNotify);
         });
     }
 
@@ -170,7 +170,7 @@ internal class DefaultNotificationsHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OriginalHeroId, out var originalHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OriginalGainedRelationWithId, out var originalGainedRelationWith)) return;
 
-            notificationsBehavior.OnRelationChanged(effectiveHero, effectiveHeroGainedRelationWith, data.RelationChange, data.ShowNotification, data.Detail, originalHero, originalGainedRelationWith);
+            CampaignEventDispatcher.Instance.OnHeroRelationChanged(effectiveHero, effectiveHeroGainedRelationWith, data.RelationChange, data.ShowNotification, data.Detail, originalHero, originalGainedRelationWith);
         });
     }
 
@@ -205,7 +205,7 @@ internal class DefaultNotificationsHandler : IHandler
                     desertedTroops.Add(troop);
                 }
 
-                notificationsBehavior.OnTroopsDeserted(mobileParty, desertedTroops);
+                CampaignEventDispatcher.Instance.OnTroopsDeserted(mobileParty, desertedTroops);
             }
         });
     }
@@ -254,7 +254,7 @@ internal class DefaultNotificationsHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Town>(data.TownId, out var town)) return;
             if (!objectManager.TryGetObjectWithLogging<Building>(data.BuildingId, out var building)) return;
 
-            notificationsBehavior.OnBuildingLevelChanged(town, building, data.LevelChange);
+            CampaignEventDispatcher.Instance.OnBuildingLevelChanged(town, building, data.LevelChange);
         });
     }
 
@@ -301,7 +301,7 @@ internal class DefaultNotificationsHandler : IHandler
                 return;
             }
 
-            notificationsBehavior.OnHeroTeleportationRequested(hero, targetSettlement, targetParty, data.Detail);
+            CampaignEventDispatcher.Instance.OnHeroTeleportationRequested(hero, targetSettlement, targetParty, data.Detail);
         });
     }
 
