@@ -186,7 +186,7 @@ internal class BattleSimulationRunHandler : IHandler
         // Claim the event for the simulation mode on every client (greys the mission option for anyone at the menu),
         // then open the spectator scoreboards and accept the requester.
         network.SendAll(new NetworkBattleModeSet(mapEventId, (int)BattleStartMode.Simulation));
-        network.SendAll(new NetworkOpenBattleSimulation(mapEventId));
+        network.SendAllBut(requestingPeer, new NetworkOpenBattleSimulation(mapEventId));
         network.Send(requestingPeer, new NetworkBattleStartReply(payload.What.RequestId, true));
 
         mapEventLogger.DebugMapEvent(mapEvent, "Battle simulation set up; awaiting client-paced advances");
