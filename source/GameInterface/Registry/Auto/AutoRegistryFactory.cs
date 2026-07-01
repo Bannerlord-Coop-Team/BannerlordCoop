@@ -16,6 +16,19 @@ public interface IAutoRegistryFactory : IDisposable
 
     void RegisterAll();
 
+    /// <summary>
+    /// Server: collect the owner-derived id -> current server id for every registry-managed object whose
+    /// live-create id diverges from the id a joining client re-derives in RegisterAllObjects. Reuses each
+    /// registry's own RegisterAllObjects so the id formula has a single source of truth.
+    /// </summary>
+    void BuildIdRemap(IDictionary<string, string> map);
+
+    /// <summary>
+    /// Joining client: stash the server's owner-derived id -> server id map so the next <see cref="RegisterAll"/>
+    /// registers each live-created attachment directly under the server's id. Consumed and cleared by RegisterAll.
+    /// </summary>
+    void SetJoinIdRemap(IDictionary<string, string> map);
+
     bool IsManaged(Type type);
 }
 
@@ -32,7 +45,11 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
     ISerializableTypeMapper TypeMapper { get; }
     List<IDisposable> Disposables { get; } = new List<IDisposable>();
 
-    List<Action> RegisterAllCallbacks = new List<Action>();
+    List<Action<IDictionary<string, string>>> RegisterAllCallbacks = new List<Action<IDictionary<string, string>>>();
+
+    List<Action<IDictionary<string, string>>> IdRemapCallbacks = new List<Action<IDictionary<string, string>>>();
+
+    private IDictionary<string, string> joinIdRemap;
 
     private readonly HashSet<Type> managedTypes = new HashSet<Type>();
 
@@ -98,15 +115,36 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
             PatchCollector.AddPostfix(destroy, patch);
         }
 
-        RegisterAllCallbacks.Add(autoRegistry.RegisterAllObjects);
+        RegisterAllCallbacks.Add(autoRegistry.RegisterAllObjectsWithRemap);
+        IdRemapCallbacks.Add(autoRegistry.CollectIdRemap);
         Disposables.Add(handler);
+    }
+
+    public void SetJoinIdRemap(IDictionary<string, string> map)
+    {
+        joinIdRemap = map;
     }
 
     public void RegisterAll()
     {
-        foreach (var callback in RegisterAllCallbacks)
+        try
         {
-            callback();
+            foreach (var callback in RegisterAllCallbacks)
+            {
+                callback(joinIdRemap);
+            }
+        }
+        finally
+        {
+            joinIdRemap = null;
+        }
+    }
+
+    public void BuildIdRemap(IDictionary<string, string> map)
+    {
+        foreach (var callback in IdRemapCallbacks)
+        {
+            callback(map);
         }
     }
 
