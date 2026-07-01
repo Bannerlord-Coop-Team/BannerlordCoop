@@ -94,7 +94,7 @@ internal class BattleHostHandler : IHandler
     /// line in join order; broadcast the assignment. A duplicate/late requester just gets a re-confirm.</summary>
     private void Handle_NetworkRequestBattleHost(MessagePayload<NetworkRequestBattleHost> payload)
     {
-        if (!ModInformation.IsServer) return;
+        if (ModInformation.IsClient) return;
 
         var mapEventId = payload.What.MapEventId;
         var requesterId = payload.What.ControllerId;
@@ -151,7 +151,7 @@ internal class BattleHostHandler : IHandler
     /// reserve; reply with its full owned set at the current ledger pointers so adopted parties resume cleanly.</summary>
     private void Handle_NetworkRequestBattleReserves(MessagePayload<NetworkRequestBattleReserves> payload)
     {
-        if (!ModInformation.IsServer) return;
+        if (ModInformation.IsClient) return;
 
         var mapEventId = payload.What.MapEventId;
         var requesterId = payload.What.ControllerId;
@@ -185,7 +185,7 @@ internal class BattleHostHandler : IHandler
     /// migration), or drop it from the successor line otherwise; broadcast the updated assignment.</summary>
     private void Handle_MissionMemberDeparted(MessagePayload<MissionMemberDeparted> payload)
     {
-        if (!ModInformation.IsServer) return;
+        if (ModInformation.IsClient) return;
 
         var controllerId = payload.What.ControllerId;
         var mapEventId = payload.What.InstanceId;

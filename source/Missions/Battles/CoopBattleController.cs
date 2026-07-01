@@ -1035,9 +1035,14 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
         // Carry the troop's party so the agent has a real BattleCombatant — the battle observer/scoreboard
         // reads origin.BattleCombatant, and SimpleAgentOrigin leaves it null for non-hero troops.
         var party = ResolvePuppetParty(data.MapEventPartyId);
-        IAgentOriginBase origin = party != null
-            ? new CoopAgentOrigin(character, party, -1, null, new UniqueTroopDescriptor(data.TroopSeed))
-            : new SimpleAgentOrigin(character, -1, null, default);
+
+        if (party == null)
+        {
+            Logger.Warning("[BattleSync] Puppet skipped: unresolved party {Party} for agent {AgentId}", data.MapEventPartyId, data.AgentId);
+            return false;
+        }
+
+        var origin = new CoopAgentOrigin(character, party, -1, null, new UniqueTroopDescriptor(data.TroopSeed))
 
         var buildData = new AgentBuildData(character);
         buildData.BodyProperties(character.GetBodyPropertiesMax());
