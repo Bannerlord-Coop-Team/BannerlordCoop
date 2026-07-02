@@ -377,16 +377,47 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
             hostRegistry.IsLocalHost(instanceId), _activator.IsActivated);
     }
 
-    // [Host] A peer finished deploying before we did. Release the NPC AI now so it engages while we (and any
-    // other players) are still placing our own formations — the "any client" gate. Our own troops stay frozen
-    // until our own Start Battle. Non-hosts drive no NPCs (theirs are puppets that follow us), so they ignore
-    // this; and once we have already activated (our own finish, or an earlier peer), later finishes are no-ops.
+    // [Host] A peer finished deploying. First-finish-starts-the-battle: the host drives the NPCs, which cannot
+    // move while the host sits in Deployment mode (the combat AI is gated on Battle mode — un-pausing agents is
+    // not enough). So the FIRST player to finish forces the host out of its own deployment — flipping
+    // Mission.Mode to Battle, un-pausing the whole field, and closing our Order-of-Battle; the resulting
+    // OnDeploymentFinished broadcasts the battle-activated signal. Once we have finished, later peer finishes
+    // fall through to the activator's idempotent gating. Non-hosts drive no NPCs (theirs are host-driven
+    // puppets), so they take no action here.
     private void Handle_NetworkBattleDeploymentFinished(MessagePayload<NetworkBattleDeploymentFinished> payload)
     {
-        // Host-only + first-finish gating lives in the activator; on the host's first remote finish it releases
-        // the NPC AI (we are still deploying) and broadcasts the battle-activated signal.
         Logger.Information("[BattleSync] Peer {Controller} finished deployment", payload.What.ControllerId);
+
+        if (hostRegistry.IsLocalHost(instanceId) && Mission.Current?.IsDeploymentFinished == false)
+        {
+            ForceFinishLocalDeployment();
+            return;
+        }
+
         _activator.OnRemoteDeploymentFinished();
+    }
+
+    // [Host, game thread] Force our own deployment to finish (as if we clicked Start Battle) because another
+    // player finished first. This flips Mission.Mode to Battle so the host-driven NPC AI can actually move,
+    // un-pauses the whole field, and closes our Order-of-Battle. FinishDeployment raises OnDeploymentFinished,
+    // which runs our normal local-finish path (activator broadcast + reveal).
+    private void ForceFinishLocalDeployment()
+    {
+        GameThread.RunSafe(() =>
+        {
+            var mission = Mission.Current;
+            if (mission == null || mission.IsDeploymentFinished) return;
+
+            var deployment = mission.GetMissionBehavior<DeploymentMissionController>();
+            if (deployment == null)
+            {
+                Logger.Warning("[BattleSync] Cannot force deployment finish: no DeploymentMissionController on the mission");
+                return;
+            }
+
+            Logger.Information("[BattleSync] Forcing host deployment finish (a player finished first) — starting the battle");
+            deployment.FinishDeployment();
+        });
     }
 
     // The host announced the battle is live (NPCs released). Record it so a later promotion to host (migration)
@@ -410,11 +441,11 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
 
     // [Host, game thread] Release the host-driven NPC AI so it engages mid-deployment. The mission gates AI
     // globally during deployment (Mission.AllowAiTicking == false) and the agents are AI-paused; turn ticking
-    // back on and un-pause the enemy side exactly as the native FinishDeployment does per agent. The host's OWN
-    // deploying troops stay put because they remain AI-paused until the host's own Start Battle.
-    // Phase B scope: the enemy side (the NPCs the host owns and drives). Releasing allied AI on the host's own
-    // side, while excluding the host's own still-deploying party, needs the per-party ownership info that comes
-    // with the deployment-authority work (requirement #3/#4) — until then those release on the host's own finish.
+    // back on and un-pause them exactly as the native FinishDeployment does per agent. The host's OWN deploying
+    // troops stay put because they remain AI-paused until the host's own Start Battle.
+    // Scope: the enemy side AND our allied AI NPC parties (PlayerAllyTeam) — everything except our own party
+    // (PlayerTeam) — so the NPCs engage on the FIRST deployment-finish from ANY player, not just the host's.
+    // Movement-synced puppets (other players' parties) are skipped by the per-agent IsAIControlled guard below.
     private void ActivateNpcAi()
     {
         GameThread.RunSafe(() =>
@@ -424,14 +455,18 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
 
             var hostSide = PartyBase.MainParty?.Side ?? BattleSideEnum.None;
             var enemySide = hostSide == BattleSideEnum.Attacker ? BattleSideEnum.Defender : BattleSideEnum.Attacker;
+            var playerAllyTeam = mission.PlayerAllyTeam;
 
-            // Global AI gate back on so the enemy formations tick; our own side stays put because it is AI-paused.
+            // Global AI gate back on so the released formations tick; our own party stays put because it is AI-paused.
             mission.AllowAiTicking = true;
 
             int released = 0;
             foreach (var team in mission.Teams)
             {
-                if (team.Side != enemySide) continue;
+                // Enemy side, plus our allied AI NPCs (PlayerAllyTeam). Our own party (PlayerTeam) is neither, so
+                // it stays frozen until our own Start Battle.
+                bool releaseTeam = team.Side == enemySide || (playerAllyTeam != null && team == playerAllyTeam);
+                if (!releaseTeam) continue;
 
                 foreach (var formation in team.FormationsIncludingSpecialAndEmpty)
                 {
@@ -454,7 +489,7 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
                 team.ResetTactic();
             }
 
-            Logger.Information("[BattleSync] Released {Count} enemy NPC agent(s) on first deployment finish", released);
+            Logger.Information("[BattleSync] Released {Count} NPC agent(s) (enemy + allied) on first deployment finish", released);
         });
     }
 
