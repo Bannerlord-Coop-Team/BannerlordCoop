@@ -8,7 +8,7 @@
 
         <ListPanel DoNotAcceptEvents="false" WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
                    HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="-320"
-                   LayoutImp.LayoutMethod="HorizontalLeftToRight">
+                   LayoutImp.LayoutMethod="HorizontalLeftToRight" IsVisible="@IpAddressVisible">
           <Children>
             <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="256" HeightSizePolicy="Fixed"
                         SuggestedHeight="64" VerticalAlignment="Center" HorizontalAlignment="Right"
@@ -55,8 +55,8 @@
         </ListPanel>
 
         <ListPanel DoNotAcceptEvents="false" WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
-                   HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="70"
-                   LayoutImp.LayoutMethod="HorizontalLeftToRight" IsVisible="@SteamAvailable">
+                   HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="-320"
+                   LayoutImp.LayoutMethod="HorizontalLeftToRight" IsVisible="@PublicAddressVisible">
           <Children>
             <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="256" HeightSizePolicy="Fixed"
                         SuggestedHeight="64" VerticalAlignment="Center" HorizontalAlignment="Right"
@@ -71,7 +71,7 @@
         </ListPanel>
 
         <ListPanel DoNotAcceptEvents="false" WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
-                   HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="200"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="70"
                    LayoutImp.LayoutMethod="HorizontalLeftToRight" IsVisible="@SteamAvailable">
           <Children>
             <Standard.Button HorizontalAlignment="Center" VerticalAlignment="Center" SuggestedWidth="256"
@@ -80,7 +80,7 @@
         </ListPanel>
 
         <ListPanel DoNotAcceptEvents="false" WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
-                   HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="330"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="200"
                    LayoutImp.LayoutMethod="HorizontalLeftToRight">
           <Children>
             <Standard.Button Brush="Standard.BackButton" HorizontalAlignment="Center" VerticalAlignment="Center" SuggestedWidth="128"
