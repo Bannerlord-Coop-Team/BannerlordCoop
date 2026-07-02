@@ -30,23 +30,12 @@ namespace GameInterface.Services.UI
 
         public string connectPassword = "";
 
-        // The toggle picks the mode: hosting (join the local server, advertise the public
-        // address via Steam) or direct connect (type the host's address, no advertising).
-        public bool enableSteamInvites = SessionDiscovery.SteamAvailable;
-
         public string publicAddress = "";
 
+        // Connecting to your own local server is hosting, so the public address to advertise
+        // to Steam friends is asked for exactly then; any other address is a direct join.
         [DataSourceProperty]
-        public bool SteamAvailable => SessionDiscovery.SteamAvailable;
-
-        [DataSourceProperty]
-        public bool IpAddressVisible => !enableSteamInvites;
-
-        [DataSourceProperty]
-        public bool PublicAddressVisible => enableSteamInvites;
-
-        [DataSourceProperty]
-        public string SteamInvitesButtonText => $"Steam Invites: {(enableSteamInvites ? "On" : "Off")}";
+        public bool PublicAddressVisible => SessionDiscovery.SteamAvailable && IsLoopbackAddress(connectIP);
 
         [DataSourceProperty]
         public string PublicAddress
@@ -71,6 +60,7 @@ namespace GameInterface.Services.UI
                     return;
                 connectIP = value;
                 OnPropertyChanged(nameof(connectIP));
+                OnPropertyChanged(nameof(PublicAddressVisible));
             }
         }
 
@@ -101,12 +91,10 @@ namespace GameInterface.Services.UI
             }
         }
 
-        public void ActionToggleSteamInvites()
+        private static bool IsLoopbackAddress(string address)
         {
-            enableSteamInvites = !enableSteamInvites;
-            OnPropertyChanged(nameof(SteamInvitesButtonText));
-            OnPropertyChanged(nameof(IpAddressVisible));
-            OnPropertyChanged(nameof(PublicAddressVisible));
+            return string.Equals(address, "localhost", StringComparison.OrdinalIgnoreCase) ||
+                (IPAddress.TryParse(address, out var ip) && IPAddress.IsLoopback(ip));
         }
 
         public void ActionConnect()
@@ -119,17 +107,12 @@ namespace GameInterface.Services.UI
 
             try
             {
-                // Hosting mode always joins the local server; only the host's own client may
-                // advertise the session it hosts.
-                bool steamInvites = enableSteamInvites && SessionDiscovery.SteamAvailable;
+                // Advertise exactly when the screen offered the public address field.
+                bool steamInvites = PublicAddressVisible;
 
                 IPAddress ip;
 
-                if (steamInvites)
-                {
-                    ip = IPAddress.Loopback;
-                }
-                else if (IPAddress.TryParse(connectIP, out var enteredIp))
+                if (IPAddress.TryParse(connectIP, out var enteredIp))
                 {
                     ip = enteredIp;
                 }

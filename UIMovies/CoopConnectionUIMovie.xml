@@ -8,7 +8,7 @@
 
         <ListPanel DoNotAcceptEvents="false" WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
                    HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="-320"
-                   LayoutImp.LayoutMethod="HorizontalLeftToRight" IsVisible="@IpAddressVisible">
+                   LayoutImp.LayoutMethod="HorizontalLeftToRight">
           <Children>
             <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="256" HeightSizePolicy="Fixed"
                         SuggestedHeight="64" VerticalAlignment="Center" HorizontalAlignment="Right"
@@ -55,7 +55,7 @@
         </ListPanel>
 
         <ListPanel DoNotAcceptEvents="false" WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
-                   HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="-320"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="70"
                    LayoutImp.LayoutMethod="HorizontalLeftToRight" IsVisible="@PublicAddressVisible">
           <Children>
             <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="256" HeightSizePolicy="Fixed"
@@ -67,15 +67,6 @@
                                 Brush="ScoreboardPanels_2" Brush.AlphaFactor="0.75" Brush.FontSize="32"
                                 Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
                                 Text="@PublicAddress" IsVisible="true" PositionXOffset="-80"/>
-          </Children>
-        </ListPanel>
-
-        <ListPanel DoNotAcceptEvents="false" WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
-                   HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="70"
-                   LayoutImp.LayoutMethod="HorizontalLeftToRight" IsVisible="@SteamAvailable">
-          <Children>
-            <Standard.Button HorizontalAlignment="Center" VerticalAlignment="Center" SuggestedWidth="256"
-                      Command.Click="ActionToggleSteamInvites" Parameter.Text="@SteamInvitesButtonText"/>
           </Children>
         </ListPanel>
 
