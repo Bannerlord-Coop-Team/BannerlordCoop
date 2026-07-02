@@ -1248,7 +1248,11 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
         Logger.Information("[BattleSync] Fielded reinforcement party {Party}: spawned {Count} troop(s)", mapEventPartyId, spawned);
 
         if (spawned > 0)
-            InformationManager.DisplayMessage(new InformationMessage($"Reinforcements have arrived: {party.Name} ({spawned})"));
+        {
+            var troopText = spawned > 1 ? $"{spawned} troops" : $"{spawned} troop";
+            InformationManager.DisplayMessage(new InformationMessage($"Reinforcements have arrived: {party.Name} ({troopText})"));
+        }
+            
     }
 
     // [Host, game thread] Spawn one reinforcement troop AI-controlled. With no InitialPosition set, the engine
