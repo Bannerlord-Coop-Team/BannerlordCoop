@@ -17,7 +17,9 @@ namespace Common.PacketHandlers
         FieldAutoSync,
         PropertyAutoSync,
         SaveData,
-        Relay
+        Relay,
+        // Appended (not inserted) so existing ordinal values stay wire-stable.
+        AgentAction
     }
 
     public interface IPacket
