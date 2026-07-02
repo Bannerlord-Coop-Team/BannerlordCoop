@@ -191,7 +191,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
         {
             reconnectPending = false;
 
-            messageBroker.Publish(this, new SendInformationMessage($"Retrying connection to {ServerEndpoint}..."));
+            messageBroker.Publish(this, new SendInformationMessage("Retrying connection to server..."));
             Logger.Information("Retrying connection to {Endpoint}...", ServerEndpoint);
             netManager.Connect(ServerEndpoint, Config.Token);
         }
