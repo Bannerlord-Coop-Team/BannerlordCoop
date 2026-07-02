@@ -181,8 +181,6 @@ internal class MapEventSideDataHandler : IHandler
                     side._battleParties.Add(party);
                 }
 
-                // Re-apply the ambient battle-size now that a party is in the side;
-                // a no-op unless this map event's visual initialized before its sides were ready.
                 MapEventBattleSizeCorrection.TryCorrect(side.MapEvent);
             }
             catch (Exception e)
@@ -219,8 +217,6 @@ internal class MapEventSideDataHandler : IHandler
                     mapEvent._sides[side] = mapEventSide;
                 }
 
-                // Re-apply the ambient battle-size now that a side is populated;
-                // a no-op unless this map event's visual initialized before its sides were ready.
                 MapEventBattleSizeCorrection.TryCorrect(mapEvent);
             }
             catch (Exception e)
@@ -259,8 +255,6 @@ internal class MapEventSideDataHandler : IHandler
                     mapEventSide._battleParties.Add(mapEventParty);
                 }
 
-                // Re-apply the ambient battle-size now that a battle party is in the side;
-                // a no-op unless this map event's visual initialized before its sides were ready.
                 MapEventBattleSizeCorrection.TryCorrect(mapEventSide.MapEvent);
             }
             catch (Exception e)

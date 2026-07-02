@@ -8,7 +8,7 @@ namespace GameInterface.Services.GuantletMapEventVisuals;
 /// <summary>
 /// Client-side: re-applies a field battle's ambient <c>battle_size</c> when its visual initialized before
 /// the sides/parties synced. Vanilla <see cref="GauntletMapEventVisual"/> bakes the size into the sound once
-/// (the #1426 guard defaults it to 0 while un-synced and never updates it), so without this a large battle
+/// (the guard defaults it to 0 while un-synced and never updates it), so without this a large battle
 /// stays too quiet for its whole life. We re-apply the real size to the existing sound as the parties arrive.
 /// </summary>
 internal static class MapEventBattleSizeCorrection
@@ -25,7 +25,7 @@ internal static class MapEventBattleSizeCorrection
         if (mapEvent == null) return;
 
         // Seed the ceiling with the size Initialize just applied: the real bucket if the battle was already
-        // computable (possibly a partial roster), else the #1426 stopgap's 0. TryCorrect only raises it, so
+        // computable (possibly a partial roster), else the stopgap's 0. TryCorrect only raises it, so
         // a later message can't push the size below what Initialize already set.
         var initialSize = GauntletMapEventVisualPatches.BattleSizeComputable(mapEvent)
             ? ComputeBattleSize(mapEvent.GetNumberOfInvolvedMen())
