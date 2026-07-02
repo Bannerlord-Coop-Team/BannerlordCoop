@@ -21,10 +21,10 @@ namespace GameInterface.Services.UI
         public string BuyMeACoffeeButtonText => "Buy a Coffee";
         public string MovieTextHeader => "Join Co-op Sandbox";
         public string CommunityText => "Join the Community";
-        public string IpText => "Server Address:";
+        public string IpText => "Server IP Address:";
         public string PortText => "Port:";
         public string PasswordText => "Password:";
-        public string PublicAddressText => "Address for Friends:";
+        public string PublicAddressText => "IP Address for Friends:";
 
         [DataSourceProperty]
         public HintViewModel ServerAddressHint { get; } = new HintViewModel(new TextObject(
