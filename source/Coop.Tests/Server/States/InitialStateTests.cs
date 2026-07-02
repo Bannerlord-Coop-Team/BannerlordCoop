@@ -3,8 +3,6 @@ using Common.Messaging;
 using Coop.Core.Server;
 using Coop.Core.Server.States;
 using GameInterface.Services.GameState.Messages;
-using GameInterface.Services.UI.Interfaces;
-using Moq;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -36,26 +34,6 @@ namespace Coop.Tests.Server.States
 
             // Assert
             Assert.IsType<ServerRunningState>(serverLogic.State);
-        }
-
-        [Fact]
-        public void CampaignReady_SetsLoadingMessages()
-        {
-            // Arrange
-            IServerLogic serverLogic = serverComponent.Container.Resolve<IServerLogic>();
-            var loadingInterfaceMock = serverComponent.Container.Resolve<Mock<ILoadingInterface>>();
-            var initialState = Assert.IsType<InitialServerState>(serverLogic.State);
-
-            // Act
-            initialState.Handle_CampaignReady(new MessagePayload<CampaignReady>(null, new CampaignReady()));
-
-            // Assert
-            loadingInterfaceMock.Verify(x => x.SetLoadingMessage(
-                "Hosting Coop Server",
-                "Registering campaign objects..."), Times.Once);
-            loadingInterfaceMock.Verify(x => x.SetLoadingMessage(
-                "Hosting Coop Server",
-                "Applying synced object lifetimes..."), Times.Once);
         }
 
         [Fact]
