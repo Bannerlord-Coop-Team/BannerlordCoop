@@ -38,6 +38,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     private readonly IMessageBroker messageBroker;
     private readonly IPacketManager packetManager;
+    private readonly IMessagePacketHandler messagePacketHandler;
     private readonly IConnectionMessageQueue connectionMessageQueue;
     // Buffers per-change sends and merges them into one send per key. Drained each tick in Update.
     private readonly ISendCoalescer coalescer;
@@ -53,6 +54,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         INetworkConfig configuration,
         IMessageBroker messageBroker,
         IPacketManager packetManager,
+        IMessagePacketHandler messagePacketHandler,
         IConnectionMessageQueue connectionMessageQueue,
         IControllerIdProvider controllerIdProvider,
         IMissionManager missionManager,
@@ -63,6 +65,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         // Dependancy assignment
         this.messageBroker = messageBroker;
         this.packetManager = packetManager;
+        this.messagePacketHandler = messagePacketHandler;
         this.connectionMessageQueue = connectionMessageQueue;
         this.missionManager = missionManager;
         this.overloadedPeerManager = overloadedPeerManager;
@@ -103,8 +106,22 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
     {
-        IPacket packet = (IPacket)serializer.Deserialize(reader.GetRemainingBytes());
-        packetManager.HandleReceive(peer, packet);
+        object received = serializer.Deserialize(reader.GetRemainingBytes());
+
+        // A campaign message now travels as its own wrapper, so it deserializes to a bare IMessage;
+        // publish it directly. Real IPackets (and relay-tunneled MessagePackets) still dispatch by type.
+        if (received is IPacket packet)
+        {
+            packetManager.HandleReceive(peer, packet);
+        }
+        else if (received is IMessage message)
+        {
+            messagePacketHandler.PublishEvent(peer, message);
+        }
+        else
+        {
+            Logger.Error("Received payload deserialized to neither IPacket nor IMessage: {Type}", received?.GetType());
+        }
     }
 
     public override void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)

@@ -33,6 +33,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 
     private readonly IMessageBroker messageBroker;
     private readonly IPacketManager packetManager;
+    private readonly IMessagePacketHandler messagePacketHandler;
     private bool isConnected = false;
     private bool reconnectPending = false;
     private DateTime reconnectAfter = DateTime.MinValue;
@@ -41,10 +42,12 @@ public class CoopClient : CoopNetworkBase, ICoopClient
         INetworkConfig config,
         IMessageBroker messageBroker,
         IPacketManager packetManager,
+        IMessagePacketHandler messagePacketHandler,
         ICommonSerializer serializer) : base(config, serializer)
     {
         this.messageBroker = messageBroker;
         this.packetManager = packetManager;
+        this.messagePacketHandler = messagePacketHandler;
     }
 
     public override void OnConnectionRequest(ConnectionRequest request)
@@ -68,9 +71,22 @@ public class CoopClient : CoopNetworkBase, ICoopClient
     {
         try
         {
-            IPacket packet = (IPacket)serializer.Deserialize(reader.GetRemainingBytes());
+            object received = serializer.Deserialize(reader.GetRemainingBytes());
 
-            packetManager.HandleReceive(peer, packet);
+            // A campaign message now travels as its own wrapper, so it deserializes to a bare IMessage;
+            // publish it directly. Real IPackets (and relay-tunneled MessagePackets) still dispatch by type.
+            if (received is IPacket packet)
+            {
+                packetManager.HandleReceive(peer, packet);
+            }
+            else if (received is IMessage message)
+            {
+                messagePacketHandler.PublishEvent(peer, message);
+            }
+            else
+            {
+                Logger.Error("Received payload deserialized to neither IPacket nor IMessage: {Type}", received?.GetType());
+            }
         }
         catch (Exception ex)
         {
