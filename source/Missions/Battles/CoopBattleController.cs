@@ -1252,7 +1252,6 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
             var troopText = spawned > 1 ? $"{spawned} troops" : $"{spawned} troop";
             InformationManager.DisplayMessage(new InformationMessage($"Reinforcements have arrived: {party.Name} ({troopText})"));
         }
-            
     }
 
     // [Host, game thread] Spawn one reinforcement troop AI-controlled. With no InitialPosition set, the engine
