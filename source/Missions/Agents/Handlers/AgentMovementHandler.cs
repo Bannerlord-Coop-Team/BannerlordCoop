@@ -174,7 +174,7 @@ public class AgentMovementHandler : IAgentMovementHandler
 
                     // Position is reconciled per-frame by the interpolator (smoother than a per-packet
                     // correction bound to the ~10ms poll cadence); push the latest targets it eases toward.
-                    if (agent.HasMount && data.MountData != null && agent.MountAgent != null)
+                    if (agent.HasMount && data.MountData != null)
                     {
                         // Mounted: rider + horse are a rigid rig, and the rider's synced position IS the saddle
                         // position. Interpolate ONLY the mount and let the rider ride along — teleporting the

@@ -21,7 +21,7 @@ namespace Missions.Agents.Packets
             // the mount while it is itself active — mirrors the rider guard in AgentMovementHandler.PollAgents
             // and the horse.IsActive() check in SyncMountState.
             Agent mount = agent.MountAgent;
-            if (agent.HasMount && mount != null && mount.IsActive())
+            if (agent.HasMount && mount.IsActive())
             {
                 MountData = new AgentMountData(mount);
             }
@@ -47,8 +47,6 @@ namespace Missions.Agents.Packets
 
             // apply the agent's look direction
             agent.LookDirection = LookDirection;
-
-            // Input drives the puppet's own walk + animation; the position tween above only eases residual drift.
             agent.MovementInputVector = InputVector;
 
             // Update equipment

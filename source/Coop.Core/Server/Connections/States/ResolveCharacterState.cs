@@ -1,7 +1,6 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Coop.Core.Client.Services.Heroes.Messages;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
@@ -9,7 +8,6 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
 using Serilog;
-using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
@@ -30,6 +28,7 @@ public class ResolveCharacterState : ConnectionStateBase
     private readonly IPlayerManager playerManager;
     private readonly IObjectManager objectManager;
     private readonly IModuleInfoProvider moduleInfoProvider;
+    private readonly IExistingPlayerSender existingPlayerSender;
 
     public ResolveCharacterState(IConnectionLogic connectionLogic,
         IMessageBroker messageBroker,
@@ -37,7 +36,8 @@ public class ResolveCharacterState : ConnectionStateBase
         IModuleValidator moduleValidator,
         IPlayerManager playerManager,
         IObjectManager objectManager,
-        IModuleInfoProvider moduleInfoProvider)
+        IModuleInfoProvider moduleInfoProvider,
+        IExistingPlayerSender existingPlayerSender)
         : base(connectionLogic)
     {
         this.messageBroker = messageBroker;
@@ -46,6 +46,7 @@ public class ResolveCharacterState : ConnectionStateBase
         this.playerManager = playerManager;
         this.objectManager = objectManager;
         this.moduleInfoProvider = moduleInfoProvider;
+        this.existingPlayerSender = existingPlayerSender;
 
         messageBroker.Subscribe<NetworkClientValidate>(Handle_ClientValidate);
         messageBroker.Subscribe<NetworkModuleVersionsValidate>(Handle_ModuleVersionsValidate);
@@ -80,25 +81,12 @@ public class ResolveCharacterState : ConnectionStateBase
             network.SendImmediate(peer, new NetworkClientValidated(true, player));
             ConnectionLogic.TransferSave();
 
-            SendExistingPlayers(peer, obj.What.PlayerId);
+            existingPlayerSender.SendExistingPlayers(peer, obj.What.PlayerId);
         }
         else
         {
             network.SendImmediate(peer, new NetworkClientValidated(false, null));
             ConnectionLogic.CreateCharacter();
-        }
-    }
-
-    private void SendExistingPlayers(NetPeer joiner, string joinerControllerId)
-    {
-        foreach (var player in playerManager.Players)
-        {
-            // Skip the joiner's own player (it registers itself on load) and the host (the server is not a
-            // controlled player on clients).
-            if (player.ControllerId == joinerControllerId) continue;
-            if (player.ControllerId == CoopServer.ServerControllerId) continue;
-
-            network.Send(joiner, new NetworkNewPlayerHeroCreated(player.ControllerId, player, Array.Empty<byte>()));
         }
     }
 
