@@ -1276,6 +1276,14 @@ public class CoopBattleController : CoopMissionController, IBattleMissionBehavio
         }
         agent.SetIsAIPaused(false);
 
+        // Wake the AI exactly as ConvertPuppetToHostAi / ActivateNpcAi do. Without this the reinforcement is
+        // AI-controlled but NOT alarmed and holds stale enemy caches, so it ignores its formation's Charge order
+        // (set in SpawnReinforcementParty) and stands idle — the "reinforcements spawn but don't move" bug. In a
+        // coop battle no general drives the formation, so nothing else alarms them.
+        agent.SetAlarmState(Agent.AIStateFlag.Alarmed);
+        agent.ResetEnemyCaches();
+        agent.HumanAIComponent?.SyncBehaviorParamsIfNecessary();
+
         return agent;
     }
 

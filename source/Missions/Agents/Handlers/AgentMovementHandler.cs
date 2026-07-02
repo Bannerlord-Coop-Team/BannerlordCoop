@@ -6,6 +6,7 @@ using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
 using LiteNetLib;
+using Missions.Agents;
 using Missions.Agents.Packets;
 using Missions.Messages;
 using Serilog;
@@ -17,6 +18,8 @@ namespace Missions.Agents.Handlers;
 
 public interface IAgentMovementHandler : IPacketHandler, IDisposable
 {
+    /// <summary>Per-frame position smoother for received puppets; ticked by CoopMissionController.OnMissionTick.</summary>
+    IAgentPositionInterpolator Interpolator { get; }
 }
 
 public class AgentMovementHandler : IAgentMovementHandler
@@ -48,6 +51,15 @@ public class AgentMovementHandler : IAgentMovementHandler
     // (this handler is transient), so it can't leak across missions.
     private readonly Dictionary<Agent, Agent> _dismountedHorses = new Dictionary<Agent, Agent>();
 
+    // Per-frame position smoothing for received puppets. Fed the latest target on each packet apply (below) and
+    // ticked from CoopMissionController.OnMissionTick, so the ease is decoupled from the bursty poll cadence.
+    private readonly AgentPositionInterpolator _interpolator = new AgentPositionInterpolator();
+    public IAgentPositionInterpolator Interpolator => _interpolator;
+
+    // Dispose is called deterministically on mission teardown (CoopMissionController.OnEndMissionInternal); this
+    // guards against a second call (the GC finalizer, or the DI scope also disposing this transient handler).
+    private bool _disposed;
+
     public AgentMovementHandler(
         IBattleNetwork client,
         IPacketManager packetManager,
@@ -75,20 +87,39 @@ public class AgentMovementHandler : IAgentMovementHandler
         poller.Start();
     }
 
+    // Safety net only: with deterministic disposal on mission end the finalizer is suppressed and never runs.
     ~AgentMovementHandler()
     {
         Dispose();
     }
 
+    /// <summary>
+    /// Deterministic teardown, called from <c>CoopMissionController.OnEndMissionInternal</c> at the start of the
+    /// leave path. Stops the background poller FIRST so its loop is not reading agents/mission state as they are
+    /// freed (it races the game thread and crashes on freed native agents), then detaches from the packet manager
+    /// and message broker. Idempotent — safe if the GC finalizer or the DI scope disposes this handler again.
+    /// </summary>
     public void Dispose()
     {
+        if (_disposed) return;
+        _disposed = true;
+
         Logger.Verbose("Disposing {handlerType}", typeof(AgentMovementHandler));
+
+        // Stop the poll loop before anything else AND wait for an in-flight tick to finish: cancelling alone
+        // would let a tick already reading agents run concurrently with the teardown that frees them (native AV).
+        // PollAgents never blocks on the game thread, so this join returns in ~a tick; the timeout is a guard.
+        if (!poller.StopAndWait(TimeSpan.FromSeconds(1)))
+            Logger.Warning("Movement poller did not stop within the timeout; proceeding with teardown");
+        _interpolator.Clear();
 
         packetManager.RemovePacketHandler(this);
         messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
         messageBroker.Unsubscribe<MissionPeerLeft>(Handle_PeerLeft);
         messageBroker.Unsubscribe<MissionPeerDisconnected>(Handle_PeerDisconnected);
-        poller.Stop();
+
+        // Disposed explicitly, so the finalizer no longer needs to run.
+        GC.SuppressFinalize(this);
     }
 
     public PacketType PacketType => PacketType.Movement;
@@ -162,6 +193,22 @@ public class AgentMovementHandler : IAgentMovementHandler
 
                     SyncMountState(agent, data);
                     data.Apply(agent);
+
+                    // Position is reconciled per-frame by the interpolator (smoother than a per-packet
+                    // correction bound to the ~10ms poll cadence); push the latest targets it eases toward.
+                    if (agent.HasMount && data.MountData != null)
+                    {
+                        // Mounted: rider + horse are a rigid rig, and the rider's synced position IS the saddle
+                        // position. Interpolate ONLY the mount and let the rider ride along — teleporting the
+                        // rider independently every frame forces the engine to re-seat it, which snaps the
+                        // mount's orientation. Drop any stale rider target left from before it mounted.
+                        _interpolator.Forget(agent);
+                        _interpolator.SetMountTarget(agent.MountAgent, data.MountData.MountPosition);
+                    }
+                    else
+                    {
+                        _interpolator.SetRiderTarget(agent, data.Position);
+                    }
                 }
             }
         });
@@ -179,8 +226,10 @@ public class AgentMovementHandler : IAgentMovementHandler
 
         if (!ownerMounted && agent.HasMount)
         {
-            // Owner dismounted: get the puppet off the horse. Remember the horse for a possible re-mount.
+            // Owner dismounted: get the puppet off the horse. Remember the horse for a possible re-mount, and
+            // stop interpolating it (its target is no longer being reported).
             _dismountedHorses[agent] = agent.MountAgent;
+            _interpolator.Forget(agent.MountAgent);
             agent.MountAgent = null;
         }
         else if (ownerMounted && !agent.HasMount)

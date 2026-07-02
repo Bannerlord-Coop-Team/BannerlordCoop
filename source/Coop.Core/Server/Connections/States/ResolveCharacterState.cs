@@ -28,6 +28,7 @@ public class ResolveCharacterState : ConnectionStateBase
     private readonly IPlayerManager playerManager;
     private readonly IObjectManager objectManager;
     private readonly IModuleInfoProvider moduleInfoProvider;
+    private readonly IExistingPlayerSender existingPlayerSender;
 
     public ResolveCharacterState(IConnectionLogic connectionLogic,
         IMessageBroker messageBroker,
@@ -35,7 +36,8 @@ public class ResolveCharacterState : ConnectionStateBase
         IModuleValidator moduleValidator,
         IPlayerManager playerManager,
         IObjectManager objectManager,
-        IModuleInfoProvider moduleInfoProvider)
+        IModuleInfoProvider moduleInfoProvider,
+        IExistingPlayerSender existingPlayerSender)
         : base(connectionLogic)
     {
         this.messageBroker = messageBroker;
@@ -44,6 +46,7 @@ public class ResolveCharacterState : ConnectionStateBase
         this.playerManager = playerManager;
         this.objectManager = objectManager;
         this.moduleInfoProvider = moduleInfoProvider;
+        this.existingPlayerSender = existingPlayerSender;
 
         messageBroker.Subscribe<NetworkClientValidate>(Handle_ClientValidate);
         messageBroker.Subscribe<NetworkModuleVersionsValidate>(Handle_ModuleVersionsValidate);
@@ -78,9 +81,7 @@ public class ResolveCharacterState : ConnectionStateBase
             network.SendImmediate(peer, new NetworkClientValidated(true, player));
             ConnectionLogic.TransferSave();
 
-            // TransferSave has taken the save snapshot and begun queueing this peer's broadcasts, so a
-            // reconnecting player is told about every other existing player too, not just itself.
-            JoiningPlayerSync.SendExistingPlayers(network, playerManager, peer, obj.What.PlayerId);
+            existingPlayerSender.SendExistingPlayers(peer, obj.What.PlayerId);
         }
         else
         {

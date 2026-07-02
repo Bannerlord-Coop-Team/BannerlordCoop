@@ -16,7 +16,6 @@ public class Poller
     /// <summary>
     /// The function to be polled
     /// </summary>
-    // 
     private Action<TimeSpan> pollingFunction;
 
     /// <summary>
@@ -64,7 +63,7 @@ public class Poller
         }
 
         cts = new CancellationTokenSource();
-        pollingTask = Task.Factory.StartNew(PollAsync);
+        pollingTask = Task.Run(PollAsync);
     }
 
     private async Task PollAsync()
@@ -118,11 +117,40 @@ public class Poller
     }
 
     /// <summary>
-    /// Stops the background polling task
+    /// Stops the background polling task (cancellation only — does NOT wait for an in-flight tick to finish).
+    /// Use <see cref="StopAndWait"/> when a running tick would race a teardown of the state it reads.
     /// </summary>
     public void Stop()
     {
         // Cancel the cancellation token
         cts?.Cancel();
+    }
+
+    /// <summary>
+    /// Stops the poller and blocks (up to <paramref name="timeout"/>) until any in-flight tick has finished, so
+    /// the caller can safely tear down state the polling function reads. Cancelling alone (<see cref="Stop"/>)
+    /// only prevents FUTURE ticks — a tick already running continues concurrently and would race the teardown.
+    /// </summary>
+    /// <param name="timeout">Upper bound on the wait, so a stuck polling function can never hang the caller.</param>
+    /// <returns>True if the loop stopped within the timeout; false if it was still running when the wait elapsed.</returns>
+    public bool StopAndWait(TimeSpan timeout)
+    {
+        cts?.Cancel();
+
+        var task = pollingTask;
+        if (task == null)
+        {
+            return true;
+        }
+
+        try
+        {
+            return task.Wait(timeout);
+        }
+        catch (AggregateException)
+        {
+            // The loop faulted; it is no longer running, which is all the caller needs.
+            return true;
+        }
     }
 }

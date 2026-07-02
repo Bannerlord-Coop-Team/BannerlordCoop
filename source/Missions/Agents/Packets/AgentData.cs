@@ -30,7 +30,7 @@ namespace Missions.Agents.Packets
             // the mount while it is itself active — mirrors the rider guard in AgentMovementHandler.PollAgents
             // and the horse.IsActive() check in SyncMountState.
             Agent mount = agent.MountAgent;
-            if (agent.HasMount && mount != null && mount.IsActive())
+            if (agent.HasMount && mount.IsActive())
             {
                 MountData = new AgentMountData(mount);
             }
@@ -48,20 +48,14 @@ namespace Missions.Agents.Packets
                 return;
             }
 
-            Vec3 pos = Position;
-
-            // if the distance between the local agent and the info passed from the server is greater than 1 unit, teleport the agent
-            if (agent.GetPathDistanceToPoint(ref pos) > 1f)
-            {
-                agent.TeleportToPosition(pos);
-            }
+            // NOTE: position is NOT applied here. It is reconciled per-frame by AgentPositionInterpolator (fed
+            // this packet's Position by AgentMovementHandler), so the ease is decoupled from the packet cadence.
+            // Everything below is per-packet state that drives the puppet's own walk + animation.
 
             agent.SetMovementDirection(MovementDirection);
 
             // apply the agent's look direction
             agent.LookDirection = LookDirection;
-
-            // apply the agent's movement input vector...Is this necessary?
             agent.MovementInputVector = InputVector;
 
             // Update equipment

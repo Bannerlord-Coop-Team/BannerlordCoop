@@ -15,6 +15,8 @@ namespace GameInterface.Services.UI
         public string JoinButtonText => "Join";
         public string GithubButtonText => "Github";
         public string DiscordButtonText => "Discord";
+        public string PatreonButtonText => "Patreon";
+        public string BuyMeACoffeeButtonText => "Buy a Coffee";
         public string MovieTextHeader => "Join Co-op Sandbox";
         public string CommunityText => "Join the Community";
         public string IpText => "IP-Address:";
@@ -151,6 +153,16 @@ namespace GameInterface.Services.UI
         public void ActionDiscord()
         {
             System.Diagnostics.Process.Start("https://discord.gg/ngC4RVb");
+        }
+
+        public void ActionPatreon()
+        {
+            System.Diagnostics.Process.Start("https://www.patreon.com/c/bannerlordcoop");
+        }
+
+        public void ActionBuyMeACoffee()
+        {
+            System.Diagnostics.Process.Start("https://buymeacoffee.com/bannerlordcoop");
         }
     }
 }

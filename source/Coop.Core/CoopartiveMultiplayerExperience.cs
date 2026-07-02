@@ -16,9 +16,11 @@ using GameInterface;
 using GameInterface.AutoSync;
 using GameInterface.Services.GameState;
 using GameInterface.Services.GameState.Interfaces;
+using GameInterface.Services.UI.Interfaces;
 using GameInterface.Services.UI.Messages;
 using Serilog;
 using System;
+using System.Threading.Tasks;
 using TaleWorlds.Library;
 
 namespace Coop.Core
@@ -31,6 +33,7 @@ namespace Coop.Core
         private INetworkConfig configuration;
         private IContainer container;
         private readonly IJoinEndpointPreparer joinEndpointPreparer = new DirectJoinEndpointPreparer();
+        private volatile bool coopStarting;
 
         public CoopartiveMultiplayerExperience()
         {
@@ -124,11 +127,7 @@ namespace Coop.Core
 
         private void Handle(MessagePayload<HostSaveGame> obj)
         {
-            StartAsServer();
-
-            container
-                .Resolve<IGameStateInterface>()
-                .LoadGame(obj.What.SaveName);
+            StartAsServer(obj.What.SaveName);
         }
 
         private void Handle(MessagePayload<EndCoopMode> payload)
@@ -140,8 +139,11 @@ namespace Coop.Core
 
         public int Priority => 0;
 
-        public void StartAsServer()
+        public void StartAsServer(string saveName = null)
         {
+            // A second Host or Join click while patches are still applying would tear down the in-flight start
+            if (coopStarting) return;
+
             DestroyContainer();
 
             ModInformation.IsServer = true;
@@ -153,15 +155,80 @@ namespace Coop.Core
 
             GameInterface.ContainerProvider.SetContainer(container);
 
-            // Create harmony patches
-            container.Resolve<IGameInterface>().PatchAll();
+            var gameInterface = container.Resolve<IGameInterface>();
+            var loadingInterface = container.Resolve<ILoadingInterface>();
 
-            var logic = container.Resolve<ILogic>();
-            logic.Start();
+            // Headless server has no loading window to keep alive; patch synchronously
+            if (!loadingInterface.IsLoadingScreenAvailable)
+            {
+                gameInterface.PatchAll();
+                StartServerLogic(saveName);
+                return;
+            }
+
+            loadingInterface.ShowLoadingScreen("Hosting Coop Server", "Applying patches...");
+
+            PatchAllOffGameThread(gameInterface, loadingInterface, () =>
+            {
+                loadingInterface.SetLoadingMessage("Hosting Coop Server", "Loading campaign save...");
+                StartServerLogic(saveName);
+            });
+        }
+
+        // LoadGame must follow PatchAll (the LoadPatches postfix publishes GameLoaded), so it runs here, after patching, not at the caller
+        private void StartServerLogic(string saveName)
+        {
+            container.Resolve<ILogic>().Start();
+
+            if (saveName != null)
+            {
+                container.Resolve<IGameStateInterface>().LoadGame(saveName);
+            }
+        }
+
+        // The ~30s patch compile must stay off the game thread so the loading window keeps drawing, like the client patching on its network thread
+        private void PatchAllOffGameThread(IGameInterface gameInterface, ILoadingInterface loadingInterface, Action continueStart)
+        {
+            coopStarting = true;
+
+            Task.Factory.StartNew(() =>
+            {
+                try
+                {
+                    gameInterface.PatchAll();
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Applying patches failed while starting coop");
+                    coopStarting = false;
+                    GameThread.RunSafe(loadingInterface.HideLoadingScreen);
+                    return;
+                }
+
+                GameThread.RunSafe(() =>
+                {
+                    try
+                    {
+                        continueStart();
+                    }
+                    catch
+                    {
+                        loadingInterface.HideLoadingScreen();
+                        throw;
+                    }
+                    finally
+                    {
+                        coopStarting = false;
+                    }
+                });
+            }, TaskCreationOptions.LongRunning);
         }
 
         public void StartAsClient(INetworkConfig configuration = null, SessionAdvertisementConfig advertisementConfig = null)
         {
+            // A second Host or Join click while patches are still applying would tear down the in-flight start
+            if (coopStarting) return;
+
             DestroyContainer();
 
             ModInformation.IsServer = false;
@@ -190,7 +257,18 @@ namespace Coop.Core
 
 #if DEBUG
             // For debugging faster, normally this is done after connection
-            container.Resolve<IGameInterface>().PatchAll();
+            var gameInterface = container.Resolve<IGameInterface>();
+            var loadingInterface = container.Resolve<ILoadingInterface>();
+
+            if (loadingInterface.IsLoadingScreenAvailable)
+            {
+                loadingInterface.ShowLoadingScreen("Connecting to Coop Server", "Applying patches...");
+
+                PatchAllOffGameThread(gameInterface, loadingInterface, () => container.Resolve<ILogic>().Start());
+                return;
+            }
+
+            gameInterface.PatchAll();
 #endif
 
             var logic = container.Resolve<ILogic>();

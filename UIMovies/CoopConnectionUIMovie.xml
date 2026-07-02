@@ -92,7 +92,7 @@
 
         <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="256" HeightSizePolicy="Fixed"
                         SuggestedHeight="64" VerticalAlignment="Bottom" HorizontalAlignment="Right"
-                        Brush="ScoreboardPanels_2" Text="@CommunityText" PositionYOffset="-90" PositionXOffset="-6"/>
+                        Brush="ScoreboardPanels_2" Text="@CommunityText" PositionYOffset="-220" PositionXOffset="-6"/>
 
         <ListPanel DoNotAcceptEvents="false" WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
                    HorizontalAlignment="Right" VerticalAlignment="Bottom" MarginBottom="60"
@@ -109,6 +109,24 @@
           <Children>
             <Standard.Button HorizontalAlignment="Left" VerticalAlignment="Bottom"
                       Command.Click="ActionDiscord" Parameter.Text="@DiscordButtonText" PositionXOffset="-20"/>
+          </Children>
+        </ListPanel>
+
+        <ListPanel DoNotAcceptEvents="false" WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
+                   HorizontalAlignment="Right" VerticalAlignment="Bottom" MarginBottom="110"
+                   LayoutImp.LayoutMethod="HorizontalLeftToRight">
+          <Children>
+            <Standard.Button HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                      Command.Click="ActionPatreon" Parameter.Text="@PatreonButtonText" PositionXOffset="-20"/>
+          </Children>
+        </ListPanel>
+
+        <ListPanel DoNotAcceptEvents="false" WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
+                   HorizontalAlignment="Right" VerticalAlignment="Bottom" MarginBottom="160"
+                   LayoutImp.LayoutMethod="HorizontalLeftToRight">
+          <Children>
+            <Standard.Button HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                      Command.Click="ActionBuyMeACoffee" Parameter.Text="@BuyMeACoffeeButtonText" PositionXOffset="-20"/>
           </Children>
         </ListPanel>
 
