@@ -82,7 +82,12 @@ internal class WorkshopDataHandler : IHandler
         {
             using (new AllowedThread())
             {
-                GetWorkshopsBehavior().AddNewWorkshopData(workshop);
+                var workshopsBehavior = GetWorkshopsBehavior();
+                workshopsBehavior.EnsureBehaviorDataSize();
+                if (workshopsBehavior.GetDataOfWorkshop(workshop) == null)
+                {
+                    workshopsBehavior.AddNewWorkshopData(workshop);
+                }
             }
         });
     }

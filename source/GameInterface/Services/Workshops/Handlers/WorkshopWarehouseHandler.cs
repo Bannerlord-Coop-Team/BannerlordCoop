@@ -119,7 +119,11 @@ internal class WorkshopWarehouseHandler : IHandler
             // Only update roster for target client. Warehouse data is client specific
             if (owner == Hero.MainHero)
             {
-                workshopsBehavior.AddNewWarehouseDataIfNeeded(workshop.Settlement);
+                using (new AllowedThread())
+                {
+                    workshopsBehavior.EnsureBehaviorDataSize();
+                    workshopsBehavior.AddNewWarehouseDataIfNeeded(workshop.Settlement);
+                }
                 return;
             }
             if (oldOwner == Hero.MainHero && !owner.IsPlayerHero())

@@ -1,13 +1,17 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Util;
 using GameInterface.Services.Actions.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using HarmonyLib;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.Actions.Patches;
 
@@ -23,9 +27,15 @@ internal class ChangeOwnerOfWorkshopActionPatches
         // Send message to server to manage workshop with new owner if called on client
         if (ModInformation.IsClient)
         {
-            var message = new WorkshopOwnerChanged(workshop, newOwner, workshopType, capital, cost);
-            MessageBroker.Instance.Publish(null, message);
+            if (workshop.Owner != newOwner)
+            {
+                ApplyPredictedWorkshopOwnership(workshop, newOwner);
 
+                var message = new WorkshopOwnerChanged(workshop, newOwner, workshopType, capital, cost);
+                MessageBroker.Instance.Publish(null, message);
+            }
+
+            ApplyPredictedWorkshopData(workshop, newOwner);
             return false;
         }
 
@@ -35,21 +45,71 @@ internal class ChangeOwnerOfWorkshopActionPatches
         return false;
     }
 
-    public static void ApplyInternalOverride(Workshop workshop, Hero newOwner, WorkshopType workshopType, int capital, int cost)
+    internal static void ApplyPredictedWorkshopOwnership(Workshop workshop, Hero newOwner)
+    {
+        if (workshop == null || newOwner == null || workshop.Owner == newOwner) return;
+
+        using (new AllowedThread())
+        {
+            Hero owner = workshop.Owner;
+            if (owner != null)
+            {
+                owner._ownedWorkshops?.Remove(workshop);
+            }
+
+            if (newOwner._ownedWorkshops == null)
+            {
+                newOwner._ownedWorkshops = new MBList<Workshop>();
+            }
+
+            workshop._owner = newOwner;
+            if (!newOwner._ownedWorkshops.Contains(workshop))
+            {
+                newOwner._ownedWorkshops.Add(workshop);
+            }
+        }
+    }
+
+    internal static void ApplyPredictedWorkshopData(Workshop workshop, Hero newOwner)
+    {
+        if (workshop == null || newOwner == null || newOwner != Hero.MainHero || workshop.Settlement == null) return;
+
+        var workshopsBehavior = Campaign.Current?.GetCampaignBehavior<WorkshopsCampaignBehavior>();
+        if (workshopsBehavior == null) return;
+
+        using (new AllowedThread())
+        {
+            workshopsBehavior.EnsureBehaviorDataSize();
+            if (workshopsBehavior.GetDataOfWorkshop(workshop) == null)
+            {
+                workshopsBehavior.AddNewWorkshopData(workshop);
+            }
+            workshopsBehavior.AddNewWarehouseDataIfNeeded(workshop.Settlement);
+        }
+    }
+
+    public static void ApplyInternalOverride(Workshop workshop, Hero newOwner, WorkshopType workshopType, int capital, int cost, Action onApplied = null)
     {
         GameThread.RunSafe(() =>
         {
-            Hero owner = workshop.Owner;
-            workshop.ChangeOwnerOfWorkshop(newOwner, workshopType, capital);
-            if (newOwner.IsPlayerHero())
+            try
             {
-                GiveGoldAction.ApplyBetweenCharacters(newOwner, owner, cost, false);
+                Hero owner = workshop.Owner;
+                workshop.ChangeOwnerOfWorkshop(newOwner, workshopType, capital);
+                if (newOwner.IsPlayerHero())
+                {
+                    GiveGoldAction.ApplyBetweenCharacters(newOwner, owner, cost, false);
+                }
+                if (owner.IsPlayerHero())
+                {
+                    GiveGoldAction.ApplyBetweenCharacters(null, owner, cost, false);
+                }
+                CampaignEventDispatcher.Instance.OnWorkshopOwnerChanged(workshop, owner);
             }
-            if (owner.IsPlayerHero())
+            finally
             {
-                GiveGoldAction.ApplyBetweenCharacters(null, owner, cost, false);
+                onApplied?.Invoke();
             }
-            CampaignEventDispatcher.Instance.OnWorkshopOwnerChanged(workshop, owner);
         });
     }
 }

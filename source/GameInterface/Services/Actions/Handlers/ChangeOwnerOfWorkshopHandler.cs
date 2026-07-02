@@ -55,9 +55,22 @@ internal class ChangeOwnerOfWorkshopHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.NewOwnerId, out var newOwner)) return;
         if (!objectManager.TryGetObjectWithLogging<WorkshopType>(obj.What.WorkshopTypeId, out var workshopType)) return;
 
-        ChangeOwnerOfWorkshopActionPatches.ApplyInternalOverride(workshop, newOwner, workshopType, obj.What.Capital, obj.What.Cost);
+        var peer = obj.Who as NetPeer;
+        if (workshop.Owner == newOwner)
+        {
+            SendWorkshopRefresh(peer);
+            return;
+        }
+
+        ChangeOwnerOfWorkshopActionPatches.ApplyInternalOverride(workshop, newOwner, workshopType, obj.What.Capital, obj.What.Cost,
+            () => SendWorkshopRefresh(peer));
+    }
+
+    private void SendWorkshopRefresh(NetPeer peer)
+    {
+        if (peer == null) return;
 
         // ClanManagementVM when selling a workshop, also used when changing type of workshop
-        network.Send(obj.Who as NetPeer, new RefreshWorkshopsList());
+        network.Send(peer, new RefreshWorkshopsList());
     }
 }
