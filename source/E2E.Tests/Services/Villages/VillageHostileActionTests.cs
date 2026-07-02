@@ -439,9 +439,12 @@ public class VillageHostileActionTests : MapEventTestBase
 
             Server.NetworkSentMessages.Clear();
 
-            Server.Resolve<IVillageHostileActionInterface>().ApplyForceActionOutcome(
-                mapEvent,
-                VillageHostileAction.ForceSupplies);
+            using (new AllowedThread())
+            {
+                Server.Resolve<IVillageHostileActionInterface>().ApplyForceActionOutcome(
+                    mapEvent,
+                    VillageHostileAction.ForceSupplies);
+            }
         }, disabledMethods);
 
         var itemRosterUpdate = Server.NetworkSentMessages.GetMessages<NetworkItemRosterUpdate>().Single();

@@ -420,7 +420,10 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface
                     lootedItems.AddToCounts(equipmentElement, count);
                 }
 
-                mobileParty.Party.ItemRoster.AddToCounts(equipmentElement, count);
+                using (AllowedThread.Suspend())
+                {
+                    mobileParty.Party.ItemRoster.AddToCounts(equipmentElement, count);
+                }
             }
         }
 
@@ -429,11 +432,19 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface
         {
             var goldReward = rewardUnits * Campaign.Current.Models.RaidModel.GoldRewardForEachLostHearth;
             if (goldReward > 0)
-                GiveGoldAction.ApplyBetweenCharacters(null, leaderHero, goldReward, true);
+            {
+                using (AllowedThread.Suspend())
+                {
+                    GiveGoldAction.ApplyBetweenCharacters(null, leaderHero, goldReward, true);
+                }
+            }
         }
 
         SetForceActionCooldown(settlement);
-        settlement.SettlementHitPoints *= 0.2f;
+        using (AllowedThread.Suspend())
+        {
+            settlement.SettlementHitPoints *= 0.2f;
+        }
         SkillLevelingManager.OnForceSupplies(mobileParty, lootedItems, mapEvent.IsPlayerMapEvent == false);
     }
 
