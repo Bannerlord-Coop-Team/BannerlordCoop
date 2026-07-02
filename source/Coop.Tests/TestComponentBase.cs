@@ -9,6 +9,7 @@ using GameInterface.CoopSessionData;
 using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.GameState.Interfaces;
+using GameInterface.Services.GuantletMapEventVisuals;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Kingdoms;
@@ -98,6 +99,7 @@ internal abstract class TestComponentBase
         RegisterMock<IAttachmentIdMapper>(builder);
         RegisterMock<IAutoRegistryFactory>(builder);
         RegisterMock<IBattleTroopReserveBuilder>(builder);
+        RegisterMock<IMapEventBattleSizeCorrection>(builder);
 
         // ISaveInterface is consumed by TransferSaveState's constructor, which packages a save the
         // moment the state is entered. Give it a non-null default so simply entering the state does
