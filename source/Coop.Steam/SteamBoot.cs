@@ -1,6 +1,4 @@
-﻿using Common.Logging;
-using Common.Messaging;
-using Serilog;
+﻿using Common.Messaging;
 using Steamworks;
 using System;
 using System.Runtime.CompilerServices;
@@ -15,8 +13,6 @@ namespace Coop.Steam;
 /// </summary>
 public static class SteamBoot
 {
-    private static readonly ILogger Logger = LogManager.GetLogger(typeof(SteamBoot));
-
     // Strong root: MessageBroker subscriptions are weak references, so the listener must be
     // reachable for the process lifetime or its subscriptions silently die.
     public static SteamJoinListener JoinListener { get; private set; }
@@ -30,10 +26,9 @@ public static class SteamBoot
         {
             available = ProbeSteam();
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             // Steamworks.NET.dll absent (non-Steam install) or SteamAPI not initialized.
-            Logger.Warning("Steam unavailable, invites disabled: {Reason}", ex.Message);
             available = false;
         }
 

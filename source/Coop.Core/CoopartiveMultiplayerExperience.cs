@@ -14,12 +14,12 @@ using Coop.Core.Common.Session;
 using Coop.Core.Server;
 using GameInterface;
 using GameInterface.AutoSync;
-using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.UI.Messages;
 using Serilog;
 using System;
+using TaleWorlds.Library;
 
 namespace Coop.Core
 {
@@ -81,16 +81,14 @@ namespace Coop.Core
             // Steam callbacks can fire at any moment, so this join must check state itself.
             if (container != null)
             {
-                Logger.Information("Ignoring Steam join; already in a co-op session");
-                messageBroker.Publish(this, new SendInformationMessage(
+                InformationManager.DisplayMessage(new InformationMessage(
                     "Already in a co-op session; leave it before joining another"));
                 return;
             }
 
             if (!GameStateQuery.IsAtMainMenu)
             {
-                Logger.Information("Ignoring Steam join; not at the main menu");
-                messageBroker.Publish(this, new SendInformationMessage(
+                InformationManager.DisplayMessage(new InformationMessage(
                     "Return to the main menu to join a co-op session"));
                 return;
             }
@@ -114,15 +112,14 @@ namespace Coop.Core
                 // Tear down the half-built container, otherwise it blocks every later Steam join.
                 Logger.Error(ex, "Steam-initiated join to {Address}:{Port} failed to start", prepared.Address, prepared.Port);
                 DestroyContainer();
-                messageBroker.Publish(this, new SendInformationMessage(
+                InformationManager.DisplayMessage(new InformationMessage(
                     $"Could not connect to the advertised address '{prepared.Address}:{prepared.Port}'"));
             }
         }
 
         private void Handle(MessagePayload<SessionJoinFailed> obj)
         {
-            Logger.Warning("Steam join failed: {Reason}", obj.What.Reason);
-            messageBroker.Publish(this, new SendInformationMessage(obj.What.Reason));
+            InformationManager.DisplayMessage(new InformationMessage(obj.What.Reason));
         }
 
         private void Handle(MessagePayload<HostSaveGame> obj)

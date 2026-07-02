@@ -6,7 +6,7 @@ namespace Coop.Core.Client.Services.Session;
 
 /// <summary>
 /// Builds the advertised join info from what the hosting player configured: their public
-/// address (empty until they enter one on the connect screen) and the port their session runs on.
+/// address (possibly empty) and the port their session runs on.
 /// </summary>
 public class ConfiguredSessionJoinInfoSource : ISessionJoinInfoSource
 {
