@@ -1,10 +1,11 @@
 ﻿using Common;
+using Common.Messaging;
 using Common.Network.Session;
+using GameInterface.Services.GameDebug.Messages;
 using HarmonyLib;
 using SandBox.View.Map;
 using System;
 using System.Collections.Generic;
-using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade.ViewModelCollection.EscapeMenu;
 
@@ -30,7 +31,7 @@ internal class EscapeMenuInviteFriendsPatch
             {
                 if (!advertiser.InviteFriends())
                 {
-                    InformationManager.DisplayMessage(new InformationMessage(SessionInviteText.OverlayUnavailableHint));
+                    MessageBroker.Instance.Publish(null, new SendInformationMessage(SessionInviteText.OverlayUnavailableHint));
                 }
             },
             identifier: null,
