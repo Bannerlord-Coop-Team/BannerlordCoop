@@ -17,14 +17,20 @@ internal class MapEventSideDataHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
+    private readonly IMapEventBattleSizeCorrection mapEventBattleSizeCorrection;
 
     private static readonly ILogger Logger = LogManager.GetLogger<MapEventSideDataHandler>();
 
-    public MapEventSideDataHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
+    public MapEventSideDataHandler(
+        IMessageBroker messageBroker,
+        INetwork network,
+        IObjectManager objectManager,
+        IMapEventBattleSizeCorrection mapEventBattleSizeCorrection)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
+        this.mapEventBattleSizeCorrection = mapEventBattleSizeCorrection;
 
         messageBroker.Subscribe<MapEventSideIFactionChanged>(Handle);
         messageBroker.Subscribe<NetworkChangeMapEventSideIFaction>(Handle);
@@ -181,7 +187,7 @@ internal class MapEventSideDataHandler : IHandler
                     side._battleParties.Add(party);
                 }
 
-                MapEventBattleSizeCorrection.TryCorrect(side.MapEvent);
+                mapEventBattleSizeCorrection.TryCorrect(side.MapEvent);
             }
             catch (Exception e)
             {
@@ -217,7 +223,7 @@ internal class MapEventSideDataHandler : IHandler
                     mapEvent._sides[side] = mapEventSide;
                 }
 
-                MapEventBattleSizeCorrection.TryCorrect(mapEvent);
+                mapEventBattleSizeCorrection.TryCorrect(mapEvent);
             }
             catch (Exception e)
             {
@@ -255,7 +261,7 @@ internal class MapEventSideDataHandler : IHandler
                     mapEventSide._battleParties.Add(mapEventParty);
                 }
 
-                MapEventBattleSizeCorrection.TryCorrect(mapEventSide.MapEvent);
+                mapEventBattleSizeCorrection.TryCorrect(mapEventSide.MapEvent);
             }
             catch (Exception e)
             {

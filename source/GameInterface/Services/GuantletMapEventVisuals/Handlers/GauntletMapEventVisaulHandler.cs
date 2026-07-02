@@ -18,12 +18,18 @@ internal class GauntletMapEventVisaulHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IMapEventBattleSizeCorrection mapEventBattleSizeCorrection;
 
-    public GauntletMapEventVisaulHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
+    public GauntletMapEventVisaulHandler(
+        IMessageBroker messageBroker,
+        IObjectManager objectManager,
+        INetwork network,
+        IMapEventBattleSizeCorrection mapEventBattleSizeCorrection)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.mapEventBattleSizeCorrection = mapEventBattleSizeCorrection;
         messageBroker.Subscribe<GauntletMapEventVisualInitialized>(Handle_GauntletMapEventVisualInitialized);
         messageBroker.Subscribe<NetworkGauntletMapEventVisualInitialized>(Handle_NetworkGauntletMapEventVisualInitialized);
     }
@@ -33,9 +39,8 @@ internal class GauntletMapEventVisaulHandler : IHandler
         messageBroker.Unsubscribe<GauntletMapEventVisualInitialized>(Handle_GauntletMapEventVisualInitialized);
         messageBroker.Unsubscribe<NetworkGauntletMapEventVisualInitialized>(Handle_NetworkGauntletMapEventVisualInitialized);
 
-        // Drop any pending battle-size corrections so the static map doesn't carry stale ids into the
-        // next session.
-        MapEventBattleSizeCorrection.Reset();
+        // Drop any pending battle-size corrections so they don't carry stale ids into the next session.
+        mapEventBattleSizeCorrection.Reset();
     }
     private void Handle_GauntletMapEventVisualInitialized(MessagePayload<GauntletMapEventVisualInitialized> payload)
     {
@@ -89,7 +94,7 @@ internal class GauntletMapEventVisaulHandler : IHandler
                     var mapEvent = visual.MapEvent;
                     if (mapEvent.IsFieldBattle || mapEvent.IsSallyOut)
                     {
-                        MapEventBattleSizeCorrection.Register(visual);
+                        mapEventBattleSizeCorrection.Register(visual);
                     }
                 }
                 catch (Exception ex)

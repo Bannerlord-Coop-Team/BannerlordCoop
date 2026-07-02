@@ -5,21 +5,40 @@ using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.Services.GuantletMapEventVisuals;
 
+public interface IMapEventBattleSizeCorrection : IGameAbstraction
+{
+    /// <summary>Client: start tracking a field-battle/sally-out visual for a possible size correction.</summary>
+    void Register(GauntletMapEventVisual visual);
+
+    /// <summary>Client: stop tracking a visual (its map event ended).</summary>
+    void Clear(GauntletMapEventVisual visual);
+
+    /// <summary>Client: drop every pending correction (session ended).</summary>
+    void Reset();
+
+    /// <summary>
+    /// Re-applies the real ambient battle size to a pending map event's sound once its sides/parties are
+    /// populated enough to compute it, but only when the size has grown. A cheap no-op for any map event
+    /// that is not pending.
+    /// </summary>
+    void TryCorrect(MapEvent mapEvent);
+}
+
 /// <summary>
 /// Client-side: re-applies a field battle's ambient <c>battle_size</c> when its visual initialized before
 /// the sides/parties synced. Vanilla <see cref="GauntletMapEventVisual"/> bakes the size into the sound once
 /// (the guard defaults it to 0 while un-synced and never updates it), so without this a large battle
 /// stays too quiet for its whole life. We re-apply the real size to the existing sound as the parties arrive.
 /// </summary>
-internal static class MapEventBattleSizeCorrection
+internal class MapEventBattleSizeCorrection : IMapEventBattleSizeCorrection
 {
     // Field-battle visuals needing a size correction, keyed by the visual itself. Value = the highest
     // battle_size applied so far; TryCorrect only ever raises it, since a battle is computable while still
     // partly populated and the live headcount drops as troops die, so without a ceiling the size would lock
     // in a partial count or drift below vanilla mid-battle. Cleared when the visual is torn down or on reset.
-    private static readonly ConcurrentDictionary<GauntletMapEventVisual, int> pendingMaxSize = new ConcurrentDictionary<GauntletMapEventVisual, int>();
+    private readonly ConcurrentDictionary<GauntletMapEventVisual, int> pendingMaxSize = new ConcurrentDictionary<GauntletMapEventVisual, int>();
 
-    public static void Register(GauntletMapEventVisual visual)
+    public void Register(GauntletMapEventVisual visual)
     {
         var mapEvent = visual?.MapEvent;
         if (mapEvent == null) return;
@@ -33,21 +52,16 @@ internal static class MapEventBattleSizeCorrection
         pendingMaxSize.TryAdd(visual, initialSize);
     }
 
-    public static void Clear(GauntletMapEventVisual visual)
+    public void Clear(GauntletMapEventVisual visual)
     {
         if (visual != null) pendingMaxSize.TryRemove(visual, out _);
     }
 
-    // Drops all pending corrections - called when the client session ends so the static map does not
+    // Drops all pending corrections - called when the client session ends so the map does not
     // accumulate stale ids across reconnects.
-    public static void Reset() => pendingMaxSize.Clear();
+    public void Reset() => pendingMaxSize.Clear();
 
-    /// <summary>
-    /// Re-applies the real ambient battle size to a pending map event's sound once its sides/parties are
-    /// populated enough to compute it, but only when the size has grown. A cheap no-op for any map event
-    /// that is not pending.
-    /// </summary>
-    public static void TryCorrect(MapEvent mapEvent)
+    public void TryCorrect(MapEvent mapEvent)
     {
         if (mapEvent?.MapEventVisual is not GauntletMapEventVisual visual) return;
         if (!pendingMaxSize.TryGetValue(visual, out var appliedSize)) return;
