@@ -48,11 +48,6 @@ internal class PlayerOccupancyPauseHandler : IHandler
         if (ModInformation.IsClient)
             return;
 
-        // Only a connected player's party changing occupancy can complete "all players occupied"; ignore the
-        // churn of AI parties entering/leaving map events and settlements.
-        if (!IsConnectedPlayerParty(payload.What.MobileParty))
-            return;
-
         if (!AllPlayersOccupied())
             return;
 
@@ -73,13 +68,5 @@ internal class PlayerOccupancyPauseHandler : IHandler
 
             return playerParty.MapEvent != null || playerParty.CurrentSettlement != null;
         });
-    }
-
-    private bool IsConnectedPlayerParty(MobileParty party)
-    {
-        if (party == null || !objectManager.TryGetId(party, out var partyId))
-            return false;
-
-        return playerManager.Players.Any(player => player.MobilePartyId == partyId);
     }
 }

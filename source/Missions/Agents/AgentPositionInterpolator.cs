@@ -127,9 +127,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                 : Vec3.Lerp(agent.Position, target.Position, alpha);     // ease
             agent.TeleportToPosition(next);
             agent.LookDirection = lookDirection;
-
-            if (agent.IsMount)
-                agent.SetMovementDirection(movementDirection);
+            agent.SetMovementDirection(movementDirection);
         }
 
         if (_evict.Count > 0)
