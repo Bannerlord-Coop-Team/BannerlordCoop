@@ -167,55 +167,16 @@ internal class MapEventCreationCoordinator : IHandler
         if (ModInformation.IsClient) return;
 
         var request = payload.What;
-
-        if (!(payload.Who is NetPeer requestingPeer))
-        {
-            Logger.Error("Received {Message} with no originating peer. RequestId={RequestId}", nameof(NetworkRequestCreateMapEvent), request.RequestId);
+        if (!TryGetRequestingPeer(payload, request, out var requestingPeer))
             return;
-        }
 
-        if (!objectManager.TryGetObjectWithLogging<PartyBase>(request.AttackerId, out var attacker)) return;
-        if (!objectManager.TryGetObjectWithLogging<PartyBase>(request.DefenderId, out var defender)) return;
-
-        if (!villageHostileActionInterface.TryConsumeApprovedMapEventStart(attacker, defender, request.Flags, out var reason))
-        {
-            Logger.Warning(
-                "Rejecting hostile-action map event creation. RequestId={RequestId}, AttackerId={AttackerId}, DefenderId={DefenderId}, Reason={Reason}",
-                request.RequestId,
-                request.AttackerId,
-                request.DefenderId,
-                reason);
+        if (!TryResolveRequestParties(request, out var attacker, out var defender))
             return;
-        }
 
-        string mapEventId = null;
+        if (!TryConsumeApprovedMapEventStart(request, attacker, defender))
+            return;
 
-        // MapEvent creation mutates campaign state and must run on the server's main thread. The AllowedThread scope
-        // lets the resulting StartBattleInternal/MapEvent construction run through unblocked by the mod's patches,
-        // and registers the new MapEvent (broadcasting it to clients) before we read back its id.
-        GameThread.RunSafe(
-            () =>
-            {
-                if (attacker.MobileParty?.IsPlayerParty() == true &&
-                    defender.MobileParty?.IsCurrentlyEngagingParty == true &&
-                    defender.MobileParty?.ShortTermTargetParty == attacker.MobileParty)
-                {
-                    var temp = attacker;
-                    attacker = defender;
-                    defender = temp;
-                }
-
-                var mapEvent = MapEventBattleFactory.CreateMapEvent(attacker, defender, request.Flags);
-                if (mapEvent == null) return;
-
-                if (!objectManager.TryGetIdWithLogging(mapEvent, out mapEventId))
-                {
-                    Logger.Error("Server created a map event but it has no registered id. RequestId={RequestId}", request.RequestId);
-                }
-            },
-            blocking: true,
-            context: nameof(Handle_NetworkRequestCreateMapEvent));
-
+        string mapEventId = CreateMapEventOnGameThread(request, attacker, defender);
         if (string.IsNullOrEmpty(mapEventId))
         {
             // Intentionally do not respond; the client will time out and abort its battle start.
@@ -226,6 +187,90 @@ internal class MapEventCreationCoordinator : IHandler
         Logger.Debug("Server created map event {MapEventId} for RequestId={RequestId}. Responding to client.", mapEventId, request.RequestId);
 
         network.Send(requestingPeer, new NetworkMapEventCreated(request.RequestId, mapEventId));
+    }
+
+    private static bool TryGetRequestingPeer(
+        MessagePayload<NetworkRequestCreateMapEvent> payload,
+        NetworkRequestCreateMapEvent request,
+        out NetPeer requestingPeer)
+    {
+        requestingPeer = payload.Who as NetPeer;
+        if (requestingPeer != null)
+            return true;
+
+        Logger.Error("Received {Message} with no originating peer. RequestId={RequestId}", nameof(NetworkRequestCreateMapEvent), request.RequestId);
+        return false;
+    }
+
+    private bool TryResolveRequestParties(
+        NetworkRequestCreateMapEvent request,
+        out PartyBase attacker,
+        out PartyBase defender)
+    {
+        attacker = null;
+        defender = null;
+
+        if (!objectManager.TryGetObjectWithLogging<PartyBase>(request.AttackerId, out attacker))
+            return false;
+
+        return objectManager.TryGetObjectWithLogging<PartyBase>(request.DefenderId, out defender);
+    }
+
+    private bool TryConsumeApprovedMapEventStart(
+        NetworkRequestCreateMapEvent request,
+        PartyBase attacker,
+        PartyBase defender)
+    {
+        if (villageHostileActionInterface.TryConsumeApprovedMapEventStart(attacker, defender, request.Flags, out var reason))
+            return true;
+
+        Logger.Warning(
+            "Rejecting hostile-action map event creation. RequestId={RequestId}, AttackerId={AttackerId}, DefenderId={DefenderId}, Reason={Reason}",
+            request.RequestId,
+            request.AttackerId,
+            request.DefenderId,
+            reason);
+        return false;
+    }
+
+    private string CreateMapEventOnGameThread(
+        NetworkRequestCreateMapEvent request,
+        PartyBase attacker,
+        PartyBase defender)
+    {
+        string mapEventId = null;
+
+        // MapEvent creation mutates campaign state and must run on the server's main thread. The AllowedThread scope
+        // lets the resulting StartBattleInternal/MapEvent construction run through unblocked by the mod's patches,
+        // and registers the new MapEvent (broadcasting it to clients) before we read back its id.
+        GameThread.RunSafe(
+            () =>
+            {
+                var parties = GetMapEventParties(attacker, defender);
+                var mapEvent = MapEventBattleFactory.CreateMapEvent(parties.Attacker, parties.Defender, request.Flags);
+                if (mapEvent == null) return;
+
+                if (!objectManager.TryGetIdWithLogging(mapEvent, out mapEventId))
+                {
+                    Logger.Error("Server created a map event but it has no registered id. RequestId={RequestId}", request.RequestId);
+                }
+            },
+            blocking: true,
+            context: nameof(Handle_NetworkRequestCreateMapEvent));
+
+        return mapEventId;
+    }
+
+    private static (PartyBase Attacker, PartyBase Defender) GetMapEventParties(PartyBase attacker, PartyBase defender)
+    {
+        if (attacker.MobileParty?.IsPlayerParty() == true &&
+            defender.MobileParty?.IsCurrentlyEngagingParty == true &&
+            defender.MobileParty?.ShortTermTargetParty == attacker.MobileParty)
+        {
+            return (defender, attacker);
+        }
+
+        return (attacker, defender);
     }
 
     /// <summary>[Client] Complete the pending blocking request with the server-assigned MapEvent id.</summary>

@@ -105,15 +105,36 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface
         if (!IsKnownAction(action))
             return false;
 
-        if (mobileParty?.Party == null)
+        if (!TryValidateHostileActionRequester(mobileParty, out reason))
+            return false;
+
+        if (!TryValidateHostileActionSettlement(settlement, out reason))
+            return false;
+
+        if (!TryValidateHostileActionState(mobileParty, settlement, allowPendingApproval, out reason))
+            return false;
+
+        var village = settlement.Village;
+        if (action == VillageHostileAction.ForceVolunteers && village.Hearth <= 0)
         {
-            reason = VillageHostileActionDeniedReason.InvalidRequester;
+            reason = VillageHostileActionDeniedReason.HearthTooLow;
             return false;
         }
 
-        if (settlement == null || settlement.IsVillage == false || settlement.Village == null || settlement.Party == null)
+        if (IsForceAction(action) && IsForceActionOnCooldown(settlement, out reason))
+            return false;
+
+        reason = VillageHostileActionDeniedReason.Invalid;
+        return true;
+    }
+
+    private static bool TryValidateHostileActionRequester(MobileParty mobileParty, out VillageHostileActionDeniedReason reason)
+    {
+        reason = VillageHostileActionDeniedReason.Invalid;
+
+        if (mobileParty?.Party == null)
         {
-            reason = VillageHostileActionDeniedReason.NonVillageSettlement;
+            reason = VillageHostileActionDeniedReason.InvalidRequester;
             return false;
         }
 
@@ -123,11 +144,35 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface
             return false;
         }
 
+        return true;
+    }
+
+    private static bool TryValidateHostileActionSettlement(Settlement settlement, out VillageHostileActionDeniedReason reason)
+    {
+        reason = VillageHostileActionDeniedReason.Invalid;
+
+        if (settlement == null || settlement.IsVillage == false || settlement.Village == null || settlement.Party == null)
+        {
+            reason = VillageHostileActionDeniedReason.NonVillageSettlement;
+            return false;
+        }
+
         if (settlement.IsUnderSiege)
         {
             reason = VillageHostileActionDeniedReason.AlreadyInMapEvent;
             return false;
         }
+
+        return true;
+    }
+
+    private bool TryValidateHostileActionState(
+        MobileParty mobileParty,
+        Settlement settlement,
+        bool allowPendingApproval,
+        out VillageHostileActionDeniedReason reason)
+    {
+        reason = VillageHostileActionDeniedReason.Invalid;
 
         if (mobileParty.MapEvent != null || settlement.Party.MapEvent != null)
         {
@@ -143,8 +188,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface
             return false;
         }
 
-        var village = settlement.Village;
-        if (village.VillageState != Village.VillageStates.Normal)
+        if (settlement.Village.VillageState != Village.VillageStates.Normal)
         {
             reason = VillageHostileActionDeniedReason.InvalidVillageState;
             return false;
@@ -156,16 +200,6 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface
             return false;
         }
 
-        if (action == VillageHostileAction.ForceVolunteers && village.Hearth <= 0)
-        {
-            reason = VillageHostileActionDeniedReason.HearthTooLow;
-            return false;
-        }
-
-        if (IsForceAction(action) && IsForceActionOnCooldown(settlement, out reason))
-            return false;
-
-        reason = VillageHostileActionDeniedReason.Invalid;
         return true;
     }
 

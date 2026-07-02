@@ -24,6 +24,7 @@ using GameInterface.Services.Players.Data;
 using GameInterface.Services.Time.Interfaces;
 using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.UI.Interfaces;
+using GameInterface.Services.Villages.Interfaces;
 using Moq;
 using Serilog;
 using System;

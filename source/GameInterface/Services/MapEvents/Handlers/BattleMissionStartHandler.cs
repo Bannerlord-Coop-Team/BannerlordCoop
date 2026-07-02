@@ -105,11 +105,14 @@ internal class BattleMissionStartHandler : IHandler
         // point at a torn-down event.
         GameThread.RunSafe(() =>
         {
+            var operation = "resolve map event";
+
             try
             {
                 if (!objectManager.TryGetObject(payload.What.MapEventId, out MapEvent mapEvent))
                     return;
 
+                operation = "validate hostile action mode";
                 if (mapEvent.IsUnsupportedMultiPlayerHostileAction())
                 {
                     Logger.Warning("Rejecting attack mission start for map event {MapEventId}: this hostile action does not support multiple player parties", payload.What.MapEventId);
@@ -120,6 +123,7 @@ internal class BattleMissionStartHandler : IHandler
                 // Server-authoritative mode gate: accept the live mission only if no auto-resolve simulation already
                 // owns this event. On reject, don't make the sides mission-ready or reply — the requesting client
                 // waits for NetworkStartAttackMission to open the mission, so it simply stays at the encounter menu.
+                operation = "claim mission mode";
                 if (!ServerBattleModeArbiter.TryClaimMission(payload.What.MapEventId))
                 {
                     mapEventLogger.DebugMapEvent(mapEvent, "Rejecting attack mission: an auto-resolve simulation is already underway for this event");
@@ -132,8 +136,10 @@ internal class BattleMissionStartHandler : IHandler
                 // Apply the diplomatic consequences of the client's attack (war / relation)
                 // authoritatively before the mission opens, reproducing the hostile-action head of
                 // vanilla EncounterAttackConsequence that neither the client nor the server runs.
+                operation = "apply attack hostile-action consequences";
                 ApplyClientAttackHostileConsequences(mapEvent, payload.What.AttackerPartyId);
 
+                operation = "make map event sides mission-ready";
                 foreach (var side in mapEvent._sides)
                 {
                     side.MakeReadyForMission(null);
@@ -142,22 +148,44 @@ internal class BattleMissionStartHandler : IHandler
                 // Reply first so the requesting client's blocked consequence unblocks before the mission-open
                 // message arrives — the mission then opens off the menu-consequence stack, as in the pre-coordinator
                 // flow, rather than re-entrantly during the blocking wait.
+                operation = "send battle start reply";
                 network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, true));
 
-                AtmosphereInfo atmosphereOnCampaign = Campaign.Current.Models.MapWeatherModel.GetAtmosphereModel(mapEvent.Position);
+                operation = "read campaign atmosphere";
+                AtmosphereInfo atmosphereOnCampaign = GetAtmosphereOnCampaign(mapEvent);
+
+                operation = "send attack mission start";
                 network.SendAll(new NetworkStartAttackMission(payload.What.MapEventId, randomTerrainSeed, atmosphereOnCampaign));
 
                 // Claim the event for the mission mode on every client, so one still sitting at the encounter menu
                 // greys out the auto-resolve option — a map event is fought as a live mission XOR an auto-resolve,
                 // never both (see BattleModeEncounterOptionsPatch / BattleModeRegistry).
+                operation = "send battle mode";
                 network.SendAll(new NetworkBattleModeSet(payload.What.MapEventId, (int)BattleStartMode.Mission));
             }
             catch (Exception e)
             {
-                Logger.Error(e, "Failed to make map event sides mission-ready for {Message}", nameof(NetworkBattleStartRequest));
+                Logger.Error(e, "Failed to {Operation} for {Message}", operation, nameof(NetworkBattleStartRequest));
                 network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
             }
         }, context: nameof(Handle_NetworkBattleStartRequest));
+    }
+
+    private static AtmosphereInfo GetAtmosphereOnCampaign(MapEvent mapEvent)
+    {
+        var weatherModel = Campaign.Current?.Models?.MapWeatherModel;
+        if (weatherModel == null)
+            return default;
+
+        try
+        {
+            return weatherModel.GetAtmosphereModel(mapEvent.Position);
+        }
+        catch (Exception e)
+        {
+            Logger.Warning(e, "Failed to read campaign atmosphere for map event; using default atmosphere");
+            return default;
+        }
     }
 
     /// <summary>
