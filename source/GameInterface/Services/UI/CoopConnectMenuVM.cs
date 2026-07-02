@@ -28,7 +28,7 @@ namespace GameInterface.Services.UI
 
         [DataSourceProperty]
         public HintViewModel ServerAddressHint { get; } = new HintViewModel(new TextObject(
-            "The address of the co-op server to join. Keep localhost if you are the host; type the address your friend shared to join their game."));
+            "The address of the co-op server to join. Keep localhost if you are the host; otherwise, type the address your friend shared to join their game."));
 
         [DataSourceProperty]
         public HintViewModel FriendsAddressHint { get; } = new HintViewModel(new TextObject(
