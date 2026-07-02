@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Coop.Core;
+using Coop.Core.Common.Session;
 using Coop.Lib.NoHarmony;
 using Coop.UI.LoadGameUI;
 using GameInterface;
@@ -265,6 +266,7 @@ namespace Coop
 
         private bool m_IsFirstTick = true;
         private bool _autoStarted = false;
+        private bool steamBootAttempted = false;
         protected override void OnApplicationTick(float dt)
         {
             if(m_IsFirstTick)
@@ -276,6 +278,13 @@ namespace Coop
 #endif
 
                 m_IsFirstTick = false;
+            }
+
+            // Boot Steam services once the main menu is up, so a +connect_lobby launch resolves while joining is possible.
+            if (!steamBootAttempted && GameStateManager.Current?.ActiveState is InitialState)
+            {
+                steamBootAttempted = true;
+                SteamIntegrationBoot.TryStart(isServer, Utilities.GetFullCommandLineString());
             }
 
             TimeSpan frameTime = TimeSpan.FromSeconds(dt);

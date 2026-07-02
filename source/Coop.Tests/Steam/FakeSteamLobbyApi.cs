@@ -1,0 +1,105 @@
+﻿using Coop.Steam;
+using System;
+using System.Collections.Generic;
+
+namespace Coop.Tests.Steam
+{
+    /// <summary>
+    /// Scriptable <see cref="ISteamLobbyApi"/>: records calls and lets tests decide when and
+    /// how the asynchronous lobby operations complete.
+    /// </summary>
+    public class FakeSteamLobbyApi : ISteamLobbyApi
+    {
+        public bool OverlayEnabled = true;
+        public ulong NextCreatedLobbyId = 1001;
+        public bool CreateSucceeds = true;
+        public bool JoinSucceeds = true;
+        public bool SetLobbyDataSucceeds = true;
+        public bool CompleteOperationsImmediately = true;
+        public string LaunchCommandLine = string.Empty;
+
+        public readonly List<ulong> LeftLobbies = new List<ulong>();
+        public readonly List<ulong> InviteDialogsOpened = new List<ulong>();
+        public readonly List<string> RichPresenceConnects = new List<string>();
+        public readonly Dictionary<ulong, Dictionary<string, string>> LobbyData = new Dictionary<ulong, Dictionary<string, string>>();
+        public int ClearRichPresenceCalls;
+
+        public Action PendingCreateCompletion;
+        public Action PendingJoinCompletion;
+
+        public bool IsOverlayEnabled => OverlayEnabled;
+
+        public event Action<ulong> LobbyJoinRequested;
+        public event Action<string> ConnectStringReceived;
+
+        public void RaiseLobbyJoinRequested(ulong lobbyId) => LobbyJoinRequested?.Invoke(lobbyId);
+        public void RaiseConnectStringReceived(string connectString) => ConnectStringReceived?.Invoke(connectString);
+
+        public void CreateFriendsOnlyLobby(int maxMembers, Action<ulong, bool> onCompleted)
+        {
+            PendingCreateCompletion = () => onCompleted(NextCreatedLobbyId, CreateSucceeds);
+
+            if (CompleteOperationsImmediately) CompletePendingCreate();
+        }
+
+        public void CompletePendingCreate()
+        {
+            var completion = PendingCreateCompletion;
+            PendingCreateCompletion = null;
+            completion?.Invoke();
+        }
+
+        public void JoinLobby(ulong lobbyId, Action<ulong, bool> onCompleted)
+        {
+            PendingJoinCompletion = () => onCompleted(lobbyId, JoinSucceeds);
+
+            if (CompleteOperationsImmediately) CompletePendingJoin();
+        }
+
+        public void CompletePendingJoin()
+        {
+            var completion = PendingJoinCompletion;
+            PendingJoinCompletion = null;
+            completion?.Invoke();
+        }
+
+        public void LeaveLobby(ulong lobbyId) => LeftLobbies.Add(lobbyId);
+
+        public bool SetLobbyData(ulong lobbyId, string key, string value)
+        {
+            if (!SetLobbyDataSucceeds) return false;
+
+            if (!LobbyData.TryGetValue(lobbyId, out var data))
+            {
+                data = new Dictionary<string, string>();
+                LobbyData[lobbyId] = data;
+            }
+
+            data[key] = value;
+            return true;
+        }
+
+        public string GetLobbyData(ulong lobbyId, string key)
+        {
+            if (LobbyData.TryGetValue(lobbyId, out var data) && data.TryGetValue(key, out var value)) return value;
+
+            return string.Empty;
+        }
+
+        public void OpenInviteDialog(ulong lobbyId) => InviteDialogsOpened.Add(lobbyId);
+
+        public bool SetRichPresenceConnect(string value)
+        {
+            RichPresenceConnects.Add(value);
+            return true;
+        }
+
+        public void ClearRichPresenceConnect() => ClearRichPresenceCalls++;
+
+        public string GetLaunchCommandLine() => LaunchCommandLine;
+
+        public void Dispose()
+        {
+        }
+    }
+}

@@ -83,6 +83,9 @@
       <Project>{E12F967C-1CC9-4E4D-8D8F-5029E0BA96EE}</Project>
       <Name>Missions</Name>
     </ProjectReference>
+    <ProjectReference Include="..\Coop.Steam\Coop.Steam.csproj">
+      <Name>Coop.Steam</Name>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <Content Include="FodyWeavers.xml" />

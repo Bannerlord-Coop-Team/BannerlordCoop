@@ -7,7 +7,7 @@
         <Standard.TopPanel Parameter.Title="@MovieTextHeader"/>
 
         <ListPanel DoNotAcceptEvents="false" WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
-                   HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="-300"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="-320"
                    LayoutImp.LayoutMethod="HorizontalLeftToRight">
           <Children>
             <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="256" HeightSizePolicy="Fixed"
@@ -23,7 +23,7 @@
         </ListPanel>
 
         <ListPanel DoNotAcceptEvents="false" WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
-                   HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="-100"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="-190"
                    LayoutImp.LayoutMethod="HorizontalLeftToRight">
           <Children>
             <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="256" HeightSizePolicy="Fixed"
@@ -39,7 +39,7 @@
         </ListPanel>
 
         <ListPanel DoNotAcceptEvents="false" WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
-                   HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="100"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="-60"
                    LayoutImp.LayoutMethod="HorizontalLeftToRight">
           <Children>
             <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="256" HeightSizePolicy="Fixed"
@@ -55,7 +55,32 @@
         </ListPanel>
 
         <ListPanel DoNotAcceptEvents="false" WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
-                   HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="300"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="70"
+                   LayoutImp.LayoutMethod="HorizontalLeftToRight" IsVisible="@SteamAvailable">
+          <Children>
+            <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="256" HeightSizePolicy="Fixed"
+                        SuggestedHeight="64" VerticalAlignment="Center" HorizontalAlignment="Right"
+                        Brush="Clan.TabControl.Text" Text="@PublicAddressText" PositionXOffset="-20"/>
+
+            <EditableTextWidget WidthSizePolicy="Fixed" SuggestedWidth="256" HeightSizePolicy="Fixed"
+                                SuggestedHeight="64" VerticalAlignment="Center" HorizontalAlignment="Left"
+                                Brush="ScoreboardPanels_2" Brush.AlphaFactor="0.75" Brush.FontSize="32"
+                                Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                                Text="@PublicAddress" IsVisible="true" PositionXOffset="-80"/>
+          </Children>
+        </ListPanel>
+
+        <ListPanel DoNotAcceptEvents="false" WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="200"
+                   LayoutImp.LayoutMethod="HorizontalLeftToRight" IsVisible="@SteamAvailable">
+          <Children>
+            <Standard.Button HorizontalAlignment="Center" VerticalAlignment="Center" SuggestedWidth="256"
+                      Command.Click="ActionToggleSteamInvites" Parameter.Text="@SteamInvitesButtonText"/>
+          </Children>
+        </ListPanel>
+
+        <ListPanel DoNotAcceptEvents="false" WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="330"
                    LayoutImp.LayoutMethod="HorizontalLeftToRight">
           <Children>
             <Standard.Button Brush="Standard.BackButton" HorizontalAlignment="Center" VerticalAlignment="Center" SuggestedWidth="128"

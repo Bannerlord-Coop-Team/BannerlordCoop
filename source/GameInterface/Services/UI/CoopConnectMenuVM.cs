@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Common.Network.Session;
 using GameInterface.Services.UI.Messages;
 using System;
 using System.Linq;
@@ -19,12 +20,37 @@ namespace GameInterface.Services.UI
         public string IpText => "IP-Address:";
         public string PortText => "Port:";
         public string PasswordText => "Password:";
+        public string PublicAddressText => "Public Address:";
 
         public string connectIP = "localhost";
 
         public string connectPort = "4200";
 
         public string connectPassword = "";
+
+        // Only takes effect for loopback connects (the host's own client), so defaulting on is safe.
+        public bool enableSteamInvites = SessionDiscovery.SteamAvailable;
+
+        public string publicAddress = "";
+
+        [DataSourceProperty]
+        public bool SteamAvailable => SessionDiscovery.SteamAvailable;
+
+        [DataSourceProperty]
+        public string SteamInvitesButtonText => $"Steam Invites: {(enableSteamInvites ? "On" : "Off")}";
+
+        [DataSourceProperty]
+        public string PublicAddress
+        {
+            get => publicAddress;
+            set
+            {
+                if (value == publicAddress)
+                    return;
+                publicAddress = value;
+                OnPropertyChanged(nameof(publicAddress));
+            }
+        }
 
         [DataSourceProperty]
         public string Ip
@@ -66,6 +92,12 @@ namespace GameInterface.Services.UI
             }
         }
 
+        public void ActionToggleSteamInvites()
+        {
+            enableSteamInvites = !enableSteamInvites;
+            OnPropertyChanged(nameof(SteamInvitesButtonText));
+        }
+
         public void ActionConnect()
         {
             if (!int.TryParse(connectPort, out var port) || port < IPEndPoint.MinPort || port > IPEndPoint.MaxPort)
@@ -95,7 +127,10 @@ namespace GameInterface.Services.UI
                     }
                 }
 
-                MessageBroker.Instance.Publish(this, new AttemptJoin(ip, port));
+                // Only the host's own client (loopback connect) may advertise the session it hosts.
+                bool steamInvites = enableSteamInvites && SessionDiscovery.SteamAvailable && IPAddress.IsLoopback(ip);
+
+                MessageBroker.Instance.Publish(this, new AttemptJoin(ip, port, steamInvites, publicAddress?.Trim()));
             }
             catch (Exception ex)
             {

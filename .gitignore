@@ -368,6 +368,8 @@ MigrationBackup/
 
 # Exclude .NET assemblies from source
 *.dll
+# Vendored reference assemblies are tracked deliberately
+!source/libs/**/*.dll
 
 ### VisualStudioCode ###
 .vscode/*

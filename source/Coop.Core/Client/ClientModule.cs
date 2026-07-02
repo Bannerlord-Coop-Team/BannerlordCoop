@@ -2,10 +2,15 @@
 using Common.LogicStates;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Session;
 using Common.PacketHandlers;
 using Coop.Core.Client.Policies;
+using Coop.Core.Client.Services.Session;
 using Coop.Core.Client.States;
 using Coop.Core.Common;
+using Coop.Core.Common.Configuration;
+using Coop.Core.Common.Session;
+using Coop.Steam;
 using GameInterface.Policies;
 using LiteNetLib;
 using Missions;
@@ -29,6 +34,20 @@ public class ClientModule : CommonModule
 
         // Policies
         builder.RegisterType<ClientSyncPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();
+
+        // Steam registrations only when the boot probe found Steam, so tests and non-Steam installs never load Steamworks types.
+        if (SessionDiscovery.SteamAvailable)
+        {
+            builder.RegisterType<SteamLobbyApi>().As<ISteamLobbyApi>().InstancePerLifetimeScope();
+            builder.RegisterType<SteamLobbyAdvertiser>().As<ISessionAdvertiser>().InstancePerLifetimeScope();
+        }
+        else
+        {
+            builder.RegisterType<NoopSessionAdvertiser>().As<ISessionAdvertiser>().InstancePerLifetimeScope();
+        }
+
+        builder.RegisterType<ConfiguredSessionJoinInfoSource>().As<ISessionJoinInfoSource>().InstancePerLifetimeScope();
+        builder.RegisterType<SessionAdvertisementConfig>().AsSelf().InstancePerLifetimeScope();
 
         RegisterAllTypesWithInterface<ClientModule, IHandler>(builder, autoInstantiate: true);
         RegisterAllTypesWithInterface<ClientModule, IPacketHandler>(builder, autoInstantiate: true);
