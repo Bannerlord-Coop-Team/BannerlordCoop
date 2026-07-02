@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.Heroes.Messages.Collections;
 using GameInterface.Services.ObjectManager;
+using static GameInterface.Services.ObjectManager.ObjectManager;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
@@ -73,6 +74,8 @@ namespace GameInterface.Services.Heroes.Handlers
             if (!TryGetId(data.Instance, out string HeroId)) return;
             if (!TryGetId(data.Value, out string CharacterObjectId) && data.Value != null) return;
 
+            HeroId = Compact(HeroId, typeof(Hero));
+            CharacterObjectId = Compact(CharacterObjectId, typeof(CharacterObject));
             network.SendAll(new NetworkUpdateArray(HeroId, CharacterObjectId, data.Index));
         }
 

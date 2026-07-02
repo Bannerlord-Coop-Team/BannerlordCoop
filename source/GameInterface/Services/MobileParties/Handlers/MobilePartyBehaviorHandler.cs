@@ -10,6 +10,7 @@ using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.MobilePartyAIs;
 using GameInterface.Services.MobilePartyAIs.Patches;
 using GameInterface.Services.ObjectManager;
+using static GameInterface.Services.ObjectManager.ObjectManager;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem.Party;
@@ -69,10 +70,14 @@ internal class MobilePartyBehaviorHandler : IHandler
         if (!partyAi._mobileParty.IsControlledByThisInstance())
             return;
 
+        partyId = Compact(partyId, typeof(MobileParty));
+
         string interactablePointId = null;
         if (interactablePoint is PartyBase partyBase &&
             !objectManager.TryGetId(partyBase, out interactablePointId))
             return;
+
+        interactablePointId = Compact(interactablePointId, typeof(PartyBase));
 
         PartyBehaviorUpdateData data = new PartyBehaviorUpdateData(
             partyId,

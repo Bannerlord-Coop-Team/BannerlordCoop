@@ -2,7 +2,9 @@
 using Common.Network;
 using Coop.Core.Server.Services.Villages.Messages;
 using GameInterface.Services.ObjectManager;
+using static GameInterface.Services.ObjectManager.ObjectManager;
 using GameInterface.Services.Villages.Messages;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace Coop.Core.Server.Services.Villages.Handlers;
 
@@ -72,6 +74,7 @@ internal class ServerVillageHandler : IHandler
         var obj = payload.What;
 
         if (!objectManager.TryGetIdWithLogging(obj.Village, out var villageId)) return;
+        villageId = Compact(villageId, typeof(Village));
 
         var networkMessage = new NetworkChangeVillageHearth(
             villageId,
