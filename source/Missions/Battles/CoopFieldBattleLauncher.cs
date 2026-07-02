@@ -143,7 +143,7 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
                 // Battle), spawn both sides frozen during SetupTeams, hold Mission.AllowAiTicking off, and start
                 // the spawners + un-pause AI only on Start Battle (FinishDeployment). This replaces the coop
                 // force-spawn shortcut (CoopBattleController.EnsureSidesSpawning), now removed.
-                new BattleDeploymentMissionController(isPlayerAttacker),
+                new CoopBattleDeploymentMissionController(isPlayerAttacker),
                 new BattleDeploymentHandler(isPlayerAttacker),
             };
 
