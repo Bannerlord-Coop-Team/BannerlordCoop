@@ -74,7 +74,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
         // of what happens below, so a stale peer never resolves to the wrong party
         playerManager.ClearPeer(peer);
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             if (!party.IsActive)
             {
@@ -83,7 +83,6 @@ internal class PlayerPartyVisibilityHandler : IHandler
             }
 
             party.IsActive = false;
-
 
             RemoveVisual(party);
 
@@ -105,7 +104,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
             return;
         }
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             if (party.IsActive)
             {
