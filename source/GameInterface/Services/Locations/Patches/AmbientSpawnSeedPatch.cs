@@ -1,7 +1,10 @@
 using Common;
+using GameInterface.Services.Heroes.Extensions;
 using HarmonyLib;
 using SandBox.Missions.MissionLogics;
+using Serilog.Core;
 using System;
+using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -37,6 +40,8 @@ internal class AmbientSpawnSeedPatch
 
     static void Prefix(out SeedScope __state)
     {
+        StripPlayerHeroes();
+
         __state = default;
 
         if (!ModInformation.IsClient) return;
@@ -60,6 +65,19 @@ internal class AmbientSpawnSeedPatch
         if (Game.Current != null)
         {
             RandomGeneratorProperty.SetValue(Game.Current, __state.Previous);
+        }
+    }
+
+    private static void StripPlayerHeroes()
+    {
+        var location = CampaignMission.Current?.Location;
+        if (location?.GetCharacterList() == null) return;
+
+        foreach (var entry in location.GetCharacterList()
+                     .Where(c => c?.Character?.HeroObject?.IsPlayerHero() == true).ToList())
+        {
+            SyncedLocationCharacters.Unregister(entry);
+            location._characterList.Remove(entry);
         }
     }
 
