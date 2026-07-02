@@ -34,7 +34,7 @@ public class BattleHostRegistry : IBattleHostRegistry
         }
     }
 
-    public bool IsLocalHost(string mapEventId)
+    public bool IsHost(string mapEventId)
     {
         lock (gate)
         {

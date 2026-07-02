@@ -191,6 +191,13 @@ public class AgentMovementHandler : IAgentMovementHandler
                     if (agent == null || agent.Mission != Mission.Current || agent.IsActive() == false)
                         continue;
 
+                    // Re-check authority ON the game thread: a packet from the previous owner can be queued
+                    // behind a host-migration adoption (both are game-thread actions queued from the network
+                    // thread), and applying it after the transfer would re-pin the freshly adopted agent to a
+                    // stale position/input snapshot the AI then fights.
+                    if (agentRegistry.IsLocallyControlled(agent))
+                        continue;
+
                     SyncMountState(agent, data);
                     data.Apply(agent);
 
