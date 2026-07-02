@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.GuantletMapEventVisuals;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
@@ -16,14 +17,20 @@ internal class MapEventSideDataHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
+    private readonly IMapEventBattleSizeCorrection mapEventBattleSizeCorrection;
 
     private static readonly ILogger Logger = LogManager.GetLogger<MapEventSideDataHandler>();
 
-    public MapEventSideDataHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
+    public MapEventSideDataHandler(
+        IMessageBroker messageBroker,
+        INetwork network,
+        IObjectManager objectManager,
+        IMapEventBattleSizeCorrection mapEventBattleSizeCorrection)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
+        this.mapEventBattleSizeCorrection = mapEventBattleSizeCorrection;
 
         messageBroker.Subscribe<MapEventSideIFactionChanged>(Handle);
         messageBroker.Subscribe<NetworkChangeMapEventSideIFaction>(Handle);
@@ -179,6 +186,8 @@ internal class MapEventSideDataHandler : IHandler
 
                     side._battleParties.Add(party);
                 }
+
+                mapEventBattleSizeCorrection.TryCorrect(side.MapEvent);
             }
             catch (Exception e)
             {
@@ -213,6 +222,8 @@ internal class MapEventSideDataHandler : IHandler
                 {
                     mapEvent._sides[side] = mapEventSide;
                 }
+
+                mapEventBattleSizeCorrection.TryCorrect(mapEvent);
             }
             catch (Exception e)
             {
@@ -249,6 +260,8 @@ internal class MapEventSideDataHandler : IHandler
                 {
                     mapEventSide._battleParties.Add(mapEventParty);
                 }
+
+                mapEventBattleSizeCorrection.TryCorrect(mapEventSide.MapEvent);
             }
             catch (Exception e)
             {
