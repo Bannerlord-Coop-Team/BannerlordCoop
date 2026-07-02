@@ -14,6 +14,7 @@ using System;
 using System.Collections.Concurrent;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.AgentOrigins;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -333,13 +334,20 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
                 // The player may have left between receiving the join info and this running.
                 if (Mission.Current == null) return;
 
+                // In a village the hero rides in on their battle mount; towns, taverns and castle courtyards
+                // are civilian and on-foot. Mirror that split (the same IsVillage test the server uses when it
+                // spawns notables/companions in SettlementPopulationTracker) so a remote player's puppet matches
+                // how its owner spawned. Forcing NoHorses + civilian equipment here is what left every village
+                // puppet dismounted; once it has a mount, AgentMovementHandler keeps the mount pose in sync.
+                bool isVillage = Settlement.CurrentSettlement?.IsVillage == true;
+
                 AgentBuildData agentBuildData = new AgentBuildData(character);
                 agentBuildData.BodyProperties(character.GetBodyPropertiesMax());
                 agentBuildData.InitialPosition(startingPos);
                 agentBuildData.Team(Mission.Current.PlayerAllyTeam);
                 agentBuildData.InitialDirection(Vec2.Forward);
-                agentBuildData.NoHorses(true);
-                agentBuildData.Equipment(character.FirstCivilianEquipment);
+                agentBuildData.NoHorses(!isVillage);
+                agentBuildData.Equipment(isVillage ? character.FirstBattleEquipment : character.FirstCivilianEquipment);
                 agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
                 agentBuildData.Controller(AgentControllerType.None);
                 agentBuildData.ClothingColor1(character.HeroObject.MapFaction.Color);
