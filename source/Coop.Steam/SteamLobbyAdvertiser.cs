@@ -66,7 +66,8 @@ public class SteamLobbyAdvertiser : ISessionAdvertiser
         }
 
         lobbyId = createdLobbyId;
-        Logger.Information("Steam lobby {LobbyId} created", lobbyId);
+        // Lobby ids are logged as strings; numeric log properties get double-rounded past 2^53 in structured viewers.
+        Logger.Information("Steam lobby {LobbyId} created", lobbyId.ToString());
         ApplyLobbyData();
     }
 

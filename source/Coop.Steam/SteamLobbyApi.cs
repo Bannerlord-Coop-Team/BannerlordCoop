@@ -59,7 +59,7 @@ public class SteamLobbyApi : ISteamLobbyApi
     {
         try
         {
-            Logger.Information("Steam lobby join requested for lobby {LobbyId}", callback.m_steamIDLobby.m_SteamID);
+            Logger.Information("Steam lobby join requested for lobby {LobbyId}", callback.m_steamIDLobby.m_SteamID.ToString());
             LobbyJoinRequested?.Invoke(callback.m_steamIDLobby.m_SteamID);
         }
         catch (Exception ex)

@@ -68,20 +68,21 @@ public class SteamJoinListener : IDisposable
         // A second JoinLobby would silently unregister the first pending call result.
         if (joinInFlight)
         {
-            Logger.Information("Ignoring Steam lobby join for {LobbyId}; another join is in flight", lobbyId);
+            Logger.Information("Ignoring Steam lobby join for {LobbyId}; another join is in flight", lobbyId.ToString());
             return;
         }
 
         try
         {
-            Logger.Information("Joining Steam lobby {LobbyId}", lobbyId);
+            // Lobby ids are logged as strings; numeric log properties get double-rounded past 2^53 in structured viewers.
+            Logger.Information("Joining Steam lobby {LobbyId}", lobbyId.ToString());
             joinInFlight = true;
             lobbyApi.JoinLobby(lobbyId, OnLobbyEntered);
         }
         catch (Exception ex)
         {
             joinInFlight = false;
-            Logger.Error(ex, "Failed to join Steam lobby {LobbyId}", lobbyId);
+            Logger.Error(ex, "Failed to join Steam lobby {LobbyId}", lobbyId.ToString());
             messageBroker.Publish(this, new SessionJoinFailed("Could not join the Steam lobby"));
         }
     }
@@ -119,7 +120,7 @@ public class SteamJoinListener : IDisposable
         }
         catch (Exception ex)
         {
-            Logger.Error(ex, "Failed to read Steam lobby {LobbyId}", lobbyId);
+            Logger.Error(ex, "Failed to read Steam lobby {LobbyId}", lobbyId.ToString());
             messageBroker.Publish(this, new SessionJoinFailed("Could not read the Steam lobby"));
         }
     }
