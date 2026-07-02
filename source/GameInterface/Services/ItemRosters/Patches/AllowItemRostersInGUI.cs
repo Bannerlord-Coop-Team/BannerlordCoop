@@ -3,6 +3,7 @@ using HarmonyLib;
 using Helpers;
 using System.Collections.Generic;
 using System.Reflection;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.ViewModelCollection;
 using TaleWorlds.Core.ViewModelCollection.Information;
@@ -18,7 +19,8 @@ internal class AllowItemRostersInGUI
         AccessTools.Method(typeof(PropertyBasedTooltipVM), "OnPeriodicRefresh"),
         AccessTools.Method(typeof(GauntletInformationView), "OnShowTooltip"),
         AccessTools.Method(typeof(TooltipRefresherCollection), "RefreshSettlementTooltip"),
-        AccessTools.Method(typeof(PartyScreenHelper), nameof(PartyScreenHelper.OpenPartyScreen))
+        AccessTools.Method(typeof(PartyScreenHelper), nameof(PartyScreenHelper.OpenPartyScreen)),
+        AccessTools.Method(typeof(CaravansCampaignBehavior), nameof(CaravansCampaignBehavior.BribeAmount))
     };
 
     [HarmonyPrefix]

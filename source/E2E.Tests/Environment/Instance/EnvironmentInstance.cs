@@ -1,4 +1,4 @@
-﻿using Autofac;
+using Autofac;
 using Common;
 using Common.Messaging;
 using Common.PacketHandlers;
@@ -7,6 +7,7 @@ using Common.Tests.Utils;
 using Common.Util;
 using E2E.Tests.Environment.Mock;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.TroopRosters;
 using HarmonyLib;
 using LiteNetLib;
 using ProtoBuf.Meta;

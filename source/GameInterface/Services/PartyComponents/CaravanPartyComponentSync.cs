@@ -8,10 +8,8 @@ namespace GameInterface.Services.PartyComponents
     {
         public CaravanPartyComponentSync(AutoSyncRegistry autoSyncBuilder)
         {
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(CaravanPartyComponent), nameof(CaravanPartyComponent.Settlement)));
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(CaravanPartyComponent), nameof(CaravanPartyComponent.Owner)));
-
             autoSyncBuilder.AddField(AccessTools.Field(typeof(CaravanPartyComponent), nameof(CaravanPartyComponent._leader)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(CaravanPartyComponent), nameof(CaravanPartyComponent._isElite)));
         }
     }
 }

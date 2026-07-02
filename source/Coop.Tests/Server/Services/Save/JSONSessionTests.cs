@@ -1,9 +1,11 @@
 ﻿using Common.Serialization;
 using GameInterface.CoopSessionData.Save.Data;
+using GameInterface.Services.Caravans;
 using GameInterface.Services.Heroes.Data;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.Workshops;
+using GameInterface.Services.Alleys;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -30,7 +32,13 @@ namespace Coop.Tests.Server.Services.Save
                 new Player("MyPlayer", "MyHero", "MyParty", "MyClan", "MyCharacter")
             };
 
-            var sessionData = new CoopSession("TestId", players, new CraftingPlayerData(new(), new(), new()), new WorkshopPlayerData(new()));
+            var sessionData = new CoopSession(
+                "TestId",
+                players,
+                new CraftingPlayerData(new(), new(), new()),
+                new WorkshopPlayerData(new()),
+                new CaravansPlayerData(new(), new(), new()),
+                new AlleyPlayerData(new()));
 
             string saveFile = SAVE_PATH + sessionData.UniqueGameId + ".json";
 

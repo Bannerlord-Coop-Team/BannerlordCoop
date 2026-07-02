@@ -1,5 +1,9 @@
 using E2E.Tests.Util;
+using HarmonyLib;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -38,6 +42,21 @@ public class KingdomSyncTests : SyncTestBase
     }
 
     [Fact]
+    public void Server_Kingdom_Collections()
+    {
+        AssertArmyListSyncs();
+        TestEnvironment.AssertCollectionReferenceField<Kingdom, Clan>(nameof(Kingdom._clans), KingdomId);
+        TestEnvironment.AssertCollectionReferenceField<Kingdom, Town>(nameof(Kingdom._fiefsCache), KingdomId);
+        TestEnvironment.AssertCollectionReferenceField<Kingdom, Hero>(nameof(Kingdom._heroesCache), KingdomId);
+        TestEnvironment.AssertCollectionReferenceField<Kingdom, Hero>(nameof(Kingdom._aliveLordsCache), KingdomId);
+        TestEnvironment.AssertCollectionReferenceField<Kingdom, Hero>(nameof(Kingdom._deadLordsCache), KingdomId);
+        TestEnvironment.AssertCollectionReferenceField<Kingdom, Settlement>(nameof(Kingdom._settlementsCache), KingdomId);
+        TestEnvironment.AssertCollectionReferenceField<Kingdom, Town>(nameof(Kingdom._townsCache), KingdomId);
+        TestEnvironment.AssertCollectionReferenceField<Kingdom, Village>(nameof(Kingdom._villagesCache), KingdomId);
+        AssertWarPartyComponentsCacheSyncs();
+    }
+
+    [Fact]
     public void Server_Kingdom_Properties()
     {
         var banner = new Banner();
@@ -64,5 +83,146 @@ public class KingdomSyncTests : SyncTestBase
         TestEnvironment.AssertProperty<Kingdom, CampaignTime>(nameof(Kingdom.NotAttackableByPlayerUntilTime), new CampaignTime(54));
         TestEnvironment.AssertProperty<Kingdom, uint>(nameof(Kingdom.PrimaryBannerColor), 7);
         TestEnvironment.AssertProperty<Kingdom, uint>(nameof(Kingdom.SecondaryBannerColor), 7);
+    }
+
+    private void AssertArmyListSyncs()
+    {
+        var fieldInfo = AccessTools.Field(typeof(Kingdom), nameof(Kingdom._armies));
+        var firstArmyId = CreateRegisteredArmy();
+        var secondArmyId = CreateRegisteredArmy();
+
+        var setIntercept = TestEnvironment.GetIntercept(fieldInfo);
+        var addIntercept = TestEnvironment.GetCollectionAddIntercept(fieldInfo);
+        var removeIntercept = TestEnvironment.GetCollectionRemoveIntercept(fieldInfo);
+
+        Assert.True(Server.ObjectManager.TryGetObject(firstArmyId, out Army firstArmy));
+        var collection = new MBList<Army> { firstArmy };
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject(KingdomId, out Kingdom kingdom));
+
+            setIntercept.Invoke(null, new object[] { kingdom, collection });
+
+            Assert.Same(collection, kingdom._armies);
+            Assert.Contains(firstArmy, kingdom._armies);
+        });
+
+        AssertKingdomCollectionContains(fieldInfo, collection);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject(KingdomId, out Kingdom kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject(secondArmyId, out Army secondArmy));
+
+            addIntercept.Invoke(null, new object[] { kingdom._armies, secondArmy, kingdom });
+
+            Assert.Contains(secondArmy, kingdom._armies);
+            Assert.Equal(2, kingdom._armies.Count);
+        });
+
+        AssertKingdomCollectionContains(fieldInfo, collection);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject(KingdomId, out Kingdom kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject(firstArmyId, out Army firstArmy));
+
+            removeIntercept.Invoke(null, new object[] { kingdom._armies, firstArmy, kingdom });
+
+            Assert.DoesNotContain(firstArmy, kingdom._armies);
+            Assert.Single(kingdom._armies);
+        });
+
+        AssertKingdomCollectionContains(fieldInfo, collection);
+    }
+
+    private void AssertWarPartyComponentsCacheSyncs()
+    {
+        var fieldInfo = AccessTools.Field(typeof(Kingdom), nameof(Kingdom._warPartyComponentsCache));
+        var setIntercept = TestEnvironment.GetIntercept(fieldInfo);
+        var addIntercept = TestEnvironment.GetCollectionAddIntercept(fieldInfo);
+        var removeIntercept = TestEnvironment.GetCollectionRemoveIntercept(fieldInfo);
+        var firstComponentId = TestEnvironment.CreateRegisteredObject<LordPartyComponent>();
+        var secondComponentId = TestEnvironment.CreateRegisteredObject<LordPartyComponent>();
+
+        Assert.True(Server.ObjectManager.TryGetObject(firstComponentId, out LordPartyComponent firstComponent));
+        var collection = new MBList<WarPartyComponent> { firstComponent };
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject(KingdomId, out Kingdom kingdom));
+
+            setIntercept.Invoke(null, new object[] { kingdom, collection });
+
+            Assert.Same(collection, kingdom._warPartyComponentsCache);
+            Assert.Contains(firstComponent, kingdom._warPartyComponentsCache);
+        });
+
+        AssertKingdomCollectionContains(fieldInfo, collection);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject(KingdomId, out Kingdom kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject(secondComponentId, out LordPartyComponent secondComponent));
+
+            addIntercept.Invoke(null, new object[] { kingdom._warPartyComponentsCache, secondComponent, kingdom });
+
+            Assert.Contains(secondComponent, kingdom._warPartyComponentsCache);
+            Assert.Equal(2, kingdom._warPartyComponentsCache.Count);
+        });
+
+        AssertKingdomCollectionContains(fieldInfo, collection);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject(KingdomId, out Kingdom kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject(firstComponentId, out LordPartyComponent firstComponent));
+
+            removeIntercept.Invoke(null, new object[] { kingdom._warPartyComponentsCache, firstComponent, kingdom });
+
+            Assert.DoesNotContain(firstComponent, kingdom._warPartyComponentsCache);
+            Assert.Single(kingdom._warPartyComponentsCache);
+        });
+
+        AssertKingdomCollectionContains(fieldInfo, collection);
+    }
+
+    private string CreateRegisteredArmy()
+    {
+        string armyId = null;
+
+        Server.Call(() =>
+        {
+            var kingdom = GameObjectCreator.CreateInitializedObject<Kingdom>();
+            var mobileParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var clan = GameObjectCreator.CreateInitializedObject<Clan>();
+
+            mobileParty.LeaderHero.Clan = clan;
+
+            var army = new Army(kingdom, mobileParty, Army.ArmyTypes.Patrolling);
+
+            Assert.True(Server.ObjectManager.TryGetId(army, out armyId));
+        });
+
+        Assert.NotNull(armyId);
+        return armyId;
+    }
+
+    private void AssertKingdomCollectionContains<TField>(FieldInfo fieldInfo, IEnumerable<TField> serverCollection)
+    {
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject(KingdomId, out Kingdom kingdom));
+            var clientList = (IEnumerable<TField>)fieldInfo.GetValue(kingdom);
+
+            Assert.Equal(serverCollection.Count(), clientList.Count());
+            for (int i = 0; i < clientList.Count(); i++)
+            {
+                Assert.True(Server.ObjectManager.TryGetId(serverCollection.ElementAt(i), out string serverReferenceId));
+                Assert.True(client.ObjectManager.TryGetId(clientList.ElementAt(i), out string clientReferenceId));
+                Assert.Equal(serverReferenceId, clientReferenceId);
+            }
+        }
     }
 }

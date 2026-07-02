@@ -33,6 +33,9 @@ internal class PartyLifetimeHandler : IHandler
         messageBroker.Subscribe<DestroyPartyApplied>(Handle_PartyDestroyed);
         messageBroker.Subscribe<NetworkApplyDestroyParty>(Handle_DestroyParty);
 
+        messageBroker.Subscribe<DestroyPartyRequested>(Handle_DestroyPartyRequested);
+        messageBroker.Subscribe<NetworkRequestDestroyParty>(Handle_NetworkRequestDestroyParty);
+
         messageBroker.Subscribe<PartyDisbanded>(Handle_PartyDisbanded);
         messageBroker.Subscribe<NetworkPartyDisbanded>(Handle_NetworkPartyDisbanded);
     }
@@ -41,6 +44,9 @@ internal class PartyLifetimeHandler : IHandler
     {
         messageBroker.Unsubscribe<DestroyPartyApplied>(Handle_PartyDestroyed);
         messageBroker.Unsubscribe<NetworkApplyDestroyParty>(Handle_DestroyParty);
+
+        messageBroker.Unsubscribe<DestroyPartyRequested>(Handle_DestroyPartyRequested);
+        messageBroker.Unsubscribe<NetworkRequestDestroyParty>(Handle_NetworkRequestDestroyParty);
 
         messageBroker.Unsubscribe<PartyDisbanded>(Handle_PartyDisbanded);
         messageBroker.Unsubscribe<NetworkPartyDisbanded>(Handle_NetworkPartyDisbanded);
@@ -115,6 +121,59 @@ internal class PartyLifetimeHandler : IHandler
                 DestroyPartyAction.Apply(victoriousPartyBase, defeatedParty);
             }
         );
+    }
+
+    internal void Handle_DestroyPartyRequested(MessagePayload<DestroyPartyRequested> payload)
+    {
+        var destroyerParty = payload.What.DestroyerParty;
+        var defeatedParty = payload.What.DefeatedParty;
+
+        // The defeated party can be a client-local object with no network id — e.g. a quest-spawned
+        // party the server never registered. Those are destroyed locally only and have nothing for
+        // the server to replicate, so skip silently (no logging) rather than reporting a missing id.
+        if (!objectManager.TryGetId(defeatedParty, out var defeatedPartyId))
+            return;
+
+        if (!objectManager.TryGetIdWithLogging(destroyerParty, out var destroyerPartyId))
+            return;
+
+        network.SendAll(new NetworkRequestDestroyParty(destroyerPartyId, defeatedPartyId));
+    }
+
+    internal void Handle_NetworkRequestDestroyParty(MessagePayload<NetworkRequestDestroyParty> payload)
+    {
+        // Only the server applies the destroy authoritatively; clients receive the resulting
+        // NetworkApplyDestroyParty broadcast instead.
+        if (!ModInformation.IsServer)
+            return;
+
+        var message = payload.What;
+
+        // Resolve and apply on the game thread with patches LIVE (no AllowedThread): the request
+        // arrives on the network (poller) thread, and the party can be destroyed or unregistered
+        // between resolving it and the queued action draining, so resolve it at drain time. The
+        // server's DestroyPartyActionPatch.PrefixApply then publishes DestroyPartyApplied, and
+        // Handle_PartyDestroyed replicates the destruction to every client.
+        GameThread.Run(() =>
+        {
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging<PartyBase>(message.DestroyerPartyId, out var destroyerParty))
+                    return;
+
+                if (!objectManager.TryGetObjectWithLogging<MobileParty>(message.DefeatedPartyId, out var defeatedParty))
+                    return;
+
+                if (!defeatedParty.IsActive)
+                    return;
+
+                DestroyPartyAction.Apply(destroyerParty, defeatedParty);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "[Server] Failed to apply requested destroy for party {DefeatedPartyId}", message.DefeatedPartyId);
+            }
+        });
     }
 
     private void Handle_PartyDisbanded(MessagePayload<PartyDisbanded> payload)

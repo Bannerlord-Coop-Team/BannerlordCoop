@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.Entity;
+﻿using Common;
+using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players.Data;
 using Serilog;
@@ -82,6 +83,19 @@ public class PlayerManager : IPlayerManager
         }
 
         PlayerObjects.Add(obj, new ControlledObjectInfo(controllerId, controllerIdProvider));
+
+        if (obj is MobileParty mobileParty)
+        {
+            InvalidatePlayerPartySpeedCache(mobileParty);
+        }
+    }
+
+    private void InvalidatePlayerPartySpeedCache(MobileParty mobileParty)
+    {
+        GameThread.RunSafe(() =>
+        {
+            mobileParty._partyPureSpeedLastCheckVersion = -1;
+        }, context: nameof(PlayerManager));
     }
 
     public bool TryGetPlayer(string controllerId, out Player player)

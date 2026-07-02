@@ -1,9 +1,10 @@
-﻿using Common;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
+using GameInterface.Services.Kingdoms;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Interfaces;
@@ -23,14 +24,21 @@ public class ServerSettlementExitEnterHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly ISettlementInterface settlementInterface;
+    private readonly IKingdomCreationSettlementTracker settlementTracker;
     private readonly ILogger Logger = LogManager.GetLogger<ServerSettlementExitEnterHandler>();
 
-    public ServerSettlementExitEnterHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager, ISettlementInterface settlementInterface)
+    public ServerSettlementExitEnterHandler(
+        IMessageBroker messageBroker,
+        INetwork network,
+        IObjectManager objectManager,
+        ISettlementInterface settlementInterface,
+        IKingdomCreationSettlementTracker settlementTracker)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.settlementInterface = settlementInterface;
+        this.settlementTracker = settlementTracker;
         messageBroker.Subscribe<NetworkRequestStartSettlementEncounter>(Handle);
         messageBroker.Subscribe<NetworkRequestEndSettlementEncounter>(Handle);
 
@@ -70,6 +78,13 @@ public class ServerSettlementExitEnterHandler : IHandler
     private void Handle(MessagePayload<NetworkRequestEndSettlementEncounter> obj)
     {
         var payload = obj.What;
+
+        objectManager.TryGetObject<MobileParty>(payload.PartyId, out var mobileParty);
+        if (settlementTracker.TryConsumeLeave(mobileParty, payload.PartyId))
+        {
+            return;
+        }
+
         var peer = (NetPeer)obj.Who;
 
         // The sending client is currently in a settlement encounter, this is handled
@@ -103,6 +118,11 @@ public class ServerSettlementExitEnterHandler : IHandler
         var payload = obj.What;
 
         if (!objectManager.TryGetIdWithLogging(payload.MobileParty, out var mobilePartyId)) return;
+
+        if (settlementTracker.TryConsumeLeave(payload.MobileParty, mobilePartyId))
+        {
+            return;
+        }
 
         network.SendAll(new NetworkPartyLeaveSettlement(mobilePartyId));
 
