@@ -66,11 +66,7 @@ namespace Coop.Core
 
         private void Handle(MessagePayload<HostSaveGame> obj)
         {
-            var saveName = obj.What.SaveName;
-
-            StartAsServer(() => container
-                .Resolve<IGameStateInterface>()
-                .LoadGame(saveName));
+            StartAsServer(obj.What.SaveName);
         }
 
         private void Handle(MessagePayload<EndCoopMode> payload)
@@ -82,7 +78,7 @@ namespace Coop.Core
 
         public int Priority => 0;
 
-        public void StartAsServer(Action afterStart = null)
+        public void StartAsServer(string saveName = null)
         {
             // A second Host or Join click while patches are still applying would tear down the in-flight start
             if (coopStarting) return;
@@ -105,8 +101,7 @@ namespace Coop.Core
             if (!loadingInterface.IsLoadingScreenAvailable)
             {
                 gameInterface.PatchAll();
-                container.Resolve<ILogic>().Start();
-                afterStart?.Invoke();
+                StartServerLogic(saveName);
                 return;
             }
 
@@ -115,9 +110,19 @@ namespace Coop.Core
             PatchAllOffGameThread(gameInterface, loadingInterface, () =>
             {
                 loadingInterface.SetLoadingMessage("Hosting Coop Server", "Loading campaign save...");
-                container.Resolve<ILogic>().Start();
-                afterStart?.Invoke();
+                StartServerLogic(saveName);
             });
+        }
+
+        // LoadGame must follow PatchAll (the LoadPatches postfix publishes GameLoaded), so it runs here, after patching, not at the caller
+        private void StartServerLogic(string saveName)
+        {
+            container.Resolve<ILogic>().Start();
+
+            if (saveName != null)
+            {
+                container.Resolve<IGameStateInterface>().LoadGame(saveName);
+            }
         }
 
         // The ~30s patch compile must stay off the game thread so the loading window keeps drawing, like the client patching on its network thread
