@@ -69,7 +69,10 @@ public static class PartyBehaviorPatch
             }
         }
 
-        return false;
+        // Clients predict locally (run the original now) instead of waiting a round trip
+        // for the server echo; the echo is dropped in MobilePartyBehaviorHandler. The
+        // server keeps applying via the handler so it still broadcasts to clients.
+        return ModInformation.IsClient;
     }
 
     private static bool BehaviorIsSame(

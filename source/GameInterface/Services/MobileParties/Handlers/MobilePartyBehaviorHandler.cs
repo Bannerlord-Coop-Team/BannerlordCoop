@@ -104,6 +104,13 @@ internal class MobilePartyBehaviorHandler : IHandler
                 if (!objectManager.TryGetObject(data.MobilePartyId, out MobileParty party))
                     return;
 
+                // Only this instance issues behavior for parties it controls, so any
+                // incoming update for one is our own echo: prediction already applied
+                // it, and the stale PartyPosition it carries would snap the party
+                // back (visible jitter).
+                if (ModInformation.IsClient && party.IsControlledByThisInstance())
+                    return;
+
                 // The apply drives the Harmony-patched SetAiBehavior path; the AutoSync
                 // patch must stand down while the replicated behavior is applied.
                 using (new AllowedThread())
