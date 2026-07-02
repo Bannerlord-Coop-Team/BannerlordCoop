@@ -14,6 +14,9 @@ public interface IGameInterface : IDisposable
 public class GameInterface : IGameInterface
 {
     public const string HARMONY_STATIC_FIXES_CATEGORY = "HarmonyStaticFixes";
+
+    // Applied at boot by CoopMod, not by PatchAll: the loading-window keepalive must already be live while a host waits on PatchAll itself
+    public const string HARMONY_UI_LOADING_CATEGORY = "UILoadingPatches";
     
     private readonly Harmony harmony;
     private readonly IAutoSyncPatchCollector patchCollector;

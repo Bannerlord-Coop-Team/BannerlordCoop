@@ -61,8 +61,12 @@ public class InitialServerState : ServerStateBase
         // Remove server party
         messageBroker.Publish(this, new RemoveMainParty());
 
+        loadingInterface.SetLoadingMessage("Hosting Coop Server", "Registering campaign objects...");
+
         // Register all objects after main party is removed to keep order
         registryManager.RegisterAllGameObjects();
+
+        loadingInterface.SetLoadingMessage("Hosting Coop Server", "Applying synced object lifetimes...");
         registryManager.PatchLifetimes();
 
         Logic.SetState<ServerRunningState>();

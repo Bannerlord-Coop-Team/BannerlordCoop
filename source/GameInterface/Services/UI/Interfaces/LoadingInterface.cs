@@ -8,6 +8,7 @@ namespace GameInterface.Services.UI.Interfaces;
 
 public interface ILoadingInterface : IGameAbstraction
 {
+    bool IsLoadingScreenAvailable { get; }
     void HideLoadingScreen();
     void ShowLoadingScreen();
     void ShowLoadingScreen(string titleText, string descriptionText = "");
@@ -22,6 +23,8 @@ internal class LoadingInterface : ILoadingInterface
 
     private static readonly FieldInfo LoadingWindowViewModelField =
         AccessTools.Field(typeof(GauntletDefaultLoadingWindowManager), "_loadingWindowViewModel");
+
+    public bool IsLoadingScreenAvailable => LoadingWindow.LoadingWindowManager != null;
 
     public void ShowLoadingScreen()
     {
