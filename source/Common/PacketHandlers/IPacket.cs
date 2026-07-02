@@ -18,7 +18,6 @@ namespace Common.PacketHandlers
         PropertyAutoSync,
         SaveData,
         Relay,
-        // Appended (not inserted) so existing ordinal values stay wire-stable.
         AgentAction
     }
 
