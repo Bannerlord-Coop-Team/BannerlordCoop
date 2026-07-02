@@ -71,51 +71,54 @@ internal class WorkshopWarehouseHandler : IHandler
 
     private void Handle_WorkshopOwnerChanged(MessagePayload<WorkshopOwnerChanged> obj)
     {
-        if (!objectManager.TryGetIdWithLogging(obj.What.Workshop, out var workshopId)) return;
-        if (!objectManager.TryGetIdWithLogging(obj.What.OldOwner, out var oldOwnerId)) return;
-        if (!objectManager.TryGetIdWithLogging(obj.What.Workshop.Owner, out var ownerId)) return;
-        if (!objectManager.TryGetIdWithLogging(obj.What.Workshop.Settlement, out var settlementId)) return;
-
-        WorkshopsCampaignBehavior workshopsBehavior = GetWorkshopsBehavior();
-        Workshop workshop = obj.What.Workshop;
-        Hero owner = workshop.Owner;
-        Hero oldOwner = obj.What.OldOwner;
-
-        if (owner.IsPlayerHero())
+        GameThread.RunSafe(() =>
         {
-            sessionWorkshopPlayerDataInterface.AddNewWarehouseDataIfNeeded(ownerId, settlementId);
-            workshopsBehavior.AddNewWorkshopData(workshop);
-        }
-        else if (oldOwner.IsPlayerHero())
-        {
-            if (oldOwner.OwnedWorkshops.All((Workshop x) => x.Settlement != workshop.Settlement))
+            if (!objectManager.TryGetIdWithLogging(obj.What.Workshop, out var workshopId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.OldOwner, out var oldOwnerId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.Workshop.Owner, out var ownerId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.Workshop.Settlement, out var settlementId)) return;
+
+            WorkshopsCampaignBehavior workshopsBehavior = GetWorkshopsBehavior();
+            Workshop workshop = obj.What.Workshop;
+            Hero owner = workshop.Owner;
+            Hero oldOwner = obj.What.OldOwner;
+
+            if (owner.IsPlayerHero())
             {
-                if (oldOwner.CurrentSettlement != null && oldOwner.CurrentSettlement == workshop.Settlement)
+                sessionWorkshopPlayerDataInterface.AddNewWarehouseDataIfNeeded(ownerId, settlementId);
+                workshopsBehavior.AddNewWorkshopData(workshop);
+            }
+            else if (oldOwner.IsPlayerHero())
+            {
+                if (oldOwner.OwnedWorkshops.All((Workshop x) => x.Settlement != workshop.Settlement))
                 {
-                    foreach (ItemRosterElement itemRosterElement in sessionWorkshopPlayerDataInterface.GetWarehouseRoster(oldOwnerId, settlementId))
+                    if (oldOwner.CurrentSettlement != null && oldOwner.CurrentSettlement == workshop.Settlement)
                     {
-                        oldOwner.PartyBelongedTo.ItemRoster.AddToCounts(itemRosterElement.EquipmentElement, itemRosterElement.Amount);
+                        foreach (ItemRosterElement itemRosterElement in sessionWorkshopPlayerDataInterface.GetWarehouseRoster(oldOwnerId, settlementId))
+                        {
+                            oldOwner.PartyBelongedTo.ItemRoster.AddToCounts(itemRosterElement.EquipmentElement, itemRosterElement.Amount);
+                        }
+                        sessionWorkshopPlayerDataInterface.RemoveWarehouseData(oldOwnerId, settlementId);
                     }
                     sessionWorkshopPlayerDataInterface.RemoveWarehouseData(oldOwnerId, settlementId);
                 }
-                sessionWorkshopPlayerDataInterface.RemoveWarehouseData(oldOwnerId, settlementId);
+                workshopsBehavior.RemoveWorkshopData(workshop);
             }
-            workshopsBehavior.RemoveWorkshopData(workshop);
-        }
 
-        network.SendAll(new ChangeWorkshopOwner(workshopId, oldOwnerId));
+            network.SendAll(new ChangeWorkshopOwner(workshopId, oldOwnerId));
+        }, context: nameof(WorkshopWarehouseHandler));
     }
 
     private void Handle_ChangeWorkshopOwner(MessagePayload<ChangeWorkshopOwner> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.OldOwnerId, out var oldOwner)) return;
-
-        WorkshopsCampaignBehavior workshopsBehavior = GetWorkshopsBehavior();
-        Hero owner = workshop.Owner;
-
         GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.OldOwnerId, out var oldOwner)) return;
+
+            WorkshopsCampaignBehavior workshopsBehavior = GetWorkshopsBehavior();
+            Hero owner = workshop.Owner;
+
             // Only update roster for target client. Warehouse data is client specific
             if (owner == Hero.MainHero)
             {
@@ -137,48 +140,51 @@ internal class WorkshopWarehouseHandler : IHandler
                     workshopsBehavior.RemoveWarehouseData(workshop.Settlement);
                 }
             }
-        });
+        }, context: nameof(WorkshopWarehouseHandler));
     }
 
     private void Handle_OutputProducedToWarehouse(MessagePayload<OutputProducedToWarehouse> obj)
     {
-        if (!objectManager.TryGetIdWithLogging(obj.What.Workshop, out var workshopId)) return;
-        if (!objectManager.TryGetIdWithLogging(obj.What.Workshop.Owner, out var ownerId)) return;
-        if (!objectManager.TryGetIdWithLogging(obj.What.Workshop.Settlement, out var settlementId)) return;
-
-        if (obj.What.Workshop.Owner.IsPlayerHero())
+        GameThread.RunSafe(() =>
         {
-            sessionWorkshopPlayerDataInterface.AddToWarehouse(ownerId, settlementId, obj.What.OutputItem);
-        }
+            if (!objectManager.TryGetIdWithLogging(obj.What.Workshop, out var workshopId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.Workshop.Owner, out var ownerId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.Workshop.Settlement, out var settlementId)) return;
 
-        network.SendAll(new ProduceOutputToWarehouse(workshopId, obj.What.OutputItem));
+            if (obj.What.Workshop.Owner.IsPlayerHero())
+            {
+                sessionWorkshopPlayerDataInterface.AddToWarehouse(ownerId, settlementId, obj.What.OutputItem);
+            }
+
+            network.SendAll(new ProduceOutputToWarehouse(workshopId, obj.What.OutputItem));
+        }, context: nameof(WorkshopWarehouseHandler));
     }
 
     private void Handle_ProduceOutputToWarehouse(MessagePayload<ProduceOutputToWarehouse> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
-
-        // Only update roster for target client. Warehouse data is client specific
-        if (workshop.Owner == Hero.MainHero)
+        GameThread.RunSafe(() =>
         {
-            GameThread.RunSafe(() =>
+            if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
+
+            // Only update roster for target client. Warehouse data is client specific
+            if (workshop.Owner == Hero.MainHero)
             {
                 using (new AllowedThread()) // Uses ItemRoster.AddToCounts
                 {
                     GetWorkshopsBehavior().ProduceAnOutputToWarehouse(obj.What.OutputItem, workshop);
                 }
-            });
-        }
+            }
+        }, context: nameof(WorkshopWarehouseHandler));
     }
 
     private void Handle_InputConsumedFromWarehouse(MessagePayload<InputConsumedFromWarehouse> obj)
     {
-        if (!objectManager.TryGetIdWithLogging(obj.What.Workshop, out var workshopId)) return;
-        if (!objectManager.TryGetIdWithLogging(obj.What.Workshop.Owner, out var ownerId)) return;
-        if (!objectManager.TryGetIdWithLogging(obj.What.Workshop.Settlement, out var settlementId)) return;
-
         GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetIdWithLogging(obj.What.Workshop, out var workshopId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.Workshop.Owner, out var ownerId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.Workshop.Settlement, out var settlementId)) return;
+
             List<ItemRosterElement> warehouseRosterData = sessionWorkshopPlayerDataInterface.GetWarehouseRoster(ownerId, settlementId);
             int num = obj.What.InputCount;
             for (int i = 0; i < warehouseRosterData.Count; i++)
@@ -206,43 +212,46 @@ internal class WorkshopWarehouseHandler : IHandler
                     CampaignEventDispatcher.Instance.OnItemConsumed(itemAtIndex, obj.What.Workshop.Settlement, obj.What.InputCount);
                 }
             }
-        });
+        }, context: nameof(WorkshopWarehouseHandler));
     }
 
     private void Handle_ConsumeInputFromWarehouse(MessagePayload<ConsumeInputFromWarehouse> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
-        if (!objectManager.TryGetObjectWithLogging<ItemObject>(obj.What.ItemId, out var item)) return;
-
-        // Only update roster for target client. Warehouse data is client specific
-        if (workshop.Owner == Hero.MainHero)
+        GameThread.RunSafe(() =>
         {
-            GameThread.RunSafe(() =>
+            if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
+            if (!objectManager.TryGetObjectWithLogging<ItemObject>(obj.What.ItemId, out var item)) return;
+
+            // Only update roster for target client. Warehouse data is client specific
+            if (workshop.Owner == Hero.MainHero)
             {
                 using (new AllowedThread())
                 {
                     GetWorkshopsBehavior().GetWarehouseRoster(workshop.Settlement).AddToCounts(item, -obj.What.InputCount);
                 }
-            });
-        }
+            }
+        }, context: nameof(WorkshopWarehouseHandler));
     }
 
     private void Handle_WarehouseRosterManaged(MessagePayload<WarehouseRosterManaged> obj)
     {
-        if (!objectManager.TryGetIdWithLogging(obj.What.Hero, out var heroId)) return;
-        if (!objectManager.TryGetIdWithLogging(obj.What.Settlement, out var settlementId)) return;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.Hero, out var heroId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.Settlement, out var settlementId)) return;
 
-        sessionWorkshopPlayerDataInterface.UpdateWarehouseRoster(heroId, settlementId, obj.What.NewWarehouseRosterData);
+            sessionWorkshopPlayerDataInterface.UpdateWarehouseRoster(heroId, settlementId, obj.What.NewWarehouseRosterData);
 
-        network.Send(obj.What.NetPeer, new ManageWarehouseRoster(settlementId, obj.What.NewWarehouseRosterData));
+            network.Send(obj.What.NetPeer, new ManageWarehouseRoster(settlementId, obj.What.NewWarehouseRosterData));
+        }, context: nameof(WorkshopWarehouseHandler));
     }
 
     private void Handle_ManageWarehouseRoster(MessagePayload<ManageWarehouseRoster> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.SettlementId, out var settlement)) return;
-
         GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.SettlementId, out var settlement)) return;
+
             using (new AllowedThread())
             {
                 var warehouseRosters = GetWorkshopsBehavior()._warehouseRosterPerSettlement;
@@ -255,7 +264,7 @@ internal class WorkshopWarehouseHandler : IHandler
                     }
                 }
             }
-        });
+        }, context: nameof(WorkshopWarehouseHandler));
     }
 
     private void Handle_TownWorkshopRun(MessagePayload<TownWorkshopRun> obj)

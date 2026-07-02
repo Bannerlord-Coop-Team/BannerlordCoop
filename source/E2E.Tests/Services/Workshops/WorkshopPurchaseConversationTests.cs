@@ -59,6 +59,7 @@ public class WorkshopPurchaseConversationTests : IDisposable
 
         var request = Assert.Single(client.NetworkSentMessages.GetMessages<ChangeWorkshopOwner>());
         Assert.Equal(state.WorkshopId, request.WorkshopId);
+        Assert.Equal(state.SellerId, request.ExpectedOwnerId);
         Assert.Equal(state.BuyerId, request.NewOwnerId);
         Assert.Equal(state.WorkshopTypeId, request.WorkshopTypeId);
         Assert.Equal(WorkshopCapital, request.Capital);
@@ -83,6 +84,7 @@ public class WorkshopPurchaseConversationTests : IDisposable
         client.Call(() => client.Resolve<Common.Network.INetwork>().SendAll(new ChangeWorkshopOwner(
             state.WorkshopId,
             state.BuyerId,
+            state.BuyerId,
             state.WorkshopTypeId,
             WorkshopCapital,
             WorkshopCost)));
@@ -94,6 +96,54 @@ public class WorkshopPurchaseConversationTests : IDisposable
         }
 
         Assert.Single(Server.NetworkSentMessages.GetMessages<RefreshWorkshopsList>());
+    }
+
+    [Fact]
+    public void SimultaneousPurchaseRequest_WhenOwnerChangedBeforeSecondApply_RejectsStaleBuyerWithoutCharging()
+    {
+        var clients = Clients.ToArray();
+        var firstClient = clients[0];
+        var secondClient = clients[1];
+        var state = CreatePurchaseState(workshopOwnedByBuyer: false, buyerGold: 1000, sellerGold: 0);
+        var secondBuyerId = TestEnvironment.CreateRegisteredObject<Hero>();
+
+        RegisterPlayerHero(Server, secondBuyerId, "WorkshopBuyerTwo");
+        foreach (var client in Clients)
+        {
+            RegisterPlayerHero(client, secondBuyerId, "WorkshopBuyerTwo");
+        }
+        PrepareBuyer(secondBuyerId, 1000);
+        ClearMessages(Server);
+        foreach (var client in Clients)
+        {
+            ClearMessages(client);
+        }
+
+        firstClient.Call(() => firstClient.Resolve<Common.Network.INetwork>().SendAll(new ChangeWorkshopOwner(
+            state.WorkshopId,
+            state.SellerId,
+            state.BuyerId,
+            state.WorkshopTypeId,
+            WorkshopCapital,
+            WorkshopCost)));
+
+        secondClient.Call(() => secondClient.Resolve<Common.Network.INetwork>().SendAll(new ChangeWorkshopOwner(
+            state.WorkshopId,
+            state.SellerId,
+            secondBuyerId,
+            state.WorkshopTypeId,
+            WorkshopCapital,
+            WorkshopCost)));
+
+        AssertWorkshopOwnedByBuyer(Server, state, expectedBuyerGold: 600, expectedSellerGold: 400);
+        AssertHeroGold(Server, secondBuyerId, 1000);
+        foreach (var environmentClient in Clients)
+        {
+            AssertWorkshopOwnedByBuyer(environmentClient, state, expectedBuyerGold: 600, expectedSellerGold: 400);
+            AssertHeroGold(environmentClient, secondBuyerId, 1000);
+        }
+
+        Assert.Equal(2, Server.NetworkSentMessages.GetMessages<RefreshWorkshopsList>().Count());
     }
 
     [Fact]
@@ -207,11 +257,16 @@ public class WorkshopPurchaseConversationTests : IDisposable
 
     private static void RegisterPlayerHero(EnvironmentInstance instance, string buyerId)
     {
+        RegisterPlayerHero(instance, buyerId, BuyerControllerId);
+    }
+
+    private static void RegisterPlayerHero(EnvironmentInstance instance, string buyerId, string controllerId)
+    {
         instance.Call(() =>
         {
-            instance.Resolve<IControllerIdProvider>().SetControllerId(BuyerControllerId);
+            instance.Resolve<IControllerIdProvider>().SetControllerId(controllerId);
             Assert.True(instance.Resolve<IPlayerManager>().AddPlayer(new Player(
-                BuyerControllerId,
+                controllerId,
                 buyerId,
                 string.Empty,
                 string.Empty,
@@ -252,6 +307,28 @@ public class WorkshopPurchaseConversationTests : IDisposable
                 workshop._owner = seller;
                 seller._ownedWorkshops.Add(workshop);
             }
+        });
+    }
+
+    private void PrepareBuyer(string buyerId, int buyerGold)
+    {
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(buyerId, out var buyer));
+                buyer.Gold = buyerGold;
+                EnsureOwnedWorkshops(buyer);
+            });
+        }
+    }
+
+    private static void AssertHeroGold(EnvironmentInstance instance, string heroId, int expectedGold)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            Assert.Equal(expectedGold, hero.Gold);
         });
     }
 

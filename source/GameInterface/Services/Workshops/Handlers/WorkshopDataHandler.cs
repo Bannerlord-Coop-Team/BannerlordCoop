@@ -69,17 +69,20 @@ internal class WorkshopDataHandler : IHandler
 
     private void Handle_NewWorkshopDataAdded(MessagePayload<NewWorkshopDataAdded> obj)
     {
-        if (!objectManager.TryGetIdWithLogging(obj.What.Workshop, out var workshopId)) return;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.Workshop, out var workshopId)) return;
 
-        network.SendAll(new AddNewWorkshopData(workshopId));
+            network.SendAll(new AddNewWorkshopData(workshopId));
+        }, context: nameof(WorkshopDataHandler));
     }
 
     private void Handle_AddNewWorkshopData(MessagePayload<AddNewWorkshopData> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
-
         GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
+
             using (new AllowedThread())
             {
                 var workshopsBehavior = GetWorkshopsBehavior();
@@ -89,127 +92,148 @@ internal class WorkshopDataHandler : IHandler
                     workshopsBehavior.AddNewWorkshopData(workshop);
                 }
             }
-        });
+        }, context: nameof(WorkshopDataHandler));
     }
 
     private void Handle_WorkshopDataRemoved(MessagePayload<WorkshopDataRemoved> obj)
     {
-        if (!objectManager.TryGetIdWithLogging(obj.What.Workshop, out var workshopId)) return;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.Workshop, out var workshopId)) return;
 
-        network.SendAll(new RemoveWorkshopData(workshopId));
+            network.SendAll(new RemoveWorkshopData(workshopId));
+        }, context: nameof(WorkshopDataHandler));
     }
 
     private void Handle_RemoveWorkshopData(MessagePayload<RemoveWorkshopData> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
-
         GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
+
             using (new AllowedThread())
             {
                 GetWorkshopsBehavior().RemoveWorkshopData(workshop);
             }
-        });
+        }, context: nameof(WorkshopDataHandler));
     }
 
     private void Handle_OutputProgressAddedForWarehouse(MessagePayload<OutputProgressAddedForWarehouse> obj)
     {
-        if (!objectManager.TryGetIdWithLogging(obj.What.Workshop, out var workshopId)) return;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.Workshop, out var workshopId)) return;
 
-        network.SendAll(new AddOutputProgressForWarehouse(workshopId, obj.What.ProgressToAdd));
+            network.SendAll(new AddOutputProgressForWarehouse(workshopId, obj.What.ProgressToAdd));
+        }, context: nameof(WorkshopDataHandler));
     }
 
     private void Handle_AddOutputProgressForWarehouse(MessagePayload<AddOutputProgressForWarehouse> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
-
         GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
+
             using (new AllowedThread())
             {
                 GetWorkshopsBehavior().AddOutputProgressForWarehouse(workshop, obj.What.ProgressToAdd);
             }
-        });
+        }, context: nameof(WorkshopDataHandler));
     }
 
     private void Handle_OutputProgressForTownAdded(MessagePayload<OutputProgressForTownAdded> obj)
     {
-        if (!objectManager.TryGetIdWithLogging(obj.What.Workshop, out var workshopId)) return;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.Workshop, out var workshopId)) return;
 
-        network.SendAll(new AddOutputProgressForTown(workshopId, obj.What.ProgressToAdd));
+            network.SendAll(new AddOutputProgressForTown(workshopId, obj.What.ProgressToAdd));
+        }, context: nameof(WorkshopDataHandler));
     }
 
     private void Handle_AddOutputProgressForTown(MessagePayload<AddOutputProgressForTown> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
-
         GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
+
             using (new AllowedThread())
             {
                 GetWorkshopsBehavior().AddOutputProgressForTown(workshop, obj.What.ProgressToAdd);
             }
-        });
+        }, context: nameof(WorkshopDataHandler));
     }
 
     private void Handle_IsGettingInputsFromWarehouseSet(MessagePayload<IsGettingInputsFromWarehouseSet> obj)
     {
-        if (!objectManager.TryGetIdWithLogging(obj.What.Workshop, out var workshopId)) return;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.Workshop, out var workshopId)) return;
 
-        // Send to server
-        network.SendAll(new SetIsGettingInputsFromWarehouse(workshopId, obj.What.IsActive));
+            // Send to server
+            network.SendAll(new SetIsGettingInputsFromWarehouse(workshopId, obj.What.IsActive));
+        }, context: nameof(WorkshopDataHandler));
     }
 
     private void Handle_SetIsGettingInputsFromWarehouse(MessagePayload<SetIsGettingInputsFromWarehouse> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
 
-        Campaign.Current.GetCampaignBehavior<IWorkshopWarehouseCampaignBehavior>().SetIsGettingInputsFromWarehouse(workshop, obj.What.IsActive);
+            Campaign.Current.GetCampaignBehavior<IWorkshopWarehouseCampaignBehavior>().SetIsGettingInputsFromWarehouse(workshop, obj.What.IsActive);
 
-        network.SendAll(new SetIsGettingInputsFromWarehouseClients(obj.What.WorkshopId, obj.What.IsActive));
+            network.SendAll(new SetIsGettingInputsFromWarehouseClients(obj.What.WorkshopId, obj.What.IsActive));
+        }, context: nameof(WorkshopDataHandler));
     }
 
     private void Handle_SetIsGettingInputsFromWarehouseClients(MessagePayload<SetIsGettingInputsFromWarehouseClients> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
-
         GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
+
             using (new AllowedThread())
             {
                 Campaign.Current.GetCampaignBehavior<IWorkshopWarehouseCampaignBehavior>().SetIsGettingInputsFromWarehouse(workshop, obj.What.IsActive);
             }
-        });
+        }, context: nameof(WorkshopDataHandler));
     }
 
     private void Handle_StockProductionInWarehouseRatioSet(MessagePayload<StockProductionInWarehouseRatioSet> obj)
     {
-        if (!objectManager.TryGetIdWithLogging(obj.What.Workshop, out var workshopId)) return;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.Workshop, out var workshopId)) return;
 
-        // Send to server
-        network.SendAll(new SetStockProductionInWarehouseRatio(workshopId, obj.What.ProgressToAdd));
+            // Send to server
+            network.SendAll(new SetStockProductionInWarehouseRatio(workshopId, obj.What.ProgressToAdd));
+        }, context: nameof(WorkshopDataHandler));
     }
 
     private void Handle_SetStockProductionInWarehouseRatio(MessagePayload<SetStockProductionInWarehouseRatio> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
 
-        Campaign.Current.GetCampaignBehavior<IWorkshopWarehouseCampaignBehavior>().SetStockProductionInWarehouseRatio(workshop, obj.What.ProgressToAdd);
+            Campaign.Current.GetCampaignBehavior<IWorkshopWarehouseCampaignBehavior>().SetStockProductionInWarehouseRatio(workshop, obj.What.ProgressToAdd);
 
-        network.SendAll(new SetStockProductionInWarehouseRatioClients(obj.What.WorkshopId, obj.What.ProgressToAdd));
+            network.SendAll(new SetStockProductionInWarehouseRatioClients(obj.What.WorkshopId, obj.What.ProgressToAdd));
+        }, context: nameof(WorkshopDataHandler));
     }
 
     private void Handle_SetStockProductionInWarehouseRatioClients(MessagePayload<SetStockProductionInWarehouseRatioClients> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
-
         GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
+
             using (new AllowedThread())
             {
                 Campaign.Current.GetCampaignBehavior<IWorkshopWarehouseCampaignBehavior>().SetStockProductionInWarehouseRatio(workshop, obj.What.ProgressToAdd);
             }
-        });
+        }, context: nameof(WorkshopDataHandler));
     }
 
     private WorkshopsCampaignBehavior GetWorkshopsBehavior()

@@ -29,9 +29,10 @@ internal class ChangeOwnerOfWorkshopActionPatches
         {
             if (workshop.Owner != newOwner)
             {
+                Hero expectedOwner = workshop.Owner;
                 ApplyPredictedWorkshopOwnership(workshop, newOwner);
 
-                var message = new WorkshopOwnerChanged(workshop, newOwner, workshopType, capital, cost);
+                var message = new WorkshopOwnerChanged(workshop, expectedOwner, newOwner, workshopType, capital, cost);
                 MessageBroker.Instance.Publish(null, message);
             }
 
