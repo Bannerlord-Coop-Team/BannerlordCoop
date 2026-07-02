@@ -8,7 +8,7 @@ namespace GameInterface.Services.UI.Patches;
 
 /// <summary>
 /// Keeps the global loading window visible across game-state transitions while a coop
-/// client is joining a server.
+/// session is starting (a client joining, or the host applying patches before its save loads).
 /// </summary>
 /// <remarks>
 /// The engine destroys and recreates its loading window manager during state changes
@@ -18,9 +18,13 @@ namespace GameInterface.Services.UI.Patches;
 /// <see cref="LoadingWindow.DisableGlobalLoadingWindow"/>. So, by keeping the flag active
 /// and blocking native disables while <see cref="ForceLoadingWindow"/> is set, the loading
 /// screen stays up consistently instead of flickering as the client's local world is
-/// swapped for the server world.
+/// swapped for the server world. These patches are applied at boot (see CoopMod) through
+/// <see cref="GameInterface.HARMONY_UI_LOADING_CATEGORY"/> so the guard already exists while
+/// the host's own PatchAll is still compiling; they do nothing until a coop flow sets
+/// <see cref="ForceLoadingWindow"/> or a loading message.
 /// </remarks>
 [HarmonyPatch(typeof(LoadingWindow))]
+[HarmonyPatchCategory(GameInterface.HARMONY_UI_LOADING_CATEGORY)]
 internal static class LoadingWindowPatches
 {
     /// <summary>
@@ -49,6 +53,7 @@ internal static class LoadingWindowPatches
 /// loading window manager.
 /// </summary>
 [HarmonyPatch]
+[HarmonyPatchCategory(GameInterface.HARMONY_UI_LOADING_CATEGORY)]
 internal static class GauntletDefaultLoadingWindowManagerPatches
 {
     private static MethodBase TargetMethod()
