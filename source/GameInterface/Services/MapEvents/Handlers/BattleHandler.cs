@@ -185,16 +185,9 @@ internal class BattleHandler : IHandler
 
     private void Handle_PlayerJoinedBattle(MessagePayload<PlayerJoinedBattle> payload)
     {
-        if (AllPlayersInMapEvents())
-        {
-            timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
-        }
-        else
-        {
-            // A player started a battle while others remain on the map.
-            CapFastForwardForMapEvent();
-        }
-
+        // A player started a battle: cap fast-forward while any player is in a map event. Pausing once EVERY
+        // player is occupied (in a map event OR settlement) is handled separately by PlayerOccupancyPauseHandler.
+        CapFastForwardForMapEvent();
         RefreshFastForwardState();
     }
 
@@ -272,17 +265,6 @@ internal class BattleHandler : IHandler
     private bool FastForwardWhilePlayerInMapEventPolicy()
     {
         return AnyPlayerInMapEvent() == false;
-    }
-
-    private bool AllPlayersInMapEvents()
-    {
-        return playerRegistry.Players.All(player =>
-        {
-            if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var playerParty))
-                return false;
-
-            return playerParty.MapEvent != null;
-        });
     }
 
     private bool AnyPlayerInMapEvent() => CountPlayersInMapEvents() > 0;

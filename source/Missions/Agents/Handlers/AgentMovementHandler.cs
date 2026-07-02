@@ -6,6 +6,7 @@ using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
 using LiteNetLib;
+using Missions.Agents;
 using Missions.Agents.Packets;
 using Missions.Messages;
 using Serilog;
@@ -17,6 +18,8 @@ namespace Missions.Agents.Handlers;
 
 public interface IAgentMovementHandler : IPacketHandler, IDisposable
 {
+    /// <summary>Per-frame position smoother for received puppets; ticked by CoopMissionController.OnMissionTick.</summary>
+    IAgentPositionInterpolator Interpolator { get; }
 }
 
 public class AgentMovementHandler : IAgentMovementHandler
@@ -190,6 +193,22 @@ public class AgentMovementHandler : IAgentMovementHandler
 
                     SyncMountState(agent, data);
                     data.Apply(agent);
+
+                    // Position is reconciled per-frame by the interpolator (smoother than a per-packet
+                    // correction bound to the ~10ms poll cadence); push the latest targets it eases toward.
+                    if (agent.HasMount && data.MountData != null)
+                    {
+                        // Mounted: rider + horse are a rigid rig, and the rider's synced position IS the saddle
+                        // position. Interpolate ONLY the mount and let the rider ride along — teleporting the
+                        // rider independently every frame forces the engine to re-seat it, which snaps the
+                        // mount's orientation. Drop any stale rider target left from before it mounted.
+                        _interpolator.Forget(agent);
+                        _interpolator.SetMountTarget(agent.MountAgent, data.MountData.MountPosition);
+                    }
+                    else
+                    {
+                        _interpolator.SetRiderTarget(agent, data.Position);
+                    }
                 }
             }
         });
@@ -207,8 +226,10 @@ public class AgentMovementHandler : IAgentMovementHandler
 
         if (!ownerMounted && agent.HasMount)
         {
-            // Owner dismounted: get the puppet off the horse. Remember the horse for a possible re-mount.
+            // Owner dismounted: get the puppet off the horse. Remember the horse for a possible re-mount, and
+            // stop interpolating it (its target is no longer being reported).
             _dismountedHorses[agent] = agent.MountAgent;
+            _interpolator.Forget(agent.MountAgent);
             agent.MountAgent = null;
         }
         else if (ownerMounted && !agent.HasMount)

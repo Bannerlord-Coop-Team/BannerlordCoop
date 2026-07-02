@@ -25,8 +25,9 @@ public class CreateCharacterState : ConnectionStateBase
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IHeroInterface heroInterface;
-    private readonly IPlayerManager playerRegistry;
+    private readonly IPlayerManager playerManager;
     private readonly IGameStateInterface gameStateInterface;
+    private readonly IExistingPlayerSender existingPlayerSender;
 
     public CreateCharacterState(
         IConnectionLogic connectionLogic,
@@ -34,16 +35,18 @@ public class CreateCharacterState : ConnectionStateBase
         IMessageBroker messageBroker,
         INetwork network,
         IHeroInterface heroInterface,
-        IPlayerManager playerRegistry,
-        IGameStateInterface gameStateInterface)
+        IPlayerManager playerManager,
+        IGameStateInterface gameStateInterface,
+        IExistingPlayerSender existingPlayerSender)
         : base(connectionLogic)
     {
         this.objectManager = objectManager;
         this.messageBroker = messageBroker;
         this.network = network;
         this.heroInterface = heroInterface;
-        this.playerRegistry = playerRegistry;
+        this.playerManager = playerManager;
         this.gameStateInterface = gameStateInterface;
+        this.existingPlayerSender = existingPlayerSender;
         messageBroker.Subscribe<NetworkTransferNewHero>(Handle_NetworkTransferNewHero);
     }
 
@@ -72,7 +75,7 @@ public class CreateCharacterState : ConnectionStateBase
             return;
         }
 
-        if (!playerRegistry.AddPlayer(player))
+        if (!playerManager.AddPlayer(player))
             Logger.Error("Player has been already added.");
 
         // Send created to all other clients
@@ -86,7 +89,7 @@ public class CreateCharacterState : ConnectionStateBase
 
         // TransferSave has taken the save snapshot and begun queueing this peer's broadcasts, so tell the
         // joiner about every other existing player. These queue and replay once it enters its campaign.
-        JoiningPlayerSync.SendExistingPlayers(network, playerRegistry, netPeer, controllerId);
+        existingPlayerSender.SendExistingPlayers(netPeer, controllerId);
     }
 
     private bool TryCreatePlayer(string controllerId, Hero hero, out Player player)
