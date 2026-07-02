@@ -20,7 +20,7 @@
                                 Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
                                 Text="@Ip" IsVisible="true" PositionXOffset="-80"/>
 
-            <HintWidget DataSource="{PrivateIpHint}" WidthSizePolicy="Fixed" SuggestedWidth="40" HeightSizePolicy="Fixed"
+            <HintWidget DataSource="{ServerAddressHint}" WidthSizePolicy="Fixed" SuggestedWidth="40" HeightSizePolicy="Fixed"
                         SuggestedHeight="64" VerticalAlignment="Center" PositionXOffset="-60"
                         Command.HoverBegin="ExecuteBeginHint" Command.HoverEnd="ExecuteEndHint">
               <Children>
@@ -95,7 +95,7 @@
                                 Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
                                 Text="@PublicAddress" IsVisible="true" PositionXOffset="-80"/>
 
-            <HintWidget DataSource="{PublicIpHint}" WidthSizePolicy="Fixed" SuggestedWidth="40" HeightSizePolicy="Fixed"
+            <HintWidget DataSource="{FriendsAddressHint}" WidthSizePolicy="Fixed" SuggestedWidth="40" HeightSizePolicy="Fixed"
                         SuggestedHeight="64" VerticalAlignment="Center" PositionXOffset="-60"
                         Command.HoverBegin="ExecuteBeginHint" Command.HoverEnd="ExecuteEndHint">
               <Children>

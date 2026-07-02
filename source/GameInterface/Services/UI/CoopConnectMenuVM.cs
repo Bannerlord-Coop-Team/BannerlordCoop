@@ -21,17 +21,17 @@ namespace GameInterface.Services.UI
         public string BuyMeACoffeeButtonText => "Buy a Coffee";
         public string MovieTextHeader => "Join Co-op Sandbox";
         public string CommunityText => "Join the Community";
-        public string IpText => "Private IP Address:";
+        public string IpText => "Server Address:";
         public string PortText => "Port:";
         public string PasswordText => "Password:";
-        public string PublicAddressText => "Public IP Address:";
+        public string PublicAddressText => "Address for Friends:";
 
         [DataSourceProperty]
-        public HintViewModel PrivateIpHint { get; } = new HintViewModel(new TextObject(
-            "Where this game connects. Keep localhost when hosting on this PC; type the host's address to join a friend's server directly."));
+        public HintViewModel ServerAddressHint { get; } = new HintViewModel(new TextObject(
+            "The address of the co-op server to join. Keep localhost if you are the host; type the address your friend shared to join their game."));
 
         [DataSourceProperty]
-        public HintViewModel PublicIpHint { get; } = new HintViewModel(new TextObject(
+        public HintViewModel FriendsAddressHint { get; } = new HintViewModel(new TextObject(
             "When you're hosting, this is the address friends use to reach your session over the internet. Search 'what is my IP' to find it, and forward UDP ports 4200-4201 on your router. Friends on your own network can use your LAN address instead: run ipconfig in command prompt and share the 'IPv4 Address' with your friends."));
 
         [DataSourceProperty]
