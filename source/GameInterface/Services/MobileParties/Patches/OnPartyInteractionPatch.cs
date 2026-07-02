@@ -22,17 +22,27 @@ internal class OnPartyInteractionPatch
     [HarmonyPrefix]
     private static bool Prefix(MobileParty __instance, MobileParty engagingParty)
     {
-        if (__instance?.MemberRoster == null || __instance.MemberRoster.Count == 0)
+        var targetParty = GetEffectiveInteractionTargetParty(__instance, engagingParty);
+
+        if (targetParty?.MemberRoster == null || targetParty.MemberRoster.Count == 0)
         {
             Logger.Verbose("Skipping {Method} for party '{Party}' because its MemberRoster is empty",
-                nameof(MobileParty.OnPartyInteraction), __instance?.StringId ?? "<null>");
+                nameof(MobileParty.OnPartyInteraction), targetParty?.StringId ?? "<null>");
             return false;
         }
 
-        if (TryHandleReciprocalPlayerInteraction(__instance, engagingParty))
+        if (TryHandleReciprocalPlayerInteraction(targetParty, engagingParty))
             return false;
 
         return true;
+    }
+
+    internal static MobileParty GetEffectiveInteractionTargetParty(MobileParty targetParty, MobileParty engagingParty)
+    {
+        if (targetParty?.AttachedTo != null && engagingParty != targetParty.AttachedTo)
+            return targetParty.AttachedTo;
+
+        return targetParty;
     }
 
     private static bool TryHandleReciprocalPlayerInteraction(MobileParty targetParty, MobileParty engagingParty)
