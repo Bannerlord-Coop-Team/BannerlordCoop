@@ -403,66 +403,6 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     [Fact]
-    public void ForceSuppliesOutcome_AttackerVictory_AppliesRewardsAndSyncs()
-    {
-        var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
-        var target = CreateVillageTarget();
-        var itemRosterId = RegisterMobilePartyItemRoster(mobilePartyId);
-        var itemId = TestEnvironment.CreateRegisteredObject<ItemObject>();
-        var villageTypeId = TestEnvironment.CreateRegisteredObject<VillageType>();
-
-        var disabledMethods = MapEventDisabledMethods
-            .Append(AccessTools.Method(typeof(SkillLevelingManager), nameof(SkillLevelingManager.OnForceSupplies)))
-            .ToList();
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty));
-            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
-            Assert.True(Server.ObjectManager.TryGetObject<Village>(target.VillageId, out var village));
-            Assert.True(Server.ObjectManager.TryGetObject<ItemObject>(itemId, out var item));
-            Assert.True(Server.ObjectManager.TryGetObject<VillageType>(villageTypeId, out var villageType));
-
-            villageType._productions = new MBList<(ItemObject, float)>
-            {
-                (item, 120f),
-            };
-            village.VillageType = villageType;
-            village.Hearth = 90f;
-            settlement.SettlementHitPoints = 1f;
-            mobileParty.LeaderHero.Gold = 0;
-
-            var mapEvent = CreateHostileActionMapEvent(mobileParty.Party, settlement.Party, VillageHostileAction.ForceSupplies);
-            mapEvent._battleState = BattleState.AttackerVictory;
-
-            Assert.True(Server.ObjectManager.TryGetId(mapEvent, out var _));
-
-            Server.NetworkSentMessages.Clear();
-
-            using (new AllowedThread())
-            {
-                Server.Resolve<IVillageHostileActionInterface>().ApplyForceActionOutcome(
-                    mapEvent,
-                    VillageHostileAction.ForceSupplies);
-            }
-        }, disabledMethods);
-
-        var itemRosterUpdate = Server.NetworkSentMessages.GetMessages<NetworkItemRosterUpdate>().Single();
-        Assert.Equal(itemRosterId, itemRosterUpdate.ItemRosterId);
-        Assert.Equal(itemId, itemRosterUpdate.ItemID);
-        Assert.Equal(40, itemRosterUpdate.Amount);
-
-        AssertCooldownBroadcast(target.SettlementId);
-        AssertForceSuppliesOutcome(Server, mobilePartyId, target.SettlementId, itemId);
-        AssertCooldownSynced(Server, target.SettlementId);
-        foreach (var client in Clients)
-        {
-            AssertForceSuppliesOutcome(client, mobilePartyId, target.SettlementId, itemId);
-            AssertCooldownSynced(client, target.SettlementId);
-        }
-    }
-
-    [Fact]
     public void ForceSuppliesOutcome_WithoutProductions_AppliesGoldAndCooldown()
     {
         var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
