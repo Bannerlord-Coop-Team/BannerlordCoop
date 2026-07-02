@@ -56,34 +56,20 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     private const float MountDeadzone = 1f;
     private const float MountSnapDistance = 12f;
 
-    private readonly struct Target
-    {
-        public readonly Vec3 Position;
-        public readonly float Deadzone;
-        public readonly float SnapDistance;
-
-        public Target(Vec3 position, float deadzone, float snapDistance)
-        {
-            Position = position;
-            Deadzone = deadzone;
-            SnapDistance = snapDistance;
-        }
-    }
-
-    private readonly Dictionary<Agent, Target> _targets = new Dictionary<Agent, Target>();
+    private readonly Dictionary<Agent, Vec3> _targets = new Dictionary<Agent, Vec3>();
     // Reused scratch list so eviction doesn't allocate every tick.
     private readonly List<Agent> _evict = new List<Agent>();
 
     public void SetRiderTarget(Agent agent, Vec3 targetPosition)
     {
         if (agent == null) return;
-        _targets[agent] = new Target(targetPosition, RiderDeadzone, RiderSnapDistance);
+        _targets[agent] = targetPosition;
     }
 
     public void SetMountTarget(Agent mountAgent, Vec3 targetPosition)
     {
         if (mountAgent == null) return;
-        _targets[mountAgent] = new Target(targetPosition, MountDeadzone, MountSnapDistance);
+        _targets[mountAgent] = targetPosition;
     }
 
     public void Forget(Agent agent)
@@ -114,22 +100,26 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             if (agent.MountAgent != null)
                 continue;
 
-            Target target = pair.Value;
-            float dist = agent.Position.Distance(target.Position);
-            if (dist <= target.Deadzone)
+            // Tolerances are constant per kind, so derive them from the agent instead of storing them per target:
+            // a mount tolerates more slack before we correct/snap; a rider is held tighter.
+            bool isMount = agent.IsMount;
+            float deadzone = isMount ? MountDeadzone : RiderDeadzone;
+            float snapDistance = isMount ? MountSnapDistance : RiderSnapDistance;
+
+            Vec3 target = pair.Value;
+            float dist = agent.Position.Distance(target);
+            if (dist <= deadzone)
                 continue; // input-driven walk handles small drift
 
             var lookDirection = agent.LookDirection;
             var movementDirection = agent.GetMovementDirection();
 
-            Vec3 next = dist > target.SnapDistance
-                ? target.Position                                        // large gap: snap
-                : Vec3.Lerp(agent.Position, target.Position, alpha);     // ease
+            Vec3 next = dist > snapDistance
+                ? target                                            // large gap: snap
+                : Vec3.Lerp(agent.Position, target, alpha);         // ease
             agent.TeleportToPosition(next);
             agent.LookDirection = lookDirection;
-
-            if (agent.IsMount)
-                agent.SetMovementDirection(movementDirection);
+            agent.SetMovementDirection(movementDirection);
         }
 
         if (_evict.Count > 0)
