@@ -108,8 +108,6 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     {
         object received = serializer.Deserialize(reader.GetRemainingBytes());
 
-        // A campaign message now travels as its own wrapper, so it deserializes to a bare IMessage;
-        // publish it directly. Real IPackets (and relay-tunneled MessagePackets) still dispatch by type.
         if (received is IPacket packet)
         {
             packetManager.HandleReceive(peer, packet);
