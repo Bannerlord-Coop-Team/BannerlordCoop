@@ -154,7 +154,7 @@ public class AgentActionHandler : IAgentActionHandler
                 foreach (var (agent, data) in toApply)
                 {
                     // The agent may have become invalid between queueing and running; only apply while active.
-                    if (agent == null || agent.Mission != Mission.Current || agent.IsActive() == false)
+                    if (agent == null || agent.Mission != Mission.Current || !agent.IsActive())
                         continue;
 
                     data.Apply(agent);
