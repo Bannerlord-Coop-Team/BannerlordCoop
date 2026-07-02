@@ -78,7 +78,7 @@ internal class CaravansCommands
         {
             if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var coopSessionProvider)) return "Unable to resolve CoopSessionProvider";
 
-            foreach (var playerInteractedCaravan in coopSessionProvider.CoopSession.CaravansPlayerData.PlayerInteractedCaravans)
+            foreach (var playerInteractedCaravan in coopSessionProvider.CoopSession.InteractionsPlayerData.PlayerInteractedCaravans)
             {
                 if (playerInteractedCaravan.Key == null || playerInteractedCaravan.Value == null) continue;
 

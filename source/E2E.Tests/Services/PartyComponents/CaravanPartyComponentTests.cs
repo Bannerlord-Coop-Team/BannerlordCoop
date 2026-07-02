@@ -63,6 +63,8 @@ public class CaravanPartyComponentTests : SyncTestBase
             Assert.NotNull(newLeaderHero);
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var newParty));
             Assert.IsType<CaravanPartyComponent>(newParty.PartyComponent);
+            Assert.True(newParty.IsCaravan);
+            Assert.False(newParty.IsLordParty);
         }
     }
 

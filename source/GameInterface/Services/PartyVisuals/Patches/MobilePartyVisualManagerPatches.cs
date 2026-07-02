@@ -4,6 +4,7 @@ using SandBox.View.Map.Managers;
 using Serilog;
 using System;
 using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.PartyVisuals.Patches
 {
@@ -16,6 +17,8 @@ namespace GameInterface.Services.PartyVisuals.Patches
         [HarmonyPrefix]
         private static bool Prefix(MobilePartyVisualManager __instance, float realDt, float dt)
         {
+            if (Mission.Current != null) return false;
+
             __instance._dirtyPartyVisualCount = -1;
             TWParallel.For(0, __instance._visualsFlattened.Count, delegate (int startInclusive, int endExclusive)
             {
@@ -27,9 +30,17 @@ namespace GameInterface.Services.PartyVisuals.Patches
                         continue;
                     }
 
+                    // Skip a visual whose party has been removed (IsActive == false) or unhooked: its native
+                    // scene entity is already freed, so the native Tick below throws AccessViolationException —
+                    // a corrupted-state exception the try/catch cannot catch, so it hard-crashes the game.
+                    var visual = __instance._visualsFlattened[i];
+                    var party = visual?.MapEntity?.MobileParty;  
+                    if (party == null || !party.IsActive)
+                        continue;
+
                     try
                     {
-                        __instance._visualsFlattened[i].Tick(dt, realDt, ref __instance._dirtyPartyVisualCount, ref __instance._dirtyPartiesList);
+                        visual.Tick(dt, realDt, ref __instance._dirtyPartyVisualCount, ref __instance._dirtyPartiesList);
                     }
                     catch (Exception ex)
                     {

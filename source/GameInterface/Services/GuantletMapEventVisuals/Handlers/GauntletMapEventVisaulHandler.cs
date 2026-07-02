@@ -62,6 +62,14 @@ internal class GauntletMapEventVisaulHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<GauntletMapEventVisual>(instanceId, out var visual))
                 return;
 
+            // The visual's MapEvent syncs in separately; if it never resolved here it stays null and vanilla
+            // Initialize throws on it. An un-synced visual has no battle to show, so skip the init.
+            if (visual.MapEvent == null)
+            {
+                Logger.Warning("Skipping init of GauntletMapEventVisual {InstanceId}: its MapEvent did not resolve on this client", instanceId);
+                return;
+            }
+
             using (new AllowedThread())
             {
                 try
@@ -71,7 +79,7 @@ internal class GauntletMapEventVisaulHandler : IHandler
                     // visibility is local (see MapEventVisibilityClientPatch), and the vanilla IsVisible setter
                     // keeps the visual in lock-step, so seeding the visual from the local value keeps the icon
                     // and battle sound consistent here instead of starting in the server-visible state.
-                    visual.Initialize(position, visual.MapEvent?.IsVisible ?? false);
+                    visual.Initialize(position, visual.MapEvent.IsVisible);
 
                     // If the visual initialized before its sides/parties finished syncing, the ambient
                     // battle-size Initialize just applied may be too small. Track every field
@@ -79,7 +87,7 @@ internal class GauntletMapEventVisaulHandler : IHandler
                     // re-applied as the parties stream in. We can't gate on BattleSizeComputable here: it's
                     // already true for a half-populated battle, so the partial-roster case would be missed.
                     var mapEvent = visual.MapEvent;
-                    if (mapEvent != null && (mapEvent.IsFieldBattle || mapEvent.IsSallyOut))
+                    if (mapEvent.IsFieldBattle || mapEvent.IsSallyOut)
                     {
                         MapEventBattleSizeCorrection.Register(visual);
                     }

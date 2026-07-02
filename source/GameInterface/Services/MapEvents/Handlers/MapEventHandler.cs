@@ -8,6 +8,7 @@ using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.MapEvents.Handlers;
 
@@ -71,21 +72,27 @@ internal class MapEventHandler : IHandler
         var battleState = payload.What.BattleState;
         GameThread.Run(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging<MapEvent>(mapEventId, out var mapEvent))
+                return;
+
+            mapEventLogger.DebugMapEvent(mapEvent,
+                "Applying network battle state change. BattleState={BattleState}",
+                battleState);
+
             try
             {
-                if (!objectManager.TryGetObjectWithLogging<MapEvent>(mapEventId, out var mapEvent))
-                    return;
-
-                mapEventLogger.DebugMapEvent(mapEvent,
-                    "Applying network battle state change. BattleState={BattleState}",
-                    battleState);
-
                 mapEvent.BattleState = battleState;
             }
             catch (Exception e)
             {
                 Logger.Error(e, "Failed to apply {Message}", nameof(NetworkChangeBattleState));
             }
+
+            // A concluded battle (a side won) auto-finalizes coop-side independently of the result-commit the
+            // native setter runs above, so the player no longer has to leave the post-battle menu. Hand off to
+            // BattleHandler for the server-authoritative teardown + the close instruction to every player.
+            if (battleState == BattleState.AttackerVictory || battleState == BattleState.DefenderVictory)
+                messageBroker.Publish(this, new MapEventConcluded(mapEventId));
         });
     }
 
@@ -99,7 +106,7 @@ internal class MapEventHandler : IHandler
 
     private void Handle_NetworkMapEventSurrender(MessagePayload<NetworkMapEventSurrender> payload)
     {
-        if (!ModInformation.IsServer)
+        if (ModInformation.IsClient)
             return;
 
         var mapEventId = payload.What.MapEventId;

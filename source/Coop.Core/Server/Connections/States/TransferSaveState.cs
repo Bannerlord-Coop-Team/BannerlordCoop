@@ -1,10 +1,15 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Network;
+using Common.Network.Coalescing;
 using Coop.Core.Common.Network.Packets;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.ObjectManager;
+using Serilog;
+using System;
 
 namespace Coop.Core.Server.Connections.States;
 
@@ -14,13 +19,17 @@ namespace Coop.Core.Server.Connections.States;
 /// </summary>
 public class TransferSaveState : ConnectionStateBase
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<TransferSaveState>();
+
     public TransferSaveState(
         IConnectionLogic connectionLogic,
         INetwork network,
         ICoopSessionProvider coopSessionProvider,
         ISaveInterface saveInterface,
         ITimeControlInterface timeControlInterface,
-        IConnectionMessageQueue connectionMessageQueue)
+        IConnectionMessageQueue connectionMessageQueue,
+        ISendCoalescer coalescer,
+        IAttachmentIdMapper attachmentIdMapper)
         : base(connectionLogic)
     {
         GameThread.Run(() =>
@@ -31,6 +40,18 @@ public class TransferSaveState : ConnectionStateBase
             // the transition completes (see IsLoading below).
             timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
 
+            // Flush pending coalesced sends before the snapshot, while this peer is still Dropping: a deferred
+            // delta would otherwise be both captured in the snapshot and replayed to this peer after BeginQueueing
+            // (double-apply). Guarded so a throwing send can't strand this blocking GameThread.Run.
+            try
+            {
+                coalescer.Flush(network);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Failed to flush coalesced sends before the join save snapshot");
+            }
+
             var saveResults = saveInterface.SaveCurrentGame();
 
             var savePacket = new GameSaveDataPacket(
@@ -39,7 +60,9 @@ public class TransferSaveState : ConnectionStateBase
                 coopSessionProvider.CoopSession?.CraftingPlayerData,
                 coopSessionProvider.CoopSession?.WorkshopPlayerData,
                 coopSessionProvider.CoopSession?.CaravansPlayerData,
-                coopSessionProvider.CoopSession?.AlleyPlayerData);
+                coopSessionProvider.CoopSession?.AlleyPlayerData,
+                coopSessionProvider.CoopSession?.InteractionsPlayerData,
+                attachmentIdMapper.BuildServerMap());
 
             // Disconnect peer on failure
             if (!saveResults.Success)

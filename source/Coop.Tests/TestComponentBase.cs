@@ -7,10 +7,12 @@ using Coop.Tests.Mocks;
 using GameInterface.AutoSync;
 using GameInterface.CoopSessionData;
 using GameInterface.Registry;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Kingdoms;
+using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
@@ -93,6 +95,9 @@ internal abstract class TestComponentBase
         RegisterMock<IMobilePartyInterface>(builder);
         RegisterMock<IGameStateInterface>(builder);
         RegisterMock<ISettlementInterface>(builder);
+        RegisterMock<IAttachmentIdMapper>(builder);
+        RegisterMock<IAutoRegistryFactory>(builder);
+        RegisterMock<IBattleTroopReserveBuilder>(builder);
 
         // ISaveInterface is consumed by TransferSaveState's constructor, which packages a save the
         // moment the state is entered. Give it a non-null default so simply entering the state does

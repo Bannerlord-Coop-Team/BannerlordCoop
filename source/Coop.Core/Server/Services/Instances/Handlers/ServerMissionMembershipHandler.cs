@@ -68,6 +68,10 @@ public class ServerMissionMembershipHandler : IHandler
         {
             network.Send(otherPeer, new MissionPeerLeft(message.ControllerId, message.InstanceId));
         }
+
+        // Local signal for battle host migration / successor cleanup (no-op for non-battle instances). A
+        // graceful leave is a retreat — the battle reserve forgets the party so a rejoin re-spawns.
+        messageBroker.Publish(this, new MissionMemberDeparted(message.ControllerId, message.InstanceId, wasRetreat: true));
     }
 
     private void Handle_PlayerDisconnected(MessagePayload<PlayerDisconnected> payload)
@@ -80,5 +84,9 @@ public class ServerMissionMembershipHandler : IHandler
         {
             network.Send(otherPeer, new MissionPeerDisconnected(controllerId, instanceId));
         }
+
+        // Local signal for battle host migration / successor cleanup (no-op for non-battle instances). A drop
+        // is NOT a retreat — the host adopts the dropped player's troops, so the reserve pointer is kept.
+        messageBroker.Publish(this, new MissionMemberDeparted(controllerId, instanceId, wasRetreat: false));
     }
 }

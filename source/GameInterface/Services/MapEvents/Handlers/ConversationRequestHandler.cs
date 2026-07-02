@@ -110,7 +110,7 @@ internal class ConversationRequestHandler : IHandler
     /// <summary>[Server] Validate the request; reply to allow, or stay silent to reject.</summary>
     private void Handle_NetworkRequestConversation(MessagePayload<NetworkRequestConversation> payload)
     {
-        if (!ModInformation.IsServer) return;
+        if (ModInformation.IsClient) return;
 
         var request = payload.What;
 
@@ -421,7 +421,7 @@ internal class ConversationRequestHandler : IHandler
     /// <summary>[Server] A client's encounter finished: release the AI party held for that player, if any.</summary>
     private void Handle_NetworkConversationEnded(MessagePayload<NetworkConversationEnded> payload)
     {
-        if (!ModInformation.IsServer) return;
+        if (ModInformation.IsClient) return;
 
         if (!(payload.Who is NetPeer peer))
         {
@@ -445,7 +445,7 @@ internal class ConversationRequestHandler : IHandler
     /// later disconnect can be mapped back to this conversation.</summary>
     private void Handle_NetworkPvpDefenderShown(MessagePayload<NetworkPvpDefenderShown> payload)
     {
-        if (!ModInformation.IsServer) return;
+        if (ModInformation.IsClient) return;
 
         if (payload.Who is NetPeer defenderPeer)
             conversationPartyTracker.SetPvpDefenderPeer(payload.What.DefenderPartyId, defenderPeer);
@@ -455,7 +455,7 @@ internal class ConversationRequestHandler : IHandler
     /// (as attacker), and the PvP conversation they were the defender of.</summary>
     private void Handle_PlayerDisconnected(MessagePayload<PlayerDisconnected> payload)
     {
-        if (!ModInformation.IsServer) return;
+        if (ModInformation.IsClient) return;
 
         ReleaseEngagementOnMainThread(payload.What.PlayerId);
         EndPvpInteraction(payload.What.PlayerId);

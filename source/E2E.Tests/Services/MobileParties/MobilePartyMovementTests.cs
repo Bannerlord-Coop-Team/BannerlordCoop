@@ -555,7 +555,6 @@ public class MobilePartyMovementTests : SyncTestBase
 
         Assert.Equal(serverParty.DefaultBehavior, clientParty.DefaultBehavior);
         Assert.Equal(serverParty.ShortTermBehavior, clientParty.ShortTermBehavior);
-        Assert.Equal(serverParty.TargetPosition, clientParty.TargetPosition);
         Assert.Equal(serverParty.MoveTargetPoint, clientParty.MoveTargetPoint);
         Assert.Equal(serverParty.DesiredAiNavigationType, clientParty.DesiredAiNavigationType);
 

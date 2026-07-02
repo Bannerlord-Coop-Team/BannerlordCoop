@@ -5,6 +5,7 @@ using GameInterface.Registry.Messages;
 using GameInterface.Services.Alleys;
 using GameInterface.Services.Caravans;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.MobileParties;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Smithing;
@@ -51,20 +52,17 @@ internal class SaveGameHandler : IHandler
     private void Handle_GameSaved(MessagePayload<GameSaved> obj)
     {
         var saveName = obj.What.SaveName;
+        var current = coopSessionProvider.CoopSession;
 
-        CraftingPlayerData craftingPlayerData = coopSessionProvider.CoopSession.CraftingPlayerData;
-        craftingPlayerData ??= new(new(), new(), new());
+        CoopSession session = new CoopSession(
+            saveName,
+            playerRegistry.Players.ToArray(),
+            current?.CraftingPlayerData ?? new CraftingPlayerData(new(), new(), new()),
+            current?.WorkshopPlayerData ?? new WorkshopPlayerData(new()),
+            current?.CaravansPlayerData ?? new CaravansPlayerData(new(), new()),
+            current?.AlleyPlayerData ?? new AlleyPlayerData(new()),
+            current?.InteractionsPlayerData ?? new InteractionsPlayerData(new(), new(), new(), new()));
 
-        WorkshopPlayerData workshopPlayerData = coopSessionProvider.CoopSession.WorkshopPlayerData;
-        workshopPlayerData ??= new(new());
-
-        CaravansPlayerData caravansPlayerData = coopSessionProvider.CoopSession.CaravansPlayerData;
-        caravansPlayerData ??= new(new(), new(), new());
-
-        AlleyPlayerData alleyPlayerData = coopSessionProvider.CoopSession.AlleyPlayerData;
-        alleyPlayerData ??= new(new());
-
-        CoopSession session = new CoopSession(saveName, playerRegistry.Players.ToArray(), craftingPlayerData, workshopPlayerData, caravansPlayerData, alleyPlayerData);
         coopSessionProvider.CoopSession = session;
 
         saveManager.SaveCoopSession(saveName, session);
@@ -80,8 +78,9 @@ internal class SaveGameHandler : IHandler
             loaded?.Players ?? new Player[0],
             loaded?.CraftingPlayerData ?? new CraftingPlayerData(new(), new(), new()),
             loaded?.WorkshopPlayerData ?? new WorkshopPlayerData(new()),
-            loaded?.CaravansPlayerData ?? new CaravansPlayerData(new(), new(), new()),
-            loaded?.AlleyPlayerData ?? new AlleyPlayerData(new()));
+            loaded?.CaravansPlayerData ?? new CaravansPlayerData(new(), new()),
+            loaded?.AlleyPlayerData ?? new AlleyPlayerData(new()),
+            loaded?.InteractionsPlayerData ?? new InteractionsPlayerData(new(), new(), new(), new()));
 
         coopSessionProvider.CoopSession = savedSession;
     }

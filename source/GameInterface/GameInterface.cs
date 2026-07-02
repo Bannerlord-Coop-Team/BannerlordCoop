@@ -14,6 +14,9 @@ public interface IGameInterface : IDisposable
 public class GameInterface : IGameInterface
 {
     public const string HARMONY_STATIC_FIXES_CATEGORY = "HarmonyStaticFixes";
+
+    // Applied at boot by CoopMod, not by PatchAll: the loading-window keepalive must already be live while a host waits on PatchAll itself
+    public const string HARMONY_UI_LOADING_CATEGORY = "UILoadingPatches";
     
     private readonly Harmony harmony;
     private readonly IAutoSyncPatchCollector patchCollector;
@@ -33,7 +36,13 @@ public class GameInterface : IGameInterface
     public void PatchAll()
     {
         // NOTE: Patching in constructor causes issues with tests and CI
-        if (Harmony.HasAnyPatches(harmony.Id)) return;
+        if (Harmony.HasAnyPatches(harmony.Id))
+        {
+            // The patch install below is skipped on reconnect, so rebind the torn-down AutoSync handlers onto
+            // the new container here (see RebindHandlers) or every synced update is dropped.
+            AutoSyncPatcher.RebindHandlers();
+            return;
+        }
 
         var assembly = typeof(GameInterface).Assembly;
 

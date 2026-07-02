@@ -223,6 +223,11 @@ internal class PartyComponentHandler : IHandler
                 {
                     partyComponent.MobileParty = mobileParty;
                     mobileParty._partyComponent = partyComponent;
+
+                    // The type flags (IsMilitia/IsLordParty/IsCaravan/etc.) are derived from the
+                    // component, so recompute them from the component we just set; otherwise they
+                    // stay stale on the client.
+                    mobileParty.UpdatePartyComponentFlags();
                 }
             }
             catch (Exception e)
