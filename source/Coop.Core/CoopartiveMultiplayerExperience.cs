@@ -124,7 +124,6 @@ namespace Coop.Core
         private void PatchAllOffGameThread(IGameInterface gameInterface, ILoadingInterface loadingInterface, Action continueStart)
         {
             coopStarting = true;
-            var startedContainer = container;
 
             Task.Factory.StartNew(() =>
             {
@@ -144,13 +143,6 @@ namespace Coop.Core
                 {
                     try
                     {
-                        // Torn down or replaced while patching; only hide the window when nothing replaced this start
-                        if (container != startedContainer)
-                        {
-                            if (container == null) loadingInterface.HideLoadingScreen();
-                            return;
-                        }
-
                         continueStart();
                     }
                     catch
