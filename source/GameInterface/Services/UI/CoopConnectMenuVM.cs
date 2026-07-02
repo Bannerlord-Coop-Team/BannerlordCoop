@@ -5,7 +5,9 @@ using System;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using TaleWorlds.Core.ViewModelCollection.Information;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.UI
@@ -19,10 +21,26 @@ namespace GameInterface.Services.UI
         public string BuyMeACoffeeButtonText => "Buy a Coffee";
         public string MovieTextHeader => "Join Co-op Sandbox";
         public string CommunityText => "Join the Community";
-        public string IpText => "IP-Address:";
+        public string IpText => "Private IP Address:";
         public string PortText => "Port:";
         public string PasswordText => "Password:";
-        public string PublicAddressText => "Public Address:";
+        public string PublicAddressText => "Public IP Address:";
+
+        [DataSourceProperty]
+        public HintViewModel PrivateIpHint { get; } = new HintViewModel(new TextObject(
+            "Where this game connects. Keep localhost when hosting on this PC; type the host's address to join a friend's server directly."));
+
+        [DataSourceProperty]
+        public HintViewModel PublicIpHint { get; } = new HintViewModel(new TextObject(
+            "When you're hosting, this is the address friends use to reach your session over the internet. Search 'what is my IP' to find it, and forward UDP ports 4200-4201 on your router. Friends on your own network can use your LAN address instead: run ipconfig in command prompt and share the 'IPv4 Address' with your friends."));
+
+        [DataSourceProperty]
+        public HintViewModel PortHint { get; } = new HintViewModel(new TextObject(
+            "The port the co-op server listens on. Leave 4200 unless the host changed it."));
+
+        [DataSourceProperty]
+        public HintViewModel PasswordHint { get; } = new HintViewModel(new TextObject(
+            "The session password set by the host. Leave empty if the host has not set one."));
 
         public string connectIP = "localhost";
 
