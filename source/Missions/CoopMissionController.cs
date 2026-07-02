@@ -4,7 +4,7 @@ using GameInterface.Services.ObjectManager;
 using LiteNetLib;
 using Missions.Messages;
 using Serilog;
-using System;
+using System; 
 using TaleWorlds.MountAndBlade;
 
 namespace Missions;
@@ -86,6 +86,12 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
 
     public override void OnEndMissionInternal()
     {
+        // Dispose the movement handler FIRST — this stops its background poller before anything else tears down,
+        // so the poll loop is not reading agents/mission state as they are freed (it races the game thread and
+        // crashes on freed native agents), and it deterministically detaches the handler instead of leaking it
+        // until the GC finalizer runs.
+        coopMissionComponent.AgentMovementHandler.Dispose();
+
         OnLeaving();
 
         base.OnEndMission();

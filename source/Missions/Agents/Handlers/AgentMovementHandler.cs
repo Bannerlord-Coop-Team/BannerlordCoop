@@ -56,6 +56,10 @@ public class AgentMovementHandler : IAgentMovementHandler
     private readonly AgentPositionInterpolator _interpolator = new AgentPositionInterpolator();
     public IAgentPositionInterpolator Interpolator => _interpolator;
 
+    // Dispose is called deterministically on mission teardown (CoopMissionController.OnEndMissionInternal); this
+    // guards against a second call (the GC finalizer, or the DI scope also disposing this transient handler).
+    private bool _disposed;
+
     public AgentMovementHandler(
         IBattleNetwork client,
         IPacketManager packetManager,
@@ -83,21 +87,39 @@ public class AgentMovementHandler : IAgentMovementHandler
         poller.Start();
     }
 
+    // Safety net only: with deterministic disposal on mission end the finalizer is suppressed and never runs.
     ~AgentMovementHandler()
     {
         Dispose();
     }
 
+    /// <summary>
+    /// Deterministic teardown, called from <c>CoopMissionController.OnEndMissionInternal</c> at the start of the
+    /// leave path. Stops the background poller FIRST so its loop is not reading agents/mission state as they are
+    /// freed (it races the game thread and crashes on freed native agents), then detaches from the packet manager
+    /// and message broker. Idempotent — safe if the GC finalizer or the DI scope disposes this handler again.
+    /// </summary>
     public void Dispose()
     {
+        if (_disposed) return;
+        _disposed = true;
+
         Logger.Verbose("Disposing {handlerType}", typeof(AgentMovementHandler));
+
+        // Stop the poll loop before anything else AND wait for an in-flight tick to finish: cancelling alone
+        // would let a tick already reading agents run concurrently with the teardown that frees them (native AV).
+        // PollAgents never blocks on the game thread, so this join returns in ~a tick; the timeout is a guard.
+        if (!poller.StopAndWait(TimeSpan.FromSeconds(1)))
+            Logger.Warning("Movement poller did not stop within the timeout; proceeding with teardown");
+        _interpolator.Clear();
 
         packetManager.RemovePacketHandler(this);
         messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
         messageBroker.Unsubscribe<MissionPeerLeft>(Handle_PeerLeft);
         messageBroker.Unsubscribe<MissionPeerDisconnected>(Handle_PeerDisconnected);
-        poller.Stop();
-        _interpolator.Clear();
+
+        // Disposed explicitly, so the finalizer no longer needs to run.
+        GC.SuppressFinalize(this);
     }
 
     public PacketType PacketType => PacketType.Movement;
