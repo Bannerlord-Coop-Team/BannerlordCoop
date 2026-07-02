@@ -127,8 +127,8 @@ public class WorkshopPurchaseConversationTests : IDisposable
             Assert.True(client.ObjectManager.TryGetObject<Hero>(state.BuyerId, out var buyer));
 
             var workshopsBehavior = Campaign.Current.GetCampaignBehavior<WorkshopsCampaignBehavior>();
-            workshopsBehavior._workshopData = new WorkshopsCampaignBehavior.WorkshopData[0];
-            workshopsBehavior._warehouseRosterPerSettlement = new KeyValuePair<Settlement, ItemRoster>[0];
+            workshopsBehavior._workshopData = Array.Empty<WorkshopsCampaignBehavior.WorkshopData>();
+            workshopsBehavior._warehouseRosterPerSettlement = Array.Empty<KeyValuePair<Settlement, ItemRoster>>();
 
             ChangeOwnerOfWorkshopActionPatches.ApplyPredictedWorkshopOwnership(workshop, buyer);
             ChangeOwnerOfWorkshopActionPatches.ApplyPredictedWorkshopData(workshop, buyer);
