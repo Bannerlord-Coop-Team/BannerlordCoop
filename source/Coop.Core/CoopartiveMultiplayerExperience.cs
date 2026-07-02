@@ -26,7 +26,7 @@ namespace Coop.Core
         private IMessageBroker messageBroker;
         private INetworkConfig configuration;
         private IContainer container;
-        private volatile bool serverStarting;
+        private volatile bool coopStarting;
 
         public CoopartiveMultiplayerExperience()
         {
@@ -84,8 +84,8 @@ namespace Coop.Core
 
         public void StartAsServer(Action afterStart = null)
         {
-            // A second Host click while patches are still applying would tear down the in-flight start
-            if (serverStarting) return;
+            // A second Host or Join click while patches are still applying would tear down the in-flight start
+            if (coopStarting) return;
 
             DestroyContainer();
 
@@ -111,10 +111,21 @@ namespace Coop.Core
             }
 
             loadingInterface.ShowLoadingScreen("Hosting Coop Server", "Applying patches...");
-            serverStarting = true;
+
+            PatchAllOffGameThread(gameInterface, loadingInterface, () =>
+            {
+                loadingInterface.SetLoadingMessage("Hosting Coop Server", "Loading campaign save...");
+                container.Resolve<ILogic>().Start();
+                afterStart?.Invoke();
+            });
+        }
+
+        // The ~30s patch compile must stay off the game thread so the loading window keeps drawing, like the client patching on its network thread
+        private void PatchAllOffGameThread(IGameInterface gameInterface, ILoadingInterface loadingInterface, Action continueStart)
+        {
+            coopStarting = true;
             var startedContainer = container;
 
-            // The ~30s patch compile must stay off the game thread so the loading window keeps drawing, like the client patching on its network thread
             Task.Factory.StartNew(() =>
             {
                 try
@@ -123,8 +134,8 @@ namespace Coop.Core
                 }
                 catch (Exception e)
                 {
-                    Logger.Error(e, "Applying patches failed while starting the coop server");
-                    serverStarting = false;
+                    Logger.Error(e, "Applying patches failed while starting coop");
+                    coopStarting = false;
                     GameThread.RunSafe(loadingInterface.HideLoadingScreen);
                     return;
                 }
@@ -140,9 +151,7 @@ namespace Coop.Core
                             return;
                         }
 
-                        loadingInterface.SetLoadingMessage("Hosting Coop Server", "Loading campaign save...");
-                        container.Resolve<ILogic>().Start();
-                        afterStart?.Invoke();
+                        continueStart();
                     }
                     catch
                     {
@@ -151,7 +160,7 @@ namespace Coop.Core
                     }
                     finally
                     {
-                        serverStarting = false;
+                        coopStarting = false;
                     }
                 });
             }, TaskCreationOptions.LongRunning);
@@ -159,6 +168,9 @@ namespace Coop.Core
 
         public void StartAsClient(INetworkConfig configuration = null)
         {
+            // A second Host or Join click while patches are still applying would tear down the in-flight start
+            if (coopStarting) return;
+
             DestroyContainer();
 
             ModInformation.IsServer = false;
@@ -182,7 +194,18 @@ namespace Coop.Core
 
 #if DEBUG
             // For debugging faster, normally this is done after connection
-            container.Resolve<IGameInterface>().PatchAll();
+            var gameInterface = container.Resolve<IGameInterface>();
+            var loadingInterface = container.Resolve<ILoadingInterface>();
+
+            if (loadingInterface.IsLoadingScreenAvailable)
+            {
+                loadingInterface.ShowLoadingScreen("Connecting to Coop Server", "Applying patches...");
+
+                PatchAllOffGameThread(gameInterface, loadingInterface, () => container.Resolve<ILogic>().Start());
+                return;
+            }
+
+            gameInterface.PatchAll();
 #endif
 
             var logic = container.Resolve<ILogic>();
