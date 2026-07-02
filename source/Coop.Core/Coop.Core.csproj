@@ -122,7 +122,7 @@
 	    <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Core.dll</HintPath>
 	  </Reference>
 	  <Reference Include="TaleWorlds.GauntletUI.Data">
-	    <HintPath>..\..\mb2\Modules\Sandbox\bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.Data.dll</HintPath>
+	    <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.Data.dll</HintPath>
 	  </Reference>
 	  <Reference Include="TaleWorlds.Library">
 		  <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Library.dll</HintPath>
