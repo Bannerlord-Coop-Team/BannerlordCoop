@@ -17,7 +17,7 @@ internal class DisableRetreatConfirmationPausePatch
         }
 
         __instance._isSurrender = false;
-        InformationManager.ShowInquiry(__instance.GetRetreatPopUpData(), false, false);
+        InformationManager.ShowInquiry(__instance.GetRetreatPopUpData());
         return false;
     }
 }
