@@ -19,6 +19,8 @@ internal static class TunnelSocket
         var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp)
         {
             Blocking = false,
+            ReceiveBufferSize = SteamTunnel.LoopbackBufferBytes,
+            SendBufferSize = SteamTunnel.LoopbackBufferBytes,
         };
 
         // Best effort: the control code is Windows-only, and the receive helpers tolerate

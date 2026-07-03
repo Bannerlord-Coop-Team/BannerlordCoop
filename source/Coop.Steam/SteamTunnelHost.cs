@@ -21,15 +21,24 @@ public class SteamTunnelHost : ISessionTunnelHost
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SteamTunnelHost>();
 
+    // A peer's loopback socket toward the server, plus one held-back datagram for when the
+    // Steam send buffer is full: the pump retries it before draining the socket further.
+    private sealed class TunnelPeer
+    {
+        public Socket Socket;
+        public byte[] PendingDatagram = new byte[SteamTunnel.MaxDatagramBytes];
+        public int PendingLength;
+    }
+
     private readonly ISteamTunnelTransport transport;
     private readonly object gate = new object();
-    private readonly Dictionary<uint, Socket> peerSockets = new Dictionary<uint, Socket>();
+    private readonly Dictionary<uint, TunnelPeer> peers = new Dictionary<uint, TunnelPeer>();
     private readonly byte[] serverBuffer = new byte[SteamTunnel.MaxDatagramBytes];
     private readonly byte[] steamBuffer = new byte[SteamTunnel.MaxDatagramBytes];
 
     // Rebuilt under the gate whenever the peer set changes, so the 2ms pump tick reads a
     // stable array without taking the lock.
-    private volatile KeyValuePair<uint, Socket>[] peerSnapshot = Array.Empty<KeyValuePair<uint, Socket>>();
+    private volatile KeyValuePair<uint, TunnelPeer>[] peerSnapshot = Array.Empty<KeyValuePair<uint, TunnelPeer>>();
     // Only touched on the poller thread.
     private EndPoint receiveSender = TunnelSocket.AnyEndpoint();
 
@@ -71,18 +80,18 @@ public class SteamTunnelHost : ISessionTunnelHost
         // Wait out any in-flight pump tick so the socket teardown below can't race it.
         poller?.StopAndWait(TimeSpan.FromSeconds(1));
 
-        KeyValuePair<uint, Socket>[] peers;
+        KeyValuePair<uint, TunnelPeer>[] remaining;
         lock (gate)
         {
-            peers = peerSockets.ToArray();
-            peerSockets.Clear();
-            peerSnapshot = Array.Empty<KeyValuePair<uint, Socket>>();
+            remaining = peers.ToArray();
+            peers.Clear();
+            peerSnapshot = Array.Empty<KeyValuePair<uint, TunnelPeer>>();
         }
 
-        foreach (var peer in peers)
+        foreach (var peer in remaining)
         {
             transport.CloseConnection(peer.Key);
-            peer.Value.Close();
+            peer.Value.Socket.Close();
         }
 
         Logger.Information("Steam tunnel host stopped");
@@ -101,12 +110,12 @@ public class SteamTunnelHost : ISessionTunnelHost
             case TunnelConnectionState.Connected:
                 lock (gate)
                 {
-                    if (!listening || peerSockets.ContainsKey(connection)) return;
+                    if (!listening || peers.ContainsKey(connection)) return;
 
                     var socket = TunnelSocket.CreateLoopbackDatagramSocket();
                     socket.Connect(serverEndpoint);
-                    peerSockets[connection] = socket;
-                    peerSnapshot = peerSockets.ToArray();
+                    peers[connection] = new TunnelPeer { Socket = socket };
+                    peerSnapshot = peers.ToArray();
 
                     Logger.Information("Tunnel peer {Connection} connected; local relay port {Port}",
                         connection, ((IPEndPoint)socket.LocalEndPoint).Port);
@@ -114,16 +123,16 @@ public class SteamTunnelHost : ISessionTunnelHost
                 break;
 
             case TunnelConnectionState.Closed:
-                Socket peerSocket;
+                TunnelPeer closedPeer;
                 lock (gate)
                 {
-                    if (!peerSockets.TryGetValue(connection, out peerSocket)) return;
+                    if (!peers.TryGetValue(connection, out closedPeer)) return;
 
-                    peerSockets.Remove(connection);
-                    peerSnapshot = peerSockets.ToArray();
+                    peers.Remove(connection);
+                    peerSnapshot = peers.ToArray();
                 }
 
-                peerSocket.Close();
+                closedPeer.Socket.Close();
                 Logger.Information("Tunnel peer {Connection} disconnected", connection);
                 break;
         }
@@ -135,24 +144,49 @@ public class SteamTunnelHost : ISessionTunnelHost
         {
             try
             {
-                int length;
-                while ((length = TunnelSocket.TryReceiveFrom(peer.Value, serverBuffer, ref receiveSender)) >= 0)
-                {
-                    if (length == 0) continue;
-
-                    transport.SendDatagram(peer.Key, serverBuffer, length);
-                }
+                PumpToSteam(peer.Key, peer.Value);
 
                 int size;
                 while ((size = transport.ReceiveDatagram(peer.Key, steamBuffer)) > 0)
                 {
-                    peer.Value.Send(steamBuffer, size, SocketFlags.None);
+                    peer.Value.Socket.Send(steamBuffer, size, SocketFlags.None);
                 }
             }
             catch (ObjectDisposedException)
             {
                 // The Closed handler disposed this peer's socket mid-tick; the next tick's
                 // snapshot no longer contains it.
+            }
+            catch (SocketException)
+            {
+                // A refused loopback send loses one datagram; LiteNetLib retransmits what matters.
+            }
+        }
+    }
+
+    // A refused send parks the datagram and stops draining, so the OS socket buffer queues
+    // the rest instead of anything reliable being dropped while the Steam send buffer is full.
+    private void PumpToSteam(uint connection, TunnelPeer peer)
+    {
+        // Only reliable-class datagrams ever park, so the retry is never droppable.
+        if (peer.PendingLength > 0)
+        {
+            if (!transport.SendDatagram(connection, peer.PendingDatagram, peer.PendingLength, droppable: false)) return;
+
+            peer.PendingLength = 0;
+        }
+
+        int length;
+        while ((length = TunnelSocket.TryReceiveFrom(peer.Socket, serverBuffer, ref receiveSender)) >= 0)
+        {
+            if (length == 0) continue;
+
+            bool droppable = SteamTunnel.IsDroppableDatagram(serverBuffer, length);
+            if (!transport.SendDatagram(connection, serverBuffer, length, droppable))
+            {
+                Array.Copy(serverBuffer, peer.PendingDatagram, length);
+                peer.PendingLength = length;
+                return;
             }
         }
     }

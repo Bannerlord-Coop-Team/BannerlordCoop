@@ -20,6 +20,40 @@ public static class SteamTunnel
     /// Each pump pass adds at most this much one-way latency on top of the Steam link.
     /// </summary>
     public static readonly TimeSpan PumpInterval = TimeSpan.FromMilliseconds(2);
+
+    /// <summary>
+    /// Steam send buffer per tunnel connection. The join-save transfer bursts megabytes of
+    /// fragments at once; the 512 KB default overflows and stalls the join.
+    /// </summary>
+    public const int SendBufferBytes = 8 * 1024 * 1024;
+
+    /// <summary>
+    /// Ceiling for Steam's send pacing. The default caps around 1 MB/s, which would stretch
+    /// a ~40 MB join save into minutes on links that can go much faster.
+    /// </summary>
+    public const int SendRateMaxBytesPerSecond = 20 * 1024 * 1024;
+
+    /// <summary>
+    /// Kernel buffers on the pump sockets. Must absorb what LiteNetLib keeps in flight
+    /// while a full Steam send buffer parks the pump, or the kernel silently drops there.
+    /// </summary>
+    public const int LoopbackBufferBytes = 2 * 1024 * 1024;
+
+    /// <summary>
+    /// True when the datagram's sender tolerates loss, so the tunnel may keep it off the
+    /// reliable Steam lane and drop it under pressure instead of stalling newer traffic.
+    /// LiteNetLib 1.3.1 wire format: the packet property is the low five bits of the first
+    /// byte; Unreliable (0), Ping (3), and Pong (4) are droppable by contract. Anything
+    /// else — channeled traffic, acks, handshake, merged datagrams — and any unknown value
+    /// is delivered reliably.
+    /// </summary>
+    public static bool IsDroppableDatagram(byte[] data, int length)
+    {
+        if (length < 1) return true;
+
+        int property = data[0] & 0x1F;
+        return property == 0 || property == 3 || property == 4;
+    }
 }
 
 public enum TunnelConnectionState
@@ -54,7 +88,13 @@ public interface ISteamTunnelTransport : IDisposable
 
     void CloseConnection(uint connection);
 
-    bool SendDatagram(uint connection, byte[] data, int length);
+    /// <summary>
+    /// Queues one datagram for delivery. A droppable datagram may be discarded when the
+    /// send buffer is full (its sender tolerates loss); otherwise false means the buffer is
+    /// full and the caller must retry the same datagram later — never drop it. A dead
+    /// connection swallows the datagram, so a retry loop can never wedge on it.
+    /// </summary>
+    bool SendDatagram(uint connection, byte[] data, int length, bool droppable);
 
     /// <summary>Reads one queued datagram into the buffer; returns its length, or 0 when none.</summary>
     int ReceiveDatagram(uint connection, byte[] buffer);

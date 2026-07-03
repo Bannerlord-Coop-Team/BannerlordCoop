@@ -11,7 +11,10 @@ namespace Coop.Steam;
 /// <remarks>
 /// User-flavor sockets under the player's own Steam identity, so the game's per-frame
 /// SteamAPI.RunCallbacks pump dispatches the status callback with no pump of our own.
-/// Datagrams are sent unreliable: LiteNetLib runs its own reliability on top.
+/// Reliable-class datagrams (the join save, campaign sync) ride Steam's reliable lane so
+/// Steam owns pacing, retransmission, and flow control — the join-save burst overwhelms an
+/// unreliable pipe. Droppable classes (movement snapshots, pings) stay unreliable so a
+/// lost packet never head-of-line-blocks newer ones behind a retransmit.
 /// </remarks>
 public class SteamNetworkingTunnelTransport : ISteamTunnelTransport
 {
@@ -37,7 +40,8 @@ public class SteamNetworkingTunnelTransport : ISteamTunnelTransport
         var identity = new SteamNetworkingIdentity();
         identity.SetSteamID64(hostSteamId);
 
-        var connection = SteamNetworkingSockets.ConnectP2P(ref identity, virtualPort, 0, null);
+        var options = TunnelConnectionOptions();
+        var connection = SteamNetworkingSockets.ConnectP2P(ref identity, virtualPort, options.Length, options);
         if (connection == HSteamNetConnection.Invalid)
         {
             throw new InvalidOperationException("Steam refused the tunnel connection");
@@ -57,7 +61,8 @@ public class SteamNetworkingTunnelTransport : ISteamTunnelTransport
         {
             if (listenSocket != HSteamListenSocket.Invalid) return;
 
-            var socket = SteamNetworkingSockets.CreateListenSocketP2P(virtualPort, 0, null);
+            var options = TunnelConnectionOptions();
+            var socket = SteamNetworkingSockets.CreateListenSocketP2P(virtualPort, options.Length, options);
             if (socket == HSteamListenSocket.Invalid)
             {
                 throw new InvalidOperationException("Steam refused the tunnel listen socket");
@@ -102,8 +107,12 @@ public class SteamNetworkingTunnelTransport : ISteamTunnelTransport
         }
     }
 
-    public bool SendDatagram(uint connection, byte[] data, int length)
+    public bool SendDatagram(uint connection, byte[] data, int length, bool droppable)
     {
+        int sendFlags = droppable
+            ? Constants.k_nSteamNetworkingSend_UnreliableNoNagle
+            : Constants.k_nSteamNetworkingSend_ReliableNoNagle;
+
         // Pinning the caller's buffer avoids a copy and keeps sends off the shared gate,
         // which the game thread's status callback also takes.
         var handle = GCHandle.Alloc(data, GCHandleType.Pinned);
@@ -111,14 +120,39 @@ public class SteamNetworkingTunnelTransport : ISteamTunnelTransport
         {
             var result = SteamNetworkingSockets.SendMessageToConnection(
                 new HSteamNetConnection(connection), handle.AddrOfPinnedObject(), (uint)length,
-                Constants.k_nSteamNetworkingSend_UnreliableNoNagle, out _);
+                sendFlags, out _);
 
-            return result == EResult.k_EResultOK;
+            // Only a full send buffer asks the pump to retry, and only for reliable-class
+            // datagrams (a droppable one is simply lost, per its contract). Any other
+            // failure means the connection is gone, so the datagram is swallowed and the
+            // Closed event that follows tears the peer down.
+            return droppable || result != EResult.k_EResultLimitExceeded;
         }
         finally
         {
             handle.Free();
         }
+    }
+
+    // A full send buffer (k_EResultLimitExceeded) surfaces as false from SendDatagram, and
+    // the pumps hold the datagram until it fits.
+    private static SteamNetworkingConfigValue_t[] TunnelConnectionOptions()
+    {
+        return new[]
+        {
+            Int32Option(ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendBufferSize, SteamTunnel.SendBufferBytes),
+            Int32Option(ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendRateMax, SteamTunnel.SendRateMaxBytesPerSecond),
+        };
+    }
+
+    private static SteamNetworkingConfigValue_t Int32Option(ESteamNetworkingConfigValue key, int value)
+    {
+        return new SteamNetworkingConfigValue_t
+        {
+            m_eValue = key,
+            m_eDataType = ESteamNetworkingConfigDataType.k_ESteamNetworkingConfig_Int32,
+            m_val = new SteamNetworkingConfigValue_t.OptionValue { m_int32 = value },
+        };
     }
 
     public int ReceiveDatagram(uint connection, byte[] buffer)
