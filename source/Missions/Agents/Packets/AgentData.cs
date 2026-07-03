@@ -20,8 +20,11 @@ namespace Missions.Agents.Packets
             // reading the mount's native state (MovementInputVector, etc.) then access-violates. Only capture
             // the mount while it is itself active — mirrors the rider guard in AgentMovementHandler.PollAgents
             // and the horse.IsActive() check in SyncMountState.
+            // Guard against the snapshot alone, not agent.HasMount (a re-read of MountAgent) — this constructor
+            // runs on the background poll thread while mount/dismount happens on the game thread, so re-reading
+            // between the snapshot and the guard can see a mount that mount is still null for, and NRE.
             Agent mount = agent.MountAgent;
-            if (agent.HasMount && mount.IsActive())
+            if (mount != null && mount.IsActive())
             {
                 MountData = new AgentMountData(mount);
             }
