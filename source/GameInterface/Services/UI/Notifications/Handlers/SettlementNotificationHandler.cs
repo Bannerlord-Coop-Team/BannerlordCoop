@@ -8,6 +8,9 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.UI.Notifications.Messages;
+using SandBox.GauntletUI.Map;
+using SandBox.View.Map;
+using SandBox.ViewModelCollection.Nameplate.NameplateNotifications.SettlementNotificationTypes;
 using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -149,7 +152,7 @@ internal class SettlementNotificationHandler : IHandler
 
             using (new AllowedThread())
             {
-                CampaignEventDispatcher.Instance.OnTroopRecruited(recruiterHero, settlement, troopSource, troop, data.Amount);
+                GetSettlementNotifications(settlement)?.OnTroopRecruited(recruiterHero, settlement, troopSource, troop, data.Amount);
             }
         });
     }
@@ -225,5 +228,13 @@ internal class SettlementNotificationHandler : IHandler
         }
 
         return roster;
+    }
+
+    private static SettlementNameplateNotificationsVM GetSettlementNotifications(Settlement settlement)
+    {
+        var nameplatesVM = MapScreen.Instance?.GetMapView<GauntletMapSettlementNameplateView>()?._dataSource;
+        var notifications = nameplatesVM?.GetNameplateOfSettlement(settlement)?.SettlementNotifications;
+
+        return notifications?.IsEventsRegistered == true ? notifications : null;
     }
 }

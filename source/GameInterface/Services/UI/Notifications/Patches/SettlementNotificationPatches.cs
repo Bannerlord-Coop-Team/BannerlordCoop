@@ -2,6 +2,7 @@ using Common;
 using Common.Messaging;
 using GameInterface.Services.UI.Notifications.Messages;
 using HarmonyLib;
+using SandBox.ViewModelCollection.Nameplate.NameplateNotifications.SettlementNotificationTypes;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -29,17 +30,6 @@ internal class SettlementNotificationPatches
         MessageBroker.Instance.Publish(null, new NotifyCaravanTransaction(caravanParty, town, itemRosterElements));
     }
 
-    [HarmonyPatch(nameof(CampaignEventDispatcher.OnTroopRecruited))]
-    [HarmonyPostfix]
-    private static void OnTroopRecruitedPostfix(Hero recruiterHero, Settlement recruitmentSettlement, Hero recruitmentSource, CharacterObject troop, int amount)
-    {
-        if (ModInformation.IsClient) return;
-        // The nameplate popup requires both; the prisoner-recruit path passes a null settlement
-        if (recruiterHero == null || recruitmentSettlement == null || troop == null) return;
-
-        MessageBroker.Instance.Publish(null, new NotifyTroopRecruited(recruiterHero, recruitmentSettlement, recruitmentSource, troop, amount));
-    }
-
     [HarmonyPatch(nameof(CampaignEventDispatcher.OnPrisonerSold))]
     [HarmonyPostfix]
     private static void OnPrisonerSoldPostfix(PartyBase sellerParty, PartyBase buyerParty, TroopRoster prisoners)
@@ -58,5 +48,20 @@ internal class SettlementNotificationPatches
         if (giverHero == null || recipientSettlement == null || roster == null) return;
 
         MessageBroker.Instance.Publish(null, new NotifyTroopGivenToSettlement(giverHero, recipientSettlement, roster));
+    }
+}
+
+[HarmonyPatch(typeof(SettlementNameplateNotificationsVM))]
+internal class NameplateNotificationPatches
+{
+    [HarmonyPatch(nameof(SettlementNameplateNotificationsVM.OnTroopRecruited))]
+    [HarmonyPostfix]
+    private static void OnTroopRecruitedPostfix(Hero recruiterHero, Settlement settlement, Hero troopSource, CharacterObject troop, int amount)
+    {
+        if (ModInformation.IsClient) return;
+        // The nameplate popup requires both; the prisoner-recruit path passes a null settlement
+        if (recruiterHero == null || settlement == null || troop == null) return;
+
+        MessageBroker.Instance.Publish(null, new NotifyTroopRecruited(recruiterHero, settlement, troopSource, troop, amount));
     }
 }
