@@ -58,20 +58,22 @@ public class SteamNetworkingTunnelTransport : ISteamTunnelTransport
     // cannot observe locally, so the same values are also set globally.
     private static void ApplyGlobalTunnelConfig()
     {
-        SetGlobalInt32(ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendBufferSize, SteamTunnel.SendBufferBytes);
-        SetGlobalInt32(ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendRateMax, SteamTunnel.SendRateMaxBytesPerSecond);
+        SetConfigInt32(ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_Global, IntPtr.Zero,
+            ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendBufferSize, SteamTunnel.SendBufferBytes);
+        SetConfigInt32(ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_Global, IntPtr.Zero,
+            ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendRateMax, SteamTunnel.SendRateMaxBytesPerSecond);
     }
 
-    private static void SetGlobalInt32(ESteamNetworkingConfigValue key, int value)
+    private static void SetConfigInt32(ESteamNetworkingConfigScope scope, IntPtr scopeObj,
+        ESteamNetworkingConfigValue key, int value)
     {
         var handle = GCHandle.Alloc(value, GCHandleType.Pinned);
         try
         {
-            if (!SteamNetworkingUtils.SetConfigValue(key,
-                ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_Global, IntPtr.Zero,
+            if (!SteamNetworkingUtils.SetConfigValue(key, scope, scopeObj,
                 ESteamNetworkingConfigDataType.k_ESteamNetworkingConfig_Int32, handle.AddrOfPinnedObject()))
             {
-                Logger.Warning("Steam refused global tunnel config {Key}", key);
+                Logger.Warning("Steam refused tunnel config {Key} at scope {Scope}", key, scope);
             }
         }
         finally
@@ -135,7 +137,16 @@ public class SteamNetworkingTunnelTransport : ISteamTunnelTransport
         {
             Logger.Error("Accepting tunnel connection {Connection} failed: {Result}", connection, result);
             CloseConnection(connection);
+            return;
         }
+
+        // Observed live: an accepted connection ignores both the listen-socket options and
+        // the global values (it stayed pinned at the 256 KB/s default), while connection
+        // scope provably works, so the config is applied straight onto it.
+        SetConfigInt32(ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_Connection, (IntPtr)connection,
+            ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendBufferSize, SteamTunnel.SendBufferBytes);
+        SetConfigInt32(ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_Connection, (IntPtr)connection,
+            ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendRateMax, SteamTunnel.SendRateMaxBytesPerSecond);
     }
 
     public void CloseConnection(uint connection)
