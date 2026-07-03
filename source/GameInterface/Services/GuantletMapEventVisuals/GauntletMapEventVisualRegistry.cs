@@ -13,10 +13,17 @@ namespace GameInterface.Services.GuantletMapEventVisuals;
 
 internal class GauntletMapEventVisualRegistry : AutoRegistryBase<GauntletMapEventVisual>
 {
+    private readonly IMapEventBattleSizeCorrection mapEventBattleSizeCorrection;
+
     public override bool Debug => true;
-    public GauntletMapEventVisualRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+    public GauntletMapEventVisualRegistry(
+        ILogger logger,
+        IAutoRegistryFactory autoRegistryFactory,
+        IObjectManager objectManager,
+        IMapEventBattleSizeCorrection mapEventBattleSizeCorrection)
         : base(logger, autoRegistryFactory, objectManager)
     {
+        this.mapEventBattleSizeCorrection = mapEventBattleSizeCorrection;
     }
 
     public override IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(GauntletMapEventVisual));
@@ -70,6 +77,9 @@ internal class GauntletMapEventVisualRegistry : AutoRegistryBase<GauntletMapEven
         {
             obj.OnMapEventEnd();
         }
+
+        // Drop any pending ambient battle-size correction for this ended battle.
+        mapEventBattleSizeCorrection.Clear(obj);
     }
 
     public override void OnServerCreated(GauntletMapEventVisual obj, string id)

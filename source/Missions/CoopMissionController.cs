@@ -52,6 +52,11 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         // override OnMissionTick call base (CoopBattleController does), and CoopLocationsController does not
         // override it, so this runs for both battle and location missions.
         coopMissionComponent.AgentMovementHandler.Interpolator.Tick(dt);
+
+        // Capture discrete action changes on the GAME thread (attacks, jumps, gestures...): a one-frame action
+        // transition can't be observed reliably from the background movement poller, so actions are event-synced
+        // from here instead of polled with movement.
+        coopMissionComponent.AgentActionHandler.PollActions();
     }
 
     public virtual void Dispose()
@@ -86,11 +91,12 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
 
     public override void OnEndMissionInternal()
     {
-        // Dispose the movement handler FIRST — this stops its background poller before anything else tears down,
-        // so the poll loop is not reading agents/mission state as they are freed (it races the game thread and
-        // crashes on freed native agents), and it deterministically detaches the handler instead of leaking it
-        // until the GC finalizer runs.
+        // Detach the per-mission agent handlers FIRST. The movement handler stops its background poller before
+        // anything else tears down, so the poll loop isn't reading agents/mission state as they are freed (it
+        // races the game thread and crashes on freed native agents). Both detach deterministically here instead
+        // of leaking their poller/packet-handler registration until the GC finalizer runs.
         coopMissionComponent.AgentMovementHandler.Dispose();
+        coopMissionComponent.AgentActionHandler.Dispose();
 
         OnLeaving();
 

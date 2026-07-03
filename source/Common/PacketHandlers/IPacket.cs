@@ -13,11 +13,11 @@ namespace Common.PacketHandlers
         RequestMobilePartyMovement,
         UpdateMobilePartyMovement,
         RequestUpdatePartyBehavior,
-        UpdatePartyBehavior,
         FieldAutoSync,
         PropertyAutoSync,
         SaveData,
-        Relay
+        Relay,
+        AgentAction
     }
 
     public interface IPacket

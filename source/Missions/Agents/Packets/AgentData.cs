@@ -16,15 +16,6 @@ namespace Missions.Agents.Packets
 
             AgentEquipment = new AgentEquipmentData(agent);
 
-            if (agent.Health > 0f)
-            {
-                ActionData = new AgentActionData(agent);
-            }
-            else
-            {
-                ActionData = null;
-            }
-
             // The rider can be active while its mount is mid-teardown (e.g. right after a battle concludes):
             // reading the mount's native state (MovementInputVector, etc.) then access-violates. Only capture
             // the mount while it is itself active — mirrors the rider guard in AgentMovementHandler.PollAgents
@@ -61,8 +52,9 @@ namespace Missions.Agents.Packets
             // Update equipment
             AgentEquipment.Apply(agent);
 
-            // Update actions
-            //ActionData?.Apply(agent);
+            // NOTE: actions/animations are NOT applied here anymore. They are events, not continuous state, so
+            // they are synced separately and on-change by AgentActionHandler (reliable-ordered), not polled with
+            // movement. This keeps the movement packet purely continuous state.
 
             // Update mount
             if (agent.HasMount)
@@ -81,8 +73,7 @@ namespace Missions.Agents.Packets
         public Vec2 MovementDirection { get; }
         [ProtoMember(5)]
         public AgentEquipmentData AgentEquipment { get; }
-        [ProtoMember(6)]
-        public AgentActionData ActionData { get; }
+        // 6 was ActionData — actions moved to the event-driven AgentActionHandler; tag left unused for wire stability.
         [ProtoMember(7)]
         public AgentMountData MountData { get; }
     }

@@ -1,5 +1,4 @@
 using GameInterface.Services.MapEvents;
-using Moq;
 using Xunit;
 
 namespace Coop.Tests.GameInterface.Services.MapEvents;
@@ -8,97 +7,75 @@ namespace Coop.Tests.GameInterface.Services.MapEvents;
 /// Unit tests for <see cref="BattleDeploymentActivator"/> — the gate that releases the host-driven NPC AI on the
 /// first deployment-finish from ANY client ("NPC parties do not begin moving until any client has finished").
 /// Covers host vs non-host, first/duplicate finishes, a client disconnecting without finishing, and host
-/// migration (a promoted client releasing — or correctly NOT releasing — the NPCs it adopts).
+/// migration (a promoted client releasing — or correctly NOT releasing — the NPCs it adopts). The activator is
+/// pure (inputs in, verdicts out): a true return asks the caller for the side effect named by the method's doc.
 /// </summary>
 public class BattleDeploymentActivatorTests
 {
-    private readonly Mock<IBattleDeploymentBridge> bridge = new(MockBehavior.Strict);
-    private readonly BattleDeploymentActivator sut;
-
-    public BattleDeploymentActivatorTests()
-    {
-        sut = new BattleDeploymentActivator(bridge.Object);
-    }
-
-    private void AsHost() => bridge.SetupGet(b => b.IsLocalHost).Returns(true);
-    private void AsNonHost() => bridge.SetupGet(b => b.IsLocalHost).Returns(false);
+    private readonly BattleDeploymentActivator sut = new();
 
     [Fact]
-    public void HostFinishesOwnDeploymentFirst_AnnouncesAndMarksLive_WithoutSurgicalRelease()
+    public void HostFinishesOwnDeploymentFirst_MarksLive_AndAsksToBroadcast()
     {
-        AsHost();
-        bridge.Setup(b => b.AnnounceLocalDeploymentFinished());
-        bridge.Setup(b => b.BroadcastBattleActivated());
-
-        sut.OnLocalDeploymentFinished();
-
+        // The native FinishDeployment that triggered this already freed the host's NPCs — the true return asks
+        // only for the battle-activated broadcast, never a surgical release.
+        Assert.True(sut.OnLocalDeploymentFinished(isLocalHost: true));
         Assert.True(sut.IsActivated);
-        bridge.Verify(b => b.AnnounceLocalDeploymentFinished(), Times.Once); // told peers we finished
-        bridge.Verify(b => b.BroadcastBattleActivated(), Times.Once);        // told peers the battle is live
-        bridge.Verify(b => b.ReleaseNpcAi(), Times.Never);                   // native FinishDeployment freed our NPCs
     }
 
     [Fact]
-    public void HostSeesPeerFinishFirst_SurgicallyReleasesOnce_AndBroadcastsLive()
+    public void HostsOwnSecondFinish_IsANoOp()
     {
-        AsHost();
-        bridge.Setup(b => b.BroadcastBattleActivated());
-        bridge.Setup(b => b.ReleaseNpcAi());
+        Assert.True(sut.OnLocalDeploymentFinished(isLocalHost: true));
 
-        sut.OnRemoteDeploymentFinished();
-
+        Assert.False(sut.OnLocalDeploymentFinished(isLocalHost: true)); // no re-broadcast
         Assert.True(sut.IsActivated);
-        bridge.Verify(b => b.ReleaseNpcAi(), Times.Once);            // still deploying -> surgical NPC release
-        bridge.Verify(b => b.BroadcastBattleActivated(), Times.Once);
+    }
+
+    [Fact]
+    public void HostSeesPeerFinishFirst_AsksToReleaseAndBroadcast_Once()
+    {
+        // Still deploying ourselves -> the true return asks for the surgical NPC release + the live broadcast.
+        Assert.True(sut.OnRemoteDeploymentFinished(isLocalHost: true));
+        Assert.True(sut.IsActivated);
 
         // Further peer finishes are no-ops.
-        sut.OnRemoteDeploymentFinished();
-        bridge.Verify(b => b.ReleaseNpcAi(), Times.Once);
-        bridge.Verify(b => b.BroadcastBattleActivated(), Times.Once);
+        Assert.False(sut.OnRemoteDeploymentFinished(isLocalHost: true));
     }
 
     [Fact]
-    public void NonHostFinishesOwnDeployment_AnnouncesOnly_NoActivation()
+    public void HostsOwnFinish_AfterAPeerAlreadyActivated_DoesNotRebroadcast()
     {
-        AsNonHost();
-        bridge.Setup(b => b.AnnounceLocalDeploymentFinished());
+        Assert.True(sut.OnRemoteDeploymentFinished(isLocalHost: true));
 
-        sut.OnLocalDeploymentFinished();
+        Assert.False(sut.OnLocalDeploymentFinished(isLocalHost: true));
+    }
 
+    [Fact]
+    public void NonHostFinishesOwnDeployment_NoActivation()
+    {
+        Assert.False(sut.OnLocalDeploymentFinished(isLocalHost: false));
         Assert.False(sut.IsActivated);
-        bridge.Verify(b => b.AnnounceLocalDeploymentFinished(), Times.Once);
-        bridge.Verify(b => b.BroadcastBattleActivated(), Times.Never);
-        bridge.Verify(b => b.ReleaseNpcAi(), Times.Never);
     }
 
     [Fact]
     public void NonHostSeesPeerFinish_Ignored()
     {
-        AsNonHost();
-
-        sut.OnRemoteDeploymentFinished();
-
+        // A non-host drives no NPCs (theirs are host-driven puppets).
+        Assert.False(sut.OnRemoteDeploymentFinished(isLocalHost: false));
         Assert.False(sut.IsActivated);
-        bridge.Verify(b => b.ReleaseNpcAi(), Times.Never);
-        bridge.Verify(b => b.BroadcastBattleActivated(), Times.Never);
     }
 
     [Fact]
-    public void NonHostReceivesActivatedBroadcast_RecordsLive_WithoutReleasing()
-    {
-        // No bridge calls expected (strict mock): a non-host drives no NPCs; it only records the state.
-        sut.OnBattleActivatedReceived();
-
-        Assert.True(sut.IsActivated);
-    }
-
-    [Fact]
-    public void DuplicateActivatedBroadcast_IsIdempotent()
+    public void NonHostReceivesActivatedBroadcast_RecordsLive_Idempotently()
     {
         sut.OnBattleActivatedReceived();
         sut.OnBattleActivatedReceived();
 
         Assert.True(sut.IsActivated);
+
+        // Recorded state also suppresses a later would-be activation (e.g. we become host and a peer finishes).
+        Assert.False(sut.OnRemoteDeploymentFinished(isLocalHost: true));
     }
 
     [Fact]
@@ -106,14 +83,8 @@ public class BattleDeploymentActivatorTests
     {
         // A peer dropped before deploying, so no remote finish ever arrives. The host finishing its own
         // deployment must still start the battle (no deadlock).
-        AsHost();
-        bridge.Setup(b => b.AnnounceLocalDeploymentFinished());
-        bridge.Setup(b => b.BroadcastBattleActivated());
-
-        sut.OnLocalDeploymentFinished();
-
+        Assert.True(sut.OnLocalDeploymentFinished(isLocalHost: true));
         Assert.True(sut.IsActivated);
-        bridge.Verify(b => b.BroadcastBattleActivated(), Times.Once);
     }
 
     [Fact]
@@ -124,11 +95,7 @@ public class BattleDeploymentActivatorTests
 
         // The old host disconnects and we are promoted. Our adopted NPCs must be released even though we may
         // still be in our own deployment (the deployment AI gate would otherwise hold them frozen).
-        bridge.Setup(b => b.ReleaseNpcAi());
-        sut.OnPromotedToHost();
-
-        bridge.Verify(b => b.ReleaseNpcAi(), Times.Once);
-        bridge.Verify(b => b.BroadcastBattleActivated(), Times.Never); // already broadcast by the previous host
+        Assert.True(sut.OnPromotedToHost());
     }
 
     [Fact]
@@ -136,19 +103,10 @@ public class BattleDeploymentActivatorTests
     {
         // Nobody finished before the old host left, so the battle is not live. The new host must NOT release the
         // NPCs on promotion (that would break the gate); it releases on the first finish that arrives afterwards.
-        sut.OnPromotedToHost();
-
+        Assert.False(sut.OnPromotedToHost());
         Assert.False(sut.IsActivated);
-        bridge.Verify(b => b.ReleaseNpcAi(), Times.Never);
 
-        AsHost();
-        bridge.Setup(b => b.BroadcastBattleActivated());
-        bridge.Setup(b => b.ReleaseNpcAi());
-
-        sut.OnRemoteDeploymentFinished();
-
+        Assert.True(sut.OnRemoteDeploymentFinished(isLocalHost: true));
         Assert.True(sut.IsActivated);
-        bridge.Verify(b => b.ReleaseNpcAi(), Times.Once);
-        bridge.Verify(b => b.BroadcastBattleActivated(), Times.Once);
     }
 }

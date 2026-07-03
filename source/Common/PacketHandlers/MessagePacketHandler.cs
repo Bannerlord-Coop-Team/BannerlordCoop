@@ -13,7 +13,11 @@ using System.Runtime.ExceptionServices;
 
 namespace Common.PacketHandlers;
 
-public interface IMessagePacketHandler : IPacketHandler { }
+public interface IMessagePacketHandler : IPacketHandler
+{
+    // Also invoked from OnNetworkReceive for a bare received message that arrived without a MessagePacket layer.
+    void PublishEvent(NetPeer peer, IMessage message);
+}
 
 public class MessagePacketHandler : IMessagePacketHandler
 {
@@ -49,7 +53,7 @@ public class MessagePacketHandler : IMessagePacketHandler
     }
     private readonly ConcurrentDictionary<Type, Action<IMessageBroker, NetPeer, IMessage>> publishFunctionCache = new();
 
-    internal virtual void PublishEvent(NetPeer peer, IMessage message)
+    public virtual void PublishEvent(NetPeer peer, IMessage message)
     {
         if (message is null)
             throw new ArgumentNullException(nameof(message));
