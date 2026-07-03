@@ -65,6 +65,11 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), nameof(Agent.SetAlarmState), nameof(Agent_SetAlarmState));
         Prefix(typeof(Agent), nameof(Agent.ResetEnemyCaches), nameof(Agent_ResetEnemyCaches));
         Prefix(typeof(Agent), nameof(Agent.FadeIn), nameof(Agent_FadeIn));
+        // Retreat/adoption paths: own-party classification reads the origin, the adoption clears a mount's
+        // interpolation target, and the retreat despawn fades the withdrawing troops out.
+        Prefix(typeof(Agent), "get_Origin", nameof(Agent_get_Origin));
+        Prefix(typeof(Agent), "get_MountAgent", nameof(Agent_get_MountAgent));
+        Prefix(typeof(Agent), nameof(Agent.FadeOut), nameof(Agent_FadeOut));
         Prefix(typeof(Team), nameof(Team.GetFormation), nameof(Team_GetFormation));
         Prefix(typeof(Formation), nameof(Formation.SetControlledByAI), nameof(Formation_SetControlledByAI));
         Prefix(typeof(Formation), nameof(Formation.SetMovementOrder), nameof(Formation_SetMovementOrder));
@@ -289,6 +294,28 @@ public sealed class MissionEngineFixture : IDisposable
     {
         // No visual loop headless — accept the call so freshly spawned (reinforcement) agents don't deref natives.
         return !AgentMirror.TryGet(__instance, out _);
+    }
+
+    private static bool Agent_get_Origin(Agent __instance, ref IAgentOriginBase __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.Origin;
+        return false;
+    }
+
+    private static bool Agent_get_MountAgent(Agent __instance, ref Agent __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.MountAgent;
+        return false;
+    }
+
+    private static bool Agent_FadeOut(Agent __instance)
+    {
+        // A faded-out agent is gone: mirror it as inactive so despawn paths (retreat withdrawal) are assertable.
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.IsActive = false;
+        return false;
     }
 
     private static bool Team_GetFormation(Team __instance, FormationClass __0, ref Formation __result)

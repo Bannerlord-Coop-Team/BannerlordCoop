@@ -1,12 +1,10 @@
-﻿using Common.Logging;
-using Common.Messaging;
-using Common.Network;
+﻿using Common.Messaging;
+using Common.Network.Coalescing;
 using Common.PacketHandlers;
-using Coop.Core.Client.Services.MobileParties.Packets;
+using Coop.Core.Server.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Packets;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using LiteNetLib;
-using Serilog;
 
 namespace Coop.Core.Server.Services.MobileParties.PacketHandlers;
 
@@ -15,20 +13,22 @@ namespace Coop.Core.Server.Services.MobileParties.PacketHandlers;
 /// </summary>
 internal class RequestMobilePartyBehaviorPacketHandler : IPacketHandler
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<RequestMobilePartyBehaviorPacketHandler>();
+    // Coalescer channel for per-party behavior updates; only the latest behavior per party is sent each tick.
+    private const string PartyBehaviorUpdateChannel = "PartyBehaviorUpdate";
+
     public PacketType PacketType => PacketType.RequestUpdatePartyBehavior;
 
     private readonly IPacketManager packetManager;
-    private readonly INetwork network;
+    private readonly ISendCoalescer coalescer;
     private readonly IMessageBroker messageBroker;
 
     public RequestMobilePartyBehaviorPacketHandler(
         IPacketManager packetManager,
-        INetwork network,
+        ISendCoalescer coalescer,
         IMessageBroker messageBroker)
     {
         this.packetManager = packetManager;
-        this.network = network;
+        this.coalescer = coalescer;
         this.messageBroker = messageBroker;
         packetManager.RegisterPacketHandler(this);
 
@@ -55,6 +55,8 @@ internal class RequestMobilePartyBehaviorPacketHandler : IPacketHandler
     {
         var data = payload.What.BehaviorUpdateData;
 
-        network.SendAll(new UpdatePartyBehaviorPacket(ref data));
+        // Coalesce per party: repeated behavior changes to one party collapse into a single latest-wins send per tick.
+        var key = new CoalesceKey(PartyBehaviorUpdateChannel, data.MobilePartyId);
+        coalescer.Enqueue(key, new LatestWinsPayload(new NetworkUpdatePartyBehavior(data)));
     }
 }
