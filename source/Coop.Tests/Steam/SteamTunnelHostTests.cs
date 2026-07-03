@@ -151,6 +151,35 @@ namespace Coop.Tests.Steam
         }
 
         [Fact]
+        public void Governor_RaisesFloorOnlyWhileBacklogWaits()
+        {
+            host.Start(4200);
+            transport.RaiseConnectionState(7, TunnelConnectionState.Connected);
+
+            transport.PendingReliableBytes = 1024 * 1024;
+            SteamTunnelClientTests.WaitUntil(() =>
+                transport.LastFloorFor(7) == SteamTunnel.TransferFloorBytesPerSecond);
+
+            transport.PendingReliableBytes = 0;
+            SteamTunnelClientTests.WaitUntil(() => transport.LastFloorFor(7) == 256 * 1024);
+        }
+
+        [Fact]
+        public void Governor_BacksOffWhenDeliveryQualitySags()
+        {
+            host.Start(4200);
+            transport.RaiseConnectionState(7, TunnelConnectionState.Connected);
+
+            transport.PendingReliableBytes = 1024 * 1024;
+            SteamTunnelClientTests.WaitUntil(() =>
+                transport.LastFloorFor(7) == SteamTunnel.TransferFloorBytesPerSecond);
+
+            transport.Quality = 0.5f;
+            SteamTunnelClientTests.WaitUntil(() =>
+                transport.LastFloorFor(7) == SteamTunnel.TransferFloorBytesPerSecond / 2);
+        }
+
+        [Fact]
         public void TwoPeers_GetDistinctRelayPorts()
         {
             using var serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);

@@ -104,6 +104,40 @@ namespace Coop.Tests.Steam
 
         public string DescribeConnection(uint connection) => "fake";
 
+        // Health the governor reads; volatile because the pump polls from its own thread.
+        public volatile int PendingReliableBytes;
+        public volatile float Quality = -1f;
+
+        private readonly List<(uint Connection, int Floor)> floorSets = new List<(uint, int)>();
+
+        public void SetSendRateFloor(uint connection, int bytesPerSecond)
+        {
+            lock (gate)
+            {
+                floorSets.Add((connection, bytesPerSecond));
+            }
+        }
+
+        public int LastFloorFor(uint connection)
+        {
+            lock (gate)
+            {
+                for (int i = floorSets.Count - 1; i >= 0; i--)
+                {
+                    if (floorSets[i].Connection == connection) return floorSets[i].Floor;
+                }
+            }
+
+            return -1;
+        }
+
+        public bool TryGetSendHealth(uint connection, out int pendingReliableBytes, out float quality)
+        {
+            pendingReliableBytes = PendingReliableBytes;
+            quality = Quality;
+            return true;
+        }
+
         public void Dispose() => Disposed = true;
     }
 }

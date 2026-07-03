@@ -28,6 +28,8 @@ public class SteamTunnelHost : ISessionTunnelHost
         public Socket Socket;
         public byte[] PendingDatagram = new byte[SteamTunnel.MaxDatagramBytes];
         public int PendingLength;
+        // 0 = untouched: the connection runs on Steam's default pacing.
+        public int FloorBytesPerSecond;
     }
 
     private readonly ISteamTunnelTransport transport;
@@ -48,6 +50,20 @@ public class SteamTunnelHost : ISessionTunnelHost
     // ~10s of 2ms pump ticks between connection-stats log lines.
     private const int StatsLogTicks = 5000;
     private int ticksSinceStatsLog;
+
+    // Send-rate governor: Steam's pacing estimate never rises on its own in the game's
+    // build, so a floor forces the join transfer through — but only while a join-sized
+    // reliable backlog waits, halved when delivery quality sags (a weak uplink degrades to
+    // a slower transfer instead of a loss spiral), and restored to default once drained.
+    // The quality band is hysteresis so the floor doesn't flap around one threshold.
+    private const int GovernorTicks = 500;
+    private const int RaiseBacklogBytes = 256 * 1024;
+    private const int DrainBacklogBytes = 64 * 1024;
+    private const float BackOffQuality = 0.95f;
+    private const float RaiseQuality = 0.98f;
+    // Matches the default pacing rate observed on this Steam build.
+    private const int DefaultFloorBytesPerSecond = 256 * 1024;
+    private int ticksSinceGovernor;
 
     public SteamTunnelHost(ISteamTunnelTransport transport)
     {
@@ -155,6 +171,15 @@ public class SteamTunnelHost : ISessionTunnelHost
             }
         }
 
+        if (peerSnapshot.Length > 0 && ++ticksSinceGovernor >= GovernorTicks)
+        {
+            ticksSinceGovernor = 0;
+            foreach (var peer in peerSnapshot)
+            {
+                GovernSendRate(peer.Key, peer.Value);
+            }
+        }
+
         foreach (var peer in peerSnapshot)
         {
             try
@@ -177,6 +202,45 @@ public class SteamTunnelHost : ISessionTunnelHost
                 // A refused loopback send loses one datagram; LiteNetLib retransmits what matters.
             }
         }
+    }
+
+    private void GovernSendRate(uint connection, TunnelPeer peer)
+    {
+        if (!transport.TryGetSendHealth(connection, out int pendingReliable, out float quality)) return;
+
+        int floor = peer.FloorBytesPerSecond;
+        bool qualityKnown = quality >= 0;
+
+        if (floor > DefaultFloorBytesPerSecond && qualityKnown && quality < BackOffQuality)
+        {
+            SetFloor(connection, peer, Math.Max(DefaultFloorBytesPerSecond, floor / 2), "delivery quality sagged");
+            return;
+        }
+
+        if (pendingReliable > RaiseBacklogBytes && (!qualityKnown || quality >= RaiseQuality))
+        {
+            int target = floor <= DefaultFloorBytesPerSecond
+                ? SteamTunnel.TransferFloorBytesPerSecond
+                : Math.Min(SteamTunnel.TransferFloorBytesPerSecond, floor * 2);
+            if (target > floor)
+            {
+                SetFloor(connection, peer, target, "reliable backlog waiting");
+            }
+            return;
+        }
+
+        if (floor > DefaultFloorBytesPerSecond && pendingReliable < DrainBacklogBytes)
+        {
+            SetFloor(connection, peer, DefaultFloorBytesPerSecond, "backlog drained");
+        }
+    }
+
+    private void SetFloor(uint connection, TunnelPeer peer, int bytesPerSecond, string reason)
+    {
+        peer.FloorBytesPerSecond = bytesPerSecond;
+        transport.SetSendRateFloor(connection, bytesPerSecond);
+        Logger.Information("Tunnel peer {Connection} send floor {Floor}B/s ({Reason})",
+            connection, bytesPerSecond, reason);
     }
 
     // A refused send parks the datagram and stops draining, so the OS socket buffer queues

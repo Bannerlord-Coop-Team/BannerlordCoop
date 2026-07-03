@@ -28,12 +28,13 @@ public static class SteamTunnel
     public const int SendBufferBytes = 8 * 1024 * 1024;
 
     /// <summary>
-    /// Floor for Steam's send pacing, and in practice the effective transfer rate: this
-    /// Steam build never raises the rate toward the ceiling on its own (observed pinned at
-    /// the 256 KB/s default while saturated on a 3 ms link), so the floor is what carries
-    /// the ~55 MB join payload in seconds instead of minutes.
+    /// Send-pacing floor while a join-sized reliable backlog is draining. The pacer's
+    /// estimate never rises on its own in the game's Steam build (observed pinned at the
+    /// 256 KB/s default while saturated on a 3 ms link), so this floor is what carries the
+    /// ~55 MB join payload in seconds instead of minutes; the tunnel host's governor
+    /// applies it only under backlog and backs it off when delivery quality sags.
     /// </summary>
-    public const int SendRateMinBytesPerSecond = 2 * 1024 * 1024;
+    public const int TransferFloorBytesPerSecond = 2 * 1024 * 1024;
 
     /// <summary>Ceiling for Steam's send pacing, headroom above the floor.</summary>
     public const int SendRateMaxBytesPerSecond = 20 * 1024 * 1024;
@@ -106,4 +107,13 @@ public interface ISteamTunnelTransport : IDisposable
 
     /// <summary>One-line live status (effective send rate, backlog, throughput, ping) for logs.</summary>
     string DescribeConnection(uint connection);
+
+    /// <summary>Sets the connection's send-pacing floor.</summary>
+    void SetSendRateFloor(uint connection, int bytesPerSecond);
+
+    /// <summary>
+    /// Live send-side health; false when unavailable. Quality is the delivered fraction of
+    /// our sends, negative until Steam has a measurement.
+    /// </summary>
+    bool TryGetSendHealth(uint connection, out int pendingReliableBytes, out float quality);
 }

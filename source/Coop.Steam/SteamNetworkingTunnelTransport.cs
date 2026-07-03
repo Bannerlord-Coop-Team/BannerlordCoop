@@ -61,9 +61,25 @@ public class SteamNetworkingTunnelTransport : ISteamTunnelTransport
         SetConfigInt32(ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_Global, IntPtr.Zero,
             ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendBufferSize, SteamTunnel.SendBufferBytes);
         SetConfigInt32(ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_Global, IntPtr.Zero,
-            ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendRateMin, SteamTunnel.SendRateMinBytesPerSecond);
-        SetConfigInt32(ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_Global, IntPtr.Zero,
             ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendRateMax, SteamTunnel.SendRateMaxBytesPerSecond);
+    }
+
+    public void SetSendRateFloor(uint connection, int bytesPerSecond)
+    {
+        SetConfigInt32(ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_Connection, (IntPtr)connection,
+            ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendRateMin, bytesPerSecond);
+    }
+
+    public bool TryGetSendHealth(uint connection, out int pendingReliableBytes, out float quality)
+    {
+        var status = default(SteamNetConnectionRealTimeStatus_t);
+        var lanes = default(SteamNetConnectionRealTimeLaneStatus_t);
+        var result = SteamNetworkingSockets.GetConnectionRealTimeStatus(
+            new HSteamNetConnection(connection), ref status, 0, ref lanes);
+
+        pendingReliableBytes = status.m_cbPendingReliable;
+        quality = status.m_flConnectionQualityLocal;
+        return result == EResult.k_EResultOK;
     }
 
     private static void SetConfigInt32(ESteamNetworkingConfigScope scope, IntPtr scopeObj,
@@ -148,8 +164,6 @@ public class SteamNetworkingTunnelTransport : ISteamTunnelTransport
         SetConfigInt32(ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_Connection, (IntPtr)connection,
             ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendBufferSize, SteamTunnel.SendBufferBytes);
         SetConfigInt32(ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_Connection, (IntPtr)connection,
-            ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendRateMin, SteamTunnel.SendRateMinBytesPerSecond);
-        SetConfigInt32(ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_Connection, (IntPtr)connection,
             ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendRateMax, SteamTunnel.SendRateMaxBytesPerSecond);
 
         // Read-back separates "stored but the pacer ignores it" from "never stored".
@@ -230,7 +244,6 @@ public class SteamNetworkingTunnelTransport : ISteamTunnelTransport
         return new[]
         {
             Int32Option(ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendBufferSize, SteamTunnel.SendBufferBytes),
-            Int32Option(ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendRateMin, SteamTunnel.SendRateMinBytesPerSecond),
             Int32Option(ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendRateMax, SteamTunnel.SendRateMaxBytesPerSecond),
         };
     }
