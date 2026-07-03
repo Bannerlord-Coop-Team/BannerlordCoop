@@ -56,5 +56,4 @@ internal static class TunnelSocket
             return ex.SocketErrorCode == SocketError.WouldBlock ? -1 : 0;
         }
     }
-
 }
