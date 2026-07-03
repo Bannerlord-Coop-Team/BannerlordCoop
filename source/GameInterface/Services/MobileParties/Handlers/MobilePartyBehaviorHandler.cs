@@ -29,6 +29,11 @@ internal class MobilePartyBehaviorHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyBehaviorHandler>();
 
+    // Owner-party position resync threshold, in campaign-map units. The per-click prediction lead is
+    // a small fraction of a unit while map features sit tens of units apart, so 1 unit stays above
+    // normal prediction drift but still catches a genuine desync.
+    private const float OwnerPositionResyncThreshold = 1f;
+
     private readonly IMessageBroker messageBroker;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IMobilePartyInterface mobilePartyInterface;
@@ -123,7 +128,16 @@ internal class MobilePartyBehaviorHandler : IHandler
 
                     if (ModInformation.IsClient)
                     {
-                        party.Ai._mobileParty.Position = data.PartyPosition;
+                        // The local player's own party is client-predicted and runs slightly ahead of the
+                        // server's relayed position; snapping it mid-move is the jitter. Snap when it's at rest,
+                        // on a nav-layer (land/sea) change, or once it's drifted far enough to be a real desync.
+                        if (!party.IsControlledByThisInstance() ||
+                            !party.IsMoving ||
+                            party.Position.IsOnLand != data.PartyPosition.IsOnLand ||
+                            party.Position.Distance(data.PartyPosition) > OwnerPositionResyncThreshold)
+                        {
+                            party.Position = data.PartyPosition;
+                        }
                     }
                     else
                     {
