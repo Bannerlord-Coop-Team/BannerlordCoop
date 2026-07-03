@@ -1,4 +1,6 @@
-﻿namespace GameInterface.Utils.NetworkEvents
+﻿using GameInterface.Services.ObjectManager;
+
+namespace GameInterface.Utils.NetworkEvents
 {
     public abstract record GenericNetworkReferenceEvent<TInstance, TValue> : GenericNetworkEvent<TInstance, TValue>
     {
@@ -6,7 +8,8 @@
 
         protected GenericNetworkReferenceEvent(string instanceId, string valueId) : base(instanceId)
         {
-            ValueId = valueId;
+            // Compact the id for the wire; the receiver re-adds the "{TValue}_" prefix by type.
+            ValueId = ObjectManager.Compact(valueId, typeof(TValue));
         }
     }
 }

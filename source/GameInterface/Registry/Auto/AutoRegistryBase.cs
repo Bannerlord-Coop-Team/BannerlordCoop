@@ -92,6 +92,37 @@ public abstract class AutoRegistryBase<T> : IAutoRegistry<T> where T : class
     /// <inheritdoc/>
     public abstract void RegisterAllObjects();
 
+    private IDictionary<string, string> idRemapCollector;
+    private IDictionary<string, string> idRemapOverride;
+
+    /// <summary>
+    /// Runs <see cref="RegisterAllObjects"/> in "collect" mode: instead of registering each object, records into
+    /// <paramref name="map"/> the owner-derived id this registry would mint mapped to the object's current server
+    /// id, for every object whose two ids differ (i.e. live-created ones). RegisterAllObjects is the single source
+    /// of the owner-derived id formula, so reusing it keeps the join-time reconciliation (see AttachmentIdMapper)
+    /// from re-deriving the formula and silently drifting from the registries.
+    /// </summary>
+    public void CollectIdRemap(IDictionary<string, string> map)
+    {
+        idRemapCollector = map;
+        try { RegisterAllObjects(); }
+        finally { idRemapCollector = null; }
+    }
+
+    /// <summary>
+    /// Runs <see cref="RegisterAllObjects"/> on a joining client with <paramref name="map"/> (owner-derived id ->
+    /// server id) active, so each live-created attachment is registered directly under the server's id instead of
+    /// the owner-derived id this client would otherwise mint. A null map registers normally. This is the join-time
+    /// counterpart to <see cref="CollectIdRemap"/>: the client adopts the server's ids during registration rather
+    /// than re-keying afterward.
+    /// </summary>
+    public void RegisterAllObjectsWithRemap(IDictionary<string, string> map)
+    {
+        idRemapOverride = map;
+        try { RegisterAllObjects(); }
+        finally { idRemapOverride = null; }
+    }
+
     /// <summary>
     /// Registers an existing object with the specified identifier, associating it with the current object manager.
     /// </summary>
@@ -106,6 +137,20 @@ public abstract class AutoRegistryBase<T> : IAutoRegistry<T> where T : class
     protected void RegisterExistingObject(string id, T obj)
     {
         id = $"{typeof(T).Name}_{id}";
+
+        if (idRemapCollector != null)
+        {
+            // Collect mode: record the divergence so a joining client can register under the server's current id,
+            // instead of registering.
+            if (objectManager.TryGetId(obj, out var serverId) && serverId != id)
+                idRemapCollector[id] = serverId;
+            return;
+        }
+
+        // Joining client: adopt the server's id for a live-created attachment instead of this owner-derived id,
+        // so the object is registered once under the id the server actually uses (no register-wrong-then-rekey).
+        if (idRemapOverride != null && idRemapOverride.TryGetValue(id, out var overrideId))
+            id = overrideId;
 
         EnsureObjectManagerCounter(id, obj);
 

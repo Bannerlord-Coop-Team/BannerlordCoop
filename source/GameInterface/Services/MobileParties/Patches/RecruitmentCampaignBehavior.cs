@@ -211,6 +211,10 @@ internal class RecruitmentCampaignBehaviorPatch
     [HarmonyPostfix]
     public static void UpdateVolunteersOfNotablesInSettlementPostfix(Settlement settlement)
     {
+        // Volunteer generation is server-authoritative; only the server may publish the snapshot.
+        // Without this, a client's locally-generated volunteers would be sent back to the server.
+        if (ModInformation.IsClient) return;
+
         if ((settlement.IsTown && !settlement.Town.InRebelliousState) || (settlement.IsVillage && !settlement.Village.Bound.Town.InRebelliousState))
         {
             Dictionary<Hero, CharacterObject[]> updatedVolunteerTypes = new();
@@ -229,6 +233,9 @@ internal class RecruitmentCampaignBehaviorPatch
     [HarmonyPostfix]
     public static void ApplyInternalPostfix(Hero individual, int number, int bitCode, RecruitmentCampaignBehavior.RecruitingDetail detail)
     {
+        // Server-authoritative; clients forward recruitment via RecruitmentVMPatches. Mirrors the update postfix.
+        if (ModInformation.IsClient) return;
+
         if (detail != RecruitmentCampaignBehavior.RecruitingDetail.VolunteerFromIndividual && detail != RecruitmentCampaignBehavior.RecruitingDetail.VolunteerFromIndividualToGarrison)
         {
             return;

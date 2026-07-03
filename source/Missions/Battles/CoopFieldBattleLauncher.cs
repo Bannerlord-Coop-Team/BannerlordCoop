@@ -1,6 +1,5 @@
 using Common.Logging;
 using Common.Messaging;
-using GameInterface;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.TroopSupply;
@@ -43,11 +42,16 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
+    private readonly ICoopBattleBehaviorAttacher behaviorAttacher;
 
-    public CoopFieldBattleLauncher(IMessageBroker messageBroker, IObjectManager objectManager)
+    public CoopFieldBattleLauncher(
+        IMessageBroker messageBroker,
+        IObjectManager objectManager,
+        ICoopBattleBehaviorAttacher behaviorAttacher)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
+        this.behaviorAttacher = behaviorAttacher;
     }
 
     public Mission OpenCoopFieldBattle(MissionInitializerRecord rec)
@@ -143,18 +147,17 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
                 // Battle), spawn both sides frozen during SetupTeams, hold Mission.AllowAiTicking off, and start
                 // the spawners + un-pause AI only on Start Battle (FinishDeployment). This replaces the coop
                 // force-spawn shortcut (CoopBattleController.EnsureSidesSpawning), now removed.
-                new BattleDeploymentMissionController(isPlayerAttacker),
+                new CoopBattleDeploymentMissionController(isPlayerAttacker),
                 new BattleDeploymentHandler(isPlayerAttacker),
             };
 
-            // Coop P2P behaviors (CoopBattleController, ...) — resolved fresh per mission, as BattleMissionEntryPatch did.
-            if (ContainerProvider.TryResolve(out IEnumerable<IBattleMissionBehavior> coopBehaviors))
-                foreach (var behavior in coopBehaviors)
-                    if (behavior is MissionBehavior missionBehavior)
-                        behaviors.Add(missionBehavior);
-
             return behaviors.ToArray();
         }, true, true);
+
+        // Attach the coop P2P behaviors (a fresh CoopBattleController) BEFORE PlayerEnteredBattle is published
+        // by our caller, so the controller is alive and subscribed for the instance request — the same
+        // post-open attach the native path uses (BattleMissionEntryPatch).
+        behaviorAttacher.Attach(mission);
 
         mission.SetPlayerCanTakeControlOfAnotherAgentWhenDead();
         Logger.Information("[BattleSync] Opened coop field battle for {MapEventId} (player side {Side})",

@@ -3,10 +3,13 @@ using System.Linq;
 using Common.Messaging;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.MockEngine;
-using HarmonyLib;
+using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.TroopSupply;
 using Missions;
 using Missions.Battles;
 using Missions.Messages;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 using Xunit;
@@ -41,7 +44,7 @@ public class BattleMigrationMirrorTests : MissionTestEnvironment
             var registry = newHost.Resolve<INetworkAgentRegistry>();
 
             // Put this controller "in" battle mapEvent1 so the migration handler accepts the message.
-            AccessTools.Field(typeof(CoopBattleController), "instanceId").SetValue(controller, "mapEvent1");
+            controller.Session.TryBegin("mapEvent1");
 
             // An enemy NPC the OLD host "A" was running, replicated here as an inert puppet on an Attacker team.
             var team = new MockTeam(BattleSideEnum.Attacker);
@@ -69,5 +72,75 @@ public class BattleMigrationMirrorTests : MissionTestEnvironment
 
             GC.KeepAlive(controller);
         });
+    }
+
+    /// <summary>
+    /// A host RETREAT is not a disconnect: the retreating host's OWN party withdraws (despawned on every
+    /// client), while the AI it was running is adopted by the promoted successor — two DISJOINT sets, which is
+    /// what makes the despawn and the adoption race-free (racing over the same agents was a native crash).
+    /// Own-party membership is identified by the agent's origin party, not its battle side, so a host-fielded
+    /// allied NPC party keeps fighting.
+    /// </summary>
+    [Fact]
+    public void HostRetreat_DespawnsItsOwnParty_AndAdoptsOnlyTheAiItRan()
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, partyIds) = SetupCoopBattle("A", "B");
+        var successor = Clients.Skip(1).First(); // "B"
+
+        var ownPartyTroopId = Guid.NewGuid();
+        var npcTroopId = Guid.NewGuid();
+
+        try
+        {
+            successor.Call(() =>
+            {
+                var mock = fixture.CreateMission(successor);
+                var controller = successor.Resolve<CoopBattleController>();
+                var registry = successor.Resolve<INetworkAgentRegistry>();
+
+                controller.Session.TryBegin(mapEventId);
+                successor.Resolve<IBattleHostRegistry>().Set(mapEventId, new BattleHostAssignment("A", new[] { "B" }));
+
+                // A live coop battle: the movement handler's location-style peer cleanup must stand down (it is
+                // gated on the spawn gate), exactly as in a real battle — otherwise it would despawn A's agents
+                // wholesale and there would be nothing left to adopt.
+                BattleSpawnGate.BeginBattle(mapEventId);
+
+                Assert.True(successor.ObjectManager.TryGetObject<MobileParty>(partyIds[0], out var hostParty));
+                var character = (CharacterObject)Game.Current.PlayerTroop;
+                var team = new MockTeam(BattleSideEnum.Defender);
+
+                // A's OWN-party troop (origin party = A's player party) — must withdraw on A's retreat.
+                var ownOrigin = new CoopAgentOrigin(character, hostParty.Party, -1, null, new UniqueTroopDescriptor(1));
+                var ownTroop = mock.SpawnAgent(new AgentBuildData(character).Controller(AgentControllerType.None).Team(team.Shell).TroopOrigin(ownOrigin));
+                Assert.True(registry.TryRegisterAgent("A", ownPartyTroopId, ownTroop));
+
+                // An NPC troop A was RUNNING (no player origin party) — must be adopted and keep fighting.
+                var npcTroop = mock.SpawnAgent(new AgentBuildData(character).Controller(AgentControllerType.None).Team(team.Shell));
+                Assert.True(registry.TryRegisterAgent("A", npcTroopId, npcTroop));
+
+                // A retreats (the graceful leave arrives first), then the server promotes us.
+                successor.Resolve<IMessageBroker>().Publish(this, new MissionPeerLeft("A", mapEventId));
+                successor.Resolve<IMessageBroker>().Publish(this, new BattleHostMigrated(mapEventId, "A"));
+
+                // A's own-party troop withdrew: faded out and deregistered, NOT adopted.
+                Assert.False(registry.TryGetAgentInfo(ownPartyTroopId, out _));
+                Assert.True(AgentMirror.TryGet(ownTroop, out var ownMirror));
+                Assert.False(ownMirror.IsActive);
+
+                // The NPC troop was adopted: authority moved to us and it fights on as host AI.
+                Assert.True(registry.TryGetAgentInfo(npcTroopId, out var npcInfo));
+                Assert.Equal("B", npcInfo.CurrentAuthority);
+                Assert.True(AgentMirror.TryGet(npcTroop, out var npcMirror));
+                Assert.Equal(AgentControllerType.AI, npcMirror.Controller);
+
+                GC.KeepAlive(controller);
+            });
+        }
+        finally
+        {
+            BattleSpawnGate.EndBattle();
+        }
     }
 }

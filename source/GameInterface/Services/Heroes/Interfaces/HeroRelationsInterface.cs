@@ -81,10 +81,8 @@ internal class HeroRelationsInterface : IHeroRelationsInterface
         {
             notable.SupporterOf = playerClan;
             GiveGoldAction.ApplyBetweenCharacters(mainHero, notable, cost, false);
-            //TODO notify player of changed gold
 
             ChangeRelationAction.ApplyRelationChangeBetweenHeroes(mainHero, notable, 5, false);
-            // TODO notify player of changed relation
         });
     }
 
@@ -131,6 +129,9 @@ internal class HeroRelationsInterface : IHeroRelationsInterface
                     }
                 }
             }
+
+            // Guard against updating supporterOf if the notable doesn't support a clan
+            if (notable.SupporterOf == null) return;
 
             int relation2 = notable.GetRelation(notable.SupporterOf.Leader);
             if (relation2 < 0 || MBRandom.RandomFloat < (50f - (float)relation2) / 500f)

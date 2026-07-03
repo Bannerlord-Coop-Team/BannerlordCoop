@@ -18,12 +18,18 @@ internal class GauntletMapEventVisaulHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IMapEventBattleSizeCorrection mapEventBattleSizeCorrection;
 
-    public GauntletMapEventVisaulHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
+    public GauntletMapEventVisaulHandler(
+        IMessageBroker messageBroker,
+        IObjectManager objectManager,
+        INetwork network,
+        IMapEventBattleSizeCorrection mapEventBattleSizeCorrection)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.mapEventBattleSizeCorrection = mapEventBattleSizeCorrection;
         messageBroker.Subscribe<GauntletMapEventVisualInitialized>(Handle_GauntletMapEventVisualInitialized);
         messageBroker.Subscribe<NetworkGauntletMapEventVisualInitialized>(Handle_NetworkGauntletMapEventVisualInitialized);
     }
@@ -32,6 +38,9 @@ internal class GauntletMapEventVisaulHandler : IHandler
     {
         messageBroker.Unsubscribe<GauntletMapEventVisualInitialized>(Handle_GauntletMapEventVisualInitialized);
         messageBroker.Unsubscribe<NetworkGauntletMapEventVisualInitialized>(Handle_NetworkGauntletMapEventVisualInitialized);
+
+        // Drop any pending battle-size corrections so they don't carry stale ids into the next session.
+        mapEventBattleSizeCorrection.Reset();
     }
     private void Handle_GauntletMapEventVisualInitialized(MessagePayload<GauntletMapEventVisualInitialized> payload)
     {
@@ -76,6 +85,17 @@ internal class GauntletMapEventVisaulHandler : IHandler
                     // keeps the visual in lock-step, so seeding the visual from the local value keeps the icon
                     // and battle sound consistent here instead of starting in the server-visible state.
                     visual.Initialize(position, visual.MapEvent.IsVisible);
+
+                    // If the visual initialized before its sides/parties finished syncing, the ambient
+                    // battle-size Initialize just applied may be too small. Track every field
+                    // battle / sally-out (the only events that read the battle-size) so the real size is
+                    // re-applied as the parties stream in. We can't gate on BattleSizeComputable here: it's
+                    // already true for a half-populated battle, so the partial-roster case would be missed.
+                    var mapEvent = visual.MapEvent;
+                    if (mapEvent.IsFieldBattle || mapEvent.IsSallyOut)
+                    {
+                        mapEventBattleSizeCorrection.Register(visual);
+                    }
                 }
                 catch (Exception ex)
                 {

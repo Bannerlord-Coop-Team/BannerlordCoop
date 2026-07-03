@@ -6,6 +6,8 @@ using Coop.UI.LoadGameUI;
 using GameInterface;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.UI;
+using GameInterface.Utils;
+using HarmonyLib;
 using Serilog;
 using System;
 using System.IO;
@@ -78,6 +80,10 @@ namespace Coop
                 Logger.Information("[AutoConnect] isServer={IsServer} isAutoConnect={IsAutoConnect}", isServer, isAutoConnect);
                 EnsureSafeExitConfig();
             }
+
+            // Boot-apply the loading-window patches so the keepalive guard exists before a host or join waits on PatchAll
+            new Harmony("Coop.UILoading").PatchCategory(
+                typeof(IGameInterface).Assembly, GameInterface.GameInterface.HARMONY_UI_LOADING_CATEGORY);
 
             GameThread.Instance.MarkGameThread();
         }
@@ -269,7 +275,11 @@ namespace Coop
             if(m_IsFirstTick)
             {
                 GameThread.Instance.MarkGameThread();
-                
+
+#if DEBUG
+                WindowTitle.Apply(isServer);
+#endif
+
                 m_IsFirstTick = false;
             }
 

@@ -159,7 +159,7 @@ public class MissionTestEnvironment : E2ETestEnvironment
         instance.Call(() =>
         {
             var registry = instance.Resolve<IBattleHostRegistry>();
-            Assert.Equal(expected, registry.IsLocalHost(mapEventId));
+            Assert.Equal(expected, registry.IsHost(mapEventId));
         });
     }
 }

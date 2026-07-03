@@ -4,7 +4,7 @@ using GameInterface.Services.ObjectManager;
 using LiteNetLib;
 using Missions.Messages;
 using Serilog;
-using System;
+using System; 
 using TaleWorlds.MountAndBlade;
 
 namespace Missions;
@@ -43,6 +43,22 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
     }
 
+    public override void OnMissionTick(float dt)
+    {
+        base.OnMissionTick(dt);
+
+        // Smoothly reconcile received puppets toward their owners' last-reported positions every frame; the
+        // per-packet correction was bound to the bursty ~10ms poll cadence and looked stepped. Subclasses that
+        // override OnMissionTick call base (CoopBattleController does), and CoopLocationsController does not
+        // override it, so this runs for both battle and location missions.
+        coopMissionComponent.AgentMovementHandler.Interpolator.Tick(dt);
+
+        // Capture discrete action changes on the GAME thread (attacks, jumps, gestures...): a one-frame action
+        // transition can't be observed reliably from the background movement poller, so actions are event-synced
+        // from here instead of polled with movement.
+        coopMissionComponent.AgentActionHandler.PollActions();
+    }
+
     public virtual void Dispose()
     {
         messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_MissionPeerEntered);
@@ -75,6 +91,13 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
 
     public override void OnEndMissionInternal()
     {
+        // Detach the per-mission agent handlers FIRST. The movement handler stops its background poller before
+        // anything else tears down, so the poll loop isn't reading agents/mission state as they are freed (it
+        // races the game thread and crashes on freed native agents). Both detach deterministically here instead
+        // of leaking their poller/packet-handler registration until the GC finalizer runs.
+        coopMissionComponent.AgentMovementHandler.Dispose();
+        coopMissionComponent.AgentActionHandler.Dispose();
+
         OnLeaving();
 
         base.OnEndMission();

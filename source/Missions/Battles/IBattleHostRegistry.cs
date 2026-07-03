@@ -29,7 +29,7 @@ public interface IBattleHostRegistry
     bool TryGet(string mapEventId, out BattleHostAssignment assignment);
 
     /// <summary>True if this instance is the elected host for the given battle.</summary>
-    bool IsLocalHost(string mapEventId);
+    bool IsHost(string mapEventId);
 
     void Remove(string mapEventId);
 }
