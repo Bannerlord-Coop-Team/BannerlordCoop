@@ -56,7 +56,9 @@ public class SteamTunnelHost : ISessionTunnelHost
     // reliable backlog waits, halved when delivery quality sags (a weak uplink degrades to
     // a slower transfer instead of a loss spiral), and restored to default once drained.
     // The quality band is hysteresis so the floor doesn't flap around one threshold.
-    private const int GovernorTicks = 500;
+    // Nominally ~100ms of pump ticks; degraded Task.Delay timer resolution stretches a
+    // tick toward 15ms, so the real cadence can be several times longer.
+    private const int GovernorTicks = 50;
     private const int RaiseBacklogBytes = 256 * 1024;
     private const int DrainBacklogBytes = 64 * 1024;
     private const float BackOffQuality = 0.95f;
