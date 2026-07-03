@@ -151,6 +151,35 @@ public class SteamNetworkingTunnelTransport : ISteamTunnelTransport
             ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendRateMin, SteamTunnel.SendRateMinBytesPerSecond);
         SetConfigInt32(ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_Connection, (IntPtr)connection,
             ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendRateMax, SteamTunnel.SendRateMaxBytesPerSecond);
+
+        // Read-back separates "stored but the pacer ignores it" from "never stored".
+        Logger.Information("Tunnel connection {Connection} config: sendRateMin={Min} sendRateMax={Max} sendBuffer={Buffer}",
+            connection,
+            ReadConfigInt32(connection, ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendRateMin),
+            ReadConfigInt32(connection, ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendRateMax),
+            ReadConfigInt32(connection, ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendBufferSize));
+    }
+
+    private static string ReadConfigInt32(uint connection, ESteamNetworkingConfigValue key)
+    {
+        var buffer = new int[1];
+        var handle = GCHandle.Alloc(buffer, GCHandleType.Pinned);
+        try
+        {
+            ulong size = sizeof(int);
+            var result = SteamNetworkingUtils.GetConfigValue(key,
+                ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_Connection, (IntPtr)connection,
+                out _, handle.AddrOfPinnedObject(), ref size);
+
+            return result == ESteamNetworkingGetConfigValueResult.k_ESteamNetworkingGetConfigValue_OK ||
+                result == ESteamNetworkingGetConfigValueResult.k_ESteamNetworkingGetConfigValue_OKInherited
+                ? buffer[0].ToString()
+                : result.ToString();
+        }
+        finally
+        {
+            handle.Free();
+        }
     }
 
     public void CloseConnection(uint connection)
