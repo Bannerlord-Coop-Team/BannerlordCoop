@@ -7,13 +7,16 @@ using Common.Network;
 using Common.Network.Session;
 using Common.Network.Session.Messages;
 using Coop.Core.Client;
+using Coop.Core.Client.Messages;
 using Coop.Core.Client.Services.Session;
 using Coop.Core.Common.Configuration;
 using Coop.Core.Common.Services.Connection.Messages;
 using Coop.Core.Common.Session;
+using Coop.Core.Common.Session.Messages;
 using Coop.Core.Server;
 using GameInterface;
 using GameInterface.AutoSync;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.UI.Interfaces;
@@ -33,19 +36,31 @@ namespace Coop.Core
         private INetworkConfig configuration;
         private IContainer container;
         private readonly SteamOrDirectJoinEndpointPreparer joinEndpointPreparer = new SteamOrDirectJoinEndpointPreparer();
+        private readonly ServerProcessManager serverProcessManager;
         private volatile bool coopStarting;
+        private volatile bool hostedSession;
+        private volatile bool clientConnectedOnce;
+        // Bumped when a new host attempt starts, so a prior attempt's deferred exit handling drops out.
+        private volatile int hostSessionGeneration;
+
+        // A spawned server has to load the whole campaign save before it binds its port.
+        public static readonly TimeSpan HostedServerStartTimeout = TimeSpan.FromMinutes(5);
 
         public CoopartiveMultiplayerExperience()
         {
             // TODO use DI maybe?
             messageBroker = MessageBroker.Instance;
             configuration = new NetworkConfig();
+            serverProcessManager = new ServerProcessManager(messageBroker);
 
             messageBroker.Subscribe<AttemptJoin>(Handle);
+            messageBroker.Subscribe<AttemptHost>(Handle);
             messageBroker.Subscribe<HostSaveGame>(Handle);
             messageBroker.Subscribe<EndCoopMode>(Handle);
             messageBroker.Subscribe<SessionJoinInfoResolved>(Handle);
             messageBroker.Subscribe<SessionJoinFailed>(Handle);
+            messageBroker.Subscribe<HostedServerExited>(Handle);
+            messageBroker.Subscribe<NetworkConnected>(Handle);
         }
 
         public bool Running { get
@@ -64,6 +79,8 @@ namespace Coop.Core
         {
             var connectMessage = obj.What;
 
+            AbandonAnyStartingSession();
+
             configuration = new NetworkConfig()
             {
                 Address = connectMessage.Address.ToString(),
@@ -77,6 +94,130 @@ namespace Coop.Core
             };
 
             StartAsClient(configuration, advertisementConfig);
+        }
+
+        private void Handle(MessagePayload<AttemptHost> obj)
+        {
+            if (!GameStateQuery.IsAtMainMenu)
+            {
+                InformationManager.DisplayMessage(new InformationMessage(
+                    "Return to the main menu to host a co-op session"));
+                return;
+            }
+
+            // A previous start is still applying patches; StartAsClient/StartAsServer would no-op,
+            // so bail before spawning a server this instance can't wire itself to.
+            if (coopStarting) return;
+
+            AbandonAnyStartingSession();
+
+            // Off Steam, keep the in-process dedicated-server behavior: this instance becomes
+            // the server, and the player launches a second instance to join it.
+            if (!SessionDiscovery.SteamAvailable)
+            {
+                StartAsServer(obj.What.SaveName);
+                return;
+            }
+
+            if (serverProcessManager.IsRunning)
+            {
+                InformationManager.DisplayMessage(new InformationMessage(
+                    "A hosted co-op server is still running; wait for it to shut down before hosting again"));
+                return;
+            }
+
+            // Mark the session active before spawning, so an instantly-crashing child's exit event
+            // is recognised by Handle(HostedServerExited) instead of dropped on !hostedSession.
+            hostedSession = true;
+            clientConnectedOnce = false;
+
+            try
+            {
+                serverProcessManager.Start(obj.What.SaveName);
+            }
+            catch (Exception ex)
+            {
+                hostedSession = false;
+                Logger.Error(ex, "Failed to spawn the co-op server process");
+                InformationManager.DisplayMessage(new InformationMessage(
+                    "Could not start the co-op server process"));
+                return;
+            }
+
+            configuration = new NetworkConfig()
+            {
+                Address = "127.0.0.1",
+            };
+
+            var advertisementConfig = new SessionAdvertisementConfig
+            {
+                EnableSteamInvites = SessionDiscovery.SteamAvailable,
+                PublicAddress = string.Empty,
+            };
+
+            try
+            {
+                StartAsClient(configuration, advertisementConfig);
+
+                container.Resolve<SteamJoinWatchdog>().Arm(configuration.Address, configuration.Port,
+                    timeout: HostedServerStartTimeout,
+                    timeoutText: "The co-op server did not finish starting. Check that the save loads in singleplayer, then try hosting again.");
+
+                InformationManager.DisplayMessage(new InformationMessage(
+                    "Starting the co-op server; you will join it automatically once it is up"));
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Hosted co-op session failed to start");
+                hostedSession = false;
+                DestroyContainer();
+                serverProcessManager.Stop();
+                InformationManager.DisplayMessage(new InformationMessage(
+                    "Could not start the co-op session"));
+            }
+        }
+
+        // A deliberate new session supersedes any half-started one left at the main menu.
+        private void AbandonAnyStartingSession()
+        {
+            // A never-joined spawned server from a prior Host click would otherwise idle until its
+            // own timeout; kill it now. StartAsClient/StartAsServer tear the container down themselves.
+            if (hostedSession && !clientConnectedOnce)
+            {
+                serverProcessManager.Stop();
+            }
+
+            hostSessionGeneration++;
+            hostedSession = false;
+            clientConnectedOnce = false;
+        }
+
+        private void Handle(MessagePayload<HostedServerExited> obj)
+        {
+            if (!hostedSession) return;
+
+            // Once connected, a dead server surfaces as a normal disconnect and that
+            // path already returns the player to the main menu with a message.
+            if (clientConnectedOnce) return;
+
+            // The exit is for this host attempt; a newer attempt bumps the generation so its
+            // just-built session isn't torn down by a stale exit that fires a frame later.
+            var generation = hostSessionGeneration;
+
+            GameThread.RunSafe(() =>
+            {
+                if (hostSessionGeneration != generation) return;
+                if (!hostedSession || clientConnectedOnce || container == null) return;
+
+                messageBroker.Publish(this, new SendPopupMessage(
+                    "The co-op server closed before the session could start"));
+                messageBroker.Publish(this, new EndCoopMode());
+            }, context: "HostedServerExited");
+        }
+
+        private void Handle(MessagePayload<NetworkConnected> obj)
+        {
+            clientConnectedOnce = true;
         }
 
         private void Handle(MessagePayload<SessionJoinInfoResolved> obj)
@@ -145,6 +286,17 @@ namespace Coop.Core
         private void Handle(MessagePayload<EndCoopMode> payload)
         {
             DestroyContainer();
+
+            // A pre-connect abort leaves a starting server behind, so backstop it. Once a
+            // connection happened the server shuts itself down when its players leave, and
+            // may legitimately keep running for friends still on it.
+            if (hostedSession && !clientConnectedOnce)
+            {
+                serverProcessManager.Stop();
+            }
+
+            hostedSession = false;
+            clientConnectedOnce = false;
 
             messageBroker.Publish(this, new CoopModeEnded());
         }

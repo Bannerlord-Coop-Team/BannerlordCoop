@@ -48,7 +48,8 @@ namespace Coop.UI.LoadGameUI
                 GameStateManager.Current = Module.CurrentModule.GlobalGameStateManager;
             }
 
-            MessageBroker.Instance.Publish(this, new HostSaveGame(Save.Name));
+            // The handler decides spawn-managed (Steam) vs in-process hosting.
+            MessageBroker.Instance.Publish(this, new AttemptHost(Save.Name));
         }
 	}
 

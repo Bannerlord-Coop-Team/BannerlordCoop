@@ -1,7 +1,9 @@
 ﻿using Common;
 using Common.Logging;
+using Common.Messaging;
 using Coop.Core;
 using Coop.Core.Common.Session;
+using Coop.Core.Server.Services.Session;
 using Coop.Lib.NoHarmony;
 using Coop.UI.LoadGameUI;
 using GameInterface;
@@ -35,6 +37,8 @@ namespace Coop
         public static InitialStateOption CoopCampaign;
 
         public static InitialStateOption JoinCoopGame;
+
+        private ManagedServerLifetime managedServerLifetime;
 
         private static ILogger Logger;
 
@@ -73,7 +77,21 @@ namespace Coop
 
             isAutoConnect = args.Any(a => a.Equals("/autoconnect", StringComparison.OrdinalIgnoreCase));
 
+            // GetFullCommandLineString splits on spaces, which would cut a quoted save
+            // name apart; the managed-server arguments need real Windows arg parsing.
+            if (ServerLaunchArguments.TryParse(Environment.GetCommandLineArgs(), out var managedSaveName, out var ownerProcessId))
+            {
+                ManagedServerConfig.SaveName = managedSaveName;
+                ManagedServerConfig.OwnerProcessId = ownerProcessId;
+            }
+
             SetupLogging();
+
+            if (ManagedServerConfig.IsManagedServer)
+            {
+                Logger.Information("[ManagedServer] Spawned by process {OwnerProcessId} to host save '{SaveName}'",
+                    ManagedServerConfig.OwnerProcessId, ManagedServerConfig.SaveName);
+            }
 
             if (isAutoConnect)
             {
@@ -182,6 +200,13 @@ namespace Coop
         {
             Coop = new CoopartiveMultiplayerExperience();
 
+            // A spawned server manages its own shutdown at process level so the timers outlive
+            // any session-container teardown that would otherwise orphan this game window.
+            if (ManagedServerConfig.IsManagedServer)
+            {
+                managedServerLifetime = new ManagedServerLifetime(MessageBroker.Instance);
+            }
+
             Updateables.Add(GameThread.Instance);
 
 
@@ -263,6 +288,10 @@ namespace Coop
         {
             base.OnGameEnd(game);
 
+            // The managed-server lifetime is intentionally NOT disposed here: OnGameEnd runs while
+            // returning to the menu, before ServerRunningState publishes EndCoopMode, so disposing
+            // now would drop the save-and-quit. It spans the process and is reaped when it quits.
+
             if (Coop.Running)
             {
                 Coop.Dispose();
@@ -295,13 +324,39 @@ namespace Coop
             TimeSpan frameTime = TimeSpan.FromSeconds(dt);
             Updateables.UpdateAll(frameTime);
 
+            TryManagedServerAutoStart();
+
 #if DEBUG
             TryAutoConnect();
 #endif
         }
 
+        private bool _managedAutoStarted = false;
+        private void TryManagedServerAutoStart()
+        {
+            // Keyed on the auto-load save, not the managed flag: a manually launched
+            // /coopsave server also auto-loads, it just isn't lifetime-managed.
+            if (!isServer || !ManagedServerConfig.HasAutoLoadSave || _managedAutoStarted) return;
+            if (!(GameStateManager.Current?.ActiveState is InitialState)) return;
+
+            _managedAutoStarted = true;
+            Logger.Information("[ManagedServer] InitialState active — hosting save '{SaveName}'", ManagedServerConfig.SaveName);
+
+            try
+            {
+                Coop.StartAsServer(ManagedServerConfig.SaveName);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "[ManagedServer] Exception during auto-start");
+            }
+        }
+
         private void TryAutoConnect()
         {
+            // The auto-load-save start path owns this process's startup.
+            if (ManagedServerConfig.HasAutoLoadSave) return;
+
             if (isAutoConnect && !_autoStarted && GameStateManager.Current?.ActiveState is InitialState)
             {
                 _autoStarted = true;

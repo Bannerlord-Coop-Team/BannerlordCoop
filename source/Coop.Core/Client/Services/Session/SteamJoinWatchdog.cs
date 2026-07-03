@@ -29,6 +29,7 @@ public class SteamJoinWatchdog : IHandler
     private string address;
     private int port;
     private bool tunneled;
+    private string timeoutText;
 
     public SteamJoinWatchdog(IMessageBroker messageBroker)
     {
@@ -45,14 +46,15 @@ public class SteamJoinWatchdog : IHandler
         timer = null;
     }
 
-    public void Arm(string address, int port, bool tunneled = false)
+    public void Arm(string address, int port, bool tunneled = false, TimeSpan? timeout = null, string timeoutText = null)
     {
         if (connected) return;
 
         this.address = address;
         this.port = port;
         this.tunneled = tunneled;
-        timer = new Timer(_ => OnTimeout(), null, Timeout, System.Threading.Timeout.InfiniteTimeSpan);
+        this.timeoutText = timeoutText;
+        timer = new Timer(_ => OnTimeout(), null, timeout ?? Timeout, System.Threading.Timeout.InfiniteTimeSpan);
 
         // The connect can complete while the timer is being created; drop it then.
         if (connected)
@@ -78,13 +80,13 @@ public class SteamJoinWatchdog : IHandler
             // Also skip when disposed: a stale queued action must never end a newer session.
             if (connected || disposed) return;
 
-            Logger.Warning("Steam-initiated join to {Address}:{Port} (tunneled={Tunneled}) timed out", address, port, tunneled);
+            Logger.Warning("Watched join to {Address}:{Port} (tunneled={Tunneled}) timed out", address, port, tunneled);
 
             // A tunneled join dials a local pump, so port-forwarding advice would be wrong there.
-            string popupText = tunneled
+            string popupText = timeoutText ?? (tunneled
                 ? "Could not reach the co-op host through Steam. Make sure the host is still in their session, then try the invite again."
                 : $"Could not reach the co-op host at {address}:{port}. " +
-                  $"The host must port-forward UDP {port} and set their public address on the co-op screen.";
+                  $"The host must port-forward UDP {port} and set their public address on the co-op screen.");
 
             messageBroker.Publish(this, new SendPopupMessage(popupText));
             messageBroker.Publish(this, new EndCoopMode());
