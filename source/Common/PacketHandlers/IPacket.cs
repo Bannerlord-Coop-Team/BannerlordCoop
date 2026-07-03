@@ -13,7 +13,6 @@ namespace Common.PacketHandlers
         RequestMobilePartyMovement,
         UpdateMobilePartyMovement,
         RequestUpdatePartyBehavior,
-        UpdatePartyBehavior,
         FieldAutoSync,
         PropertyAutoSync,
         SaveData,
