@@ -26,6 +26,9 @@ public class SteamTunnelClient : IDisposable
     // the first datagram.
     private EndPoint receiveSender = TunnelSocket.AnyEndpoint();
     private EndPoint clientEndpoint;
+    // Length of a held-back datagram for when the Steam send buffer is full. It stays in
+    // udpBuffer, which nothing overwrites until the retry succeeds.
+    private int pendingLength;
 
     public SteamTunnelClient(ISteamTunnelTransport transport)
     {
@@ -53,6 +56,37 @@ public class SteamTunnelClient : IDisposable
 
     private void Update(TimeSpan deltaTime)
     {
+        PumpToSteam();
+
+        try
+        {
+            int size;
+            while ((size = transport.ReceiveDatagram(connection, steamBuffer)) > 0)
+            {
+                // Nothing has dialed the pump yet; the server never sends first, so drop.
+                if (clientEndpoint == null) continue;
+
+                socket.SendTo(steamBuffer, size, SocketFlags.None, clientEndpoint);
+            }
+        }
+        catch (SocketException)
+        {
+            // A refused loopback send loses one datagram; LiteNetLib retransmits what matters.
+        }
+    }
+
+    // A refused send parks the datagram and stops draining, so the OS socket buffer queues
+    // the rest instead of anything being dropped while the Steam send buffer is full.
+    private void PumpToSteam()
+    {
+        // Only reliable-class datagrams ever park, so the retry is never droppable.
+        if (pendingLength > 0)
+        {
+            if (!transport.SendDatagram(connection, udpBuffer, pendingLength, droppable: false)) return;
+
+            pendingLength = 0;
+        }
+
         while (true)
         {
             int length = TunnelSocket.TryReceiveFrom(socket, udpBuffer, ref receiveSender);
@@ -60,16 +94,12 @@ public class SteamTunnelClient : IDisposable
             if (length == 0) continue;
 
             clientEndpoint = receiveSender;
-            transport.SendDatagram(connection, udpBuffer, length);
-        }
-
-        int size;
-        while ((size = transport.ReceiveDatagram(connection, steamBuffer)) > 0)
-        {
-            // Nothing has dialed the pump yet; the server never sends first, so drop.
-            if (clientEndpoint == null) continue;
-
-            socket.SendTo(steamBuffer, size, SocketFlags.None, clientEndpoint);
+            bool droppable = SteamTunnel.IsDroppableDatagram(udpBuffer, length);
+            if (!transport.SendDatagram(connection, udpBuffer, length, droppable))
+            {
+                pendingLength = length;
+                return;
+            }
         }
     }
 

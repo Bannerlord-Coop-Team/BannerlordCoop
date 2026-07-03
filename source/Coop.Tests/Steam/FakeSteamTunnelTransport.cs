@@ -21,6 +21,8 @@ namespace Coop.Tests.Steam
         public bool Listening;
         public bool Disposed;
         public int RelayAccessCalls;
+        public int FailSendsRemaining;
+        public int RejectedSends;
         public readonly List<uint> AcceptedConnections = new List<uint>();
         public readonly List<uint> ClosedConnections = new List<uint>();
 
@@ -70,10 +72,18 @@ namespace Coop.Tests.Steam
 
         public void CloseConnection(uint connection) => ClosedConnections.Add(connection);
 
-        public bool SendDatagram(uint connection, byte[] data, int length)
+        public bool SendDatagram(uint connection, byte[] data, int length, bool droppable)
         {
             lock (gate)
             {
+                if (FailSendsRemaining > 0)
+                {
+                    FailSendsRemaining--;
+                    RejectedSends++;
+                    // Mirrors the real transport: a droppable datagram is lost, not retried.
+                    return droppable;
+                }
+
                 sentDatagrams.Add((connection, data.Take(length).ToArray()));
             }
 

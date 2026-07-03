@@ -66,6 +66,45 @@ namespace Coop.Tests.Steam
         }
 
         [Fact]
+        public void BackpressuredSend_IsRetriedInOrderWithoutLoss()
+        {
+            client.Start(76561198000000042);
+
+            using var liteNetSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            liteNetSocket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+            var pumpEndpoint = new IPEndPoint(IPAddress.Loopback, client.LocalPort);
+
+            transport.FailSendsRemaining = 2;
+            liteNetSocket.SendTo(new byte[] { 1 }, pumpEndpoint);
+            WaitUntil(() => transport.RejectedSends >= 1);
+            liteNetSocket.SendTo(new byte[] { 2 }, pumpEndpoint);
+
+            WaitUntil(() => transport.SentDatagrams.Length == 2);
+            Assert.Equal(new byte[] { 1 }, transport.SentDatagrams[0].Data);
+            Assert.Equal(new byte[] { 2 }, transport.SentDatagrams[1].Data);
+        }
+
+        [Fact]
+        public void DroppableDatagram_IsDroppedNotParkedUnderBackpressure()
+        {
+            client.Start(76561198000000042);
+
+            using var liteNetSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            liteNetSocket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+            var pumpEndpoint = new IPEndPoint(IPAddress.Loopback, client.LocalPort);
+
+            transport.FailSendsRemaining = 1;
+            // First byte 0 = LiteNetLib Unreliable: refused under pressure means dropped.
+            liteNetSocket.SendTo(new byte[] { 0, 9 }, pumpEndpoint);
+            WaitUntil(() => transport.RejectedSends >= 1);
+
+            // First byte 1 = Channeled (reliable class): must still get through.
+            liteNetSocket.SendTo(new byte[] { 1, 7 }, pumpEndpoint);
+            WaitUntil(() => transport.SentDatagrams.Length == 1);
+            Assert.Equal(new byte[] { 1, 7 }, transport.SentDatagrams[0].Data);
+        }
+
+        [Fact]
         public void InboundBeforeAnyOutbound_IsDroppedNotMisdelivered()
         {
             client.Start(76561198000000042);

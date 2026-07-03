@@ -97,6 +97,60 @@ namespace Coop.Tests.Steam
         }
 
         [Fact]
+        public void BackpressuredSend_IsRetriedInOrderWithoutLoss()
+        {
+            using var serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            serverSocket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+            serverSocket.ReceiveTimeout = 5000;
+            int serverPort = ((IPEndPoint)serverSocket.LocalEndPoint).Port;
+
+            host.Start(serverPort);
+            transport.RaiseConnectionState(7, TunnelConnectionState.Connected);
+
+            // Learn the peer's relay endpoint from one steam->server datagram.
+            transport.EnqueueReceive(7, new byte[] { 0 });
+            var buffer = new byte[SteamTunnel.MaxDatagramBytes];
+            EndPoint peerRelayEndpoint = new IPEndPoint(IPAddress.Any, 0);
+            serverSocket.ReceiveFrom(buffer, ref peerRelayEndpoint);
+
+            transport.FailSendsRemaining = 2;
+            serverSocket.SendTo(new byte[] { 1 }, peerRelayEndpoint);
+            SteamTunnelClientTests.WaitUntil(() => transport.RejectedSends >= 1);
+            serverSocket.SendTo(new byte[] { 2 }, peerRelayEndpoint);
+
+            SteamTunnelClientTests.WaitUntil(() => transport.SentDatagrams.Length == 2);
+            Assert.Equal(new byte[] { 1 }, transport.SentDatagrams[0].Data);
+            Assert.Equal(new byte[] { 2 }, transport.SentDatagrams[1].Data);
+        }
+
+        [Fact]
+        public void DroppableDatagram_IsDroppedNotParkedUnderBackpressure()
+        {
+            using var serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            serverSocket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+            serverSocket.ReceiveTimeout = 5000;
+            int serverPort = ((IPEndPoint)serverSocket.LocalEndPoint).Port;
+
+            host.Start(serverPort);
+            transport.RaiseConnectionState(7, TunnelConnectionState.Connected);
+
+            transport.EnqueueReceive(7, new byte[] { 0 });
+            var buffer = new byte[SteamTunnel.MaxDatagramBytes];
+            EndPoint peerRelayEndpoint = new IPEndPoint(IPAddress.Any, 0);
+            serverSocket.ReceiveFrom(buffer, ref peerRelayEndpoint);
+
+            transport.FailSendsRemaining = 1;
+            // First byte 0 = LiteNetLib Unreliable: refused under pressure means dropped.
+            serverSocket.SendTo(new byte[] { 0, 9 }, peerRelayEndpoint);
+            SteamTunnelClientTests.WaitUntil(() => transport.RejectedSends >= 1);
+
+            // First byte 1 = Channeled (reliable class): must still get through.
+            serverSocket.SendTo(new byte[] { 1, 7 }, peerRelayEndpoint);
+            SteamTunnelClientTests.WaitUntil(() => transport.SentDatagrams.Length == 1);
+            Assert.Equal(new byte[] { 1, 7 }, transport.SentDatagrams[0].Data);
+        }
+
+        [Fact]
         public void TwoPeers_GetDistinctRelayPorts()
         {
             using var serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
