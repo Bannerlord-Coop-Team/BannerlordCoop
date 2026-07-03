@@ -621,7 +621,27 @@ internal readonly struct NetworkNotifyPartyRemovedFromArmy : ICommand
 }
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct NetworkArmyDispersed : ICommand {}
+internal readonly struct NetworkArmyDispersed : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string ArmyId;
+
+    [ProtoMember(2)]
+    public readonly Army.ArmyDispersionReason Reason;
+
+    [ProtoMember(3)]
+    public readonly bool IsPlayersArmy;
+
+    public NetworkArmyDispersed(
+        string armyId,
+        Army.ArmyDispersionReason reason,
+        bool isPlayersArmy)
+    {
+        ArmyId = armyId;
+        Reason = reason;
+        IsPlayersArmy = isPlayersArmy;
+    }
+}
 
 [ProtoContract(SkipConstructor = true)]
 internal readonly struct NetworkNotifyHeroesMarried : ICommand
@@ -665,18 +685,18 @@ internal readonly struct NetworkNotifyGivenBirth : ICommand
     public readonly string MotherId;
 
     [ProtoMember(2)]
-    public readonly List<string> AliveOffsprings;
+    public readonly List<string> AliveOffspringsIds;
 
     [ProtoMember(3)]
     public readonly int StillbornCount;
 
     public NetworkNotifyGivenBirth(
         string motherId,
-        List<string> aliveOffsprings,
+        List<string> aliveOffspringsIds,
         int stillbornCount)
     {
         MotherId = motherId;
-        AliveOffsprings = aliveOffsprings;
+        AliveOffspringsIds = aliveOffspringsIds;
         StillbornCount = stillbornCount;
     }
 }

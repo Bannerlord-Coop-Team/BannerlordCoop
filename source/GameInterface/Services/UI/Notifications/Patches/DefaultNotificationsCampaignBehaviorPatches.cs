@@ -85,7 +85,7 @@ internal class DefaultNotificationsCampaignBehaviorPatches
     [HarmonyPostfix]
     public static void OnPartyAddedToMapEventPostfix(ref DefaultNotificationsCampaignBehavior __instance, PartyBase involvedParty)
     {
-        if (ModInformation.IsClient || !IsValidPlayerClan(involvedParty.LeaderHero.Clan)) return;
+        if (ModInformation.IsClient || involvedParty.LeaderHero == null || !IsValidPlayerClan(involvedParty.LeaderHero.Clan)) return;
 
         var message = new NotifyPartyAddedToMapEvent(involvedParty);
         MessageBroker.Instance.Publish(__instance, message);
@@ -166,7 +166,7 @@ internal class DefaultNotificationsCampaignBehaviorPatches
     [HarmonyPostfix]
     public static void OnSiegeEventStartedPostfix(ref DefaultNotificationsCampaignBehavior __instance, SiegeEvent siegeEvent)
     {
-        if (ModInformation.IsClient || !IsValidPlayerClan(siegeEvent.BesiegedSettlement.OwnerClan)) return;
+        if (ModInformation.IsClient || siegeEvent.BesiegedSettlement == null || !IsValidPlayerClan(siegeEvent.BesiegedSettlement.OwnerClan)) return;
 
         var message = new NotifySiegeEventStarted(siegeEvent);
         MessageBroker.Instance.Publish(__instance, message);
@@ -323,7 +323,7 @@ internal class DefaultNotificationsCampaignBehaviorPatches
     [HarmonyPostfix]
     public static void OnArmyDispersedPostfix(ref DefaultNotificationsCampaignBehavior __instance, Army army, Army.ArmyDispersionReason reason, bool isPlayersArmy)
     {
-        if (ModInformation.IsClient) return;
+        if (ModInformation.IsClient || !isPlayersArmy) return;
 
         var message = new ArmyDispersed(); // Needs to check food notifications
         MessageBroker.Instance.Publish(__instance, message);
@@ -428,7 +428,7 @@ internal class DefaultNotificationsCampaignBehaviorPatches
     [HarmonyPostfix]
     public static void OnBuildingLevelChangedPostfix(ref DefaultNotificationsCampaignBehavior __instance, Town town, Building building, int levelChange)
     {
-        if (ModInformation.IsClient || town.OwnerClan == null || !town.OwnerClan.IsPlayerClan()) return;
+        if (ModInformation.IsClient || !IsValidPlayerClan(town.OwnerClan)) return;
 
         var message = new NotifyBuildingLevelChanged(town, building, levelChange);
         MessageBroker.Instance.Publish(__instance, message);
@@ -438,7 +438,7 @@ internal class DefaultNotificationsCampaignBehaviorPatches
     [HarmonyPostfix]
     public static void OnHeroTeleportationRequestedPostfix(ref DefaultNotificationsCampaignBehavior __instance, Hero hero, Settlement targetSettlement, MobileParty targetParty, TeleportHeroAction.TeleportationDetail detail)
     {
-        if (ModInformation.IsClient || hero.Clan == null || !hero.Clan.IsPlayerClan()) return;
+        if (ModInformation.IsClient || IsValidPlayerClan(hero.Clan)) return;
 
         var message = new NotifyHeroTeleportation(hero, targetSettlement, targetParty, detail);
         MessageBroker.Instance.Publish(__instance, message);

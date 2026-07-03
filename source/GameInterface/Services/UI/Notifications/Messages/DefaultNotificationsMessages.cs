@@ -468,7 +468,22 @@ public readonly struct NotifyPartyRemovedFromArmy : IEvent
     }
 }
 
-public readonly struct ArmyDispersed : IEvent {}
+public readonly struct ArmyDispersed : IEvent
+{
+    public readonly Army Army;
+    public readonly Army.ArmyDispersionReason Reason;
+    public readonly bool IsPlayersArmy;
+
+    public ArmyDispersed(
+        Army army,
+        Army.ArmyDispersionReason reason,
+        bool isPlayersArmy)
+    {
+        Army = army;
+        Reason = reason;
+        IsPlayersArmy = isPlayersArmy;
+    }
+}
 
 public readonly struct NotifyHeroesMarried : IEvent
 {
