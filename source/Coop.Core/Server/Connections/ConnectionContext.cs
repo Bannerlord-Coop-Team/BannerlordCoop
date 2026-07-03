@@ -33,7 +33,8 @@ public class ConnectionContext
         ITimeControlInterface timeControlInterface,
         IConnectionMessageQueue connectionMessageQueue,
         ISendCoalescer coalescer,
-        IAttachmentIdMapper attachmentIdMapper)
+        IAttachmentIdMapper attachmentIdMapper,
+        IExistingPlayerSender existingPlayerSender)
     {
         MessageBroker = messageBroker;
         Network = network;
@@ -49,6 +50,7 @@ public class ConnectionContext
         ConnectionMessageQueue = connectionMessageQueue;
         Coalescer = coalescer;
         AttachmentIdMapper = attachmentIdMapper;
+        ExistingPlayerSender = existingPlayerSender;
     }
 
     public IMessageBroker MessageBroker { get; }
@@ -65,4 +67,5 @@ public class ConnectionContext
     public IConnectionMessageQueue ConnectionMessageQueue { get; }
     public ISendCoalescer Coalescer { get; }
     public IAttachmentIdMapper AttachmentIdMapper { get; }
+    public IExistingPlayerSender ExistingPlayerSender { get; }
 }

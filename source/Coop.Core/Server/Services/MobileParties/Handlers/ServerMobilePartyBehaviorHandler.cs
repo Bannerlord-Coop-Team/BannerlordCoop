@@ -1,6 +1,4 @@
 ﻿using Common.Messaging;
-using Common.Network;
-using Coop.Core.Client.Services.MobileParties.Packets;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 
 namespace Coop.Core.Server.Services.MobileParties.Handlers;
@@ -13,14 +11,11 @@ namespace Coop.Core.Server.Services.MobileParties.Handlers;
 public class ServerMobilePartyBehaviorHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;
-    private readonly INetwork network;
 
-    public ServerMobilePartyBehaviorHandler(IMessageBroker messageBroker, INetwork network)
+    public ServerMobilePartyBehaviorHandler(IMessageBroker messageBroker)
     {
         this.messageBroker = messageBroker;
-        this.network = network;
         messageBroker.Subscribe<ControlledPartyBehaviorUpdated>(Handle);
-
     }
     public void Dispose()
     {
@@ -30,8 +25,6 @@ public class ServerMobilePartyBehaviorHandler : IHandler
     private void Handle(MessagePayload<ControlledPartyBehaviorUpdated> obj)
     {
         var data = obj.What.BehaviorUpdateData;
-
-        network.SendAll(new UpdatePartyBehaviorPacket(ref data));
 
         messageBroker.Publish(this, new UpdatePartyBehavior(ref data));
     }

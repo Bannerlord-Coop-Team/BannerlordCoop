@@ -1,5 +1,9 @@
-﻿using Common.Util;
+﻿using Common.Network;
+using Common.Network.Coalescing;
+using Common.Util;
+using Coop.Core.Server.Services.MobileParties.Messages;
 using Coop.IntegrationTests.Environment;
+using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 
@@ -58,13 +62,52 @@ public class PartyBehaviorTest
         // Act
         server.SimulateMessage(this, message);
 
-        /// wait for polling task to complete <see cref="RequestMobilePartyBehaviorPacketHandler.Poll"/>
-        Thread.Sleep(1000);
+        // The update is coalesced, so it only reaches clients once the server flushes for the tick.
+        FlushCoalescer(server);
 
         // Assert
         foreach (var client in TestEnvironment.Clients)
         {
             Assert.Equal(1, client.InternalMessages.GetMessageCount<UpdatePartyBehavior>());
         }
+    }
+
+    /// <summary>
+    /// Repeated behavior updates to the same party within a tick collapse into one latest-wins send.
+    /// </summary>
+    [Fact]
+    public void ServerCoalescesPartyBehaviorUpdates_SendsLatestOnly()
+    {
+        // Arrange: two updates for the same party, distinguished by HasTarget so the latest is identifiable.
+        var first = new PartyBehaviorUpdateData("Test_Party", default, default, default, false, default, default, default, default);
+        var latest = new PartyBehaviorUpdateData("Test_Party", default, default, default, true, default, default, default, default);
+
+        var server = TestEnvironment.Server;
+
+        // Act
+        server.SimulateMessage(this, new PartyBehaviorUpdated(ref first));
+        server.SimulateMessage(this, new PartyBehaviorUpdated(ref latest));
+
+        // Nothing goes out until the tick flush.
+        Assert.Equal(0, server.NetworkSentMessages.GetMessageCount<NetworkUpdatePartyBehavior>());
+
+        FlushCoalescer(server);
+
+        // Assert: the two updates for the same party collapse into one send carrying the latest behavior.
+        var sent = Assert.Single(server.NetworkSentMessages.GetMessages<NetworkUpdatePartyBehavior>());
+        Assert.True(sent.BehaviorUpdateData.HasTarget);
+
+        foreach (var client in TestEnvironment.Clients)
+        {
+            var update = Assert.Single(client.InternalMessages.GetMessages<UpdatePartyBehavior>());
+            Assert.True(update.BehaviorUpdateData.HasTarget);
+        }
+    }
+
+    // Drains the server's per-tick coalescer the way CoopServer.Update does, inside the server's
+    // static scope so the merged send routes to clients.
+    private static void FlushCoalescer(EnvironmentInstance server)
+    {
+        server.Call(() => server.Resolve<ISendCoalescer>().Flush(server.Resolve<INetwork>()));
     }
 }

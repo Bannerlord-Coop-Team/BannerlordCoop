@@ -263,7 +263,7 @@ internal class BattleHostHandler : IHandler
         Logger.Information("[BattleHost] Battle {MapEventId} host is {Host}{IsMe} (successors: {Successors})",
             message.MapEventId,
             message.HostControllerId,
-            hostRegistry.IsLocalHost(message.MapEventId) ? " (this client)" : "",
+            hostRegistry.IsHost(message.MapEventId) ? " (this client)" : "",
             string.Join(", ", assignment.SuccessorControllerIds));
 
         // Migration: the host changed and it is now us — adopt the previous host's orphaned agents so the

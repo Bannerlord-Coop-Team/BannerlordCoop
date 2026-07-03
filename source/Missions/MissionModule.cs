@@ -50,13 +50,20 @@ public class MissionModule : Module
             .As<ILocationMissionBehavior>()
             .InstancePerDependency();
 
-        // The field-battle P2P controller. Resolved as IBattleMissionBehavior by BattleMissionEntryPatch and
-        // attached to every opened battle mission. The battle counterpart to CoopLocationsController; transient
-        // so each mission gets a fresh controller that is disposed with that mission.
+        // The field-battle P2P controller — the battle counterpart to CoopLocationsController. Transient so
+        // each mission gets a fresh controller that is disposed with that mission. Attached to the mission by
+        // CoopBattleBehaviorAttacher (below), never resolved by type from outside the Missions assembly.
         builder.RegisterType<CoopBattleController>()
             .AsSelf()
-            .As<IBattleMissionBehavior>()
             .InstancePerDependency();
+
+        // Attaches the coop battle behaviors to a freshly opened battle mission. Resolved from the container
+        // by BattleMissionEntryPatch (the native OpenBattleMission path) and injected into the coop launcher;
+        // lives in Missions so it can name the concrete behavior types GameInterface cannot reference.
+        // Stateless, so a single per-scope instance is fine.
+        builder.RegisterType<CoopBattleBehaviorAttacher>()
+            .As<ICoopBattleBehaviorAttacher>()
+            .InstancePerLifetimeScope();
 
         // Builds the coop field-battle mission (mirrors SandBoxMissions.OpenBattleMission with coop suppliers,
         // no deployment phase, and the coop behaviors attached). Resolved from the container by the GameInterface
@@ -89,6 +96,7 @@ public class MissionModule : Module
         //builder.RegisterType<NetworkMissileRegistry>().As<INetworkMissileRegistry>().InstancePerDependency();
         builder.RegisterType<MissileHandler>().As<IMissileHandler>().InstancePerDependency();
         builder.RegisterType<AgentMovementHandler>().As<IAgentMovementHandler>().InstancePerDependency();
+        builder.RegisterType<AgentActionHandler>().As<IAgentActionHandler>().InstancePerDependency();
         builder.RegisterType<WeaponDropHandler>().As<IWeaponDropHandler>().InstancePerDependency();
         builder.RegisterType<WeaponPickupHandler>().As<IWeaponPickupHandler>().InstancePerDependency();
         builder.RegisterType<ShieldDamageHandler>().As<IShieldDamageHandler>().InstancePerDependency();

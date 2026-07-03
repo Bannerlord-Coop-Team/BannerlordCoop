@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.ObjectManager;
 
 namespace GameInterface.Utils.NetworkEvents
 {
@@ -12,7 +13,8 @@ namespace GameInterface.Utils.NetworkEvents
 
         public GenericNetworkEvent(string instanceId)
         {
-            InstanceId = instanceId;
+            // Compact the id for the wire; the receiver re-adds the "{TInstance}_" prefix by type.
+            InstanceId = ObjectManager.Compact(instanceId, typeof(TInstance));
         }
     }
 }

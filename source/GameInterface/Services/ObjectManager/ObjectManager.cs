@@ -231,8 +231,10 @@ public class ObjectManager : IObjectManager
 
         if (string.IsNullOrEmpty(id)) return false;
 
-        if (!idObjs.TryGetValue(id, out var storedObj)
-            && !idObjs.TryGetValue($"{typeof(T).Name}_{id}", out storedObj)) // If object not found also attempt with prefixed type name
+        // Compacted ids arrive without their "{TypeName}_" prefix, so try the prefixed key first;
+        // a bare id could otherwise collide with an un-prefixed key registered for another object.
+        if (!idObjs.TryGetValue($"{typeof(T).Name}_{id}", out var storedObj)
+            && !idObjs.TryGetValue(id, out storedObj))
         {
             return false;
         }
@@ -246,6 +248,21 @@ public class ObjectManager : IObjectManager
         obj = castedObject;
 
         return true;
+    }
+
+    /// <summary>
+    /// Strips the redundant leading "{type.Name}_" prefix from a registered id for the wire; the
+    /// receiver re-adds it by type in <see cref="TryGetObject{T}"/>. Conditional, so a full id whose
+    /// concrete type differs from the wire type is transmitted untouched.
+    /// </summary>
+    public static string Compact(string id, Type type)
+    {
+        if (string.IsNullOrEmpty(id) || type == null) return id;
+
+        var prefix = type.Name + "_";
+        return id.StartsWith(prefix, StringComparison.Ordinal)
+            ? id.Substring(prefix.Length)
+            : id;
     }
 
     public bool Remove(object obj)

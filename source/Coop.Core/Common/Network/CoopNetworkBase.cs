@@ -112,8 +112,11 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
 
     private void SendInternal(NetPeer netPeer, IPacket packet)
     {
-        // Serialize data
-        byte[] data = serializer.Serialize(packet);
+        // A MessagePacket already holds a fully serialized, self-identifying message wrapper in Data; send
+        // that directly instead of serializing the packet a second time (which double-wraps every message).
+        byte[] data = packet is MessagePacket messagePacket
+            ? messagePacket.Data
+            : serializer.Serialize(packet);
 
         // Profile every outbound packet (server only). MessagePacket carries its message type, so the
         // profile breaks message traffic out by message type rather than one opaque MessagePacket bucket.
