@@ -17,6 +17,9 @@ public static class SteamBoot
     // reachable for the process lifetime or its subscriptions silently die.
     public static SteamJoinListener JoinListener { get; private set; }
 
+    // Created before any session container exists, so it lives here rather than in DI.
+    public static SteamTunnelJoinEndpointPreparer TunnelPreparer { get; private set; }
+
     public static bool TryStart(IMessageBroker messageBroker, string commandLine)
     {
         if (JoinListener != null) return true;
@@ -48,6 +51,7 @@ public static class SteamBoot
     private static void CreateServices(IMessageBroker messageBroker, string commandLine)
     {
         JoinListener = new SteamJoinListener(messageBroker, new SteamLobbyApi());
+        TunnelPreparer = new SteamTunnelJoinEndpointPreparer();
         JoinListener.ProcessLaunchArguments(commandLine);
     }
 }

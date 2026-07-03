@@ -3,7 +3,6 @@ using Common.Network;
 using Common.Network.Session;
 using Common.Network.Session.Messages;
 using System.Collections.Generic;
-using System.Net;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.UI.Commands;
@@ -24,6 +23,12 @@ public class SteamDebugCommand
         if (!ContainerProvider.TryGetContainer(out _)) return "Steam integration active; no co-op session running";
         if (!ContainerProvider.TryResolve<ISessionAdvertiser>(out var advertiser)) return "Steam integration active; this process has no session advertiser (server process?)";
 
+        if (ContainerProvider.TryResolve<ISessionTunnelHost>(out var tunnelHost))
+        {
+            return $"Steam integration active; advertising={advertiser.IsAdvertising}; " +
+                $"tunnelListening={tunnelHost.IsListening}; tunnelPeers={tunnelHost.PeerCount}";
+        }
+
         return $"Steam integration active; advertising={advertiser.IsAdvertising}";
     }
 
@@ -34,15 +39,18 @@ public class SteamDebugCommand
         if (!ContainerProvider.TryResolve<ISessionAdvertiser>(out var advertiser)) return "No session advertiser; join a session first";
         if (!ContainerProvider.TryResolve<ISessionJoinInfoSource>(out var joinInfoSource)) return "No join info source; join a session first";
         if (!ContainerProvider.TryResolve<INetworkConfig>(out var networkConfig)) return "No network config; join a session first";
+        if (!ContainerProvider.TryResolve<ISessionTunnelHost>(out var tunnelHost)) return "No session tunnel host; join a session first";
 
-        // Only the host's own client (connected over loopback) may advertise the session.
-        bool loopback = networkConfig.Address == "localhost" ||
-            (IPAddress.TryParse(networkConfig.Address, out var address) && IPAddress.IsLoopback(address));
-        if (!loopback) return "Run coop.debug.steam.host_lobby on the host's own client (connected to localhost)";
+        // Only the host's own client (connected over loopback) may advertise the session; a
+        // tunneled joiner's loopback address is its own join pump, not a local server.
+        if (networkConfig.IsTunneled || !TunnelAdvertisement.IsLoopbackAddress(networkConfig.Address))
+            return "Run coop.debug.steam.host_lobby on the host's own client (connected to localhost)";
 
         var info = joinInfoSource.Get();
+        TunnelAdvertisement.StartAndStamp(tunnelHost, networkConfig, info);
+
         advertiser.Advertise(info);
-        return $"Advertising session (address='{info.Address}', port={info.Port})";
+        return $"Advertising session (address='{info.Address}', port={info.Port}, version={info.Version})";
     }
 
     [CommandLineArgumentFunction("invite", "coop.debug.steam")]

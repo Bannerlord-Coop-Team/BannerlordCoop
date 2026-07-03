@@ -171,6 +171,11 @@ public class SteamLobbyApi : ISteamLobbyApi
         return SteamMatchmaking.GetLobbyData(new CSteamID(lobbyId), key);
     }
 
+    public ulong GetLobbyOwner(ulong lobbyId)
+    {
+        return SteamMatchmaking.GetLobbyOwner(new CSteamID(lobbyId)).m_SteamID;
+    }
+
     public void OpenInviteDialog(ulong lobbyId)
     {
         SteamFriends.ActivateGameOverlayInviteDialog(new CSteamID(lobbyId));

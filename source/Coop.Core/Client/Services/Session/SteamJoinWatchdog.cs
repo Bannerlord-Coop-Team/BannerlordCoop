@@ -28,6 +28,7 @@ public class SteamJoinWatchdog : IHandler
     private volatile bool disposed;
     private string address;
     private int port;
+    private bool tunneled;
 
     public SteamJoinWatchdog(IMessageBroker messageBroker)
     {
@@ -44,12 +45,13 @@ public class SteamJoinWatchdog : IHandler
         timer = null;
     }
 
-    public void Arm(string address, int port)
+    public void Arm(string address, int port, bool tunneled = false)
     {
         if (connected) return;
 
         this.address = address;
         this.port = port;
+        this.tunneled = tunneled;
         timer = new Timer(_ => OnTimeout(), null, Timeout, System.Threading.Timeout.InfiniteTimeSpan);
 
         // The connect can complete while the timer is being created; drop it then.
@@ -76,11 +78,15 @@ public class SteamJoinWatchdog : IHandler
             // Also skip when disposed: a stale queued action must never end a newer session.
             if (connected || disposed) return;
 
-            Logger.Warning("Steam-initiated join to {Address}:{Port} timed out", address, port);
+            Logger.Warning("Steam-initiated join to {Address}:{Port} (tunneled={Tunneled}) timed out", address, port, tunneled);
 
-            messageBroker.Publish(this, new SendPopupMessage(
-                $"Could not reach the co-op host at {address}:{port}. " +
-                $"The host must port-forward UDP {port} and set their public address on the co-op screen."));
+            // A tunneled join dials a local pump, so port-forwarding advice would be wrong there.
+            string popupText = tunneled
+                ? "Could not reach the co-op host through Steam. Make sure the host is still in their session, then try the invite again."
+                : $"Could not reach the co-op host at {address}:{port}. " +
+                  $"The host must port-forward UDP {port} and set their public address on the co-op screen.";
+
+            messageBroker.Publish(this, new SendPopupMessage(popupText));
             messageBroker.Publish(this, new EndCoopMode());
         }, context: "SteamJoinTimeout");
     }

@@ -28,9 +28,10 @@ namespace Coop.Tests.Steam
         private void Handle_Resolved(MessagePayload<SessionJoinInfoResolved> payload) => resolved.Add(payload.What);
         private void Handle_Failed(MessagePayload<SessionJoinFailed> payload) => failed.Add(payload.What);
 
-        private void SetupLobby(ulong lobbyId, string address = "203.0.113.7", int port = 4200)
+        private void SetupLobby(ulong lobbyId, string address = "203.0.113.7", int port = 4200,
+            int version = SessionJoinInfo.CurrentVersion)
         {
-            foreach (var pair in LobbyDataCodec.Encode(new SessionJoinInfo { Address = address, Port = port }))
+            foreach (var pair in LobbyDataCodec.Encode(new SessionJoinInfo { Address = address, Port = port, Version = version }))
             {
                 api.SetLobbyData(lobbyId, pair.Key, pair.Value);
             }
@@ -123,15 +124,42 @@ namespace Coop.Tests.Steam
         }
 
         [Fact]
-        public void LobbyWithoutAddress_PublishesFailureAndLeaves()
+        public void DirectOnlyLobbyWithoutAddress_PublishesFailureAndLeaves()
         {
-            SetupLobby(42, address: null);
+            SetupLobby(42, address: null, version: SessionJoinInfo.MinTunnelVersion - 1);
 
             api.RaiseLobbyJoinRequested(42);
 
             Assert.Empty(resolved);
             Assert.Contains("public address", Assert.Single(failed).Reason);
             Assert.Contains(42UL, api.LeftLobbies);
+        }
+
+        [Fact]
+        public void TunnelCapableLobby_ResolvesHostSteamIdWithoutAddress()
+        {
+            SetupLobby(42, address: null);
+
+            api.RaiseLobbyJoinRequested(42);
+
+            var info = Assert.Single(resolved).JoinInfo;
+            Assert.Equal(api.LobbyOwner, info.HostSteamId);
+            Assert.False(info.HasAddress);
+            Assert.Empty(failed);
+            // The owner is only readable while a member, so the leave must come after the read.
+            Assert.Contains(42UL, api.LeftLobbies);
+        }
+
+        [Fact]
+        public void DirectOnlyLobby_ResolvesWithoutHostSteamId()
+        {
+            SetupLobby(42, version: SessionJoinInfo.MinTunnelVersion - 1);
+
+            api.RaiseLobbyJoinRequested(42);
+
+            var info = Assert.Single(resolved).JoinInfo;
+            Assert.False(info.HasHostSteamId);
+            Assert.Equal("203.0.113.7", info.Address);
         }
 
         [Theory]

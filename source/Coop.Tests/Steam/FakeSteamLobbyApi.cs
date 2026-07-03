@@ -12,6 +12,7 @@ namespace Coop.Tests.Steam
     {
         public bool OverlayEnabled = true;
         public ulong NextCreatedLobbyId = 1001;
+        public ulong LobbyOwner = 76561198000000001;
         public bool CreateSucceeds = true;
         public bool JoinSucceeds = true;
         public bool SetLobbyDataSucceeds = true;
@@ -84,6 +85,12 @@ namespace Coop.Tests.Steam
             if (LobbyData.TryGetValue(lobbyId, out var data) && data.TryGetValue(key, out var value)) return value;
 
             return string.Empty;
+        }
+
+        // Only valid while a member, like the real API; reading after leaving yields nothing.
+        public ulong GetLobbyOwner(ulong lobbyId)
+        {
+            return LeftLobbies.Contains(lobbyId) ? 0 : LobbyOwner;
         }
 
         public void OpenInviteDialog(ulong lobbyId) => InviteDialogsOpened.Add(lobbyId);

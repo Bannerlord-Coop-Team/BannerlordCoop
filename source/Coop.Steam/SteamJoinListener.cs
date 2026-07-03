@@ -101,6 +101,13 @@ public class SteamJoinListener : IDisposable
 
             // Membership is only needed to read the join info; leaving keeps the host's slots free.
             bool decoded = LobbyDataCodec.TryDecode(key => lobbyApi.GetLobbyData(lobbyId, key), out var info, out var error);
+
+            // The owner runs the tunnel on tunnel-capable lobbies; readable only while still a member.
+            if (decoded && info.Version >= SessionJoinInfo.MinTunnelVersion)
+            {
+                info.HostSteamId = lobbyApi.GetLobbyOwner(lobbyId);
+            }
+
             lobbyApi.LeaveLobby(lobbyId);
 
             if (!decoded)
@@ -109,7 +116,7 @@ public class SteamJoinListener : IDisposable
                 return;
             }
 
-            if (!info.HasAddress)
+            if (!info.HasAddress && !info.HasHostSteamId)
             {
                 messageBroker.Publish(this, new SessionJoinFailed(
                     "The host has not set a public address on their co-op screen, so this session cannot be joined yet"));

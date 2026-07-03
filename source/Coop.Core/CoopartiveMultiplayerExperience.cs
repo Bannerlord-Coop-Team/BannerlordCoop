@@ -32,7 +32,7 @@ namespace Coop.Core
         private IMessageBroker messageBroker;
         private INetworkConfig configuration;
         private IContainer container;
-        private readonly IJoinEndpointPreparer joinEndpointPreparer = new DirectJoinEndpointPreparer();
+        private readonly SteamOrDirectJoinEndpointPreparer joinEndpointPreparer = new SteamOrDirectJoinEndpointPreparer();
         private volatile bool coopStarting;
 
         public CoopartiveMultiplayerExperience()
@@ -98,23 +98,35 @@ namespace Coop.Core
 
             var prepared = joinEndpointPreparer.PrepareAsync(obj.What.JoinInfo).GetAwaiter().GetResult();
 
+            // A failed tunnel setup falls back to the advertised address, which a
+            // tunnel-only lobby doesn't have; an empty address would resolve to this machine.
+            if (!prepared.HasAddress)
+            {
+                InformationManager.DisplayMessage(new InformationMessage(
+                    "Could not set up the Steam connection to the host, and the host has not shared a public address to fall back to"));
+                return;
+            }
+
             configuration = new NetworkConfig()
             {
                 Address = prepared.Address,
                 Port = prepared.Port,
+                IsTunneled = prepared.Tunneled,
             };
 
             try
             {
                 StartAsClient(configuration);
 
-                container.Resolve<SteamJoinWatchdog>().Arm(prepared.Address, prepared.Port);
+                container.Resolve<SteamJoinWatchdog>().Arm(prepared.Address, prepared.Port, prepared.Tunneled);
             }
             catch (Exception ex)
             {
                 // Tear down the half-built container, otherwise it blocks every later Steam join.
                 Logger.Error(ex, "Steam-initiated join to {Address}:{Port} failed to start", prepared.Address, prepared.Port);
                 DestroyContainer();
+                // This failure exit publishes no session message, so the tunnel is closed here.
+                joinEndpointPreparer.TearDownActiveTunnel();
                 InformationManager.DisplayMessage(new InformationMessage(
                     $"Could not connect to the advertised address '{prepared.Address}:{prepared.Port}'"));
             }

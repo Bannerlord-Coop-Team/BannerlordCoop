@@ -48,6 +48,22 @@ namespace Coop.Tests.Steam
         }
 
         [Fact]
+        public void Decode_AcceptsOlderVersion()
+        {
+            var data = new Dictionary<string, string>
+            {
+                [LobbyDataCodec.VersionKey] = "1",
+                [LobbyDataCodec.AddressKey] = "203.0.113.7",
+                [LobbyDataCodec.PortKey] = "4200",
+            };
+
+            Assert.True(LobbyDataCodec.TryDecode(key => Read(data, key), out var decoded, out _));
+
+            Assert.Equal(1, decoded.Version);
+            Assert.True(decoded.Version < SessionJoinInfo.MinTunnelVersion);
+        }
+
+        [Fact]
         public void Decode_FailsOnNewerVersion()
         {
             var data = new Dictionary<string, string>

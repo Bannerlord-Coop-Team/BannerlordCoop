@@ -14,6 +14,7 @@ using Coop.Steam;
 using GameInterface.Policies;
 using LiteNetLib;
 using Missions;
+using System.Runtime.CompilerServices;
 
 namespace Coop.Core.Client;
 
@@ -38,12 +39,12 @@ public class ClientModule : CommonModule
         // Steam registrations only when the boot probe found Steam, so tests and non-Steam installs never load Steamworks types.
         if (SessionDiscovery.SteamAvailable)
         {
-            builder.RegisterType<SteamLobbyApi>().As<ISteamLobbyApi>().InstancePerLifetimeScope();
-            builder.RegisterType<SteamLobbyAdvertiser>().As<ISessionAdvertiser>().InstancePerLifetimeScope();
+            RegisterSteamSessionServices(builder);
         }
         else
         {
             builder.RegisterType<NoopSessionAdvertiser>().As<ISessionAdvertiser>().InstancePerLifetimeScope();
+            builder.RegisterType<NoopSessionTunnelHost>().As<ISessionTunnelHost>().InstancePerLifetimeScope();
         }
 
         builder.RegisterType<ConfiguredSessionJoinInfoSource>().As<ISessionJoinInfoSource>().InstancePerLifetimeScope();
@@ -51,5 +52,17 @@ public class ClientModule : CommonModule
 
         RegisterAllTypesWithInterface<ClientModule, IHandler>(builder, autoInstantiate: true);
         RegisterAllTypesWithInterface<ClientModule, IPacketHandler>(builder, autoInstantiate: true);
+    }
+
+    // The tunnel transport's layout embeds Steamworks value types, so mentioning it in Load
+    // would pull in Steamworks.NET while JIT-compiling Load even when the Steam branch is
+    // never taken; this non-inlined helper is only compiled once Steam is known to be present.
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void RegisterSteamSessionServices(ContainerBuilder builder)
+    {
+        builder.RegisterType<SteamLobbyApi>().As<ISteamLobbyApi>().InstancePerLifetimeScope();
+        builder.RegisterType<SteamLobbyAdvertiser>().As<ISessionAdvertiser>().InstancePerLifetimeScope();
+        builder.RegisterType<SteamNetworkingTunnelTransport>().As<ISteamTunnelTransport>().InstancePerLifetimeScope();
+        builder.RegisterType<SteamTunnelHost>().As<ISessionTunnelHost>().InstancePerLifetimeScope();
     }
 }

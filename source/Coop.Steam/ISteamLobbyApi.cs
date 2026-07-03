@@ -15,6 +15,8 @@ public interface ISteamLobbyApi : IDisposable
     void LeaveLobby(ulong lobbyId);
     bool SetLobbyData(ulong lobbyId, string key, string value);
     string GetLobbyData(ulong lobbyId, string key);
+    /// <summary>Steam id of the lobby's owner; only valid while a member of the lobby.</summary>
+    ulong GetLobbyOwner(ulong lobbyId);
     void OpenInviteDialog(ulong lobbyId);
     bool SetRichPresenceConnect(string value);
     void ClearRichPresenceConnect();
