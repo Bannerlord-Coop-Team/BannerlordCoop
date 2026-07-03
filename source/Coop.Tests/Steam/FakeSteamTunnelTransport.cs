@@ -102,6 +102,8 @@ namespace Coop.Tests.Steam
             }
         }
 
+        public string DescribeConnection(uint connection) => "fake";
+
         public void Dispose() => Disposed = true;
     }
 }

@@ -33,7 +33,52 @@ public class SteamNetworkingTunnelTransport : ISteamTunnelTransport
         statusChangedCallback = Callback<SteamNetConnectionStatusChangedCallback_t>.Create(OnConnectionStatusChanged);
     }
 
-    public void EnsureRelayAccess() => SteamNetworkingUtils.InitRelayNetworkAccess();
+    public void EnsureRelayAccess()
+    {
+        ApplyGlobalTunnelConfig();
+        SteamNetworkingUtils.InitRelayNetworkAccess();
+    }
+
+    public string DescribeConnection(uint connection)
+    {
+        var status = default(SteamNetConnectionRealTimeStatus_t);
+        var lanes = default(SteamNetConnectionRealTimeLaneStatus_t);
+        var result = SteamNetworkingSockets.GetConnectionRealTimeStatus(
+            new HSteamNetConnection(connection), ref status, 0, ref lanes);
+        if (result != EResult.k_EResultOK) return $"status unavailable ({result})";
+
+        return $"sendRate={status.m_nSendRateBytesPerSecond}B/s out={status.m_flOutBytesPerSec:F0}B/s " +
+            $"in={status.m_flInBytesPerSec:F0}B/s pendingReliable={status.m_cbPendingReliable} " +
+            $"unacked={status.m_cbSentUnackedReliable} ping={status.m_nPing}ms " +
+            $"quality={status.m_flConnectionQualityLocal:F2}";
+    }
+
+    // The per-call options on ConnectP2P/CreateListenSocketP2P should already cover this,
+    // but whether an accepted connection inherits listen-socket options is the one link we
+    // cannot observe locally, so the same values are also set globally.
+    private static void ApplyGlobalTunnelConfig()
+    {
+        SetGlobalInt32(ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendBufferSize, SteamTunnel.SendBufferBytes);
+        SetGlobalInt32(ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendRateMax, SteamTunnel.SendRateMaxBytesPerSecond);
+    }
+
+    private static void SetGlobalInt32(ESteamNetworkingConfigValue key, int value)
+    {
+        var handle = GCHandle.Alloc(value, GCHandleType.Pinned);
+        try
+        {
+            if (!SteamNetworkingUtils.SetConfigValue(key,
+                ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_Global, IntPtr.Zero,
+                ESteamNetworkingConfigDataType.k_ESteamNetworkingConfig_Int32, handle.AddrOfPinnedObject()))
+            {
+                Logger.Warning("Steam refused global tunnel config {Key}", key);
+            }
+        }
+        finally
+        {
+            handle.Free();
+        }
+    }
 
     public uint ConnectToHost(ulong hostSteamId, int virtualPort)
     {

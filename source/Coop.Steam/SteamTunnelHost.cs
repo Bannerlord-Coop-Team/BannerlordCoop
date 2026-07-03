@@ -45,6 +45,9 @@ public class SteamTunnelHost : ISessionTunnelHost
     private IPEndPoint serverEndpoint;
     private Poller poller;
     private volatile bool listening;
+    // ~10s of 2ms pump ticks between connection-stats log lines.
+    private const int StatsLogTicks = 5000;
+    private int ticksSinceStatsLog;
 
     public SteamTunnelHost(ISteamTunnelTransport transport)
     {
@@ -117,8 +120,10 @@ public class SteamTunnelHost : ISessionTunnelHost
                     peers[connection] = new TunnelPeer { Socket = socket };
                     peerSnapshot = peers.ToArray();
 
-                    Logger.Information("Tunnel peer {Connection} connected; local relay port {Port}",
-                        connection, ((IPEndPoint)socket.LocalEndPoint).Port);
+                    // The effective sendRate/buffer here also proves whether the listen
+                    // socket's config options reached the accepted connection.
+                    Logger.Information("Tunnel peer {Connection} connected; local relay port {Port}; {Status}",
+                        connection, ((IPEndPoint)socket.LocalEndPoint).Port, transport.DescribeConnection(connection));
                 }
                 break;
 
@@ -140,6 +145,16 @@ public class SteamTunnelHost : ISessionTunnelHost
 
     private void Update(TimeSpan deltaTime)
     {
+        if (peerSnapshot.Length > 0 && ++ticksSinceStatsLog >= StatsLogTicks)
+        {
+            ticksSinceStatsLog = 0;
+            foreach (var peer in peerSnapshot)
+            {
+                Logger.Information("Tunnel peer {Connection}: {Status}",
+                    peer.Key, transport.DescribeConnection(peer.Key));
+            }
+        }
+
         foreach (var peer in peerSnapshot)
         {
             try
