@@ -1,11 +1,13 @@
 ﻿using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.PartyBases.Extensions;
 using SandBox.View.Map.Managers;
 using SandBox.View.Map.Visuals;
 using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.PartyVisuals;
 
@@ -30,14 +32,14 @@ internal class PartyVisualRegistry : AutoRegistryBase<MobilePartyVisual>
             return;
         }
 
-        //foreach (var party in MobileParty.All)
-        //{
-        //    var mobilePartyVisual = party.Party.GetPartyVisual();
+        foreach (var party in MobileParty.All)
+        {
+            var mobilePartyVisual = party.Party.GetPartyVisual();
 
-        //    if (mobilePartyVisual == null) continue;
+            if (mobilePartyVisual == null) continue;
 
-        //    objectManager.AddExisting(party.StringId, mobilePartyVisual);
-        //}
+            objectManager.AddExisting(party.StringId, mobilePartyVisual);
+        }
 
         foreach (MobilePartyVisual visual in visualManager._visualsFlattened)
         {

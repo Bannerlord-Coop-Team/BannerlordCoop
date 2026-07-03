@@ -61,7 +61,7 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
         // (MapEventManager.Tick) walks every frame. This callback runs on the network thread, so defer
         // the add to the main thread — matching OnClientDestroyed — so it can't race that iteration and
         // leave a torn/null slot the tick dereferences.
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             using (new AllowedThread())
             {
