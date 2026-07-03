@@ -110,10 +110,12 @@ public class SteamTunnelClient : IDisposable
         switch (state)
         {
             case TunnelConnectionState.Connected:
-                Logger.Information("Steam tunnel to the host established");
+                Logger.Information("Steam tunnel to the host established; {Status}",
+                    transport.DescribeConnection(connection));
                 break;
             case TunnelConnectionState.Closed:
-                Logger.Warning("Steam tunnel to the host closed");
+                Logger.Warning("Steam tunnel to the host closed; {Status}",
+                    transport.DescribeConnection(connection));
                 break;
         }
     }

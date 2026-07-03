@@ -98,4 +98,7 @@ public interface ISteamTunnelTransport : IDisposable
 
     /// <summary>Reads one queued datagram into the buffer; returns its length, or 0 when none.</summary>
     int ReceiveDatagram(uint connection, byte[] buffer);
+
+    /// <summary>One-line live status (effective send rate, backlog, throughput, ping) for logs.</summary>
+    string DescribeConnection(uint connection);
 }
