@@ -21,7 +21,7 @@ namespace Missions.Agents.Packets
             // the mount while it is itself active — mirrors the rider guard in AgentMovementHandler.PollAgents
             // and the horse.IsActive() check in SyncMountState.
             Agent mount = agent.MountAgent;
-            if (agent.HasMount && mount.IsActive())
+            if (mount != null && mount.IsActive())
             {
                 MountData = new AgentMountData(mount);
             }
