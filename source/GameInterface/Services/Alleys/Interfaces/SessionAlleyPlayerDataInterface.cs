@@ -21,10 +21,10 @@ public interface ISessionAlleyPlayerDataInterface : IGameAbstraction
     void RemoveManagementData(string alleyId);
 
     /// <summary>Records that a rival alley is attacking this player alley, with the answer deadline.</summary>
-    void SetUnderAttack(string alleyId, string attackerAlleyId, CampaignTime dueDate);
+    void SetUnderAttackByAi(string alleyId, string attackerAlleyId, CampaignTime dueDate);
 
     /// <summary>Clears the under-attack state once the attack is resolved (defended, lost or timed out).</summary>
-    void ClearUnderAttack(string alleyId);
+    void ClearUnderAttackByAi(string alleyId);
 }
 
 /// <inheritdoc cref="ISessionAlleyPlayerDataInterface"/>
@@ -78,7 +78,7 @@ public class SessionAlleyPlayerDataInterface : ISessionAlleyPlayerDataInterface
         ManagementData?.Remove(alleyId);
     }
 
-    public void SetUnderAttack(string alleyId, string attackerAlleyId, CampaignTime dueDate)
+    public void SetUnderAttackByAi(string alleyId, string attackerAlleyId, CampaignTime dueDate)
     {
         // Only a managed (player-owned) alley can be under attack; if there's no entry there's nothing to mark.
         if (!TryGetManagementData(alleyId, out var data)) return;
@@ -86,7 +86,7 @@ public class SessionAlleyPlayerDataInterface : ISessionAlleyPlayerDataInterface
         data.AttackResponseDueDate = dueDate;
     }
 
-    public void ClearUnderAttack(string alleyId)
+    public void ClearUnderAttackByAi(string alleyId)
     {
         if (!TryGetManagementData(alleyId, out var data)) return;
         data.UnderAttackByAlleyId = null;

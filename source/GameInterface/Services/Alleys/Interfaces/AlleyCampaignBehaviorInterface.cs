@@ -30,10 +30,10 @@ public interface IAlleyCampaignBehaviorInterface : IGameAbstraction
     /// player visits. <paramref name="showNotification"/> adds the vanilla under-attack map notice (only
     /// for a fresh attack, not a late-join restore where the notice would be stale).
     /// </summary>
-    void SetPlayerAlleyUnderAttack(Alley alley, Alley attacker, CampaignTime dueDate, bool showNotification);
+    void SetPlayerAlleyUnderAttackByAi(Alley alley, Alley attacker, CampaignTime dueDate, bool showNotification);
 
     /// <summary>Clears the owning client's mirror under-attack state once the attack is resolved.</summary>
-    void ClearPlayerAlleyUnderAttack(Alley alley);
+    void ClearPlayerAlleyUnderAttackByAi(Alley alley);
 
     /// <summary>
     /// Enumerates the currently player-owned alleys so the host can add management data for them to the
@@ -138,7 +138,7 @@ public class AlleyCampaignBehaviorInterface : IAlleyCampaignBehaviorInterface
         });
     }
 
-    public void SetPlayerAlleyUnderAttack(Alley alley, Alley attacker, CampaignTime dueDate, bool showNotification)
+    public void SetPlayerAlleyUnderAttackByAi(Alley alley, Alley attacker, CampaignTime dueDate, bool showNotification)
     {
         if (alley == null || attacker == null) return;
 
@@ -158,7 +158,7 @@ public class AlleyCampaignBehaviorInterface : IAlleyCampaignBehaviorInterface
         });
     }
 
-    public void ClearPlayerAlleyUnderAttack(Alley alley)
+    public void ClearPlayerAlleyUnderAttackByAi(Alley alley)
     {
         if (alley == null) return;
 

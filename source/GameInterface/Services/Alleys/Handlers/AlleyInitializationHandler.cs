@@ -73,7 +73,7 @@ internal class AlleyInitializationHandler : IHandler
                 if (pair.Value.UnderAttackByAlleyId != null &&
                     objectManager.TryGetObjectWithLogging<Alley>(pair.Value.UnderAttackByAlleyId, out var attacker))
                 {
-                    behaviorInterface.SetPlayerAlleyUnderAttack(alley, attacker, pair.Value.AttackResponseDueDate, showNotification: false);
+                    behaviorInterface.SetPlayerAlleyUnderAttackByAi(alley, attacker, pair.Value.AttackResponseDueDate, showNotification: false);
                 }
             }
         });

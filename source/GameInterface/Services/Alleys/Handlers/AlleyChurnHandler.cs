@@ -79,9 +79,7 @@ internal class AlleyChurnHandler : IHandler
 
     private static AlleyModel Model => Campaign.Current?.Models?.AlleyModel;
 
-    // The triggers only fire on the server, but the handler exists on both sides, so guard anyway.
-    // They arrive synchronously on the game thread from the daily-tick patches, so no marshal is needed.
-
+    // Caller is game thread
     private void Handle_DailyTick(MessagePayload<AlleyDailyTickTriggered> payload)
     {
         if (ModInformation.IsClient) return;
@@ -245,7 +243,7 @@ internal class AlleyChurnHandler : IHandler
         var responseRoster = AlleyGarrisonData.FromData(data.Garrison, objectManager);
         var dueDate = CampaignTime.DaysFromNow(Model.GetAlleyAttackResponseTimeInDays(responseRoster));
 
-        sessionInterface.SetUnderAttack(alleyId, attackerId, dueDate);
+        sessionInterface.SetUnderAttackByAi(alleyId, attackerId, dueDate);
 
         // Same relation hit vanilla applies to the attacking gang leader, keyed off the alley owner.
         if (alley.Owner != null && attacker.Owner != null)
@@ -274,6 +272,7 @@ internal class AlleyChurnHandler : IHandler
         network.SendAll(new NetworkAlleyManagementRemoved(alleyId));
     }
 
+    // Caller is game thread
     private void Handle_DailyTickSettlement(MessagePayload<AlleyDailyTickSettlementTriggered> payload)
     {
         if (ModInformation.IsClient) return;
@@ -336,6 +335,7 @@ internal class AlleyChurnHandler : IHandler
         return false;
     }
 
+    // Caller is game thread
     private void Handle_HeroKilled(MessagePayload<AlleyHeroKilledTriggered> payload)
     {
         if (ModInformation.IsClient) return;
@@ -392,7 +392,7 @@ internal class AlleyChurnHandler : IHandler
         if (data.UnderAttackByAlleyId != null &&
             objectManager.TryGetObject<Alley>(data.UnderAttackByAlleyId, out var attacker) && attacker.Owner == victim)
         {
-            sessionInterface.ClearUnderAttack(alleyId);
+            sessionInterface.ClearUnderAttackByAi(alleyId);
             network.SendAll(new NetworkAlleyUnderAttack(alleyId, null, default));
         }
     }
@@ -413,15 +413,16 @@ internal class AlleyChurnHandler : IHandler
 
             if (data.AttackerAlleyId == null)
             {
-                behaviorInterface.ClearPlayerAlleyUnderAttack(alley);
+                behaviorInterface.ClearPlayerAlleyUnderAttackByAi(alley);
                 return;
             }
 
             if (!objectManager.TryGetObjectWithLogging<Alley>(data.AttackerAlleyId, out var attacker)) return;
-            behaviorInterface.SetPlayerAlleyUnderAttack(alley, attacker, data.DueDate, showNotification: true);
+            behaviorInterface.SetPlayerAlleyUnderAttackByAi(alley, attacker, data.DueDate, showNotification: true);
         });
     }
 
+    // Caller is game thread
     private void Handle_AlleyDefenseResolvedRequested(MessagePayload<AlleyDefenseResolvedRequested> payload)
     {
         if (ModInformation.IsServer) return;
@@ -432,7 +433,7 @@ internal class AlleyChurnHandler : IHandler
 
         // The fight is over: clear the local under-attack state and switch to the vanilla result menu the
         // patched AlleyFightWon/Lost would have (their body is skipped so the outcome comes from the server).
-        behaviorInterface.ClearPlayerAlleyUnderAttack(alley);
+        behaviorInterface.ClearPlayerAlleyUnderAttackByAi(alley);
         GameMenu.SwitchToMenu(won ? "alley_fight_won" : "alley_fight_lost");
 
         // On a win, forward the post-fight garrison so the server records the defenders lost in the fight.
@@ -475,7 +476,7 @@ internal class AlleyChurnHandler : IHandler
             attacker.SetOwner(null);
         }
 
-        sessionInterface.ClearUnderAttack(alleyId);
+        sessionInterface.ClearUnderAttackByAi(alleyId);
 
         // Record the post-fight garrison so the server's roster matches the client and a later management
         // update or rejoin doesn't restore the defenders that died in the fight.
@@ -492,6 +493,7 @@ internal class AlleyChurnHandler : IHandler
     }
 
     // Debug cheat entry: force an attack on a specific player alley now, bypassing the daily 1.5% roll.
+    // Caller is game thread
     private void Handle_ForceAlleyAttack(MessagePayload<ForceAlleyAttackRequested> payload)
     {
         if (ModInformation.IsClient) return;
