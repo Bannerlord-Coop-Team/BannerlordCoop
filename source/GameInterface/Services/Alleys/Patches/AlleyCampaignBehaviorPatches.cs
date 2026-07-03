@@ -1,6 +1,10 @@
 ﻿using Common;
+using Common.Messaging;
+using GameInterface.Services.Alleys.Messages;
 using HarmonyLib;
 using SandBox.CampaignBehaviors;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Alleys.Patches;
 
@@ -10,10 +14,11 @@ namespace GameInterface.Services.Alleys.Patches;
 /// handler decides per-role whether to run. The host is a dedicated server with no main hero and the
 /// behavior derefs <c>Hero.MainHero</c> throughout, so the client runs the co-op-safe handlers (the
 /// manage-alley menus/dialogs, the alley scene NPCs, and the per-player UX: the lost-ownership popup,
-/// the don't-die-in-an-alley-fight guard, and the alley-leader-can't-lead-a-party restriction), while
-/// the AI-churn and authoritative-ownership handlers (daily ticks, new-game seeding, occupied/cleared,
-/// hero-killed) stay off on both sides so alley ownership can only change server-authoritatively (see
-/// AlleyHandler / AlleyManagementHandler), never from divergent per-client RNG.
+/// the don't-die-in-an-alley-fight guard, and the alley-leader-can't-lead-a-party restriction). The AI
+/// churn (daily ticks, hero-killed) can't run per client - the host's <c>_playerOwnedCommonAreaData</c>
+/// is empty and RNG would diverge - so those handlers publish a trigger the server-side AlleyChurnHandler
+/// applies authoritatively; new-game gang seeding runs on the server only; and the occupied/cleared
+/// handlers stay off (the take-over is already driven through AlleyManagementHandler).
 /// </summary>
 [HarmonyPatch(typeof(AlleyCampaignBehavior))]
 internal class AlleyCampaignBehaviorPatches
@@ -51,18 +56,8 @@ internal class AlleyCampaignBehaviorPatches
     [HarmonyPrefix]
     private static bool CommonAlleyLeaderRestrictionPrefix() => ModInformation.IsClient;
 
-    // Off on both sides. These are AI churn or authoritative ownership changes (they use RNG and mutate
-    // alley world-state). Player ownership is driven server-authoritatively (AlleyHandler /
-    // AlleyManagementHandler) and AI alley churn is not replicated, so running them anywhere would only
-    // create divergent per-client state.
-    [HarmonyPatch("OnHeroKilled")]
-    [HarmonyPrefix]
-    private static bool OnHeroKilledPrefix() => false;
-
-    [HarmonyPatch("OnNewGameCreated")]
-    [HarmonyPrefix]
-    private static bool OnNewGameCreatedPrefix() => false;
-
+    // Stay off: the player take-over/clear is already driven authoritatively by the RequestAcquireAlley /
+    // RequestAbandonAlley path (AlleyManagementHandler), so the vanilla completion must not also run.
     [HarmonyPatch("OnAlleyOccupiedByPlayer")]
     [HarmonyPrefix]
     private static bool OnAlleyOccupiedByPlayerPrefix() => false;
@@ -71,11 +66,35 @@ internal class AlleyCampaignBehaviorPatches
     [HarmonyPrefix]
     private static bool OnAlleyClearedByPlayerPrefix() => false;
 
-    [HarmonyPatch("DailyTickSettlement")]
-    [HarmonyPrefix]
-    private static bool DailyTickSettlementPrefix() => false;
-
+    // AI churn: on the server, hand off to AlleyChurnHandler (RNG rolled once, results replicated) and
+    // skip the vanilla body on both sides (host list is empty, per-client RNG would diverge).
     [HarmonyPatch("DailyTick")]
     [HarmonyPrefix]
-    private static bool DailyTickPrefix() => false;
+    private static bool DailyTickPrefix(AlleyCampaignBehavior __instance)
+    {
+        if (ModInformation.IsServer) MessageBroker.Instance.Publish(__instance, new AlleyDailyTickTriggered());
+        return false;
+    }
+
+    [HarmonyPatch("DailyTickSettlement")]
+    [HarmonyPrefix]
+    private static bool DailyTickSettlementPrefix(AlleyCampaignBehavior __instance, Settlement settlement)
+    {
+        if (ModInformation.IsServer) MessageBroker.Instance.Publish(__instance, new AlleyDailyTickSettlementTriggered(settlement));
+        return false;
+    }
+
+    [HarmonyPatch("OnHeroKilled")]
+    [HarmonyPrefix]
+    private static bool OnHeroKilledPrefix(AlleyCampaignBehavior __instance, Hero victim)
+    {
+        if (ModInformation.IsServer) MessageBroker.Instance.Publish(__instance, new AlleyHeroKilledTriggered(victim));
+        return false;
+    }
+
+    // Seeds initial gang alley ownership at new-game on the server only; its SetOwner calls replicate and
+    // persist for joining clients, and this path never derefs Hero.MainHero.
+    [HarmonyPatch("OnNewGameCreated")]
+    [HarmonyPrefix]
+    private static bool OnNewGameCreatedPrefix() => ModInformation.IsServer;
 }
