@@ -21,6 +21,7 @@ public sealed class MirrorAgent
     public Team Team { get; set; }
     public Formation Formation { get; set; }
     public IAgentOriginBase Origin { get; set; }
+    public Agent MountAgent { get; set; }
 }
 
 /// <summary>

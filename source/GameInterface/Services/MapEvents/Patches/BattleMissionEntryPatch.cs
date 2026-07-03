@@ -89,26 +89,18 @@ internal class BattleMissionEntryPatch
     }
 
     // GameInterface cannot reference the Missions P2P behaviors directly (Missions depends on GameInterface),
-    // so resolve them from the shared container as IBattleMissionBehavior and add them to the mission.
+    // so the attacher — implemented in Missions, like ICoopFieldBattleLauncher — crosses the boundary.
     private static void AttachBattleBehaviors(Mission mission)
     {
         if (AttachedMissions.TryGetValue(mission, out _)) return;
 
-        if (ContainerProvider.TryResolve(out IEnumerable<IBattleMissionBehavior> behaviors) == false)
+        if (ContainerProvider.TryResolve(out ICoopBattleBehaviorAttacher attacher) == false)
         {
             Logger.Warning("[BattleSync] Mission container not available — cannot attach P2P battle behaviors to '{Scene}'", mission.SceneName);
             return;
         }
 
         AttachedMissions.Add(mission, null);
-
-        foreach (var behavior in behaviors)
-        {
-            if (behavior is MissionBehavior missionBehavior)
-            {
-                mission.AddMissionBehavior(missionBehavior);
-                Logger.Information("[BattleSync] Attached {Behavior} to mission '{Scene}'", behavior.GetType().Name, mission.SceneName);
-            }
-        }
+        attacher.Attach(mission);
     }
 }

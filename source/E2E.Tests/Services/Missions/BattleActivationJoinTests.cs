@@ -3,8 +3,6 @@ using System.Linq;
 using Common.Messaging;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.MockEngine;
-using GameInterface.Services.MapEvents;
-using HarmonyLib;
 using Missions.Battles;
 using Missions.Messages;
 using Xunit;
@@ -28,13 +26,9 @@ public class BattleActivationJoinTests : MissionTestEnvironment
 {
     public BattleActivationJoinTests(ITestOutputHelper output) : base(output) { }
 
-    // The gate state lives in the controller's private BattleDeploymentActivator; read it the same way the other
-    // mirror tests reach controller internals (AccessTools), so we assert the propagated state, not a side effect.
-    private static bool IsActivated(CoopBattleController controller)
-    {
-        var activator = (IBattleDeploymentActivator)AccessTools.Field(typeof(CoopBattleController), "_activator").GetValue(controller);
-        return activator.IsActivated;
-    }
+    // The gate state lives in the controller's deployment coordinator, exposed for exactly this kind of
+    // assertion — we assert the propagated state, not a side effect.
+    private static bool IsActivated(CoopBattleController controller) => controller.Deployment.IsActivated;
 
     // What the server fans out to existing instance members when a new controller enters — it drives the host's
     // CoopMissionController.SendJoinInfo to the joiner over the mesh (join info + the activation catch-up).
@@ -68,7 +62,7 @@ public class BattleActivationJoinTests : MissionTestEnvironment
         {
             fixture.CreateMission(joiner);
             joinerController = joiner.Resolve<CoopBattleController>();
-            AccessTools.Field(typeof(CoopBattleController), "instanceId").SetValue(joinerController, mapEventId);
+            joinerController.Session.TryBegin(mapEventId);
         });
         Assert.False(IsActivated(joinerController), "precondition: a late joiner misses the one-shot activation broadcast");
 
@@ -104,7 +98,7 @@ public class BattleActivationJoinTests : MissionTestEnvironment
         {
             fixture.CreateMission(joiner);
             joinerController = joiner.Resolve<CoopBattleController>();
-            AccessTools.Field(typeof(CoopBattleController), "instanceId").SetValue(joinerController, mapEventId);
+            joinerController.Session.TryBegin(mapEventId);
         });
 
         TriggerJoinHandshake(host, "joiner", mapEventId);
