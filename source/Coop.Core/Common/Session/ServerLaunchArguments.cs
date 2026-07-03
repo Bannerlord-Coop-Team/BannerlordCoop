@@ -16,39 +16,34 @@ public static class ServerLaunchArguments
     public const string OwnerArgument = "/coopowner";
 
     /// <summary>
-    /// Rebuilds this process's arguments into the spawned server's: role flags and Steam
-    /// join tokens are dropped, /server is forced, and the save + owner pid appended.
-    /// Everything else (module list, platform id) is kept so the child sees the same
-    /// module set and save directory as the client that spawned it.
+    /// Builds the spawned server's command line from scratch, mirroring deploy/start-server.bat:
+    /// /singleplayer /server, the active module list, then the save + owner pid. Built fresh
+    /// (not carried from this process's arguments) because a Steam launch hosts the engine inside
+    /// the launcher, so the running process's command line has neither the module list nor the mode.
     /// </summary>
-    public static string BuildChildArguments(IReadOnlyList<string> currentArgs, string saveName, int ownerProcessId)
+    public static string BuildManagedServerArguments(IReadOnlyList<string> moduleIds, string saveName, int ownerProcessId)
     {
         if (saveName == null) throw new ArgumentNullException(nameof(saveName));
+        if (moduleIds == null) throw new ArgumentNullException(nameof(moduleIds));
 
-        var kept = new List<string>();
-        for (int i = 0; i < currentArgs.Count; i++)
+        var tokens = new List<string>
         {
-            var arg = currentArgs[i];
+            "/singleplayer",
+            "/server",
+            BuildModuleList(moduleIds),
+            SaveArgument,
+            saveName,
+            OwnerArgument,
+            ownerProcessId.ToString(CultureInfo.InvariantCulture),
+        };
 
-            if (IsToken(arg, "/server") || IsToken(arg, "/client") || IsToken(arg, "/autoconnect")) continue;
+        return string.Join(" ", tokens.Select(QuoteArgument));
+    }
 
-            // These carry a value; drop it with them.
-            if (IsToken(arg, SaveArgument) || IsToken(arg, OwnerArgument) || IsToken(arg, "+connect_lobby"))
-            {
-                i++;
-                continue;
-            }
-
-            kept.Add(arg);
-        }
-
-        kept.Add("/server");
-        kept.Add(SaveArgument);
-        kept.Add(saveName);
-        kept.Add(OwnerArgument);
-        kept.Add(ownerProcessId.ToString(CultureInfo.InvariantCulture));
-
-        return string.Join(" ", kept.Select(QuoteArgument));
+    /// <summary>Formats the module ids as the engine's <c>_MODULES_*A*B*_MODULES_</c> launch token.</summary>
+    public static string BuildModuleList(IReadOnlyList<string> moduleIds)
+    {
+        return "_MODULES_" + string.Concat(moduleIds.Select(id => "*" + id)) + "*_MODULES_";
     }
 
     public static bool TryParse(IReadOnlyList<string> args, out string saveName, out int ownerProcessId)

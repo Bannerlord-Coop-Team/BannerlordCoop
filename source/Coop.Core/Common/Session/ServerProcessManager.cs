@@ -1,11 +1,11 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Coop.Core.Common.Session.Messages;
+using GameInterface.Services.GameState;
 using Serilog;
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 
 namespace Coop.Core.Common.Session;
 
@@ -49,9 +49,9 @@ public class ServerProcessManager : IDisposable
             CleanupLocked();
 
             var currentProcess = Process.GetCurrentProcess();
-            var exePath = currentProcess.MainModule.FileName;
-            var arguments = ServerLaunchArguments.BuildChildArguments(
-                Environment.GetCommandLineArgs().Skip(1).ToArray(), saveName, currentProcess.Id);
+            var exePath = ManagedServerLauncher.GetEngineExecutablePath();
+            var arguments = ServerLaunchArguments.BuildManagedServerArguments(
+                ManagedServerLauncher.GetActiveModuleIds(), saveName, currentProcess.Id);
 
             Logger.Information("Spawning co-op server for save '{SaveName}': {Exe} {Arguments}", saveName, exePath, arguments);
 

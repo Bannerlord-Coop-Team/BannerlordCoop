@@ -76,44 +76,26 @@ public class ServerLaunchArgumentsTests
     }
 
     [Fact]
-    public void BuildChildArguments_ForcesServerAndAppendsManagedArguments()
+    public void BuildModuleList_FormatsEngineToken()
     {
-        var current = new[] { "/singleplayer", "_MODULES_*Native*Coop*_MODULES_" };
-
-        var built = ServerLaunchArguments.BuildChildArguments(current, "My Save", 1234);
-
-        Assert.Equal("/singleplayer _MODULES_*Native*Coop*_MODULES_ /server /coopsave \"My Save\" /coopowner 1234", built);
+        Assert.Equal("_MODULES_*Native*SandBoxCore*SandBox*StoryMode*Coop*_MODULES_",
+            ServerLaunchArguments.BuildModuleList(new[] { "Native", "SandBoxCore", "SandBox", "StoryMode", "Coop" }));
     }
 
     [Fact]
-    public void BuildChildArguments_StripsRoleAndSteamJoinArguments()
+    public void BuildManagedServerArguments_MatchesTheStartServerShape()
     {
-        var current = new[]
-        {
-            "/singleplayer", "/client", "/autoconnect", "+connect_lobby", "109775240976525422",
-            "/coopsave", "old save", "/coopowner", "99", "_MODULES_*Native*Coop*_MODULES_",
-        };
+        var built = ServerLaunchArguments.BuildManagedServerArguments(
+            new[] { "Native", "SandBoxCore", "SandBox", "StoryMode", "Coop" }, "MP", 1234);
 
-        var built = ServerLaunchArguments.BuildChildArguments(current, "save1", 7);
-
-        Assert.Equal("/singleplayer _MODULES_*Native*Coop*_MODULES_ /server /coopsave save1 /coopowner 7", built);
+        Assert.Equal("/singleplayer /server _MODULES_*Native*SandBoxCore*SandBox*StoryMode*Coop*_MODULES_ /coopsave MP /coopowner 1234", built);
     }
 
     [Fact]
-    public void BuildChildArguments_DoesNotDuplicateServerFlag()
+    public void BuildManagedServerArguments_QuotesSaveNameWithSpaces()
     {
-        var built = ServerLaunchArguments.BuildChildArguments(new[] { "/server" }, "save1", 7);
+        var built = ServerLaunchArguments.BuildManagedServerArguments(new[] { "Native", "Coop" }, "My Save", 42);
 
-        Assert.Equal("/server /coopsave save1 /coopowner 7", built);
-    }
-
-    [Fact]
-    public void BuildChildArguments_KeepsPlatformId()
-    {
-        var current = new[] { "/singleplayer", "/platformId", "testclient1" };
-
-        var built = ServerLaunchArguments.BuildChildArguments(current, "save1", 7);
-
-        Assert.Equal("/singleplayer /platformId testclient1 /server /coopsave save1 /coopowner 7", built);
+        Assert.Equal("/singleplayer /server _MODULES_*Native*Coop*_MODULES_ /coopsave \"My Save\" /coopowner 42", built);
     }
 }
