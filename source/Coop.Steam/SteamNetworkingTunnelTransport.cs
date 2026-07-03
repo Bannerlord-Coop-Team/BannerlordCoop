@@ -61,6 +61,8 @@ public class SteamNetworkingTunnelTransport : ISteamTunnelTransport
         SetConfigInt32(ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_Global, IntPtr.Zero,
             ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendBufferSize, SteamTunnel.SendBufferBytes);
         SetConfigInt32(ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_Global, IntPtr.Zero,
+            ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendRateMin, SteamTunnel.SendRateMinBytesPerSecond);
+        SetConfigInt32(ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_Global, IntPtr.Zero,
             ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendRateMax, SteamTunnel.SendRateMaxBytesPerSecond);
     }
 
@@ -146,6 +148,8 @@ public class SteamNetworkingTunnelTransport : ISteamTunnelTransport
         SetConfigInt32(ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_Connection, (IntPtr)connection,
             ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendBufferSize, SteamTunnel.SendBufferBytes);
         SetConfigInt32(ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_Connection, (IntPtr)connection,
+            ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendRateMin, SteamTunnel.SendRateMinBytesPerSecond);
+        SetConfigInt32(ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_Connection, (IntPtr)connection,
             ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendRateMax, SteamTunnel.SendRateMaxBytesPerSecond);
     }
 
@@ -197,6 +201,7 @@ public class SteamNetworkingTunnelTransport : ISteamTunnelTransport
         return new[]
         {
             Int32Option(ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendBufferSize, SteamTunnel.SendBufferBytes),
+            Int32Option(ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendRateMin, SteamTunnel.SendRateMinBytesPerSecond),
             Int32Option(ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendRateMax, SteamTunnel.SendRateMaxBytesPerSecond),
         };
     }

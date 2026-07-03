@@ -28,9 +28,14 @@ public static class SteamTunnel
     public const int SendBufferBytes = 8 * 1024 * 1024;
 
     /// <summary>
-    /// Ceiling for Steam's send pacing. The default caps around 1 MB/s, which would stretch
-    /// a ~40 MB join save into minutes on links that can go much faster.
+    /// Floor for Steam's send pacing, and in practice the effective transfer rate: this
+    /// Steam build never raises the rate toward the ceiling on its own (observed pinned at
+    /// the 256 KB/s default while saturated on a 3 ms link), so the floor is what carries
+    /// the ~55 MB join payload in seconds instead of minutes.
     /// </summary>
+    public const int SendRateMinBytesPerSecond = 2 * 1024 * 1024;
+
+    /// <summary>Ceiling for Steam's send pacing, headroom above the floor.</summary>
     public const int SendRateMaxBytesPerSecond = 20 * 1024 * 1024;
 
     /// <summary>
