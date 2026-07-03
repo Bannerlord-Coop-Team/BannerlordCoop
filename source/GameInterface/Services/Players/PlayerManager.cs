@@ -163,7 +163,8 @@ public class PlayerManager : IPlayerManager
     }
     public bool IsConnected(Player player)
     {
-        return peerToPlayer.Values.Contains(player);
+        return peerToPlayer.Any(kvp =>
+         kvp.Value == player && kvp.Key.ConnectionState == ConnectionState.Connected);
     }
 }
 
