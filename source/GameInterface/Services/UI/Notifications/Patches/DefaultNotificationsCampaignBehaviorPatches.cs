@@ -197,8 +197,8 @@ internal class DefaultNotificationsCampaignBehaviorPatches
     public static void OnRelationChangedPostfix(ref DefaultNotificationsCampaignBehavior __instance, Hero effectiveHero, Hero effectiveHeroGainedRelationWith, int relationChange, bool showNotification, ChangeRelationAction.ChangeRelationDetail detail, Hero originalHero, Hero originalGainedRelationWith)
     {
         if (ModInformation.IsClient
-            || !IsValidPlayerHero(effectiveHero) && !IsValidPlayerHero(effectiveHeroGainedRelationWith)
-            && !IsValidPlayerHero(originalHero) && !IsValidPlayerHero(originalGainedRelationWith)) return;
+            || (!IsValidPlayerHero(effectiveHero) && !IsValidPlayerHero(effectiveHeroGainedRelationWith)
+            && !IsValidPlayerHero(originalHero) && !IsValidPlayerHero(originalGainedRelationWith))) return;
 
         var message = new NotifyRelationChanged(effectiveHero, effectiveHeroGainedRelationWith, relationChange, showNotification, detail, originalHero, originalGainedRelationWith);
         MessageBroker.Instance.Publish(__instance, message);
@@ -377,7 +377,7 @@ internal class DefaultNotificationsCampaignBehaviorPatches
     public static void OnHeroSharedFoodWithAnotherHeroPostfix(ref DefaultNotificationsCampaignBehavior __instance, Hero supporterHero, Hero supportedHero, float influence)
     {
         if (ModInformation.IsClient 
-            || !IsValidPlayerHero(supporterHero) && !IsValidPlayerHero(supportedHero)) return;
+            || (!IsValidPlayerHero(supporterHero) && !IsValidPlayerHero(supportedHero))) return;
 
         var message = new HeroSharedFoodWithAnotherHero(supporterHero, supportedHero, influence);
         MessageBroker.Instance.Publish(__instance, message);

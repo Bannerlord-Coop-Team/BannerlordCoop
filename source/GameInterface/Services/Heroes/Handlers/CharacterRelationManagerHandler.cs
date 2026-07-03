@@ -60,7 +60,6 @@ namespace GameInterface.Services.Heroes.Handlers
                 {
                     CharacterRelationManager.SetHeroRelation(hero1, hero2, payload.Value);
                 }
-
             }, context: $"apply hero relation {payload.Hero1Id}<->{payload.Hero2Id}");
         }
     }
