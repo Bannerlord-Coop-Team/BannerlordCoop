@@ -142,10 +142,7 @@ internal class MapEventPartyHandler : IHandler
     {
         var obj = payload.What;
 
-        // A client applying this message already got Party.MemberRoster's mutation separately
-        // replicated when the server applied the casualty, so it only needs the scoreboard
-        // tally here. The server itself is authoritative for a casualty reported outside a live
-        // coop battle (e.g. simulated battle resolution) and must apply the full mutation.
+        // A client only needs the scoreboard tally; Party.MemberRoster arrives separately.
         GameThread.Run(() =>
         {
             try
@@ -157,8 +154,6 @@ internal class MapEventPartyHandler : IHandler
 
                 if (ModInformation.IsServer)
                 {
-                    // Runs with patches live, not under AllowedThread: this mutation must still
-                    // register with TroopRosterPatches so it replicates to clients normally.
                     mapEventParty.OnTroopKilled(troopDescriptor);
                 }
                 else
@@ -192,10 +187,7 @@ internal class MapEventPartyHandler : IHandler
     {
         var obj = payload.What;
 
-        // A client applying this message already got Party.MemberRoster's mutation separately
-        // replicated when the server applied the casualty, so it only needs the scoreboard
-        // tally here. The server itself is authoritative for a casualty reported outside a live
-        // coop battle (e.g. simulated battle resolution) and must apply the full mutation.
+        // A client only needs the scoreboard tally; Party.MemberRoster arrives separately.
         GameThread.Run(() =>
         {
             try
@@ -207,8 +199,6 @@ internal class MapEventPartyHandler : IHandler
 
                 if (ModInformation.IsServer)
                 {
-                    // Runs with patches live, not under AllowedThread: this mutation must still
-                    // register with TroopRosterPatches so it replicates to clients normally.
                     mapEventParty.OnTroopWounded(troopDescriptor);
                 }
                 else
@@ -242,11 +232,8 @@ internal class MapEventPartyHandler : IHandler
     {
         var obj = payload.What;
 
-        // A client applying this message already got Party.MemberRoster's mutation separately
-        // replicated when the server applied the casualty, so it only needs the scoreboard
-        // tally here (vanilla only tallies non-hero routs, so match that). The server itself is
-        // authoritative for a casualty reported outside a live coop battle (e.g. simulated
-        // battle resolution) and must apply the full mutation.
+        // A client only needs the scoreboard tally (non-hero routs only, matching vanilla);
+        // Party.MemberRoster arrives separately.
         GameThread.Run(() =>
         {
             try
@@ -258,8 +245,6 @@ internal class MapEventPartyHandler : IHandler
 
                 if (ModInformation.IsServer)
                 {
-                    // Runs with patches live, not under AllowedThread: this mutation must still
-                    // register with TroopRosterPatches so it replicates to clients normally.
                     mapEventParty.OnTroopRouted(troopDescriptor);
                 }
                 else if (!mapEventParty.Troops[troopDescriptor].Troop.IsHero)
