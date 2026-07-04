@@ -155,12 +155,18 @@ internal class MapEventPartyHandler : IHandler
 
                 var troopDescriptor = new UniqueTroopDescriptor(obj.TroopSeed);
 
-                using (new AllowedThread())
+                if (ModInformation.IsServer)
                 {
-                    if (ModInformation.IsServer)
-                        mapEventParty.OnTroopKilled(troopDescriptor);
-                    else
+                    // Runs with patches live, not under AllowedThread: this mutation must still
+                    // register with TroopRosterPatches so it replicates to clients normally.
+                    mapEventParty.OnTroopKilled(troopDescriptor);
+                }
+                else
+                {
+                    using (new AllowedThread())
+                    {
                         mapEventParty.Troops.OnTroopKilled(troopDescriptor);
+                    }
                 }
             }
             catch (Exception ex)
@@ -199,12 +205,18 @@ internal class MapEventPartyHandler : IHandler
 
                 var troopDescriptor = new UniqueTroopDescriptor(obj.TroopSeed);
 
-                using (new AllowedThread())
+                if (ModInformation.IsServer)
                 {
-                    if (ModInformation.IsServer)
-                        mapEventParty.OnTroopWounded(troopDescriptor);
-                    else
+                    // Runs with patches live, not under AllowedThread: this mutation must still
+                    // register with TroopRosterPatches so it replicates to clients normally.
+                    mapEventParty.OnTroopWounded(troopDescriptor);
+                }
+                else
+                {
+                    using (new AllowedThread())
+                    {
                         mapEventParty.Troops.OnTroopWounded(troopDescriptor);
+                    }
                 }
             }
             catch (Exception ex)
@@ -244,13 +256,15 @@ internal class MapEventPartyHandler : IHandler
 
                 var troopDescriptor = new UniqueTroopDescriptor(obj.TroopSeed);
 
-                using (new AllowedThread())
+                if (ModInformation.IsServer)
                 {
-                    if (ModInformation.IsServer)
-                    {
-                        mapEventParty.OnTroopRouted(troopDescriptor);
-                    }
-                    else if (!mapEventParty.Troops[troopDescriptor].Troop.IsHero)
+                    // Runs with patches live, not under AllowedThread: this mutation must still
+                    // register with TroopRosterPatches so it replicates to clients normally.
+                    mapEventParty.OnTroopRouted(troopDescriptor);
+                }
+                else if (!mapEventParty.Troops[troopDescriptor].Troop.IsHero)
+                {
+                    using (new AllowedThread())
                     {
                         mapEventParty.Troops.OnTroopRouted(troopDescriptor);
                     }
