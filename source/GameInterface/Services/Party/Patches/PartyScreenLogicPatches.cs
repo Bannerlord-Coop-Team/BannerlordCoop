@@ -19,7 +19,8 @@ namespace GameInterface.Services.Party.Patches;
 internal class PartyScreenLogicPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<PartyScreenLogic>();
-
+    [ThreadStatic]
+    public static bool InCommit;
     [HarmonyPatch(nameof(PartyScreenLogic.DoneLogic))]
     [HarmonyPrefix]
     public static bool DoneLogicPrefix(PartyScreenLogic __instance, ref bool __result, bool isForced)
@@ -84,27 +85,34 @@ internal class PartyScreenLogicPatches
                 TroopRoster duplicateLeftMemberRoster = __instance.MemberRosters[0].CloneRosterData();
                 TroopRoster duplicateLeftPrisonerRoster = __instance.PrisonerRosters[0].CloneRosterData();
 
-                __instance.Reset(true);
-            
-                //__instance.FireCampaignRelatedEvents(); // Managed on server
-                __instance.SetPartyGoldChangeAmount(0);
-                __instance.SetHorseChangeAmount(0);
-                __instance.SetInfluenceChangeAmount(0, 0, 0);
-                __instance.SetMoraleChangeAmount(0);
-                __instance.CurrentData.UpgradedTroopsHistory = new List<Tuple<CharacterObject, CharacterObject, int>>();
-                __instance.CurrentData.TransferredPrisonersHistory = new List<Tuple<CharacterObject, int>>();
-                __instance.CurrentData.RecruitedPrisonersHistory = new List<Tuple<CharacterObject, int>>();
-                __instance.CurrentData.UsedUpgradeHorsesHistory = new List<Tuple<EquipmentElement, int>>();
-                __instance._initialData.CopyFromScreenData(__instance.CurrentData);
+                InCommit = true;
+                try
+                {
+                    __instance.Reset(true);
 
-                // In vanilla, the rosters would already be updated but with this patch the rosters are reset on the client to be managed by the server.
-                // This assigns a duplicate version of the left rosters needed in extra logic handled by the PartyScreenHelper when closing the party screen.
-                // For example, the left member roster when creating a new clan party is not managed on the server but the server does need this data.
-                __instance.MemberRosters[0] = duplicateLeftMemberRoster;
-                __instance.PrisonerRosters[1] = duplicateLeftPrisonerRoster;
+                    //__instance.FireCampaignRelatedEvents(); // Managed on server
+                    __instance.SetPartyGoldChangeAmount(0);
+                    __instance.SetHorseChangeAmount(0);
+                    __instance.SetInfluenceChangeAmount(0, 0, 0);
+                    __instance.SetMoraleChangeAmount(0);
+                    __instance.CurrentData.UpgradedTroopsHistory = new List<Tuple<CharacterObject, CharacterObject, int>>();
+                    __instance.CurrentData.TransferredPrisonersHistory = new List<Tuple<CharacterObject, int>>();
+                    __instance.CurrentData.RecruitedPrisonersHistory = new List<Tuple<CharacterObject, int>>();
+                    __instance.CurrentData.UsedUpgradeHorsesHistory = new List<Tuple<EquipmentElement, int>>();
+                    __instance._initialData.CopyFromScreenData(__instance.CurrentData);
+
+                    // In vanilla, the rosters would already be updated but with this patch the rosters are reset on the client to be managed by the server.
+                    // This assigns a duplicate version of the left rosters needed in extra logic handled by the PartyScreenHelper when closing the party screen.
+                    // For example, the left member roster when creating a new clan party is not managed on the server but the server does need this data.
+                    __instance.MemberRosters[0] = duplicateLeftMemberRoster;
+                    __instance.PrisonerRosters[1] = duplicateLeftPrisonerRoster;
+                }
+                finally
+                {
+                    InCommit = false;
+                }
             }
         }
-
         __result = flag;
         return false;
     }
