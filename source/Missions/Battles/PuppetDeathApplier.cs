@@ -63,8 +63,9 @@ public class PuppetDeathApplier : IPuppetDeathApplier
             Logger.Information("[DeathDiag] Killing puppet {AgentId}: agentPresent={Present}, health={Health}", payload.What.AgentId, agent != null, agent?.Health ?? -1f);
             if (agent != null && agent.Health > 0)
             {
-                agent.MakeDead(false, ActionIndexCache.act_none);
-                agent.FadeOut(false, true);
+                // isKilled picks Killed vs Unconscious for the scoreboard tally; no FadeOut,
+                // so the puppet ragdolls and stays visible like every other death.
+                agent.MakeDead(!payload.What.Wounded, ActionIndexCache.act_none);
             }
 
             // Deregister AFTER the kill, INSIDE this game-thread action. We receive this on the network thread,
