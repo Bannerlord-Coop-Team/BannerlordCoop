@@ -88,12 +88,19 @@ namespace Coop
             GameThread.Instance.MarkGameThread();
         }
 
-        // True if filePath was free (no other process has it open), claimed via an exclusive open/close.
+        // Held open for the whole process lifetime (never disposed) so the claim can't race with a second
+        // instance's own attempt: a check-then-release probe would leave a window, between our own close and
+        // Serilog's later open of the real log file, where a second process's identical probe could also
+        // succeed. A sidecar lock file kept open under FileShare.None the entire time closes that window, and
+        // is independent of whatever sharing mode Serilog itself uses to open the actual log file.
+        private static FileStream logLockHandle;
+
+        // True if filePath was free (no other live process holds its lock).
         private static bool TryClaimExclusive(string filePath)
         {
             try
             {
-                using (new FileStream(filePath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None)) { }
+                logLockHandle = new FileStream(filePath + ".lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose);
                 return true;
             }
             catch (IOException)
