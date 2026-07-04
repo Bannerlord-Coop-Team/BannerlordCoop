@@ -117,6 +117,8 @@ public class PuppetSpawner : IPuppetSpawner
 
         var team = ResolvePuppetTeam(data);
         if (team == null) return false;                                 // teams not created yet — buffer
+        Logger.Information("[SideDiag] TrySpawnPuppetNow: agent {AgentId} owner={Owner} data.Side={DataSide} resolvedTeam.Side={TeamSide}",
+            data.AgentId, data.OwnerControllerId, data.Side, team.Side);
 
         if (!objectManager.TryGetObjectWithLogging(data.CharacterId, out CharacterObject character))
         {
@@ -263,6 +265,8 @@ public class PuppetSpawner : IPuppetSpawner
         if (allyTeam != null && allyTeam != playerTeam) return allyTeam;
 
         // No separate ally team on our side yet (only our own party present) — fall back to the main team.
+        Logger.Information("[SideDiag] ResolvePuppetTeam: no ally team for data.Side={DataSide} (allyTeam={AllyTeam}, playerTeam={PlayerTeam}) - falling back to mainTeam {MainTeam}",
+            data.Side, allyTeam, playerTeam, mainTeam);
         return mainTeam;
     }
 }
