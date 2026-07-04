@@ -18,7 +18,7 @@ internal class HostSettlementMenuLoadPatch
         // RemoveMainParty has already run by this point (it fires earlier in the same load, from
         // CampaignReady), so MobileParty.MainParty is gone; PlayerEncounter.Finish() assumes a live
         // main party and would NRE, so the encounter is cleared directly instead.
-        if (!ModInformation.IsServer || !__instance.AtMenu)
+        if (ModInformation.IsClient || !__instance.AtMenu)
             return;
 
         __instance.ExitMenuMode();
