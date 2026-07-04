@@ -88,6 +88,20 @@ namespace Coop
             GameThread.Instance.MarkGameThread();
         }
 
+        // True if filePath was free (no other process has it open), claimed via an exclusive open/close.
+        private static bool TryClaimExclusive(string filePath)
+        {
+            try
+            {
+                using (new FileStream(filePath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None)) { }
+                return true;
+            }
+            catch (IOException)
+            {
+                return false;
+            }
+        }
+
         private void SetupLogging()
         {
             var outputTemplate = "[({ProcessId}) {Timestamp:HH:mm:ss} {Level:u3} {SourceContext}] {Message:lj}{NewLine}{Exception}";
@@ -95,25 +109,20 @@ namespace Coop
             var filePostfix = isServer ? "server" : "client";
             var filePath = $"Coop_{filePostfix}.log";
 
+            // File.Delete alone can't detect another live instance: it succeeds even on a file another
+            // process still has open, as long as that handle allows shared delete (Serilog's file sink
+            // does), so two same-install clients would silently keep fighting over one file. An exclusive
+            // open is the only check that actually fails when someone else already has the file open.
+            if (!TryClaimExclusive(filePath))
+                filePath = $"Coop_{filePostfix}_{System.Diagnostics.Process.GetCurrentProcess().Id}.log";
+
             try
             {
-                // Clear old filepath
                 File.Delete(filePath);
             }
             catch (Exception)
             {
-                // The default name is still held by another running instance (e.g. a second client
-                // launched from this same install for local dual-client testing) - fall back to a
-                // process-id-suffixed name instead of both instances fighting over the same file.
-                filePath = $"Coop_{filePostfix}_{System.Diagnostics.Process.GetCurrentProcess().Id}.log";
-                try
-                {
-                    File.Delete(filePath);
-                }
-                catch (Exception)
-                {
-                    // Best effort delete
-                }
+                // Best effort delete
             }
 
             LogManager.Configuration
