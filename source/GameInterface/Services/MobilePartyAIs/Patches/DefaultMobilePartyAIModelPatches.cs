@@ -1,5 +1,6 @@
 ﻿using Common;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -35,6 +36,18 @@ internal class DefaultMobilePartyAIModelPatches
         // would block the attack anyway, and this keeps the AI from chasing an unattackable target.
         if (ConversationPartyHold.IsInPlayerConversation(targetParty))
             __result = false;
+    }
+    [HarmonyPatch(nameof(DefaultMobilePartyAIModel.ShouldPartyCheckInitiativeBehavior))]
+    [HarmonyPrefix]
+    private static bool ShouldPartyCheckInitiativeBehaviorPrefix(MobileParty mobileParty, ref bool __result)
+    {
+        if (mobileParty.IsPlayerParty())
+        {
+            __result = false;
+            return false;
+        }
+
+        return true;
     }
     [HarmonyPatch(typeof(DefaultMobilePartyAIModel))]
     internal class FixGarrisonFleePatch
