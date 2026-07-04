@@ -142,7 +142,6 @@ internal class MapEventPartyHandler : IHandler
     {
         var obj = payload.What;
 
-        // A client only needs the scoreboard tally; Party.MemberRoster arrives separately.
         GameThread.Run(() =>
         {
             try
@@ -158,6 +157,7 @@ internal class MapEventPartyHandler : IHandler
                 }
                 else
                 {
+                    // Only the scoreboard tally; Party.MemberRoster arrives separately.
                     using (new AllowedThread())
                     {
                         mapEventParty.Troops.OnTroopKilled(troopDescriptor);
@@ -187,7 +187,6 @@ internal class MapEventPartyHandler : IHandler
     {
         var obj = payload.What;
 
-        // A client only needs the scoreboard tally; Party.MemberRoster arrives separately.
         GameThread.Run(() =>
         {
             try
@@ -203,6 +202,7 @@ internal class MapEventPartyHandler : IHandler
                 }
                 else
                 {
+                    // Only the scoreboard tally; Party.MemberRoster arrives separately.
                     using (new AllowedThread())
                     {
                         mapEventParty.Troops.OnTroopWounded(troopDescriptor);
@@ -232,8 +232,6 @@ internal class MapEventPartyHandler : IHandler
     {
         var obj = payload.What;
 
-        // A client only needs the scoreboard tally (non-hero routs only, matching vanilla);
-        // Party.MemberRoster arrives separately.
         GameThread.Run(() =>
         {
             try
@@ -247,6 +245,8 @@ internal class MapEventPartyHandler : IHandler
                 {
                     mapEventParty.OnTroopRouted(troopDescriptor);
                 }
+                // Only the scoreboard tally (non-hero routs only, matching vanilla);
+                // Party.MemberRoster arrives separately.
                 else if (!mapEventParty.Troops[troopDescriptor].Troop.IsHero)
                 {
                     using (new AllowedThread())
