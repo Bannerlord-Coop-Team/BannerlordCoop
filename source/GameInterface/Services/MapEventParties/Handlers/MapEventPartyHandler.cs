@@ -142,9 +142,10 @@ internal class MapEventPartyHandler : IHandler
     {
         var obj = payload.What;
 
-        // OnTroopKilled mutates the roster the game loop reads, so it is deferred to the
-        // main thread. OnTroopKilled is Harmony-patched, so AllowedThread silences the
-        // client prefix to stop it re-running and rebroadcasting in a loop.
+        // A client applying this message already got Party.MemberRoster's mutation separately
+        // replicated when the server applied the casualty, so it only needs the scoreboard
+        // tally here. The server itself is authoritative for a casualty reported outside a live
+        // coop battle (e.g. simulated battle resolution) and must apply the full mutation.
         GameThread.Run(() =>
         {
             try
@@ -153,11 +154,13 @@ internal class MapEventPartyHandler : IHandler
                     return;
 
                 var troopDescriptor = new UniqueTroopDescriptor(obj.TroopSeed);
-                var troop = mapEventParty._roster[troopDescriptor].Troop;
 
                 using (new AllowedThread())
                 {
-                    mapEventParty.OnTroopKilled(troopDescriptor);
+                    if (ModInformation.IsServer)
+                        mapEventParty.OnTroopKilled(troopDescriptor);
+                    else
+                        mapEventParty.Troops.OnTroopKilled(troopDescriptor);
                 }
             }
             catch (Exception ex)
@@ -183,9 +186,10 @@ internal class MapEventPartyHandler : IHandler
     {
         var obj = payload.What;
 
-        // OnTroopWounded mutates the roster the game loop reads, so it is deferred to the
-        // main thread. OnTroopWounded is Harmony-patched, so AllowedThread silences the
-        // client prefix to stop it re-running and rebroadcasting in a loop.
+        // A client applying this message already got Party.MemberRoster's mutation separately
+        // replicated when the server applied the casualty, so it only needs the scoreboard
+        // tally here. The server itself is authoritative for a casualty reported outside a live
+        // coop battle (e.g. simulated battle resolution) and must apply the full mutation.
         GameThread.Run(() =>
         {
             try
@@ -197,7 +201,10 @@ internal class MapEventPartyHandler : IHandler
 
                 using (new AllowedThread())
                 {
-                    mapEventParty.OnTroopWounded(troopDescriptor);
+                    if (ModInformation.IsServer)
+                        mapEventParty.OnTroopWounded(troopDescriptor);
+                    else
+                        mapEventParty.Troops.OnTroopWounded(troopDescriptor);
                 }
             }
             catch (Exception ex)
@@ -223,9 +230,11 @@ internal class MapEventPartyHandler : IHandler
     {
         var obj = payload.What;
 
-        // OnTroopRouted mutates the roster the game loop reads, so it is deferred to the
-        // main thread. OnTroopRouted is Harmony-patched, so AllowedThread silences the
-        // client prefix to stop it re-running and rebroadcasting in a loop.
+        // A client applying this message already got Party.MemberRoster's mutation separately
+        // replicated when the server applied the casualty, so it only needs the scoreboard
+        // tally here (vanilla only tallies non-hero routs, so match that). The server itself is
+        // authoritative for a casualty reported outside a live coop battle (e.g. simulated
+        // battle resolution) and must apply the full mutation.
         GameThread.Run(() =>
         {
             try
@@ -237,7 +246,14 @@ internal class MapEventPartyHandler : IHandler
 
                 using (new AllowedThread())
                 {
-                    mapEventParty.OnTroopRouted(troopDescriptor);
+                    if (ModInformation.IsServer)
+                    {
+                        mapEventParty.OnTroopRouted(troopDescriptor);
+                    }
+                    else if (!mapEventParty.Troops[troopDescriptor].Troop.IsHero)
+                    {
+                        mapEventParty.Troops.OnTroopRouted(troopDescriptor);
+                    }
                 }
             }
             catch (Exception ex)
