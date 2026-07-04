@@ -128,7 +128,6 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
 
             var attribution = casualties.GetOrDefault(info.AgentId);
             var side = agent.Team != null ? agent.Team.Side : BattleSideEnum.None;
-            Logger.Information("[SideDiag] ReplicateCurrentAgentsTo: agent {AgentId} team={Team} side={Side}", info.AgentId, agent.Team, side);
 
             records.Add(new BattleAgentSpawnData(
                 info.AgentId, characterId, agent.Position, side, agent.Health,
@@ -184,7 +183,6 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         casualties.Record(agentId, mapEventPartyId, troopSeed, characterId);
 
         BattleSideEnum side = agent.Team != null ? agent.Team.Side : BattleSideEnum.None;
-        Logger.Information("[SideDiag] Handle_AgentSpawnedInBattle: agent {AgentId} team={Team} side={Side}", agentId, agent.Team, side);
         var data = new BattleAgentSpawnData(agentId, characterId, agent.Position, side, agent.Health, owner, mapEventPartyId, troopSeed);
 
         // Requirement #4 "hidden everywhere until deployed": while we are still placing our own formations our
