@@ -102,7 +102,18 @@ namespace Coop
             }
             catch (Exception)
             {
-                // Best effort delete
+                // The default name is still held by another running instance (e.g. a second client
+                // launched from this same install for local dual-client testing) - fall back to a
+                // process-id-suffixed name instead of both instances fighting over the same file.
+                filePath = $"Coop_{filePostfix}_{System.Diagnostics.Process.GetCurrentProcess().Id}.log";
+                try
+                {
+                    File.Delete(filePath);
+                }
+                catch (Exception)
+                {
+                    // Best effort delete
+                }
             }
 
             LogManager.Configuration
