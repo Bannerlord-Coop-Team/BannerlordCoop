@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Util;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
@@ -74,8 +75,8 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
     {
         GameThread.Run(() =>
         {
-            // Captured before FinishBattle clears it; kept for the debug log only — the PvP encounter close is now
-            // driven server-side via NetworkClosePvpEncounter, not from this teardown.
+            // Captured before FinishBattle clears it. Also gates the reward-snapshot capture below; the PvP
+            // encounter close itself is driven server-side via NetworkClosePvpEncounter, not from this teardown.
             bool localPartyWasInvolved = MobileParty.MainParty?.MapEvent == obj;
             // The action is deferred, so the campaign can be torn down (disconnect, save-load) before it runs.
             if (Campaign.Current == null) return;
@@ -87,6 +88,18 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
                 // makes MobileParty.MapEvent null and SetVisualAsDirty re-marks the figure, dropping it out of
                 // the fighting animation. The full vanilla finalize is deliberately not re-run — the server
                 // already replicated the battle results.
+
+                // Snapshot MainParty's reward figures before nulling any side removes it from obj's party lists —
+                // GetBattleRewardsPrefix falls back to this if this client's scoreboard reads them after teardown.
+                if (localPartyWasInvolved)
+                {
+                    var mainPartyEventParty = obj.FindMapEventParty(PartyBase.MainParty);
+
+                    if (mainPartyEventParty != null)
+                    {
+                        MainPartyBattleRewardsCache.Capture(obj, mainPartyEventParty, obj.GetPlayerBattleContributionRate());
+                    }
+                }
 
                 // Mark finalized first so clearing a side's last party (which re-enters FinalizeEvent via
                 // RemovePartyInternal) no-ops on IsFinalized instead of depending on the State sync arriving first.

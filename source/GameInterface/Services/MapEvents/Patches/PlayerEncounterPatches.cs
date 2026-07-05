@@ -2,6 +2,8 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.Messages.Leave;
@@ -9,10 +11,12 @@ using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
 using Serilog;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MapEvents.Patches;
@@ -112,6 +116,38 @@ internal class PlayerEncounterPatches
     [HarmonyPrefix]
     private static bool PrefixCheckNearbyPartiesToJoinPlayerMapEvent()
     {
+        return false;
+    }
+
+    // Vanilla looks up MainParty's MapEventParty via PartiesOnSide(PlayerSide), which indexes _sides by
+    // (int)PlayerSide and throws once MapEventRegistry.OnClientDestroyed nulls MainParty's MapEventSide first
+    // (PlayerSide becomes BattleSideEnum.None). Search both sides for MainParty directly instead; if teardown
+    // already removed it from both, fall back to the snapshot OnClientDestroyed captured before nulling it.
+    [HarmonyPatch(nameof(PlayerEncounter.GetBattleRewards))]
+    [HarmonyPrefix]
+    private static bool GetBattleRewardsPrefix(PlayerEncounter __instance, out ExplainedNumber renownChange,
+        out ExplainedNumber influenceChange, out ExplainedNumber moraleChange, out float playerEarnedLootRate,
+        out Figurehead playerEarnedFigurehead)
+    {
+        var mapEvent = __instance._mapEvent;
+        playerEarnedFigurehead = __instance.PlayerLootedFigurehead;
+
+        var mapEventParty = mapEvent.FindMapEventParty(PartyBase.MainParty);
+
+        if (mapEventParty != null)
+        {
+            renownChange = mapEventParty.GainedRenownExplained;
+            influenceChange = mapEventParty.GainedInfluenceExplained;
+            moraleChange = mapEventParty.GainedMoraleExplained;
+            playerEarnedLootRate = mapEvent.GetPlayerBattleContributionRate();
+            return false;
+        }
+
+        if (!MainPartyBattleRewardsCache.TryGet(mapEvent, out renownChange, out influenceChange, out moraleChange, out playerEarnedLootRate))
+        {
+            Logger.Warning("GetBattleRewards: MainParty not found on either side of {MapEvent} and no cached snapshot; defaulting rewards to zero", mapEvent);
+        }
+
         return false;
     }
 

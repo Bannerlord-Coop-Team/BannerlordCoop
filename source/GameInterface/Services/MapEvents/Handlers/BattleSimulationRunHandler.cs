@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
 using Common.Util;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MobileParties.Extensions;
@@ -503,7 +504,7 @@ internal class BattleSimulationRunHandler : IHandler
                     if (!objectManager.TryGetObject<PartyBase>(winner.PartyId, out var winnerParty))
                         continue;
 
-                    var winnerMapEventParty = FindMapEventParty(mapEvent, winnerParty);
+                    var winnerMapEventParty = mapEvent.FindMapEventParty(winnerParty);
                     if (winnerMapEventParty != null)
                         winnerMapEventParty._contributionToBattle = winner.ContributionToBattle;
                 }
@@ -513,7 +514,7 @@ internal class BattleSimulationRunHandler : IHandler
                     if (!objectManager.TryGetObject<PartyBase>(defeated.PartyId, out var party))
                         continue;
 
-                    var mapEventParty = FindMapEventParty(mapEvent, party);
+                    var mapEventParty = mapEvent.FindMapEventParty(party);
                     if (mapEventParty == null)
                         continue;
 
@@ -538,16 +539,6 @@ internal class BattleSimulationRunHandler : IHandler
 
             roster.AddToCounts(character, casualty.Number, insertAtFront: false, casualty.WoundedNumber);
         }
-    }
-
-    private static MapEventParty FindMapEventParty(MapEvent mapEvent, PartyBase party)
-    {
-        foreach (var side in mapEvent._sides)
-            foreach (var mapEventParty in side.Parties)
-                if (mapEventParty.Party == party)
-                    return mapEventParty;
-
-        return null;
     }
 
     /// <summary>[Client] Server finished simulating: end playback once the queued rounds drain.</summary>
