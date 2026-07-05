@@ -25,7 +25,7 @@ internal class PartyTemplateObjectRegistry : AutoRegistryBase<PartyTemplateObjec
     {
         foreach (var partyTemplateObject in MBObjectManager.Instance.GetObjectTypeList<PartyTemplateObject>())
         {
-            objectManager.AddExisting(partyTemplateObject.StringId, partyTemplateObject);
+            RegisterExistingObject(partyTemplateObject.StringId, partyTemplateObject);
         }
     }
 
