@@ -167,8 +167,6 @@ public class PuppetSpawner : IPuppetSpawner
         agent.FadeIn();
         if (data.Health > 0) agent.Health = data.Health;
 
-        // Without this a puppet's Formation stays null, so its icon and order-targeting never appear on this
-        // client even though the side is fully populated.
         AgentFormationAssigner.Assign(agent);
 
         // Adopt our own hero as the controllable main agent of this mission.
