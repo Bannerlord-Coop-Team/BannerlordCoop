@@ -42,6 +42,9 @@ internal class MobilePartyDebugCommand
         stringBuilder.AppendLine($"MobileParty info for: {SafeToString(mobileParty)}");
         stringBuilder.AppendLine($"StringID: {SafeToString(mobileParty.StringId)}");
         stringBuilder.AppendLine($"Name: {SafeToString(mobileParty.Name)}");
+        stringBuilder.AppendLine($"morale : {mobileParty.Morale}");
+        stringBuilder.AppendLine($"recentmorale : {mobileParty.RecentEventsMorale}");
+        stringBuilder.AppendLine($"unpaidwage : {mobileParty.HasUnpaidWages}");
         stringBuilder.AppendLine();
 
         stringBuilder.AppendLine("Fields:");
