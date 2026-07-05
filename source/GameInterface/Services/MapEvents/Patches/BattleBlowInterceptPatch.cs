@@ -18,6 +18,10 @@ namespace GameInterface.Services.MapEvents.Patches;
 /// Puppets are inert (never attack), so every blow originates from a locally-controlled agent — only the
 /// VICTIM's ownership matters here.
 /// </para>
+/// <para>
+/// Mounts are never registered/puppet-gated themselves, so a blow against a horse is keyed off its rider's
+/// ownership instead.
+/// </para>
 /// </summary>
 [HarmonyPatch(typeof(Agent), nameof(Agent.RegisterBlow))]
 internal class BattleBlowInterceptPatch
@@ -28,10 +32,16 @@ internal class BattleBlowInterceptPatch
         if (!BattleSpawnConfig.Enabled) return true;
         if (!BattleSpawnGate.IsCoopBattleActive) return true;
 
+        if (__instance == null) return true;
+
         // A puppet is an agent this client does not own: own troops are AI-controlled and the own hero is
-        // Player; every replicated puppet is spawned with AgentControllerType.None. Non-puppet victims take
-        // the blow locally as usual.
-        if (__instance == null || !__instance.IsHuman || __instance.Controller != AgentControllerType.None)
+        // Player; every replicated puppet is spawned with AgentControllerType.None. A mount is never itself
+        // registered/puppet-gated, so route it off its rider's ownership instead.
+        bool isMount = !__instance.IsHuman;
+        Agent puppet = isMount ? __instance.RiderAgent : __instance;
+
+        // A masterless horse, or one carrying our own rider, has no ownership conflict — take the blow locally.
+        if (puppet == null || puppet.Controller != AgentControllerType.None)
             return true;
 
         // Suppress locally and route the WHOLE blow (+ collision data) to the puppet's owner, which re-applies
@@ -40,7 +50,7 @@ internal class BattleBlowInterceptPatch
         if (blow.InflictedDamage > 0)
         {
             var attacker = Mission.Current?.FindAgentWithIndex(blow.OwnerId);
-            MessageBroker.Instance.Publish(__instance, new BattlePuppetHit(__instance, attacker, blow, collisionData));
+            MessageBroker.Instance.Publish(__instance, new BattlePuppetHit(puppet, attacker, blow, collisionData, isMount));
         }
         return false;
     }

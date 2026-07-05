@@ -31,12 +31,17 @@ public class NetworkApplyBattleDamage : IEvent
     public Blow Blow { get; }
     [ProtoMember(4)]
     public AttackCollisionData CollisionData { get; }
+    /// <summary>True when the blow targets <see cref="VictimAgentId"/>'s mount, not the rider itself — mounts
+    /// are never registered/puppet-gated, so a mount hit is routed through its rider's ownership instead.</summary>
+    [ProtoMember(5)]
+    public bool IsMount { get; }
 
-    public NetworkApplyBattleDamage(Guid victimAgentId, Guid attackerAgentId, Blow blow, AttackCollisionData collisionData)
+    public NetworkApplyBattleDamage(Guid victimAgentId, Guid attackerAgentId, Blow blow, AttackCollisionData collisionData, bool isMount = false)
     {
         VictimAgentId = victimAgentId;
         AttackerAgentId = attackerAgentId;
         Blow = blow;
         CollisionData = collisionData;
+        IsMount = isMount;
     }
 }

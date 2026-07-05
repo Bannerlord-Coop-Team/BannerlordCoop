@@ -70,14 +70,15 @@ public class BattleDamageRouter : IBattleDamageRouter
             if (payload.What.Attacker != null && registry.TryGetAgentInfo(payload.What.Attacker, out var attackerInfo))
                 attackerId = attackerInfo.AgentId;
 
-            Logger.Information("[DeathDiag] Routing puppet hit to owner {Owner}: victim={Victim}, dmg={Dmg}", victimInfo.CurrentAuthority, victimInfo.AgentId, payload.What.Blow.InflictedDamage);
-            network.SendAll(new NetworkApplyBattleDamage(victimInfo.AgentId, attackerId, payload.What.Blow, payload.What.CollisionData));
+            Logger.Information("[DeathDiag] Routing puppet hit to owner {Owner}: victim={Victim}, dmg={Dmg}, mount={IsMount}", victimInfo.CurrentAuthority, victimInfo.AgentId, payload.What.Blow.InflictedDamage, payload.What.IsMount);
+            network.SendAll(new NetworkApplyBattleDamage(victimInfo.AgentId, attackerId, payload.What.Blow, payload.What.CollisionData, payload.What.IsMount));
         });
     }
 
-    // [Owner] Another client's troop hit one of OUR agents. Re-apply the real blow through Agent.RegisterBlow so
-    // the engine resolves damage, hit reaction, ragdoll and (if lethal) death — the death then flows through
-    // Agent.Die -> BattleAgentDiedPatch -> the normal death/casualty sync. Non-owners ignore it. No synthetic blow.
+    // [Owner] Another client's troop hit one of OUR agents (or, for a mount hit, one of our riders' horses — a
+    // mount is never itself registered, so it's addressed via its rider's agent id). Re-apply the real blow
+    // through Agent.RegisterBlow so the engine resolves damage, hit reaction, ragdoll and (if lethal) death,
+    // which BattleAgentDiedPatch picks up for the normal death/casualty sync. Non-owners ignore it. No synthetic blow.
     private void Handle_NetworkApplyBattleDamage(MessagePayload<NetworkApplyBattleDamage> payload)
     {
         var registry = coopMissionComponent.AgentRegistry;
@@ -87,7 +88,7 @@ public class BattleDamageRouter : IBattleDamageRouter
             if (!registry.TryGetAgentInfo(payload.What.VictimAgentId, out var info)) return;
             if (info.CurrentAuthority != session.OwnControllerId) return;
 
-            var victim = info.Agent;
+            var victim = payload.What.IsMount ? info.Agent?.MountAgent : info.Agent;
             var blow = payload.What.Blow;
             var collisionData = payload.What.CollisionData;
             var attackerId = payload.What.AttackerAgentId;
