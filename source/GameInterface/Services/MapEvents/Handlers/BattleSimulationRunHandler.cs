@@ -349,9 +349,11 @@ internal class BattleSimulationRunHandler : IHandler
 
             mapEventLogger.DebugMapEvent(sim.MapEvent, "Server-side battle simulation finished. BattleState={BattleState}", sim.MapEvent.BattleState);
 
-            // Loot first so the client applies it before the finish closes the playback.
+            // Loot first so the client applies it before the finish closes the playback. Broadcast: every
+            // winning-side player (the pacer or a joiner) needs the loot flow; each client applies it only
+            // if its own party is among the winners.
             if (hasLoot)
-                network.Send(sim.Peer, lootMessage);
+                network.SendAll(lootMessage);
 
             network.SendAll(new NetworkBattleSimulationFinished(mapEventId));
         }
@@ -481,6 +483,14 @@ internal class BattleSimulationRunHandler : IHandler
                 return;
 
             if (!objectManager.TryGetObject<MapEvent>(message.MapEventId, out var mapEvent))
+                return;
+
+            // Broadcast message: only a client whose own party is on the winning side runs the loot flow;
+            // losing or uninvolved spectators ignore it.
+            if (!objectManager.TryGetId(PartyBase.MainParty, out var mainPartyId))
+                return;
+
+            if (message.Winners?.Any(w => w.PartyId == mainPartyId) != true)
                 return;
 
             // Re-applying server-authoritative results; the roster patches must stand down during the apply.
