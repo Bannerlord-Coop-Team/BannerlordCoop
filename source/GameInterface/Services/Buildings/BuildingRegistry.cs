@@ -32,7 +32,7 @@ internal class BuildingRegistry : AutoRegistryBase<Building>
 
             foreach (var building in settlement.Town.Buildings)
             {
-                objectManager.AddExisting(settlement.StringId + "_" + building.BuildingType.ToString(), building);
+                RegisterExistingObject(settlement.StringId + "_" + building.BuildingType.ToString(), building);
             }
         }
     }
