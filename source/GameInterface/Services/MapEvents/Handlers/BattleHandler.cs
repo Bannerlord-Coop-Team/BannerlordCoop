@@ -110,7 +110,8 @@ internal class BattleHandler : IHandler
             // even while neither local encounter reference points at the event, otherwise the mission mode sticks.
             if (mode == BattleStartMode.Unclaimed)
             {
-                BattleModeRegistry.End(mapEventId);
+                if (BattleModeRegistry.End(mapEventId))
+                    RefreshCurrentEncounterMenu();
                 return;
             }
 
@@ -121,9 +122,17 @@ internal class BattleHandler : IHandler
                 return;
 
             BattleModeRegistry.Begin(mapEventId, mode);
+            RefreshCurrentEncounterMenu();
         });
     }
 
+    private static void RefreshCurrentEncounterMenu()
+    {
+        var menuContext = Campaign.Current?.CurrentMenuContext;
+        // The menu can activate before this queued update, so rebuild it with the new mode.
+        if (menuContext?.GameMenu?.StringId == "encounter")
+            menuContext.Refresh();
+    }
 
     private void Handle_MapEventInvolvedPartiesAdded(MessagePayload<MapEventInvolvedPartiesAdded> payload)
     {

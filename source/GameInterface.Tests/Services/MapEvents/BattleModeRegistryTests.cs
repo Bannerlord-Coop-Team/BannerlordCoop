@@ -14,7 +14,7 @@ public class BattleModeRegistryTests
 
         try
         {
-            BattleModeRegistry.End("old-map-event");
+            Assert.False(BattleModeRegistry.End("old-map-event"));
 
             Assert.True(BattleModeRegistry.IsMission("current-map-event"));
         }
@@ -22,5 +22,14 @@ public class BattleModeRegistryTests
         {
             BattleModeRegistry.End();
         }
+    }
+
+    [Fact]
+    public void End_CurrentMapEvent_ClearsModeAndReportsChange()
+    {
+        BattleModeRegistry.Begin("current-map-event", BattleStartMode.Mission);
+
+        Assert.True(BattleModeRegistry.End("current-map-event"));
+        Assert.False(BattleModeRegistry.IsMission("current-map-event"));
     }
 }

@@ -1,4 +1,4 @@
-using GameInterface.Services.MapEvents.Handlers;
+﻿using GameInterface.Services.MapEvents.Handlers;
 
 namespace GameInterface.Services.MapEvents;
 
@@ -29,10 +29,12 @@ internal static class BattleModeRegistry
     public static void End() => mapEventId = null;
 
     /// <summary>Clear the record only if it still belongs to the given map event.</summary>
-    public static void End(string id)
+    public static bool End(string id)
     {
-        if (mapEventId == id)
-            mapEventId = null;
+        if (mapEventId != id) return false;
+
+        mapEventId = null;
+        return true;
     }
 
     /// <summary>True if a live mission owns the given map event.</summary>
