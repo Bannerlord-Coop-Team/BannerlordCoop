@@ -106,16 +106,21 @@ internal class BattleHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            // A retreat briefly tears down the local encounter before reopening its menu. Apply an id-scoped clear
+            // even while neither local encounter reference points at the event, otherwise the mission mode sticks.
+            if (mode == BattleStartMode.Unclaimed)
+            {
+                BattleModeRegistry.End(mapEventId);
+                return;
+            }
+
             if (!objectManager.TryGetObject(mapEventId, out MapEvent mapEvent) || mapEvent == null)
                 return;
 
             if (MobileParty.MainParty?.MapEvent != mapEvent && PlayerEncounter.Battle != mapEvent)
                 return;
 
-            if (mode == BattleStartMode.Unclaimed)
-                BattleModeRegistry.End(mapEventId);
-            else
-                BattleModeRegistry.Begin(mapEventId, mode);
+            BattleModeRegistry.Begin(mapEventId, mode);
         });
     }
 

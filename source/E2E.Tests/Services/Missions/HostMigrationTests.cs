@@ -71,7 +71,12 @@ public class HostMigrationTests : MissionTestEnvironment
     public void LastPlayerDeparts_ReleasesMissionModeForSimulation()
     {
         var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B");
-        EnterBattle(Clients.First(), mapEventId);
+        var client = Clients.First();
+        EnterBattle(client, mapEventId);
+
+        // Model the retreat transition: the mission mode is still recorded, but this harness's main party and
+        // PlayerEncounter do not point at the event while the unclaimed update arrives.
+        client.Call(() => BattleModeRegistry.Begin(mapEventId, BattleStartMode.Mission));
 
         Server.Call(() => Assert.True(ServerBattleModeArbiter.TryClaimMission(mapEventId)));
         Server.NetworkSentMessages.Clear();
@@ -81,6 +86,7 @@ public class HostMigrationTests : MissionTestEnvironment
         var modeChange = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleModeSet>());
         Assert.Equal(mapEventId, modeChange.MapEventId);
         Assert.Equal((int)BattleStartMode.Unclaimed, modeChange.Mode);
+        client.Call(() => Assert.False(BattleModeRegistry.IsMission(mapEventId)));
 
         Server.Call(() =>
         {
