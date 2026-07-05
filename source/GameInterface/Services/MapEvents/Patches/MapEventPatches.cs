@@ -12,9 +12,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
@@ -152,7 +155,9 @@ internal class MapEventPatches
 
         if (__instance.ContainsPlayerParty())
         {
-            __instance.CalculateAndCommitMapEventResults();
+            // Run a custom implementation of MapEvent.CalculateAndCommitMapEventResults that broadcasts results to players
+            var message = new CommitMapEventResults(__instance);
+            MessageBroker.Instance.Publish(__instance, message);
         }
 
         return true;
