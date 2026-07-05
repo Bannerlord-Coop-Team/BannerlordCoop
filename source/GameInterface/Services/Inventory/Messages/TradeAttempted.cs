@@ -20,7 +20,7 @@ public readonly struct TradeAttempted : IEvent
     public readonly CharacterObject InitialCharacterEquipment;
     public readonly int TotalAmount;
     public readonly int MerchantGold;
-    public readonly MobileParty Party;
+    public readonly MobileParty OwnerParty;
     public readonly MobileParty CurrentMobileParty;
     public readonly SettlementComponent CurrentSettlementComponent;
     public readonly List<(ItemRosterElement, int)> BoughtItems;
@@ -37,7 +37,7 @@ public readonly struct TradeAttempted : IEvent
         CharacterObject initialCharacterEquipment,
     int totalAmount,
         int merchantGold,
-        MobileParty party,
+        MobileParty ownerParty,
         MobileParty currentMobileParty,
         SettlementComponent currentSettlementComponent,
         List<(ItemRosterElement, int)> boughtItems,
@@ -53,7 +53,7 @@ public readonly struct TradeAttempted : IEvent
         InitialCharacterEquipment = initialCharacterEquipment;
         TotalAmount = totalAmount;
         MerchantGold = merchantGold;
-        Party = party;
+        OwnerParty = ownerParty;
         CurrentMobileParty = currentMobileParty;
         CurrentSettlementComponent = currentSettlementComponent;
         BoughtItems = boughtItems;

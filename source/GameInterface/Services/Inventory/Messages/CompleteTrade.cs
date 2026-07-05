@@ -37,20 +37,22 @@ internal readonly struct CompleteTrade : ICommand
     [ProtoMember(13)]
     public readonly int MerchantGold;
     [ProtoMember(14)]
-    public readonly string PartyId;
+    public readonly string OwnerPartyId;
     [ProtoMember(15)]
-    public readonly bool IsSettlementComponentNull;
+    public readonly string CurrentMobilePartyId;
     [ProtoMember(16)]
+    public readonly bool IsSettlementComponentNull;
+    [ProtoMember(17)]
     public readonly string CurrentSettlementComponentId;
 
-    [ProtoMember(17)]
-    public readonly (ItemRosterElementData, int)[] BoughtItems;
     [ProtoMember(18)]
+    public readonly (ItemRosterElementData, int)[] BoughtItems;
+    [ProtoMember(19)]
     public readonly (ItemRosterElementData, int)[] SoldItems;
 
-    [ProtoMember(19)]
-    public readonly string TroopRosterId;
     [ProtoMember(20)]
+    public readonly string TroopRosterId;
+    [ProtoMember(21)]
     public readonly TroopRosterData TroopRosterData;
 
     public CompleteTrade(
@@ -67,7 +69,8 @@ internal readonly struct CompleteTrade : ICommand
         string initialHeroId,
         int totalAmount,
         int merchantGold,
-        string partyId,
+        string ownerPartyId,
+        string currentMobilePartyId,
         bool isSettlementComponentNull,
         string currentSettlementComponentId,
         (ItemRosterElementData, int)[] boughtItems,
@@ -88,7 +91,8 @@ internal readonly struct CompleteTrade : ICommand
         InitialHeroId = initialHeroId;
         TotalAmount = totalAmount;
         MerchantGold = merchantGold;
-        PartyId = partyId;
+        OwnerPartyId = ownerPartyId;
+        CurrentMobilePartyId = currentMobilePartyId;
         IsSettlementComponentNull = isSettlementComponentNull;
         CurrentSettlementComponentId = currentSettlementComponentId;
         BoughtItems = boughtItems;

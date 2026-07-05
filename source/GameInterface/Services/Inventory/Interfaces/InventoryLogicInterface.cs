@@ -56,27 +56,20 @@ namespace GameInterface.Services.Inventory.Interfaces
             List<ValueTuple<ItemRosterElement, int>> boughtItems,
             List<ValueTuple<ItemRosterElement, int>> soldItems)
         {
-            GameThread.Run(() =>
+            GameThread.RunSafe(() =>
             {
-                try
-                {
-                    ApplyDoneLogicInternal(
+                ApplyDoneLogicInternal(
                         fromRoster,
                         toRoster,
-                        isTrading, 
+                        isTrading,
                         isDiscardDonating,
-                        ownerHero, 
-                        totalAmount, 
+                        ownerHero,
+                        totalAmount,
                         merchantGold,
                         currentMobileParty,
                         currentSettlementComponent,
                         boughtItems,
                         soldItems);
-                }
-                catch (Exception ex)
-                {
-                    logger.Error(ex, "Failed to {method}", nameof(ApplyDoneLogic));
-                }
             });
         }
 
@@ -105,7 +98,7 @@ namespace GameInterface.Services.Inventory.Interfaces
 
             if (ownerHero.CharacterObject != null && ownerHero != null && isTrading)
             {
-                // Trasnfers gold between player and other party (if party does not have enough gold, sends all gold)
+                // Transfers gold between player and other party (if party does not have enough gold, sends all gold)
                 // Note: Total amount = transactional debt which is negative
                 GiveGoldAction.ApplyBetweenCharacters(null, ownerHero, MathF.Min(-totalAmount, merchantGold), false);
                 if (currentSettlementComponent != null && currentSettlementComponent.IsTown && ownerHero.CharacterObject.GetPerkValue(DefaultPerks.Trade.TrickleDown))
@@ -157,7 +150,6 @@ namespace GameInterface.Services.Inventory.Interfaces
             }
             else if (((currentMobileParty != null) ? currentMobileParty.Party.LeaderHero : null) != null && isTrading)
             {
-                // TODO
                 GiveGoldAction.ApplyBetweenCharacters(null, currentMobileParty.Party.LeaderHero, totalAmount, false);
                 if (currentMobileParty.Party.LeaderHero.CompanionOf != null)
                 {
@@ -166,7 +158,6 @@ namespace GameInterface.Services.Inventory.Interfaces
             }
             else if (partyBase != null && partyBase.LeaderHero == null && isTrading)
             {
-                // TODO
                 GiveGoldAction.ApplyForCharacterToParty(null, partyBase, totalAmount, false);
             }
         }
