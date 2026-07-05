@@ -5,10 +5,10 @@ namespace GameInterface.Services.MapEvents;
 /// <summary>
 /// [Client] The single, server-authoritative record of how the local player's current battle is being resolved — a
 /// live mission or an auto-resolve simulation. Set from the server's <see cref="Messages.Start.NetworkBattleModeSet"/>
-/// broadcast (sent when <c>ServerBattleModeArbiter</c> claims the event for a mode) and cleared when the event
-/// finalizes. The encounter-menu gate (<c>BattleModeEncounterOptionsPatch</c>) reads it to grey out the wrong-mode
-/// options. Replaces the former pair of mission/simulation client flags; <see cref="BattleSimulationReplay"/> keeps
-/// only its playback state now.
+/// broadcast (sent when <c>ServerBattleModeArbiter</c> claims or releases the event) and cleared when the mission is
+/// abandoned or the event finalizes. The encounter-menu gate (<c>BattleModeEncounterOptionsPatch</c>) reads it to
+/// grey out the wrong-mode options. Replaces the former pair of mission/simulation client flags;
+/// <see cref="BattleSimulationReplay"/> keeps only its playback state now.
 /// </summary>
 /// <remarks>
 /// The local player is in at most one battle at a time, so a single id suffices. Touched only on the game main thread.
@@ -27,6 +27,13 @@ internal static class BattleModeRegistry
 
     /// <summary>Clear the record (the battle has ended / the event finalized).</summary>
     public static void End() => mapEventId = null;
+
+    /// <summary>Clear the record only if it still belongs to the given map event.</summary>
+    public static void End(string id)
+    {
+        if (mapEventId == id)
+            mapEventId = null;
+    }
 
     /// <summary>True if a live mission owns the given map event.</summary>
     public static bool IsMission(string id) => mapEventId != null && mapEventId == id && mode == BattleStartMode.Mission;

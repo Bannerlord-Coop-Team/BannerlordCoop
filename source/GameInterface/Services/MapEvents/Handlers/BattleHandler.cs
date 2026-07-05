@@ -112,7 +112,10 @@ internal class BattleHandler : IHandler
             if (MobileParty.MainParty?.MapEvent != mapEvent && PlayerEncounter.Battle != mapEvent)
                 return;
 
-            BattleModeRegistry.Begin(mapEventId, mode);
+            if (mode == BattleStartMode.Unclaimed)
+                BattleModeRegistry.End(mapEventId);
+            else
+                BattleModeRegistry.Begin(mapEventId, mode);
         });
     }
 
