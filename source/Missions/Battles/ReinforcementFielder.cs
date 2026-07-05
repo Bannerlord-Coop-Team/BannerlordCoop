@@ -177,12 +177,7 @@ public class ReinforcementFielder : IReinforcementFielder
         var agent = mission.SpawnAgent(buildData);
         agent.FadeIn();
 
-        if (agent.Character != null && agent.Team != null)
-        {
-            var formation = agent.Team.GetFormation(agent.Character.GetFormationClass());
-            if (formation != null)
-                agent.Formation = formation;
-        }
+        AgentFormationAssigner.Assign(agent);
 
         // Wake the AI exactly as the adopt and NPC-release paths do. Without this the reinforcement is
         // AI-controlled but NOT alarmed and holds stale enemy caches, so it ignores its formation's Charge order

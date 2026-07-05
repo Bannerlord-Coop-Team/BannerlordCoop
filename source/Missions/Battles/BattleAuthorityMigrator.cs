@@ -361,15 +361,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     // coop battle the host fights as a hero, not a general, so nothing would otherwise order it to engage.
     private static void ConvertPuppetToHostAi(Agent agent)
     {
-        if (agent.Character != null && agent.Team != null)
-        {
-            var formation = agent.Team.GetFormation(agent.Character.GetFormationClass());
-            if (formation != null)
-            {
-                agent.Formation = formation;
-                formation.SetControlledByAI(true);
-            }
-        }
+        AgentFormationAssigner.Assign(agent)?.SetControlledByAI(true);
 
         agent.Controller = AgentControllerType.AI;
 
