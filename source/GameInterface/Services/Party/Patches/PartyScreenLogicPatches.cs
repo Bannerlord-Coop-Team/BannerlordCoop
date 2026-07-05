@@ -20,7 +20,12 @@ internal class PartyScreenLogicPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<PartyScreenLogic>();
     [ThreadStatic]
-    public static bool InCommit;
+    private static bool _inCommit;
+    internal static bool InCommit
+    {
+        get => _inCommit;
+        private set => _inCommit = value;
+    }
     [HarmonyPatch(nameof(PartyScreenLogic.DoneLogic))]
     [HarmonyPrefix]
     public static bool DoneLogicPrefix(PartyScreenLogic __instance, ref bool __result, bool isForced)
