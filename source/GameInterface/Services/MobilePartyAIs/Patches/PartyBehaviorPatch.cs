@@ -24,6 +24,11 @@ public static class PartyBehaviorPatch
 {
     static readonly ILogger Logger = LogManager.GetLogger<MobilePartyAi>();
 
+    [ThreadStatic]
+    private static int clientBehaviorCalculationDepth;
+
+    internal static bool IsClientBehaviorCalculation => clientBehaviorCalculationDepth > 0;
+
     /// <summary>
     /// This prevents the tick method being called without the need for an update
     /// Likely speeds the game up quite a bit lmao
@@ -36,6 +41,27 @@ public static class PartyBehaviorPatch
             
         // This disables AI
         return __instance._mobileParty == MobileParty.MainParty;
+    }
+
+    [HarmonyPrefix]
+    [HarmonyPatch("GetBehaviors")]
+    internal static void GetBehaviorsPrefix(out bool __state)
+    {
+        __state = ModInformation.IsClient;
+        if (__state)
+        {
+            clientBehaviorCalculationDepth++;
+        }
+    }
+
+    [HarmonyFinalizer]
+    [HarmonyPatch("GetBehaviors")]
+    internal static void GetBehaviorsFinalizer(bool __state)
+    {
+        if (__state)
+        {
+            clientBehaviorCalculationDepth--;
+        }
     }
 
     [HarmonyPrefix]
@@ -145,5 +171,20 @@ public static class PartyBehaviorPatch
                 Logger.Error(ex, "Failed to update party behavior for {StringId}", mobileParty.StringId);
             }
         }
+    }
+}
+
+/// <summary>
+/// Keeps client AI calculation from applying provisional behavior before the server accepts it.
+/// </summary>
+[HarmonyPatch(typeof(MobileParty), "SetShortTermBehavior")]
+internal static class MobilePartyShortTermBehaviorPatches
+{
+    [HarmonyPrefix]
+    internal static bool SetShortTermBehaviorPrefix()
+    {
+        if (!PartyBehaviorPatch.IsClientBehaviorCalculation) return true;
+
+        return CallOriginalPolicy.IsOriginalAllowed();
     }
 }
