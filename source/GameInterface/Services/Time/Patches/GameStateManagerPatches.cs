@@ -3,6 +3,7 @@ using SandBox.View.Map;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.Time.Patches
 {
@@ -39,6 +40,25 @@ namespace GameInterface.Services.Time.Patches
 
                 if (mapInput != null) mapInput.IsKeysAllowed = keysAllowed;
             }
+        }
+    }
+
+    /// <summary>
+    /// Prevents the inactive campaign map camera from replacing a mission's global audio listener.
+    /// </summary>
+    [HarmonyPatch(typeof(MapCameraView), nameof(MapCameraView.OnBeforeTick))]
+    internal static class MapCameraViewPatches
+    {
+        [HarmonyPrefix]
+        private static bool OnBeforeTickPrefix()
+        {
+            return ShouldTickMapCamera(GameStateManager.Current?.ActiveState);
+        }
+
+        internal static bool ShouldTickMapCamera(TaleWorlds.Core.GameState activeState)
+        {
+            // The map camera writes the global audio listener, which the active mission owns.
+            return activeState is not MissionState;
         }
     }
 }
