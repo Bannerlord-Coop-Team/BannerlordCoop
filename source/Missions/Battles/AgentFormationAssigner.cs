@@ -3,10 +3,10 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Battles;
 
 /// <summary>
-/// The one copy of "slot this agent into its team's formation for its troop class" every spawn path needs.
-/// Vanilla's Alt-hold/order-screen formation marker VM (and order-targeting) key off
-/// <c>Formation.CountOfUnits</c>, which only counts members actually assigned via <c>Agent.Formation</c> — an
-/// agent left off its formation is invisible to both even though it's a real, fighting member of the side.
+/// Slots an agent into its team's formation for its troop class. Vanilla's Alt-hold/order-screen formation
+/// marker VM (and order-targeting) key off <c>Formation.CountOfUnits</c>, which only counts members actually
+/// assigned via <c>Agent.Formation</c> — an agent left off its formation is invisible to both even though
+/// it's a real, fighting member of the side.
 /// </summary>
 public static class AgentFormationAssigner
 {
