@@ -1,4 +1,4 @@
-﻿﻿using GameInterface.Services.MapEvents.TroopSupply;
+﻿using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.Players;
 using HarmonyLib;
 using System;
@@ -16,7 +16,7 @@ namespace GameInterface.Services.UI.Patches;
 /// regardless of who did it.
 /// </summary>
 [HarmonyPatch(typeof(SPGeneralKillNotificationItemVM), MethodType.Constructor,
-    new[] { typeof(Agent), typeof(Agent), typeof(bool), typeof(bool), typeof(bool), typeof(Action<SPGeneralKillNotificationItemVM>) })]
+    typeof(Agent), typeof(Agent), typeof(bool), typeof(bool), typeof(bool), typeof(Action<SPGeneralKillNotificationItemVM>))]
 internal class KillFeedPlayerColorPatch
 {
     [HarmonyPostfix]

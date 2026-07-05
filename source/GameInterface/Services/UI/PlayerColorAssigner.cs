@@ -17,7 +17,6 @@ public static class PlayerColorAssigner
         new Color(0.545f, 0.361f, 0.965f), // violet
         new Color(0.961f, 0.620f, 0.043f), // amber
         new Color(0.024f, 0.714f, 0.831f), // cyan
-        new Color(0.925f, 0.282f, 0.600f), // pink
         new Color(0.980f, 0.800f, 0.082f), // yellow
         new Color(0.388f, 0.400f, 0.945f), // indigo
         new Color(0.078f, 0.722f, 0.651f), // teal
@@ -25,7 +24,6 @@ public static class PlayerColorAssigner
         new Color(0.055f, 0.647f, 0.914f), // sky blue
         new Color(0.659f, 0.333f, 0.969f), // purple
         new Color(0.918f, 0.702f, 0.031f), // gold
-        new Color(0.957f, 0.447f, 0.714f), // light pink
         new Color(0.220f, 0.741f, 0.973f), // light blue
         new Color(0.753f, 0.518f, 0.988f), // light purple
         new Color(0.988f, 0.827f, 0.302f), // light yellow
@@ -40,8 +38,7 @@ public static class PlayerColorAssigner
         return Palette[HashToIndex(controllerId)];
     }
 
-    // FNV-1a: string.GetHashCode() is randomized per process in .NET, so it can't be used here — every
-    // client must derive the same index for the same controllerId, including across reconnects and restarts.
+    // string.GetHashCode() is randomized per process in .NET, so it can't be used here.
     private static int HashToIndex(string controllerId)
     {
         var hash = 2166136261u;
