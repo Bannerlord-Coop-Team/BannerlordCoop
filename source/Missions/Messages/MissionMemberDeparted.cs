@@ -4,9 +4,9 @@ namespace Missions.Messages;
 
 /// <summary>
 /// [Server, local] A controller left or dropped from a mission instance, published once the membership
-/// handler has resolved the controller id and instance id (so it is not a networked message). Battle host
-/// election uses it to promote a successor when the departed controller was the host, or to drop the
-/// controller from the successor line otherwise.
+/// handler has resolved the controller id, instance id, and remaining membership (so it is not a networked
+/// message). Battle host election uses it to promote a successor when the departed controller was the host, or
+/// to drop the controller from the successor line otherwise.
 /// <para>
 /// <see cref="WasRetreat"/> distinguishes a graceful leave (retreat — the player's troops despawned, so the
 /// battle reserve must forget its party for a clean re-spawn on rejoin) from an ungraceful drop (disconnect —
@@ -18,11 +18,13 @@ public readonly struct MissionMemberDeparted : IEvent
     public readonly string ControllerId;
     public readonly string InstanceId;
     public readonly bool WasRetreat;
+    public readonly bool IsInstanceEmpty;
 
-    public MissionMemberDeparted(string controllerId, string instanceId, bool wasRetreat)
+    public MissionMemberDeparted(string controllerId, string instanceId, bool wasRetreat, bool isInstanceEmpty)
     {
         ControllerId = controllerId;
         InstanceId = instanceId;
         WasRetreat = wasRetreat;
+        IsInstanceEmpty = isInstanceEmpty;
     }
 }

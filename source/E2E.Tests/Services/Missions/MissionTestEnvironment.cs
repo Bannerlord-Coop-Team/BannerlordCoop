@@ -133,11 +133,12 @@ public class MissionTestEnvironment : E2ETestEnvironment
     /// publishes <see cref="MissionMemberDeparted"/> on the server, which drives host migration (promote the
     /// next successor) or successor-line cleanup. The promotion broadcast travels the mock campaign network.
     /// </summary>
-    protected void DepartBattle(string controllerId, string mapEventId, bool wasRetreat = false)
+    protected void DepartBattle(string controllerId, string mapEventId, bool wasRetreat = false, bool isInstanceEmpty = false)
     {
         Server.Call(() =>
         {
-            Server.Resolve<IMessageBroker>().Publish(this, new MissionMemberDeparted(controllerId, mapEventId, wasRetreat));
+            Server.Resolve<IMessageBroker>().Publish(this,
+                new MissionMemberDeparted(controllerId, mapEventId, wasRetreat, isInstanceEmpty));
         });
     }
 
