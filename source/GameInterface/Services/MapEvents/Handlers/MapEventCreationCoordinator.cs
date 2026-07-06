@@ -9,6 +9,7 @@ using LiteNetLib;
 using Serilog;
 using System;
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Threading;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -125,14 +126,24 @@ internal class MapEventCreationCoordinator : IHandler
             }
 
             // The MapEvent object is materialized on this client by the AutoRegistry create broadcast, which is
-            // sent just before the reply; keep pumping in case the reply is processed first.
+            // sent just before the reply; keep pumping in case the reply is processed first. Resolving the bare
+            // MapEvent isn't enough: the parties' side attachment lands via separate, GameThread-deferred
+            // messages sent right after, so wait for those on the same deadline too.
             MapEvent mapEvent = null;
+            bool BothSidesAttached() =>
+                attacker.MapEventSide != null && defender.MapEventSide != null
+                && attacker.MapEventSide.Parties.Any(p => p.Party == attacker)
+                && defender.MapEventSide.Parties.Any(p => p.Party == defender)
+                && (mapEvent.AttackerSide == attacker.MapEventSide || mapEvent.DefenderSide == attacker.MapEventSide)
+                && (mapEvent.AttackerSide == defender.MapEventSide || mapEvent.DefenderSide == defender.MapEventSide);
+
             if (!GameThread.WaitWhilePumping(
-                    () => objectManager.TryGetObject(pending.MapEventId, out mapEvent) && mapEvent != null,
+                    () => objectManager.TryGetObject(pending.MapEventId, out mapEvent) && mapEvent != null
+                        && BothSidesAttached(),
                     deadline))
             {
                 Logger.Error(
-                    "Server created map event {MapEventId} but it was not resolvable on this client before timeout. RequestId={RequestId}",
+                    "Server created map event {MapEventId} but it (or the attacker/defender side attachment) was not resolvable on this client before timeout. RequestId={RequestId}",
                     pending.MapEventId, requestId);
                 return null;
             }

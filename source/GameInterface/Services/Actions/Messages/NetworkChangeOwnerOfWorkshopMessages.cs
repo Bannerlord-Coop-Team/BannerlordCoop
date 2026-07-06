@@ -21,9 +21,13 @@ internal readonly struct ChangeWorkshopOwner : ICommand
     [ProtoMember(5)]
     public readonly int Cost;
 
-    public ChangeWorkshopOwner(string workshopId, string newOwnerId, string workshopTypeId, int capital, int cost)
+    [ProtoMember(6)]
+    public readonly string ExpectedOwnerId;
+
+    public ChangeWorkshopOwner(string workshopId, string expectedOwnerId, string newOwnerId, string workshopTypeId, int capital, int cost)
     {
         WorkshopId = workshopId;
+        ExpectedOwnerId = expectedOwnerId;
         NewOwnerId = newOwnerId;
         WorkshopTypeId = workshopTypeId;
         Capital = capital;

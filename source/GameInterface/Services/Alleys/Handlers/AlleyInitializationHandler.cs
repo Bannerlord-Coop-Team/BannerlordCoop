@@ -67,6 +67,14 @@ internal class AlleyInitializationHandler : IHandler
                 if (pair.Value.OverseerId != null) objectManager.TryGetObjectWithLogging(pair.Value.OverseerId, out overseer);
 
                 behaviorInterface.AddOrUpdatePlayerAlleyData(alley, overseer, AlleyGarrisonData.FromData(pair.Value.Garrison, objectManager));
+
+                // Restore an in-progress attack so the confront-alley menu works after joining mid-attack;
+                // no map notice, it would be stale.
+                if (pair.Value.UnderAttackByAlleyId != null &&
+                    objectManager.TryGetObjectWithLogging<Alley>(pair.Value.UnderAttackByAlleyId, out var attacker))
+                {
+                    behaviorInterface.SetPlayerAlleyUnderAttackByAi(alley, attacker, pair.Value.AttackResponseDueDate, showNotification: false);
+                }
             }
         });
     }

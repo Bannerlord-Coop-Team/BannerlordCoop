@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Actions.Messages;
@@ -41,23 +42,55 @@ internal class ChangeOwnerOfWorkshopHandler : IHandler
 
     private void Handle_WorkshopOwnerChanged(MessagePayload<WorkshopOwnerChanged> obj)
     {
-        if (!objectManager.TryGetIdWithLogging(obj.What.Workshop, out var workshopId)) return;
-        if (!objectManager.TryGetIdWithLogging(obj.What.NewOwner, out var newOwnerId)) return;
-        if (!objectManager.TryGetIdWithLogging(obj.What.WorkshopType, out var workshopTypeId)) return;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.Workshop, out var workshopId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.ExpectedOwner, out var expectedOwnerId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.NewOwner, out var newOwnerId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.WorkshopType, out var workshopTypeId)) return;
 
-        var message = new ChangeWorkshopOwner(workshopId, newOwnerId, workshopTypeId, obj.What.Capital, obj.What.Cost);
-        network.SendAll(message);
+            var message = new ChangeWorkshopOwner(workshopId, expectedOwnerId, newOwnerId, workshopTypeId, obj.What.Capital, obj.What.Cost);
+            network.SendAll(message);
+        }, context: nameof(ChangeOwnerOfWorkshopHandler));
     }
-    
+
     private void Handle_ChangeWorkshopOwner(MessagePayload<ChangeWorkshopOwner> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.NewOwnerId, out var newOwner)) return;
-        if (!objectManager.TryGetObjectWithLogging<WorkshopType>(obj.What.WorkshopTypeId, out var workshopType)) return;
+        var peer = obj.Who as NetPeer;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.NewOwnerId, out var newOwner)) return;
+            if (!objectManager.TryGetObjectWithLogging<WorkshopType>(obj.What.WorkshopTypeId, out var workshopType)) return;
 
-        ChangeOwnerOfWorkshopActionPatches.ApplyInternalOverride(workshop, newOwner, workshopType, obj.What.Capital, obj.What.Cost);
+            if (workshop.Owner == newOwner)
+            {
+                SendWorkshopRefresh(peer);
+                return;
+            }
+
+            if (!objectManager.TryGetIdWithLogging(workshop.Owner, out var currentOwnerId) || currentOwnerId != obj.What.ExpectedOwnerId)
+            {
+                Logger.Debug(
+                    "Rejected workshop owner change because owner changed before apply. WorkshopId={WorkshopId}, ExpectedOwnerId={ExpectedOwnerId}, CurrentOwnerId={CurrentOwnerId}, NewOwnerId={NewOwnerId}",
+                    obj.What.WorkshopId,
+                    obj.What.ExpectedOwnerId,
+                    currentOwnerId,
+                    obj.What.NewOwnerId);
+                SendWorkshopRefresh(peer);
+                return;
+            }
+
+            ChangeOwnerOfWorkshopActionPatches.ApplyInternalOverride(workshop, newOwner, workshopType, obj.What.Capital, obj.What.Cost,
+                () => SendWorkshopRefresh(peer));
+        }, context: nameof(ChangeOwnerOfWorkshopHandler));
+    }
+
+    private void SendWorkshopRefresh(NetPeer peer)
+    {
+        if (peer == null) return;
 
         // ClanManagementVM when selling a workshop, also used when changing type of workshop
-        network.Send(obj.Who as NetPeer, new RefreshWorkshopsList());
+        network.Send(peer, new RefreshWorkshopsList());
     }
 }

@@ -1,3 +1,4 @@
+using Common.Messaging;
 using Coop.Core.Server.Services.Instances;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
@@ -58,6 +59,35 @@ public class MissionMembershipTests
         Leave(members[2]);
 
         AssertControllersEquivalent(members.Take(2).ToList());
+    }
+
+    [Fact]
+    public void ClientLeaves_DepartureMarksWhetherInstanceIsEmpty()
+    {
+        var members = SetupClients().Take(2).ToArray();
+        var departures = new List<MissionMemberDeparted>();
+        var messageBroker = TestEnvironment.Server.Resolve<IMessageBroker>();
+        messageBroker.Subscribe<MissionMemberDeparted>(payload => departures.Add(payload.What));
+
+        Join(members[0]);
+        Join(members[1]);
+
+        Leave(members[1]);
+
+        var firstDeparture = Assert.Single(departures);
+        Assert.Equal(members[1].ControllerId, firstDeparture.ControllerId);
+        Assert.Equal(InstanceId, firstDeparture.InstanceId);
+        Assert.True(firstDeparture.WasRetreat);
+        Assert.False(firstDeparture.IsInstanceEmpty);
+
+        departures.Clear();
+        Leave(members[0]);
+
+        var lastDeparture = Assert.Single(departures);
+        Assert.Equal(members[0].ControllerId, lastDeparture.ControllerId);
+        Assert.Equal(InstanceId, lastDeparture.InstanceId);
+        Assert.True(lastDeparture.WasRetreat);
+        Assert.True(lastDeparture.IsInstanceEmpty);
     }
 
     private record Member(EnvironmentInstance Instance, string ControllerId);

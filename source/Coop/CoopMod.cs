@@ -1,6 +1,9 @@
 ﻿using Common;
 using Common.Logging;
+using Common.Messaging;
 using Coop.Core;
+using Coop.Core.Common.Session;
+using Coop.Core.Server.Services.Session;
 using Coop.Lib.NoHarmony;
 using Coop.UI.LoadGameUI;
 using GameInterface;
@@ -34,6 +37,8 @@ namespace Coop
         public static InitialStateOption CoopCampaign;
 
         public static InitialStateOption JoinCoopGame;
+
+        private ManagedServerLifetime managedServerLifetime;
 
         private static ILogger Logger;
 
@@ -72,7 +77,21 @@ namespace Coop
 
             isAutoConnect = args.Any(a => a.Equals("/autoconnect", StringComparison.OrdinalIgnoreCase));
 
+            // GetFullCommandLineString splits on spaces, which would cut a quoted save
+            // name apart; the managed-server arguments need real Windows arg parsing.
+            if (ServerLaunchArguments.TryParse(Environment.GetCommandLineArgs(), out var managedSaveName, out var ownerProcessId))
+            {
+                ManagedServerConfig.SaveName = managedSaveName;
+                ManagedServerConfig.OwnerProcessId = ownerProcessId;
+            }
+
             SetupLogging();
+
+            if (ManagedServerConfig.IsManagedServer)
+            {
+                Logger.Information("[ManagedServer] Spawned by process {OwnerProcessId} to host save '{SaveName}'",
+                    ManagedServerConfig.OwnerProcessId, ManagedServerConfig.SaveName);
+            }
 
             if (isAutoConnect)
             {
@@ -88,6 +107,53 @@ namespace Coop
             GameThread.Instance.MarkGameThread();
         }
 
+        // Held open for the whole process lifetime (never disposed) so the claim can't race with a second
+        // instance's own attempt: a check-then-release probe would leave a window, between our own close and
+        // Serilog's later open of the real log file, where a second process's identical probe could also
+        // succeed. A sidecar lock file kept open under FileShare.None the entire time closes that window, and
+        // is independent of whatever sharing mode Serilog itself uses to open the actual log file.
+        private static FileStream logLockHandle;
+
+        // True if filePath was free (no other live process holds its lock).
+        private static bool TryClaimExclusive(string filePath)
+        {
+            try
+            {
+                logLockHandle = new FileStream(filePath + ".lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose);
+                return true;
+            }
+            catch (IOException)
+            {
+                return false;
+            }
+        }
+
+        // Keep only the newest few process-id-suffixed logs. Each dual-client run mints one under a fresh
+        // pid, so unlike the canonical Coop_{postfix}.log (deleted and recreated every startup) they would
+        // otherwise pile up unbounded. The canonical file has no pid and isn't matched, so it's never touched.
+        private static void PruneProcessSuffixedLogs(string filePostfix)
+        {
+            const int keep = 5;
+            try
+            {
+                // The extension filter guards the .NET quirk where a 3-char pattern extension (.log) also
+                // matches files whose extension merely starts with it, e.g. our own .log.lock sidecar files.
+                var stale = Directory.GetFiles(Directory.GetCurrentDirectory(), $"Coop_{filePostfix}_*.log")
+                    .Where(f => System.IO.Path.GetExtension(f).Equals(".log", StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(File.GetLastWriteTimeUtc)
+                    .Skip(keep);
+                foreach (var file in stale)
+                {
+                    try { File.Delete(file); }
+                    catch (Exception) { /* still open by a live instance, or already gone — skip */ }
+                }
+            }
+            catch (Exception)
+            {
+                // Best effort — log housekeeping must never break startup.
+            }
+        }
+
         private void SetupLogging()
         {
             var outputTemplate = "[({ProcessId}) {Timestamp:HH:mm:ss} {Level:u3} {SourceContext}] {Message:lj}{NewLine}{Exception}";
@@ -95,9 +161,17 @@ namespace Coop
             var filePostfix = isServer ? "server" : "client";
             var filePath = $"Coop_{filePostfix}.log";
 
+            // File.Delete alone can't detect another live instance: it succeeds even on a file another
+            // process still has open, as long as that handle allows shared delete (Serilog's file sink
+            // does), so two same-install clients would silently keep fighting over one file. An exclusive
+            // open is the only check that actually fails when someone else already has the file open.
+            if (!TryClaimExclusive(filePath))
+                filePath = $"Coop_{filePostfix}_{System.Diagnostics.Process.GetCurrentProcess().Id}.log";
+
+            PruneProcessSuffixedLogs(filePostfix);
+
             try
             {
-                // Clear old filepath
                 File.Delete(filePath);
             }
             catch (Exception)
@@ -181,6 +255,13 @@ namespace Coop
         {
             Coop = new CoopartiveMultiplayerExperience();
 
+            // A spawned server manages its own shutdown at process level so the timers outlive
+            // any session-container teardown that would otherwise orphan this game window.
+            if (ManagedServerConfig.IsManagedServer)
+            {
+                managedServerLifetime = new ManagedServerLifetime(MessageBroker.Instance);
+            }
+
             Updateables.Add(GameThread.Instance);
 
 
@@ -262,6 +343,10 @@ namespace Coop
         {
             base.OnGameEnd(game);
 
+            // The managed-server lifetime is intentionally NOT disposed here: OnGameEnd runs while
+            // returning to the menu, before ServerRunningState publishes EndCoopMode, so disposing
+            // now would drop the save-and-quit. It spans the process and is reaped when it quits.
+
             if (Coop.Running)
             {
                 Coop.Dispose();
@@ -270,6 +355,7 @@ namespace Coop
 
         private bool m_IsFirstTick = true;
         private bool _autoStarted = false;
+        private bool steamBootAttempted = false;
         protected override void OnApplicationTick(float dt)
         {
             if(m_IsFirstTick)
@@ -283,16 +369,49 @@ namespace Coop
                 m_IsFirstTick = false;
             }
 
+            // Boot Steam services once the main menu is up, so a +connect_lobby launch resolves while joining is possible.
+            if (!steamBootAttempted && GameStateManager.Current?.ActiveState is InitialState)
+            {
+                steamBootAttempted = true;
+                SteamIntegrationBoot.TryStart(isServer, Utilities.GetFullCommandLineString());
+            }
+
             TimeSpan frameTime = TimeSpan.FromSeconds(dt);
             Updateables.UpdateAll(frameTime);
+
+            TryManagedServerAutoStart();
 
 #if DEBUG
             TryAutoConnect();
 #endif
         }
 
+        private bool _managedAutoStarted = false;
+        private void TryManagedServerAutoStart()
+        {
+            // Keyed on the auto-load save, not the managed flag: a manually launched
+            // /coopsave server also auto-loads, it just isn't lifetime-managed.
+            if (!isServer || !ManagedServerConfig.HasAutoLoadSave || _managedAutoStarted) return;
+            if (!(GameStateManager.Current?.ActiveState is InitialState)) return;
+
+            _managedAutoStarted = true;
+            Logger.Information("[ManagedServer] InitialState active — hosting save '{SaveName}'", ManagedServerConfig.SaveName);
+
+            try
+            {
+                Coop.StartAsServer(ManagedServerConfig.SaveName);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "[ManagedServer] Exception during auto-start");
+            }
+        }
+
         private void TryAutoConnect()
         {
+            // The auto-load-save start path owns this process's startup.
+            if (ManagedServerConfig.HasAutoLoadSave) return;
+
             if (isAutoConnect && !_autoStarted && GameStateManager.Current?.ActiveState is InitialState)
             {
                 _autoStarted = true;

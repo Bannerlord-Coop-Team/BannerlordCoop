@@ -7,10 +7,12 @@ namespace GameInterface.Tests.Serialization;
 
 public class NetworkBattleModeSetSerializationTest
 {
-    [Fact]
-    public void RoundTrip_PreservesFields()
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void RoundTrip_PreservesFields(int mode)
     {
-        var original = new NetworkBattleModeSet("mapEvent-7", 1);
+        var original = new NetworkBattleModeSet("mapEvent-7", mode);
 
         byte[] bytes;
         using (var ms = new MemoryStream())
@@ -28,6 +30,6 @@ public class NetworkBattleModeSetSerializationTest
         }
 
         Assert.Equal("mapEvent-7", result.MapEventId);
-        Assert.Equal(1, result.Mode);
+        Assert.Equal(mode, result.Mode);
     }
 }

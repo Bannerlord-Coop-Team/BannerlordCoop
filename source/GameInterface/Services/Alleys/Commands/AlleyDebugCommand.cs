@@ -124,6 +124,32 @@ public class AlleyDebugCommand
         return $"Abandoned alley [{args[1]}] in {alley.Settlement.Name}";
     }
 
+    [CommandLineArgumentFunction("daily_tick", "coop.debug.alley")]
+    public static string DailyTick(List<string> args)
+    {
+        if (ModInformation.IsClient) return "Run coop.debug.alley.daily_tick on the server (host) only";
+
+        // Run one server daily alley pass now instead of waiting for a game day (troop decay, overseer XP,
+        // dead-leader/timeout destroy, and the 1.5% attack roll over every player-owned alley).
+        MessageBroker.Instance.Publish(null, new AlleyDailyTickTriggered());
+        return "Ran the server alley daily tick once";
+    }
+
+    [CommandLineArgumentFunction("attack", "coop.debug.alley")]
+    public static string Attack(List<string> args)
+    {
+        if (ModInformation.IsClient) return "Run coop.debug.alley.attack on the server (host) only";
+        if (args.Count != 2) return "Usage: coop.debug.alley.attack <settlementId> <alleyIndex>";
+
+        if (!TryGetAlley(args[0], args[1], out var alley, out _, out var error)) return error;
+        if (alley.Owner == null || alley.Owner.IsGangLeader) return "Alley is not player-owned; only a player alley can be attacked";
+
+        // Force an AI attack now (bypasses the daily roll). Needs a gang-occupied rival alley in the same
+        // settlement to attack from; if there is none nothing happens (check coop.debug.alley.list).
+        MessageBroker.Instance.Publish(alley, new ForceAlleyAttackRequested(alley));
+        return $"Started an AI attack on alley [{args[1]}] in {alley.Settlement.Name}; the owner must go defend it";
+    }
+
     [CommandLineArgumentFunction("info", "coop.debug.alley")]
     public static string Info(List<string> args)
     {

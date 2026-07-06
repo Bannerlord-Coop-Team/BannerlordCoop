@@ -2,14 +2,8 @@
 using GameInterface.CoopSessionData;
 using GameInterface.CoopSessionData.Save.Data;
 using GameInterface.Registry.Messages;
-using GameInterface.Services.Alleys;
-using GameInterface.Services.Caravans;
 using GameInterface.Services.Heroes.Messages;
-using GameInterface.Services.MobileParties;
 using GameInterface.Services.Players;
-using GameInterface.Services.Players.Data;
-using GameInterface.Services.Smithing;
-using GameInterface.Services.Workshops;
 using System.Linq;
 
 namespace Coop.Core.Server.Services.Save.Handlers;
@@ -53,15 +47,16 @@ internal class SaveGameHandler : IHandler
     {
         var saveName = obj.What.SaveName;
         var current = coopSessionProvider.CoopSession;
+        var empty = CoopSession.Empty;
 
         CoopSession session = new CoopSession(
             saveName,
             playerRegistry.Players.ToArray(),
-            current?.CraftingPlayerData ?? new CraftingPlayerData(new(), new(), new()),
-            current?.WorkshopPlayerData ?? new WorkshopPlayerData(new()),
-            current?.CaravansPlayerData ?? new CaravansPlayerData(new(), new()),
-            current?.AlleyPlayerData ?? new AlleyPlayerData(new()),
-            current?.InteractionsPlayerData ?? new InteractionsPlayerData(new(), new(), new(), new()));
+            current?.CraftingPlayerData ?? empty.CraftingPlayerData,
+            current?.WorkshopPlayerData ?? empty.WorkshopPlayerData,
+            current?.CaravansPlayerData ?? empty.CaravansPlayerData,
+            current?.AlleyPlayerData ?? empty.AlleyPlayerData,
+            current?.InteractionsPlayerData ?? empty.InteractionsPlayerData);
 
         coopSessionProvider.CoopSession = session;
 
@@ -72,15 +67,16 @@ internal class SaveGameHandler : IHandler
     private void Handle_GameLoaded(MessagePayload<GameLoaded> obj)
     {
         var loaded = saveManager.LoadCoopSession(obj.What.SaveName);
+        var empty = CoopSession.Empty;
 
         savedSession = new CoopSession(
             loaded?.UniqueGameId ?? obj.What.SaveName,
-            loaded?.Players ?? new Player[0],
-            loaded?.CraftingPlayerData ?? new CraftingPlayerData(new(), new(), new()),
-            loaded?.WorkshopPlayerData ?? new WorkshopPlayerData(new()),
-            loaded?.CaravansPlayerData ?? new CaravansPlayerData(new(), new()),
-            loaded?.AlleyPlayerData ?? new AlleyPlayerData(new()),
-            loaded?.InteractionsPlayerData ?? new InteractionsPlayerData(new(), new(), new(), new()));
+            loaded?.Players ?? empty.Players,
+            loaded?.CraftingPlayerData ?? empty.CraftingPlayerData,
+            loaded?.WorkshopPlayerData ?? empty.WorkshopPlayerData,
+            loaded?.CaravansPlayerData ?? empty.CaravansPlayerData,
+            loaded?.AlleyPlayerData ?? empty.AlleyPlayerData,
+            loaded?.InteractionsPlayerData ?? empty.InteractionsPlayerData);
 
         coopSessionProvider.CoopSession = savedSession;
     }
