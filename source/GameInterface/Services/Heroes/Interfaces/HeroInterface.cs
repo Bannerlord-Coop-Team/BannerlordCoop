@@ -138,7 +138,13 @@ internal class HeroInterface : IHeroInterface
         party.IsVisible = true;
 
         party.CheckPositionsForMapChangeAndUpdateIfNeeded();
-        MobilePartyVisualManager.Current.AddNewPartyVisualForParty(party);
+
+        // Headless hosts run without the SandBox.View layer, so the visual manager is null there
+        // and party visuals are optional (same contract as PartyBaseExtensions.GetPartyVisual).
+        // An unguarded call here aborts the whole hero setup before its network ids are assigned.
+        if (MobilePartyVisualManager.Current != null)
+            MobilePartyVisualManager.Current.AddNewPartyVisualForParty(party);
+
         CampaignEventDispatcher.Instance.OnPartyVisibilityChanged(party.Party);
 
         // Add to game managed lists

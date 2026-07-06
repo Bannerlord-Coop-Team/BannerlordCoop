@@ -125,6 +125,15 @@ namespace ServerHeadless
                 }
 
                 TestServerSave();
+
+                // Interactive operator console: game console commands typed on stdin are queued
+                // here and executed on this (game-loop) thread inside TickCampaign.
+                HeadlessConsole.Start(() =>
+                {
+                    Console.WriteLine("[ServerHeadless] Shutdown requested (console). Stopping game loop...");
+                    Shutdown.Cancel();
+                });
+
                 TickCampaign();
             }
             catch (OperationCanceledException)
@@ -362,6 +371,9 @@ namespace ServerHeadless
 
                     // Pump the Coop server's main-thread work queue (network handlers etc.).
                     CoopServerLauncher.PumpGameLoop(TimeSpan.FromSeconds(dt));
+
+                    // Execute any console commands typed since the last tick (game-thread only).
+                    HeadlessConsole.PumpCommands();
                 }
                 catch (Exception ex)
                 {
