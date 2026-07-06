@@ -85,8 +85,6 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), nameof(Agent.FadeOut), nameof(Agent_FadeOut));
         // Mount identity (#1750): registration, routing and death sync read the rider/mount relationship;
         // the movement sync's SyncMountState also assigns MountAgent and reads HasMount.
-        Prefix(typeof(Agent), "get_IsMount", nameof(Agent_get_IsMount));
-        Prefix(typeof(Agent), "get_RiderAgent", nameof(Agent_get_RiderAgent));
         Prefix(typeof(Agent), "get_HasMount", nameof(Agent_get_HasMount));
         Prefix(typeof(Agent), "set_MountAgent", nameof(Agent_set_MountAgent));
         // MakeDead kills broadcast deaths (PuppetDeathApplier) — pin the full (bool, ActionIndexCache, int)
@@ -404,20 +402,6 @@ public sealed class MissionEngineFixture : IDisposable
         // registered-horse-spared-vs-unregistered-horse-cascaded death paths are assertable.
         if (hideMount && m.MountAgent != null && AgentMirror.TryGet(m.MountAgent, out var horse))
             horse.IsActive = false;
-        return false;
-    }
-
-    private static bool Agent_get_IsMount(Agent __instance, ref bool __result)
-    {
-        if (!AgentMirror.TryGet(__instance, out var m)) return true;
-        __result = m.IsMount;
-        return false;
-    }
-
-    private static bool Agent_get_RiderAgent(Agent __instance, ref Agent __result)
-    {
-        if (!AgentMirror.TryGet(__instance, out var m)) return true;
-        __result = m.RiderAgent;
         return false;
     }
 

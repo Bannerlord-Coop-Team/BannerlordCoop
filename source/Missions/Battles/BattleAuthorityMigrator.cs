@@ -433,12 +433,14 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     }
 
     // Turn an inert puppet (driven only by replicated movement) into a real AI combatant under the host's
-    // command: place it in its team's formation for its troop class and hand it to the engine AI so it
-    // maneuvers and fights like the host's own AI troops. The formation is set AI-controlled because in a
+    // command: keep the formation slot its owner placed it in (mirrored at spawn) and hand it to the engine AI
+    // so it maneuvers and fights like the host's own AI troops. The formation is set AI-controlled because in a
     // coop battle the host fights as a hero, not a general, so nothing would otherwise order it to engage.
     private void ConvertPuppetToHostAi(Agent agent)
     {
-        formationAssigner.Assign(agent)?.SetControlledByAI(true);
+        // Fall back to the troop-class default only if the puppet has no formation yet.
+        var formation = agent.Formation ?? formationAssigner.Assign(agent);
+        formation?.SetControlledByAI(true);
 
         agent.Controller = AgentControllerType.AI;
 
