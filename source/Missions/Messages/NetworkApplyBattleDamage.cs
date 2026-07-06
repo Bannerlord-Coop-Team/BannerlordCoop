@@ -31,8 +31,9 @@ public class NetworkApplyBattleDamage : IEvent
     public Blow Blow { get; }
     [ProtoMember(4)]
     public AttackCollisionData CollisionData { get; }
-    /// <summary>True when the blow targets <see cref="VictimAgentId"/>'s mount, not the rider itself — mounts
-    /// are never registered/puppet-gated, so a mount hit is routed through its rider's ownership instead.</summary>
+    /// <summary>True when the blow targets <see cref="VictimAgentId"/>'s mount, not the rider itself. Fallback
+    /// path only: a REGISTERED mount is routed by its own id (IsMount stays false); an unregistered horse is
+    /// keyed off its rider's id and the owner resolves the rider's current MountAgent at apply time.</summary>
     [ProtoMember(5)]
     public bool IsMount { get; }
 

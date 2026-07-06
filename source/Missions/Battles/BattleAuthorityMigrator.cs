@@ -145,17 +145,23 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
             }
 
             int despawned = 0;
+            var despawnedRiders = new HashSet<Agent>();
             foreach (var info in registry.GetAgents(controllerId))
             {
                 var agent = info.Agent;
-                if (agent == null || !IsOwnPartyAgent(agent, playerParty, playerHero)) continue;
+                if (agent == null || agent.IsMount || !IsOwnPartyAgent(agent, playerParty, playerHero)) continue;
 
                 if (agent.IsActive())
                     agent.FadeOut(false, true);
                 registry.RemoveAgent(info.AgentId);
                 casualties.Forget(info.AgentId);
+                despawnedRiders.Add(agent);
                 despawned++;
             }
+
+            // Only the mounts of the riders that just withdrew: the host's AI cavalry horses stay registered
+            // so the promoted successor adopts them (authority transfer) along with their riders.
+            CleanUpDepartedMounts(controllerId, despawnedRiders, allMounts: false);
 
             if (despawned > 0)
                 Logger.Information("[BattleSync] Despawned {Count} retreating own-party troop(s) of host {Controller}", despawned, controllerId);
@@ -188,22 +194,60 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
 
             var playerSide = Mission.Current.PlayerTeam.Side;
             int despawned = 0;
+            var despawnedRiders = new HashSet<Agent>();
             foreach (var info in troops)
             {
                 var agent = info.Agent;
-                if (agent == null || agent.Team == null || agent.Team.Side != playerSide)
+                if (agent == null || agent.IsMount || agent.Team == null || agent.Team.Side != playerSide)
                     continue;
 
                 if (agent.IsActive())
                     agent.FadeOut(false, true);
                 registry.RemoveAgent(info.AgentId);
                 casualties.Forget(info.AgentId);
+                despawnedRiders.Add(agent);
                 despawned++;
             }
+
+            // A non-host owns nothing but its own party, and nobody adopts a retreater — clear ALL its
+            // registered mounts so none stays routed to a controller that no longer answers.
+            CleanUpDepartedMounts(controllerId, despawnedRiders, allMounts: true);
 
             if (despawned > 0)
                 Logger.Information("[BattleSync] Despawned {Count} retreating troop(s) of {Controller}", despawned, controllerId);
         });
+    }
+
+    // [Game thread] Clean up a departed controller's registered MOUNTS. A horse registered to a controller
+    // that no longer answers would be unkillable everywhere (hits on it route to its authority), so its
+    // registry entries must not outlive it: the horses whose riders withdrew here (or that stand masterless)
+    // fade out with the party; one that a LIVE rider of another owner took over is only deregistered, falling
+    // back to rider-keyed damage routing. With allMounts false, only the withdrawn riders' horses are touched —
+    // the rest stay registered for the adoption path (a promoted successor takes them over).
+    private void CleanUpDepartedMounts(string controllerId, HashSet<Agent> despawnedRiders, bool allMounts)
+    {
+        var registry = coopMissionComponent.AgentRegistry;
+
+        int removed = 0;
+        foreach (var info in registry.GetAgents(controllerId))
+        {
+            var agent = info.Agent;
+            if (agent == null || !agent.IsMount) continue;
+
+            var rider = agent.RiderAgent;
+            bool riderWithdrew = rider != null && despawnedRiders.Contains(rider);
+            if (!allMounts && !riderWithdrew) continue;
+
+            bool ridden = rider != null && rider.IsActive() && !riderWithdrew;
+            if (!ridden && agent.IsActive())
+                agent.FadeOut(false, true);
+
+            registry.RemoveAgent(info.AgentId);
+            removed++;
+        }
+
+        if (removed > 0)
+            Logger.Information("[BattleSync] Cleaned up {Count} registered mount(s) of departed {Controller}", removed, controllerId);
     }
 
     // [Host] A player left/dropped from this battle. Their troops must not vanish: the current host adopts
@@ -258,7 +302,8 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
             foreach (var info in registry.GetAgents(controllerId))
             {
                 // A retreating host's own-party troop — it withdraws (despawned), so it is not ours to adopt.
-                if (retreatedParty != null && info.Agent != null && IsOwnPartyAgent(info.Agent, retreatedParty, retreatedHero))
+                // Neither is the horse under such a troop: it fades out with its rider (CleanUpDepartedMounts).
+                if (retreatedParty != null && info.Agent != null && IsRetreatersAgent(info.Agent, retreatedParty, retreatedHero))
                     continue;
                 adopted.Add(info);
             }
@@ -289,6 +334,10 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
                     // so forget that too.
                     interpolator.Forget(agent);
                     if (agent.MountAgent != null) interpolator.Forget(agent.MountAgent);
+
+                    // An adopted MOUNT only changes authority (damage routing + death broadcast now answer to
+                    // us) — it is not a combatant: no AI controller, no formation, no wake.
+                    if (agent.IsMount) continue;
 
                     ConvertPuppetToHostAi(agent);
                     if (agent.Controller == AgentControllerType.AI) aiCount++;
@@ -349,6 +398,15 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         return agent.Origin is CoopAgentOrigin origin && origin.Party == playerParty;
     }
 
+    // An agent that withdraws with the retreating player rather than being adopted: an own-party troop, or the
+    // horse one of them is riding (a horse has no origin party of its own — it follows its rider out).
+    private static bool IsRetreatersAgent(Agent agent, PartyBase playerParty, Hero playerHero)
+    {
+        if (agent.IsMount)
+            return agent.RiderAgent is Agent rider && IsOwnPartyAgent(rider, playerParty, playerHero);
+        return IsOwnPartyAgent(agent, playerParty, playerHero);
+    }
+
     // [Owner, game thread] Ask the server for our current owned reserve (after adopting a departed owner's
     // parties). The reply re-sets our suppliers at the ledger pointers.
     private void RequestReserves()
@@ -371,9 +429,9 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         // Wake the AI the same way the NPC-release path does. Without this an adopted agent is AI-controlled
         // but NOT alarmed and holds stale enemy caches, so it ignores its formation's Charge order and stands
         // idle — the "allied NPCs don't move after host migration" bug. The ally side never goes through the
-        // NPC release (which only frees the ENEMY side), so the adopt path must do the wake itself; adopted
-        // agents are combat troops (the registry only holds riders, never mounts), so the CanWieldWeapon guard
-        // the NPC release uses is unnecessary here.
+        // NPC release (which only frees the ENEMY side), so the adopt path must do the wake itself; only
+        // combat troops reach this conversion (the adoption loop skips registered mounts), so the
+        // CanWieldWeapon guard the NPC release uses is unnecessary here.
         AgentAiWaker.Wake(agent);
     }
 }

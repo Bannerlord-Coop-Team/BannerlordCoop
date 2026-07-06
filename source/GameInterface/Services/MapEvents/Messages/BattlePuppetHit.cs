@@ -13,8 +13,9 @@ namespace GameInterface.Services.MapEvents.Messages;
 /// </summary>
 public record BattlePuppetHit : IEvent
 {
-    /// <summary>The puppet that was hit, or (for a mount hit) the puppet riding it — mounts are never
-    /// registered/puppet-gated themselves, so ownership is always resolved through a rider.</summary>
+    /// <summary>The agent actually struck — a puppet, or (for a mount hit) the horse itself. The router
+    /// resolves a registered victim by its own registry id; an unregistered horse falls back to being routed
+    /// through its rider's id (<see cref="IsMount"/>).</summary>
     public Agent Victim { get; }
     /// <summary>The local attacker, resolved from <c>blow.OwnerId</c>; null if it couldn't be resolved.</summary>
     public Agent Attacker { get; }

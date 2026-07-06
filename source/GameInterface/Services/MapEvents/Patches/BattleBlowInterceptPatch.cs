@@ -19,8 +19,11 @@ namespace GameInterface.Services.MapEvents.Patches;
 /// VICTIM's ownership matters here.
 /// </para>
 /// <para>
-/// Mounts are never registered/puppet-gated themselves, so a blow against a horse is keyed off its rider's
-/// ownership instead.
+/// Mounts are registered with their own identity (see <c>OwnedAgentReplicator</c>/<c>PuppetSpawner</c>), so a
+/// blow against a registered horse is gated by the HORSE's own authority (via
+/// <see cref="BattleSpawnGate.MountAuthorityProbe"/> — this static patch cannot reach the per-mission
+/// registry). That also covers a masterless horse whose rider died. An UNregistered horse (e.g. a loose
+/// native one) falls back to its rider's ownership.
 /// </para>
 /// </summary>
 [HarmonyPatch(typeof(Agent), nameof(Agent.RegisterBlow))]
@@ -34,23 +37,36 @@ internal class BattleBlowInterceptPatch
 
         if (__instance == null) return true;
 
-        // A puppet is an agent this client does not own: own troops are AI-controlled and the own hero is
-        // Player; every replicated puppet is spawned with AgentControllerType.None. A mount is never itself
-        // registered/puppet-gated, so route it off its rider's ownership instead.
         bool isMount = !__instance.IsHuman;
-        Agent puppet = isMount ? __instance.RiderAgent : __instance;
+        if (isMount)
+        {
+            bool? remotelyOwned = BattleSpawnGate.MountAuthorityProbe?.Invoke(__instance);
+            if (remotelyOwned == false) return true; // our registered horse — we are its authority
+            if (remotelyOwned == null)
+            {
+                // Unregistered horse: key off its rider's ownership. A masterless one, or one carrying our
+                // own rider, has no ownership conflict — take the blow locally.
+                var rider = __instance.RiderAgent;
+                if (rider == null || rider.Controller != AgentControllerType.None)
+                    return true;
+            }
+            // remotelyOwned == true → another client's registered horse: suppress and route below.
+        }
+        else
+        {
+            // A puppet is an agent this client does not own: own troops are AI-controlled and the own hero is
+            // Player; every replicated puppet is spawned with AgentControllerType.None.
+            if (__instance.Controller != AgentControllerType.None)
+                return true;
+        }
 
-        // A masterless horse, or one carrying our own rider, has no ownership conflict — take the blow locally.
-        if (puppet == null || puppet.Controller != AgentControllerType.None)
-            return true;
-
-        // Suppress locally and route the WHOLE blow (+ collision data) to the puppet's owner, which re-applies
+        // Suppress locally and route the WHOLE blow (+ collision data) to the victim's owner, which re-applies
         // it through Agent.RegisterBlow so the engine resolves real damage/ragdoll/death. blow.OwnerId is the
         // attacker's LOCAL index here — resolve the agent so the owner can re-map it to its own local index.
         if (blow.InflictedDamage > 0)
         {
             var attacker = Mission.Current?.FindAgentWithIndex(blow.OwnerId);
-            MessageBroker.Instance.Publish(__instance, new BattlePuppetHit(puppet, attacker, blow, collisionData, isMount));
+            MessageBroker.Instance.Publish(__instance, new BattlePuppetHit(__instance, attacker, blow, collisionData, isMount));
         }
         return false;
     }
