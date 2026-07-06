@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Missions.Messages;
@@ -63,8 +63,11 @@ public class PuppetDeathApplier : IPuppetDeathApplier
             Logger.Information("[DeathDiag] Killing puppet {AgentId}: agentPresent={Present}, health={Health}", payload.What.AgentId, agent != null, agent?.Health ?? -1f);
             if (agent != null && agent.Health > 0)
             {
-                agent.MakeDead(false, ActionIndexCache.act_none);
-                agent.FadeOut(false, true);
+                // Dismount first: MakeDead skips the dismount a real death does, so the horse would keep a link to
+                // the dead rider and AVE in native Agent.Die when later killed.
+                if (agent.MountAgent != null)
+                    agent.MountAgent = null;
+                agent.MakeDead(!payload.What.Wounded, ActionIndexCache.act_none);
             }
 
             // Deregister AFTER the kill, INSIDE this game-thread action. We receive this on the network thread,
