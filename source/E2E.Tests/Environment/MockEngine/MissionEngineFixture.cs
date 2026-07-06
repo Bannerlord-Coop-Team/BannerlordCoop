@@ -40,6 +40,9 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Mission), "get_AttackerTeam", nameof(Mission_get_AttackerTeam));
         Prefix(typeof(Mission), "get_DefenderTeam", nameof(Mission_get_DefenderTeam));
         Prefix(typeof(Mission), "get_PlayerEnemyTeam", nameof(Mission_get_PlayerEnemyTeam));
+        // The non-host retreat despawn filters the retreater's troops by the player team's side.
+        Prefix(typeof(Mission), "get_PlayerTeam", nameof(Mission_get_PlayerTeam));
+        Prefix(typeof(Team), "get_Side", nameof(Team_get_Side));
         // GetMissionBehavior<T> walks the mission's behavior list, which a skip-ctor shell doesn't have (NRE).
         // The spawn-capture and deployment paths probe for DeploymentMissionController — answer "none" for mock
         // missions. Reference-type instantiations share one method body, so patching this one covers them all.
@@ -58,6 +61,10 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), "get_Position", nameof(Agent_get_Position));
         Prefix(typeof(Agent), "get_Name", nameof(Agent_get_Name));
         Prefix(typeof(Agent), nameof(Agent.IsActive), nameof(Agent_IsActive));
+        // Puppet classification (LocationPvpBlockPatch): human/mount/rider resolve via the mirror.
+        Prefix(typeof(Agent), "get_IsHuman", nameof(Agent_get_IsHuman));
+        Prefix(typeof(Agent), "get_IsMount", nameof(Agent_get_IsMount));
+        Prefix(typeof(Agent), "get_RiderAgent", nameof(Agent_get_RiderAgent));
 
         // RegisterBlow is overloaded — pin the (Blow, in AttackCollisionData) signature.
         harmony.Patch(
@@ -211,6 +218,20 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
+    private static bool Mission_get_PlayerTeam(Mission __instance, ref Team __result)
+    {
+        if (!MockMission.ForShell(__instance, out var mock)) return true;
+        __result = mock.PlayerTeam?.Shell;
+        return false;
+    }
+
+    private static bool Team_get_Side(Team __instance, ref BattleSideEnum __result)
+    {
+        if (!MockTeam.ForShell(__instance, out var team)) return true;
+        __result = team.Side;
+        return false;
+    }
+
     // ---- Agent shims ----
     private static bool Agent_get_Controller(Agent __instance, ref AgentControllerType __result)
     {
@@ -279,6 +300,27 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
         __result = m.Character?.StringId ?? "mock-agent";
+        return false;
+    }
+
+    private static bool Agent_get_IsHuman(Agent __instance, ref bool __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.IsHuman;
+        return false;
+    }
+
+    private static bool Agent_get_IsMount(Agent __instance, ref bool __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.IsMount;
+        return false;
+    }
+
+    private static bool Agent_get_RiderAgent(Agent __instance, ref Agent __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.RiderAgent;
         return false;
     }
 
