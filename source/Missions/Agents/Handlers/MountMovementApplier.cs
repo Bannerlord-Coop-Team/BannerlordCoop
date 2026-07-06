@@ -38,22 +38,22 @@ public class MountMovementApplier : IPacketHandler
         var movement = (MountMovementPacket)packet;
         if (movement.MountIds == null) return;
 
-        // Resolve the horses to apply (skipping our own) on the network thread, then apply the whole batch
-        // in ONE game-thread action — matching AgentMovementHandler.HandlePacket.
-        var toApply = new List<(Agent horse, AgentMountData data)>();
-        for (int i = 0; i < movement.MountIds.Length; i++)
-        {
-            var mountId = movement.MountIds[i];
-            if (agentRegistry.IsLocallyControlled(mountId)) continue;
-            if (!agentRegistry.TryGetAgentInfo(mountId, out var mountInfo)) continue;
-            toApply.Add((mountInfo.Agent, movement.Mounts[i]));
-        }
-
-        if (toApply.Count == 0) return;
-
         GameThread.RunSafe(() =>
         {
             if (Mission.Current == null) return;
+
+            // Resolve the horses to apply (skipping our own) on the network thread, then apply the whole batch
+            // in ONE game-thread action — matching AgentMovementHandler.HandlePacket.
+            var toApply = new List<(Agent horse, AgentMountData data)>();
+            for (int i = 0; i < movement.MountIds.Length; i++)
+            {
+                var mountId = movement.MountIds[i];
+                if (agentRegistry.IsLocallyControlled(mountId)) continue;
+                if (!agentRegistry.TryGetAgentInfo(mountId, out var mountInfo)) continue;
+                toApply.Add((mountInfo.Agent, movement.Mounts[i]));
+            }
+
+            if (toApply.Count == 0) return;
 
             using (new AllowedThread())
             {

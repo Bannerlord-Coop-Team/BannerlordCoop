@@ -607,4 +607,74 @@ public class BattleMountIdentityTests : MissionTestEnvironment
             BattleSpawnGate.EndBattle();
         }
     }
+
+    /// <summary>A NON-host retreats while a LIVE rider of another owner sits on one of its registered horses
+    /// (e.g. a player who took a loose horse of the retreater's dead cavalry). The horse must not fade —
+    /// someone is riding it — nor fall out of the registry: it transfers to the rider's owner, so horse-keyed
+    /// routing and death sync keep answering. The retreater's own cavalry still withdraws whole.</summary>
+    [Fact]
+    public void NonHostRetreat_TransfersItsForeignRiddenHorse_ToTheRidersOwner()
+    {
+        using var fixture = new MissionEngineFixture();
+        var observer = Clients.First();
+        SetControllerId(observer, "B");
+
+        var ownTroopId = Guid.NewGuid();
+        var ownHorseId = Guid.NewGuid();
+        var riderId = Guid.NewGuid();
+        var takenHorseId = Guid.NewGuid();
+
+        try
+        {
+            observer.Call(() =>
+            {
+                var mock = fixture.CreateMission(observer);
+                var controller = observer.Resolve<CoopBattleController>();
+                var registry = observer.Resolve<INetworkAgentRegistry>();
+
+                controller.Session.TryBegin("mapEvent1");
+                BattleSpawnGate.BeginBattle("mapEvent1");
+
+                // The non-host retreat despawn selects A's troops by the player team's side.
+                mock.PlayerTeam = mock.DefenderTeam;
+
+                BasicCharacterObject character = Game.Current.PlayerTroop;
+
+                // A's own cavalry — rider and horse withdraw together on the retreat.
+                var ownTroop = mock.SpawnAgent(new AgentBuildData(character).Controller(AgentControllerType.None).Team(mock.DefenderTeam.Shell));
+                var ownHorse = mock.SpawnMount(ownTroop);
+                Assert.True(registry.TryRegisterAgent("A", ownTroopId, ownTroop));
+                Assert.True(registry.TryRegisterAgent("A", ownHorseId, ownHorse));
+
+                // OUR rider took one of A's loose horses and is still on it when A leaves.
+                var ourRider = mock.SpawnAgent(new AgentBuildData(character).Controller(AgentControllerType.Player).Team(mock.DefenderTeam.Shell));
+                var takenHorse = mock.SpawnMount(ourRider);
+                Assert.True(registry.TryRegisterAgent("B", riderId, ourRider));
+                Assert.True(registry.TryRegisterAgent("A", takenHorseId, takenHorse));
+
+                // A retreats gracefully; no host assignment names it, so it is a NON-host leave.
+                observer.Resolve<IMessageBroker>().Publish(this, new MissionPeerLeft("A", "mapEvent1"));
+
+                // A's own cavalry withdrew whole: rider and horse faded out and deregistered.
+                Assert.False(registry.TryGetAgentInfo(ownTroopId, out _));
+                Assert.False(registry.TryGetAgentInfo(ownHorseId, out _));
+                Assert.True(AgentMirror.TryGet(ownHorse, out var ownHorseMirror));
+                Assert.False(ownHorseMirror.IsActive);
+
+                // The horse under OUR rider stayed registered and alive — re-keyed to us, not dropped.
+                Assert.True(registry.TryGetAgentInfo(takenHorseId, out var takenInfo));
+                Assert.Equal("B", takenInfo.CurrentAuthority);
+                Assert.True(AgentMirror.TryGet(takenHorse, out var takenHorseMirror));
+                Assert.True(takenHorseMirror.IsActive);
+                Assert.True(AgentMirror.TryGet(ourRider, out var riderMirror));
+                Assert.Same(takenHorse, riderMirror.MountAgent);
+
+                GC.KeepAlive(controller);
+            });
+        }
+        finally
+        {
+            BattleSpawnGate.EndBattle();
+        }
+    }
 }
