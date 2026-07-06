@@ -364,8 +364,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     // coop battle the host fights as a hero, not a general, so nothing would otherwise order it to engage.
     private void ConvertPuppetToHostAi(Agent agent)
     {
-        // Keep the owner's mirrored slot rather than re-deriving by troop class, so authority migration doesn't
-        // collapse the owner's deployment split; fall back to the class default only if it has no formation yet.
+        // Fall back to the troop-class default only if the puppet has no formation yet.
         var formation = agent.Formation ?? formationAssigner.Assign(agent);
         formation?.SetControlledByAI(true);
 
