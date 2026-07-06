@@ -31,12 +31,18 @@ public class NetworkApplyBattleDamage : IEvent
     public Blow Blow { get; }
     [ProtoMember(4)]
     public AttackCollisionData CollisionData { get; }
+    /// <summary>True when the blow targets <see cref="VictimAgentId"/>'s mount, not the rider itself. Fallback
+    /// path only: a REGISTERED mount is routed by its own id (IsMount stays false); an unregistered horse is
+    /// keyed off its rider's id and the owner resolves the rider's current MountAgent at apply time.</summary>
+    [ProtoMember(5)]
+    public bool IsMount { get; }
 
-    public NetworkApplyBattleDamage(Guid victimAgentId, Guid attackerAgentId, Blow blow, AttackCollisionData collisionData)
+    public NetworkApplyBattleDamage(Guid victimAgentId, Guid attackerAgentId, Blow blow, AttackCollisionData collisionData, bool isMount = false)
     {
         VictimAgentId = victimAgentId;
         AttackerAgentId = attackerAgentId;
         Blow = blow;
         CollisionData = collisionData;
+        IsMount = isMount;
     }
 }

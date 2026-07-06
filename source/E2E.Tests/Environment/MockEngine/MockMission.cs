@@ -48,6 +48,10 @@ public sealed class MockMission
     /// <summary>Resolve the mock that owns a given Mission shell (used by the Mission member shims).</summary>
     public static bool ForShell(Mission shell, out MockMission mock) => ByShell.TryGetValue(shell, out mock);
 
+    /// <summary>While true, each <see cref="SpawnAgent"/> also mints a linked horse — models the engine
+    /// spawning a cavalry rider's mount implicitly (from its equipment) inside the same SpawnAgent call.</summary>
+    public bool SpawnMounted { get; set; }
+
     /// <summary>Headless replacement for <see cref="Mission.SpawnAgent"/>: mints a skip-ctor agent, mirrors the
     /// build data, assigns a mission-local index, and tracks it.</summary>
     public Agent SpawnAgent(AgentBuildData buildData)
@@ -61,10 +65,36 @@ public sealed class MockMission
             Team = buildData.AgentTeam,
             Position = buildData.AgentInitialPosition ?? default,
             Origin = buildData.AgentOrigin,
+            Mission = Shell,
         };
         AgentMirror.Bind(agent, mirror);
         agentsByIndex[mirror.Index] = agent;
+        if (SpawnMounted) SpawnMount(agent);
         return agent;
+    }
+
+    /// <summary>Mints a horse agent, optionally seated under <paramref name="rider"/>. Like the engine's
+    /// implicit cavalry mounts it has NO character (<c>Agent.Character</c> null) and Controller None.</summary>
+    public Agent SpawnMount(Agent rider = null)
+    {
+        var horse = ObjectHelper.SkipConstructor<Agent>();
+        var mirror = new MirrorAgent
+        {
+            Index = nextIndex++,
+            Controller = AgentControllerType.None,
+            IsMount = true,
+            Mission = Shell,
+        };
+        AgentMirror.Bind(horse, mirror);
+        agentsByIndex[mirror.Index] = horse;
+
+        if (rider != null && AgentMirror.TryGet(rider, out var riderMirror))
+        {
+            riderMirror.MountAgent = horse;
+            mirror.RiderAgent = rider;
+            mirror.Position = riderMirror.Position;
+        }
+        return horse;
     }
 
     public Agent FindAgentWithIndex(int index) => agentsByIndex.TryGetValue(index, out var a) ? a : null;

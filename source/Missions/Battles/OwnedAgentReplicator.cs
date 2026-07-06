@@ -57,6 +57,13 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
     private readonly ICasualtyAttributionMap casualties;
     private readonly IBattleDeploymentCoordinator deployment;
 
+    // The horse each of our riders SPAWNED with (rider id → mount id), so a record built while the rider is
+    // momentarily dismounted still carries the horse's identity — a joiner's puppet spawns a horse from the
+    // rider's equipment either way, and must map it to the id the rest of the battle already routes by, or
+    // that horse's death broadcast never reaches the joiner. Touched only on the game thread (spawn capture
+    // and record building both run there), so no lock; per-mission (this component is transient).
+    private readonly Dictionary<Guid, Guid> spawnMounts = new Dictionary<Guid, Guid>();
+
     public OwnedAgentReplicator(
         IBattleNetwork network,
         IMessageBroker messageBroker,
@@ -114,13 +121,15 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
     // [Game thread] Build spawn records for the battle agents WE currently own, at their CURRENT positions.
     // <paramref name="ownPartyOnly"/> limits it to the local player's own-party troops — used by the deployment
     // commit, which withholds those until they are placed; the joiner catch-up passes false to replay all we own.
+    // Registered MOUNTS get no record of their own — a horse spawns implicitly with its rider on the receiver,
+    // so its id rides on the rider's record instead (MountAgentId).
     private List<BattleAgentSpawnData> BuildOwnedAgentRecords(bool ownPartyOnly)
     {
         var records = new List<BattleAgentSpawnData>();
         foreach (var info in coopMissionComponent.AgentRegistry.GetAgents(session.OwnControllerId))
         {
             var agent = info.Agent;
-            if (agent == null || !agent.IsActive() || !(agent.Character is CharacterObject character)) continue;
+            if (agent == null || !agent.IsActive() || agent.IsMount || !(agent.Character is CharacterObject character)) continue;
             if (ownPartyOnly && !IsOwnPartyAgent(agent, character)) continue;
 
             // Carried by CharacterObject id, uniform for heroes and troops (hero CharacterObjects are registered).
@@ -132,9 +141,37 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
 
             records.Add(new BattleAgentSpawnData(
                 info.AgentId, characterId, agent.Position, side, agent.Health,
-                session.OwnControllerId, attribution.MapEventPartyId, attribution.TroopSeed, formationIndex));
+                session.OwnControllerId, attribution.MapEventPartyId, attribution.TroopSeed,
+                ResolveMountIdFor(info.AgentId, agent), formationIndex));
         }
         return records;
+    }
+
+    // The registry id of the agent's current mount, or Guid.Empty when on foot / the horse isn't registered
+    // (then the receiver's puppet horse simply stays unregistered and hits on it fall back to rider-keyed routing).
+    private Guid GetRegisteredMountId(Agent agent)
+    {
+        var mount = agent.MountAgent;
+        if (mount != null && coopMissionComponent.AgentRegistry.TryGetAgentInfo(mount, out var mountInfo))
+            return mountInfo.AgentId;
+        return Guid.Empty;
+    }
+
+    // The mount id carried on a rider's record: its CURRENT horse when mounted, else the horse it spawned
+    // with — as long as that one is still registered, alive and riderless (a horse someone else took rides
+    // on THAT rider's record instead). Without the fallback, a rider that happens to be dismounted at
+    // record-build time would strand the joiner's implicitly-spawned horse without the battle's id for it.
+    private Guid ResolveMountIdFor(Guid riderId, Agent rider)
+    {
+        var current = GetRegisteredMountId(rider);
+        if (current != Guid.Empty) return current;
+
+        if (spawnMounts.TryGetValue(riderId, out var spawnMountId)
+            && coopMissionComponent.AgentRegistry.TryGetAgentInfo(spawnMountId, out var mountInfo)
+            && mountInfo.Agent is Agent horse && horse.IsActive() && horse.RiderAgent == null)
+            return spawnMountId;
+
+        return Guid.Empty;
     }
 
     // Whether an agent belongs to the LOCAL player's own party — the troops withheld until deployment commit
@@ -164,6 +201,20 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         var agentId = Guid.NewGuid();
         coopMissionComponent.AgentRegistry.TryRegisterAgent(owner, agentId, agent);
 
+        // A cavalry spawn's horse is already live and linked here (the engine spawns it inside the same
+        // Mission.SpawnAgent call, from the rider's equipment). Register it with its OWN identity under us, so
+        // hits on it route by the horse's id and its death broadcasts like any agent's (issue #1750). Mounts
+        // get no casualty attribution — a horse is not a roster troop.
+        var mountAgentId = Guid.Empty;
+        if (agent.MountAgent is Agent mount)
+        {
+            mountAgentId = Guid.NewGuid();
+            if (!coopMissionComponent.AgentRegistry.TryRegisterAgent(owner, mountAgentId, mount))
+                mountAgentId = Guid.Empty;
+            else
+                spawnMounts[agentId] = mountAgentId;
+        }
+
         // Casualty attribution: the battle-troop origin carries the map-event party and the exact troop
         // descriptor seed the server's OnTroopKilled path keys on. Carry them so we can report the casualty
         // on death (puppets, spawned with a SimpleAgentOrigin, get these from the spawn data).
@@ -185,7 +236,7 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
 
         BattleSideEnum side = agent.Team != null ? agent.Team.Side : BattleSideEnum.None;
         int formationIndex = agent.Formation != null ? (int)agent.Formation.FormationIndex : -1;
-        var data = new BattleAgentSpawnData(agentId, characterId, agent.Position, side, agent.Health, owner, mapEventPartyId, troopSeed, formationIndex);
+        var data = new BattleAgentSpawnData(agentId, characterId, agent.Position, side, agent.Health, owner, mapEventPartyId, troopSeed, mountAgentId, formationIndex);
 
         // Requirement #4 "hidden everywhere until deployed": while we are still placing our own formations our
         // own-party troops are spawned locally (so we can deploy them) but NOT replicated, so other clients never

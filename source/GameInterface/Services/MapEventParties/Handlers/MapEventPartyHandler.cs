@@ -142,9 +142,6 @@ internal class MapEventPartyHandler : IHandler
     {
         var obj = payload.What;
 
-        // OnTroopKilled mutates the roster the game loop reads, so it is deferred to the
-        // main thread. OnTroopKilled is Harmony-patched, so AllowedThread silences the
-        // client prefix to stop it re-running and rebroadcasting in a loop.
         GameThread.Run(() =>
         {
             try
@@ -153,11 +150,18 @@ internal class MapEventPartyHandler : IHandler
                     return;
 
                 var troopDescriptor = new UniqueTroopDescriptor(obj.TroopSeed);
-                var troop = mapEventParty._roster[troopDescriptor].Troop;
 
-                using (new AllowedThread())
+                if (ModInformation.IsServer)
                 {
                     mapEventParty.OnTroopKilled(troopDescriptor);
+                }
+                else
+                {
+                    // Only the scoreboard tally; Party.MemberRoster arrives separately.
+                    using (new AllowedThread())
+                    {
+                        mapEventParty.Troops.OnTroopKilled(troopDescriptor);
+                    }
                 }
             }
             catch (Exception ex)
@@ -183,9 +187,6 @@ internal class MapEventPartyHandler : IHandler
     {
         var obj = payload.What;
 
-        // OnTroopWounded mutates the roster the game loop reads, so it is deferred to the
-        // main thread. OnTroopWounded is Harmony-patched, so AllowedThread silences the
-        // client prefix to stop it re-running and rebroadcasting in a loop.
         GameThread.Run(() =>
         {
             try
@@ -195,9 +196,17 @@ internal class MapEventPartyHandler : IHandler
 
                 var troopDescriptor = new UniqueTroopDescriptor(obj.TroopSeed);
 
-                using (new AllowedThread())
+                if (ModInformation.IsServer)
                 {
                     mapEventParty.OnTroopWounded(troopDescriptor);
+                }
+                else
+                {
+                    // Only the scoreboard tally; Party.MemberRoster arrives separately.
+                    using (new AllowedThread())
+                    {
+                        mapEventParty.Troops.OnTroopWounded(troopDescriptor);
+                    }
                 }
             }
             catch (Exception ex)
@@ -223,9 +232,6 @@ internal class MapEventPartyHandler : IHandler
     {
         var obj = payload.What;
 
-        // OnTroopRouted mutates the roster the game loop reads, so it is deferred to the
-        // main thread. OnTroopRouted is Harmony-patched, so AllowedThread silences the
-        // client prefix to stop it re-running and rebroadcasting in a loop.
         GameThread.Run(() =>
         {
             try
@@ -235,9 +241,18 @@ internal class MapEventPartyHandler : IHandler
 
                 var troopDescriptor = new UniqueTroopDescriptor(obj.TroopSeed);
 
-                using (new AllowedThread())
+                if (ModInformation.IsServer)
                 {
                     mapEventParty.OnTroopRouted(troopDescriptor);
+                }
+                // Only the scoreboard tally (non-hero routs only, matching vanilla);
+                // Party.MemberRoster arrives separately.
+                else if (!mapEventParty.Troops[troopDescriptor].Troop.IsHero)
+                {
+                    using (new AllowedThread())
+                    {
+                        mapEventParty.Troops.OnTroopRouted(troopDescriptor);
+                    }
                 }
             }
             catch (Exception ex)

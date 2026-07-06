@@ -189,6 +189,20 @@ public class PuppetSpawner : IPuppetSpawner
         }
 
         registry.TryRegisterAgent(data.OwnerControllerId, data.AgentId, agent);
+
+        // The owner registered its cavalry's horse with its own network id; our engine spawned a matching
+        // horse implicitly (same equipment) inside SpawnAgent. Register OUR copy under the same id, so mount
+        // hits route by the horse's identity and its death broadcast finds it. No casualty record — a horse
+        // is not a roster troop. If the puppet unexpectedly spawned on foot, the id just stays unmapped here
+        // and hits on the (nonexistent) horse can't occur anyway.
+        if (data.MountAgentId != Guid.Empty)
+        {
+            if (agent.MountAgent is Agent mount)
+                registry.TryRegisterAgent(data.OwnerControllerId, data.MountAgentId, mount);
+            else
+                Logger.Warning("[BattleSync] Spawn record for {AgentId} carries mount {MountId} but the puppet spawned unmounted", data.AgentId, data.MountAgentId);
+        }
+
         // Key the casualty on the troop's CHARACTER through the object manager (never a raw StringId).
         objectManager.TryGetId(character, out var troopCharacterId);
         casualties.Record(data.AgentId, data.MapEventPartyId, data.TroopSeed, troopCharacterId);

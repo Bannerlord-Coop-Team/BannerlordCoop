@@ -52,6 +52,11 @@ public interface IPlayerManager
     /// Resolves the Player currently controlled by a connected peer.
     /// </summary>
     bool TryGetPlayer(NetPeer peer, out Player player);
+
+    /// <summary>
+    /// Checks whether the given player has a connected peer.
+    /// </summary>
+    bool IsConnected(Player player);
 }
 
 /// <inheritdoc cref="IPlayerManager"/>
@@ -155,6 +160,11 @@ public class PlayerManager : IPlayerManager
     public bool TryGetPlayer(NetPeer peer, out Player player)
     {
         return peerToPlayer.TryGetValue(peer, out player);
+    }
+    public bool IsConnected(Player player)
+    {
+        return peerToPlayer.Any(kvp =>
+         kvp.Value == player && kvp.Key.ConnectionState == ConnectionState.Connected);
     }
 }
 
