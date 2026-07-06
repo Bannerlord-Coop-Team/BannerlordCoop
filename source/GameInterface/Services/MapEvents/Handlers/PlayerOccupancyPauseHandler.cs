@@ -2,6 +2,7 @@ using Common;
 using Common.Messaging;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -64,7 +65,16 @@ internal class PlayerOccupancyPauseHandler : IHandler
             if (!objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty))
                 return false;
 
-            return playerParty.MapEvent != null || playerParty.CurrentSettlement != null;
+            return IsPlayerOccupied(playerParty);
         });
+    }
+
+    private static bool IsPlayerOccupied(MobileParty playerParty)
+    {
+        if (playerParty.CurrentSettlement != null)
+            return true;
+
+        return playerParty.MapEvent != null &&
+               playerParty.MapEvent.IsActiveSlowVillageRaid() == false;
     }
 }
