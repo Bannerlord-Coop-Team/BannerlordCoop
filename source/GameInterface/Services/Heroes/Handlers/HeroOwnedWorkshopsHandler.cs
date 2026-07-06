@@ -60,7 +60,10 @@ internal class HeroOwnedWorkshopsHandler : IHandler
         {
             using (new AllowedThread())
             {
-                hero.AddOwnedWorkshop(workshop);
+                if (!hero.OwnedWorkshops.Contains(workshop))
+                {
+                    hero.AddOwnedWorkshop(workshop);
+                }
             }
         });
     }
