@@ -257,7 +257,7 @@ internal class RaidProductionRewardsHandler : IHandler
             return objectManager.TryGetId(item, out itemId);
         }
 
-        if (objectManager.AddExisting(itemId, item) == false)
+        if (!objectManager.AddExisting(itemId, item))
             return false;
 
         return objectManager.TryGetId(item, out itemId);
@@ -284,7 +284,7 @@ internal class RaidProductionRewardsHandler : IHandler
         if (item == null)
             return false;
 
-        if (TryRegisterRewardItem(item, out var registeredItemId) == false)
+        if (!TryRegisterRewardItem(item, out var registeredItemId))
             return false;
 
         if (objectManager.TryGetObject(itemId, out item))

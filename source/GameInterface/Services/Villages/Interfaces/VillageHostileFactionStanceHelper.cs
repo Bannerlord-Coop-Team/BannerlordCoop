@@ -1,4 +1,3 @@
-using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 
@@ -22,7 +21,7 @@ internal static class VillageHostileFactionStanceHelper
         if (faction1 == null || faction2 == null)
             return;
 
-        if (FactionManager.IsAtWarAgainstFaction(faction1, faction2) == false)
+        if (!FactionManager.IsAtWarAgainstFaction(faction1, faction2))
             FactionManager.SetStance(faction1, faction2, StanceType.War);
 
         var stanceLink = FactionManager.Instance.GetStanceLinkInternal(faction1, faction2);
@@ -61,14 +60,7 @@ internal static class VillageHostileFactionStanceHelper
 
     private static bool HasFactionWar(IFaction faction, IFaction otherFaction)
     {
-        try
-        {
-            return faction.FactionsAtWarWith?.Contains(otherFaction) == true;
-        }
-        catch (NullReferenceException)
-        {
-            return false;
-        }
+        return faction.FactionsAtWarWith?.Contains(otherFaction) == true;
     }
 
     private static MBList<IFaction> GetFactionsAtWarWith(IFaction faction)

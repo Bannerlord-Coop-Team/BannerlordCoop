@@ -15,7 +15,7 @@ internal static class RaidAiInterventionSuppression
     public static bool ShouldSuppressParty(MapEventSide side, PartyBase party)
     {
         var mobileParty = party?.MobileParty;
-        if (IsSuppressibleAiParty(mobileParty) == false)
+        if (!IsSuppressibleAiParty(mobileParty))
             return false;
 
         return side?.MapEvent?.IsRaidAiInterventionSuppressed() == true;
@@ -29,10 +29,10 @@ internal static class RaidAiInterventionSuppression
 
     public static bool ShouldSuppressSettlementEncounter(MobileParty party, Settlement settlement)
     {
-        if (IsSuppressibleAiParty(party) == false)
+        if (!IsSuppressibleAiParty(party))
             return false;
 
-        if (IsSuppressedRaidTarget(settlement) == false)
+        if (!IsSuppressedRaidTarget(settlement))
             return false;
 
         HoldParty(party);
@@ -41,7 +41,7 @@ internal static class RaidAiInterventionSuppression
 
     public static bool ShouldSuppressMobilePartyEncounter(MobileParty party)
     {
-        if (IsSuppressibleAiParty(party) == false)
+        if (!IsSuppressibleAiParty(party))
             return false;
 
         if (IsSuppressedRaidTarget(party.ShortTermTargetParty?.Party) ||
@@ -63,7 +63,7 @@ internal static class RaidAiInterventionSuppression
 
     public static void SuppressJoinedDefenders(MapEvent mapEvent)
     {
-        if (mapEvent.IsRaidAiInterventionSuppressed() == false)
+        if (!mapEvent.IsRaidAiInterventionSuppressed())
             return;
 
         var defenderSide = mapEvent.DefenderSide;
@@ -74,7 +74,7 @@ internal static class RaidAiInterventionSuppression
         {
             var mapEventParty = defenderSide._battleParties[i];
             var party = mapEventParty?.Party;
-            if (ShouldSuppressParty(defenderSide, party) == false)
+            if (!ShouldSuppressParty(defenderSide, party))
                 continue;
 
             defenderSide._battleParties.RemoveAt(i);
@@ -98,10 +98,10 @@ internal static class RaidAiInterventionSuppression
 
     private static bool TrySuppressPartyAgainstTarget(MobileParty party, PartyBase target)
     {
-        if (IsSuppressibleAiParty(party) == false)
+        if (!IsSuppressibleAiParty(party))
             return false;
 
-        if (IsSuppressedRaidTarget(target) == false)
+        if (!IsSuppressedRaidTarget(target))
             return false;
 
         HoldParty(party);
@@ -110,9 +110,9 @@ internal static class RaidAiInterventionSuppression
 
     private static bool IsSuppressibleAiParty(MobileParty party)
     {
-        return MapEventConfig.AllowRaidAiIntervention == false &&
+        return !MapEventConfig.AllowRaidAiIntervention &&
                party != null &&
-               party.IsPlayerParty() == false;
+               !party.IsPlayerParty();
     }
 
     private static bool IsSuppressedRaidTarget(PartyBase party)

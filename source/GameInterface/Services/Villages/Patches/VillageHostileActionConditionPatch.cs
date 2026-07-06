@@ -15,7 +15,7 @@ internal static class VillageHostileActionConditionPatch
     public static void ApplySyncedCooldown(MenuCallbackArgs args, bool result)
     {
         if (ModInformation.IsServer) return;
-        if (result == false || args.IsEnabled == false) return;
+        if (!result || !args.IsEnabled) return;
 
         var settlement = Settlement.CurrentSettlement;
         if (settlement == null)

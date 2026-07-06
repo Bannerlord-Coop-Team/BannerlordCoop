@@ -63,7 +63,7 @@ internal class ServerVillageHostileActionHandler : IHandler
 
     private void Handle_NetworkRequestVillageHostileAction(MessagePayload<NetworkRequestVillageHostileAction> payload)
     {
-        if (!ModInformation.IsServer) return;
+        if (ModInformation.IsClient) return;
 
         if (!(payload.Who is NetPeer peer))
         {
@@ -155,14 +155,14 @@ internal class ServerVillageHostileActionHandler : IHandler
 
     private void Handle_VillageHostileActionCooldownsChanged(MessagePayload<VillageHostileActionCooldownsChanged> payload)
     {
-        if (!ModInformation.IsServer) return;
+        if (ModInformation.IsClient) return;
 
         network.SendAll(new NetworkVillageHostileActionCooldowns(payload.What.Cooldowns ?? Array.Empty<VillageHostileActionCooldownData>()));
     }
 
     private void Handle_PlayerCampaignEntered(MessagePayload<PlayerCampaignEntered> payload)
     {
-        if (!ModInformation.IsServer) return;
+        if (ModInformation.IsClient) return;
 
         GameThread.RunSafe(
             () => SendJoinSnapshots(payload.What.playerId),

@@ -284,7 +284,7 @@ internal class MapEventSideDataHandler : IHandler
         if (ModInformation.IsServer)
             return;
 
-        if (mapEvent.IsRaidHostileAction() == false || mapEvent.IsActiveSlowVillageRaid())
+        if (!mapEvent.IsRaidHostileAction() || mapEvent.IsActiveSlowVillageRaid())
             return;
 
         if (MobileParty.MainParty?.MapEvent != mapEvent)

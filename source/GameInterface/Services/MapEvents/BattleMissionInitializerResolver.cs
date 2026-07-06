@@ -26,7 +26,7 @@ internal class BattleMissionInitializerResolver : IBattleMissionInitializerResol
     {
         foreach (var initializer in initializers)
         {
-            if (initializer.CanHandle(mapEvent) == false)
+            if (!initializer.CanHandle(mapEvent))
                 continue;
 
             Logger.Information("[BattleSync] Using {Initializer} for battle mission initializer", initializer.GetType().Name);

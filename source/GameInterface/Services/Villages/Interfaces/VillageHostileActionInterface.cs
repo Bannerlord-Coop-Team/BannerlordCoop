@@ -145,7 +145,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface
             return false;
         }
 
-        if (!mobileParty.IsActive || mobileParty.Party.IsActive == false || mobileParty.LeaderHero?.IsPrisoner == true)
+        if (!mobileParty.IsActive || !mobileParty.Party.IsActive || mobileParty.LeaderHero?.IsPrisoner == true)
         {
             reason = VillageHostileActionDeniedReason.InvalidRequester;
             return false;
@@ -158,7 +158,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface
     {
         reason = VillageHostileActionDeniedReason.Invalid;
 
-        if (settlement == null || settlement.IsVillage == false || settlement.Village == null || settlement.Party == null)
+        if (settlement == null || !settlement.IsVillage || settlement.Village == null || settlement.Party == null)
         {
             reason = VillageHostileActionDeniedReason.NonVillageSettlement;
             return false;
@@ -201,7 +201,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface
             return false;
         }
 
-        if (allowPendingApproval == false && HasPendingHostileActionApproval(settlement))
+        if (!allowPendingApproval && HasPendingHostileActionApproval(settlement))
         {
             reason = VillageHostileActionDeniedReason.AlreadyInMapEvent;
             return false;
@@ -448,7 +448,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface
         {
             settlement.SettlementHitPoints *= 0.2f;
         }
-        SkillLevelingManager.OnForceSupplies(mobileParty, lootedItems, mapEvent.IsPlayerMapEvent == false);
+        SkillLevelingManager.OnForceSupplies(mobileParty, lootedItems, !mapEvent.IsPlayerMapEvent);
     }
 
     private void ApplyForceVolunteersOutcome(MobileParty mobileParty, Settlement settlement)
@@ -585,7 +585,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface
         var removed = false;
         foreach (var pair in approvedMapEventStarts)
         {
-            if (pair.Value.SettlementId != settlementId || pair.Value.IsExpired == false)
+            if (pair.Value.SettlementId != settlementId || !pair.Value.IsExpired)
                 continue;
 
             if (approvedMapEventStarts.TryRemove(pair.Key, out _))
@@ -600,7 +600,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface
     {
         foreach (var pair in approvedMapEventStarts)
         {
-            if (pair.Value.SettlementId == settlementId && pair.Value.IsExpired == false)
+            if (pair.Value.SettlementId == settlementId && !pair.Value.IsExpired)
                 return;
         }
 

@@ -26,7 +26,7 @@ internal class RaidJoinEncounterConditionPatch
     private static void Postfix(MethodBase __originalMethod, MenuCallbackArgs args, ref bool __result)
     {
         var mapEvent = PlayerEncounter.EncounteredBattle;
-        if (mapEvent.IsActiveSlowVillageRaid() == false)
+        if (!mapEvent.IsActiveSlowVillageRaid())
             return;
 
         if (!RaidJoinEncounterPatch.TryGetJoinSide(__originalMethod, out _))
@@ -55,7 +55,7 @@ internal class RaidJoinEncounterPatch
 
         var mapEvent = PlayerEncounter.EncounteredBattle;
         var mainParty = MobileParty.MainParty?.Party;
-        if (mapEvent.IsRaidHostileAction() == false || mainParty == null)
+        if (!mapEvent.IsRaidHostileAction() || mainParty == null)
             return true;
 
         if (mapEvent.IsActiveSlowVillageRaid())
@@ -80,7 +80,7 @@ internal class RaidJoinEncounterPatch
             return;
         }
 
-        if (mapEvent?.DefenderSide?.TroopCount > 0 && mapEvent.IsActiveSlowVillageRaid() == false)
+        if (mapEvent?.DefenderSide?.TroopCount > 0 && !mapEvent.IsActiveSlowVillageRaid())
         {
             GameMenu.SwitchToMenu("encounter");
             return;

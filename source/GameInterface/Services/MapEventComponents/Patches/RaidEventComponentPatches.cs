@@ -100,7 +100,7 @@ internal class RaidEventComponentPatches
 
         foreach (var reward in after)
         {
-            if (before.TryGetValue(reward.Key, out var previous) == false)
+            if (!before.TryGetValue(reward.Key, out var previous))
                 return true;
 
             if (previous != reward.Value)

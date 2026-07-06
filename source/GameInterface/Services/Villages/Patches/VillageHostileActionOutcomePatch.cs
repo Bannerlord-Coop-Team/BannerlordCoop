@@ -12,7 +12,7 @@ internal class ForceVolunteersEventComponentOnBeforeFinalizePatch
     [HarmonyPostfix]
     private static void Postfix(ForceVolunteersEventComponent __instance)
     {
-        if (!ModInformation.IsServer) return;
+        if (ModInformation.IsClient) return;
         if (!ContainerProvider.TryResolve<IVillageHostileActionInterface>(out var hostileActionInterface)) return;
 
         hostileActionInterface.ApplyForceActionOutcome(__instance.MapEvent, VillageHostileAction.ForceVolunteers);
@@ -25,7 +25,7 @@ internal class ForceSuppliesEventComponentOnBeforeFinalizePatch
     [HarmonyPostfix]
     private static void Postfix(ForceSuppliesEventComponent __instance)
     {
-        if (!ModInformation.IsServer) return;
+        if (ModInformation.IsClient) return;
         if (!ContainerProvider.TryResolve<IVillageHostileActionInterface>(out var hostileActionInterface)) return;
 
         hostileActionInterface.ApplyForceActionOutcome(__instance.MapEvent, VillageHostileAction.ForceSupplies);

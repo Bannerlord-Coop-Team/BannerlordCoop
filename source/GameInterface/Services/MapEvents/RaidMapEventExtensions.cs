@@ -38,21 +38,21 @@ public static class RaidMapEventExtensions
 
     public static bool IsUnsupportedMultiPlayerHostileAction(this MapEvent mapEvent)
     {
-        return mapEvent.IsVillageHostileActionWithMultiplePlayerParties() && mapEvent.IsRaidHostileAction() == false;
+        return mapEvent.IsVillageHostileActionWithMultiplePlayerParties() && !mapEvent.IsRaidHostileAction();
     }
 
     public static bool IsActiveSlowVillageRaid(this MapEvent mapEvent)
     {
         return mapEvent?.Component is RaidEventComponent &&
-               mapEvent.HasWinner == false &&
-               (HasDefenderTroops(mapEvent) == false || IsRaidAiInterventionSuppressed(mapEvent));
+               !mapEvent.HasWinner &&
+               (!HasDefenderTroops(mapEvent) || IsRaidAiInterventionSuppressed(mapEvent));
     }
 
     public static bool IsUnopposedVillageRaid(this MapEvent mapEvent)
     {
         return mapEvent?.Component is RaidEventComponent &&
-               mapEvent.HasWinner == false &&
-               HasDefenderTroops(mapEvent) == false;
+               !mapEvent.HasWinner &&
+               !HasDefenderTroops(mapEvent);
     }
 
     private static bool HasDefenderTroops(MapEvent mapEvent)
@@ -63,10 +63,10 @@ public static class RaidMapEventExtensions
     public static bool IsRaidAiInterventionSuppressed(this MapEvent mapEvent)
     {
         return mapEvent?.Component is RaidEventComponent &&
-               mapEvent.HasWinner == false &&
-               MapEventConfig.AllowRaidAiIntervention == false &&
+               !mapEvent.HasWinner &&
+               !MapEventConfig.AllowRaidAiIntervention &&
                mapEvent.ContainsPlayerParty() &&
-               HasDefenderPlayerParty(mapEvent) == false;
+               !HasDefenderPlayerParty(mapEvent);
     }
 
     private static bool HasDefenderPlayerParty(MapEvent mapEvent)

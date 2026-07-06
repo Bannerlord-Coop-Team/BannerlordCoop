@@ -340,10 +340,10 @@ internal class BattleFinalizeHandler : IHandler
 
     private static bool ShouldResetRaidDefenderVictoryToVillage(MapEvent mapEvent)
     {
-        if (mapEvent.IsRaidHostileAction() == false)
+        if (!mapEvent.IsRaidHostileAction())
             return false;
 
-        if (IsAttackerVictory(mapEvent) == false)
+        if (!IsAttackerVictory(mapEvent))
             return false;
 
         var settlement = mapEvent.MapEventSettlement;

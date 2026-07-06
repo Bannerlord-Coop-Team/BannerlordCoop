@@ -53,7 +53,7 @@ internal class EncounterManagerPatches
         if (TryRequestActiveSlowRaidSettlementEncounter(attackerParty, defenderParty))
             return false;
 
-        return RaidAiInterventionSuppression.ShouldSuppressEncounter(attackerParty, defenderParty) == false;
+        return !RaidAiInterventionSuppression.ShouldSuppressEncounter(attackerParty, defenderParty);
     }
 
     [HarmonyPrefix]

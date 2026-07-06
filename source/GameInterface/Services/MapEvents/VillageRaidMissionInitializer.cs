@@ -21,7 +21,7 @@ internal class VillageRaidMissionInitializer : IBattleMissionInitializer
 
     public bool CanHandle(MapEvent battle)
     {
-        if (battle.IsRaidHostileAction() == false)
+        if (!battle.IsRaidHostileAction())
             return false;
 
         return TryGetVillageScene(battle, out _, out _, logWarnings: true);
@@ -29,7 +29,7 @@ internal class VillageRaidMissionInitializer : IBattleMissionInitializer
 
     public MissionInitializerRecord Create(MapEvent battle, int randomTerrainSeed, AtmosphereInfo atmosphereOnCampaign)
     {
-        if (TryGetVillageScene(battle, out Settlement settlement, out string villageScene, logWarnings: false) == false)
+        if (!TryGetVillageScene(battle, out Settlement settlement, out string villageScene, logWarnings: false))
             throw new InvalidOperationException("Village raid mission initializer could not resolve a village raid scene");
 
         MissionInitializerRecord record = SandBoxMissions.CreateSandBoxMissionInitializerRecord(

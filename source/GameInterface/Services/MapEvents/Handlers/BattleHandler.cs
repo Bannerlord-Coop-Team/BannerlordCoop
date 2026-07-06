@@ -304,6 +304,6 @@ internal class BattleHandler : IHandler
     {
         return mapEvent != null &&
                mapEvent != excluding &&
-               mapEvent.IsActiveSlowVillageRaid() == false;
+               !mapEvent.IsActiveSlowVillageRaid();
     }
 }

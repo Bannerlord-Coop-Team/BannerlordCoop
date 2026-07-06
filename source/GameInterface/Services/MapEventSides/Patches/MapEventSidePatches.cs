@@ -67,7 +67,7 @@ internal class MapEventSidePatches
 
     private static bool ShouldBlockRaidAiIntervention(MapEventSide side, PartyBase party)
     {
-        if (RaidAiInterventionSuppression.ShouldSuppressParty(side, party) == false)
+        if (!RaidAiInterventionSuppression.ShouldSuppressParty(side, party))
             return false;
 
         RaidAiInterventionSuppression.BlockJoin(side, party);
