@@ -40,6 +40,9 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Mission), "get_AttackerTeam", nameof(Mission_get_AttackerTeam));
         Prefix(typeof(Mission), "get_DefenderTeam", nameof(Mission_get_DefenderTeam));
         Prefix(typeof(Mission), "get_PlayerEnemyTeam", nameof(Mission_get_PlayerEnemyTeam));
+        // The non-host retreat despawn filters the retreater's troops by the player team's side.
+        Prefix(typeof(Mission), "get_PlayerTeam", nameof(Mission_get_PlayerTeam));
+        Prefix(typeof(Team), "get_Side", nameof(Team_get_Side));
         // GetMissionBehavior<T> walks the mission's behavior list, which a skip-ctor shell doesn't have (NRE).
         // The spawn-capture and deployment paths probe for DeploymentMissionController — answer "none" for mock
         // missions. Reference-type instantiations share one method body, so patching this one covers them all.
@@ -208,6 +211,20 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!MockMission.ForShell(__instance, out var mock)) return true;
         __result = mock.AttackerTeam.Shell;
+        return false;
+    }
+
+    private static bool Mission_get_PlayerTeam(Mission __instance, ref Team __result)
+    {
+        if (!MockMission.ForShell(__instance, out var mock)) return true;
+        __result = mock.PlayerTeam?.Shell;
+        return false;
+    }
+
+    private static bool Team_get_Side(Team __instance, ref BattleSideEnum __result)
+    {
+        if (!MockTeam.ForShell(__instance, out var team)) return true;
+        __result = team.Side;
         return false;
     }
 
