@@ -130,7 +130,13 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         {
             var agent = info.Agent;
             if (agent == null || !agent.IsActive() || agent.IsMount || !(agent.Character is CharacterObject character)) continue;
-            if (ownPartyOnly && !IsOwnPartyAgent(agent, character)) continue;
+
+            bool isOwnParty = IsOwnPartyAgent(agent, character);
+            if (ownPartyOnly && !isOwnParty) continue;
+            // Consistent with the per-spawn withhold: don't replay own-party while our deployment is uncommitted,
+            // or a joiner catch-up spawns them at their pre-arrangement formation and dedupes the commit broadcast
+            // that carries the real one. They arrive via that commit broadcast (or a post-commit catch-up) instead.
+            if (deployment.ShouldWithhold(isOwnParty)) continue;
 
             // Carried by CharacterObject id, uniform for heroes and troops (hero CharacterObjects are registered).
             if (!objectManager.TryGetId(character, out var characterId)) continue;
