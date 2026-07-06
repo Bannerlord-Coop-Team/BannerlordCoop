@@ -6,6 +6,7 @@ using Missions.Messages;
 using Serilog;
 using System;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Battles;
@@ -78,10 +79,11 @@ public class PuppetDeathApplier : IPuppetDeathApplier
                     affectorAgent = affectorInfo.Agent;
                 }
 
-                var killingBlow = payload.What.KillingBlow;
-                killingBlow.OwnerId = affectorAgent?.Index ?? -1;
-                var deathAction = killingBlow.IsValid
-                    ? new ActionIndexCache(killingBlow.DeathAction)
+                var killingBlow = payload.What.DeathAction >= 0
+                    ? CreateReplicatedKillingBlow(payload.What, affectorAgent?.Index ?? -1)
+                    : default;
+                var deathAction = payload.What.DeathAction >= 0
+                    ? new ActionIndexCache(payload.What.DeathAction)
                     : ActionIndexCache.act_none;
 
                 BattleSpawnGate.RunWithReplicatedDeath(
@@ -98,5 +100,15 @@ public class PuppetDeathApplier : IPuppetDeathApplier
             registry.RemoveAgent(payload.What.AgentId);
             casualties.Forget(payload.What.AgentId);
         });
+    }
+
+    private static KillingBlow CreateReplicatedKillingBlow(NetworkBattleAgentDied message, int ownerId)
+    {
+        var blow = new Blow(ownerId)
+        {
+            InflictedDamage = message.InflictedDamage,
+            VictimBodyPart = message.VictimBodyPart,
+        };
+        return new KillingBlow(blow, Vec3.Zero, Vec3.Zero, message.DeathAction, 0);
     }
 }

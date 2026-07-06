@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Entity;
@@ -10,6 +10,8 @@ using Missions.Data;
 using Missions.Messages;
 using Serilog;
 using System;
+using TaleWorlds.Core;
+using TaleWorlds.MountAndBlade;
 
 namespace Missions.Battles;
 
@@ -116,6 +118,13 @@ public class CoopBattleController : CoopMissionController
         puppetSpawner.DrainPendingPuppets();
         diagnostics.Tick(dt);
         supplyReporter.Tick(dt);
+    }
+
+    public override void OnAgentRemoved(Agent affectedAgent, Agent affectorAgent, AgentState agentState, KillingBlow killingBlow)
+    {
+        base.OnAgentRemoved(affectedAgent, affectorAgent, agentState, killingBlow);
+
+        deathReporter.OnAgentRemoved(affectedAgent, affectorAgent, agentState, killingBlow);
     }
 
     // The local player just finished their own deployment (Start Battle): the coordinator announces it to the

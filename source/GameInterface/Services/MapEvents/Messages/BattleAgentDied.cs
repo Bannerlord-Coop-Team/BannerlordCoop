@@ -13,13 +13,23 @@ public record BattleAgentDied : IEvent
 
     /// <summary>True when the agent fell unconscious (wounded) rather than being killed outright.</summary>
     public bool Wounded { get; }
-    public KillingBlow KillingBlow { get; }
+    public int InflictedDamage { get; }
+    public BoneBodyPartType VictimBodyPart { get; }
+    public int DeathAction { get; }
 
-    public BattleAgentDied(Agent agent, Agent affectorAgent, bool wounded, KillingBlow killingBlow)
+    public BattleAgentDied(
+        Agent agent,
+        Agent affectorAgent,
+        bool wounded,
+        int inflictedDamage = 0,
+        BoneBodyPartType victimBodyPart = default,
+        int deathAction = -1)
     {
         Agent = agent;
         AffectorAgent = affectorAgent;
         Wounded = wounded;
-        KillingBlow = killingBlow;
+        InflictedDamage = inflictedDamage;
+        VictimBodyPart = victimBodyPart;
+        DeathAction = deathAction;
     }
 }

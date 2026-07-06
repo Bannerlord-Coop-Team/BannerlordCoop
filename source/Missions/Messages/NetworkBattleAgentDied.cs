@@ -20,13 +20,25 @@ public class NetworkBattleAgentDied : IEvent
     [ProtoMember(3)]
     public readonly Guid AffectorAgentId;
     [ProtoMember(4)]
-    public readonly KillingBlow KillingBlow;
+    public readonly int InflictedDamage;
+    [ProtoMember(5)]
+    public readonly BoneBodyPartType VictimBodyPart;
+    [ProtoMember(6)]
+    public readonly int DeathAction;
 
-    public NetworkBattleAgentDied(Guid agentId, bool wounded, Guid affectorAgentId, KillingBlow killingBlow)
+    public NetworkBattleAgentDied(
+        Guid agentId,
+        bool wounded,
+        Guid affectorAgentId,
+        int inflictedDamage,
+        BoneBodyPartType victimBodyPart,
+        int deathAction)
     {
         AgentId = agentId;
         Wounded = wounded;
         AffectorAgentId = affectorAgentId;
-        KillingBlow = killingBlow;
+        InflictedDamage = inflictedDamage;
+        VictimBodyPart = victimBodyPart;
+        DeathAction = deathAction;
     }
 }

@@ -7,7 +7,6 @@ using Missions;
 using Missions.Battles;
 using Missions.Messages;
 using TaleWorlds.Core;
-using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using Xunit;
 using Xunit.Abstractions;
@@ -62,16 +61,22 @@ public class BattleDeathMirrorTests : MissionTestEnvironment
                 DamageType = DamageTypes.Pierce,
                 VictimBodyPart = BoneBodyPartType.Head,
             };
-            var killingBlow = new KillingBlow(blow, Vec3.Zero, Vec3.Zero, 321, 0);
             owner.Resolve<IMessageBroker>().Publish(this,
-                new BattleAgentDied(ownerVictim, ownerAffector, wounded: false, killingBlow));
+                new BattleAgentDied(
+                    ownerVictim,
+                    ownerAffector,
+                    wounded: false,
+                    blow.InflictedDamage,
+                    blow.VictimBodyPart,
+                    deathAction: 321));
         });
 
         var message = Assert.Single(peer.InternalMessages.GetMessages<NetworkBattleAgentDied>());
         Assert.Equal(victimId, message.AgentId);
         Assert.Equal(affectorId, message.AffectorAgentId);
-        Assert.Equal(321, message.KillingBlow.DeathAction);
-        Assert.Equal(87, message.KillingBlow.InflictedDamage);
+        Assert.Equal(321, message.DeathAction);
+        Assert.Equal(87, message.InflictedDamage);
+        Assert.Equal(BoneBodyPartType.Head, message.VictimBodyPart);
 
         Assert.True(AgentMirror.TryGet(peerVictim, out var victimMirror));
         Assert.False(victimMirror.IsActive);
@@ -109,10 +114,14 @@ public class BattleDeathMirrorTests : MissionTestEnvironment
             peerVictim = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
             Assert.True(registry.TryRegisterAgent("owner", victimId, peerVictim));
 
-            var blow = new Blow(-1) { InflictedDamage = 100 };
-            var killingBlow = new KillingBlow(blow, Vec3.Zero, Vec3.Zero, 222, 0);
             peer.Resolve<IMessageBroker>().Publish(this,
-                new NetworkBattleAgentDied(victimId, wounded: true, Guid.NewGuid(), killingBlow));
+                new NetworkBattleAgentDied(
+                    victimId,
+                    wounded: true,
+                    Guid.NewGuid(),
+                    inflictedDamage: 100,
+                    victimBodyPart: BoneBodyPartType.Neck,
+                    deathAction: 222));
 
             Assert.False(registry.TryGetAgentInfo(victimId, out _));
         });

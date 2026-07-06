@@ -39,7 +39,6 @@ public class SurrogateCollection : ISurrogateCollection
             AddSurrogate<Vec3, Vec3Surrogate>();
             AddSurrogate<Mat3, Mat3Surrogate>();
             AddSurrogate<Blow, BlowSurrogate>();
-            AddSurrogate<KillingBlow, KillingBlowSurrogate>();
             AddSurrogate<AttackCollisionData, AttackCollisionDataSurrogate>();
             AddSurrogate<SunInformation, SunInformationSurrogate>();
             AddSurrogate<RainInformation, RainInformationSurrogate>();

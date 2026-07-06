@@ -13,8 +13,8 @@ namespace GameInterface.Services.MapEvents.Commands;
 /// <summary>
 /// Battle-outcome test commands: kill one enemy, the whole enemy team, or the local player team in the current
 /// battle mission. Run the direct kill commands on the battle-authority client because it owns the AI/enemy
-/// agents, so each kill goes through the coop death path (<c>Agent.Die</c> → <c>BattleAgentRemovedPatch</c> →
-/// the death broadcast + the server-roster casualty), exactly like <c>coop.debug.mapevent.kms</c>. Use
+/// agents, so each kill goes through the coop death path: <c>Agent.Die</c>, the mission death callback,
+/// the death broadcast, and the server-roster casualty, exactly like <c>coop.debug.mapevent.kms</c>. Use
 /// <c>kill_enemy_puppet</c> from a client that sees the enemy as a puppet to test routed ally kills.
 /// </summary>
 internal class BattleTeamKillCommands
