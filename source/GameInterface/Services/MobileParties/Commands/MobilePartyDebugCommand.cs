@@ -3,6 +3,7 @@ using Common;
 using Common.Logging;
 using GameInterface.Services.MobileParties.Audit;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using Helpers;
 using Serilog;
 using System;
@@ -124,6 +125,63 @@ internal class MobilePartyDebugCommand
         var result = sb.ToString();
         Logger.Debug("{AttachmentIds}", result);
         return result;
+    }
+
+    [CommandLineArgumentFunction("verify_ai_authority", "coop.debug.mobileparty")]
+    public static string VerifyAiAuthority(List<string> args)
+    {
+        if (ModInformation.IsClient)
+        {
+            return "verify_ai_authority is server-only";
+        }
+
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.mobileparty.verify_ai_authority <MobilePartyId>";
+        }
+
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+        {
+            return $"Unable to get {nameof(IObjectManager)}";
+        }
+
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
+        {
+            return $"Unable to get {nameof(IPlayerManager)}";
+        }
+
+        if (!objectManager.TryGetObjectWithLogging<MobileParty>(args[0], out var mobileParty))
+        {
+            return $"Unable to get {nameof(MobileParty)} with id: {args[0]}";
+        }
+
+        if (!playerManager.Contains(mobileParty))
+        {
+            return $"Party {args[0]} is not registered as a player party";
+        }
+
+        var partyAi = mobileParty.Ai;
+        if (partyAi == null)
+        {
+            return $"Party {args[0]} has no {nameof(MobilePartyAi)}";
+        }
+
+        bool previousNeedsUpdate = partyAi.DefaultBehaviorNeedsUpdate;
+        bool tickWasBlocked;
+        try
+        {
+            partyAi.DefaultBehaviorNeedsUpdate = true;
+            partyAi.Tick(0f);
+            tickWasBlocked = partyAi.DefaultBehaviorNeedsUpdate;
+        }
+        finally
+        {
+            partyAi.DefaultBehaviorNeedsUpdate = previousNeedsUpdate;
+        }
+
+        return tickWasBlocked
+            ? $"Server AI tick blocked for player party {args[0]}"
+            : $"Server AI tick ran for player party {args[0]}";
     }
 
     private static void AppendAttachmentId(StringBuilder sb, IObjectManager objectManager, string label, object obj)
