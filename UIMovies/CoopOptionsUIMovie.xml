@@ -1,0 +1,94 @@
+<Prefab>
+  <Window>
+    <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent">
+      <Children>
+        <Standard.Background/>
+
+        <Standard.TopPanel Parameter.Title="@MovieTextHeader"/>
+
+        <ListPanel WidthSizePolicy="Fixed" SuggestedWidth="780" HeightSizePolicy="CoverChildren"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="-40"
+                   LayoutImp.LayoutMethod="VerticalTopToBottom">
+          <Children>
+            <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="48"
+                        Brush="Clan.TabControl.Text" Brush.FontSize="36"
+                        Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                        Text="@KillFeedColorText"/>
+            <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="58"
+                        Brush="Clan.TabControl.Text" Brush.FontSize="22" Brush.FontColor="#B8B8B8FF"
+                        Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                        Text="@KillFeedColorDescriptionText"/>
+
+            <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="78"
+                       LayoutImp.LayoutMethod="HorizontalLeftToRight">
+              <Children>
+                <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="132" HeightSizePolicy="StretchToParent"
+                            Brush="Clan.TabControl.Text" Brush.FontSize="28"
+                            Brush.TextVerticalAlignment="Center" Text="@RedText"/>
+                <Standard.Slider WidthSizePolicy="Fixed" SuggestedWidth="420" HeightSizePolicy="Fixed" SuggestedHeight="46"
+                                 VerticalAlignment="Center" Parameter.ValueInt="@Red" Parameter.MinValue="0" Parameter.MaxValue="255"/>
+                <IntegerInputTextWidget WidthSizePolicy="Fixed" SuggestedWidth="96" HeightSizePolicy="Fixed" SuggestedHeight="48"
+                                        VerticalAlignment="Center" MarginLeft="28"
+                                        Brush="ScoreboardPanels_2" Brush.AlphaFactor="0.75" Brush.FontSize="28"
+                                        Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                                        IntText="@Red" MaxInt="255" MinInt="0" EnableClamp="true"/>
+              </Children>
+            </ListPanel>
+
+            <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="78"
+                       LayoutImp.LayoutMethod="HorizontalLeftToRight">
+              <Children>
+                <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="132" HeightSizePolicy="StretchToParent"
+                            Brush="Clan.TabControl.Text" Brush.FontSize="28"
+                            Brush.TextVerticalAlignment="Center" Text="@GreenText"/>
+                <Standard.Slider WidthSizePolicy="Fixed" SuggestedWidth="420" HeightSizePolicy="Fixed" SuggestedHeight="46"
+                                 VerticalAlignment="Center" Parameter.ValueInt="@Green" Parameter.MinValue="0" Parameter.MaxValue="255"/>
+                <IntegerInputTextWidget WidthSizePolicy="Fixed" SuggestedWidth="96" HeightSizePolicy="Fixed" SuggestedHeight="48"
+                                        VerticalAlignment="Center" MarginLeft="28"
+                                        Brush="ScoreboardPanels_2" Brush.AlphaFactor="0.75" Brush.FontSize="28"
+                                        Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                                        IntText="@Green" MaxInt="255" MinInt="0" EnableClamp="true"/>
+              </Children>
+            </ListPanel>
+
+            <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="78"
+                       LayoutImp.LayoutMethod="HorizontalLeftToRight">
+              <Children>
+                <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="132" HeightSizePolicy="StretchToParent"
+                            Brush="Clan.TabControl.Text" Brush.FontSize="28"
+                            Brush.TextVerticalAlignment="Center" Text="@BlueText"/>
+                <Standard.Slider WidthSizePolicy="Fixed" SuggestedWidth="420" HeightSizePolicy="Fixed" SuggestedHeight="46"
+                                 VerticalAlignment="Center" Parameter.ValueInt="@Blue" Parameter.MinValue="0" Parameter.MaxValue="255"/>
+                <IntegerInputTextWidget WidthSizePolicy="Fixed" SuggestedWidth="96" HeightSizePolicy="Fixed" SuggestedHeight="48"
+                                        VerticalAlignment="Center" MarginLeft="28"
+                                        Brush="ScoreboardPanels_2" Brush.AlphaFactor="0.75" Brush.FontSize="28"
+                                        Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                                        IntText="@Blue" MaxInt="255" MinInt="0" EnableClamp="true"/>
+              </Children>
+            </ListPanel>
+
+            <ListPanel WidthSizePolicy="CoverChildren" HeightSizePolicy="Fixed" SuggestedHeight="72"
+                       HorizontalAlignment="Center" LayoutImp.LayoutMethod="HorizontalLeftToRight">
+              <Children>
+                <ColorButtonWidget WidthSizePolicy="Fixed" SuggestedWidth="96" HeightSizePolicy="Fixed" SuggestedHeight="58"
+                                   VerticalAlignment="Center" Brush="Creation.ColorCard"
+                                   ColorToApply="@PreviewColorString" UpdateChildrenStates="true"/>
+              </Children>
+            </ListPanel>
+
+            <ListPanel WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
+                       HorizontalAlignment="Center" MarginTop="36"
+                       LayoutImp.LayoutMethod="HorizontalLeftToRight">
+              <Children>
+                <Standard.Button Brush="Standard.BackButton" HorizontalAlignment="Center" SuggestedWidth="128"
+                                 Command.Click="ActionCancel" SuggestedHeight="64" MarginRight="24"/>
+                <Standard.Button HorizontalAlignment="Center" SuggestedWidth="156"
+                                 Command.Click="ActionApply" Parameter.Text="@ApplyButtonText" SuggestedHeight="64"/>
+              </Children>
+            </ListPanel>
+          </Children>
+        </ListPanel>
+      </Children>
+    </Widget>
+  </Window>
+</Prefab>

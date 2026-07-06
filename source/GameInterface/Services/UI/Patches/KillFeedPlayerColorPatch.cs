@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.Players;
+using GameInterface.Services.UI;
 using HarmonyLib;
 using System;
 using TaleWorlds.CampaignSystem.AgentOrigins;
@@ -36,6 +37,12 @@ internal class KillFeedPlayerColorPatch
         if (party == null) return;
 
         if (!PlayerManager.TryGetControlledObjectInfo(party, out var info)) return;
+
+        if (ContainerProvider.TryResolve<IPlayerKillFeedColorService>(out var colorService))
+        {
+            __instance.BackgroundColor = colorService.GetColor(info.ObjectControllerId);
+            return;
+        }
 
         __instance.BackgroundColor = PlayerColorAssigner.GetColor(info.ObjectControllerId);
     }
