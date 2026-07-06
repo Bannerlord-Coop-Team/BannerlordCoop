@@ -44,6 +44,7 @@ public class PuppetSpawner : IPuppetSpawner
     private readonly IBattleSession session;
     private readonly ICasualtyAttributionMap casualties;
     private readonly IBattleDeploymentCoordinator deployment;
+    private readonly IAgentFormationAssigner formationAssigner;
 
     // Puppet spawns from the host's catch-up burst can arrive while THIS client's mission is still loading
     // (before MissionCombatantsLogic creates the teams). An agent built with a null team later NREs the
@@ -58,7 +59,8 @@ public class PuppetSpawner : IPuppetSpawner
         ICoopMissionComponent coopMissionComponent,
         IBattleSession session,
         ICasualtyAttributionMap casualties,
-        IBattleDeploymentCoordinator deployment)
+        IBattleDeploymentCoordinator deployment,
+        IAgentFormationAssigner formationAssigner)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -66,6 +68,7 @@ public class PuppetSpawner : IPuppetSpawner
         this.session = session;
         this.casualties = casualties;
         this.deployment = deployment;
+        this.formationAssigner = formationAssigner;
 
         messageBroker.Subscribe<NetworkSpawnBattleAgents>(Handle_NetworkSpawnBattleAgents);
     }
@@ -167,7 +170,7 @@ public class PuppetSpawner : IPuppetSpawner
         agent.FadeIn();
         if (data.Health > 0) agent.Health = data.Health;
 
-        AgentFormationAssigner.Assign(agent, data.FormationIndex);
+        formationAssigner.Assign(agent, data.FormationIndex);
 
         // Adopt our own hero as the controllable main agent of this mission.
         if (isOwnAgent)
