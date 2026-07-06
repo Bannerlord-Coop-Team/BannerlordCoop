@@ -81,8 +81,13 @@ public class MobilePartyCachePatch
             {
                 if (AddMobileParty)
                 {
-                    settlement._partiesCache.Add(party);
-                } 
+                    // The client also gets this membership through the CurrentSettlement AutoSync, so
+                    // guard the Add like vanilla AddMobileParty does, otherwise the party double-lists.
+                    if (!settlement._partiesCache.Contains(party))
+                    {
+                        settlement._partiesCache.Add(party);
+                    }
+                }
                 else
                 {
                     settlement._partiesCache.Remove(party);
