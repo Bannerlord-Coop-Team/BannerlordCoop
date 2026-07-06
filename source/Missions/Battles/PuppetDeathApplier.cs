@@ -64,7 +64,9 @@ public class PuppetDeathApplier : IPuppetDeathApplier
             if (agent != null && agent.Health > 0)
             {
                 // Dismount first: MakeDead skips the dismount a real death does, so the horse would keep a link to
-                // the dead rider and AVE in native Agent.Die when later killed.
+                // the dead rider and AVE in native Agent.Die when later killed. The horse itself is left
+                // standing — a REGISTERED one dies through its OWN death broadcast (see AgentDeathReporter),
+                // an unregistered one stays a local loose horse.
                 if (agent.MountAgent != null)
                     agent.MountAgent = null;
                 agent.MakeDead(!payload.What.Wounded, ActionIndexCache.act_none);
