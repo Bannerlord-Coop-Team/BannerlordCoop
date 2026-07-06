@@ -61,6 +61,10 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), "get_Position", nameof(Agent_get_Position));
         Prefix(typeof(Agent), "get_Name", nameof(Agent_get_Name));
         Prefix(typeof(Agent), nameof(Agent.IsActive), nameof(Agent_IsActive));
+        // Puppet classification (LocationPvpBlockPatch): human/mount/rider resolve via the mirror.
+        Prefix(typeof(Agent), "get_IsHuman", nameof(Agent_get_IsHuman));
+        Prefix(typeof(Agent), "get_IsMount", nameof(Agent_get_IsMount));
+        Prefix(typeof(Agent), "get_RiderAgent", nameof(Agent_get_RiderAgent));
 
         // RegisterBlow is overloaded — pin the (Blow, in AttackCollisionData) signature.
         harmony.Patch(
@@ -296,6 +300,27 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
         __result = m.Character?.StringId ?? "mock-agent";
+        return false;
+    }
+
+    private static bool Agent_get_IsHuman(Agent __instance, ref bool __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.IsHuman;
+        return false;
+    }
+
+    private static bool Agent_get_IsMount(Agent __instance, ref bool __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.IsMount;
+        return false;
+    }
+
+    private static bool Agent_get_RiderAgent(Agent __instance, ref Agent __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.RiderAgent;
         return false;
     }
 
