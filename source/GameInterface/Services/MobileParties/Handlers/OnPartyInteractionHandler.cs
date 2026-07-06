@@ -27,7 +27,6 @@ internal class PlayerPartyInteractionHandler : IHandler
     private void Handle_ReciprocalPlayerPartyInteractionAttempted(MessagePayload<ReciprocalPlayerPartyInteractionAttempted> payload)
     {
         var message = payload.What;
-        message.SetHandled();
 
         if (ShouldInitiateReciprocalPlayerInteraction(message.EngagingParty, message.TargetParty))
             EncounterManager.StartPartyEncounter(message.EngagingParty, message.TargetParty);

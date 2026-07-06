@@ -39,7 +39,7 @@ internal class OnPartyInteractionPatch
         var message = new ReciprocalPlayerPartyInteractionAttempted(targetPartyBase, engagingPartyBase);
         MessageBroker.Instance.Publish(__instance, message);
 
-        return !message.Handled;
+        return false;
     }
 
     internal static MobileParty GetEffectiveInteractionTargetParty(MobileParty targetParty, MobileParty engagingParty)

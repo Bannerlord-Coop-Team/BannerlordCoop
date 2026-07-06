@@ -59,7 +59,7 @@ public class PlayerPartyInteractionHandlerTests
     }
 
     [Fact]
-    public void ReciprocalPlayerPartyInteractionAttempted_PublishedMessage_MarksHandled()
+    public void ReciprocalPlayerPartyInteractionAttempted_PublishedMessage_ChecksInteractionEligibility()
     {
         var engagingParty = CreatePartyBase();
         var targetParty = CreatePartyBase();
@@ -68,7 +68,8 @@ public class PlayerPartyInteractionHandlerTests
 
         messageBroker.Publish(this, message);
 
-        Assert.True(message.Handled);
+        objectManager.Verify(o => o.TryGetId(engagingParty, out It.Ref<string>.IsAny), Times.Once);
+        objectManager.Verify(o => o.TryGetId(targetParty, out It.Ref<string>.IsAny), Times.Never);
     }
 
     private static PartyBase CreatePartyBase()
