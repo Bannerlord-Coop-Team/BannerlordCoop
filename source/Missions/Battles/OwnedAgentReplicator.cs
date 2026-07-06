@@ -130,18 +130,25 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         {
             var agent = info.Agent;
             if (agent == null || !agent.IsActive() || agent.IsMount || !(agent.Character is CharacterObject character)) continue;
-            if (ownPartyOnly && !IsOwnPartyAgent(agent, character)) continue;
+
+            bool isOwnParty = IsOwnPartyAgent(agent, character);
+            if (ownPartyOnly && !isOwnParty) continue;
+            // Consistent with the per-spawn withhold: don't replay own-party while our deployment is uncommitted,
+            // or a joiner catch-up spawns them at their pre-arrangement formation and dedupes the commit broadcast
+            // that carries the real one. They arrive via that commit broadcast (or a post-commit catch-up) instead.
+            if (deployment.ShouldWithhold(isOwnParty)) continue;
 
             // Carried by CharacterObject id, uniform for heroes and troops (hero CharacterObjects are registered).
             if (!objectManager.TryGetId(character, out var characterId)) continue;
 
             var attribution = casualties.GetOrDefault(info.AgentId);
             var side = agent.Team != null ? agent.Team.Side : BattleSideEnum.None;
+            int formationIndex = agent.Formation != null ? (int)agent.Formation.FormationIndex : -1;
 
             records.Add(new BattleAgentSpawnData(
                 info.AgentId, characterId, agent.Position, side, agent.Health,
                 session.OwnControllerId, attribution.MapEventPartyId, attribution.TroopSeed,
-                ResolveMountIdFor(info.AgentId, agent)));
+                ResolveMountIdFor(info.AgentId, agent), formationIndex));
         }
         return records;
     }
@@ -234,7 +241,8 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         casualties.Record(agentId, mapEventPartyId, troopSeed, characterId);
 
         BattleSideEnum side = agent.Team != null ? agent.Team.Side : BattleSideEnum.None;
-        var data = new BattleAgentSpawnData(agentId, characterId, agent.Position, side, agent.Health, owner, mapEventPartyId, troopSeed, mountAgentId);
+        int formationIndex = agent.Formation != null ? (int)agent.Formation.FormationIndex : -1;
+        var data = new BattleAgentSpawnData(agentId, characterId, agent.Position, side, agent.Health, owner, mapEventPartyId, troopSeed, mountAgentId, formationIndex);
 
         // Requirement #4 "hidden everywhere until deployed": while we are still placing our own formations our
         // own-party troops are spawned locally (so we can deploy them) but NOT replicated, so other clients never

@@ -16,6 +16,7 @@ public sealed class MirrorAgent
     public AgentControllerType Controller { get; set; }
     public float Health { get; set; } = 100f;
     public bool IsActive { get; set; } = true;
+    public bool IsHuman { get; set; } = true;
     public Vec3 Position { get; set; }
     public BasicCharacterObject Character { get; set; }
     public Team Team { get; set; }
