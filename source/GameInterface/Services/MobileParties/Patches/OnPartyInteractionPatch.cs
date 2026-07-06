@@ -1,7 +1,8 @@
 using Common;
 using Common.Logging;
+using Common.Messaging;
 using GameInterface.Services.MobileParties.Extensions;
-using GameInterface.Services.MobileParties.Handlers;
+using GameInterface.Services.MobileParties.Messages;
 using HarmonyLib;
 using Serilog;
 using TaleWorlds.CampaignSystem.Party;
@@ -35,11 +36,10 @@ internal class OnPartyInteractionPatch
         if (!TryGetPartyBases(targetParty, engagingParty, out var targetPartyBase, out var engagingPartyBase))
             return true;
 
-        if (ContainerProvider.TryResolve<PlayerPartyInteractionHandler>(out var handler) &&
-            handler.TryHandleReciprocalPlayerInteraction(targetPartyBase, engagingPartyBase))
-            return false;
+        var message = new ReciprocalPlayerPartyInteractionAttempted(targetPartyBase, engagingPartyBase);
+        MessageBroker.Instance.Publish(__instance, message);
 
-        return true;
+        return !message.Handled;
     }
 
     internal static MobileParty GetEffectiveInteractionTargetParty(MobileParty targetParty, MobileParty engagingParty)

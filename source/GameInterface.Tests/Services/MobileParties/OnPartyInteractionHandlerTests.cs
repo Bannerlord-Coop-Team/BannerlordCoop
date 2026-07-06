@@ -1,5 +1,7 @@
+using Common.Tests.Utils;
 using Common.Util;
 using GameInterface.Services.MobileParties.Handlers;
+using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
 using Moq;
 using TaleWorlds.CampaignSystem.Party;
@@ -9,12 +11,13 @@ namespace GameInterface.Tests.Services.MobileParties;
 
 public class PlayerPartyInteractionHandlerTests
 {
+    private readonly TestMessageBroker messageBroker = new();
     private readonly Mock<IObjectManager> objectManager = new();
     private readonly PlayerPartyInteractionHandler handler;
 
     public PlayerPartyInteractionHandlerTests()
     {
-        handler = new PlayerPartyInteractionHandler(objectManager.Object);
+        handler = new PlayerPartyInteractionHandler(messageBroker, objectManager.Object);
     }
 
     [Fact]
@@ -53,6 +56,19 @@ public class PlayerPartyInteractionHandlerTests
         var shouldInitiate = handler.ShouldInitiateReciprocalPlayerInteraction(engagingParty, targetParty);
 
         Assert.False(shouldInitiate);
+    }
+
+    [Fact]
+    public void ReciprocalPlayerPartyInteractionAttempted_PublishedMessage_MarksHandled()
+    {
+        var engagingParty = CreatePartyBase();
+        var targetParty = CreatePartyBase();
+        SetupNoId(engagingParty);
+        var message = new ReciprocalPlayerPartyInteractionAttempted(targetParty, engagingParty);
+
+        messageBroker.Publish(this, message);
+
+        Assert.True(message.Handled);
     }
 
     private static PartyBase CreatePartyBase()

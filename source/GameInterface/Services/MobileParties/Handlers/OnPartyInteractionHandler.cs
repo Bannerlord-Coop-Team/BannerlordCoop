@@ -1,4 +1,5 @@
 using Common.Messaging;
+using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -7,23 +8,29 @@ namespace GameInterface.Services.MobileParties.Handlers;
 
 internal class PlayerPartyInteractionHandler : IHandler
 {
+    private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
 
-    public PlayerPartyInteractionHandler(IObjectManager objectManager)
+    public PlayerPartyInteractionHandler(IMessageBroker messageBroker, IObjectManager objectManager)
     {
+        this.messageBroker = messageBroker;
         this.objectManager = objectManager;
+
+        messageBroker.Subscribe<ReciprocalPlayerPartyInteractionAttempted>(Handle_ReciprocalPlayerPartyInteractionAttempted);
     }
 
     public void Dispose()
     {
+        messageBroker.Unsubscribe<ReciprocalPlayerPartyInteractionAttempted>(Handle_ReciprocalPlayerPartyInteractionAttempted);
     }
 
-    public bool TryHandleReciprocalPlayerInteraction(PartyBase targetParty, PartyBase engagingParty)
+    private void Handle_ReciprocalPlayerPartyInteractionAttempted(MessagePayload<ReciprocalPlayerPartyInteractionAttempted> payload)
     {
-        if (ShouldInitiateReciprocalPlayerInteraction(engagingParty, targetParty))
-            EncounterManager.StartPartyEncounter(engagingParty, targetParty);
+        var message = payload.What;
+        message.SetHandled();
 
-        return true;
+        if (ShouldInitiateReciprocalPlayerInteraction(message.EngagingParty, message.TargetParty))
+            EncounterManager.StartPartyEncounter(message.EngagingParty, message.TargetParty);
     }
 
     internal bool ShouldInitiateReciprocalPlayerInteraction(PartyBase engagingParty, PartyBase targetParty)
