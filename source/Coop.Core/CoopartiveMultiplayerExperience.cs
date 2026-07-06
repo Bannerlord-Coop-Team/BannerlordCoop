@@ -212,6 +212,14 @@ namespace Coop.Core
         private void DestroyContainer()
         {
             container?.Resolve<IGameInterface>().UnpatchAll();
+
+            // UnpatchAll is currently disabled (see GameInterface.UnpatchAll), so AutoSync-intercepted setters
+            // stay live through container.Dispose() below. Clearing the provider first makes any patched call
+            // triggered by a disposed handler (e.g. ConversationPartyTracker releasing a held party) see "no
+            // container" and fail open, instead of resolving against a lifetime scope mid-disposal and throwing
+            // ObjectDisposedException.
+            GameInterface.ContainerProvider.Clear();
+
             container?.Dispose();
             container = null;
         }
