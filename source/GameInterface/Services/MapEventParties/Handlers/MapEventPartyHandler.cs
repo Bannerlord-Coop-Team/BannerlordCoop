@@ -142,7 +142,7 @@ internal class MapEventPartyHandler : IHandler
     {
         var obj = payload.What;
 
-        // OnTroopKilled mutates the roster the game loop reads, so it is deferred to the
+        // OnTroopKilled mutates rosters the game loop reads, so it is deferred to the
         // main thread. OnTroopKilled is Harmony-patched, so AllowedThread silences the
         // client prefix to stop it re-running and rebroadcasting in a loop.
         GameThread.Run(() =>
@@ -153,10 +153,23 @@ internal class MapEventPartyHandler : IHandler
                     return;
 
                 var troopDescriptor = new UniqueTroopDescriptor(obj.TroopSeed);
-                var troop = mapEventParty._roster[troopDescriptor].Troop;
 
-                using (new AllowedThread())
+                if (ModInformation.IsClient)
                 {
+                    // The member roster replicates through the TroopRoster delta sync; running vanilla
+                    // OnTroopKilled here would remove the troop a second time. The flattened battle roster
+                    // and the tally are client-local (the party's tally roster is a placeholder the delta
+                    // sync never reaches), so both are applied here.
+                    using (new AllowedThread())
+                    {
+                        mapEventParty._roster.OnTroopKilled(troopDescriptor);
+                        mapEventParty.DiedInBattle.AddToCounts(mapEventParty._roster[troopDescriptor].Troop, 1);
+                    }
+                }
+                else
+                {
+                    // Patches stay live so the member roster change replicates to clients as a
+                    // TroopRoster delta.
                     mapEventParty.OnTroopKilled(troopDescriptor);
                 }
             }
@@ -183,7 +196,7 @@ internal class MapEventPartyHandler : IHandler
     {
         var obj = payload.What;
 
-        // OnTroopWounded mutates the roster the game loop reads, so it is deferred to the
+        // OnTroopWounded mutates rosters the game loop reads, so it is deferred to the
         // main thread. OnTroopWounded is Harmony-patched, so AllowedThread silences the
         // client prefix to stop it re-running and rebroadcasting in a loop.
         GameThread.Run(() =>
@@ -195,7 +208,17 @@ internal class MapEventPartyHandler : IHandler
 
                 var troopDescriptor = new UniqueTroopDescriptor(obj.TroopSeed);
 
-                using (new AllowedThread())
+                if (ModInformation.IsClient)
+                {
+                    // Same split as Handle_NetworkTroopKilled: the member roster wound comes from the
+                    // TroopRoster delta sync; the flattened battle roster and the tally are client-local.
+                    using (new AllowedThread())
+                    {
+                        mapEventParty._roster.OnTroopWounded(troopDescriptor);
+                        mapEventParty.WoundedInBattle.AddToCounts(mapEventParty._roster[troopDescriptor].Troop, 1, insertAtFront: false, 1);
+                    }
+                }
+                else
                 {
                     mapEventParty.OnTroopWounded(troopDescriptor);
                 }
@@ -223,7 +246,7 @@ internal class MapEventPartyHandler : IHandler
     {
         var obj = payload.What;
 
-        // OnTroopRouted mutates the roster the game loop reads, so it is deferred to the
+        // OnTroopRouted mutates rosters the game loop reads, so it is deferred to the
         // main thread. OnTroopRouted is Harmony-patched, so AllowedThread silences the
         // client prefix to stop it re-running and rebroadcasting in a loop.
         GameThread.Run(() =>
@@ -235,7 +258,19 @@ internal class MapEventPartyHandler : IHandler
 
                 var troopDescriptor = new UniqueTroopDescriptor(obj.TroopSeed);
 
-                using (new AllowedThread())
+                if (ModInformation.IsClient)
+                {
+                    // Same split as Handle_NetworkTroopKilled, keeping vanilla OnTroopRouted's hero guard.
+                    using (new AllowedThread())
+                    {
+                        if (!mapEventParty._roster[troopDescriptor].Troop.IsHero)
+                        {
+                            mapEventParty._roster.OnTroopRouted(troopDescriptor);
+                            mapEventParty.RoutedInBattle.AddToCounts(mapEventParty._roster[troopDescriptor].Troop, 1);
+                        }
+                    }
+                }
+                else
                 {
                     mapEventParty.OnTroopRouted(troopDescriptor);
                 }
