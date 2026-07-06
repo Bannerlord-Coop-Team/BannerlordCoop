@@ -1,3 +1,4 @@
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Battles;
@@ -20,6 +21,24 @@ public static class AgentFormationAssigner
         if (agent.Character == null || agent.Team == null) return null;
 
         var formation = agent.Team.GetFormation(agent.Character.GetFormationClass());
+        if (formation != null)
+            agent.Formation = formation;
+
+        return formation;
+    }
+
+    /// <summary>
+    /// Assign <paramref name="agent"/> to the specific formation slot <paramref name="formationIndex"/> (a
+    /// <see cref="FormationClass"/> cast to int) its owner placed it in, so a puppet mirrors the owner's actual
+    /// deployment split rather than a default troop-class grouping. Falls back to the troop-class default when
+    /// <paramref name="formationIndex"/> is negative (the owner's agent had no formation).
+    /// </summary>
+    public static Formation Assign(Agent agent, int formationIndex)
+    {
+        if (formationIndex < 0) return Assign(agent);
+        if (agent.Team == null) return null;
+
+        var formation = agent.Team.GetFormation((FormationClass)formationIndex);
         if (formation != null)
             agent.Formation = formation;
 

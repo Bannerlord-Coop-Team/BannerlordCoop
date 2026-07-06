@@ -128,10 +128,11 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
 
             var attribution = casualties.GetOrDefault(info.AgentId);
             var side = agent.Team != null ? agent.Team.Side : BattleSideEnum.None;
+            int formationIndex = agent.Formation != null ? (int)agent.Formation.FormationIndex : -1;
 
             records.Add(new BattleAgentSpawnData(
                 info.AgentId, characterId, agent.Position, side, agent.Health,
-                session.OwnControllerId, attribution.MapEventPartyId, attribution.TroopSeed));
+                session.OwnControllerId, attribution.MapEventPartyId, attribution.TroopSeed, formationIndex));
         }
         return records;
     }
@@ -183,7 +184,8 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         casualties.Record(agentId, mapEventPartyId, troopSeed, characterId);
 
         BattleSideEnum side = agent.Team != null ? agent.Team.Side : BattleSideEnum.None;
-        var data = new BattleAgentSpawnData(agentId, characterId, agent.Position, side, agent.Health, owner, mapEventPartyId, troopSeed);
+        int formationIndex = agent.Formation != null ? (int)agent.Formation.FormationIndex : -1;
+        var data = new BattleAgentSpawnData(agentId, characterId, agent.Position, side, agent.Health, owner, mapEventPartyId, troopSeed, formationIndex);
 
         // Requirement #4 "hidden everywhere until deployed": while we are still placing our own formations our
         // own-party troops are spawned locally (so we can deploy them) but NOT replicated, so other clients never

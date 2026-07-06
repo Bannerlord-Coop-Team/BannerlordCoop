@@ -47,8 +47,12 @@ public class BattleAgentSpawnData
     public readonly string MapEventPartyId;
     [ProtoMember(9)]
     public readonly int TroopSeed;
+    // The formation slot (a FormationClass cast to int, -1 for none) the owner placed this agent in, so a puppet
+    // mirrors the owner's actual deployment split instead of a default troop-class grouping.
+    [ProtoMember(10)]
+    public readonly int FormationIndex;
 
-    public BattleAgentSpawnData(Guid agentId, string characterId, Vec3 position, BattleSideEnum side, float health, string ownerControllerId, string mapEventPartyId, int troopSeed)
+    public BattleAgentSpawnData(Guid agentId, string characterId, Vec3 position, BattleSideEnum side, float health, string ownerControllerId, string mapEventPartyId, int troopSeed, int formationIndex)
     {
         AgentId = agentId;
         CharacterId = characterId;
@@ -58,5 +62,6 @@ public class BattleAgentSpawnData
         OwnerControllerId = ownerControllerId;
         MapEventPartyId = mapEventPartyId;
         TroopSeed = troopSeed;
+        FormationIndex = formationIndex;
     }
 }
