@@ -35,16 +35,18 @@ public class PlayerKillFeedColorTests
     }
 
     [Fact]
-    public void OptionsStore_SaveAndReload_RoundTripsColor()
+    public void CoopOptionsStore_SaveAndReload_RoundTripsColor()
     {
         var filePath = CreateTempFilePath();
 
         try
         {
-            var store = new PlayerKillFeedColorOptionsStore(filePath);
+            var store = new CoopOptionsStore(filePath);
             var expected = new PlayerKillFeedColor(12, 34, 56);
+            var options = new CoopOptions();
+            options.SetKillFeedColor(expected);
 
-            store.Save(expected);
+            store.Save(options);
 
             using var document = JsonDocument.Parse(File.ReadAllText(filePath));
             Assert.True(document.RootElement.TryGetProperty("killFeedColor", out var killFeedColor));
@@ -53,8 +55,9 @@ public class PlayerKillFeedColorTests
             Assert.Equal(expected.Green, killFeedColor.GetProperty("Green").GetInt32());
             Assert.Equal(expected.Blue, killFeedColor.GetProperty("Blue").GetInt32());
 
-            var reloaded = new PlayerKillFeedColorOptionsStore(filePath);
-            Assert.True(reloaded.TryLoad(out var actual));
+            var reloaded = new CoopOptionsStore(filePath);
+            Assert.True(reloaded.TryLoad(out var actualOptions));
+            Assert.True(actualOptions.TryGetKillFeedColor(out var actual));
             Assert.Equal(expected, actual);
         }
         finally
@@ -67,16 +70,17 @@ public class PlayerKillFeedColorTests
     }
 
     [Fact]
-    public void OptionsStore_TryLoad_RejectsLegacyFlatColor()
+    public void CoopOptions_TryGetKillFeedColor_RejectsLegacyFlatColor()
     {
         var filePath = CreateTempFilePath();
 
         try
         {
             File.WriteAllText(filePath, "{\"Red\":170,\"Green\":170,\"Blue\":170}");
-            var store = new PlayerKillFeedColorOptionsStore(filePath);
+            var store = new CoopOptionsStore(filePath);
 
-            Assert.False(store.TryLoad(out _));
+            Assert.True(store.TryLoad(out var options));
+            Assert.False(options.TryGetKillFeedColor(out _));
         }
         finally
         {
@@ -91,7 +95,7 @@ public class PlayerKillFeedColorTests
     public void CoopOptionsVM_ClampsRgbAndUpdatesPreview()
     {
         var filePath = CreateTempFilePath();
-        var viewModel = new CoopOptionsVM(new PlayerKillFeedColorOptionsStore(filePath), new MessageBroker());
+        var viewModel = new CoopOptionsVM(new CoopOptionsStore(filePath), new MessageBroker());
 
         viewModel.Red = 999;
         viewModel.Green = -20;
@@ -154,31 +158,31 @@ public class PlayerKillFeedColorTests
         return Path.Combine(Path.GetTempPath(), $"BannerlordCoop-{Guid.NewGuid():N}.json");
     }
 
-    private class TestOptionsStore : IPlayerKillFeedColorOptionsStore
+    private class TestOptionsStore : ICoopOptionsStore
     {
         public string FilePath => string.Empty;
-        public PlayerKillFeedColor? SavedColor { get; private set; }
+        public CoopOptions? SavedOptions { get; private set; }
 
-        public bool TryLoad(out PlayerKillFeedColor color)
+        public bool TryLoad(out CoopOptions options)
         {
-            if (SavedColor.HasValue)
+            if (SavedOptions != null)
             {
-                color = SavedColor.Value;
+                options = SavedOptions;
                 return true;
             }
 
-            color = default;
+            options = null!;
             return false;
         }
 
-        public PlayerKillFeedColor LoadOrDefault()
+        public CoopOptions LoadOrDefault()
         {
-            return SavedColor ?? new PlayerKillFeedColor(59, 130, 246);
+            return SavedOptions ?? new CoopOptions();
         }
 
-        public void Save(PlayerKillFeedColor color)
+        public void Save(CoopOptions options)
         {
-            SavedColor = color;
+            SavedOptions = options;
         }
     }
 }

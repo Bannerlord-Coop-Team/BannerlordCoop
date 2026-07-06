@@ -19,7 +19,7 @@ public class PlayerKillFeedColorHandler : IHandler
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
     private readonly IPlayerKillFeedColorService colorService;
-    private readonly IPlayerKillFeedColorOptionsStore optionsStore;
+    private readonly ICoopOptionsStore optionsStore;
     private readonly IControllerIdProvider controllerIdProvider;
 
     public PlayerKillFeedColorHandler(
@@ -27,7 +27,7 @@ public class PlayerKillFeedColorHandler : IHandler
         INetwork network,
         IPlayerManager playerManager,
         IPlayerKillFeedColorService colorService,
-        IPlayerKillFeedColorOptionsStore optionsStore,
+        ICoopOptionsStore optionsStore,
         IControllerIdProvider controllerIdProvider)
     {
         this.messageBroker = messageBroker;
@@ -64,7 +64,8 @@ public class PlayerKillFeedColorHandler : IHandler
     private void Handle_PlayerKillFeedColorResendRequested(MessagePayload<PlayerKillFeedColorResendRequested> payload)
     {
         if (ModInformation.IsServer) return;
-        if (!optionsStore.TryLoad(out var color)) return;
+        if (!optionsStore.TryLoad(out var options)) return;
+        if (!options.TryGetKillFeedColor(out var color)) return;
 
         CacheLocalColor(color);
         network.SendAll(new NetworkRequestKillFeedColor(color.Red, color.Green, color.Blue));

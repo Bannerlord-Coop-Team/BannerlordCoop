@@ -7,7 +7,7 @@ namespace GameInterface.Services.UI;
 
 public class CoopOptionsVM : ViewModel
 {
-    private readonly IPlayerKillFeedColorOptionsStore optionsStore;
+    private readonly ICoopOptionsStore optionsStore;
     private readonly IMessageBroker messageBroker;
 
     private int red;
@@ -26,16 +26,16 @@ public class CoopOptionsVM : ViewModel
     {
     }
 
-    public CoopOptionsVM(IPlayerKillFeedColorOptionsStore optionsStore) : this(optionsStore, MessageBroker.Instance)
+    public CoopOptionsVM(ICoopOptionsStore optionsStore) : this(optionsStore, MessageBroker.Instance)
     {
     }
 
-    public CoopOptionsVM(IPlayerKillFeedColorOptionsStore optionsStore, IMessageBroker messageBroker)
+    public CoopOptionsVM(ICoopOptionsStore optionsStore, IMessageBroker messageBroker)
     {
         this.optionsStore = optionsStore;
         this.messageBroker = messageBroker;
 
-        ApplyColor(optionsStore.LoadOrDefault());
+        ApplyColor(optionsStore.LoadOrDefault().GetKillFeedColorOrDefault());
     }
 
     [DataSourceProperty]
@@ -71,7 +71,9 @@ public class CoopOptionsVM : ViewModel
 
         try
         {
-            optionsStore.Save(color);
+            var options = optionsStore.LoadOrDefault();
+            options.SetKillFeedColor(color);
+            optionsStore.Save(options);
             messageBroker.Publish(this, new PlayerKillFeedColorSelected(color));
         }
         catch
@@ -107,13 +109,13 @@ public class CoopOptionsVM : ViewModel
         }
     }
 
-    private static IPlayerKillFeedColorOptionsStore ResolveOptionsStore()
+    private static ICoopOptionsStore ResolveOptionsStore()
     {
-        if (ContainerProvider.TryResolve<IPlayerKillFeedColorOptionsStore>(out var store))
+        if (ContainerProvider.TryResolve<ICoopOptionsStore>(out var store))
         {
             return store;
         }
 
-        return new PlayerKillFeedColorOptionsStore();
+        return new CoopOptionsStore();
     }
 }
