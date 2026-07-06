@@ -59,10 +59,8 @@ internal class PlayerOccupancyPauseHandler : IHandler
     private bool AllPlayersOccupied()
     {
         var players = playerManager.Players;
-        return players.Any() && players.All(player =>
+        return players.Any() && players.Where(playerManager.IsConnected).All(player =>
         {
-            // TODO skip disconnected players
-
             if (!objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty))
                 return false;
 
