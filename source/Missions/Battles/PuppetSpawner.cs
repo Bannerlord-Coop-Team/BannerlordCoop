@@ -170,7 +170,7 @@ public class PuppetSpawner : IPuppetSpawner
         agent.FadeIn();
         if (data.Health > 0) agent.Health = data.Health;
 
-        formationAssigner.Assign(agent);
+        formationAssigner.Assign(agent, data.FormationIndex);
 
         // Adopt our own hero as the controllable main agent of this mission.
         if (isOwnAgent)

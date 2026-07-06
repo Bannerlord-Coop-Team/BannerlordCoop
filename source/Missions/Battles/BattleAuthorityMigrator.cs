@@ -209,8 +209,8 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
                 despawned++;
             }
 
-            // A non-host owns nothing but its own party, and nobody adopts a retreater — clear ALL its
-            // registered mounts so none stays routed to a controller that no longer answers.
+            // A non-host owns nothing but its own party, and nobody adopts a retreater — clear or re-key ALL
+            // its registered mounts so none stays routed to a controller that no longer answers.
             CleanUpDepartedMounts(controllerId, despawnedRiders, allMounts: true);
 
             if (despawned > 0)
@@ -221,14 +221,17 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     // [Game thread] Clean up a departed controller's registered MOUNTS. A horse registered to a controller
     // that no longer answers would be unkillable everywhere (hits on it route to its authority), so its
     // registry entries must not outlive it: the horses whose riders withdrew here (or that stand masterless)
-    // fade out with the party; one that a LIVE rider of another owner took over is only deregistered, falling
-    // back to rider-keyed damage routing. With allMounts false, only the withdrawn riders' horses are touched —
-    // the rest stay registered for the adoption path (a promoted successor takes them over).
+    // fade out with the party; one that a LIVE rider of another owner took over transfers to that owner
+    // instead — it stays registered (horse-keyed damage routing + death broadcast keep answering), and every
+    // client resolves the same rider, so they all converge on the same new authority. With allMounts false,
+    // only the withdrawn riders' horses are touched — the rest stay registered for the adoption path (a
+    // promoted successor takes them over).
     private void CleanUpDepartedMounts(string controllerId, HashSet<Agent> despawnedRiders, bool allMounts)
     {
         var registry = coopMissionComponent.AgentRegistry;
 
         int removed = 0;
+        int transferred = 0;
         foreach (var info in registry.GetAgents(controllerId))
         {
             var agent = info.Agent;
@@ -238,7 +241,19 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
             bool riderWithdrew = rider != null && despawnedRiders.Contains(rider);
             if (!allMounts && !riderWithdrew) continue;
 
+            // A live rider of another owner is on this horse: re-key the horse to that owner rather than
+            // dropping it to the unregistered fallback (which cannot broadcast the horse's death, and loses
+            // movement authority entirely once that rider dismounts).
             bool ridden = rider != null && rider.IsActive() && !riderWithdrew;
+            if (ridden
+                && registry.TryGetAgentInfo(rider, out var riderInfo)
+                && riderInfo.CurrentAuthority != controllerId
+                && registry.TryTransferAuthority(riderInfo.CurrentAuthority, info.AgentId))
+            {
+                transferred++;
+                continue;
+            }
+
             if (!ridden && agent.IsActive())
                 agent.FadeOut(false, true);
 
@@ -246,8 +261,9 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
             removed++;
         }
 
-        if (removed > 0)
-            Logger.Information("[BattleSync] Cleaned up {Count} registered mount(s) of departed {Controller}", removed, controllerId);
+        if (removed > 0 || transferred > 0)
+            Logger.Information("[BattleSync] Cleaned up registered mount(s) of departed {Controller}: {Removed} removed, {Transferred} transferred to their riders' owners",
+                controllerId, removed, transferred);
     }
 
     // [Host] A player left/dropped from this battle. Their troops must not vanish: the current host adopts
@@ -417,12 +433,14 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     }
 
     // Turn an inert puppet (driven only by replicated movement) into a real AI combatant under the host's
-    // command: place it in its team's formation for its troop class and hand it to the engine AI so it
-    // maneuvers and fights like the host's own AI troops. The formation is set AI-controlled because in a
+    // command: keep the formation slot its owner placed it in (mirrored at spawn) and hand it to the engine AI
+    // so it maneuvers and fights like the host's own AI troops. The formation is set AI-controlled because in a
     // coop battle the host fights as a hero, not a general, so nothing would otherwise order it to engage.
     private void ConvertPuppetToHostAi(Agent agent)
     {
-        formationAssigner.Assign(agent)?.SetControlledByAI(true);
+        // Fall back to the troop-class default only if the puppet has no formation yet.
+        var formation = agent.Formation ?? formationAssigner.Assign(agent);
+        formation?.SetControlledByAI(true);
 
         agent.Controller = AgentControllerType.AI;
 

@@ -26,6 +26,10 @@ public sealed class MockMission
     public MockTeam AttackerTeam { get; } = new MockTeam(BattleSideEnum.Attacker);
     public MockTeam DefenderTeam { get; } = new MockTeam(BattleSideEnum.Defender);
 
+    /// <summary>The local player's team, returned by the <c>Mission.PlayerTeam</c> shim (the non-host retreat
+    /// despawn filters by its side). Null until a test assigns one of the side teams.</summary>
+    public MockTeam PlayerTeam { get; set; }
+
     private readonly Dictionary<int, Agent> agentsByIndex = new();
     private int nextIndex;
 
