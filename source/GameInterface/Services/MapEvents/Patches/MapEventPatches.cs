@@ -180,12 +180,15 @@ internal class MapEventPatches
         if (CallOriginalPolicy.IsOriginalAllowed())
             return true;
 
-        RaidAiInterventionSuppression.SuppressJoinedDefenders(__instance);
+        if (__instance.IsRaidHostileAction())
+        {
+            RaidAiInterventionSuppression.SuppressJoinedDefenders(__instance);
 
-        // Slow village raids are campaign-map progress events, so the server must tick them even
-        // though they involve a player party and a settlement defender without a MobileParty.
-        if (__instance.IsActiveSlowVillageRaid())
-            return true;
+            // Slow raids are the only village hostile action with a campaign-map progress loop. Non-raid hostile
+            // actions still follow normal player battle gating so they do not resolve while a client is choosing mode.
+            if (__instance.IsActiveSlowVillageRaid())
+                return true;
+        }
 
         // Skip if any parties are not set
         if (__instance.InvolvedParties.Any(x => x?.MobileParty is null))

@@ -2,6 +2,7 @@ using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
@@ -166,6 +167,14 @@ internal class MapEventCreationCoordinator : IHandler
     {
         if (ModInformation.IsClient) return;
 
+        GameThread.RunSafe(
+            () => CreateAndReplyToMapEventRequest(payload),
+            blocking: true,
+            context: nameof(Handle_NetworkRequestCreateMapEvent));
+    }
+
+    private void CreateAndReplyToMapEventRequest(MessagePayload<NetworkRequestCreateMapEvent> payload)
+    {
         var request = payload.What;
         if (!TryGetRequestingPeer(payload, request, out var requestingPeer))
             return;
@@ -176,7 +185,7 @@ internal class MapEventCreationCoordinator : IHandler
         if (!TryConsumeApprovedMapEventStart(request, attacker, defender))
             return;
 
-        string mapEventId = CreateMapEventOnGameThread(request, attacker, defender);
+        string mapEventId = CreateMapEvent(request, attacker, defender);
         if (string.IsNullOrEmpty(mapEventId))
         {
             // Intentionally do not respond; the client will time out and abort its battle start.
@@ -233,30 +242,24 @@ internal class MapEventCreationCoordinator : IHandler
         return false;
     }
 
-    private string CreateMapEventOnGameThread(
+    private string CreateMapEvent(
         NetworkRequestCreateMapEvent request,
         PartyBase attacker,
         PartyBase defender)
     {
         string mapEventId = null;
 
-        // MapEvent creation mutates campaign state and must run on the server's main thread. The AllowedThread scope
-        // lets the resulting StartBattleInternal/MapEvent construction run through unblocked by the mod's patches,
-        // and registers the new MapEvent (broadcasting it to clients) before we read back its id.
-        GameThread.RunSafe(
-            () =>
-            {
-                var parties = GetMapEventParties(attacker, defender);
-                var mapEvent = MapEventBattleFactory.CreateMapEvent(parties.Attacker, parties.Defender, request.Flags);
-                if (mapEvent == null) return;
+        var parties = GetMapEventParties(attacker, defender);
+        var mapEvent = MapEventBattleFactory.CreateMapEvent(parties.Attacker, parties.Defender, request.Flags);
+        if (mapEvent == null) return null;
 
-                if (!objectManager.TryGetIdWithLogging(mapEvent, out mapEventId))
-                {
-                    Logger.Error("Server created a map event but it has no registered id. RequestId={RequestId}", request.RequestId);
-                }
-            },
-            blocking: true,
-            context: nameof(Handle_NetworkRequestCreateMapEvent));
+        if (mapEvent.IsVillageHostileAction())
+            MapEventHostileActionConsequences.Apply(mapEvent, parties.Attacker, "village hostile action start");
+
+        if (!objectManager.TryGetIdWithLogging(mapEvent, out mapEventId))
+        {
+            Logger.Error("Server created a map event but it has no registered id. RequestId={RequestId}", request.RequestId);
+        }
 
         return mapEventId;
     }

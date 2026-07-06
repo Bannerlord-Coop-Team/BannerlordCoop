@@ -9,5 +9,11 @@ internal static class MapEventConfig
     // campaign day; after it passes, AI can no longer join a player's battle (see Postfix_CanPartyJoinBattle).
     public const int PlayerBattleAiJoinWindowHours = 24;
 
-    public static bool AllowRaidAiIntervention { get; set; } = true;
+    private static volatile bool allowRaidAiIntervention = true;
+
+    public static bool AllowRaidAiIntervention
+    {
+        get => allowRaidAiIntervention;
+        set => allowRaidAiIntervention = value;
+    }
 }

@@ -10,6 +10,7 @@ using Serilog;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
@@ -29,7 +30,6 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface
     private static readonly ILogger Logger = LogManager.GetLogger<VillageHostileActionInterface>();
 
     private const int ForceActionCooldownDays = 10;
-    private const int PlayerHostilityRelationPenalty = -10;
     private static readonly TimeSpan MapEventStartApprovalTimeout = TimeSpan.FromSeconds(30);
 
     private readonly IMessageBroker messageBroker;
@@ -37,7 +37,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface
     private readonly ConcurrentDictionary<string, MapEventStartApproval> approvedMapEventStarts = new ConcurrentDictionary<string, MapEventStartApproval>();
     private readonly ConcurrentDictionary<string, bool> pendingHostileActionSettlements = new ConcurrentDictionary<string, bool>();
     private readonly ConcurrentDictionary<string, CampaignTime> forceActionCooldowns = new ConcurrentDictionary<string, CampaignTime>();
-    private readonly ConcurrentDictionary<string, bool> appliedForceActionOutcomes = new ConcurrentDictionary<string, bool>();
+    private readonly ConditionalWeakTable<MapEvent, AppliedForceActionOutcomeState> appliedForceActionOutcomes = new ConditionalWeakTable<MapEvent, AppliedForceActionOutcomeState>();
 
     public VillageHostileActionInterface(IMessageBroker messageBroker, IObjectManager objectManager)
     {
@@ -79,6 +79,13 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface
             case VillageHostileAction.ForceSupplies:
                 encounter.ForceSupplies = true;
                 break;
+        }
+
+        if (encounter._mapEvent == null)
+        {
+            var mapEvent = PlayerEncounter.StartBattle();
+            if (mapEvent == null)
+                Logger.Warning("Village hostile action presentation started without a map event");
         }
 
         GameMenu.SwitchToMenu("encounter");
@@ -203,10 +210,10 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface
         return true;
     }
 
+
     public void ApplyHostileAction(MobileParty mobileParty, Settlement settlement, VillageHostileAction action)
     {
         BeHostileAction.ApplyEncounterHostileAction(mobileParty.Party, settlement.Party);
-        ApplyPlayerHostilityWar(mobileParty.Party, settlement.Party);
     }
 
     public void ApplyForceActionOutcome(MapEvent mapEvent, VillageHostileAction action)
@@ -225,15 +232,12 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface
         if (!IsAttackerVictory(mapEvent))
             return;
 
-        if (!TryGetOutcomeKey(mapEvent, action, out var outcomeKey))
-            return;
-
         var attacker = mapEvent.AttackerSide?.LeaderParty?.MobileParty;
         var settlement = GetHostileActionSettlement(mapEvent);
         if (attacker == null || settlement?.Village == null)
             return;
 
-        if (!appliedForceActionOutcomes.TryAdd(outcomeKey, true))
+        if (!TryMarkForceActionOutcomeApplied(mapEvent, action))
             return;
 
         switch (action)
@@ -458,11 +462,19 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface
 
         var troop = settlement.Culture?.BasicTroop;
         if (troop != null && recruitCount > 0)
-            mobileParty.MemberRoster.AddToCounts(troop, recruitCount);
+        {
+            using (AllowedThread.Suspend())
+            {
+                mobileParty.MemberRoster.AddToCounts(troop, recruitCount);
+            }
+        }
 
         SetForceActionCooldown(settlement);
-        settlement.SettlementHitPoints *= 0.2f;
-        village.Hearth -= recruitCount / 2;
+        using (AllowedThread.Suspend())
+        {
+            settlement.SettlementHitPoints *= 0.2f;
+            village.Hearth -= recruitCount / 2;
+        }
         SkillLevelingManager.OnForceVolunteers(mobileParty, settlement.Party);
     }
 
@@ -509,36 +521,6 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface
         messageBroker.Publish(this, new VillageHostileActionCooldownsChanged(GetActiveCooldowns()));
     }
 
-    private static void ApplyPlayerHostilityWar(PartyBase attackerParty, PartyBase defenderParty)
-    {
-        if (Campaign.Current == null)
-            return;
-
-        if (attackerParty == null || defenderParty == null)
-            return;
-
-        var attackerFaction = GetMapFaction(attackerParty.MapFaction);
-        var defenderFaction = GetMapFaction(defenderParty.MapFaction);
-        if (attackerFaction == null || defenderFaction == null || attackerFaction == defenderFaction)
-            return;
-
-        if (Campaign.Current.Models.EncounterModel.IsEncounterExemptFromHostileActions(attackerParty, defenderParty))
-            return;
-
-        if (VillageHostileFactionStanceHelper.HasWarStance(attackerFaction, defenderFaction))
-            return;
-
-        if (attackerParty.LeaderHero != null && defenderFaction.Leader != null)
-            ChangeRelationAction.ApplyRelationChangeBetweenHeroes(attackerParty.LeaderHero, defenderFaction.Leader, PlayerHostilityRelationPenalty);
-
-        DeclareWarAction.ApplyByPlayerHostility(attackerFaction, defenderFaction);
-        VillageHostileFactionStanceHelper.ApplyWarStance(attackerFaction, defenderFaction);
-    }
-
-    private static IFaction GetMapFaction(IFaction faction)
-    {
-        return faction?.MapFaction ?? faction;
-    }
 
     private sealed class MapEventStartApproval
     {
@@ -627,15 +609,32 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface
         pendingHostileActionSettlements.TryRemove(settlementId, out _);
     }
 
-    private bool TryGetOutcomeKey(MapEvent mapEvent, VillageHostileAction action, out string key)
+    private bool TryMarkForceActionOutcomeApplied(MapEvent mapEvent, VillageHostileAction action)
     {
-        key = null;
+        var state = appliedForceActionOutcomes.GetValue(mapEvent, _ => new AppliedForceActionOutcomeState());
+        switch (action)
+        {
+            case VillageHostileAction.ForceVolunteers:
+                if (state.ForceVolunteersApplied)
+                    return false;
 
-        if (!objectManager.TryGetId(mapEvent, out var mapEventId))
-            return false;
+                state.ForceVolunteersApplied = true;
+                return true;
+            case VillageHostileAction.ForceSupplies:
+                if (state.ForceSuppliesApplied)
+                    return false;
 
-        key = $"{mapEventId}|{(int)action}";
-        return true;
+                state.ForceSuppliesApplied = true;
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private sealed class AppliedForceActionOutcomeState
+    {
+        public bool ForceVolunteersApplied;
+        public bool ForceSuppliesApplied;
     }
 
     private static bool IsAttackerVictory(MapEvent mapEvent)

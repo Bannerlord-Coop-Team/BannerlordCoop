@@ -139,7 +139,7 @@ public class ClientSettlementExitEnterHandler : IHandler
             {
                 var mainParty = MobileParty.MainParty;
                 objectManager.TryGetId(mainParty, out var partyId);
-                if (string.IsNullOrEmpty(obj.What.PartyId) == false && obj.What.PartyId != partyId)
+                if (!string.IsNullOrEmpty(obj.What.PartyId) && obj.What.PartyId != partyId)
                 {
                     return;
                 }

@@ -1,5 +1,6 @@
 using Common.Messaging;
 using ProtoBuf;
+using System;
 
 namespace GameInterface.Services.MapEvents.Messages;
 
@@ -18,7 +19,7 @@ internal readonly struct NetworkRaidBattleResetToVillage : ICommand
 
     public NetworkRaidBattleResetToVillage(string[] partyIds, string settlementId)
     {
-        PartyIds = partyIds;
+        PartyIds = partyIds ?? Array.Empty<string>();
         SettlementId = settlementId;
     }
 }

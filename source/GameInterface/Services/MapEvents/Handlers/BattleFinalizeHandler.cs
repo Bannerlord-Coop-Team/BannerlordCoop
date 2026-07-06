@@ -7,7 +7,9 @@ using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Interfaces;
 using LiteNetLib;
@@ -171,6 +173,8 @@ internal class BattleFinalizeHandler : IHandler
         GameThread.RunSafe(() =>
         {
             playerPartyIds = CollectPlayerPartyIds(mapEvent);
+            var raidSettlement = GetRaidFinalizationSettlement(mapEvent);
+            var raidAttackers = GetRaidAttackerPlayerParties(mapEvent);
 
             // The battle is over — drop its server-side troop reserves (ledger entry + flatten cache) so they
             // don't leak per battle. Done before FinalizeEventAux clears the parties, so the flatten-cache
@@ -178,6 +182,7 @@ internal class BattleFinalizeHandler : IHandler
             reserveBuilder.ForgetMapEvent(mapEvent);
 
             mapEvent.FinalizeEventAux();
+            MoveRaidAttackersToSettlementGate(raidAttackers, raidSettlement);
         }, blocking: true, context: nameof(FinalizeAndCollectPlayers));
         return playerPartyIds ?? Array.Empty<string>();
     }
@@ -267,6 +272,7 @@ internal class BattleFinalizeHandler : IHandler
             {
                 if (Campaign.Current == null) return;
                 if (!objectManager.TryGetId(MobileParty.MainParty?.Party, out var myPartyId)) return;
+                if (message.PartyIds == null || message.PartyIds.Length == 0) return;
                 if (Array.IndexOf(message.PartyIds, myPartyId) < 0) return;
                 if (!objectManager.TryGetObjectWithLogging<Settlement>(message.SettlementId, out var settlement)) return;
 
@@ -302,7 +308,7 @@ internal class BattleFinalizeHandler : IHandler
 
     private void ReturnPlayerPartiesToSettlement(string[] playerPartyIds, Settlement settlement)
     {
-        foreach (var playerPartyId in playerPartyIds)
+        foreach (var playerPartyId in playerPartyIds ?? Array.Empty<string>())
         {
             if (!objectManager.TryGetObject<PartyBase>(playerPartyId, out var party))
                 continue;
@@ -381,6 +387,9 @@ internal class BattleFinalizeHandler : IHandler
             // itself. Exiting menus here would close the capture screen.
             if (PlayerCaptivity.IsCaptive) return;
 
+            var mainParty = MobileParty.MainParty;
+            MoveLocalRaidPartyToSettlementGate(mainParty, GetLocalRaidFinalizationSettlement(mainParty));
+
             if (PlayerEncounter.Current != null)
             {
                 // TODO determine force out of settlement
@@ -389,5 +398,107 @@ internal class BattleFinalizeHandler : IHandler
 
             GameMenu.ExitToLast();
         });
+    }
+
+    private void MoveRaidAttackersToSettlementGate(MobileParty[] raidAttackers, Settlement settlement)
+    {
+        if (settlement?.Village == null)
+            return;
+
+        foreach (var mobileParty in raidAttackers)
+        {
+            if (mobileParty == null)
+                continue;
+
+            mobileParty.Position = settlement.GatePosition;
+            if (mobileParty.CurrentSettlement == settlement)
+                settlementInterface.PartyLeaveSettlement(mobileParty);
+
+            using (new AllowedThread())
+            {
+                mobileParty.SetMoveModeHold();
+            }
+            mobileParty.ResetNavigationToHold();
+            PublishPartyBehaviorUpdate(mobileParty);
+        }
+    }
+
+    private void MoveLocalRaidPartyToSettlementGate(MobileParty mainParty, Settlement settlement)
+    {
+        if (mainParty == null || settlement?.Village == null)
+            return;
+
+        using (new AllowedThread())
+        {
+            mainParty.Position = settlement.GatePosition;
+            if (mainParty.CurrentSettlement == settlement)
+                settlementInterface.PartyLeaveSettlement(mainParty);
+
+            mainParty.ResetNavigationToHold();
+        }
+    }
+
+    private void PublishPartyBehaviorUpdate(MobileParty mobileParty)
+    {
+        if (!objectManager.TryGetId(mobileParty, out var mobilePartyId))
+            return;
+
+        var data = new PartyBehaviorUpdateData(
+            mobilePartyId,
+            mobileParty.DefaultBehavior,
+            null,
+            mobileParty.Position,
+            false,
+            mobileParty.Position,
+            mobileParty.DefaultBehavior,
+            mobileParty.TargetPosition,
+            mobileParty.DesiredAiNavigationType);
+        messageBroker.Publish(this, new PartyBehaviorUpdated(ref data));
+    }
+
+    private static MobileParty[] GetRaidAttackerPlayerParties(MapEvent mapEvent)
+    {
+        if (mapEvent?.IsRaidHostileAction() != true || mapEvent.AttackerSide == null)
+            return Array.Empty<MobileParty>();
+
+        return mapEvent.AttackerSide.Parties
+            .Select(mapEventParty => mapEventParty.Party?.MobileParty)
+            .Where(mobileParty => mobileParty?.IsPlayerParty() == true)
+            .ToArray();
+    }
+
+    private static Settlement GetLocalRaidFinalizationSettlement(MobileParty mainParty)
+    {
+        var settlement = GetRaidFinalizationSettlement(PlayerEncounter.Battle ?? mainParty?.MapEvent);
+        if (settlement != null)
+            return settlement;
+
+        if (PlayerEncounter.Current?.ForceRaid == true && mainParty?.CurrentSettlement?.Village != null)
+            return mainParty.CurrentSettlement;
+
+        return null;
+    }
+
+    private static Settlement GetRaidFinalizationSettlement(MapEvent mapEvent)
+    {
+        if (mapEvent?.IsRaidHostileAction() != true)
+            return null;
+
+        if (mapEvent.MapEventSettlement?.Village != null)
+            return mapEvent.MapEventSettlement;
+
+        if (mapEvent.DefenderSide?.LeaderParty?.Settlement?.Village != null)
+            return mapEvent.DefenderSide.LeaderParty.Settlement;
+
+        if (mapEvent.DefenderSide == null)
+            return null;
+
+        foreach (var mapEventParty in mapEvent.DefenderSide.Parties)
+        {
+            if (mapEventParty.Party?.Settlement?.Village != null)
+                return mapEventParty.Party.Settlement;
+        }
+
+        return null;
     }
 }

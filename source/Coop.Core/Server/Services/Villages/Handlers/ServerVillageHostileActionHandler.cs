@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Network.Messages;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Connections.Messages;
+using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Settlements.Interfaces;
@@ -29,6 +30,7 @@ internal class ServerVillageHostileActionHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly ISettlementInterface settlementInterface;
     private readonly IVillageHostileActionInterface villageHostileActionInterface;
+    private readonly IRaidAiInterventionConfigInterface raidAiInterventionConfigInterface;
 
     public ServerVillageHostileActionHandler(
         IMessageBroker messageBroker,
@@ -36,7 +38,8 @@ internal class ServerVillageHostileActionHandler : IHandler
         IObjectManager objectManager,
         IPlayerManager playerManager,
         ISettlementInterface settlementInterface,
-        IVillageHostileActionInterface villageHostileActionInterface)
+        IVillageHostileActionInterface villageHostileActionInterface,
+        IRaidAiInterventionConfigInterface raidAiInterventionConfigInterface)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -44,6 +47,7 @@ internal class ServerVillageHostileActionHandler : IHandler
         this.playerManager = playerManager;
         this.settlementInterface = settlementInterface;
         this.villageHostileActionInterface = villageHostileActionInterface;
+        this.raidAiInterventionConfigInterface = raidAiInterventionConfigInterface;
 
         messageBroker.Subscribe<NetworkRequestVillageHostileAction>(Handle_NetworkRequestVillageHostileAction);
         messageBroker.Subscribe<VillageHostileActionCooldownsChanged>(Handle_VillageHostileActionCooldownsChanged);
@@ -161,9 +165,15 @@ internal class ServerVillageHostileActionHandler : IHandler
         if (!ModInformation.IsServer) return;
 
         GameThread.RunSafe(
-            () => SendCooldownSnapshot(payload.What.playerId),
+            () => SendJoinSnapshots(payload.What.playerId),
             blocking: true,
             context: nameof(Handle_PlayerCampaignEntered));
+    }
+
+    private void SendJoinSnapshots(NetPeer peer)
+    {
+        SendCooldownSnapshot(peer);
+        SendRaidAiInterventionConfigSnapshot(peer);
     }
 
     private void SendCooldownSnapshot(NetPeer peer)
@@ -173,5 +183,10 @@ internal class ServerVillageHostileActionHandler : IHandler
             return;
 
         network.Send(peer, new NetworkVillageHostileActionCooldowns(cooldowns));
+    }
+
+    private void SendRaidAiInterventionConfigSnapshot(NetPeer peer)
+    {
+        raidAiInterventionConfigInterface.SendSnapshot(peer);
     }
 }

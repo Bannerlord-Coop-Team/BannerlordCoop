@@ -210,6 +210,11 @@ internal class RaidProductionRewardsHandler : IHandler
 
     private bool TryGetRewardItemId(ItemObject item, out string itemId)
     {
+        itemId = null;
+
+        if (item == null)
+            return false;
+
         if (objectManager.TryGetId(item, out itemId))
             return true;
 

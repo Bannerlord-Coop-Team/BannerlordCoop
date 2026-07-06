@@ -121,7 +121,8 @@ internal class PlayerStartCaptivityPatches
 
         foreach (var party in winnerParties)
         {
-            if (party?.Party?.MemberRoster.TotalManCount <= 0)
+            var partyBase = party?.Party;
+            if (partyBase?.MemberRoster == null || partyBase.MemberRoster.TotalManCount <= 0)
                 continue;
 
             if (captor == null || party.ContributionToBattle > captor.ContributionToBattle)

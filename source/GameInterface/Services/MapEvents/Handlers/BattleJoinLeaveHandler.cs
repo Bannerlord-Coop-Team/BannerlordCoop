@@ -163,8 +163,8 @@ internal class BattleJoinLeaveHandler : IHandler
                 // The setter runs the native MapEventSide.AddPartyInternal on the server (NOT under AllowedThread), so the
                 // AddIntercept publishes the battle-party add and it replicates to every client through the map-event sync.
                 party.MapEventSide = side;
-                if (mapEvent.IsRaidHostileAction() && data.Side == BattleSideEnum.Attacker)
-                    MapEventHostileActionConsequences.Apply(mapEvent, party, "raid attacker join");
+                if (mapEvent.IsVillageHostileAction() && data.Side == BattleSideEnum.Attacker)
+                    MapEventHostileActionConsequences.Apply(mapEvent, party, "village hostile action attacker join");
 
                 // If this battle is being auto-resolved, pull the joiner into the simulation instead of leaving it stuck in
                 // the encounter menu. A ForwardingBattleObserver on the event means a server-driven simulation is running.

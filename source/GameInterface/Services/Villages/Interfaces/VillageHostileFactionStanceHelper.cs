@@ -1,7 +1,4 @@
-using HarmonyLib;
 using System;
-using System.Collections.Generic;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 
@@ -9,11 +6,6 @@ namespace GameInterface.Services.Villages.Interfaces;
 
 internal static class VillageHostileFactionStanceHelper
 {
-    private static readonly FieldInfo ClanFactionsAtWarWithField = AccessTools.Field(typeof(Clan), "_factionsAtWarWith");
-    private static readonly FieldInfo KingdomFactionsAtWarWithField = AccessTools.Field(typeof(Kingdom), "_factionsAtWarWith");
-    private static readonly FieldInfo FactionManagerStancesField = AccessTools.Field(typeof(FactionManager), "_stances");
-    private static readonly FieldInfo StancesDataDictionaryField = AccessTools.Field(typeof(FactionManagerStancesData), "_stances");
-
     public static bool HasWarStance(IFaction faction1, IFaction faction2)
     {
         if (faction1 == null || faction2 == null || faction1 == faction2)
@@ -46,8 +38,7 @@ internal static class VillageHostileFactionStanceHelper
 
     private static void EnsureStanceLinkRegistered(IFaction faction1, IFaction faction2, StanceLink stanceLink)
     {
-        var stancesData = FactionManagerStancesField.GetValue(FactionManager.Instance);
-        var stances = (Dictionary<(IFaction, IFaction), StanceLink>)StancesDataDictionaryField.GetValue(stancesData);
+        var stances = FactionManager.Instance._stances._stances;
         stances[GetStanceKey(faction1, faction2)] = stanceLink;
     }
 
@@ -82,29 +73,18 @@ internal static class VillageHostileFactionStanceHelper
 
     private static MBList<IFaction> GetFactionsAtWarWith(IFaction faction)
     {
-        FieldInfo field;
-        object owner;
         if (faction is Clan clan)
         {
-            field = ClanFactionsAtWarWithField;
-            owner = clan;
-        }
-        else if (faction is Kingdom kingdom)
-        {
-            field = KingdomFactionsAtWarWithField;
-            owner = kingdom;
-        }
-        else
-        {
-            return null;
+            clan._factionsAtWarWith ??= new MBList<IFaction>();
+            return clan._factionsAtWarWith;
         }
 
-        var factionsAtWarWith = (MBList<IFaction>)field.GetValue(owner);
-        if (factionsAtWarWith != null)
-            return factionsAtWarWith;
+        if (faction is Kingdom kingdom)
+        {
+            kingdom._factionsAtWarWith ??= new MBList<IFaction>();
+            return kingdom._factionsAtWarWith;
+        }
 
-        factionsAtWarWith = new MBList<IFaction>();
-        field.SetValue(owner, factionsAtWarWith);
-        return factionsAtWarWith;
+        return null;
     }
 }

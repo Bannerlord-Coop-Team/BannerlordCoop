@@ -281,7 +281,7 @@ internal class MapEventSideDataHandler : IHandler
 
     private static void SwitchRaiderToEncounterIfNeeded(MapEvent mapEvent)
     {
-        if (!ModInformation.IsClient)
+        if (ModInformation.IsServer)
             return;
 
         if (mapEvent.IsRaidHostileAction() == false || mapEvent.IsActiveSlowVillageRaid())

@@ -13,6 +13,7 @@ using GameInterface.Services.GuantletMapEventVisuals;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Kingdoms;
+using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.Modules;
@@ -101,6 +102,7 @@ internal abstract class TestComponentBase
         RegisterMock<IAutoRegistryFactory>(builder);
         RegisterMock<IBattleTroopReserveBuilder>(builder);
         RegisterMock<IMapEventBattleSizeCorrection>(builder);
+        RegisterMock<IRaidAiInterventionConfigInterface>(builder);
         RegisterMock<IVillageHostileActionInterface>(builder);
 
         // ISaveInterface is consumed by TransferSaveState's constructor, which packages a save the
