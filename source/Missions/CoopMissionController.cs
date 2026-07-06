@@ -98,6 +98,15 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         coopMissionComponent.AgentMovementHandler.Dispose();
         coopMissionComponent.AgentActionHandler.Dispose();
 
+        // Detach the remaining per-mission sync handlers too. They only unsubscribe from the broker in Dispose
+        // (no poller), so without this their stale subscriptions from a torn-down mission keep handling messages
+        // alongside the next mission's fresh handlers until the GC finalizer runs.
+        coopMissionComponent.MissileHandler.Dispose();
+        coopMissionComponent.WeaponDropHandler.Dispose();
+        coopMissionComponent.WeaponPickupHandler.Dispose();
+        coopMissionComponent.ShieldDamageHandler.Dispose();
+        coopMissionComponent.AgentDeathHandler.Dispose();
+
         OnLeaving();
 
         base.OnEndMission();
