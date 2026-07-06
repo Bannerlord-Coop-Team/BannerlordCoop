@@ -210,7 +210,6 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface
         return true;
     }
 
-
     public void ApplyHostileAction(MobileParty mobileParty, Settlement settlement, VillageHostileAction action)
     {
         BeHostileAction.ApplyEncounterHostileAction(mobileParty.Party, settlement.Party);
@@ -520,7 +519,6 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface
         forceActionCooldowns[settlementId] = CampaignTime.DaysFromNow(ForceActionCooldownDays);
         messageBroker.Publish(this, new VillageHostileActionCooldownsChanged(GetActiveCooldowns()));
     }
-
 
     private sealed class MapEventStartApproval
     {

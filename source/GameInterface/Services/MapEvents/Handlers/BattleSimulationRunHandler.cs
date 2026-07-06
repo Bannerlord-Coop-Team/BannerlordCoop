@@ -517,43 +517,56 @@ internal class BattleSimulationRunHandler : IHandler
 
             // Broadcast message: only a client whose own party is on the winning side runs the loot flow;
             // losing or uninvolved spectators ignore it.
-            if (!objectManager.TryGetId(PartyBase.MainParty, out var mainPartyId))
-                return;
-
-            if (message.Winners?.Any(w => w.PartyId == mainPartyId) != true)
+            if (!IsWinningLootRecipient(message))
                 return;
 
             // Re-applying server-authoritative results; the roster patches must stand down during the apply.
             using (new AllowedThread())
             {
-                // The loot/capture chance models drop any winner with ContributionToBattle == 0, which is the
-                // case on the client (its simulation engine never ran). Restore the server's values first.
-                foreach (var winner in message.Winners ?? Array.Empty<BattleSimWinner>())
-                {
-                    if (!objectManager.TryGetObject<PartyBase>(winner.PartyId, out var winnerParty))
-                        continue;
-
-                    var winnerMapEventParty = FindMapEventParty(mapEvent, winnerParty);
-                    if (winnerMapEventParty != null)
-                        winnerMapEventParty._contributionToBattle = winner.ContributionToBattle;
-                }
-
-                foreach (var defeated in message.DefeatedParties ?? Array.Empty<BattleSimDefeatedParty>())
-                {
-                    if (!objectManager.TryGetObject<PartyBase>(defeated.PartyId, out var party))
-                        continue;
-
-                    var mapEventParty = FindMapEventParty(mapEvent, party);
-                    if (mapEventParty == null)
-                        continue;
-
-                    ApplyCasualties(mapEventParty.DiedInBattle, defeated.Died);
-                    ApplyCasualties(mapEventParty.WoundedInBattle, defeated.Wounded);
-                }
-
+                ApplyWinnerContributions(mapEvent, message.Winners);
+                ApplyDefeatedPartyCasualties(mapEvent, message.DefeatedParties);
                 mapEvent.BattleState = message.WinningState;
             }
         });
+    }
+
+    private bool IsWinningLootRecipient(NetworkBattleSimulationLoot message)
+    {
+        if (!objectManager.TryGetId(PartyBase.MainParty, out var mainPartyId))
+            return false;
+
+        return message.Winners?.Any(w => w.PartyId == mainPartyId) == true;
+    }
+
+    private void ApplyWinnerContributions(MapEvent mapEvent, BattleSimWinner[] winners)
+    {
+        // The loot/capture chance models drop any winner with ContributionToBattle == 0, which is the
+        // case on the client (its simulation engine never ran). Restore the server's values first.
+        foreach (var winner in winners ?? Array.Empty<BattleSimWinner>())
+        {
+            if (!objectManager.TryGetObject<PartyBase>(winner.PartyId, out var winnerParty))
+                continue;
+
+            var winnerMapEventParty = FindMapEventParty(mapEvent, winnerParty);
+            if (winnerMapEventParty != null)
+                winnerMapEventParty._contributionToBattle = winner.ContributionToBattle;
+        }
+    }
+
+    private void ApplyDefeatedPartyCasualties(MapEvent mapEvent, BattleSimDefeatedParty[] defeatedParties)
+    {
+        foreach (var defeated in defeatedParties ?? Array.Empty<BattleSimDefeatedParty>())
+        {
+            if (!objectManager.TryGetObject<PartyBase>(defeated.PartyId, out var party))
+                continue;
+
+            var mapEventParty = FindMapEventParty(mapEvent, party);
+            if (mapEventParty == null)
+                continue;
+
+            ApplyCasualties(mapEventParty.DiedInBattle, defeated.Died);
+            ApplyCasualties(mapEventParty.WoundedInBattle, defeated.Wounded);
+        }
     }
 
     private void ApplyCasualties(TroopRoster roster, BattleSimCasualty[] casualties)
