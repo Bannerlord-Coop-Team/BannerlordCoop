@@ -7,14 +7,14 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.MobileParties;
 
-public class OnPartyInteractionHandlerTests
+public class PlayerPartyInteractionHandlerTests
 {
     private readonly Mock<IObjectManager> objectManager = new();
-    private readonly OnPartyInteractionHandler handler;
+    private readonly PlayerPartyInteractionHandler handler;
 
-    public OnPartyInteractionHandlerTests()
+    public PlayerPartyInteractionHandlerTests()
     {
-        handler = new OnPartyInteractionHandler(objectManager.Object);
+        handler = new PlayerPartyInteractionHandler(objectManager.Object);
     }
 
     [Fact]
