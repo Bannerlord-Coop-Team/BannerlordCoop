@@ -4,9 +4,10 @@ namespace GameInterface.Services.MapEvents;
 
 /// <summary>
 /// [Server] Authoritative gate that keeps a map event in a single battle-resolution mode: the first player to start
-/// a live mission OR an auto-resolve simulation claims the event, and the other mode is refused until the event is
-/// released (finalized). The client-side <c>BattleModeEncounterOptionsPatch</c> greys the menu out for UX; this is
-/// the backstop that wins the race when two clients act within the broadcast latency window.
+/// a live mission OR an auto-resolve simulation claims the event, and the other mode is refused until the claim is
+/// released. A mission claim ends when its mission instance becomes empty; either claim ends when the event
+/// finalizes. The client-side <c>BattleModeEncounterOptionsPatch</c> greys the menu out for UX; this is the backstop
+/// that wins the race when two clients act within the broadcast latency window.
 /// </summary>
 /// <remarks>
 /// Server-only state. Keyed by map-event object-manager id, so concurrent battles on different events are
@@ -41,6 +42,24 @@ internal static class ServerBattleModeArbiter
                 return current == mode;
 
             modes[mapEventId] = mode;
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Release a live-mission claim after the final mission member leaves. Returns false when the event is unclaimed
+    /// or already belongs to a simulation, so a duplicate mission departure cannot clear a newer simulation claim.
+    /// </summary>
+    public static bool ReleaseMission(string mapEventId)
+    {
+        if (mapEventId == null) return false;
+
+        lock (lockObj)
+        {
+            if (!modes.TryGetValue(mapEventId, out var current) || current != Mode.Mission)
+                return false;
+
+            modes.Remove(mapEventId);
             return true;
         }
     }

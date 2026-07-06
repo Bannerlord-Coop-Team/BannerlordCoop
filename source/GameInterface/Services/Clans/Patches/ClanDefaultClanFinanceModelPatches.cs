@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.Clans.Extensions;
+﻿using GameInterface.Services.Alleys.Patches;
+using GameInterface.Services.Clans.Extensions;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
@@ -7,6 +8,7 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.Clans.Patches;
 
 [HarmonyPatch(typeof(DefaultClanFinanceModel))]
+[HarmonyPatchCategory(AlleyIncomePatch.DeferredCategory)]
 internal class ClanDefaultClanFinanceModelPatches
 {
     [HarmonyPatch(nameof(DefaultClanFinanceModel.AddExpenseFromLeaderParty))]
