@@ -7,7 +7,7 @@ using TaleWorlds.MountAndBlade.GauntletUI.Mission.Singleplayer;
 namespace GameInterface.Services.UI.Patches;
 
 /// <summary>
-/// Restores the authoritative attacker and killing blow while the kill feed handles a replicated death.
+/// Supplies the authoritative attacker and killing blow while the kill feed handles a replicated death.
 /// </summary>
 [HarmonyPatch(typeof(MissionGauntletKillNotificationSingleplayerUIHandler),
     nameof(MissionGauntletKillNotificationSingleplayerUIHandler.OnAgentRemoved),
