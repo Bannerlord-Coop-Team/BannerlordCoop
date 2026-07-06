@@ -221,7 +221,10 @@ namespace GameInterface.Services.Heroes.Handlers
 
                     using (new AllowedThread())
                     {
-                        hero._ownedWorkshops.Add(workshop);
+                        if (!hero._ownedWorkshops.Contains(workshop))
+                        {
+                            hero._ownedWorkshops.Add(workshop);
+                        }
                     }
                 }
                 catch (Exception e)

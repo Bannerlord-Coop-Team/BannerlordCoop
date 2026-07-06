@@ -25,12 +25,12 @@ internal class CraftingOrderRegistry : AutoRegistryBase<CraftingOrder>
     {
         foreach (var townCraftingOrders in Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>()._craftingOrders)
         {
-            foreach (var craftingOrder in townCraftingOrders.Value.Slots)
+            var slots = townCraftingOrders.Value.Slots;
+            for (int i = 0; i < slots.Length; i++)
             {
-                if (objectManager.AddNewObject(craftingOrder, out var _) == false)
-                {
-                    Logger.Error($"Unable to register {nameof(CraftingOrder)}");
-                }
+                if (slots[i] == null) continue;
+
+                RegisterExistingObject($"{townCraftingOrders.Key.StringId}_{i}", slots[i]);
             }
         }
     }
