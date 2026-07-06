@@ -9,11 +9,29 @@ namespace GameInterface.Services.MapEvents;
 // live.
 internal static class MainPartyBattleRewardsCache
 {
-    private static (MapEvent MapEvent, ExplainedNumber Renown, ExplainedNumber Influence, ExplainedNumber Morale, float ContributionRate)? _snapshot;
+    private readonly struct Snapshot
+    {
+        public Snapshot(MapEvent mapEvent, ExplainedNumber renown, ExplainedNumber influence, ExplainedNumber morale, float contributionRate)
+        {
+            MapEvent = mapEvent;
+            Renown = renown;
+            Influence = influence;
+            Morale = morale;
+            ContributionRate = contributionRate;
+        }
+
+        public MapEvent MapEvent { get; }
+        public ExplainedNumber Renown { get; }
+        public ExplainedNumber Influence { get; }
+        public ExplainedNumber Morale { get; }
+        public float ContributionRate { get; }
+    }
+
+    private static Snapshot? _snapshot;
 
     public static void Capture(MapEvent mapEvent, MapEventParty mapEventParty, float contributionRate)
     {
-        _snapshot = (mapEvent, mapEventParty.GainedRenownExplained, mapEventParty.GainedInfluenceExplained,
+        _snapshot = new Snapshot(mapEvent, mapEventParty.GainedRenownExplained, mapEventParty.GainedInfluenceExplained,
             mapEventParty.GainedMoraleExplained, contributionRate);
     }
 
