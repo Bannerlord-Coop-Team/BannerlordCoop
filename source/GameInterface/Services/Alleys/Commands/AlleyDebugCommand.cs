@@ -129,10 +129,10 @@ public class AlleyDebugCommand
     {
         if (ModInformation.IsClient) return "Run coop.debug.alley.daily_tick on the server (host) only";
 
-        // Run one server daily churn pass now instead of waiting for a game day (troop decay, overseer XP,
+        // Run one server daily alley pass now instead of waiting for a game day (troop decay, overseer XP,
         // dead-leader/timeout destroy, and the 1.5% attack roll over every player-owned alley).
         MessageBroker.Instance.Publish(null, new AlleyDailyTickTriggered());
-        return "Ran the server alley daily churn once";
+        return "Ran the server alley daily tick once";
     }
 
     [CommandLineArgumentFunction("attack", "coop.debug.alley")]

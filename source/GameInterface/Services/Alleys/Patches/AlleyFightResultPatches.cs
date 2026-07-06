@@ -12,7 +12,7 @@ namespace GameInterface.Services.Alleys.Patches;
 /// win/lose result is only made authoritative by sending it to the server. These prefixes replace the
 /// client-side vanilla apply - which sets the attacker's owner, grants XP and changes hero stats locally,
 /// diverging from the server and double-counting the XP the server already replicates - with a request the
-/// <see cref="Handlers.AlleyChurnHandler"/> adjudicates. That handler also switches the result menu.
+/// <see cref="Handlers.AlleyHandler"/> adjudicates. That handler also switches the result menu.
 /// Never called on the host (no PlayerAlleyData there), so the vanilla body is left intact on the server.
 /// </summary>
 [HarmonyPatch(typeof(AlleyCampaignBehavior.PlayerAlleyData))]

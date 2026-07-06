@@ -15,8 +15,8 @@ namespace GameInterface.Services.Alleys.Patches;
 /// behavior derefs <c>Hero.MainHero</c> throughout, so the client runs the co-op-safe handlers (the
 /// manage-alley menus/dialogs, the alley scene NPCs, and the per-player UX: the lost-ownership popup,
 /// the don't-die-in-an-alley-fight guard, and the alley-leader-can't-lead-a-party restriction). The AI
-/// churn (daily ticks, hero-killed) can't run per client - the host's <c>_playerOwnedCommonAreaData</c>
-/// is empty and RNG would diverge - so those handlers publish a trigger the server-side AlleyChurnHandler
+/// activity (daily ticks, hero-killed) can't run per client - the host's <c>_playerOwnedCommonAreaData</c>
+/// is empty and RNG would diverge - so those handlers publish a trigger the server-side AlleyHandler
 /// applies authoritatively; new-game gang seeding runs on the server only; and the occupied/cleared
 /// handlers stay off (the take-over is already driven through AlleyManagementHandler).
 /// </summary>
@@ -66,7 +66,7 @@ internal class AlleyCampaignBehaviorPatches
     [HarmonyPrefix]
     private static bool OnAlleyClearedByPlayerPrefix() => false;
 
-    // AI churn: on the server, hand off to AlleyChurnHandler (RNG rolled once, results replicated) and
+    // AI activity: on the server, hand off to AlleyHandler (RNG rolled once, results replicated) and
     // skip the vanilla body on both sides (host list is empty, per-client RNG would diverge).
     [HarmonyPatch("DailyTick")]
     [HarmonyPrefix]

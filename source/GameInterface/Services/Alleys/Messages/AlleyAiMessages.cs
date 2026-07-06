@@ -8,13 +8,13 @@ using TaleWorlds.CampaignSystem.Settlements;
 namespace GameInterface.Services.Alleys.Messages;
 
 // --- Local triggers: published on the server from the gated vanilla-handler patches so the
-// authoritative alley churn runs server-side (over CoopSession-tracked alleys, not the host's empty
-// _playerOwnedCommonAreaData) instead of the divergent per-client vanilla body. ---
+// authoritative alley daily simulation runs server-side (over CoopSession-tracked alleys, not the host's
+// empty _playerOwnedCommonAreaData) instead of the divergent per-client vanilla body. ---
 
 /// <summary>Vanilla <c>DailyTick</c> fired; run the server-authoritative daily alley sim.</summary>
 public readonly struct AlleyDailyTickTriggered : IEvent { }
 
-/// <summary>Vanilla <c>DailyTickSettlement</c> fired for a settlement; run the gang-vs-gang alley churn.</summary>
+/// <summary>Vanilla <c>DailyTickSettlement</c> fired for a settlement; run the gang-vs-gang alley ownership tick.</summary>
 public readonly struct AlleyDailyTickSettlementTriggered : IEvent
 {
     public readonly Settlement Settlement;
