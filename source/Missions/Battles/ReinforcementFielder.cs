@@ -36,6 +36,7 @@ public class ReinforcementFielder : IReinforcementFielder
     private readonly IObjectManager objectManager;
     private readonly IBattleSession session;
     private readonly IBattleDeploymentCoordinator deployment;
+    private readonly IAgentFormationAssigner formationAssigner;
 
     // [Host] Map-event party ids we have already fielded as mid-battle reinforcements, so a repeated involved-
     // parties broadcast for the same party doesn't double-spawn it.
@@ -45,12 +46,14 @@ public class ReinforcementFielder : IReinforcementFielder
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         IBattleSession session,
-        IBattleDeploymentCoordinator deployment)
+        IBattleDeploymentCoordinator deployment,
+        IAgentFormationAssigner formationAssigner)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.session = session;
         this.deployment = deployment;
+        this.formationAssigner = formationAssigner;
 
         // [Host] A new AI party joining the live battle is fielded through our own spawn path (reinforcements).
         messageBroker.Subscribe<NetworkAddInvolvedParties>(Handle_ReinforcementPartiesAdded);
@@ -159,7 +162,7 @@ public class ReinforcementFielder : IReinforcementFielder
 
     // [Host, game thread] Spawn one reinforcement troop AI-controlled. With no InitialPosition set, the engine
     // positions it at the side's reinforcement spawn frame; we then drop it into its troop-class formation.
-    private static Agent SpawnReinforcementTroop(Mission mission, Team team, CharacterObject character, PartyBase party)
+    private Agent SpawnReinforcementTroop(Mission mission, Team team, CharacterObject character, PartyBase party)
     {
         var origin = new CoopAgentOrigin(character, party, -1, null, new UniqueTroopDescriptor(MBRandom.RandomInt(int.MaxValue)));
         var equipment = character.IsHero ? character.HeroObject.BattleEquipment : character.Equipment;
@@ -177,7 +180,7 @@ public class ReinforcementFielder : IReinforcementFielder
         var agent = mission.SpawnAgent(buildData);
         agent.FadeIn();
 
-        AgentFormationAssigner.Assign(agent);
+        formationAssigner.Assign(agent);
 
         // Wake the AI exactly as the adopt and NPC-release paths do. Without this the reinforcement is
         // AI-controlled but NOT alarmed and holds stale enemy caches, so it ignores its formation's Charge order

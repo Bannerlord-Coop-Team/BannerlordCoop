@@ -41,6 +41,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     private readonly IBattleSession session;
     private readonly ICasualtyAttributionMap casualties;
     private readonly IBattleDeploymentCoordinator deployment;
+    private readonly IAgentFormationAssigner formationAssigner;
 
     // Hosts that RETREATED (graceful leave) — read when the promotion lands so the adoption knows to leave the
     // retreater's own-party troops to the despawn instead of adopting them. Only touched from broker handlers,
@@ -56,7 +57,8 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         ICoopMissionComponent coopMissionComponent,
         IBattleSession session,
         ICasualtyAttributionMap casualties,
-        IBattleDeploymentCoordinator deployment)
+        IBattleDeploymentCoordinator deployment,
+        IAgentFormationAssigner formationAssigner)
     {
         this.relayNetwork = relayNetwork;
         this.messageBroker = messageBroker;
@@ -66,6 +68,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         this.session = session;
         this.casualties = casualties;
         this.deployment = deployment;
+        this.formationAssigner = formationAssigner;
 
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
         messageBroker.Subscribe<MissionPeerLeft>(Handle_PeerLeft);
@@ -359,9 +362,9 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     // command: place it in its team's formation for its troop class and hand it to the engine AI so it
     // maneuvers and fights like the host's own AI troops. The formation is set AI-controlled because in a
     // coop battle the host fights as a hero, not a general, so nothing would otherwise order it to engage.
-    private static void ConvertPuppetToHostAi(Agent agent)
+    private void ConvertPuppetToHostAi(Agent agent)
     {
-        AgentFormationAssigner.Assign(agent)?.SetControlledByAI(true);
+        formationAssigner.Assign(agent)?.SetControlledByAI(true);
 
         agent.Controller = AgentControllerType.AI;
 
