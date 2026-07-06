@@ -153,6 +153,9 @@ internal class MapEventPatches
         if (ModInformation.IsClient)
             return false;
 
+        // Need to calculate map event results before committing changes
+        __instance.CalculateMapEventResults();
+
         if (__instance.ContainsPlayerParty())
         {
             // Run a custom implementation of MapEvent.CalculateAndCommitMapEventResults that broadcasts results to players
@@ -160,7 +163,14 @@ internal class MapEventPatches
             MessageBroker.Instance.Publish(__instance, message);
         }
 
-        return true;
+        IBattleObserver battleObserver = __instance.BattleObserver;
+        if (battleObserver == null)
+        {
+            return false;
+        }
+        battleObserver.BattleResultsReady();
+
+        return false;
     }
 
     [HarmonyPatch("CommitCalculatedMapEventResults")]

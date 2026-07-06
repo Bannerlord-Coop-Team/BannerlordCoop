@@ -1,4 +1,5 @@
-﻿using ProtoBuf;
+﻿using GameInterface.Services.TroopRosters.Data;
+using ProtoBuf;
 using System.Collections.Generic;
 using TaleWorlds.Core;
 
@@ -10,11 +11,19 @@ public readonly struct NetworkPlayerLootData
     [ProtoMember(1)]
     public readonly Dictionary<string, ItemRosterElement[]> LootedItems;
 
-    //[ProtoMember(2)]
-    //public readonly Dictionary<string, TroopRosterElementData[]> LootedTroops; // ??
+    [ProtoMember(2)]
+    public readonly Dictionary<string, TroopRosterData> LootedMembers;
 
-    public NetworkPlayerLootData(Dictionary<string, ItemRosterElement[]> lootedItems)
+    [ProtoMember(3)]
+    public readonly Dictionary<string, TroopRosterData> LootedPrisoners;
+
+    public NetworkPlayerLootData(
+        Dictionary<string, ItemRosterElement[]> lootedItems,
+        Dictionary<string, TroopRosterData> lootedMembers,
+        Dictionary<string, TroopRosterData> lootedPrisoners)
     {
         LootedItems = lootedItems;
+        LootedMembers = lootedMembers;
+        LootedPrisoners = lootedPrisoners;
     }
 }

@@ -277,10 +277,10 @@ internal class PvPInteractionClientHandler : IHandler
                         encounter.EncounterState = PlayerEncounterState.LootParty;
                         break;
                     case PlayerEncounterState.LootParty:
-                        encounter.DoLootMembersAndPrisonersOfParty(); // PUT onPlayerLootMembersAndPrisonerEnd in AllowedThread
+                        encounter.DoLootMembersAndPrisonersOfParty(); // Put onPlayerLootMembersAndPrisonerEnd in AllowedThread
                         break;
                     case PlayerEncounterState.LootInventory:
-                        encounter.DoLootInventory(); // Doesn't look like items looted from defeated enemies are being dropped, only items the party has
+                        encounter.DoLootInventory();
                         break;
                     case PlayerEncounterState.LootShips:
                         encounter.DoLootShips();

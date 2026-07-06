@@ -69,6 +69,7 @@ internal class MapEventResultsHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.MapEventId, out var mapEvent)) return;
             var playerLootData = mapEventResultsInterface.UnpackPlayerLootData(data.PlayerLootData);
 
+            // Set the encounter state ahead to start at applying results when a winning player leaves the battle
             var playerEncounter = PlayerEncounter.Current;
             if (mapEvent.WinningSide == PartyBase.MainParty.Side)
             {
@@ -87,7 +88,21 @@ internal class MapEventResultsHandler : IHandler
                 playerEncounter.RosterToReceiveLootItems.Add(playerLootedItems.Value);
             }
 
+            // Add looted members to player encounter
+            foreach (var playerLootedMembers in playerLootData.LootedMembers)
+            {
+                if (playerLootedMembers.Key.Party != PartyBase.MainParty) continue;
+
+                playerEncounter.RosterToReceiveLootMembers.Add(playerLootedMembers.Value);
+            }
+
             // Add looted prisoners to player encounter
+            foreach (var playerLootedPrisoners in playerLootData.LootedPrisoners)
+            {
+                if (playerLootedPrisoners.Key.Party != PartyBase.MainParty) continue;
+
+                playerEncounter.RosterToReceiveLootPrisoners.Add(playerLootedPrisoners.Value);
+            }
         });
     }
 }

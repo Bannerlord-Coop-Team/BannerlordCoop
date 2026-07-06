@@ -13,6 +13,8 @@ using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using MathF = TaleWorlds.Library.MathF;
+using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.UI.Notifications.Messages;
 
 namespace GameInterface.Services.MapEventParties.Patches;
 
@@ -142,5 +144,19 @@ internal class MapEventPartyPatches
         }
 
         return false;
+    }
+
+    [HarmonyPatch(nameof(MapEventParty.CommitGoldChanges))]
+    [HarmonyPostfix]
+    public static void CommitGoldChangesPostfix(MapEventParty __instance)
+    {
+        if (ModInformation.IsClient) return;
+
+        // Plundering gold is a different message to the regular gold change
+        Hero leaderHero = __instance.Party.LeaderHero;
+        if (__instance.PlunderedGold > 0 && leaderHero != null && leaderHero.IsPlayerHero())
+        {
+            MessageBroker.Instance.Publish(__instance, new NotifyGoldPlundered(leaderHero, __instance.PlunderedGold));
+        }
     }
 }
