@@ -23,6 +23,8 @@ public class NetworkConfig : INetworkConfig
     // TODO find better token
     public string Token { get; set; } = "TempToken";
 
+    public bool IsTunneled { get; set; }
+
     public string P2PToken => throw new NotImplementedException();
 
     public int MaxPacketsInQueue => 10000;
