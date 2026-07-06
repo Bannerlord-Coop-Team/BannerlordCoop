@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using GameInterface.Services.MapEvents;
 using Missions.Messages;
 using Serilog;
 using System;
@@ -69,7 +70,25 @@ public class PuppetDeathApplier : IPuppetDeathApplier
                 // an unregistered one stays a local loose horse.
                 if (agent.MountAgent != null)
                     agent.MountAgent = null;
-                agent.MakeDead(!payload.What.Wounded, ActionIndexCache.act_none);
+
+                Agent affectorAgent = null;
+                if (payload.What.AffectorAgentId != Guid.Empty
+                    && registry.TryGetAgentInfo(payload.What.AffectorAgentId, out var affectorInfo))
+                {
+                    affectorAgent = affectorInfo.Agent;
+                }
+
+                var killingBlow = payload.What.KillingBlow;
+                killingBlow.OwnerId = affectorAgent?.Index ?? -1;
+                var deathAction = killingBlow.IsValid
+                    ? new ActionIndexCache(killingBlow.DeathAction)
+                    : ActionIndexCache.act_none;
+
+                BattleSpawnGate.RunWithReplicatedDeath(
+                    agent,
+                    affectorAgent,
+                    killingBlow,
+                    () => agent.MakeDead(!payload.What.Wounded, deathAction));
             }
 
             // Deregister AFTER the kill, INSIDE this game-thread action. We receive this on the network thread,

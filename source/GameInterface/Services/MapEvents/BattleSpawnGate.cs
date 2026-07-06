@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.MapEvents;
@@ -21,6 +21,15 @@ public static class BattleSpawnGate
 
     [System.ThreadStatic]
     private static bool _suppressCapture;
+
+    [System.ThreadStatic]
+    private static Agent _replicatedDeathAgent;
+
+    [System.ThreadStatic]
+    private static Agent _replicatedDeathAffector;
+
+    [System.ThreadStatic]
+    private static KillingBlow _replicatedKillingBlow;
 
     /// <summary>
     /// Set around a puppet spawn (<c>CoopBattleController.SpawnPuppet</c>) so the spawn-capture patch does NOT
@@ -48,6 +57,54 @@ public static class BattleSpawnGate
     /// rider-keyed gating. Process-global like the rest of this gate: one live battle per game process.
     /// </summary>
     public static Func<Agent, bool?> MountAuthorityProbe { get; set; }
+
+    /// <summary>Runs a replicated puppet death with the owner's kill-feed metadata available to UI patches.</summary>
+    public static void RunWithReplicatedDeath(
+        Agent affectedAgent,
+        Agent affectorAgent,
+        KillingBlow killingBlow,
+        Action applyDeath)
+    {
+        var previousAgent = _replicatedDeathAgent;
+        var previousAffector = _replicatedDeathAffector;
+        var previousKillingBlow = _replicatedKillingBlow;
+
+        _replicatedDeathAgent = affectedAgent;
+        _replicatedDeathAffector = affectorAgent;
+        _replicatedKillingBlow = killingBlow;
+        try
+        {
+            applyDeath();
+        }
+        finally
+        {
+            _replicatedDeathAgent = previousAgent;
+            _replicatedDeathAffector = previousAffector;
+            _replicatedKillingBlow = previousKillingBlow;
+        }
+    }
+
+    public static bool IsReplicatedDeath(Agent affectedAgent)
+    {
+        return ReferenceEquals(_replicatedDeathAgent, affectedAgent);
+    }
+
+    public static bool TryGetReplicatedDeath(
+        Agent affectedAgent,
+        out Agent affectorAgent,
+        out KillingBlow killingBlow)
+    {
+        if (!IsReplicatedDeath(affectedAgent))
+        {
+            affectorAgent = null;
+            killingBlow = default;
+            return false;
+        }
+
+        affectorAgent = _replicatedDeathAffector;
+        killingBlow = _replicatedKillingBlow;
+        return true;
+    }
 
     public static string ActiveMapEventId
     {

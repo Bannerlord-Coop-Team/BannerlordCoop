@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
 using Autofac;
@@ -424,12 +424,14 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
-    private static bool Agent_MakeDead(Agent __instance)
+    private static bool Agent_MakeDead(Agent __instance, bool isKilled, ActionIndexCache actionIndex)
     {
         // A killed agent is gone: mirror it dead+inactive so death-broadcast paths are assertable.
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
         m.Health = 0f;
         m.IsActive = false;
+        m.WasKilled = isKilled;
+        m.DeathAction = actionIndex.Index;
         return false;
     }
 
