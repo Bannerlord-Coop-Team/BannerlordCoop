@@ -171,13 +171,19 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
 
     public void ConnectToInstance(string instanceId)
     {
+        // The relay send and the connection-accept check both read this, so it is set even
+        // when the punch below is skipped.
+        this.instanceId = instanceId;
+
+        // A tunneled session cannot punch: the rendezvous only observes loopback pump
+        // endpoints, so mission traffic stays on the per-send server relay fallback.
+        if (Config.IsTunneled) return;
+
         Logger.Verbose("Attempting NAT Punch");
 
         ConnectionToken token = new ConnectionToken(ControllerId, instanceId);
 
         netManager.NatPunchModule.SendNatIntroduceRequest(relayNetwork.ServerEndpoint, token);
-
-        this.instanceId = instanceId;
     }
 
     public void OnNatIntroductionRequest(IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token)
