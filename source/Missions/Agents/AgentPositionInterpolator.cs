@@ -190,7 +190,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         Vec3 mountTarget = target.HasMountSnapPosition ? target.MountSnapPosition : target.Position;
         Vec3 cur = mount.Position;
         float alpha = System.Math.Min(1f, MountedFollowRate * dt);
-        Vec3 next = cur.Distance(mountTarget) > MountSnapDistance ? mountTarget : cur + (mountTarget - cur) * alpha;
+        Vec3 next = cur.Distance(mountTarget) > MountSnapDistance ? mountTarget : cur + ((mountTarget - cur) * alpha);
 
         mount.TeleportToPosition(next);
         mount.SetMovementDirection(target.MovementDirection);
