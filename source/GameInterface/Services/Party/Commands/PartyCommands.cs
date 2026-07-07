@@ -2,6 +2,7 @@ using Autofac;
 using Common;
 using Common.Logging;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Party.Patches;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
 using Serilog;
@@ -9,6 +10,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Party.Commands;
@@ -175,6 +177,32 @@ internal class PartyCommands
         }
 
         return stringBuilder.ToString();
+    }
+
+    // coop.debug.mobileparty.siege_buff
+    /// <summary>
+    /// Fills a party to 2000 troops, maxes its morale, and forces a high map speed so it can march to
+    /// and win a siege for testing. Server only; the troop add replicates via the roster sync. Get the
+    /// party id from coop.debug.mobileparty.whoami on the client that owns the party.
+    /// </summary>
+    [CommandLineArgumentFunction("siege_buff", "coop.debug.mobileparty")]
+    public static string SiegeBuffCommand(List<string> strings)
+    {
+        if (ModInformation.IsClient) return "Command can only be run on the server.";
+        if (strings.Count != 1) return "Usage: coop.debug.mobileparty.siege_buff <partyId>";
+        if (TryGetObjectManager(out var objectManager) == false) return "Unable to resolve ObjectManager.";
+        if (!objectManager.TryGetObject(strings[0], out MobileParty party)) return $"Party with id {strings[0]} not found";
+
+        var troop = party.MapFaction?.Culture?.EliteBasicTroop ?? party.MapFaction?.Culture?.BasicTroop;
+        if (troop == null) return $"Could not resolve a troop for {party.Name}'s culture";
+
+        int toAdd = 2000 - party.MemberRoster.TotalManCount;
+        if (toAdd > 0) party.MemberRoster.AddToCounts(troop, toAdd);
+
+        party.RecentEventsMorale = 100f;
+        PartyDebugBuffPatches.Boost(party);
+
+        return $"Buffed {party.Name} ({party.StringId}): {party.MemberRoster.TotalManCount} troops, max morale, boosted speed and party-size limit";
     }
 
     /// <summary>
