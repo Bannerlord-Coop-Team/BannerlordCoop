@@ -69,6 +69,7 @@ internal class MapEventResultsHandler : IHandler
             var playerLootData = mapEventResultsInterface.UnpackPlayerLootData(data.PlayerLootData);
 
             // Set the encounter state ahead to start at applying results when a winning player leaves the battle
+            // CaptureHeroes is the first EncounterState that doesn't rely on the MapEvent, which is already destroyed when a player leaves a battle
             var playerEncounter = PlayerEncounter.Current;
             if (mapEvent.WinningSide == PartyBase.MainParty.Side)
             {
