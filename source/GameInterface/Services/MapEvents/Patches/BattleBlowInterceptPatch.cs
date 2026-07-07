@@ -3,6 +3,8 @@ using Common.Util;
 using GameInterface.Services.MapEvents.Messages;
 using HarmonyLib;
 using TaleWorlds.Core;
+using TaleWorlds.Engine;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.MapEvents.Patches;
@@ -63,14 +65,39 @@ internal class BattleBlowInterceptPatch
                 return true;
         }
 
+        var attacker = Mission.Current?.FindAgentWithIndex(blow.OwnerId);
+        PlaySuppressedHitSound(__instance, attacker, blow, collisionData);
+
         // Suppress locally and route the WHOLE blow (+ collision data) to the victim's owner, which re-applies
         // it through Agent.RegisterBlow so the engine resolves real damage/ragdoll/death. blow.OwnerId is the
-        // attacker's LOCAL index here — resolve the agent so the owner can re-map it to its own local index.
+        // attacker's LOCAL index here, resolve the agent so the owner can re-map it to its own local index.
         if (blow.InflictedDamage > 0)
         {
-            var attacker = Mission.Current?.FindAgentWithIndex(blow.OwnerId);
             MessageBroker.Instance.Publish(__instance, new BattlePuppetHit(__instance, attacker, blow, collisionData, isMount));
         }
         return false;
+    }
+
+    private static void PlaySuppressedHitSound(Agent victim, Agent attacker, Blow blow, AttackCollisionData collisionData)
+    {
+        if (blow.BlowFlag.HasAnyFlag(BlowFlags.NoSound)) return;
+
+        var mission = victim.Mission ?? Mission.Current;
+        if (mission == null) return;
+
+        bool isCriticalBlow = blow.IsBlowCrit(victim.Monster.HitPoints * 4);
+        bool isLowBlow = blow.IsBlowLow(victim.Monster.HitPoints);
+        bool isOwnerHumanoid = attacker?.IsHuman ?? true;
+        bool isNonTipThrust = blow.BlowFlag.HasAnyFlag(BlowFlags.NonTipThrust);
+        int hitSound = blow.WeaponRecord.GetHitSound(isOwnerHumanoid, isCriticalBlow, isLowBlow, isNonTipThrust, blow.AttackType, blow.DamageType);
+        float soundParameterForArmorType = Agent.GetSoundParameterForArmorType(victim.GetProtectorArmorMaterialOfBone(blow.BoneIndex));
+        var parameter = new SoundEventParameter("Armor Type", soundParameterForArmorType);
+
+        mission.MakeSound(hitSound, blow.GlobalPosition, soundCanBePredicted: false, isReliable: true, blow.OwnerId, victim.Index, ref parameter);
+        if (blow.IsMissile && attacker != null)
+            mission.MakeSoundOnlyOnRelatedPeer(CombatSoundContainer.SoundCodeMissionCombatPlayerhit, blow.GlobalPosition, attacker.Index);
+
+        if (!collisionData.IsSneakAttack)
+            mission.AddSoundAlarmFactorToAgents(attacker, in blow.GlobalPosition, 7f);
     }
 }
