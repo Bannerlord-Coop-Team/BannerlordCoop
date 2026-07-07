@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using Common;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.SiegeEvents.Patches;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -79,19 +80,13 @@ public class SiegeDebugCommand
         // Put the besieger at the gate and commit its AI to the siege.
         besieger.Position = settlement.GatePosition;
         besieger.SetMoveBesiegeSettlement(settlement, MobileParty.NavigationType.Default);
-
-        // A lone forced besieger is re-tasked away by AiMilitaryBehavior's hourly think, which doesn't
-        // back this siege (DoNotMakeNewDecisions only gates short-term initiative, not the hourly
-        // re-task), so it wanders off after an hour. Wrap it in a Besieger army — the vanilla mechanism
-        // for a held AI siege — so the think stops re-deciding and it stays. A minor-faction lord with
-        // no kingdom just gets the behavior flags, which hold only briefly.
-        if (besieger.Army == null && besieger.LeaderHero != null && besieger.MapFaction is Kingdom kingdom)
-        {
-            kingdom.CreateArmy(besieger.LeaderHero, settlement, Army.ArmyTypes.Besieger);
-        }
-
         Campaign.Current.SiegeEventManager.StartSiegeEvent(settlement, besieger);
-        besieger.Ai.SetDoNotMakeNewDecisions(true);
+
+        // AiMilitaryBehavior re-scores this lord every hour and, since nothing backs this forced siege,
+        // flips its DefaultBehavior off BesiegeSettlement so the camp ejects it. Pin the party so that
+        // hourly think is skipped and DefaultBehavior stays put; the siege still advances to an assault
+        // because that is driven by the siege/encounter system, not this think.
+        SiegeDebugPinPatch.Pin(besieger);
 
         return $"{besieger.Name} ({besieger.StringId}) is now besieging {settlement.Name}";
     }
