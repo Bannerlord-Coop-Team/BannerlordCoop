@@ -14,8 +14,7 @@ namespace GameInterface.Services.MapEvents.Commands;
 /// Battle-outcome test commands: kill one enemy, the whole enemy team, or the local player team in the current
 /// battle mission. Run the direct kill commands on the battle-authority client because it owns the AI/enemy
 /// agents, so each kill goes through the coop death path: <c>Agent.Die</c>, the mission death callback,
-/// the death broadcast, and the server-roster casualty, exactly like <c>coop.debug.mapevent.kms</c>. Use
-/// <c>kill_enemy_puppet</c> from a client that sees the enemy as a puppet to test routed ally kills.
+/// the death broadcast, and the server-roster casualty, exactly like <c>coop.debug.mapevent.kms</c>.
 /// </summary>
 internal class BattleTeamKillCommands
 {
@@ -51,54 +50,6 @@ Kills one live enemy-team agent in the current battle (battle-authority side).";
         }
 
         return $"Killed enemy agent: {agent.Name}";
-    }
-
-    private const string KillEnemyPuppetUsage =
-@"Usage:
-  coop.debug.mapevent.kill_enemy_puppet
-
-Routes a fatal blow from a locally controlled ally to one remote-owned enemy puppet.";
-
-    [CommandLineArgumentFunction("kill_enemy_puppet", "coop.debug.mapevent")]
-    public static string KillEnemyPuppet(List<string> args)
-    {
-        var ctx = new CommandContext("kill_enemy_puppet", KillEnemyPuppetUsage, args);
-        if (!ctx.RequireArgCount(0, out var error))
-            return error;
-
-        var mission = Mission.Current;
-        if (mission is null)
-            return "Failed: no active mission.";
-        if (mission.PlayerTeam is null)
-            return "Failed: no player team in this mission.";
-
-        var attacker = mission.PlayerTeam.ActiveAgents
-            .FirstOrDefault(agent => agent != null && agent.IsActive() && agent.Controller == AgentControllerType.AI)
-            ?? Agent.Main;
-        if (attacker == null || !attacker.IsActive())
-            return "Failed: no locally controlled allied agent.";
-
-        var victim = mission.Agents.FirstOrDefault(agent =>
-            agent != null
-            && agent.IsActive()
-            && agent.IsHuman
-            && agent.Controller == AgentControllerType.None
-            && agent.Team != null
-            && agent.Team.IsEnemyOf(mission.PlayerTeam));
-        if (victim == null)
-            return "Failed: no remote-owned enemy puppet.";
-
-        try
-        {
-            var blow = CreateFatalBlow(victim, attacker.Index);
-            victim.RegisterBlow(blow, default);
-        }
-        catch (Exception ex)
-        {
-            return CommandHelpers.FormatException("Kill enemy puppet", ex);
-        }
-
-        return $"Routed fatal blow from {attacker.Name} to enemy puppet {victim.Name}.";
     }
 
     private const string KillEnemyTeamUsage =
