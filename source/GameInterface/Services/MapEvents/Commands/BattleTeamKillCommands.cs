@@ -143,21 +143,16 @@ coop battle LOSS.";
 
     private static void Kill(Agent agent)
     {
-        var blow = CreateFatalBlow(agent, agent.Index);
-        agent.Die(blow, Agent.KillInfo.Invalid);
-    }
-
-    private static Blow CreateFatalBlow(Agent victim, int ownerId)
-    {
-        return new Blow(ownerId)
+        var blow = new Blow(agent.Index)
         {
             DamageType = DamageTypes.Pierce,
             BaseMagnitude = 100000f,
             InflictedDamage = 100000,
             DamagedPercentage = 1f,
             DamageCalculated = true,
-            GlobalPosition = victim.Position,
+            GlobalPosition = agent.Position,
             VictimBodyPart = BoneBodyPartType.Head,
         };
+        agent.Die(blow, Agent.KillInfo.Invalid);
     }
 }
