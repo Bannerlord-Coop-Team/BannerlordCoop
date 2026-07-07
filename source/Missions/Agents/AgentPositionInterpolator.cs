@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
@@ -25,17 +24,8 @@ public interface IAgentPositionInterpolator
 }
 
 /// <summary>
-/// [Game thread] Eases synced puppets toward the position their owner last reported, EVERY frame, instead of
-/// only correcting when a movement packet applies. The owner's input (which drives the puppet's own walk +
-/// animation for engine-controlled agents) is still applied on packet receipt in <see cref="Packets.AgentData.Apply"/>;
-/// humanoid and mount puppets use vanilla scripted movement toward the same target.
-/// <para>
-/// A packet apply pushes the latest target here (<see cref="SetRiderTarget"/> / <see cref="SetMountTarget"/>);
-/// <see cref="Tick"/>, driven from <c>CoopMissionController.OnMissionTick</c>, nudges each tracked agent toward
-/// its target with frame-rate-independent exponential smoothing (fraction closed per frame = 1 - e^(-dt/tau)).
-/// Below a small deadzone nothing is corrected (the input-driven walk handles it); beyond a large snap distance
-/// it teleports (spawn / genuine desync). Targets self-evict when their agent goes inactive.
-/// </para>
+/// [Game thread] Emergency position reconciliation for received puppets. Normal movement is driven from the
+/// replicated input in <see cref="PuppetMovementComponent"/>; this only snaps large gaps from spawn/real desync.
 /// <para>
 /// All access is on the game thread — packet applies run inside <c>AgentMovementHandler</c>'s
 /// <c>GameThread.RunSafe</c> and <see cref="Tick"/> runs in <c>OnMissionTick</c>, both serialized on the game
@@ -44,23 +34,9 @@ public interface IAgentPositionInterpolator
 /// </summary>
 public class AgentPositionInterpolator : IAgentPositionInterpolator
 {
-    // Easing time constant: fraction of the remaining gap closed each frame = 1 - e^(-dt/tau). Smaller = snappier
-    // (closer to the old per-packet snap), larger = smoother but lags further behind. ~0.1s reads smooth at 60fps.
-    private const float SmoothingTau = 0.3f;
-
-    // Puppets need a small deadzone so scripted movement, not teleport easing, carries visible locomotion.
-    private const float RiderDeadzone = 0.15f;
+    // Snap only when the replicated owner is far enough away that local locomotion has clearly diverged.
     private const float RiderSnapDistance = 6f;
-
-    // Mount tolerates more slack before correcting.
-    private const float MountDeadzone = 1f;
     private const float MountSnapDistance = 12f;
-
-    private const Agent.AIScriptedFrameFlags ScriptedPuppetMovementFlags =
-        Agent.AIScriptedFrameFlags.GoToPosition
-        | Agent.AIScriptedFrameFlags.ConsiderRotation
-        | Agent.AIScriptedFrameFlags.NeverSlowDown
-        | Agent.AIScriptedFrameFlags.NoAttack;
 
     private readonly Dictionary<Agent, Vec3> _targets = new Dictionary<Agent, Vec3>();
     // Reused scratch list so eviction doesn't allocate every tick.
@@ -82,23 +58,14 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     {
         if (agent == null) return;
 
-        DisableScriptedMovement(agent);
         _targets.Remove(agent);
     }
 
-    public void Clear()
-    {
-        foreach (Agent agent in _targets.Keys)
-            DisableScriptedMovement(agent);
-
-        _targets.Clear();
-    }
+    public void Clear() => _targets.Clear();
 
     public void Tick(float dt)
     {
         if (_targets.Count == 0 || dt <= 0f) return;
-
-        float alpha = 1f - (float)Math.Exp(-dt / SmoothingTau);
 
         foreach (var pair in _targets)
         {
@@ -116,40 +83,16 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                 continue;
 
             // Tolerances are constant per kind, so derive them from the agent instead of storing them per target:
-            // a mount tolerates more slack before we correct/snap; a rider is held tighter.
+            // a mount tolerates more slack before we snap; a rider is held tighter.
             bool isMount = agent.IsMount;
-            float deadzone = isMount ? MountDeadzone : RiderDeadzone;
             float snapDistance = isMount ? MountSnapDistance : RiderSnapDistance;
 
             Vec3 target = pair.Value;
             float dist = agent.Position.Distance(target);
-            bool useScriptedMovement = agent.IsHuman || agent.IsMount;
-            if (dist <= deadzone)
-            {
-                if (useScriptedMovement)
-                    DisableScriptedMovement(agent);
-                continue; // ignore tiny drift
-            }
-
-            if (useScriptedMovement)
-            {
-                if (dist > snapDistance)
-                {
-                    Teleport(agent, target);
-                    DisableScriptedMovement(agent);
-                }
-                else
-                {
-                    MovePuppet(agent, target);
-                }
-
+            if (dist <= snapDistance)
                 continue;
-            }
 
-            Vec3 next = dist > snapDistance
-                ? target                                            // large gap: snap
-                : Vec3.Lerp(agent.Position, target, alpha);         // ease
-            Teleport(agent, next);
+            Teleport(agent, target);
         }
 
         if (_evict.Count > 0)
@@ -160,26 +103,6 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         }
     }
 
-    private static void MovePuppet(Agent agent, Vec3 target)
-    {
-        var scriptedPosition = new WorldPosition(agent.Mission.Scene, UIntPtr.Zero, target, hasValidZ: false);
-        Vec2 direction = target.AsVec2 - agent.Position.AsVec2;
-        if (direction.LengthSquared <= 0.0001f)
-            direction = agent.GetMovementDirection();
-        if (direction.LengthSquared <= 0.0001f)
-            direction = agent.LookDirection.AsVec2;
-        if (direction.LengthSquared <= 0.0001f)
-            direction = Vec2.Forward;
-
-        direction.Normalize();
-        float scriptedDirection = (float)Math.Atan2(direction.Y, direction.X);
-        agent.SetScriptedPositionAndDirection(
-            ref scriptedPosition,
-            scriptedDirection,
-            addHumanLikeDelay: false,
-            ScriptedPuppetMovementFlags);
-    }
-
     private static void Teleport(Agent agent, Vec3 position)
     {
         var lookDirection = agent.LookDirection;
@@ -187,13 +110,5 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         agent.TeleportToPosition(position);
         agent.LookDirection = lookDirection;
         agent.SetMovementDirection(movementDirection);
-    }
-
-    private static void DisableScriptedMovement(Agent agent)
-    {
-        if (agent == null || !agent.IsActive()) return;
-        if (!agent.IsHuman && !agent.IsMount) return;
-
-        agent.DisableScriptedMovement();
     }
 }
