@@ -1,9 +1,11 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.SiegeEvents.Messages;
 using HarmonyLib;
+using Serilog;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -24,6 +26,8 @@ namespace GameInterface.Services.SiegeEvents.Patches;
 [HarmonyPatch]
 internal class SiegeAftermathPatches
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<SiegeAftermathPatches>();
+
     internal class PendingAftermath
     {
         public readonly MobileParty LeaderParty;
@@ -87,6 +91,12 @@ internal class SiegeAftermathPatches
     private static bool OnMapEventEndedPrefix(SiegeAftermathCampaignBehavior __instance, MapEvent mapEvent)
     {
         var battleSide = (!mapEvent.IsSallyOut && !mapEvent.IsBlockadeSallyOut) ? BattleSideEnum.Attacker : BattleSideEnum.Defender;
+
+        // TEMP [SiegeAftermathDiag]: why a capture may not route the Devastate/Pillage/Mercy choice.
+        Logger.Information("[SiegeAftermathDiag] isServer={Srv} assault={A} sallyOut={S} blockadeSally={BS} outside={O} winner={W} expectedSide={Side} settlement={Settlement}",
+            ModInformation.IsServer, mapEvent.IsSiegeAssault, mapEvent.IsSallyOut, mapEvent.IsBlockadeSallyOut, mapEvent.IsSiegeOutside,
+            mapEvent.WinningSide, battleSide, mapEvent.MapEventSettlement?.Name?.ToString() ?? "<null>");
+
         if ((!mapEvent.IsSiegeAssault && !mapEvent.IsSiegeOutside && !mapEvent.IsSallyOut && !mapEvent.IsBlockadeSallyOut)
             || mapEvent.WinningSide != battleSide || mapEvent.MapEventSettlement == null)
         {
@@ -96,6 +106,11 @@ internal class SiegeAftermathPatches
         var settlement = mapEvent.MapEventSettlement;
         var winningSide = mapEvent.GetMapEventSide(battleSide);
         var leaderParty = winningSide.LeaderParty?.MobileParty;
+
+        // TEMP [SiegeAftermathDiag]: the winning leader decides whether a player prompt or the AI pick runs.
+        Logger.Information("[SiegeAftermathDiag] leaderParty={Party} leaderHero={Hero} isPlayerHero={IsPlayer} mainPartyOnWinningSide={MainOnSide}",
+            leaderParty?.Name?.ToString() ?? "<null>", leaderParty?.LeaderHero?.Name?.ToString() ?? "<null>",
+            leaderParty?.LeaderHero != null && leaderParty.LeaderHero.IsPlayerHero(), winningSide.IsMainPartyAmongParties());
 
         var contributions = new Dictionary<MobileParty, float>();
         foreach (var item in __instance.GetLootPercentagesOfPartiesOnSideForSiegeAftermath(mapEvent, battleSide))
