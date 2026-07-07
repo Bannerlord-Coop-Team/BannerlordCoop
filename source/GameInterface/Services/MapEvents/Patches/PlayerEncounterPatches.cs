@@ -190,12 +190,23 @@ internal class PlayerEncounterPatches
             return false;
         }
 
-        // Side leader: the server is authoritative for ending the event.
-        if (ModInformation.IsServer) return true;
-
+        // Side leader: route every instance, including the host, through the synced finalize path so the
+        // local encounter menu is explicitly closed after server-authoritative teardown.
         MessageBroker.Instance.Publish(mapEvent, new MapEventFinalizeAttempted(mapEvent));
         ClearEngageOrder(mainParty);
+        CloseLocalEncounterMenu(mainParty);
         return false;
+    }
+
+    private static void CloseLocalEncounterMenu(MobileParty mainParty)
+    {
+        if (mainParty?.MapEvent != null)
+            mainParty.Party._mapEventSide = null;
+
+        if (PlayerEncounter.Current != null)
+            PlayerEncounter.Finish(true);
+
+        GameMenu.ExitToLast();
     }
 
     private static bool IsBattleJoiner()

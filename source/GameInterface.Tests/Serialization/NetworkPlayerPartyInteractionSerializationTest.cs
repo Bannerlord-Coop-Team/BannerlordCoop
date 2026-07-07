@@ -11,6 +11,23 @@ namespace GameInterface.Tests.Serialization;
 public class NetworkPlayerPartyInteractionSerializationTest
 {
     [Fact]
+    public void HostileEncounterStarted_RoundTrip_PreservesFields()
+    {
+        var original = new NetworkPlayerPartyHostileEncounterStarted(
+            "session-1",
+            "attacker-party",
+            "defender-party",
+            "map-event-1");
+
+        var result = RoundTrip(original);
+
+        Assert.Equal(original.SessionId, result.SessionId);
+        Assert.Equal(original.AttackerPartyId, result.AttackerPartyId);
+        Assert.Equal(original.DefenderPartyId, result.DefenderPartyId);
+        Assert.Equal(original.MapEventId, result.MapEventId);
+    }
+
+    [Fact]
     public void Started_RoundTrip_PreservesFields()
     {
         var original = new NetworkPlayerPartyInteractionStarted(
@@ -45,7 +62,8 @@ public class NetworkPlayerPartyInteractionSerializationTest
             responderAcceptedTrade: false,
             partyItems: new[] { new ItemRosterElementData(new ItemObjectData("party-item", null, itemModifierNull: true), 3) },
             otherPartyItems: new[] { new ItemRosterElementData(new ItemObjectData("other-item", null, itemModifierNull: true), 4) },
-            enabledOptions: new[] { PlayerPartyInteractionOption.AcceptProposal });
+            enabledOptions: new[] { PlayerPartyInteractionOption.AcceptProposal },
+            isHostile: true);
 
         var result = RoundTrip(original);
 
@@ -60,6 +78,7 @@ public class NetworkPlayerPartyInteractionSerializationTest
         Assert.Equal(original.IsInitiator, result.IsInitiator);
         Assert.Equal(original.InitiatorAcceptedTrade, result.InitiatorAcceptedTrade);
         Assert.Equal(original.ResponderAcceptedTrade, result.ResponderAcceptedTrade);
+        Assert.Equal(original.IsHostile, result.IsHostile);
         Assert.Single(result.PartyItems);
         Assert.Equal("party-item", result.PartyItems[0].ItemObjectData.ItemObjectId);
         Assert.Equal(3, result.PartyItems[0].Amount);
@@ -120,7 +139,8 @@ public class NetworkPlayerPartyInteractionSerializationTest
             new[] { new TroopRosterElementData("troop-1", 3, 1, 4) },
             offeredGold: 25,
             offeredFiefs: new[] { "fief-1" },
-            offeredPrisoners: new[] { new TroopRosterElementData("prisoner-1", 1, 0, 0) });
+            offeredPrisoners: new[] { new TroopRosterElementData("prisoner-1", 1, 0, 0) },
+            offeredPeace: true);
 
         var result = RoundTrip(original);
 
@@ -135,6 +155,7 @@ public class NetworkPlayerPartyInteractionSerializationTest
         Assert.Equal("fief-1", result.OfferedFiefs[0]);
         Assert.Single(result.OfferedPrisoners);
         Assert.Equal("prisoner-1", result.OfferedPrisoners[0].CharacterId);
+        Assert.True(result.OfferedPeace);
     }
 
     [Fact]

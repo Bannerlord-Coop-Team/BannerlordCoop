@@ -26,6 +26,7 @@ public static class PlayerPartyInteractionDialogState
     public static PlayerPartyInteractionProposal Proposal => hasState ? currentState.Proposal : PlayerPartyInteractionProposal.None;
     public static bool InitiatorAcceptedTrade => hasState && currentState.InitiatorAcceptedTrade;
     public static bool ResponderAcceptedTrade => hasState && currentState.ResponderAcceptedTrade;
+    public static bool IsHostile => hasState && currentState.IsHostile;
     public static bool HasActiveState => hasState;
 
     internal static void Apply(NetworkPlayerPartyInteractionState state)
@@ -62,6 +63,12 @@ public static class PlayerPartyInteractionDialogState
             return true;
         }
 
+        if (option == PlayerPartyInteractionOption.OfferServices && IsHostile)
+        {
+            explanation = new TextObject("{=coop_player_party_interaction_hostile_disabled}Not available while hostile");
+            return false;
+        }
+
         explanation = new TextObject("{=coop_player_party_interaction_disabled}This option is not available.");
         return false;
     }
@@ -76,6 +83,10 @@ public static class PlayerPartyInteractionDialogState
                 return $"Awaiting response from {OtherPlayerName}...";
             case PlayerPartyInteractionPhase.ProposalPending:
                 return GetProposalText();
+            case PlayerPartyInteractionPhase.HostileDemandConfirm:
+                return "Eh? What do you want?";
+            case PlayerPartyInteractionPhase.HostileDemandPending:
+                return "I offer you one chance to surrender or die";
             case PlayerPartyInteractionPhase.TradeActive:
                 return "Let us review the trade.";
             case PlayerPartyInteractionPhase.OfferServices:
@@ -96,7 +107,7 @@ public static class PlayerPartyInteractionDialogState
     {
         if (!HasActiveState) return;
         if (Phase != PlayerPartyInteractionPhase.InitialOptions) return;
-        if (!HasOption(PlayerPartyInteractionOption.OfferServices)) return;
+        if (!IsOptionEnabled(PlayerPartyInteractionOption.OfferServices)) return;
 
         currentState = new NetworkPlayerPartyInteractionState(
             currentState.SessionId,
@@ -111,7 +122,8 @@ public static class PlayerPartyInteractionDialogState
             currentState.ResponderAcceptedTrade,
             currentState.PartyItems,
             currentState.OtherPartyItems,
-            GetLocalServiceEnabledOptions());
+            GetLocalServiceEnabledOptions(),
+            currentState.IsHostile);
 
         RefreshConversation();
     }
@@ -126,6 +138,8 @@ public static class PlayerPartyInteractionDialogState
                 return "(COMING SOON) I wish to offer my services in your clan.";
             case PlayerPartyInteractionProposal.Vassal:
                 return "I wish to swear my allegiance to your majesty.";
+            case PlayerPartyInteractionProposal.HostileDemand:
+                return "I offer you one chance to surrender or die";
             default:
                 return $"{OtherPlayerName} has made a proposal.";
         }

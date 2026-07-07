@@ -3,6 +3,7 @@ using GameInterface.Services.MapEventParties;
 using GameInterface.Services.Party.Data;
 using GameInterface.Services.TroopRosters.Data;
 using ProtoBuf;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.Party.Messages;
@@ -58,6 +59,9 @@ internal readonly struct NetworkCompleteDoneLogic : ICommand
     [ProtoMember(16)]
     public readonly bool DoNotApplyGoldTransactions;
 
+    [ProtoMember(17)]
+    public readonly CampaignVec2 ReleaserPartyPosition;
+
     public NetworkCompleteDoneLogic(
         string mainHeroId,
         FlattenedTroop[] takenPrisonersRoster,
@@ -74,7 +78,8 @@ internal readonly struct NetworkCompleteDoneLogic : ICommand
         int partyGoldChangeAmount,
         int partyInfluenceChangeAmount,
         int partyMoraleChangeAmount,
-        bool doNotApplyGoldTransactions)
+        bool doNotApplyGoldTransactions,
+        CampaignVec2 releaserPartyPosition)
     {
         MainHeroId = mainHeroId;
         TakenPrisonersRoster = takenPrisonersRoster;
@@ -92,5 +97,6 @@ internal readonly struct NetworkCompleteDoneLogic : ICommand
         PartyInfluenceChangeAmount = partyInfluenceChangeAmount;
         PartyMoraleChangeAmount = partyMoraleChangeAmount;
         DoNotApplyGoldTransactions = doNotApplyGoldTransactions;
+        ReleaserPartyPosition = releaserPartyPosition;
     }
 }

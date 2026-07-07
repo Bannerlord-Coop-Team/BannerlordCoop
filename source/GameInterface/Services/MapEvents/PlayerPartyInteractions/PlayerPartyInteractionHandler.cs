@@ -18,12 +18,14 @@ using System.Linq;
 using System.Reflection;
 using TroopRosterElementData = GameInterface.Services.TroopRosters.Data.TroopRosterElementData;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.BarterSystem;
 using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
 using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Inventory;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -44,22 +46,29 @@ internal class PlayerPartyInteractionHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly ConversationPartyTracker conversationPartyTracker;
+    private readonly INetworkConfig configuration;
+    private readonly IPlayerPartyHostileEncounterService hostileEncounterService;
     private readonly PlayerPartyInteractionOutcomeHandler outcomeHandler;
 
     private readonly ConcurrentDictionary<string, PlayerPartyInteractionSession> sessionsById = new ConcurrentDictionary<string, PlayerPartyInteractionSession>();
     private readonly ConcurrentDictionary<string, string> sessionsByPartyId = new ConcurrentDictionary<string, string>();
     private readonly HashSet<string> openedConversationSessionIds = new HashSet<string>();
+    private readonly HashSet<string> hostileEncounterSessionIds = new HashSet<string>();
 
     public PlayerPartyInteractionHandler(
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
-        ConversationPartyTracker conversationPartyTracker)
+        ConversationPartyTracker conversationPartyTracker,
+        INetworkConfig configuration,
+        IPlayerPartyHostileEncounterService hostileEncounterService)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.conversationPartyTracker = conversationPartyTracker;
+        this.configuration = configuration;
+        this.hostileEncounterService = hostileEncounterService;
         outcomeHandler = new PlayerPartyInteractionOutcomeHandler(objectManager);
 
         messageBroker.Subscribe<NetworkPlayerPartyInteractionStarted>(Handle_NetworkPlayerPartyInteractionStarted);
@@ -68,6 +77,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         messageBroker.Subscribe<NetworkPlayerPartyInteractionShown>(Handle_NetworkPlayerPartyInteractionShown);
         messageBroker.Subscribe<NetworkPlayerPartyInteractionEnded>(Handle_NetworkPlayerPartyInteractionEnded);
         messageBroker.Subscribe<NetworkPlayerPartyInteractionDenied>(Handle_NetworkPlayerPartyInteractionDenied);
+        messageBroker.Subscribe<NetworkPlayerPartyHostileEncounterStarted>(Handle_NetworkPlayerPartyHostileEncounterStarted);
         messageBroker.Subscribe<PlayerPartyInteractionOptionSelected>(Handle_PlayerPartyInteractionOptionSelected);
         messageBroker.Subscribe<PlayerPartyTradeOfferChanged>(Handle_PlayerPartyTradeOfferChanged);
         messageBroker.Subscribe<PlayerPartyTradeAcceptSelected>(Handle_PlayerPartyTradeAcceptSelected);
@@ -84,6 +94,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         messageBroker.Unsubscribe<NetworkPlayerPartyInteractionShown>(Handle_NetworkPlayerPartyInteractionShown);
         messageBroker.Unsubscribe<NetworkPlayerPartyInteractionEnded>(Handle_NetworkPlayerPartyInteractionEnded);
         messageBroker.Unsubscribe<NetworkPlayerPartyInteractionDenied>(Handle_NetworkPlayerPartyInteractionDenied);
+        messageBroker.Unsubscribe<NetworkPlayerPartyHostileEncounterStarted>(Handle_NetworkPlayerPartyHostileEncounterStarted);
         messageBroker.Unsubscribe<PlayerPartyInteractionOptionSelected>(Handle_PlayerPartyInteractionOptionSelected);
         messageBroker.Unsubscribe<PlayerPartyTradeOfferChanged>(Handle_PlayerPartyTradeOfferChanged);
         messageBroker.Unsubscribe<PlayerPartyTradeAcceptSelected>(Handle_PlayerPartyTradeAcceptSelected);
@@ -106,14 +117,7 @@ internal class PlayerPartyInteractionHandler : IHandler
             return false;
         }
 
-        if (AreHostile(initiatorParty, responderParty))
-        {
-            Logger.Debug(
-                "Rejecting player-party interaction: parties are hostile. InitiatorId={InitiatorId}, ResponderId={ResponderId}",
-                request.AttackerId, request.DefenderId);
-            network.Send(initiatorPeer, new NetworkPlayerPartyInteractionDenied(PlayerPartyInteractionDeniedReason.Hostile));
-            return false;
-        }
+        var isHostile = AreHostile(initiatorParty, responderParty);
 
         var session = new PlayerPartyInteractionSession(
             Guid.NewGuid().ToString("N"),
@@ -121,7 +125,8 @@ internal class PlayerPartyInteractionHandler : IHandler
             request.DefenderId,
             GetPartyName(initiatorParty, "Player"),
             GetPartyName(responderParty, "Player"),
-            initiatorPeer);
+            initiatorPeer,
+            isHostile);
 
         AddInitialOptions(session, initiatorParty, responderParty);
 
@@ -253,7 +258,9 @@ internal class PlayerPartyInteractionHandler : IHandler
             if (conversationManager?.IsConversationInProgress == true)
                 conversationManager.EndConversation();
 
-            CloseLocalPlayerPartyEncounter(localParty?.MobileParty);
+            var hostileEncounterStarted = hostileEncounterSessionIds.Remove(message.SessionId);
+            if (message.OutcomeType != PlayerPartyInteractionOutcomeType.HostileDemandAccepted || !hostileEncounterStarted)
+                CloseLocalPlayerPartyEncounter(localParty?.MobileParty);
         }, context: "End player-party interaction");
     }
 
@@ -267,6 +274,16 @@ internal class PlayerPartyInteractionHandler : IHandler
         GameThread.RunSafe(
             ConversationPartyHold.ShowInteractionBlockedMessage,
             context: "Show player-party interaction denied");
+    }
+
+    private void Handle_NetworkPlayerPartyHostileEncounterStarted(MessagePayload<NetworkPlayerPartyHostileEncounterStarted> payload)
+    {
+        if (ModInformation.IsServer) return;
+
+        var message = payload.What;
+        GameThread.RunSafe(
+            () => TryOpenHostileEncounter(message),
+            context: "Open player-party hostile encounter");
     }
 
     private void Handle_PlayerPartyTradeOfferChanged(MessagePayload<PlayerPartyTradeOfferChanged> payload)
@@ -291,6 +308,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         var offeredTroops = message.BarterVM != null
             ? ResolveTroopIds(GetOfferedBarterTroops(message.BarterVM))
             : Array.Empty<TroopRosterElementData>();
+        var offeredPeace = message.BarterVM != null && HasOfferedPeace(message.BarterVM);
         network.SendAll(new NetworkPlayerPartyTradeOfferUpdated(
             message.SessionId,
             partyId,
@@ -298,7 +316,8 @@ internal class PlayerPartyInteractionHandler : IHandler
             offeredTroops,
             offeredGold,
             offeredFiefs,
-            offeredPrisoners));
+            offeredPrisoners,
+            offeredPeace));
     }
 
     private void Handle_PlayerPartyTradeAcceptSelected(MessagePayload<PlayerPartyTradeAcceptSelected> payload)
@@ -325,15 +344,16 @@ internal class PlayerPartyInteractionHandler : IHandler
         var message = payload.What;
         if (!sessionsById.TryGetValue(message.SessionId, out var session)) return;
         if (!TryGetSessionPartyId(session, peer, out var partyId)) return;
-        if (session.InitiatorAcceptedTrade || session.ResponderAcceptedTrade) return;
 
+        var offeredPeace = message.OfferedPeace && CanOfferPeace(session, partyId);
         session.SetTradeOffer(
             partyId,
             message.OfferedItems,
             message.OfferedTroops,
             message.OfferedGold,
             message.OfferedFiefs,
-            message.OfferedPrisoners);
+            message.OfferedPrisoners,
+            offeredPeace);
         session.InitiatorAcceptedTrade = false;
         session.ResponderAcceptedTrade = false;
         network.SendAll(new NetworkPlayerPartyTradeOfferUpdated(
@@ -343,8 +363,18 @@ internal class PlayerPartyInteractionHandler : IHandler
             message.OfferedTroops,
             message.OfferedGold,
             message.OfferedFiefs,
-            message.OfferedPrisoners));
+            message.OfferedPrisoners,
+            offeredPeace));
         SendTradeStates(session, false);
+    }
+
+    private bool CanOfferPeace(PlayerPartyInteractionSession session, string partyId)
+    {
+        var otherPartyId = session.GetOtherPartyId(partyId);
+        if (!objectManager.TryGetObject<PartyBase>(partyId, out var party)) return false;
+        if (!objectManager.TryGetObject<PartyBase>(otherPartyId, out var otherParty)) return false;
+
+        return PlayerPartyPeaceBarterable.CanOfferPeace(party, otherParty);
     }
 
     private void Handle_NetworkPlayerPartyTradeAcceptChanged(MessagePayload<NetworkPlayerPartyTradeAcceptChanged> payload)
@@ -385,12 +415,61 @@ internal class PlayerPartyInteractionHandler : IHandler
     {
         if (option == PlayerPartyInteractionOption.Leave)
         {
+            if (session.Proposal == PlayerPartyInteractionProposal.HostileDemand && session.HostileDemandConfirmed)
+                return;
+
             EndSession(session, GetLeaveOutcome(session));
             return;
         }
 
         if (option == PlayerPartyInteractionOption.OfferServices)
         {
+            return;
+        }
+
+        if (option == PlayerPartyInteractionOption.HostileDemand)
+        {
+            if (!session.InitiatorEnabledOptions.Contains(option)) return;
+
+            session.Proposal = PlayerPartyInteractionProposal.HostileDemand;
+            session.HostileDemandConfirmed = false;
+            SendInitiatorState(
+                session,
+                PlayerPartyInteractionPhase.HostileDemandConfirm,
+                session.Proposal,
+                new[]
+                {
+                    PlayerPartyInteractionOption.ConfirmHostileDemand,
+                    PlayerPartyInteractionOption.CancelHostileDemand
+                });
+            return;
+        }
+
+        if (option == PlayerPartyInteractionOption.ConfirmHostileDemand)
+        {
+            if (session.Proposal != PlayerPartyInteractionProposal.HostileDemand) return;
+            if (session.HostileDemandConfirmed) return;
+
+            session.HostileDemandConfirmed = true;
+            SendInitiatorState(session, PlayerPartyInteractionPhase.WaitingForResponse, session.Proposal, Array.Empty<PlayerPartyInteractionOption>());
+            SendResponderState(
+                session,
+                PlayerPartyInteractionPhase.HostileDemandPending,
+                session.Proposal,
+                new[]
+                {
+                    PlayerPartyInteractionOption.RefuseHostileDemand,
+                    PlayerPartyInteractionOption.YieldHostileDemand
+                });
+            return;
+        }
+
+        if (option == PlayerPartyInteractionOption.CancelHostileDemand)
+        {
+            if (session.Proposal != PlayerPartyInteractionProposal.HostileDemand) return;
+            if (session.HostileDemandConfirmed) return;
+
+            EndSession(session, PlayerPartyInteractionOutcomeType.Left);
             return;
         }
 
@@ -414,8 +493,29 @@ internal class PlayerPartyInteractionHandler : IHandler
 
     private void HandleResponderOption(PlayerPartyInteractionSession session, PlayerPartyInteractionOption option)
     {
+        if (option == PlayerPartyInteractionOption.YieldHostileDemand)
+        {
+            if (session.Proposal != PlayerPartyInteractionProposal.HostileDemand) return;
+            if (!session.HostileDemandConfirmed) return;
+
+            EndSession(session, PlayerPartyInteractionOutcomeType.HostileDemandYielded);
+            return;
+        }
+
+        if (option == PlayerPartyInteractionOption.RefuseHostileDemand)
+        {
+            if (session.Proposal != PlayerPartyInteractionProposal.HostileDemand) return;
+            if (!session.HostileDemandConfirmed) return;
+
+            EndSession(session, PlayerPartyInteractionOutcomeType.HostileDemandAccepted);
+            return;
+        }
+
         if (option == PlayerPartyInteractionOption.Leave)
         {
+            if (session.Proposal == PlayerPartyInteractionProposal.HostileDemand && session.HostileDemandConfirmed)
+                return;
+
             EndSession(session, GetLeaveOutcome(session));
             return;
         }
@@ -476,7 +576,8 @@ internal class PlayerPartyInteractionHandler : IHandler
             session.InitiatorOfferedTroops,
             session.InitiatorOfferedGold,
             session.InitiatorOfferedFiefs,
-            session.InitiatorOfferedPrisoners));
+            session.InitiatorOfferedPrisoners,
+            session.InitiatorOfferedPeace));
 
         network.SendAll(new NetworkPlayerPartyTradeOfferUpdated(
             session.SessionId,
@@ -485,7 +586,8 @@ internal class PlayerPartyInteractionHandler : IHandler
             session.ResponderOfferedTroops,
             session.ResponderOfferedGold,
             session.ResponderOfferedFiefs,
-            session.ResponderOfferedPrisoners));
+            session.ResponderOfferedPrisoners,
+            session.ResponderOfferedPeace));
     }
 
     private void SendInitiatorState(
@@ -515,14 +617,16 @@ internal class PlayerPartyInteractionHandler : IHandler
             session.ResponderAcceptedTrade,
             partyItems,
             otherPartyItems,
-            enabledOptions));
+            enabledOptions,
+            session.IsHostile));
     }
 
     private void SendResponderState(
         PlayerPartyInteractionSession session,
         PlayerPartyInteractionPhase phase,
         PlayerPartyInteractionProposal proposal,
-        PlayerPartyInteractionOption[] options)
+        PlayerPartyInteractionOption[] options,
+        PlayerPartyInteractionOption[] enabledOptions = null)
     {
         var partyItems = phase == PlayerPartyInteractionPhase.TradeActive
             ? ResolvePartyItemIds(session.ResponderPartyId)
@@ -544,7 +648,8 @@ internal class PlayerPartyInteractionHandler : IHandler
             session.ResponderAcceptedTrade,
             partyItems,
             otherPartyItems,
-            options));
+            enabledOptions,
+            session.IsHostile));
     }
 
     private void EndSession(PlayerPartyInteractionSession session, PlayerPartyInteractionOutcomeType outcomeType)
@@ -563,12 +668,23 @@ internal class PlayerPartyInteractionHandler : IHandler
             session.InitiatorPartyId,
             session.ResponderPartyId,
             outcomeType));
+
+        if (outcomeType == PlayerPartyInteractionOutcomeType.HostileDemandAccepted ||
+            outcomeType == PlayerPartyInteractionOutcomeType.HostileDemandYielded)
+        {
+            hostileEncounterService.TryStartHostileEncounter(
+                session.SessionId,
+                session.InitiatorPartyId,
+                session.ResponderPartyId,
+                outcomeType == PlayerPartyInteractionOutcomeType.HostileDemandYielded);
+        }
     }
 
     private void AddInitialOptions(PlayerPartyInteractionSession session, PartyBase initiatorParty, PartyBase responderParty)
     {
         AddInitiatorOption(session, PlayerPartyInteractionOption.TradeProposal, enabled: true);
-        AddInitiatorOption(session, PlayerPartyInteractionOption.OfferServices, enabled: true);
+        AddInitiatorOption(session, PlayerPartyInteractionOption.OfferServices, enabled: !session.IsHostile);
+        AddInitiatorOption(session, PlayerPartyInteractionOption.HostileDemand, hostileEncounterService.CanStartHostileEncounter(initiatorParty, responderParty));
         AddInitiatorOption(session, PlayerPartyInteractionOption.JoinClan, enabled: false);
         AddInitiatorOption(
             session,
@@ -602,6 +718,8 @@ internal class PlayerPartyInteractionHandler : IHandler
                 return PlayerPartyInteractionProposal.JoinClan;
             case PlayerPartyInteractionOption.Vassal:
                 return PlayerPartyInteractionProposal.Vassal;
+            case PlayerPartyInteractionOption.HostileDemand:
+                return PlayerPartyInteractionProposal.HostileDemand;
             default:
                 return PlayerPartyInteractionProposal.None;
         }
@@ -707,6 +825,115 @@ internal class PlayerPartyInteractionHandler : IHandler
         }
 
         return false;
+    }
+
+    private void TryOpenHostileEncounter(NetworkPlayerPartyHostileEncounterStarted message)
+    {
+        if (!TryResolveHostileEncounter(message, out var attacker, out var defender, out var mapEvent))
+            return;
+
+        var localSide = GetLocalHostileEncounterSide(attacker, defender);
+        if (localSide == BattleSideEnum.None)
+            return;
+
+        if (IsCurrentLocalInteractionSession(message.SessionId))
+            hostileEncounterSessionIds.Add(message.SessionId);
+
+        OpenHostileEncounter(attacker, defender, mapEvent, localSide);
+    }
+
+    private bool TryResolveHostileEncounter(
+        NetworkPlayerPartyHostileEncounterStarted message,
+        out PartyBase attacker,
+        out PartyBase defender,
+        out MapEvent mapEvent)
+    {
+        attacker = null;
+        defender = null;
+        mapEvent = null;
+
+        var resolvedAttacker = default(PartyBase);
+        var resolvedDefender = default(PartyBase);
+        var resolvedMapEvent = default(MapEvent);
+        var deadline = DateTime.UtcNow + configuration.ObjectCreationTimeout;
+        bool IsReady() =>
+            objectManager.TryGetObject(message.AttackerPartyId, out resolvedAttacker) &&
+            objectManager.TryGetObject(message.DefenderPartyId, out resolvedDefender) &&
+            objectManager.TryGetObject(message.MapEventId, out resolvedMapEvent) &&
+            IsHostileEncounterReady(resolvedMapEvent, resolvedAttacker, resolvedDefender);
+
+        if (GameThread.WaitWhilePumping(IsReady, deadline))
+        {
+            attacker = resolvedAttacker;
+            defender = resolvedDefender;
+            mapEvent = resolvedMapEvent;
+            return true;
+        }
+        Logger.Error(
+            "Timed out waiting for player-party hostile encounter map event. SessionId={SessionId}, MapEventId={MapEventId}, AttackerPartyId={AttackerPartyId}, DefenderPartyId={DefenderPartyId}",
+            message.SessionId,
+            message.MapEventId,
+            message.AttackerPartyId,
+            message.DefenderPartyId);
+        return false;
+    }
+
+    private static bool IsHostileEncounterReady(MapEvent mapEvent, PartyBase attacker, PartyBase defender)
+    {
+        if (mapEvent == null || attacker == null || defender == null)
+            return false;
+
+        if (attacker.MapEventSide == null || defender.MapEventSide == null)
+            return false;
+
+        return HasMapEventParty(attacker.MapEventSide, attacker) &&
+               HasMapEventParty(defender.MapEventSide, defender) &&
+               (mapEvent.AttackerSide == attacker.MapEventSide || mapEvent.DefenderSide == attacker.MapEventSide) &&
+               (mapEvent.AttackerSide == defender.MapEventSide || mapEvent.DefenderSide == defender.MapEventSide);
+    }
+
+    private static bool HasMapEventParty(MapEventSide side, PartyBase party)
+        => side?.Parties?.Any(p => p.Party == party) == true;
+
+    private static void OpenHostileEncounter(PartyBase attacker, PartyBase defender, MapEvent mapEvent, BattleSideEnum localSide)
+    {
+        if (PlayerEncounter.Current != null && PlayerEncounter.Battle != mapEvent)
+            PlayerEncounter.Finish(true);
+
+        using (new AllowedThread())
+        {
+            EncounterManager.RestartPlayerEncounter(attacker, defender);
+        }
+
+        AssignLocalHostileEncounter(attacker, defender, mapEvent, localSide);
+    }
+
+    private static BattleSideEnum GetLocalHostileEncounterSide(PartyBase attacker, PartyBase defender)
+    {
+        if (attacker.MobileParty?.IsControlledByThisInstance() == true)
+            return BattleSideEnum.Attacker;
+
+        if (defender.MobileParty?.IsControlledByThisInstance() == true)
+            return BattleSideEnum.Defender;
+
+        return BattleSideEnum.None;
+    }
+
+    private static void AssignLocalHostileEncounter(PartyBase attacker, PartyBase defender, MapEvent mapEvent, BattleSideEnum localSide)
+    {
+        var encounter = PlayerEncounter.Current;
+        if (encounter == null) return;
+        if (localSide != BattleSideEnum.Attacker && localSide != BattleSideEnum.Defender) return;
+
+        encounter._attackerParty = attacker;
+        encounter._defenderParty = defender;
+        encounter._encounteredParty = localSide == BattleSideEnum.Attacker ? defender : attacker;
+        encounter._mapEvent = mapEvent;
+        encounter.PlayerSide = localSide;
+        encounter.OpponentSide = localSide == BattleSideEnum.Attacker ? BattleSideEnum.Defender : BattleSideEnum.Attacker;
+        encounter.IsJoinedBattle = true;
+
+        GameMenu.SwitchToMenu("encounter");
     }
 
     private bool TryGetControlledSessionParty(
@@ -922,10 +1149,25 @@ internal class PlayerPartyInteractionHandler : IHandler
             otherParty,
             Math.Max(0, ownerHero.Gold)), false);
 
+        AddPartyPeaceBarterable(barterData, ownerHero, otherHero, ownerParty, otherParty);
         AddPartyFiefBarterables(barterData, ownerHero, otherHero);
         AddPartyPrisonerBarterables(barterData, ownerHero, otherHero, ownerParty, otherParty);
         AddPartyItemBarterables(barterData, ownerHero, otherHero, ownerParty, otherParty);
         AddPartyTroopBarterables(barterData, ownerHero, otherHero, ownerParty, otherParty);
+    }
+
+    private static void AddPartyPeaceBarterable(
+        BarterData barterData,
+        Hero ownerHero,
+        Hero otherHero,
+        PartyBase ownerParty,
+        PartyBase otherParty)
+    {
+        if (!PlayerPartyPeaceBarterable.CanOfferPeace(ownerParty, otherParty)) return;
+
+        barterData.AddBarterable<OtherBarterGroup>(
+            new PlayerPartyPeaceBarterable(ownerHero, otherHero, ownerParty, otherParty),
+            false);
     }
 
     private static void AddPartyFiefBarterables(BarterData barterData, Hero ownerHero, Hero otherHero)
@@ -1152,6 +1394,27 @@ internal class PlayerPartyInteractionHandler : IHandler
         }
 
         return result;
+    }
+
+    private static bool HasOfferedPeace(BarterVM barterVM)
+    {
+        if (barterVM == null) return false;
+
+        return HasOfferedPeace(barterVM.LeftOfferList) ||
+               HasOfferedPeace(barterVM.RightOfferList);
+    }
+
+    private static bool HasOfferedPeace(IEnumerable<BarterItemVM> offeredItems)
+    {
+        if (offeredItems == null) return false;
+
+        foreach (var offeredItem in offeredItems)
+        {
+            if (!PlayerPartyTradeContext.CanOffer(offeredItem.Barterable)) continue;
+            if (offeredItem.Barterable is PlayerPartyPeaceBarterable) return true;
+        }
+
+        return false;
     }
 
     private static IEnumerable<Settlement> GetOfferedBarterFiefs(BarterVM barterVM)

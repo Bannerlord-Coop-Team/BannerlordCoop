@@ -128,23 +128,112 @@ internal class PvPInteractionClientHandler : IHandler
     /// </summary>
     private void Handle_NetworkClosePvpEncounter(MessagePayload<NetworkClosePvpEncounter> payload)
     {
-        if (ModInformation.IsServer) return;
-
         var partyIds = payload.What.PartyIds;
 
         GameThread.Run(() =>
         {
             if (Campaign.Current == null) return;
-            if (!objectManager.TryGetId(MobileParty.MainParty?.Party, out var myPartyId)) return;
-            if (Array.IndexOf(partyIds, myPartyId) < 0) return;
+
+            if (!TryGetLocalParty(partyIds, out var localParty)) return;
+            ClearMapEventBackReferences(partyIds);
 
             Logger.Debug("[MapEvent] {Who}: NetworkClosePvpEncounter for my party; closing", Who);
+
+            BattleModeRegistry.End();
 
             if (shownDefenderPartyId != null)
                 HideWaitingPopup();
 
-            CloseEncounter();
+            CloseEncounter(localParty);
         });
+    }
+
+    private void ClearMapEventBackReferences(string[] partyIds)
+    {
+        foreach (var partyId in partyIds ?? Array.Empty<string>())
+        {
+            if (!objectManager.TryGetObject<PartyBase>(partyId, out var party))
+                continue;
+
+            if (party.MapEventSide != null)
+                party._mapEventSide = null;
+        }
+    }
+
+    private bool TryGetLocalParty(string[] partyIds, out PartyBase party)
+    {
+        party = null;
+        var ids = partyIds ?? Array.Empty<string>();
+
+        if (objectManager.TryGetId(MobileParty.MainParty?.Party, out var localPartyId) &&
+            Array.IndexOf(ids, localPartyId) >= 0)
+        {
+            party = MobileParty.MainParty.Party;
+            return true;
+        }
+
+        if (TryGetCurrentEncounterParty(ids, out party))
+            return true;
+
+        foreach (var partyId in ids)
+        {
+            if (!objectManager.TryGetObject<PartyBase>(partyId, out var candidate))
+                continue;
+
+            if (candidate.MobileParty?.IsControlledByThisInstance() != true)
+                continue;
+
+            party = candidate;
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryGetCurrentEncounterParty(string[] partyIds, out PartyBase party)
+    {
+        party = null;
+
+        var encounter = PlayerEncounter.Current;
+        if (encounter == null)
+            return false;
+
+        var attacker = encounter._attackerParty;
+        var defender = encounter._defenderParty;
+        if (!ContainsPartyId(attacker, partyIds) && !ContainsPartyId(defender, partyIds))
+            return false;
+
+        if (IsLocalParty(attacker))
+        {
+            party = attacker;
+            return true;
+        }
+
+        if (IsLocalParty(defender))
+        {
+            party = defender;
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool ContainsPartyId(PartyBase party, string[] partyIds)
+    {
+        if (party == null || partyIds == null || partyIds.Length == 0)
+            return false;
+
+        return objectManager.TryGetId(party, out var partyId) &&
+               Array.IndexOf(partyIds, partyId) >= 0;
+    }
+
+    private static bool IsLocalParty(PartyBase party)
+    {
+        if (party?.MobileParty == null)
+            return false;
+
+        return party.MobileParty == MobileParty.MainParty ||
+               party.MobileParty.IsControlledByThisInstance();
     }
 
     /// <summary>
@@ -210,13 +299,14 @@ internal class PvPInteractionClientHandler : IHandler
     /// <see cref="PlayerEncounter.Finish"/> closes it. Finish's postfix
     /// (<see cref="Patches.PlayerEncounterPatches"/>) holds the party so it does not immediately re-engage.
     /// </summary>
-    private static void CloseEncounter()
+    private static void CloseEncounter(PartyBase localParty = null)
     {
+        var mainParty = localParty?.MobileParty ?? MobileParty.MainParty;
         Logger.Debug("[MapEvent] {Who}: CloseEncounter before: mission={Mission} encounter={Enc} mainPartyMapEvent={Me} menu={Menu}",
             Who,
             MissionState.Current != null,
             PlayerEncounter.Current != null,
-            MobileParty.MainParty?.MapEvent != null,
+            mainParty?.MapEvent != null,
             Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "<none>");
 
         // A battle mission is still running — the party belongs in it; never pull it out now. The server's
@@ -229,32 +319,31 @@ internal class PvPInteractionClientHandler : IHandler
             return;
         }
 
-        // The local player was captured in this battle: the captivity flow owns the UI (prisoner menu) and leaves the
-        // encounter itself. Finishing/exiting here would close the capture screen. Mirrors
-        // BattleHandler.Handle_NetworkMapEventFinalized.
-        if (PlayerCaptivity.IsCaptive) return;
-
         // A joiner stays bound to its map-event side after the attacker abandons the encounter: the abandon tears
         // the event down via FinalizeEvent, which (unlike FinishBattle) does not remove joined parties. The dangling
         // MainParty.MapEvent makes the encounter menu reopen the instant Finish closes it. Null the back-reference
         // directly to detach locally. NOT via the MapEventSide setter: that runs MapEventSide.RemovePartyInternal,
         // whose client patch calls FinalizeEvent when the removed party is its side's leader — which broadcasts a
         // finalize to the server (MapEventPatches.Prefix_FinalizeEventAux). We only want a local detach.
-        if (MobileParty.MainParty?.MapEvent != null)
-            MobileParty.MainParty.Party._mapEventSide = null;
+        if (mainParty?.MapEvent != null)
+            mainParty.Party._mapEventSide = null;
+
+        // The local player was captured in this battle: the captivity flow owns the UI (prisoner menu) and leaves the
+        // encounter itself. Finishing/exiting here would close the capture screen. Mirrors
+        // BattleHandler.Handle_NetworkMapEventFinalized.
+        if (PlayerCaptivity.IsCaptive) return;
 
         if (PlayerEncounter.Current != null)
             PlayerEncounter.Finish(true);
 
         // Finishing the encounter does not itself close the open game menu; exit it explicitly. Mirrors
         // BattleHandler.Handle_NetworkMapEventFinalized, the proven post-battle menu teardown.
-        if (Campaign.Current?.CurrentMenuContext != null)
-            GameMenu.ExitToLast();
+        GameMenu.ExitToLast();
 
         Logger.Debug("[MapEvent] {Who}: CloseEncounter after: encounter={Enc} mainPartyMapEvent={Me} menu={Menu}",
             Who,
             PlayerEncounter.Current != null,
-            MobileParty.MainParty?.MapEvent != null,
+            mainParty?.MapEvent != null,
             Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "<none>");
     }
 }

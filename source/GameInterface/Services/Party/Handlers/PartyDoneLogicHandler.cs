@@ -2,10 +2,12 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEventParties;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Data;
 using GameInterface.Services.Party.Messages;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.UI.Notifications.Messages;
@@ -84,6 +86,8 @@ internal class PartyDoneLogicHandler : IHandler
         var rightMemberRosterData = troopRosterInterface.PackTroopRosterDelta(obj.What.RightMemberRoster, obj.What.InitialRightMemberRoster);
         var rightPrisonerRosterData = troopRosterInterface.PackTroopRosterDelta(obj.What.RightPrisonerRoster, obj.What.InitialRightPrisonerRoster);
 
+        var releaserPartyPosition = GetReleaserPartyPosition(obj.What.MainHero);
+
         var message = new NetworkCompleteDoneLogic(
             mainHeroId,
             FlattenedTroopSerializer.Serialize(obj.What.TakenPrisonersRoster, objectManager),
@@ -100,10 +104,23 @@ internal class PartyDoneLogicHandler : IHandler
             obj.What.PartyGoldChangeAmount,
             obj.What.PartyInfluenceChangeAmount,
             obj.What.PartyMoraleChangeAmount,
-            obj.What.DoNotApplyGoldTransactions
+            obj.What.DoNotApplyGoldTransactions,
+            releaserPartyPosition
         );
 
         network.SendAll(message);
+    }
+
+    private static CampaignVec2 GetReleaserPartyPosition(Hero mainHero)
+    {
+        var releaserParty = mainHero.PartyBelongedTo;
+        if (releaserParty?.CurrentSettlement != null)
+            return releaserParty.CurrentSettlement.GatePosition;
+
+        if (releaserParty != null)
+            return releaserParty.Position;
+
+        return MobileParty.MainParty.Position;
     }
 
     // Server
@@ -132,6 +149,12 @@ internal class PartyDoneLogicHandler : IHandler
             }
 
             var donatedPrisonersRoster = FlattenedTroopSerializer.Deserialize(obj.What.DonatedPrisonersRoster, objectManager);
+            var releasedPlayerCaptivityEvents = CreatePlayerCaptivityReleaseEvents(
+                obj.What.LeftPrisonerRosterData,
+                obj.What.RightPrisonerRosterData,
+                obj.What.ReleaserPartyPosition,
+                out var leftPrisonerRosterData,
+                out var rightPrisonerRosterData);
 
             // Collect every roster delta and apply them together: ApplyTroopRosterDeltas removes before it
             // adds across all rosters, so a hero/prisoner moved between parties keeps its party linkage
@@ -140,15 +163,20 @@ internal class PartyDoneLogicHandler : IHandler
             if (leftParty != null)
             {
                 rosterDeltas.Add((leftParty.MemberRoster, obj.What.LeftMemberRosterData));
-                rosterDeltas.Add((leftParty.PrisonRoster, obj.What.LeftPrisonerRosterData));
+                rosterDeltas.Add((leftParty.PrisonRoster, leftPrisonerRosterData));
             }
             else if (leftPrisonerRoster != null) // Prisoner management doesn't have a set party
             {
-                rosterDeltas.Add((leftPrisonerRoster, obj.What.LeftPrisonerRosterData));
+                rosterDeltas.Add((leftPrisonerRoster, leftPrisonerRosterData));
             }
 
             rosterDeltas.Add((mainHero.PartyBelongedTo.MemberRoster, obj.What.RightMemberRosterData));
-            rosterDeltas.Add((mainHero.PartyBelongedTo.PrisonRoster, obj.What.RightPrisonerRosterData));
+            rosterDeltas.Add((mainHero.PartyBelongedTo.PrisonRoster, rightPrisonerRosterData));
+
+            foreach (var releaseEvent in releasedPlayerCaptivityEvents)
+            {
+                messageBroker.Publish(this, releaseEvent);
+            }
 
             troopRosterInterface.ApplyTroopRosterDeltas(rosterDeltas);
 
@@ -201,5 +229,44 @@ internal class PartyDoneLogicHandler : IHandler
                 }
             }
         });
+    }
+
+    internal List<PlayerCaptivityEndedByServer> CreatePlayerCaptivityReleaseEvents(
+        TroopRosterData leftPrisonerRosterData,
+        TroopRosterData rightPrisonerRosterData,
+        CampaignVec2 releaserPartyPosition,
+        out TroopRosterData filteredLeftPrisonerRosterData,
+        out TroopRosterData filteredRightPrisonerRosterData)
+    {
+        var releasedPlayerPrisoners = new List<Hero>();
+        filteredLeftPrisonerRosterData = FilterPlayerPrisonerReleaseDelta(leftPrisonerRosterData, releasedPlayerPrisoners);
+        filteredRightPrisonerRosterData = FilterPlayerPrisonerReleaseDelta(rightPrisonerRosterData, releasedPlayerPrisoners);
+
+        return releasedPlayerPrisoners
+            .Select(playerHero => new PlayerCaptivityEndedByServer(playerHero, EndCaptivityDetail.ReleasedByChoice, null, releaserPartyPosition))
+            .ToList();
+    }
+
+    private TroopRosterData FilterPlayerPrisonerReleaseDelta(TroopRosterData delta, List<Hero> releasedPlayerPrisoners)
+    {
+        if (delta.Data == null) return delta;
+
+        var filtered = new List<TroopRosterElementData>();
+        foreach (var elementData in delta.Data)
+        {
+            if (elementData.Number < 0 &&
+                objectManager.TryGetObjectWithLogging<CharacterObject>(elementData.CharacterId, out var character) &&
+                character.HeroObject?.IsPlayerHero() == true)
+            {
+                releasedPlayerPrisoners.Add(character.HeroObject);
+                continue;
+            }
+
+            filtered.Add(elementData);
+        }
+
+        return filtered.Count == delta.Data.Length
+            ? delta
+            : new TroopRosterData(filtered);
     }
 }

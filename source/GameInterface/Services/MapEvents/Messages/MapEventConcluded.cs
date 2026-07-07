@@ -11,9 +11,11 @@ namespace GameInterface.Services.MapEvents.Messages;
 internal readonly struct MapEventConcluded : IEvent
 {
     public readonly string MapEventId;
+    public readonly string[] PlayerPartyIds;
 
-    public MapEventConcluded(string mapEventId)
+    public MapEventConcluded(string mapEventId, string[] playerPartyIds = null)
     {
         MapEventId = mapEventId;
+        PlayerPartyIds = playerPartyIds ?? new string[0];
     }
 }

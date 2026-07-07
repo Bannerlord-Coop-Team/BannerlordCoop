@@ -83,6 +83,29 @@ internal sealed class MapEventBattleFactory
         if (defender.IsMobile && defender.MobileParty.BesiegedSettlement != null)
             return mapEventManager.StartSiegeOutsideMapEvent(attacker, defender);
 
-        return FieldBattleEventComponent.CreateFieldBattleEvent(attacker, defender).MapEvent;
+        return CreateFieldBattleEvent(attacker, defender);
+    }
+
+    private static MapEvent CreateFieldBattleEvent(PartyBase attacker, PartyBase defender)
+    {
+        var mapEvent = new MapEvent();
+        if (Campaign.Current?.VisualCreator?.MapEventVisualCreator == null)
+            mapEvent.MapEventVisual = HeadlessMapEventVisual.Instance;
+
+        mapEvent.Initialize(
+            attacker,
+            defender,
+            new FieldBattleEventComponent(mapEvent),
+            MapEvent.BattleTypes.FieldBattle);
+        return mapEvent;
+    }
+
+    private sealed class HeadlessMapEventVisual : IMapEventVisual
+    {
+        public static readonly HeadlessMapEventVisual Instance = new HeadlessMapEventVisual();
+
+        public void Initialize(CampaignVec2 position, bool isVisible) { }
+        public void OnMapEventEnd() { }
+        public void SetVisibility(bool isVisible) { }
     }
 }
