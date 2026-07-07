@@ -1,4 +1,5 @@
-using Common.Messaging;
+﻿using Common.Messaging;
+using Common.Util;
 using GameInterface.Services.MapEvents.Messages;
 using HarmonyLib;
 using TaleWorlds.Core;
@@ -34,8 +35,10 @@ internal class BattleBlowInterceptPatch
     {
         if (!BattleSpawnConfig.Enabled) return true;
         if (!BattleSpawnGate.IsCoopBattleActive) return true;
+        if (AllowedThread.IsThisThreadAllowed()) return true;
 
         if (__instance == null) return true;
+        if (BattleSpawnGate.IsReplicatedDeath(__instance)) return true;
 
         bool isMount = !__instance.IsHuman;
         if (isMount)
@@ -50,7 +53,7 @@ internal class BattleBlowInterceptPatch
                 if (rider == null || rider.Controller != AgentControllerType.None)
                     return true;
             }
-            // remotelyOwned == true → another client's registered horse: suppress and route below.
+            // remotelyOwned == true means another client's registered horse: suppress and route below.
         }
         else
         {

@@ -1,4 +1,5 @@
 ﻿using System;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.MapEvents;
@@ -30,6 +31,9 @@ public static class BattleSpawnGate
 
     [System.ThreadStatic]
     private static KillingBlow _replicatedKillingBlow;
+
+    [System.ThreadStatic]
+    private static AgentState _replicatedDeathState;
 
     /// <summary>
     /// Set around a puppet spawn (<c>CoopBattleController.SpawnPuppet</c>) so the spawn-capture patch does NOT
@@ -63,15 +67,18 @@ public static class BattleSpawnGate
         Agent affectedAgent,
         Agent affectorAgent,
         KillingBlow killingBlow,
+        AgentState agentState,
         Action applyDeath)
     {
         var previousAgent = _replicatedDeathAgent;
         var previousAffector = _replicatedDeathAffector;
         var previousKillingBlow = _replicatedKillingBlow;
+        var previousAgentState = _replicatedDeathState;
 
         _replicatedDeathAgent = affectedAgent;
         _replicatedDeathAffector = affectorAgent;
         _replicatedKillingBlow = killingBlow;
+        _replicatedDeathState = agentState;
         try
         {
             applyDeath();
@@ -81,6 +88,7 @@ public static class BattleSpawnGate
             _replicatedDeathAgent = previousAgent;
             _replicatedDeathAffector = previousAffector;
             _replicatedKillingBlow = previousKillingBlow;
+            _replicatedDeathState = previousAgentState;
         }
     }
 
@@ -103,6 +111,20 @@ public static class BattleSpawnGate
 
         affectorAgent = _replicatedDeathAffector;
         killingBlow = _replicatedKillingBlow;
+        return true;
+    }
+
+    public static bool TryGetReplicatedDeathState(
+        Agent affectedAgent,
+        out AgentState agentState)
+    {
+        if (!IsReplicatedDeath(affectedAgent))
+        {
+            agentState = AgentState.None;
+            return false;
+        }
+
+        agentState = _replicatedDeathState;
         return true;
     }
 

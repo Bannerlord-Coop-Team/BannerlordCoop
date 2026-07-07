@@ -32,7 +32,7 @@ public class ReplicatedDeathKillFeedPatchTests : IDisposable
         };
         var expectedKillingBlow = new KillingBlow(blow, Vec3.Zero, Vec3.Zero, 123, 0);
 
-        BattleSpawnGate.RunWithReplicatedDeath(affectedAgent, affectorAgent, expectedKillingBlow, () =>
+        BattleSpawnGate.RunWithReplicatedDeath(affectedAgent, affectorAgent, expectedKillingBlow, AgentState.Killed, () =>
         {
             Agent actualAffector = null!;
             KillingBlow actualKillingBlow = default;

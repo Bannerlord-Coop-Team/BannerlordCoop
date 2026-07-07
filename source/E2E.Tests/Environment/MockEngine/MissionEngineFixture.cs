@@ -4,6 +4,7 @@ using System.Reflection;
 using Autofac;
 using E2E.Tests.Environment.Instance;
 using GameInterface;
+using GameInterface.Services.MapEvents;
 using HarmonyLib;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -87,7 +88,7 @@ public sealed class MissionEngineFixture : IDisposable
         // the movement sync's SyncMountState also assigns MountAgent and reads HasMount.
         Prefix(typeof(Agent), "get_HasMount", nameof(Agent_get_HasMount));
         Prefix(typeof(Agent), "set_MountAgent", nameof(Agent_set_MountAgent));
-        // MakeDead kills broadcast deaths (PuppetDeathApplier) — pin the full (bool, ActionIndexCache, int)
+        // MakeDead is still used by non-battle despawn paths — pin the full (bool, ActionIndexCache, int)
         // signature (the int is a defaulted param callers don't see).
         harmony.Patch(
             AccessTools.Method(typeof(Agent), nameof(Agent.MakeDead), new[] { typeof(bool), typeof(ActionIndexCache), typeof(int) }),
@@ -335,7 +336,18 @@ public sealed class MissionEngineFixture : IDisposable
                 $"Missile index {blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex} not in the mock mission's missile set (models Mission.OnAgentHit)");
 
         victim.Health -= blow.InflictedDamage;
-        if (victim.Health < 1f) victim.IsActive = false;
+        if (victim.Health < 1f)
+        {
+            victim.Health = 0f;
+            victim.IsActive = false;
+            if (BattleSpawnGate.TryGetReplicatedDeathState(__instance, out var agentState))
+                victim.WasKilled = agentState == AgentState.Killed;
+            if (BattleSpawnGate.TryGetReplicatedDeath(__instance, out _, out var killingBlow) && killingBlow.IsValid)
+                victim.DeathAction = killingBlow.DeathAction;
+            if (victim.MountAgent != null && AgentMirror.TryGet(victim.MountAgent, out var horse) && horse.RiderAgent == __instance)
+                horse.RiderAgent = null;
+            victim.MountAgent = null;
+        }
         return false;
     }
 

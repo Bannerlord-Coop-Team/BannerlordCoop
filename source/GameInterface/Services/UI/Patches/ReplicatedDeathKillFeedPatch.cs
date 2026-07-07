@@ -19,11 +19,11 @@ internal class ReplicatedDeathKillFeedPatch
     {
         if (!BattleSpawnConfig.Enabled) return;
         if (!BattleSpawnGate.IsCoopBattleActive) return;
-        if (affectorAgent != null) return;
         if (!BattleSpawnGate.TryGetReplicatedDeath(affectedAgent, out var replicatedAffector, out var replicatedKillingBlow)) return;
-        if (replicatedAffector == null) return;
 
-        affectorAgent = replicatedAffector;
-        killingBlow = replicatedKillingBlow;
+        if (replicatedAffector != null)
+            affectorAgent = replicatedAffector;
+        if (replicatedKillingBlow.IsValid)
+            killingBlow = replicatedKillingBlow;
     }
 }

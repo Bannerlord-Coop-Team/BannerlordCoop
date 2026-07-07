@@ -328,9 +328,8 @@ public class BattleMountIdentityTests : MissionTestEnvironment
         GC.KeepAlive(attackerController);
     }
 
-    /// <summary>A rider-death broadcast dismounts the puppet BEFORE the kill (killing a horse still linked to
-    /// a dead rider AVs in native Agent.Die) and leaves the horse standing — even an unregistered one, which
-    /// simply stays a local loose horse.</summary>
+    /// <summary>A rider-death broadcast dismounts the puppet and leaves the horse standing, even an unregistered
+    /// one, which simply stays a local loose horse.</summary>
     [Fact]
     public void RiderDeathBroadcast_DismountsThePuppet_AndLeavesItsHorseStanding()
     {

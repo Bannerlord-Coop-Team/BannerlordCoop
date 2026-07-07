@@ -1,4 +1,4 @@
-using HarmonyLib;
+﻿using HarmonyLib;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.Source.Missions.Handlers.Logic;
@@ -8,8 +8,8 @@ namespace GameInterface.Services.MapEvents.Patches;
 /// <summary>
 /// Guards the native battle-morale interaction against a null affector during a coop battle.
 /// <para>
-/// Peers reflect a replicated death by calling <see cref="Agent.MakeDead"/> on their puppet, which fires
-/// <see cref="Mission.OnAgentRemoved"/> with a <c>null</c> affector (there is no local killer). The vanilla
+/// Peers reflect a replicated death on their puppet, which can fire <see cref="Mission.OnAgentRemoved"/> with
+/// a <c>null</c> affector when the local killer is missing. The vanilla
 /// <c>AgentMoraleInteractionLogic.OnAgentRemoved</c> then calls
 /// <c>SandboxBattleMoraleModel.CalculateMaxMoraleChangeDueToAgentIncapacitated</c>, which dereferences
 /// <c>affectorAgent.Formation</c> WITHOUT a null check (every other affector access in that method is
@@ -31,7 +31,7 @@ internal class BattleMoraleNullAffectorPatch
     [HarmonyPrefix]
     private static bool Prefix(Agent affectorAgent)
     {
-        // No local affector during a coop battle → skip the morale interaction (and the unguarded
+        // No local affector during a coop battle means skip the morale interaction (and the unguarded
         // affectorAgent.Formation deref). True original otherwise.
         return !(affectorAgent == null && BattleSpawnGate.IsCoopBattleActive);
     }
