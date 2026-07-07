@@ -1,8 +1,10 @@
-﻿using Common;
+﻿using Autofac;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Messages.Behavior;
@@ -208,5 +210,19 @@ internal class PlayerEncounterPatches
     {
         party.SetMoveModeHold();
         MessageBroker.Instance.Publish(party.Ai, new PartyBehaviorChangeAttempted(party.Ai, AiBehavior.Hold, null, party.Position));
+    }
+
+    [HarmonyPatch(nameof(PlayerEncounter.Update))]
+    [HarmonyPrefix]
+    public static bool UpdatePrefix()
+    {
+        if (MapEvent.PlayerMapEvent != null) return true;
+
+        if (ContainerProvider.TryGetContainer(out var container) == false) return true;
+
+        var playerEncounterInterface = container.Resolve<IPlayerEncounterInterface>();
+        playerEncounterInterface.UpdateInternalAfterBattle(PlayerEncounter.Current);
+
+        return false;
     }
 }

@@ -2,16 +2,15 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using GameInterface.Services.MapEvents.Data;
 using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.MapEvents.Handlers;
 
@@ -80,28 +79,31 @@ internal class MapEventResultsHandler : IHandler
                 playerEncounter.EncounterState = PlayerEncounterState.End;
             }
 
-            // Add looted items to player encounter
-            foreach (var playerLootedItems in playerLootData.LootedItems)
+            using (new AllowedThread())
             {
-                if (playerLootedItems.Key.Party != PartyBase.MainParty) continue;
+                // Add looted items to player encounter
+                foreach (var playerLootedItems in playerLootData.LootedItems)
+                {
+                    if (playerLootedItems.Key.Party != PartyBase.MainParty) continue;
 
-                playerEncounter.RosterToReceiveLootItems.Add(playerLootedItems.Value);
-            }
+                    playerEncounter.RosterToReceiveLootItems.Add(playerLootedItems.Value);
+                }
 
-            // Add looted members to player encounter
-            foreach (var playerLootedMembers in playerLootData.LootedMembers)
-            {
-                if (playerLootedMembers.Key.Party != PartyBase.MainParty) continue;
+                // Add looted members to player encounter
+                foreach (var playerLootedMembers in playerLootData.LootedMembers)
+                {
+                    if (playerLootedMembers.Key.Party != PartyBase.MainParty) continue;
 
-                playerEncounter.RosterToReceiveLootMembers.Add(playerLootedMembers.Value);
-            }
+                    playerEncounter.RosterToReceiveLootMembers.Add(playerLootedMembers.Value);
+                }
 
-            // Add looted prisoners to player encounter
-            foreach (var playerLootedPrisoners in playerLootData.LootedPrisoners)
-            {
-                if (playerLootedPrisoners.Key.Party != PartyBase.MainParty) continue;
+                // Add looted prisoners to player encounter
+                foreach (var playerLootedPrisoners in playerLootData.LootedPrisoners)
+                {
+                    if (playerLootedPrisoners.Key.Party != PartyBase.MainParty) continue;
 
-                playerEncounter.RosterToReceiveLootPrisoners.Add(playerLootedPrisoners.Value);
+                    playerEncounter.RosterToReceiveLootPrisoners.Add(playerLootedPrisoners.Value);
+                }
             }
         });
     }

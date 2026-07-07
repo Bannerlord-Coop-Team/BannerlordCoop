@@ -9,13 +9,9 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using Serilog;
 using System;
-using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
-using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
-using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -247,60 +243,11 @@ internal class PvPInteractionClientHandler : IHandler
         if (MobileParty.MainParty?.MapEvent != null)
             MobileParty.MainParty.Party._mapEventSide = null;
 
-        var encounter = PlayerEncounter.Current;
-        if (encounter != null)
-        {
-            encounter._stateHandled = false;
-            while (!encounter._stateHandled)
-            {
-                if (PlayerEncounter.Current._leaveEncounter)
-                {
-                    encounter._stateHandled = true;
-                    break;
-                }
-
-                switch (encounter.EncounterState)
-                {
-                    case PlayerEncounterState.PlayerVictory:
-                        //encounter.DoPlayerVictory(); // Needs _mapEvent
-                        encounter.EncounterState = PlayerEncounterState.CaptureHeroes;
-                        break;
-                    case PlayerEncounterState.PlayerTotalDefeat: // Player defeats handled elsewhere
-                        encounter.EncounterState = PlayerEncounterState.End;
-                        break;
-                    case PlayerEncounterState.CaptureHeroes:
-                        //encounter.DoCaptureHeroes(); // Needs _mapEvent
-                        encounter.EncounterState = PlayerEncounterState.FreeHeroes;
-                        break;
-                    case PlayerEncounterState.FreeHeroes:
-                        //encounter.DoFreeOrCapturePrisonerHeroes(); // Needs _mapEvent
-                        encounter.EncounterState = PlayerEncounterState.LootParty;
-                        break;
-                    case PlayerEncounterState.LootParty:
-                        encounter.DoLootMembersAndPrisonersOfParty(); // Put onPlayerLootMembersAndPrisonerEnd in AllowedThread
-                        break;
-                    case PlayerEncounterState.LootInventory:
-                        encounter.DoLootInventory();
-                        break;
-                    case PlayerEncounterState.LootShips:
-                        encounter.DoLootShips();
-                        break;
-                    case PlayerEncounterState.End:
-                        //encounter.DoEnd(); // Needs _mapEvent
-                        encounter._stateHandled = true;
-                        break;
-                    default:
-                        break;
-                }
-            }
-
-            PlayerEncounter.Finish(true);
-        }
 
         // Finishing the encounter does not itself close the open game menu; exit it explicitly. Mirrors
         // BattleHandler.Handle_NetworkMapEventFinalized, the proven post-battle menu teardown.
-        if (Campaign.Current?.CurrentMenuContext != null)
-            GameMenu.ExitToLast();
+        //if (Campaign.Current?.CurrentMenuContext != null)
+        //    GameMenu.ExitToLast();
 
         Logger.Debug("[MapEvent] {Who}: CloseEncounter after: encounter={Enc} mainPartyMapEvent={Me} menu={Menu}",
             Who,

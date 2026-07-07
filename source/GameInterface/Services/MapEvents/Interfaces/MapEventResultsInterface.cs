@@ -5,12 +5,9 @@ using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEvents.Data;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Data;
-using GameInterface.Services.TroopRosters.Handlers;
 using GameInterface.Services.TroopRosters.Interfaces;
 using Serilog;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -21,7 +18,6 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
-using TaleWorlds.LinQuick;
 
 namespace GameInterface.Services.MapEvents.Interfaces;
 
@@ -154,16 +150,16 @@ public class MapEventResultsInterface : IMapEventResultsInterface
 
                 // Replace the following check to just check if its a naval map event. Only used for MapEvents involving players
                 // mapEvent.IsPlayerMapEvent && PlayerEncounter.Current.IsNavalEncounterFinishedWithDisengage
-                if (mapEvent.IsNavalMapEvent)
+                if (mapEvent.IsNavalMapEvent) // TODO Change to only do this for naval encounters where ships disengage rather than total victories(?)
                 {
-                    mapEvent.LootDefeatedPartyShips(winnerParties, defeatedParties);
+                    mapEvent.LootDefeatedPartyShips(winnerParties, defeatedParties); // TODO
                 }
                 else
                 {
                     LootDefeatedPartyCasualties(winnerParties, defeatedParties, winnerPlayerParties, winningSideIncludesPlayers, playerLootData.LootedItems);
                     LootDefeatedPartyItems(winnerParties, defeatedParties, playerLootData.LootedItems);
                     LootDefeatedPartyPrisoners(winnerParties, defeatedParties, playerLootData.LootedMembers);
-                    mapEvent.LootDefeatedPartyShips(winnerParties, defeatedParties);
+                    mapEvent.LootDefeatedPartyShips(winnerParties, defeatedParties); // TODO
                     CaptureDefeatedPartyMembers(mapEvent, winnerParties, defeatedParties, playerLootData.LootedPrisoners);
                 }
 
@@ -177,8 +173,8 @@ public class MapEventResultsInterface : IMapEventResultsInterface
     }
 
     // Needs extra arguments because vanilla seems to only allow the player to loot items from enemy casualties
-    // as opposed to looting from existing item rosters (what AI parties are allowed to do).
-    // Extended for all involved winning players
+    // as opposed to looting from existing item rosters (what both player and AI parties are allowed to do).
+    // This is an extended version to work with multiple involved winning players
     private void LootDefeatedPartyCasualties(
         MBReadOnlyList<MapEventParty> winnerParties,
         MBReadOnlyList<MapEventParty> defeatedParties,
@@ -643,25 +639,6 @@ public class MapEventResultsInterface : IMapEventResultsInterface
                     defeatedParty.MemberRoster.AddToCountsAtIndex(j,  -troop.Number, -troop.WoundedNumber, 0, false);
                 }
             }
-
-            /* Shouldn't be needed, player capture handled elsewhere
-            // Player hero capture logic
-            if (defeatedParty.IsPlayerParty())
-            {
-                PartyBase captorParty = winnerParties
-                        .WhereQ(x => x.Party.MemberRoster.TotalManCount > 0)
-                        .MaxBy(x => x.ContributionToBattle)
-                        .Party;
-
-                // Militia/garrison transfer to settlement
-                if (captorParty.IsMobile && (captorParty.MobileParty.IsMilitia || captorParty.MobileParty.IsGarrison))
-                {
-                    captorParty = captorParty.MobileParty.HomeSettlement.Party;
-                }
-
-                TakePrisonerAction.Apply(captorParty, defeatedParty.LeaderHero);
-            }
-            */
 
             defeatedParty.MemberRoster.RemoveZeroCounts();
         }

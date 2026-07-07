@@ -4,6 +4,7 @@ using Helpers;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.ViewModelCollection;
 using TaleWorlds.Core.ViewModelCollection.Information;
@@ -21,7 +22,8 @@ internal class AllowItemRostersInGUI
         AccessTools.Method(typeof(TooltipRefresherCollection), "RefreshSettlementTooltip"),
         AccessTools.Method(typeof(PartyScreenHelper), nameof(PartyScreenHelper.OpenPartyScreen)),
         AccessTools.Method(typeof(CaravansCampaignBehavior), nameof(CaravansCampaignBehavior.BribeAmount)),
-        AccessTools.Method(typeof(VillagerCampaignBehavior), nameof(VillagerCampaignBehavior.CalculateConversationPartyBribeAmount))
+        AccessTools.Method(typeof(VillagerCampaignBehavior), nameof(VillagerCampaignBehavior.CalculateConversationPartyBribeAmount)),
+        AccessTools.Method(typeof(PlayerEncounter), nameof(PlayerEncounter.OnPlayerLootMembersAndPrisonerEnd))
     };
 
     [HarmonyPrefix]
