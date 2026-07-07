@@ -21,12 +21,9 @@ namespace GameInterface.Services.MapEvents;
 internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 {
     public override bool Debug => true;
-    private readonly IMainPartyBattleRewardsCache _battleRewardsCache;
-
-    public MapEventRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager, IMainPartyBattleRewardsCache battleRewardsCache)
+    public MapEventRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
         : base(logger, autoRegistryFactory, objectManager)
     {
-        _battleRewardsCache = battleRewardsCache;
     }
 
     public override IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(MapEvent));
@@ -98,9 +95,10 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
                 {
                     var mainPartyEventParty = obj.FindMapEventParty(PartyBase.MainParty);
 
-                    if (mainPartyEventParty != null)
+                    if (mainPartyEventParty != null
+                        && ContainerProvider.TryResolve<IMainPartyBattleRewardsCache>(out var rewardsCache))
                     {
-                        _battleRewardsCache.Capture(obj, mainPartyEventParty, obj.GetPlayerBattleContributionRate());
+                        rewardsCache.Capture(obj, mainPartyEventParty, obj.GetPlayerBattleContributionRate());
                     }
                 }
 
