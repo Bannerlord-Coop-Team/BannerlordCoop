@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using GameInterface.Policies;
 using HarmonyLib;
 using System.Collections.Generic;

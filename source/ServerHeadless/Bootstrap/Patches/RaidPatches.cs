@@ -1,4 +1,4 @@
-﻿using HarmonyLib;
+using HarmonyLib;
 using System;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.Core;

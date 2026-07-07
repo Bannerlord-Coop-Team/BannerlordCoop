@@ -1,4 +1,4 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using GameInterface.Services.Villages.Data;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;

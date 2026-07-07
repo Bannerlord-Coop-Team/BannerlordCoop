@@ -1,4 +1,4 @@
-﻿using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.Villages.Data;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;

@@ -1,4 +1,4 @@
-﻿using Common.Logging;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;

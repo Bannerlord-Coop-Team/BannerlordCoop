@@ -1,4 +1,4 @@
-﻿using TaleWorlds.Core;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Battles;

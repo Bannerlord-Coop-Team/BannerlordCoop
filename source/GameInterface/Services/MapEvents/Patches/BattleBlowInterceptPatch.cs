@@ -1,4 +1,4 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using GameInterface.Services.MapEvents.Messages;
 using HarmonyLib;
 using TaleWorlds.Core;

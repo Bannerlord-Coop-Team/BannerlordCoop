@@ -1,4 +1,4 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 
 namespace GameInterface.Services.UI.Messages;
 

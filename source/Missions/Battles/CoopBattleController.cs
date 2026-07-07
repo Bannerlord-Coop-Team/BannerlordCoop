@@ -1,4 +1,4 @@
-﻿using Common.Logging;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Entity;

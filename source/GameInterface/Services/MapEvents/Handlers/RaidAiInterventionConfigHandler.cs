@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.GameDebug.Messages;

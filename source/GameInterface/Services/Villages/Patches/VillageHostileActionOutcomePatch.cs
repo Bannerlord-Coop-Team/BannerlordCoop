@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using GameInterface.Services.Villages.Data;
 using GameInterface.Services.Villages.Interfaces;
 using HarmonyLib;

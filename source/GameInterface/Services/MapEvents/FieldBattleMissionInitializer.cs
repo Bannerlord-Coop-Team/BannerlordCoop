@@ -1,4 +1,4 @@
-﻿using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.MapEvents;

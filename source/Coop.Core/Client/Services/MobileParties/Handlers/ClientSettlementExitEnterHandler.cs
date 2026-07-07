@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Common;
 using Common.Messaging;
 using Common.Network;

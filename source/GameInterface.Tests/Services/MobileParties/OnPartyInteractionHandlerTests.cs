@@ -1,4 +1,4 @@
-﻿using Common.Tests.Utils;
+using Common.Tests.Utils;
 using Common.Util;
 using GameInterface.Services.MobileParties.Handlers;
 using GameInterface.Services.MobileParties.Messages;

@@ -1,4 +1,4 @@
-﻿namespace GameInterface.Services.MapEvents;
+namespace GameInterface.Services.MapEvents;
 
 /// <summary>
 /// Snapshot of the <see cref="TaleWorlds.CampaignSystem.Encounters.PlayerEncounter"/> "force" flags that

@@ -1,4 +1,4 @@
-﻿using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.Villages.Interfaces;

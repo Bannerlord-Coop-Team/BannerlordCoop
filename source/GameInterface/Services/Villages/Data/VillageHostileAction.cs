@@ -1,4 +1,4 @@
-﻿namespace GameInterface.Services.Villages.Data;
+namespace GameInterface.Services.Villages.Data;
 
 public enum VillageHostileAction
 {

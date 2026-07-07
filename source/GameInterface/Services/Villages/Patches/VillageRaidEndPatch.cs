@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.MapEvents.Messages.Leave;

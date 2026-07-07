@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using Common.Messaging;
 using E2E.Tests.Environment.MockEngine;

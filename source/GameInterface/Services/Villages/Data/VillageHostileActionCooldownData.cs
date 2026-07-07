@@ -1,4 +1,4 @@
-﻿using ProtoBuf;
+using ProtoBuf;
 
 namespace GameInterface.Services.Villages.Data;
 

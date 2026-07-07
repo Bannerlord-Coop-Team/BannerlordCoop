@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using Common.Messaging;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;

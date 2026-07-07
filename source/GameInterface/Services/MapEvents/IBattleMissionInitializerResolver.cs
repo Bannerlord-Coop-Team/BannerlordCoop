@@ -1,4 +1,4 @@
-﻿using GameInterface.Services;
+using GameInterface.Services;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.Core;
 using TaleWorlds.Library;

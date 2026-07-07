@@ -1,4 +1,4 @@
-﻿using GameInterface.Services.UI.CoopOptions.Providers;
+using GameInterface.Services.UI.CoopOptions.Providers;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.Library;

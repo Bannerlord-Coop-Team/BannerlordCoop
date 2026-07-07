@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.MapEvents;

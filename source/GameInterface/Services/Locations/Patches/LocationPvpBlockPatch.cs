@@ -1,4 +1,4 @@
-﻿using HarmonyLib;
+using HarmonyLib;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 

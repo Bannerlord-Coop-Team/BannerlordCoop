@@ -1,4 +1,4 @@
-﻿using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MobileParties.Extensions;
 using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.Services.MapEvents;

@@ -1,4 +1,4 @@
-﻿using Autofac;
+using Autofac;
 using Common;
 using Common.Network;
 using GameInterface.Services.MapEvents;

@@ -1,4 +1,4 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.MapEvents.Messages;

@@ -1,4 +1,4 @@
-﻿using Common.Serialization;
+using Common.Serialization;
 using GameInterface.Services;
 using System;
 using System.Collections.Generic;

@@ -1,4 +1,4 @@
-﻿using ServerHeadless.Bootstrap.Patches;
+using ServerHeadless.Bootstrap.Patches;
 using System.Collections.Generic;
 using TaleWorlds.Core;
 using Xunit;

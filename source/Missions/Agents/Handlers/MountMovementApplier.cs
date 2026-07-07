@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using Common.PacketHandlers;
 using Common.Util;
 using LiteNetLib;

@@ -1,4 +1,4 @@
-﻿using Common.Logging;
+using Common.Logging;
 using GameInterface.Services.Locations;
 using Serilog;
 using TaleWorlds.CampaignSystem;

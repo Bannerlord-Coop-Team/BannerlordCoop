@@ -1,4 +1,4 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using GameInterface;
 using GameInterface.Services.UI.CoopOptions.Providers;
 using GameInterface.Services.UI.CoopOptions.Providers.KillFeedTab;

@@ -1,4 +1,4 @@
-﻿using Autofac;
+using Autofac;
 using GameInterface.Services.Locations;
 using GameInterface.Services.MapEvents;
 using Missions.Agents.Handlers;

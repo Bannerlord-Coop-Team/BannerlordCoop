@@ -1,4 +1,4 @@
-﻿using Common.Network;
+using Common.Network;
 using GameInterface.Services.MapEvents.Messages;
 using LiteNetLib;
 

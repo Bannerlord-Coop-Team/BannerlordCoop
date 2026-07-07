@@ -1,4 +1,4 @@
-﻿using Common.Network;
+using Common.Network;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Inventory.Data;

@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.Locations;

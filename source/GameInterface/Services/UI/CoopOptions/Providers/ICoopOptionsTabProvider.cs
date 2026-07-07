@@ -1,4 +1,4 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using GameInterface.Services.UI.CoopOptions;
 using System;
 

@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using HarmonyLib;
 using SandBox.View.Map;
 using System;

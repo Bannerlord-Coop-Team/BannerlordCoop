@@ -1,4 +1,4 @@
-﻿using GameInterface.Services.UI;
+using GameInterface.Services.UI;
 using System.Text.Json.Serialization;
 
 namespace GameInterface.Services.UI.CoopOptions.Providers.KillFeedTab.Sections;

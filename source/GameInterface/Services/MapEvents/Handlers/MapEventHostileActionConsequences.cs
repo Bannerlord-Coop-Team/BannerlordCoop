@@ -1,4 +1,4 @@
-﻿using Common.Logging;
+using Common.Logging;
 using GameInterface.Services.Villages.Interfaces;
 using Serilog;
 using System;

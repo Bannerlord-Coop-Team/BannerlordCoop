@@ -1,4 +1,4 @@
-﻿using HarmonyLib;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.ComponentInterfaces;

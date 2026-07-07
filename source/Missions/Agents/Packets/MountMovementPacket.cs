@@ -1,4 +1,4 @@
-﻿using Common.PacketHandlers;
+using Common.PacketHandlers;
 using LiteNetLib;
 using ProtoBuf;
 using System;
