@@ -1,4 +1,5 @@
 using Common;
+using GameInterface.Services.UI.CoopOptions;
 using HarmonyLib;
 using SandBox.View.Map;
 using System;

@@ -4,6 +4,9 @@ using Common.Network;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Players;
 using GameInterface.Services.UI;
+using GameInterface.Services.UI.CoopOptions;
+using GameInterface.Services.UI.CoopOptions.Providers.KillFeedTab;
+using GameInterface.Services.UI.CoopOptions.Providers.KillFeedTab.Sections;
 using GameInterface.Services.UI.Handlers;
 using GameInterface.Services.UI.Messages;
 using Moq;
@@ -43,21 +46,22 @@ public class PlayerKillFeedColorTests
         {
             var store = new CoopOptionsStore(filePath);
             var expected = new PlayerKillFeedColor(12, 34, 56);
-            var options = new CoopOptions();
-            options.SetKillFeedColor(expected);
+            var options = CreateOptions(expected);
 
             store.Save(options);
 
             using var document = JsonDocument.Parse(File.ReadAllText(filePath));
-            Assert.True(document.RootElement.TryGetProperty("killFeedColor", out var killFeedColor));
-            Assert.False(document.RootElement.TryGetProperty("Red", out _));
+            Assert.True(document.RootElement.TryGetProperty(KillFeedOptionsTabProvider.TabId, out var killFeedTab));
+            Assert.False(document.RootElement.TryGetProperty("killFeedColor", out _));
+            Assert.True(killFeedTab.TryGetProperty(KillFeedSection.SectionId, out var killFeedSection));
+            Assert.True(killFeedSection.TryGetProperty("killFeedColor", out var killFeedColor));
             Assert.Equal(expected.Red, killFeedColor.GetProperty("Red").GetInt32());
             Assert.Equal(expected.Green, killFeedColor.GetProperty("Green").GetInt32());
             Assert.Equal(expected.Blue, killFeedColor.GetProperty("Blue").GetInt32());
 
             var reloaded = new CoopOptionsStore(filePath);
             Assert.True(reloaded.TryLoad(out var actualOptions));
-            Assert.True(actualOptions.TryGetKillFeedColor(out var actual));
+            Assert.True(KillFeedOptionsTabProvider.TryGetKillFeedColor(actualOptions, out var actual));
             Assert.Equal(expected, actual);
         }
         finally
@@ -70,41 +74,36 @@ public class PlayerKillFeedColorTests
     }
 
     [Fact]
-    public void CoopOptions_TryGetKillFeedColor_RejectsLegacyFlatColor()
+    public void CoopOptionsVM_ClampsKillFeedColorAndUpdatesPreview()
     {
         var filePath = CreateTempFilePath();
+        var viewModel = new CoopOptionsVM(new CoopOptionsStore(filePath), new MessageBroker());
+        var section = GetKillFeedSection(viewModel);
 
-        try
-        {
-            File.WriteAllText(filePath, "{\"Red\":170,\"Green\":170,\"Blue\":170}");
-            var store = new CoopOptionsStore(filePath);
+        section.KillFeedColorRed = 999;
+        section.KillFeedColorGreen = -20;
+        section.KillFeedColorBlue = 16;
 
-            Assert.True(store.TryLoad(out var options));
-            Assert.False(options.TryGetKillFeedColor(out _));
-        }
-        finally
-        {
-            if (File.Exists(filePath))
-            {
-                File.Delete(filePath);
-            }
-        }
+        Assert.Equal(255, section.KillFeedColorRed);
+        Assert.Equal(0, section.KillFeedColorGreen);
+        Assert.Equal(16, section.KillFeedColorBlue);
+        Assert.Equal("#FF0010FF", section.KillFeedPreviewColorString);
     }
 
     [Fact]
-    public void CoopOptionsVM_ClampsRgbAndUpdatesPreview()
+    public void CoopOptionsVM_DefaultTabs_SelectsKillFeedColor()
     {
         var filePath = CreateTempFilePath();
         var viewModel = new CoopOptionsVM(new CoopOptionsStore(filePath), new MessageBroker());
 
-        viewModel.Red = 999;
-        viewModel.Green = -20;
-        viewModel.Blue = 16;
-
-        Assert.Equal(255, viewModel.Red);
-        Assert.Equal(0, viewModel.Green);
-        Assert.Equal(16, viewModel.Blue);
-        Assert.Equal("#FF0010FF", viewModel.PreviewColorString);
+        var tab = Assert.Single(viewModel.Tabs);
+        Assert.Equal(KillFeedOptionsTabProvider.TabName, tab.Name);
+        Assert.Equal(KillFeedOptionsTabProvider.TabId, tab.Id);
+        Assert.Same(tab, viewModel.SelectedTab);
+        Assert.True(tab.IsSelected);
+        Assert.True(viewModel.IsApplyButtonVisible);
+        var section = Assert.IsType<KillFeedSection>(Assert.Single(tab.Sections));
+        Assert.Equal(KillFeedSection.SectionId, section.Id);
     }
 
     [Fact]
@@ -153,6 +152,67 @@ public class PlayerKillFeedColorTests
         }
     }
 
+    [Fact]
+    public void Handler_ResendRequested_ReadsNestedSavedColorAndSendsRequest()
+    {
+        var wasServer = ModInformation.IsServer;
+        ModInformation.IsServer = false;
+
+        try
+        {
+            var broker = new MessageBroker();
+            var network = new Mock<INetwork>();
+            var playerManager = new Mock<IPlayerManager>();
+            var colorService = new PlayerKillFeedColorService();
+            var optionsStore = new TestOptionsStore();
+            var controllerIdProvider = new ControllerIdProvider();
+            controllerIdProvider.SetControllerId("PlayerOne");
+
+            var color = new PlayerKillFeedColor(44, 55, 66);
+            optionsStore.Save(CreateOptions(color));
+
+            IMessage sentMessage = null!;
+            network.Setup(n => n.SendAll(It.IsAny<IMessage>()))
+                .Callback<IMessage>(message => sentMessage = message);
+
+            using var handler = new PlayerKillFeedColorHandler(
+                broker,
+                network.Object,
+                playerManager.Object,
+                colorService,
+                optionsStore,
+                controllerIdProvider);
+
+            broker.Publish(this, new PlayerKillFeedColorResendRequested());
+
+            Assert.True(colorService.TryGetColor("PlayerOne", out var cachedColor));
+            Assert.Equal(color, cachedColor);
+
+            var request = Assert.IsType<NetworkRequestKillFeedColor>(sentMessage);
+            Assert.Equal(color.Red, request.Red);
+            Assert.Equal(color.Green, request.Green);
+            Assert.Equal(color.Blue, request.Blue);
+            network.Verify(n => n.SendAll(It.IsAny<IMessage>()), Times.Once);
+        }
+        finally
+        {
+            ModInformation.IsServer = wasServer;
+        }
+    }
+
+    private static KillFeedSection GetKillFeedSection(CoopOptionsVM viewModel)
+    {
+        var tab = Assert.Single(viewModel.Tabs);
+        return Assert.IsType<KillFeedSection>(Assert.Single(tab.Sections));
+    }
+
+    private static CoopOptionsData CreateOptions(PlayerKillFeedColor color)
+    {
+        var options = new CoopOptionsData();
+        options.SetSection(KillFeedOptionsTabProvider.TabId, KillFeedSection.SectionId, KillFeedSectionOptions.FromColor(color));
+        return options;
+    }
+
     private static string CreateTempFilePath()
     {
         return Path.Combine(Path.GetTempPath(), $"BannerlordCoop-{Guid.NewGuid():N}.json");
@@ -161,9 +221,9 @@ public class PlayerKillFeedColorTests
     private class TestOptionsStore : ICoopOptionsStore
     {
         public string FilePath => string.Empty;
-        public CoopOptions? SavedOptions { get; private set; }
+        public CoopOptionsData? SavedOptions { get; private set; }
 
-        public bool TryLoad(out CoopOptions options)
+        public bool TryLoad(out CoopOptionsData options)
         {
             if (SavedOptions != null)
             {
@@ -175,12 +235,12 @@ public class PlayerKillFeedColorTests
             return false;
         }
 
-        public CoopOptions LoadOrDefault()
+        public CoopOptionsData LoadOrDefault()
         {
-            return SavedOptions ?? new CoopOptions();
+            return SavedOptions ?? new CoopOptionsData();
         }
 
-        public void Save(CoopOptions options)
+        public void Save(CoopOptionsData options)
         {
             SavedOptions = options;
         }

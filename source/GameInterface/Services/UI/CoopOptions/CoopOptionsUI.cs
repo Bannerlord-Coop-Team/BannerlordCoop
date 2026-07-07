@@ -1,7 +1,7 @@
 using TaleWorlds.Engine.GauntletUI;
 using TaleWorlds.ScreenSystem;
 
-namespace GameInterface.Services.UI;
+namespace GameInterface.Services.UI.CoopOptions;
 
 public class CoopOptionsUI : ScreenBase
 {

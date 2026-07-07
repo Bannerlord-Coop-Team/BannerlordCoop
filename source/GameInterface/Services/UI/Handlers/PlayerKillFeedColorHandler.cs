@@ -4,6 +4,8 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Players;
+using GameInterface.Services.UI.CoopOptions;
+using GameInterface.Services.UI.CoopOptions.Providers.KillFeedTab;
 using GameInterface.Services.UI.Messages;
 using LiteNetLib;
 using Serilog;
@@ -65,7 +67,7 @@ public class PlayerKillFeedColorHandler : IHandler
     {
         if (ModInformation.IsServer) return;
         if (!optionsStore.TryLoad(out var options)) return;
-        if (!options.TryGetKillFeedColor(out var color)) return;
+        if (!KillFeedOptionsTabProvider.TryGetKillFeedColor(options, out var color)) return;
 
         CacheLocalColor(color);
         network.SendAll(new NetworkRequestKillFeedColor(color.Red, color.Green, color.Blue));
