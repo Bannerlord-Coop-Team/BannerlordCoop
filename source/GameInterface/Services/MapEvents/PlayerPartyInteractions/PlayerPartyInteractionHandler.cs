@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Network.Messages;
 using Common.Util;
 using GameInterface.Services.Inventory.Data;
+using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
@@ -54,6 +55,7 @@ internal class PlayerPartyInteractionHandler : IHandler
     private readonly ConcurrentDictionary<string, string> sessionsByPartyId = new ConcurrentDictionary<string, string>();
     private readonly HashSet<string> openedConversationSessionIds = new HashSet<string>();
     private readonly HashSet<string> hostileEncounterSessionIds = new HashSet<string>();
+    private readonly HashSet<string> closedHostileEncounterPartyIds = new HashSet<string>();
 
     public PlayerPartyInteractionHandler(
         IMessageBroker messageBroker,
@@ -78,6 +80,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         messageBroker.Subscribe<NetworkPlayerPartyInteractionEnded>(Handle_NetworkPlayerPartyInteractionEnded);
         messageBroker.Subscribe<NetworkPlayerPartyInteractionDenied>(Handle_NetworkPlayerPartyInteractionDenied);
         messageBroker.Subscribe<NetworkPlayerPartyHostileEncounterStarted>(Handle_NetworkPlayerPartyHostileEncounterStarted);
+        messageBroker.Subscribe<NetworkClosePvpEncounter>(Handle_NetworkClosePvpEncounter);
         messageBroker.Subscribe<PlayerPartyInteractionOptionSelected>(Handle_PlayerPartyInteractionOptionSelected);
         messageBroker.Subscribe<PlayerPartyTradeOfferChanged>(Handle_PlayerPartyTradeOfferChanged);
         messageBroker.Subscribe<PlayerPartyTradeAcceptSelected>(Handle_PlayerPartyTradeAcceptSelected);
@@ -95,6 +98,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         messageBroker.Unsubscribe<NetworkPlayerPartyInteractionEnded>(Handle_NetworkPlayerPartyInteractionEnded);
         messageBroker.Unsubscribe<NetworkPlayerPartyInteractionDenied>(Handle_NetworkPlayerPartyInteractionDenied);
         messageBroker.Unsubscribe<NetworkPlayerPartyHostileEncounterStarted>(Handle_NetworkPlayerPartyHostileEncounterStarted);
+        messageBroker.Unsubscribe<NetworkClosePvpEncounter>(Handle_NetworkClosePvpEncounter);
         messageBroker.Unsubscribe<PlayerPartyInteractionOptionSelected>(Handle_PlayerPartyInteractionOptionSelected);
         messageBroker.Unsubscribe<PlayerPartyTradeOfferChanged>(Handle_PlayerPartyTradeOfferChanged);
         messageBroker.Unsubscribe<PlayerPartyTradeAcceptSelected>(Handle_PlayerPartyTradeAcceptSelected);
@@ -165,6 +169,9 @@ internal class PlayerPartyInteractionHandler : IHandler
         {
             if (!TryGetControlledSessionParty(message, out var myPartyId, out _)) return;
 
+            closedHostileEncounterPartyIds.Remove(message.InitiatorPartyId);
+            closedHostileEncounterPartyIds.Remove(message.ResponderPartyId);
+
             network.SendAll(new NetworkPlayerPartyInteractionShown(message.SessionId, myPartyId));
         }, context: "Confirm player-party interaction party");
     }
@@ -208,8 +215,27 @@ internal class PlayerPartyInteractionHandler : IHandler
         if (!(payload.Who is NetPeer peer)) return;
 
         var message = payload.What;
-        if (!sessionsById.TryGetValue(message.SessionId, out var session)) return;
-        if (!TryGetSessionPartyId(session, peer, out var partyId)) return;
+        if (!sessionsById.TryGetValue(message.SessionId, out var session))
+        {
+            Logger.Warning(
+                "[P2POptionTrace] Server ignored player-party dialog option for missing session; sessionId={SessionId} declaredPartyId={DeclaredPartyId} option={Option}",
+                message.SessionId ?? "<none>",
+                message.PartyId ?? "<none>",
+                message.Option);
+            return;
+        }
+
+        if (!TryGetSessionPartyId(session, peer, out var partyId))
+        {
+            Logger.Warning(
+                "[P2POptionTrace] Server ignored player-party dialog option because peer did not match session; sessionId={SessionId} declaredPartyId={DeclaredPartyId} option={Option} initiatorPartyId={InitiatorPartyId} responderPartyId={ResponderPartyId}",
+                message.SessionId ?? "<none>",
+                message.PartyId ?? "<none>",
+                message.Option,
+                session.InitiatorPartyId,
+                session.ResponderPartyId);
+            return;
+        }
 
         if (partyId == session.InitiatorPartyId)
         {
@@ -284,6 +310,17 @@ internal class PlayerPartyInteractionHandler : IHandler
         GameThread.RunSafe(
             () => TryOpenHostileEncounter(message),
             context: "Open player-party hostile encounter");
+    }
+
+    private void Handle_NetworkClosePvpEncounter(MessagePayload<NetworkClosePvpEncounter> payload)
+    {
+        if (ModInformation.IsServer) return;
+
+        GameThread.RunSafe(() =>
+        {
+            foreach (var partyId in payload.What.PartyIds ?? Array.Empty<string>())
+                closedHostileEncounterPartyIds.Add(partyId);
+        }, context: "Record closed player-party hostile encounter");
     }
 
     private void Handle_PlayerPartyTradeOfferChanged(MessagePayload<PlayerPartyTradeOfferChanged> payload)
@@ -836,11 +873,23 @@ internal class PlayerPartyInteractionHandler : IHandler
         if (localSide == BattleSideEnum.None)
             return;
 
+        if (IsHostileEncounterClosed(message))
+        {
+            CloseLocalPlayerPartyEncounter(localSide == BattleSideEnum.Attacker ? attacker.MobileParty : defender.MobileParty);
+            closedHostileEncounterPartyIds.Remove(message.AttackerPartyId);
+            closedHostileEncounterPartyIds.Remove(message.DefenderPartyId);
+            return;
+        }
+
         if (IsCurrentLocalInteractionSession(message.SessionId))
             hostileEncounterSessionIds.Add(message.SessionId);
 
         OpenHostileEncounter(attacker, defender, mapEvent, localSide);
     }
+
+    private bool IsHostileEncounterClosed(NetworkPlayerPartyHostileEncounterStarted message)
+        => closedHostileEncounterPartyIds.Contains(message.AttackerPartyId) ||
+           closedHostileEncounterPartyIds.Contains(message.DefenderPartyId);
 
     private bool TryResolveHostileEncounter(
         NetworkPlayerPartyHostileEncounterStarted message,
@@ -991,7 +1040,17 @@ internal class PlayerPartyInteractionHandler : IHandler
     private static void CloseLocalPlayerPartyEncounter(MobileParty localParty)
     {
         if (PlayerEncounter.Current != null)
-            PlayerEncounter.Finish(true);
+        {
+            PlayerEncounter.LeaveEncounter = true;
+            try
+            {
+                PlayerEncounter.Finish(true);
+            }
+            finally
+            {
+                Campaign.Current.PlayerEncounter = null;
+            }
+        }
 
         if (Campaign.Current?.CurrentMenuContext != null)
             GameMenu.ExitToLast();

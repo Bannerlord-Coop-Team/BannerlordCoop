@@ -171,6 +171,13 @@ internal class PlayerCaptivityClientHandler : IHandler
 
         PlayerCaptivityLogger.Debug("Handle_PlayerSurrendered: requesting surrender of party={PartyId} in mapEvent={MapEventId}",
             playerPartyId, mapEventId);
+        Logger.Information(
+            "[PvPBattleEncounterTrace] Client submitting battle encounter surrender request; playerPartyId={PlayerPartyId} mapEventId={MapEventId} menu={Menu} encounter={Encounter} captive={Captive}",
+            playerPartyId,
+            mapEventId,
+            Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "<none>",
+            PlayerEncounter.Current != null,
+            PlayerCaptivity.IsCaptive);
 
         network.SendAll(new NetworkPlayerSurrendered(playerPartyId, mapEventId));
     }

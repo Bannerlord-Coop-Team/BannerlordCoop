@@ -7,6 +7,7 @@ using Common.Util;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
+using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
@@ -196,6 +197,24 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         AssertMapEventRemoved(Server, setup.ctx.MapEventId);
         AssertMainPartyLeftBattle(Server);
         Assert.Contains(setup.initiatorPartyBaseId, exitToLast.PartyIds);
+    }
+
+    [Fact]
+    public void SpectatorBattleSimulationOpen_ClosesBattleEncounterMenu_WithoutEndingEncounter()
+    {
+        var setup = SetupTwoOpposingPlayersInBattle();
+        var spectatorClient = Clients.Last();
+        SetMockPlayerEncounter(spectatorClient, mapEventId: setup.ctx.MapEventId);
+
+        using var exitToLast = new GameMenuExitToLastCounter();
+
+        spectatorClient.Call(() =>
+        {
+            spectatorClient.Resolve<IMessageBroker>().Publish(this, new NetworkOpenBattleSimulation(setup.ctx.MapEventId));
+        }, MapEventDisabledMethods);
+
+        Assert.Equal(1, exitToLast.CountFor(setup.recipientPartyBaseId));
+        AssertHasPlayerEncounter(spectatorClient, expected: true);
     }
 
     /// <summary>

@@ -6,9 +6,12 @@ using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Messages.Behavior;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
 using Serilog;
+using System;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
@@ -101,6 +104,13 @@ internal class PlayerEncounterPatches
 
         if (ModInformation.IsServer) return true;
 
+        Logger.Information(
+            "[PvPBattleEncounterTrace] Battle encounter option clicked: surrender; party={PartyId} mapEvent={MapEventId} menu={Menu} encounter={Encounter}",
+            DescribePartyForTrace(MobileParty.MainParty?.Party),
+            DescribeMapEventForTrace(GetCurrentMapEventForTrace()),
+            Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "<none>",
+            PlayerEncounter.Current != null);
+
         var message = new PlayerSurrendered(PlayerEncounter.Current._mapEvent, MobileParty.MainParty);
 
         MessageBroker.Instance.Publish(__instance, message);
@@ -181,7 +191,16 @@ internal class PlayerEncounterPatches
         var mapEvent = mainParty.MapEvent;
         if (mapEvent == null) return true;
 
-        if (IsBattleJoiner())
+        var isBattleJoiner = IsBattleJoiner();
+        Logger.Information(
+            "[PvPBattleEncounterTrace] Battle encounter option clicked: leave; party={PartyId} mapEvent={MapEventId} isBattleJoiner={IsBattleJoiner} menu={Menu} encounter={Encounter}",
+            DescribePartyForTrace(mainParty.Party),
+            DescribeMapEventForTrace(mapEvent),
+            isBattleJoiner,
+            Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "<none>",
+            PlayerEncounter.Current != null);
+
+        if (isBattleJoiner)
         {
             // Block native: its LeaveBattle finalizes the whole event when the side has no NPC parties (an
             // all-player PvP side). Remove only this party authoritatively; the UI tears down on removal.
@@ -204,15 +223,67 @@ internal class PlayerEncounterPatches
             mainParty.Party._mapEventSide = null;
 
         if (PlayerEncounter.Current != null)
-            PlayerEncounter.Finish(true);
+        {
+            PlayerEncounter.LeaveEncounter = true;
+            try
+            {
+                PlayerEncounter.Finish(true);
+            }
+            finally
+            {
+                Campaign.Current.PlayerEncounter = null;
+            }
+        }
 
-        GameMenu.ExitToLast();
+        if (Campaign.Current?.CurrentMenuContext != null)
+            GameMenu.ExitToLast();
     }
 
     private static bool IsBattleJoiner()
     {
         var side = MobileParty.MainParty?.Party?.MapEventSide;
         return side != null && side.LeaderParty != MobileParty.MainParty.Party;
+    }
+
+
+    private static MapEvent GetCurrentMapEventForTrace()
+    {
+        var encounter = PlayerEncounter.Current;
+        return encounter?._mapEvent ?? GetPlayerEncounterBattleForTrace() ?? MobileParty.MainParty?.MapEvent;
+    }
+
+    private static MapEvent GetPlayerEncounterBattleForTrace()
+    {
+        try
+        {
+            return PlayerEncounter.Battle;
+        }
+        catch (NullReferenceException)
+        {
+            return null;
+        }
+    }
+
+    private static string DescribePartyForTrace(PartyBase party)
+    {
+        if (party == null)
+            return "<null>";
+
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) && objectManager.TryGetId(party, out var partyId))
+            return partyId;
+
+        return party.MobileParty?.StringId ?? party.Name?.ToString() ?? "<unregistered-party>";
+    }
+
+    private static string DescribeMapEventForTrace(MapEvent mapEvent)
+    {
+        if (mapEvent == null)
+            return "<null>";
+
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) && objectManager.TryGetId(mapEvent, out var mapEventId))
+            return mapEventId;
+
+        return mapEvent.StringId ?? "<unregistered-map-event>";
     }
 
     private static void ClearEngageOrder(MobileParty party)

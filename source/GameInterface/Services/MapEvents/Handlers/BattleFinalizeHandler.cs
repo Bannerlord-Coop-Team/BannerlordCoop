@@ -131,7 +131,7 @@ internal class BattleFinalizeHandler : IHandler
         // in live p2p hostile battles when player-party collection races teardown.
         if (playerPartyIds.Length > 0)
         {
-            SendClosePvpEncounter(playerPartyIds);
+            SendClosePvpEncounter(playerPartyIds, mapEventId: payload.What.MapEventId);
             return;
         }
 
@@ -148,10 +148,11 @@ internal class BattleFinalizeHandler : IHandler
         if (ModInformation.IsClient) return;
 
         var knownPlayerPartyIds = MapEventPlayerPartyCollector.Combine(payload.What.PlayerPartyIds);
+        var closeAlreadySent = !string.IsNullOrEmpty(payload.What.SurrenderedPartyId);
         if (!objectManager.TryGetObjectWithLogging(payload.What.MapEventId, out MapEvent mapEvent))
         {
-            if (knownPlayerPartyIds.Length > 0)
-                SendClosePvpEncounter(knownPlayerPartyIds);
+            if (!closeAlreadySent && knownPlayerPartyIds.Length > 0)
+                SendClosePvpEncounter(knownPlayerPartyIds, payload.What.SurrenderedPartyId, payload.What.MapEventId);
 
             return;
         }
@@ -165,8 +166,8 @@ internal class BattleFinalizeHandler : IHandler
         {
             var playerPartyIds = FinalizeAndCollectPlayers(mapEvent, knownPlayerPartyIds);
 
-            if (playerPartyIds.Length > 0)
-                SendClosePvpEncounter(playerPartyIds);
+            if (!closeAlreadySent && playerPartyIds.Length > 0)
+                SendClosePvpEncounter(playerPartyIds, payload.What.SurrenderedPartyId, payload.What.MapEventId);
         }
         catch (Exception e)
         {
@@ -263,12 +264,12 @@ internal class BattleFinalizeHandler : IHandler
         return true;
     }
 
-    private void SendClosePvpEncounter(string[] playerPartyIds)
+    private void SendClosePvpEncounter(string[] playerPartyIds, string surrenderedPartyId = null, string mapEventId = null)
     {
         if (playerPartyIds == null || playerPartyIds.Length == 0)
             return;
 
-        var message = new NetworkClosePvpEncounter(playerPartyIds);
+        var message = new NetworkClosePvpEncounter(playerPartyIds, surrenderedPartyId, mapEventId);
         network.SendAll(message);
 
         if (ModInformation.IsServer)

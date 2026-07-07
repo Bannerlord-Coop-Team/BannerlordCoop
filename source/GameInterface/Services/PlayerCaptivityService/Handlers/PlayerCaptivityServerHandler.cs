@@ -182,15 +182,34 @@ internal class PlayerCaptivityServerHandler : IHandler
             try
             {
                 var playerPartyIds = MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, objectManager);
+                if (!objectManager.TryGetIdWithLogging(playerParty.Party, out var surrenderedPartyId)) return;
 
+                SendClosePvpEncounter(playerPartyIds, surrenderedPartyId, payload.What.MapEventId);
                 mapEvent.DoSurrender(playerParty.Party.Side);
-                messageBroker.Publish(this, new MapEventConcluded(payload.What.MapEventId, playerPartyIds));
+                messageBroker.Publish(this, new MapEventConcluded(payload.What.MapEventId, playerPartyIds, surrenderedPartyId));
             }
             catch (Exception ex)
             {
                 Logger.Error(ex, "Failed to surrender");
             }
         }, blocking: true);
+    }
+
+    private void SendClosePvpEncounter(string[] playerPartyIds, string surrenderedPartyId, string mapEventId)
+    {
+        if (playerPartyIds == null || playerPartyIds.Length == 0)
+            return;
+
+        Logger.Information("[PvPEncounterClose] Server sending immediate surrender close: partyIds=[{PartyIds}] surrenderedPartyId={SurrenderedPartyId} mapEventId={MapEventId}",
+            string.Join(",", playerPartyIds),
+            surrenderedPartyId ?? "<none>",
+            mapEventId ?? "<none>");
+
+        var message = new NetworkClosePvpEncounter(playerPartyIds, surrenderedPartyId, mapEventId);
+        network.SendAll(message);
+
+        if (ModInformation.IsServer)
+            messageBroker.Publish(this, message);
     }
 
     /// <summary>

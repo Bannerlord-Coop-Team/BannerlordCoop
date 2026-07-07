@@ -12,10 +12,12 @@ internal readonly struct MapEventConcluded : IEvent
 {
     public readonly string MapEventId;
     public readonly string[] PlayerPartyIds;
+    public readonly string SurrenderedPartyId;
 
-    public MapEventConcluded(string mapEventId, string[] playerPartyIds = null)
+    public MapEventConcluded(string mapEventId, string[] playerPartyIds = null, string surrenderedPartyId = null)
     {
         MapEventId = mapEventId;
         PlayerPartyIds = playerPartyIds ?? new string[0];
+        SurrenderedPartyId = surrenderedPartyId;
     }
 }
