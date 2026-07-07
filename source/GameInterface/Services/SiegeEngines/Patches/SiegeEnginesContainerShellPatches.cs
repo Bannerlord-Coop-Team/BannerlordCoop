@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using GameInterface.Utils;
+using HarmonyLib;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
@@ -38,8 +39,9 @@ internal class SiegeEnginesContainerShellPatches
         var deployedCounts = new Dictionary<SiegeEngineType, int>();
         var reservedCounts = new Dictionary<SiegeEngineType, int>();
 
-        // Readonly fields refuse a direct assignment outside a constructor, so set them by FieldInfo
-        // like the registries do; the count properties have publicized setters.
+        // The publicizer exposes these fields for reading (the null guard above), but it keeps their
+        // readonly modifier, so a direct write still won't compile (CS0191) — set them by reflection.
+        // The count properties have publicized setters, so those are assigned directly below.
         SetReadonlyField(container, nameof(SiegeEnginesContainer._deployedSiegeEngines), new MBList<SiegeEngineConstructionProgress>(4));
         SetReadonlyField(container, nameof(SiegeEnginesContainer.DeployedRangedSiegeEngines), new SiegeEngineConstructionProgress[4]);
         SetReadonlyField(container, nameof(SiegeEnginesContainer.DeployedMeleeSiegeEngines),
@@ -55,6 +57,6 @@ internal class SiegeEnginesContainerShellPatches
 
     private static void SetReadonlyField(SiegeEnginesContainer container, string fieldName, object value)
     {
-        AccessTools.Field(typeof(SiegeEnginesContainer), fieldName).SetValue(container, value);
+        ReflectionUtils.SetPrivateField(typeof(SiegeEnginesContainer), fieldName, container, value);
     }
 }
