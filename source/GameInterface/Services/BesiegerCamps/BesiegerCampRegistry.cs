@@ -1,5 +1,6 @@
 ﻿using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Utils;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -41,7 +42,8 @@ internal class BesiegerCampRegistry : AutoRegistryBase<BesiegerCamp>
 
     public override void OnClientCreated(BesiegerCamp obj, string id)
     {
-        AccessTools.Field(typeof(BesiegerCamp), nameof(BesiegerCamp._besiegerParties)).SetValue(obj, new MBList<MobileParty>());
+        // _besiegerParties is readonly (publicized for reading, not writing), so fill the client shell by reflection.
+        ReflectionUtils.SetPrivateField(typeof(BesiegerCamp), nameof(BesiegerCamp._besiegerParties), obj, new MBList<MobileParty>());
     }
 
     public override void OnClientDestroyed(BesiegerCamp obj, string id)
