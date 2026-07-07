@@ -11,6 +11,7 @@ using GameInterface.Services;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Metrics;
 using GameInterface.Services.Kingdoms;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -50,6 +51,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<KingdomDecisionOutcomeResolver>().AsSelf().As<IKingdomDecisionOutcomeResolver>().InstancePerLifetimeScope();
         builder.RegisterType<KingdomDecisionVoteManager>().AsSelf().As<IKingdomDecisionVoteManager>().InstancePerLifetimeScope();
         builder.RegisterType<KingdomMembershipState>().AsSelf().As<IKingdomMembershipState>().InstancePerLifetimeScope();
+        builder.RegisterType<MainPartyBattleRewardsCache>().As<IMainPartyBattleRewardsCache>().InstancePerLifetimeScope();
         builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
 
         builder.RegisterModule<ServiceModule>();

@@ -143,11 +143,17 @@ internal class PlayerEncounterPatches
             return false;
         }
 
-        if (!MainPartyBattleRewardsCache.TryGet(mapEvent, out renownChange, out influenceChange, out moraleChange, out playerEarnedLootRate))
+        if (ContainerProvider.TryResolve<IMainPartyBattleRewardsCache>(out var cache)
+            && cache.TryGet(mapEvent, out renownChange, out influenceChange, out moraleChange, out playerEarnedLootRate))
         {
-            Logger.Warning("GetBattleRewards: MainParty not found on either side of {MapEvent} and no cached snapshot; defaulting rewards to zero", mapEvent);
+            return false;
         }
 
+        renownChange = default;
+        influenceChange = default;
+        moraleChange = default;
+        playerEarnedLootRate = 0f;
+        Logger.Warning("GetBattleRewards: MainParty not found on either side of {MapEvent} and no cached snapshot; defaulting rewards to zero", mapEvent);
         return false;
     }
 
