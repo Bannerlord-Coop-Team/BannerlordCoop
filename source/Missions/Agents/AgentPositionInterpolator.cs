@@ -240,7 +240,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         if (!doLog) return;
 
         Logger.Debug(
-            "[MountedDrive] rider={Rider} mount={Mount} dist={Dist:0.00} snap={Snap} glide(r/m)={RiderGlide:0.00}/{MountGlide:0.00} realVel(r/m)={RiderVel:0.00}/{MountVel:0.00} input(r/m)={RiderInput:0.00}/{MountInput:0.00} gait={Gait}/{GaitType}",
+            "[MountedDrive] rider={Rider} mount={Mount} dist={Dist:0.00} snap={Snap} glide(r/m)={RiderGlide:0.00}/{MountGlide:0.00} realVel(r/m)={RiderVel:0.00}/{MountVel:0.00} moveVel={MoveVel:0.00} input(r/m)={RiderInput:0.00}/{MountInput:0.00} gait={Gait}/{GaitType}",
             rider.Index,
             mount.Index,
             distToTarget,
@@ -249,6 +249,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             mountGlide,
             rider.GetRealGlobalVelocity().Length,
             mount.GetRealGlobalVelocity().Length,
+            mount.MovementVelocity.Length,
             rider.MovementInputVector.Length,
             mount.MovementInputVector.Length,
             mount.GetCurrentAction(0).Index,

@@ -8,6 +8,11 @@ namespace Missions.Agents.Packets
     [ProtoContract(SkipConstructor = true)]
     public class AgentMountData
     {
+        // Speed-cap tuning: the puppet mount is capped to the owner's real speed plus a term proportional to how
+        // far it lags, so it tracks the owner's speed instead of full gallop yet still closes a gap without snapping.
+        private const float MinSpeedCap = 0.1f;
+        private const float SpeedCatchupGain = 1.5f;
+
         // The parameter is the MOUNT agent itself (callers pass rider.MountAgent), so read it directly —
         // mirroring ApplyMount. Dereferencing .MountAgent here was reading the mount's own (null) mount → NRE.
         public AgentMountData(Agent mountAgent, Guid mountId = default)
@@ -22,6 +27,7 @@ namespace Missions.Agents.Packets
             MountLookDirection = mountAgent.LookDirection;
             MountMovementDirection = mountAgent.GetMovementDirection();
             MountPosition = mountAgent.Position;
+            MountSpeed = mountAgent.GetRealGlobalVelocity().Length;
             MountId = mountId;
         }
 
@@ -57,6 +63,11 @@ namespace Missions.Agents.Packets
             }
             mountAgent.LookDirection = MountLookDirection;
             mountAgent.MovementInputVector = MountInputVector;
+
+            // Cap the puppet to the owner's actual speed (plus a catch-up term for any lag) so the native seek stops
+            // rushing at full gallop toward the target and overshooting/snapping back when the owner is slower.
+            float lag = mountAgent.Position.Distance(MountPosition);
+            mountAgent.SetMaximumSpeedLimit(Math.Max(MinSpeedCap, MountSpeed + lag * SpeedCatchupGain), isMultiplier: false);
         }
 
         [ProtoMember(1)]
@@ -84,5 +95,7 @@ namespace Missions.Agents.Packets
         public float MountAction0Progress { get; }
         [ProtoMember(11)]
         public int MountAction0Index { get; }
+        [ProtoMember(12)]
+        public float MountSpeed { get; }
     }
 }
