@@ -33,7 +33,7 @@ namespace Missions.Agents.Packets
             }
         }
 
-        public void Apply(Agent agent)
+        public void Apply(Agent agent, bool suppressMovementInput = false)
         {
             // if the player is dead, dont sync anything
             if (agent.Health <= 0)
@@ -49,7 +49,7 @@ namespace Missions.Agents.Packets
 
             // apply the agent's look direction
             agent.LookDirection = LookDirection;
-            agent.MovementInputVector = InputVector;
+            agent.MovementInputVector = suppressMovementInput ? Vec2.Zero : InputVector;
 
             // Update equipment
             AgentEquipment.Apply(agent);
@@ -61,7 +61,7 @@ namespace Missions.Agents.Packets
             // Update mount
             if (agent.HasMount)
             {
-                MountData?.ApplyMount(agent.MountAgent);
+                MountData?.ApplyMount(agent.MountAgent, suppressMovementInput);
             }
         }
 

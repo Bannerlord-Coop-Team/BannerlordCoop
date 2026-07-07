@@ -22,7 +22,7 @@ namespace Missions.Agents.Packets
             MountId = mountId;
         }
 
-        public void ApplyMount(Agent mountAgent)
+        public void ApplyMount(Agent mountAgent, bool suppressMovementInput = false)
         {
             // NOTE: mount position is NOT applied here — it is reconciled per-frame by AgentPositionInterpolator
             // (fed MountPosition by AgentMovementHandler). Everything below is per-packet mount state/animation.
@@ -40,7 +40,7 @@ namespace Missions.Agents.Packets
                 mountAgent.SetCurrentActionProgress(1, MountAction1Progress);
             }
             mountAgent.LookDirection = MountLookDirection;
-            mountAgent.MovementInputVector = MountInputVector;
+            mountAgent.MovementInputVector = suppressMovementInput ? Vec2.Zero : MountInputVector;
         }
 
         [ProtoMember(1)]

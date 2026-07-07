@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.PacketHandlers;
@@ -12,6 +12,7 @@ using Missions.Messages;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Agents.Handlers;
@@ -46,6 +47,7 @@ public class AgentMovementHandler : IAgentMovementHandler
     // Keep the old movement-send ceiling after moving capture onto the game thread. High-FPS clients can tick
     // faster than the old poller, and sending every frame would raise battle bandwidth.
     private const float MovementPollingIntervalSeconds = 0.01f;
+    private const float StationaryMountedTargetDistanceSquared = 0.0025f;
 
     private readonly IPacketManager packetManager;
     private readonly IBattleNetwork client;
@@ -57,6 +59,7 @@ public class AgentMovementHandler : IAgentMovementHandler
     // same one. Touched only on the game thread (inside HandlePacket's apply), so no lock; per-mission
     // (this handler is transient), so it can't leak across missions.
     private readonly Dictionary<Agent, Agent> _dismountedHorses = new Dictionary<Agent, Agent>();
+    private readonly Dictionary<Agent, MountedTargetSample> _lastMountedTargets = new Dictionary<Agent, MountedTargetSample>();
 
     // Per-frame position smoothing for received puppets. Fed the latest target on each packet apply (below) and
     // ticked from CoopMissionController.OnMissionTick, so the ease is decoupled from the bursty poll cadence.
@@ -119,6 +122,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         Logger.Verbose("Disposing {handlerType}", typeof(AgentMovementHandler));
 
         _interpolator.Clear();
+        _lastMountedTargets.Clear();
 
         packetManager.RemovePacketHandler(this);
         packetManager.RemovePacketHandler(_mountMovementApplier);
@@ -231,7 +235,8 @@ public class AgentMovementHandler : IAgentMovementHandler
                         continue;
 
                     SyncMountState(agent, data);
-                    data.Apply(agent);
+                    bool suppressMovementInput = ShouldSuppressMountedMovementInput(agent, data);
+                    data.Apply(agent, suppressMovementInput);
 
                     // Position is reconciled per-frame by the interpolator (smoother than a per-packet
                     // correction bound to the ~10ms poll cadence); push the latest targets it eases toward.
@@ -249,11 +254,34 @@ public class AgentMovementHandler : IAgentMovementHandler
                     }
                     else
                     {
+                        _lastMountedTargets.Remove(agent);
                         _interpolator.SetRiderTarget(agent, data.Position, data.MovementDirection);
                     }
                 }
             }
         });
+    }
+
+    private bool ShouldSuppressMountedMovementInput(Agent agent, AgentData data)
+    {
+        if (!agent.HasMount || data.MountData == null)
+        {
+            _lastMountedTargets.Remove(agent);
+            return false;
+        }
+
+        var current = new MountedTargetSample(data.Position, data.MountData.MountPosition);
+        bool suppress = _lastMountedTargets.TryGetValue(agent, out var previous)
+                        && IsNearlySameTarget(previous.RiderPosition, current.RiderPosition)
+                        && IsNearlySameTarget(previous.MountPosition, current.MountPosition);
+
+        _lastMountedTargets[agent] = current;
+        return suppress;
+    }
+
+    private static bool IsNearlySameTarget(Vec3 previous, Vec3 current)
+    {
+        return previous.AsVec2.DistanceSquared(current.AsVec2) <= StationaryMountedTargetDistanceSquared;
     }
 
     // [Game thread] Replicate the owner's mount/dismount onto its puppet. The per-tick AgentData reports
@@ -271,6 +299,7 @@ public class AgentMovementHandler : IAgentMovementHandler
             // Owner dismounted: get the puppet off the horse. Remember the horse for a possible re-mount, and
             // stop interpolating it (its target is no longer being reported).
             _dismountedHorses[agent] = agent.MountAgent;
+            _lastMountedTargets.Remove(agent);
             _interpolator.Forget(agent.MountAgent);
             agent.MountAgent = null;
         }
@@ -329,6 +358,18 @@ public class AgentMovementHandler : IAgentMovementHandler
         if (mount != null && agentRegistry.TryGetAgentInfo(mount, out var mountInfo))
             return mountInfo.AgentId;
         return Guid.Empty;
+    }
+
+    private struct MountedTargetSample
+    {
+        public MountedTargetSample(Vec3 riderPosition, Vec3 mountPosition)
+        {
+            RiderPosition = riderPosition;
+            MountPosition = mountPosition;
+        }
+
+        public Vec3 RiderPosition { get; }
+        public Vec3 MountPosition { get; }
     }
 
     private void Handle_PeerEntered(MessagePayload<NetworkMissionPeerEntered> payload)
