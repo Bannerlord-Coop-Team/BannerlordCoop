@@ -7,7 +7,6 @@ using HarmonyLib;
 using TaleWorlds.CampaignSystem.Settlements;
 using static TaleWorlds.CampaignSystem.Settlements.Village;
 
-
 namespace GameInterface.Services.Villages.Patches;
 
 /// <summary>
@@ -29,17 +28,17 @@ internal class VillagePatches
 
         if (ModInformation.IsClient) return false;
         if (__instance._villageState == value) return false;
-        
+
         var message = new VillageStateChanged(__instance, (int)value);
-        MessageBroker.Instance.Publish(__instance, message);    
+        MessageBroker.Instance.Publish(__instance, message);
         return true;
     }
 
     public static void RunVillageStateChange(Village village, VillageStates state)
     {
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
-            using(new AllowedThread())
+            using (new AllowedThread())
             {
                 village.VillageState = state;
                 village.Settlement.Party.SetLevelMaskIsDirty();
@@ -70,7 +69,7 @@ internal class VillagePatches
 
     public static void ChangeHearth(Village village, float Hearth)
     {
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             using (new AllowedThread())
             {
@@ -97,7 +96,7 @@ internal class VillagePatches
 
     internal static void RunTradeBoundChange(Village village, Settlement tradebound)
     {
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             using (new AllowedThread())
             {
@@ -122,7 +121,7 @@ internal class VillagePatches
 
     internal static void RunTradeTaxChange(Village village, int tradeTaxAccumulated)
     {
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             using (new AllowedThread())
             {
@@ -146,7 +145,7 @@ internal class VillagePatches
 
     internal static void RunLastDemandTimeSatisified(Village village, float LastDemandSatisfiedTime)
     {
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             using (new AllowedThread())
             {

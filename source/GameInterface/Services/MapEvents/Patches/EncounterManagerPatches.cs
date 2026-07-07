@@ -8,6 +8,7 @@ using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -26,6 +27,12 @@ internal class EncounterManagerPatches
     [HarmonyPatch(nameof(EncounterManager.StartSettlementEncounter))]
     private static bool Prefix(MobileParty attackerParty, Settlement settlement)
     {
+        if (RaidAiInterventionSuppression.ShouldSuppressSettlementEncounter(attackerParty, settlement))
+            return false;
+
+        if (TryRequestActiveSlowRaidConversation(attackerParty, settlement))
+            return false;
+
         if (ModInformation.IsServer) return true;
 
         if (!attackerParty.IsControlledByThisInstance())
@@ -38,10 +45,25 @@ internal class EncounterManagerPatches
     }
 
     [HarmonyPrefix]
+    [HarmonyPatch(nameof(EncounterManager.StartPartyEncounter))]
+    private static bool StartPartyEncounterPrefix(PartyBase attackerParty, PartyBase defenderParty)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+        if (TryRequestActiveSlowRaidSettlementEncounter(attackerParty, defenderParty))
+            return false;
+
+        return !RaidAiInterventionSuppression.ShouldSuppressEncounter(attackerParty, defenderParty);
+    }
+
+    [HarmonyPrefix]
     [HarmonyPatch(nameof(EncounterManager.HandleEncounterForMobileParty))]
     internal static bool HandleEncounterForMobilePartyPatch(ref MobileParty mobileParty, ref float dt)
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+        if (ModInformation.IsServer && RaidAiInterventionSuppression.ShouldSuppressMobilePartyEncounter(mobileParty))
+            return false;
 
         // Skip this method if party is not controlled
         if (!mobileParty.IsControlledByThisInstance())
@@ -73,6 +95,12 @@ internal class EncounterManagerPatches
         // Our own server-approved re-run (AllowedThread) runs the real method.
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
+        if (RaidAiInterventionSuppression.ShouldSuppressEncounter(attackerParty, defenderParty))
+            return false;
+
+        if (TryRequestActiveSlowRaidSettlementEncounter(attackerParty, defenderParty))
+            return false;
+
         // The server runs it locally (authoritative).
         if (ModInformation.IsServer) return true;
 
@@ -81,6 +109,46 @@ internal class EncounterManagerPatches
         MessageBroker.Instance.Publish(null, new ConversationRequested(defenderParty, attackerParty, forcePlayerOutFromSettlement: false, ConversationRestartSource.EncounterManager));
 
         return false;
+    }
+
+    private static bool TryRequestActiveSlowRaidConversation(MobileParty attackerParty, Settlement settlement)
+    {
+        if (ModInformation.IsServer)
+            return false;
+
+        if (attackerParty?.IsControlledByThisInstance() != true)
+            return false;
+
+        var defenderParty = settlement?.Party;
+        if (defenderParty?.MapEvent?.IsActiveSlowVillageRaid() != true)
+            return false;
+
+        MessageBroker.Instance.Publish(null, new ConversationRequested(defenderParty, attackerParty.Party, false, ConversationRestartSource.EncounterManager));
+        return true;
+    }
+
+    private static bool TryRequestActiveSlowRaidSettlementEncounter(PartyBase attackerParty, PartyBase defenderParty)
+    {
+        if (ModInformation.IsServer)
+            return false;
+
+        var mobileParty = attackerParty?.MobileParty;
+        if (mobileParty?.IsControlledByThisInstance() != true)
+            return false;
+
+        var mapEvent = GetActiveSlowRaidMapEvent(defenderParty) ?? GetActiveSlowRaidMapEvent(attackerParty);
+        var settlement = mapEvent?.MapEventSettlement;
+        if (settlement == null)
+            return false;
+
+        MessageBroker.Instance.Publish(mobileParty, new StartSettlementEncounterAttempted(mobileParty, settlement));
+        return true;
+    }
+
+    private static MapEvent GetActiveSlowRaidMapEvent(PartyBase party)
+    {
+        var mapEvent = party?.MapEvent;
+        return mapEvent.IsActiveSlowVillageRaid() ? mapEvent : null;
     }
 }
 

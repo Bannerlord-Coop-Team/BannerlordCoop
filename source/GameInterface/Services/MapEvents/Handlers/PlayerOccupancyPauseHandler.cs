@@ -2,6 +2,7 @@ using Common;
 using Common.Messaging;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -58,13 +59,25 @@ internal class PlayerOccupancyPauseHandler : IHandler
     // session is not "all occupied", so it never pauses with no players.
     private bool AllPlayersOccupied()
     {
-        var players = playerManager.Players;
-        return players.Any() && players.Where(playerManager.IsConnected).All(player =>
+        var connectedPlayers = playerManager.Players.Where(playerManager.IsConnected).ToList();
+        return connectedPlayers.Any() && connectedPlayers.All(player =>
         {
             if (!objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty))
                 return false;
 
-            return playerParty.MapEvent != null || playerParty.CurrentSettlement != null;
+            return IsPlayerOccupied(playerParty);
         });
+    }
+
+    private static bool IsPlayerOccupied(MobileParty playerParty)
+    {
+        var mapEvent = playerParty.MapEvent;
+        if (mapEvent != null && mapEvent.IsActiveSlowVillageRaid())
+            return false;
+
+        if (playerParty.CurrentSettlement != null)
+            return true;
+
+        return mapEvent != null;
     }
 }

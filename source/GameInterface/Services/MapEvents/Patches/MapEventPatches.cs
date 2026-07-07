@@ -180,6 +180,16 @@ internal class MapEventPatches
         if (CallOriginalPolicy.IsOriginalAllowed())
             return true;
 
+        if (__instance.IsRaidHostileAction())
+        {
+            RaidAiInterventionSuppression.SuppressJoinedDefenders(__instance);
+
+            // Slow raids are the only village hostile action with a campaign-map progress loop. Non-raid hostile
+            // actions still follow normal player battle gating so they do not resolve while a client is choosing mode.
+            if (__instance.IsActiveSlowVillageRaid())
+                return true;
+        }
+
         // Skip if any parties are not set
         if (__instance.InvolvedParties.Any(x => x?.MobileParty is null))
             return false;
@@ -314,6 +324,15 @@ internal class InteractionPatches
         if (!__result)
             return;
 
+        if (__instance.IsRaidAiInterventionSuppressed())
+        {
+            __result = false;
+            return;
+        }
+
+        if (__instance.IsRaidHostileAction() && MapEventConfig.AllowRaidAiIntervention)
+            return;
+
         // Allow AI to join if no players are involved
         if (!__instance.ContainsPlayerParty())
             return;
@@ -336,7 +355,7 @@ internal class InteractionPatches
     {
         if (ModInformation.IsClient)
             return;
-        
+
         var attackerIsPlayer = attackerParty.MobileParty?.IsPlayerParty() == true;
         var defenderIsPlayer = defenderParty.MobileParty?.IsPlayerParty() == true;
 
