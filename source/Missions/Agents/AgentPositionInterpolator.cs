@@ -47,6 +47,9 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     private const float DiagnosticInterval = 2f;
     private const float StaleTargetSeconds = 1f;
     private const float MountedDiagInterval = 0.5f;
+    // Exponential ease rate for the mounted-puppet position follow: fraction MountedFollowRate*dt of the gap is
+    // closed each frame, so it tracks the owner with a small lag and settles when the owner stops.
+    private const float MountedFollowRate = 12f;
 
     private readonly Dictionary<Agent, TargetFrame> _targets = new Dictionary<Agent, TargetFrame>();
     // Reused scratch list so eviction doesn't allocate every tick.
@@ -128,7 +131,11 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             }
 
             if (isMountedRider)
+            {
                 LogMountedDiag(agent, dist, dist > snapDistance, dt);
+                FollowMounted(agent, pair.Value, dt);
+                continue;
+            }
 
             if (dist <= snapDistance)
             {
@@ -180,6 +187,24 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         Vec2 targetPosition = target.Position.AsVec2;
         Vec3 targetDirection = ResolveDirection(agent, target);
         agent.SetTargetPositionAndDirection(in targetPosition, in targetDirection);
+    }
+
+    // Position a mounted puppet by easing its HORSE directly toward the owner's reported mount position each frame.
+    // Unlike SetTargetPositionAndDirection this does NOT physically seek/collide, so the puppet tracks the owner's
+    // exact position instead of getting wedged in the local crowd, and with no seek running the synced gait action
+    // isn't clobbered. TeleportToPosition on the mount carries its rider along.
+    private static void FollowMounted(Agent rider, TargetFrame target, float dt)
+    {
+        Agent mount = rider.MountAgent;
+        if (mount == null || !mount.IsActive()) return;
+
+        Vec3 mountTarget = target.HasMountSnapPosition ? target.MountSnapPosition : target.Position;
+        Vec3 cur = mount.Position;
+        float alpha = System.Math.Min(1f, MountedFollowRate * dt);
+        Vec3 next = cur.Distance(mountTarget) > MountSnapDistance ? mountTarget : cur + (mountTarget - cur) * alpha;
+
+        mount.TeleportToPosition(next);
+        mount.SetMovementDirection(target.MovementDirection);
     }
 
     private static Vec3 ResolveDirection(Agent agent, TargetFrame target)
