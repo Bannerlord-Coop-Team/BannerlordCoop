@@ -1755,7 +1755,6 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         return (initiatorClanId, responderClanId);
     }
 
-
     private static void InvokeAddBarterGroups(BarterData barterData)
         => typeof(PlayerPartyInteractionHandler)
             .GetMethod("AddBarterGroups", BindingFlags.Static | BindingFlags.NonPublic)!

@@ -442,7 +442,6 @@ internal class PvPInteractionClientHandler : IHandler
         }
 
         ForceCloseCurrentEncounterMenu();
-
     }
 
     private void ForceEndCurrentMission()

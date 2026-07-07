@@ -31,59 +31,132 @@ internal sealed class MapEventBattleFactory
     {
         var mapEventManager = Campaign.Current.MapEventManager;
 
-        if (flags.ForceRaid)
-            return RaidEventComponent.CreateRaidEvent(attacker, defender).MapEvent;
-
-        if (flags.ForceSallyOut)
-            return mapEventManager.StartSallyOutMapEvent(attacker, defender);
-
-        if (flags.ForceVolunteers)
-            return ForceVolunteersEventComponent.CreateForceSuppliesEvent(attacker, defender).MapEvent;
-
-        if (flags.ForceSupplies)
-            return ForceSuppliesEventComponent.CreateForceSuppliesEvent(attacker, defender).MapEvent;
+        if (TryCreateForcedMapEvent(attacker, defender, flags, mapEventManager, out var mapEvent))
+            return mapEvent;
 
         if (defender.IsSettlement)
+            return CreateSettlementMapEvent(attacker, defender, flags, mapEventManager);
+
+        if (TryCreateAmbushOrBlockadeMapEvent(attacker, defender, flags, out mapEvent))
+            return mapEvent;
+
+        if (TryCreateMobileSettlementMapEvent(attacker, defender, mapEventManager, out mapEvent))
+            return mapEvent;
+
+        return CreateFieldBattleEvent(attacker, defender);
+    }
+
+    private static bool TryCreateForcedMapEvent(
+        PartyBase attacker,
+        PartyBase defender,
+        BattleCreationFlags flags,
+        MapEventManager mapEventManager,
+        out MapEvent mapEvent)
+    {
+        mapEvent = null;
+        if (flags.ForceRaid)
         {
-            if (defender.Settlement.IsFortification)
-                return mapEventManager.StartSiegeMapEvent(attacker, defender);
-
-            if (defender.Settlement.IsVillage)
-                return RaidEventComponent.CreateRaidEvent(attacker, defender).MapEvent;
-
-            if (defender.Settlement.IsHideout)
-                return HideoutEventComponent.CreateHideoutEvent(attacker, defender, flags.ForceHideoutSendTroops).MapEvent;
-
-            Logger.Error(
-                "Proper map event type could not be determined for settlement battle. Attacker={Attacker}, Defender={Defender}",
-                attacker.Name,
-                defender.Name);
-            return null;
+            mapEvent = RaidEventComponent.CreateRaidEvent(attacker, defender).MapEvent;
+            return true;
         }
 
+        if (flags.ForceSallyOut)
+        {
+            mapEvent = mapEventManager.StartSallyOutMapEvent(attacker, defender);
+            return true;
+        }
+
+        if (flags.ForceVolunteers)
+        {
+            mapEvent = ForceVolunteersEventComponent.CreateForceSuppliesEvent(attacker, defender).MapEvent;
+            return true;
+        }
+
+        if (flags.ForceSupplies)
+        {
+            mapEvent = ForceSuppliesEventComponent.CreateForceSuppliesEvent(attacker, defender).MapEvent;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static MapEvent CreateSettlementMapEvent(
+        PartyBase attacker,
+        PartyBase defender,
+        BattleCreationFlags flags,
+        MapEventManager mapEventManager)
+    {
+        if (defender.Settlement.IsFortification)
+            return mapEventManager.StartSiegeMapEvent(attacker, defender);
+
+        if (defender.Settlement.IsVillage)
+            return RaidEventComponent.CreateRaidEvent(attacker, defender).MapEvent;
+
+        if (defender.Settlement.IsHideout)
+            return HideoutEventComponent.CreateHideoutEvent(attacker, defender, flags.ForceHideoutSendTroops).MapEvent;
+
+        Logger.Error(
+            "Proper map event type could not be determined for settlement battle. Attacker={Attacker}, Defender={Defender}",
+            attacker.Name,
+            defender.Name);
+        return null;
+    }
+
+    private static bool TryCreateAmbushOrBlockadeMapEvent(
+        PartyBase attacker,
+        PartyBase defender,
+        BattleCreationFlags flags,
+        out MapEvent mapEvent)
+    {
+        mapEvent = null;
         if (flags.IsSallyOutAmbush)
-            return SiegeAmbushEventComponent.CreateSiegeAmbushEvent(attacker, defender).MapEvent;
+        {
+            mapEvent = SiegeAmbushEventComponent.CreateSiegeAmbushEvent(attacker, defender).MapEvent;
+            return true;
+        }
 
         if (flags.ForceBlockadeAttack)
-            return BlockadeBattleMapEvent.CreateBlockadeBattleMapEvent(attacker, defender, false).MapEvent;
+        {
+            mapEvent = BlockadeBattleMapEvent.CreateBlockadeBattleMapEvent(attacker, defender, false).MapEvent;
+            return true;
+        }
 
         if (flags.ForceBlockadeSallyOutAttack)
-            return BlockadeBattleMapEvent.CreateBlockadeBattleMapEvent(attacker, defender, true).MapEvent;
+        {
+            mapEvent = BlockadeBattleMapEvent.CreateBlockadeBattleMapEvent(attacker, defender, true).MapEvent;
+            return true;
+        }
 
+        return false;
+    }
+
+    private static bool TryCreateMobileSettlementMapEvent(
+        PartyBase attacker,
+        PartyBase defender,
+        MapEventManager mapEventManager,
+        out MapEvent mapEvent)
+    {
+        mapEvent = null;
         if (attacker.IsMobile
             && attacker.MobileParty.CurrentSettlement != null
             && attacker.MobileParty.CurrentSettlement.SiegeEvent != null)
         {
             if (attacker.MobileParty.IsTargetingPort)
-                return BlockadeBattleMapEvent.CreateBlockadeBattleMapEvent(attacker, defender, true).MapEvent;
+                mapEvent = BlockadeBattleMapEvent.CreateBlockadeBattleMapEvent(attacker, defender, true).MapEvent;
+            else
+                mapEvent = mapEventManager.StartSallyOutMapEvent(attacker, defender);
 
-            return mapEventManager.StartSallyOutMapEvent(attacker, defender);
+            return true;
         }
 
         if (defender.IsMobile && defender.MobileParty.BesiegedSettlement != null)
-            return mapEventManager.StartSiegeOutsideMapEvent(attacker, defender);
+        {
+            mapEvent = mapEventManager.StartSiegeOutsideMapEvent(attacker, defender);
+            return true;
+        }
 
-        return CreateFieldBattleEvent(attacker, defender);
+        return false;
     }
 
     private static MapEvent CreateFieldBattleEvent(PartyBase attacker, PartyBase defender)

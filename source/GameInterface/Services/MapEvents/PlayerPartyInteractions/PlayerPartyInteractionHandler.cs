@@ -450,66 +450,87 @@ internal class PlayerPartyInteractionHandler : IHandler
 
     private void HandleInitiatorOption(PlayerPartyInteractionSession session, PlayerPartyInteractionOption option)
     {
-        if (option == PlayerPartyInteractionOption.Leave)
+        if (TryHandleInitiatorLeaveOption(session, option)) return;
+        if (option == PlayerPartyInteractionOption.OfferServices) return;
+        if (TryHandleInitiatorHostileDemandOption(session, option)) return;
+
+        HandleInitiatorProposalOption(session, option);
+    }
+
+    private bool TryHandleInitiatorLeaveOption(PlayerPartyInteractionSession session, PlayerPartyInteractionOption option)
+    {
+        if (option != PlayerPartyInteractionOption.Leave) return false;
+
+        if (session.Proposal == PlayerPartyInteractionProposal.HostileDemand && session.HostileDemandConfirmed)
+            return true;
+
+        EndSession(session, GetLeaveOutcome(session));
+        return true;
+    }
+
+    private bool TryHandleInitiatorHostileDemandOption(PlayerPartyInteractionSession session, PlayerPartyInteractionOption option)
+    {
+        switch (option)
         {
-            if (session.Proposal == PlayerPartyInteractionProposal.HostileDemand && session.HostileDemandConfirmed)
-                return;
-
-            EndSession(session, GetLeaveOutcome(session));
-            return;
+            case PlayerPartyInteractionOption.HostileDemand:
+                HandleHostileDemandSelected(session, option);
+                return true;
+            case PlayerPartyInteractionOption.ConfirmHostileDemand:
+                HandleHostileDemandConfirmed(session);
+                return true;
+            case PlayerPartyInteractionOption.CancelHostileDemand:
+                HandleHostileDemandCanceled(session);
+                return true;
+            default:
+                return false;
         }
+    }
 
-        if (option == PlayerPartyInteractionOption.OfferServices)
-        {
-            return;
-        }
+    private void HandleHostileDemandSelected(PlayerPartyInteractionSession session, PlayerPartyInteractionOption option)
+    {
+        if (!session.InitiatorEnabledOptions.Contains(option)) return;
 
-        if (option == PlayerPartyInteractionOption.HostileDemand)
-        {
-            if (!session.InitiatorEnabledOptions.Contains(option)) return;
+        session.Proposal = PlayerPartyInteractionProposal.HostileDemand;
+        session.HostileDemandConfirmed = false;
+        SendInitiatorState(
+            session,
+            PlayerPartyInteractionPhase.HostileDemandConfirm,
+            session.Proposal,
+            new[]
+            {
+                PlayerPartyInteractionOption.ConfirmHostileDemand,
+                PlayerPartyInteractionOption.CancelHostileDemand
+            });
+    }
 
-            session.Proposal = PlayerPartyInteractionProposal.HostileDemand;
-            session.HostileDemandConfirmed = false;
-            SendInitiatorState(
-                session,
-                PlayerPartyInteractionPhase.HostileDemandConfirm,
-                session.Proposal,
-                new[]
-                {
-                    PlayerPartyInteractionOption.ConfirmHostileDemand,
-                    PlayerPartyInteractionOption.CancelHostileDemand
-                });
-            return;
-        }
+    private void HandleHostileDemandConfirmed(PlayerPartyInteractionSession session)
+    {
+        if (session.Proposal != PlayerPartyInteractionProposal.HostileDemand) return;
+        if (session.HostileDemandConfirmed) return;
 
-        if (option == PlayerPartyInteractionOption.ConfirmHostileDemand)
-        {
-            if (session.Proposal != PlayerPartyInteractionProposal.HostileDemand) return;
-            if (session.HostileDemandConfirmed) return;
+        session.HostileDemandConfirmed = true;
+        SendInitiatorState(session, PlayerPartyInteractionPhase.WaitingForResponse, session.Proposal, Array.Empty<PlayerPartyInteractionOption>());
+        SendResponderState(
+            session,
+            PlayerPartyInteractionPhase.HostileDemandPending,
+            session.Proposal,
+            new[]
+            {
+                PlayerPartyInteractionOption.RefuseHostileDemand,
+                PlayerPartyInteractionOption.YieldHostileDemand
+            });
+    }
 
-            session.HostileDemandConfirmed = true;
-            SendInitiatorState(session, PlayerPartyInteractionPhase.WaitingForResponse, session.Proposal, Array.Empty<PlayerPartyInteractionOption>());
-            SendResponderState(
-                session,
-                PlayerPartyInteractionPhase.HostileDemandPending,
-                session.Proposal,
-                new[]
-                {
-                    PlayerPartyInteractionOption.RefuseHostileDemand,
-                    PlayerPartyInteractionOption.YieldHostileDemand
-                });
-            return;
-        }
+    private void HandleHostileDemandCanceled(PlayerPartyInteractionSession session)
+    {
+        if (session.Proposal != PlayerPartyInteractionProposal.HostileDemand) return;
+        if (session.HostileDemandConfirmed) return;
 
-        if (option == PlayerPartyInteractionOption.CancelHostileDemand)
-        {
-            if (session.Proposal != PlayerPartyInteractionProposal.HostileDemand) return;
-            if (session.HostileDemandConfirmed) return;
+        EndSession(session, PlayerPartyInteractionOutcomeType.Left);
+    }
 
-            EndSession(session, PlayerPartyInteractionOutcomeType.Left);
-            return;
-        }
-
+    private void HandleInitiatorProposalOption(PlayerPartyInteractionSession session, PlayerPartyInteractionOption option)
+    {
         var proposal = ToProposal(option);
         if (proposal == PlayerPartyInteractionProposal.None) return;
         if (!session.InitiatorEnabledOptions.Contains(option)) return;

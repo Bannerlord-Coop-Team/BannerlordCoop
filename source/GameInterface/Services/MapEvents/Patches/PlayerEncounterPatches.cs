@@ -245,7 +245,6 @@ internal class PlayerEncounterPatches
         return side != null && side.LeaderParty != MobileParty.MainParty.Party;
     }
 
-
     private static MapEvent GetCurrentMapEventForTrace()
     {
         var encounter = PlayerEncounter.Current;
