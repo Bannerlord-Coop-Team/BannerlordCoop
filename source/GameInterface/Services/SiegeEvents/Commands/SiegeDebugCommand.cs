@@ -76,11 +76,20 @@ public class SiegeDebugCommand
             }
         }
 
-        // Put the besieger at the gate and commit its AI to the siege. Without SetMoveBesiegeSettlement
-        // the party's DefaultBehavior stays whatever it was (raid/patrol) and it walks off on its next
-        // think; SetDoNotMakeNewDecisions holds it on this debug siege instead of re-deciding away.
+        // Put the besieger at the gate and commit its AI to the siege.
         besieger.Position = settlement.GatePosition;
         besieger.SetMoveBesiegeSettlement(settlement, MobileParty.NavigationType.Default);
+
+        // A lone forced besieger is re-tasked away by AiMilitaryBehavior's hourly think, which doesn't
+        // back this siege (DoNotMakeNewDecisions only gates short-term initiative, not the hourly
+        // re-task), so it wanders off after an hour. Wrap it in a Besieger army — the vanilla mechanism
+        // for a held AI siege — so the think stops re-deciding and it stays. A minor-faction lord with
+        // no kingdom just gets the behavior flags, which hold only briefly.
+        if (besieger.Army == null && besieger.LeaderHero != null && besieger.MapFaction is Kingdom kingdom)
+        {
+            kingdom.CreateArmy(besieger.LeaderHero, settlement, Army.ArmyTypes.Besieger);
+        }
+
         Campaign.Current.SiegeEventManager.StartSiegeEvent(settlement, besieger);
         besieger.Ai.SetDoNotMakeNewDecisions(true);
 
