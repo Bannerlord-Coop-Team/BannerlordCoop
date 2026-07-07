@@ -81,7 +81,6 @@ public class ResolveCharacterState : ConnectionStateBase
             // This peer is a new NetPeer for an already registered player, so the
             // peer-Player link must be established here
             playerManager.SetPeer(obj.What.PlayerId, peer);
-
             network.SendImmediate(peer, new NetworkClientValidated(true, player));
             ConnectionLogic.TransferSave();
 

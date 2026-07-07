@@ -269,7 +269,7 @@ internal class BattleHandler : IHandler
         if (ModInformation.IsClient)
             return;
 
-        if (timeControlInterface.GetTimeControl() == TimeControlEnum.Play_2x)
+        if (AnyPlayerInMapEvent() && timeControlInterface.GetTimeControl() == TimeControlEnum.Play_2x)
         {
             timeControlInterface.ServerSetTimeControl(TimeControlEnum.Play_1x);
         }
@@ -296,7 +296,14 @@ internal class BattleHandler : IHandler
             if (!objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty))
                 return false;
 
-            return playerParty.MapEvent != null && playerParty.MapEvent != excluding;
+            return IsFastForwardBlockingMapEvent(playerParty.MapEvent, excluding);
         });
+    }
+
+    private static bool IsFastForwardBlockingMapEvent(MapEvent mapEvent, MapEvent excluding = null)
+    {
+        return mapEvent != null &&
+               mapEvent != excluding &&
+               !mapEvent.IsActiveSlowVillageRaid();
     }
 }

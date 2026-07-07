@@ -75,6 +75,27 @@ internal class MapEventPartyPatches
         return false;
     }
 
+    [HarmonyPatch(nameof(MapEventParty.OnTroopScoreHit))]
+    [HarmonyPrefix]
+    private static bool PrefixOnTroopScoreHit(MapEventParty __instance, ref UniqueTroopDescriptor attackerTroopDesc, CharacterObject attackedTroop, int damage, bool isFatal, bool isTeamKill, bool isSimulatedHit)
+    {
+        // Call original if we call this function
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+        if (ModInformation.IsServer) return true;
+
+        // Coop battle: score hits flow blow-applier→server through CoopAgentOrigin.OnScoreHit; suppress any
+        // native call here so the hit isn't accounted twice (see OnTroopKilled).
+        if (BattleSpawnConfig.Enabled && BattleSpawnGate.IsCoopBattleActive) return false;
+
+        // A teamkill contributes nothing (the original early-outs), so don't bother the server with it.
+        if (isTeamKill) return false;
+
+        MessageBroker.Instance.Publish(__instance, new OnTroopScoreHitAttempted(__instance, attackerTroopDesc.UniqueSeed, attackedTroop, damage, isFatal, isSimulatedHit));
+
+        return false;
+    }
+
     [HarmonyPatch(nameof(MapEventParty.CommitXpGain))]
     [HarmonyPrefix]
     private static bool PrefixCommitXpGain(MapEventParty __instance)
