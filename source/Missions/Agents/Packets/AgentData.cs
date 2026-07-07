@@ -50,7 +50,6 @@ namespace Missions.Agents.Packets
             // apply the agent's look direction
             agent.LookDirection = LookDirection;
             agent.MovementInputVector = InputVector;
-            PuppetMovementComponent.Apply(agent, InputVector, MovementDirection, LookDirection, Position);
 
             // Update equipment
             AgentEquipment.Apply(agent);

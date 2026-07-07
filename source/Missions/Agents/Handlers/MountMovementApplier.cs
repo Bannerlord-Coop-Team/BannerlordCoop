@@ -71,7 +71,7 @@ public class MountMovementApplier : IPacketHandler
                         continue;
 
                     data.ApplyMount(horse);
-                    interpolator.SetMountTarget(horse, data.MountPosition);
+                    interpolator.SetMountTarget(horse, data.MountPosition, data.MountMovementDirection);
                 }
             }
         });

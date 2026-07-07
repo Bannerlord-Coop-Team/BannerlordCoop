@@ -41,12 +41,6 @@ namespace Missions.Agents.Packets
             }
             mountAgent.LookDirection = MountLookDirection;
             mountAgent.MovementInputVector = MountInputVector;
-            PuppetMovementComponent.Apply(
-                mountAgent,
-                MountInputVector,
-                MountMovementDirection,
-                MountLookDirection,
-                MountPosition);
         }
 
         [ProtoMember(1)]

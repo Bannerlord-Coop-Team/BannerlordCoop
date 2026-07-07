@@ -242,11 +242,14 @@ public class AgentMovementHandler : IAgentMovementHandler
                         // rider independently every frame forces the engine to re-seat it, which snaps the
                         // mount's orientation. Drop any stale rider target left from before it mounted.
                         _interpolator.Forget(agent);
-                        _interpolator.SetMountTarget(agent.MountAgent, data.MountData.MountPosition);
+                        _interpolator.SetMountTarget(
+                            agent.MountAgent,
+                            data.MountData.MountPosition,
+                            data.MountData.MountMovementDirection);
                     }
                     else
                     {
-                        _interpolator.SetRiderTarget(agent, data.Position);
+                        _interpolator.SetRiderTarget(agent, data.Position, data.MovementDirection);
                     }
                 }
             }
