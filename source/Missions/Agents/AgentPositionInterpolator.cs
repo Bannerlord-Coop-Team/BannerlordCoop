@@ -46,10 +46,14 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     private const float MountSnapDistance = 12f;
     private const float DiagnosticInterval = 2f;
     private const float StaleTargetSeconds = 1f;
+    private const float MountedDiagInterval = 0.5f;
 
     private readonly Dictionary<Agent, TargetFrame> _targets = new Dictionary<Agent, TargetFrame>();
     // Reused scratch list so eviction doesn't allocate every tick.
     private readonly List<Agent> _evict = new List<Agent>();
+    // Temporary diagnostic: per-mounted-puppet drive telemetry, keyed by rider (removed on eviction). Used to
+    // decide whether easing the position actually gives the horse real velocity or just teleport-drags it.
+    private readonly Dictionary<Agent, MountedDiagSample> _mountedDiag = new Dictionary<Agent, MountedDiagSample>();
     private float diagnosticElapsed;
     private float elapsed;
 
@@ -78,7 +82,11 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         _targets.Remove(agent);
     }
 
-    public void Clear() => _targets.Clear();
+    public void Clear()
+    {
+        _targets.Clear();
+        _mountedDiag.Clear();
+    }
 
     public void Tick(float dt)
     {
@@ -119,6 +127,9 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                 continue;
             }
 
+            if (isMountedRider)
+                LogMountedDiag(agent, dist, dist > snapDistance, dt);
+
             if (dist <= snapDistance)
             {
                 MoveTowardTarget(agent, pair.Value);
@@ -132,7 +143,10 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         if (_evict.Count > 0)
         {
             foreach (Agent agent in _evict)
+            {
                 _targets.Remove(agent);
+                _mountedDiag.Remove(agent);
+            }
             _evict.Clear();
         }
 
@@ -203,6 +217,56 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         agent.LookDirection = lookDirection;
         agent.SetMovementDirection(movementDirection);
         MoveTowardTarget(agent, target);
+    }
+
+    // Temporary diagnostic. For a mounted puppet, log the on-screen glide speed (frame-to-frame position delta)
+    // next to the engine's real velocity on both rider and horse, plus the horse's gait action. If the horse
+    // glides while its real velocity stays near zero, the gait has no drive and it slides, which means easing the
+    // position isn't enough and the horse needs real velocity. Throttled per rider.
+    private void LogMountedDiag(Agent rider, float distToTarget, bool snapped, float dt)
+    {
+        Agent mount = rider.MountAgent;
+        if (mount == null || !mount.IsActive() || dt <= 0f) return;
+
+        Vec3 riderPos = rider.Position;
+        Vec3 mountPos = mount.Position;
+
+        bool hadPrev = _mountedDiag.TryGetValue(rider, out var prev);
+        float riderGlide = hadPrev ? riderPos.Distance(prev.RiderPos) / dt : 0f;
+        float mountGlide = hadPrev ? mountPos.Distance(prev.MountPos) / dt : 0f;
+        bool doLog = !hadPrev || elapsed - prev.LastLogElapsed >= MountedDiagInterval;
+
+        _mountedDiag[rider] = new MountedDiagSample(riderPos, mountPos, doLog ? elapsed : prev.LastLogElapsed);
+        if (!doLog) return;
+
+        Logger.Debug(
+            "[MountedDrive] rider={Rider} mount={Mount} dist={Dist:0.00} snap={Snap} glide(r/m)={RiderGlide:0.00}/{MountGlide:0.00} realVel(r/m)={RiderVel:0.00}/{MountVel:0.00} input(r/m)={RiderInput:0.00}/{MountInput:0.00} gait={Gait}/{GaitType}",
+            rider.Index,
+            mount.Index,
+            distToTarget,
+            snapped,
+            riderGlide,
+            mountGlide,
+            rider.GetRealGlobalVelocity().Length,
+            mount.GetRealGlobalVelocity().Length,
+            rider.MovementInputVector.Length,
+            mount.MovementInputVector.Length,
+            mount.GetCurrentAction(0).Index,
+            mount.GetCurrentActionType(0));
+    }
+
+    private struct MountedDiagSample
+    {
+        public MountedDiagSample(Vec3 riderPos, Vec3 mountPos, float lastLogElapsed)
+        {
+            RiderPos = riderPos;
+            MountPos = mountPos;
+            LastLogElapsed = lastLogElapsed;
+        }
+
+        public Vec3 RiderPos { get; }
+        public Vec3 MountPos { get; }
+        public float LastLogElapsed { get; }
     }
 
     private struct TargetFrame
