@@ -16,6 +16,7 @@ internal enum BattleStartMode
 {
     Mission = 0,
     Simulation = 1,
+    Unclaimed = 2,
 }
 
 /// <summary>

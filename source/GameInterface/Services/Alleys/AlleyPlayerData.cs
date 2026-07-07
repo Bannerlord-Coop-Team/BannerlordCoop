@@ -1,6 +1,7 @@
 ﻿using GameInterface.Services.TroopRosters.Data;
 using ProtoBuf;
 using System.Collections.Generic;
+using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Alleys;
 
@@ -36,6 +37,15 @@ public class AlleyManagementData
 
     [ProtoMember(2)]
     public TroopRosterElementData[] Garrison { get; set; }
+
+    // Set while a rival gang is attacking this alley (the AI-initiated defense flow): the attacking
+    // alley's network id and the deadline to answer. Null/default when not under attack. Stored here so
+    // the attack survives a save and reaches a client that joins mid-attack.
+    [ProtoMember(3)]
+    public string UnderAttackByAlleyId { get; set; }
+
+    [ProtoMember(4)]
+    public CampaignTime AttackResponseDueDate { get; set; }
 
     public AlleyManagementData(string overseerId, TroopRosterElementData[] garrison)
     {

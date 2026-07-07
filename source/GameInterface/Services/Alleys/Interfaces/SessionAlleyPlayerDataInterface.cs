@@ -2,7 +2,9 @@
 using GameInterface.CoopSessionData;
 using GameInterface.Services.TroopRosters.Data;
 using Serilog;
+using System;
 using System.Collections.Generic;
+using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Alleys.Interfaces;
 
@@ -17,6 +19,12 @@ public interface ISessionAlleyPlayerDataInterface : IGameAbstraction
     bool TryGetManagementData(string alleyId, out AlleyManagementData data);
     void SetManagementData(string alleyId, string overseerId, TroopRosterElementData[] garrison);
     void RemoveManagementData(string alleyId);
+
+    /// <summary>Records that a rival alley is attacking this player alley, with the answer deadline.</summary>
+    void SetUnderAttackByAi(string alleyId, string attackerAlleyId, CampaignTime dueDate);
+
+    /// <summary>Clears the under-attack state once the attack is resolved (defended, lost or timed out).</summary>
+    void ClearUnderAttackByAi(string alleyId);
 }
 
 /// <inheritdoc cref="ISessionAlleyPlayerDataInterface"/>
@@ -52,11 +60,35 @@ public class SessionAlleyPlayerDataInterface : ISessionAlleyPlayerDataInterface
             return;
         }
 
-        map[alleyId] = new AlleyManagementData(overseerId, garrison ?? new TroopRosterElementData[0]);
+        var entry = new AlleyManagementData(overseerId, garrison ?? Array.Empty<TroopRosterElementData>());
+
+        // A garrison/overseer change must not drop an in-progress attack, so carry the under-attack
+        // fields forward from the existing entry.
+        if (map.TryGetValue(alleyId, out var existing))
+        {
+            entry.UnderAttackByAlleyId = existing.UnderAttackByAlleyId;
+            entry.AttackResponseDueDate = existing.AttackResponseDueDate;
+        }
+
+        map[alleyId] = entry;
     }
 
     public void RemoveManagementData(string alleyId)
     {
         ManagementData?.Remove(alleyId);
+    }
+
+    public void SetUnderAttackByAi(string alleyId, string attackerAlleyId, CampaignTime dueDate)
+    {
+        // Only a managed (player-owned) alley can be under attack; if there's no entry there's nothing to mark.
+        if (!TryGetManagementData(alleyId, out var data)) return;
+        data.UnderAttackByAlleyId = attackerAlleyId;
+        data.AttackResponseDueDate = dueDate;
+    }
+
+    public void ClearUnderAttackByAi(string alleyId)
+    {
+        if (!TryGetManagementData(alleyId, out var data)) return;
+        data.UnderAttackByAlleyId = null;
     }
 }

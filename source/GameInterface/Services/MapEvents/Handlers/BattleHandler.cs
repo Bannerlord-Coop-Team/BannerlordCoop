@@ -106,6 +106,15 @@ internal class BattleHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            // A retreat briefly tears down the local encounter before reopening its menu. Apply an id-scoped clear
+            // even while neither local encounter reference points at the event, otherwise the mission mode sticks.
+            if (mode == BattleStartMode.Unclaimed)
+            {
+                if (BattleModeRegistry.End(mapEventId))
+                    RefreshCurrentEncounterMenu();
+                return;
+            }
+
             if (!objectManager.TryGetObject(mapEventId, out MapEvent mapEvent) || mapEvent == null)
                 return;
 
@@ -113,9 +122,17 @@ internal class BattleHandler : IHandler
                 return;
 
             BattleModeRegistry.Begin(mapEventId, mode);
+            RefreshCurrentEncounterMenu();
         });
     }
 
+    private static void RefreshCurrentEncounterMenu()
+    {
+        var menuContext = Campaign.Current?.CurrentMenuContext;
+        // The menu can activate before this queued update, so rebuild it with the new mode.
+        if (menuContext?.GameMenu?.StringId == "encounter")
+            menuContext.Refresh();
+    }
 
     private void Handle_MapEventInvolvedPartiesAdded(MessagePayload<MapEventInvolvedPartiesAdded> payload)
     {
@@ -252,7 +269,7 @@ internal class BattleHandler : IHandler
         if (ModInformation.IsClient)
             return;
 
-        if (timeControlInterface.GetTimeControl() == TimeControlEnum.Play_2x)
+        if (AnyPlayerInMapEvent() && timeControlInterface.GetTimeControl() == TimeControlEnum.Play_2x)
         {
             timeControlInterface.ServerSetTimeControl(TimeControlEnum.Play_1x);
         }
@@ -279,7 +296,14 @@ internal class BattleHandler : IHandler
             if (!objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty))
                 return false;
 
-            return playerParty.MapEvent != null && playerParty.MapEvent != excluding;
+            return IsFastForwardBlockingMapEvent(playerParty.MapEvent, excluding);
         });
+    }
+
+    private static bool IsFastForwardBlockingMapEvent(MapEvent mapEvent, MapEvent excluding = null)
+    {
+        return mapEvent != null &&
+               mapEvent != excluding &&
+               !mapEvent.IsActiveSlowVillageRaid();
     }
 }

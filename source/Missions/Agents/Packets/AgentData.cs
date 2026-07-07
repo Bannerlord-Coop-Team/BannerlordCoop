@@ -7,7 +7,9 @@ namespace Missions.Agents.Packets
     [ProtoContract(SkipConstructor = true)]
     public struct AgentData
     {
-        public AgentData(Agent agent)
+        // mountId: the mount's registry id (resolved by the caller — this ctor has no registry access), carried
+        // so the receiver can attach the puppet to the exact horse; Guid.Empty when unregistered/unmounted.
+        public AgentData(Agent agent, System.Guid mountId = default)
         {
             Position = agent.Position;
             MovementDirection = agent.GetMovementDirection();
@@ -23,7 +25,7 @@ namespace Missions.Agents.Packets
             Agent mount = agent.MountAgent;
             if (mount != null && mount.IsActive())
             {
-                MountData = new AgentMountData(mount);
+                MountData = new AgentMountData(mount, mountId);
             }
             else
             {

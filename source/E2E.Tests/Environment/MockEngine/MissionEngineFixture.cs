@@ -40,6 +40,15 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Mission), "get_AttackerTeam", nameof(Mission_get_AttackerTeam));
         Prefix(typeof(Mission), "get_DefenderTeam", nameof(Mission_get_DefenderTeam));
         Prefix(typeof(Mission), "get_PlayerEnemyTeam", nameof(Mission_get_PlayerEnemyTeam));
+        // The non-host retreat despawn filters the retreater's troops by the player team's side.
+        Prefix(typeof(Mission), "get_PlayerTeam", nameof(Mission_get_PlayerTeam));
+        Prefix(typeof(Team), "get_Side", nameof(Team_get_Side));
+        // GetMissionBehavior<T> walks the mission's behavior list, which a skip-ctor shell doesn't have (NRE).
+        // The spawn-capture and deployment paths probe for DeploymentMissionController — answer "none" for mock
+        // missions. Reference-type instantiations share one method body, so patching this one covers them all.
+        harmony.Patch(
+            AccessTools.Method(typeof(Mission), nameof(Mission.GetMissionBehavior)).MakeGenericMethod(typeof(DeploymentMissionController)),
+            prefix: new HarmonyMethod(AccessTools.Method(typeof(MissionEngineFixture), nameof(Mission_GetMissionBehavior))));
 
         // Agent members
         Prefix(typeof(Agent), "get_Controller", nameof(Agent_get_Controller));
@@ -52,6 +61,10 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), "get_Position", nameof(Agent_get_Position));
         Prefix(typeof(Agent), "get_Name", nameof(Agent_get_Name));
         Prefix(typeof(Agent), nameof(Agent.IsActive), nameof(Agent_IsActive));
+        // Puppet classification (LocationPvpBlockPatch): human/mount/rider resolve via the mirror.
+        Prefix(typeof(Agent), "get_IsHuman", nameof(Agent_get_IsHuman));
+        Prefix(typeof(Agent), "get_IsMount", nameof(Agent_get_IsMount));
+        Prefix(typeof(Agent), "get_RiderAgent", nameof(Agent_get_RiderAgent));
 
         // RegisterBlow is overloaded — pin the (Blow, in AttackCollisionData) signature.
         harmony.Patch(
@@ -70,6 +83,34 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), "get_Origin", nameof(Agent_get_Origin));
         Prefix(typeof(Agent), "get_MountAgent", nameof(Agent_get_MountAgent));
         Prefix(typeof(Agent), nameof(Agent.FadeOut), nameof(Agent_FadeOut));
+        // Mount identity (#1750): registration, routing and death sync read the rider/mount relationship;
+        // the movement sync's SyncMountState also assigns MountAgent and reads HasMount.
+        Prefix(typeof(Agent), "get_HasMount", nameof(Agent_get_HasMount));
+        Prefix(typeof(Agent), "set_MountAgent", nameof(Agent_set_MountAgent));
+        // MakeDead kills broadcast deaths (PuppetDeathApplier) — pin the full (bool, ActionIndexCache, int)
+        // signature (the int is a defaulted param callers don't see).
+        harmony.Patch(
+            AccessTools.Method(typeof(Agent), nameof(Agent.MakeDead), new[] { typeof(bool), typeof(ActionIndexCache), typeof(int) }),
+            prefix: new HarmonyMethod(AccessTools.Method(typeof(MissionEngineFixture), nameof(Agent_MakeDead))));
+        // Callers pass ActionIndexCache.act_none, whose TYPE INITIALIZER creates dozens of named actions, each
+        // resolving its index through MBAnimation.GetActionCodeWithName — a native engine call that throws
+        // headless and would poison the type for the whole process (a failed cctor is cached). Answer
+        // "unresolved" (-1) instead so the cctor completes.
+        Prefix(typeof(MBAnimation), nameof(MBAnimation.GetActionCodeWithName), nameof(MBAnimation_GetActionCodeWithName));
+        // Standalone mount movement: a masterless horse's own AgentMountData capture/apply reads and writes
+        // the movement natives, and the apply path's staleness guard compares agent.Mission to Mission.Current.
+        Prefix(typeof(Agent), "get_Mission", nameof(Agent_get_Mission));
+        Prefix(typeof(Agent), "get_LookDirection", nameof(Agent_get_LookDirection));
+        Prefix(typeof(Agent), "set_LookDirection", nameof(Agent_set_LookDirection));
+        Prefix(typeof(Agent), nameof(Agent.GetMovementDirection), nameof(Agent_GetMovementDirection));
+        Prefix(typeof(Agent), nameof(Agent.SetMovementDirection), nameof(Agent_SetMovementDirection));
+        Prefix(typeof(Agent), "get_MovementInputVector", nameof(Agent_get_MovementInputVector));
+        Prefix(typeof(Agent), "set_MovementInputVector", nameof(Agent_set_MovementInputVector));
+        // AgentMountData also snapshots action channel 1; report "no action" so capture works headless (the
+        // apply side's GetActionNameWithCode already returns null headless and skips SetActionChannel).
+        Prefix(typeof(Agent), nameof(Agent.GetCurrentAction), nameof(Agent_GetCurrentAction));
+        Prefix(typeof(Agent), nameof(Agent.GetCurrentAnimationFlag), nameof(Agent_GetCurrentAnimationFlag));
+        Prefix(typeof(Agent), nameof(Agent.GetCurrentActionProgress), nameof(Agent_GetCurrentActionProgress));
         Prefix(typeof(Team), nameof(Team.GetFormation), nameof(Team_GetFormation));
         Prefix(typeof(Formation), nameof(Formation.SetControlledByAI), nameof(Formation_SetControlledByAI));
         Prefix(typeof(Formation), nameof(Formation.SetMovementOrder), nameof(Formation_SetMovementOrder));
@@ -124,6 +165,13 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
+    private static bool Mission_GetMissionBehavior(Mission __instance, ref DeploymentMissionController __result)
+    {
+        if (!MockMission.ForShell(__instance, out _)) return true;
+        __result = null;
+        return false;
+    }
+
     private static bool Mission_get_MainAgent(Mission __instance, ref Agent __result)
     {
         if (!MockMission.ForShell(__instance, out var mock)) return true;
@@ -165,6 +213,20 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!MockMission.ForShell(__instance, out var mock)) return true;
         __result = mock.AttackerTeam.Shell;
+        return false;
+    }
+
+    private static bool Mission_get_PlayerTeam(Mission __instance, ref Team __result)
+    {
+        if (!MockMission.ForShell(__instance, out var mock)) return true;
+        __result = mock.PlayerTeam?.Shell;
+        return false;
+    }
+
+    private static bool Team_get_Side(Team __instance, ref BattleSideEnum __result)
+    {
+        if (!MockTeam.ForShell(__instance, out var team)) return true;
+        __result = team.Side;
         return false;
     }
 
@@ -239,6 +301,27 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
+    private static bool Agent_get_IsHuman(Agent __instance, ref bool __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.IsHuman;
+        return false;
+    }
+
+    private static bool Agent_get_IsMount(Agent __instance, ref bool __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.IsMount;
+        return false;
+    }
+
+    private static bool Agent_get_RiderAgent(Agent __instance, ref Agent __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.RiderAgent;
+        return false;
+    }
+
     private static bool Agent_RegisterBlow(Agent __instance, Blow blow)
     {
         if (!AgentMirror.TryGet(__instance, out var victim)) return true;
@@ -310,11 +393,119 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
-    private static bool Agent_FadeOut(Agent __instance)
+    private static bool Agent_FadeOut(Agent __instance, bool hideMount)
     {
         // A faded-out agent is gone: mirror it as inactive so despawn paths (retreat withdrawal) are assertable.
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
         m.IsActive = false;
+        // Native FadeOut(_, hideMount: true) fades the agent's mount along with it — model the cascade so the
+        // registered-horse-spared-vs-unregistered-horse-cascaded death paths are assertable.
+        if (hideMount && m.MountAgent != null && AgentMirror.TryGet(m.MountAgent, out var horse))
+            horse.IsActive = false;
+        return false;
+    }
+
+    private static bool Agent_get_HasMount(Agent __instance, ref bool __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.MountAgent != null;
+        return false;
+    }
+
+    // Keeps the horse's RiderAgent back-reference in step, like the engine does on mount/dismount.
+    private static bool Agent_set_MountAgent(Agent __instance, Agent value)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        if (m.MountAgent != null && AgentMirror.TryGet(m.MountAgent, out var oldHorse) && oldHorse.RiderAgent == __instance)
+            oldHorse.RiderAgent = null;
+        m.MountAgent = value;
+        if (value != null && AgentMirror.TryGet(value, out var newHorse))
+            newHorse.RiderAgent = __instance;
+        return false;
+    }
+
+    private static bool Agent_MakeDead(Agent __instance)
+    {
+        // A killed agent is gone: mirror it dead+inactive so death-broadcast paths are assertable.
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.Health = 0f;
+        m.IsActive = false;
+        return false;
+    }
+
+    private static bool MBAnimation_GetActionCodeWithName(ref int __result)
+    {
+        __result = -1;
+        return false;
+    }
+
+    private static bool Agent_get_Mission(Agent __instance, ref Mission __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.Mission;
+        return false;
+    }
+
+    private static bool Agent_get_LookDirection(Agent __instance, ref Vec3 __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.LookDirection;
+        return false;
+    }
+
+    private static bool Agent_set_LookDirection(Agent __instance, Vec3 value)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.LookDirection = value;
+        return false;
+    }
+
+    private static bool Agent_GetMovementDirection(Agent __instance, ref Vec2 __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.MovementDirection;
+        return false;
+    }
+
+    private static bool Agent_SetMovementDirection(Agent __instance, Vec2 __0)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.MovementDirection = __0;
+        return false;
+    }
+
+    private static bool Agent_get_MovementInputVector(Agent __instance, ref Vec2 __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.InputVector;
+        return false;
+    }
+
+    private static bool Agent_set_MovementInputVector(Agent __instance, Vec2 value)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.InputVector = value;
+        return false;
+    }
+
+    private static bool Agent_GetCurrentAction(Agent __instance, ref ActionIndexCache __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out _)) return true;
+        __result = ActionIndexCache.act_none; // safe: the MBAnimation shim above lets the cctor complete
+        return false;
+    }
+
+    private static bool Agent_GetCurrentAnimationFlag(Agent __instance, ref AnimFlags __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out _)) return true;
+        __result = 0;
+        return false;
+    }
+
+    private static bool Agent_GetCurrentActionProgress(Agent __instance, ref float __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out _)) return true;
+        __result = 0f;
         return false;
     }
 

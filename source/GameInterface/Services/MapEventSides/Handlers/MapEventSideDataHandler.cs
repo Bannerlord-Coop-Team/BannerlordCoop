@@ -5,11 +5,15 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.GuantletMapEventVisuals;
 using GameInterface.Services.MapEventSides.Messages;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MapEventSides.Handlers;
 internal class MapEventSideDataHandler : IHandler
@@ -98,7 +102,7 @@ internal class MapEventSideDataHandler : IHandler
 
     private void UpdateIFaction(MapEventSide side, IFaction faction)
     {
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             using (new AllowedThread())
             {
@@ -131,7 +135,7 @@ internal class MapEventSideDataHandler : IHandler
     {
         var data = payload.What;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             try
             {
@@ -149,6 +153,8 @@ internal class MapEventSideDataHandler : IHandler
                 using (new AllowedThread())
                 {
                     side._battleParties.Remove(party);
+                    if (party.Party?.MapEventSide == side)
+                        party.Party._mapEventSide = null;
                 }
             }
             catch (Exception e)
@@ -162,7 +168,7 @@ internal class MapEventSideDataHandler : IHandler
     {
         var data = payload.What;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             try
             {
@@ -184,6 +190,7 @@ internal class MapEventSideDataHandler : IHandler
                         data.SideId,
                         side.MapEvent.StringId ?? "<null>");
 
+                    party.Party._mapEventSide = side;
                     side._battleParties.Add(party);
                 }
 
@@ -211,7 +218,7 @@ internal class MapEventSideDataHandler : IHandler
 
         var side = (int)data.Side;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             try
             {
@@ -247,7 +254,7 @@ internal class MapEventSideDataHandler : IHandler
     {
         var data = payload.What;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             try
             {
@@ -258,15 +265,41 @@ internal class MapEventSideDataHandler : IHandler
 
                 using (new AllowedThread())
                 {
+                    mapEventParty.Party._mapEventSide = mapEventSide;
                     mapEventSide._battleParties.Add(mapEventParty);
                 }
 
                 mapEventBattleSizeCorrection.TryCorrect(mapEventSide.MapEvent);
+                SwitchRaiderToEncounterIfNeeded(mapEventSide.MapEvent);
             }
             catch (Exception e)
             {
                 Logger.Error(e, "Failed to apply NetworkAddBattleParty");
             }
         });
+    }
+
+    private static void SwitchRaiderToEncounterIfNeeded(MapEvent mapEvent)
+    {
+        if (ModInformation.IsServer)
+            return;
+
+        if (!mapEvent.IsRaidHostileAction() || mapEvent.IsActiveSlowVillageRaid())
+            return;
+
+        if (MobileParty.MainParty?.MapEvent != mapEvent)
+            return;
+
+        if (PlayerEncounter.Current == null)
+            return;
+
+        var encounterMapEvent = PlayerEncounter.Battle ?? PlayerEncounter.EncounteredBattle ?? MapEvent.PlayerMapEvent;
+        if (encounterMapEvent != mapEvent)
+            return;
+
+        if (Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId != "raiding_village")
+            return;
+
+        GameMenu.SwitchToMenu("encounter");
     }
 }

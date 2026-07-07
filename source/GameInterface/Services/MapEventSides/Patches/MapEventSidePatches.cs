@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MobileParties.Extensions;
@@ -43,9 +44,16 @@ internal class MapEventSidePatches
     [HarmonyPrefix]
     private static bool Prefix_AddPartyInternal(MapEventSide __instance, PartyBase party)
     {
-        // Server-approved replicated re-run, or the authoritative server itself: run the native add.
+        // Server-approved replicated re-run: run the native add.
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-        if (ModInformation.IsServer) return true;
+
+        if (ModInformation.IsServer)
+        {
+            if (ShouldBlockRaidAiIntervention(__instance, party))
+                return false;
+
+            return true;
+        }
 
         // Client: route a player's join through the server. Non-player client-side adds keep their existing behavior.
         if (party?.MobileParty?.IsPlayerParty() == true && __instance.MapEvent != null)
@@ -54,6 +62,15 @@ internal class MapEventSidePatches
             return false;
         }
 
+        return true;
+    }
+
+    private static bool ShouldBlockRaidAiIntervention(MapEventSide side, PartyBase party)
+    {
+        if (!RaidAiInterventionSuppression.ShouldSuppressParty(side, party))
+            return false;
+
+        RaidAiInterventionSuppression.BlockJoin(side, party);
         return true;
     }
 

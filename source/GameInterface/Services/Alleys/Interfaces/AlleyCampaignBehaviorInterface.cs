@@ -5,8 +5,10 @@ using SandBox.CampaignBehaviors;
 using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.MapNotificationTypes;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Alleys.Interfaces;
 
@@ -21,6 +23,17 @@ public interface IAlleyCampaignBehaviorInterface : IGameAbstraction
     void AddOrUpdatePlayerAlleyData(Alley alley, Hero overseer, TroopRoster garrison);
     void RemovePlayerAlleyData(Alley alley);
     bool TryGetCurrentSettlementAlley(out Alley alley);
+
+    /// <summary>
+    /// Marks the owning client's mirror entry as under attack by <paramref name="attacker"/> with the
+    /// given answer deadline, so the vanilla confront-alley menu/conversation/fight light up when the
+    /// player visits. <paramref name="showNotification"/> adds the vanilla under-attack map notice (only
+    /// for a fresh attack, not a late-join restore where the notice would be stale).
+    /// </summary>
+    void SetPlayerAlleyUnderAttackByAi(Alley alley, Alley attacker, CampaignTime dueDate, bool showNotification);
+
+    /// <summary>Clears the owning client's mirror under-attack state once the attack is resolved.</summary>
+    void ClearPlayerAlleyUnderAttackByAi(Alley alley);
 
     /// <summary>
     /// Enumerates the currently player-owned alleys so the host can add management data for them to the
@@ -69,9 +82,24 @@ public class AlleyCampaignBehaviorInterface : IAlleyCampaignBehaviorInterface
                     return;
                 }
 
+                // Preserve an in-progress attack across the rebuild: the PlayerAlleyData ctor resets
+                // UnderAttackBy, so a garrison/overseer update would otherwise drop the pending defense.
+                Alley underAttackBy = null;
+                CampaignTime dueDate = default;
+                if (TryGetByAlley(list, alley, out var existing))
+                {
+                    underAttackBy = existing.UnderAttackBy;
+                    dueDate = existing.AttackResponseDueDate;
+                }
+
                 RemoveByAlley(list, alley);
                 var data = new AlleyCampaignBehavior.PlayerAlleyData(alley, garrison);
                 if (overseer != null) data.AssignedClanMember = overseer;
+                if (underAttackBy != null)
+                {
+                    data.UnderAttackBy = underAttackBy;
+                    data.AttackResponseDueDate = dueDate;
+                }
                 list.Add(data);
 
                 // Promote State in lockstep with the entry. Vanilla's AddPlayerAlleyCharacters does an
@@ -108,6 +136,60 @@ public class AlleyCampaignBehaviorInterface : IAlleyCampaignBehaviorInterface
                 RemoveByAlley(list, alley);
             }
         });
+    }
+
+    public void SetPlayerAlleyUnderAttackByAi(Alley alley, Alley attacker, CampaignTime dueDate, bool showNotification)
+    {
+        if (alley == null || attacker == null) return;
+
+        GameThread.RunSafe(() =>
+        {
+            var list = Behavior?._playerOwnedCommonAreaData;
+            if (list == null) return;
+
+            using (new AllowedThread())
+            {
+                if (!TryGetByAlley(list, alley, out var data)) return;
+                data.UnderAttackBy = attacker;
+                data.AttackResponseDueDate = dueDate;
+
+                if (showNotification) AddUnderAttackNotice(alley, dueDate);
+            }
+        });
+    }
+
+    public void ClearPlayerAlleyUnderAttackByAi(Alley alley)
+    {
+        if (alley == null) return;
+
+        GameThread.RunSafe(() =>
+        {
+            var list = Behavior?._playerOwnedCommonAreaData;
+            if (list == null) return;
+
+            using (new AllowedThread())
+            {
+                if (TryGetByAlley(list, alley, out var data)) data.UnderAttackBy = null;
+            }
+        });
+    }
+
+    private static void AddUnderAttackNotice(Alley alley, CampaignTime dueDate)
+    {
+        var text = new TextObject("{=5bIpeW9X}Your alley in {SETTLEMENT} is under attack from neighboring gangs. Unless you go to their help, the alley will be lost in {RESPONSE_TIME} days.");
+        text.SetTextVariable("SETTLEMENT", alley.Settlement.Name);
+        text.SetTextVariable("RESPONSE_TIME", (float)dueDate.RemainingDaysFromNow, 2);
+        Campaign.Current.CampaignInformationManager.NewMapNoticeAdded(new AlleyUnderAttackMapNotification(alley, text));
+    }
+
+    private static bool TryGetByAlley(List<AlleyCampaignBehavior.PlayerAlleyData> list, Alley alley, out AlleyCampaignBehavior.PlayerAlleyData data)
+    {
+        foreach (var d in list)
+        {
+            if (d.Alley == alley) { data = d; return true; }
+        }
+        data = null;
+        return false;
     }
 
     public bool TryGetCurrentSettlementAlley(out Alley alley)
