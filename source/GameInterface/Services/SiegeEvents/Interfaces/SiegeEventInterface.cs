@@ -92,11 +92,17 @@ internal class SiegeEventInterface : ISiegeEventInterface
 
     public void StartSiegeEvent(MobileParty besiegerParty, Settlement settlement)
     {
+        // The dedicated host has no MainParty, so a client's besieging party doesn't get vanilla's
+        // IsMainParty exemption in BesiegerCamp.CheckBesiegerPartiesAndMakeThemLeave. Give it the besiege
+        // DefaultBehavior so the next server tick doesn't eject it and end the siege.
+        besiegerParty.SetMoveBesiegeSettlement(settlement, MobileParty.NavigationType.Default);
         Campaign.Current.SiegeEventManager.StartSiegeEvent(settlement, besiegerParty);
     }
 
     public void JoinSiegeCamp(MobileParty party, Settlement settlement)
     {
+        // Same as StartSiegeEvent: without the besiege DefaultBehavior the host ejects the joined party.
+        party.SetMoveBesiegeSettlement(settlement, MobileParty.NavigationType.Default);
         party.BesiegerCamp = settlement.SiegeEvent?.BesiegerCamp;
     }
 
