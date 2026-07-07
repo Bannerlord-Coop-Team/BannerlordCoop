@@ -72,6 +72,7 @@ internal class ClientSiegeEntryHandler : IHandler
         });
     }
 
+    // Runs on the game thread already — SiegeEntryFlowPatches publishes the *Attempted message from the besiege menu consequence, and this only resolves ids and sends the request, so no GameThread.RunSafe is needed.
     private void HandleBesiegeAttempt(MessagePayload<BesiegeSettlementAttempted> payload)
     {
         var obj = payload.What;
@@ -82,6 +83,7 @@ internal class ClientSiegeEntryHandler : IHandler
         network.SendAll(new NetworkRequestBesiegeSettlement(partyId, settlementId));
     }
 
+    // Runs on the game thread already — published from the join-siege menu consequence; only resolves ids and sends, so no GameThread.RunSafe.
     private void HandleJoinAttempt(MessagePayload<JoinSiegeCampAttempted> payload)
     {
         var obj = payload.What;
@@ -92,6 +94,7 @@ internal class ClientSiegeEntryHandler : IHandler
         network.SendAll(new NetworkRequestJoinSiegeCamp(partyId, settlementId));
     }
 
+    // Runs on the game thread already — published from the leave-siege consequence; only resolves an id and sends, so no GameThread.RunSafe.
     private void HandleBreakAttempt(MessagePayload<BreakSiegeAttempted> payload)
     {
         var obj = payload.What;

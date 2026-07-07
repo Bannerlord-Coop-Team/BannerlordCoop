@@ -43,6 +43,7 @@ internal class ServerSiegeEntryHandler : IHandler
         messageBroker.Subscribe<SiegeCampPositionRolled>(HandleCampPosition);
     }
 
+    // Runs on the game thread already — published from the StartBattleAction patch; only resolves ids and broadcasts, so no GameThread.RunSafe.
     private void HandleAssaultStarted(MessagePayload<SiegeAssaultStarted> payload)
     {
         var obj = payload.What;
@@ -54,6 +55,7 @@ internal class ServerSiegeEntryHandler : IHandler
         network.SendAll(new NetworkPromptSiegeDefense(attackerPartyId, settlementId));
     }
 
+    // Runs on the game thread already — published from the party-joined-siege patch; only resolves an id and broadcasts, so no GameThread.RunSafe.
     private void HandleCampPosition(MessagePayload<SiegeCampPositionRolled> payload)
     {
         var obj = payload.What;

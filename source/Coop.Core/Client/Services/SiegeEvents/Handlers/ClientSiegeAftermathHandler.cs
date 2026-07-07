@@ -55,6 +55,7 @@ internal class ClientSiegeAftermathHandler : IHandler
         });
     }
 
+    // Runs on the game thread already — published from the ApplyAftermath prefix; only resolves ids and sends, so no GameThread.RunSafe.
     private void HandleAttempt(MessagePayload<SiegeAftermathAttempted> payload)
     {
         var obj = payload.What;

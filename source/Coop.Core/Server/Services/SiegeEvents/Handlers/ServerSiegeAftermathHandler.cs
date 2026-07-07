@@ -33,6 +33,7 @@ internal class ServerSiegeAftermathHandler : IHandler
         messageBroker.Subscribe<SiegeAftermathChoicePrompted>(HandlePrompted);
     }
 
+    // Runs on the game thread already — published from the aftermath-park path (OnMapEventEnded prefix); only resolves ids and broadcasts, so no GameThread.RunSafe.
     private void HandlePrompted(MessagePayload<SiegeAftermathChoicePrompted> payload)
     {
         var obj = payload.What;
@@ -44,6 +45,7 @@ internal class ServerSiegeAftermathHandler : IHandler
         network.SendAll(new NetworkPromptSiegeAftermathChoice(settlementId, leaderPartyId));
     }
 
+    // Runs on the game thread already — published from the ApplyAftermath postfix; only resolves an id and broadcasts, so no GameThread.RunSafe.
     private void HandleApplied(MessagePayload<SiegeAftermathApplied> payload)
     {
         var obj = payload.What;

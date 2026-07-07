@@ -62,6 +62,7 @@ internal class ClientSiegeEngineHandler : IHandler
         messageBroker.Publish(this, new ChangeSiegeEngineProgress(obj.SiegeEngineId, obj.IsRedeployment, obj.Value));
     }
 
+    // Runs on the game thread already — published from the production-popup container patch; only resolves an id and sends, so no GameThread.RunSafe.
     private void HandleDeployRequested(MessagePayload<SiegeEngineDeployRequested> payload)
     {
         var obj = payload.What;

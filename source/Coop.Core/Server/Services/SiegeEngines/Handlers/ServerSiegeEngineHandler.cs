@@ -68,6 +68,7 @@ internal class ServerSiegeEngineHandler : IHandler
         });
     }
 
+    // Runs on the game thread already — published from the container-mutation patch; only resolves ids and broadcasts, so no GameThread.RunSafe.
     private void HandleDeployed(MessagePayload<SiegeEngineDeployed> payload)
     {
         var obj = payload.What;
@@ -78,6 +79,7 @@ internal class ServerSiegeEngineHandler : IHandler
         network.SendAll(new NetworkChangeSiegeEngineDeployed(containerId, siegeEngineId, obj.SiegeEngine.SiegeEngine?.StringId, obj.Index));
     }
 
+    // Runs on the game thread already — published from the container-mutation patch; only resolves an id and broadcasts, so no GameThread.RunSafe.
     private void HandleUndeployed(MessagePayload<SiegeEngineUndeployed> payload)
     {
         var obj = payload.What;
@@ -107,6 +109,7 @@ internal class ServerSiegeEngineHandler : IHandler
         network.SendAll(new NetworkChangeSiegeEngineReserveRemoved(containerId, siegeEngineId));
     }
 
+    // Runs on the game thread already — published from the construction-progress patch; only resolves an id and broadcasts, so no GameThread.RunSafe.
     private void HandleProgress(MessagePayload<SiegeEngineProgressChanged> payload)
     {
         var obj = payload.What;
