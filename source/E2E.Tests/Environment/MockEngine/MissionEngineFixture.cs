@@ -106,11 +106,19 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), nameof(Agent.SetMovementDirection), nameof(Agent_SetMovementDirection));
         Prefix(typeof(Agent), "get_MovementInputVector", nameof(Agent_get_MovementInputVector));
         Prefix(typeof(Agent), "set_MovementInputVector", nameof(Agent_set_MovementInputVector));
-        // AgentMountData also snapshots action channel 1; report "no action" so capture works headless (the
-        // apply side's GetActionNameWithCode already returns null headless and skips SetActionChannel).
+        Prefix(typeof(Agent), "get_MovementFlags", nameof(Agent_get_MovementFlags));
+        Prefix(typeof(Agent), "set_MovementFlags", nameof(Agent_set_MovementFlags));
+        Prefix(typeof(Agent), "get_EventControlFlags", nameof(Agent_get_EventControlFlags));
+        Prefix(typeof(Agent), "set_EventControlFlags", nameof(Agent_set_EventControlFlags));
+        Prefix(typeof(Agent), "get_CrouchMode", nameof(Agent_get_CrouchMode));
+        // Agent movement/action packets snapshot and apply action channels; mirror them so the headless tests can
+        // verify animation sync without native animation state.
         Prefix(typeof(Agent), nameof(Agent.GetCurrentAction), nameof(Agent_GetCurrentAction));
+        Prefix(typeof(Agent), nameof(Agent.GetCurrentActionType), nameof(Agent_GetCurrentActionType));
         Prefix(typeof(Agent), nameof(Agent.GetCurrentAnimationFlag), nameof(Agent_GetCurrentAnimationFlag));
         Prefix(typeof(Agent), nameof(Agent.GetCurrentActionProgress), nameof(Agent_GetCurrentActionProgress));
+        Prefix(typeof(Agent), nameof(Agent.SetCurrentActionProgress), nameof(Agent_SetCurrentActionProgress));
+        Prefix(typeof(Agent), nameof(Agent.SetActionChannel), nameof(Agent_SetActionChannel));
         Prefix(typeof(Team), nameof(Team.GetFormation), nameof(Team_GetFormation));
         Prefix(typeof(Formation), nameof(Formation.SetControlledByAI), nameof(Formation_SetControlledByAI));
         Prefix(typeof(Formation), nameof(Formation.SetMovementOrder), nameof(Formation_SetMovementOrder));
@@ -488,24 +496,100 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
-    private static bool Agent_GetCurrentAction(Agent __instance, ref ActionIndexCache __result)
+    private static bool Agent_get_MovementFlags(Agent __instance, ref Agent.MovementControlFlag __result)
     {
-        if (!AgentMirror.TryGet(__instance, out _)) return true;
-        __result = ActionIndexCache.act_none; // safe: the MBAnimation shim above lets the cctor complete
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.MovementFlags;
         return false;
     }
 
-    private static bool Agent_GetCurrentAnimationFlag(Agent __instance, ref AnimFlags __result)
+    private static bool Agent_set_MovementFlags(Agent __instance, Agent.MovementControlFlag value)
     {
-        if (!AgentMirror.TryGet(__instance, out _)) return true;
-        __result = 0;
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.MovementFlags = value;
         return false;
     }
 
-    private static bool Agent_GetCurrentActionProgress(Agent __instance, ref float __result)
+    private static bool Agent_get_EventControlFlags(Agent __instance, ref Agent.EventControlFlag __result)
     {
-        if (!AgentMirror.TryGet(__instance, out _)) return true;
-        __result = 0f;
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.EventControlFlags;
+        return false;
+    }
+
+    private static bool Agent_set_EventControlFlags(Agent __instance, Agent.EventControlFlag value)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.EventControlFlags = value;
+        return false;
+    }
+
+    private static bool Agent_get_CrouchMode(Agent __instance, ref bool __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.CrouchMode;
+        return false;
+    }
+
+    private static bool Agent_GetCurrentAction(Agent __instance, int channelNo, ref ActionIndexCache __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = new ActionIndexCache(channelNo == 0 ? m.Action0Index : m.Action1Index);
+        return false;
+    }
+
+    private static bool Agent_GetCurrentActionType(Agent __instance, int channelNo, ref Agent.ActionCodeType __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = channelNo == 0 ? m.Action0Type : m.Action1Type;
+        return false;
+    }
+
+    private static bool Agent_GetCurrentAnimationFlag(Agent __instance, int channelNo, ref AnimFlags __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = channelNo == 0 ? m.Action0Flags : m.Action1Flags;
+        return false;
+    }
+
+    private static bool Agent_GetCurrentActionProgress(Agent __instance, int channelNo, ref float __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = channelNo == 0 ? m.Action0Progress : m.Action1Progress;
+        return false;
+    }
+
+    private static bool Agent_SetCurrentActionProgress(Agent __instance, int channelNo, float progress)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        if (channelNo == 0) m.Action0Progress = progress;
+        else m.Action1Progress = progress;
+        return false;
+    }
+
+    private static bool Agent_SetActionChannel(Agent __instance, object[] __args, ref bool __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+
+        int channelNo = (int)__args[0];
+        var action = (ActionIndexCache)__args[1];
+        var flags = __args.Length > 3 && __args[3] is AnimFlags f ? f : (AnimFlags)0;
+        var progress = __args.Length > 8 && __args[8] is float p ? p : 0f;
+
+        if (channelNo == 0)
+        {
+            m.Action0Index = action.Index;
+            m.Action0Flags = flags;
+            m.Action0Progress = progress;
+        }
+        else
+        {
+            m.Action1Index = action.Index;
+            m.Action1Flags = flags;
+            m.Action1Progress = progress;
+        }
+
+        __result = true;
         return false;
     }
 

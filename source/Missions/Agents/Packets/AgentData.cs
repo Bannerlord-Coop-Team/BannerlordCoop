@@ -15,6 +15,7 @@ namespace Missions.Agents.Packets
             MovementDirection = agent.GetMovementDirection();
             LookDirection = agent.LookDirection;
             InputVector = agent.MovementInputVector;
+            ActionData = new AgentActionData(agent);
 
             AgentEquipment = new AgentEquipmentData(agent);
 
@@ -50,13 +51,13 @@ namespace Missions.Agents.Packets
             // apply the agent's look direction
             agent.LookDirection = LookDirection;
             agent.MovementInputVector = InputVector;
+            ActionData?.ApplyMovementActions(agent);
 
             // Update equipment
             AgentEquipment.Apply(agent);
 
-            // NOTE: actions/animations are NOT applied here anymore. They are events, not continuous state, so
-            // they are synced separately and on-change by AgentActionHandler (reliable-ordered), not polled with
-            // movement. This keeps the movement packet purely continuous state.
+            // NOTE: only locomotion/idle action state is applied here. Discrete actions/animations are events,
+            // so they are synced separately and on-change by AgentActionHandler (reliable-ordered).
 
             // Update mount
             if (agent.HasMount)
@@ -75,7 +76,8 @@ namespace Missions.Agents.Packets
         public Vec2 MovementDirection { get; }
         [ProtoMember(5)]
         public AgentEquipmentData AgentEquipment { get; }
-        // 6 was ActionData — actions moved to the event-driven AgentActionHandler; tag left unused for wire stability.
+        [ProtoMember(6)]
+        public AgentActionData ActionData { get; }
         [ProtoMember(7)]
         public AgentMountData MountData { get; }
     }

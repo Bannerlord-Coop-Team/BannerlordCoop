@@ -1,5 +1,4 @@
 ﻿using ProtoBuf;
-using System.Reflection;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Agents.Packets
@@ -7,27 +6,6 @@ namespace Missions.Agents.Packets
     [ProtoContract(SkipConstructor = true)]
     public class AgentActionData
     {
-        // MBAPI.IMBAnimation is a non-public static field. The publicizer makes it compile, but the
-        // emitted IgnoresAccessChecksTo isn't honored in every runtime load context (it throws
-        // FieldAccessException in live play). Reflecting a non-public static field always works, so
-        // resolve action names through here instead of touching MBAPI.IMBAnimation directly.
-        private static readonly FieldInfo AnimationField =
-            typeof(MBAPI).GetField("IMBAnimation", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-        private static MethodInfo getActionNameWithCode;
-
-        internal static string GetActionNameWithCode(int actionCode)
-        {
-            var animation = AnimationField?.GetValue(null);
-            if (animation == null) return null;
-
-            if (getActionNameWithCode == null)
-            {
-                getActionNameWithCode = animation.GetType().GetMethod("GetActionNameWithCode", new[] { typeof(int) });
-            }
-
-            return getActionNameWithCode?.Invoke(animation, new object[] { actionCode }) as string;
-        }
-
         public AgentActionData(Agent agent)
         {
             ActionIndexCache cache0 = agent.GetCurrentAction(0);
@@ -54,38 +32,8 @@ namespace Missions.Agents.Packets
             agent.EventControlFlags |= (Agent.EventControlFlag)EventFlag;
             agent.MovementFlags = (Agent.MovementControlFlag)MovementFlag;
 
-            // apply the animation on channel 0 if none exists
-            if (agent.GetCurrentAction(0) == ActionIndexCache.act_none || agent.GetCurrentAction(0).Index != Action0Index)
-            {
-                // Use the reflection helper, NOT MBAPI.IMBAnimation directly: the publicized static field
-                // throws FieldAccessException in live play (see GetActionNameWithCode above), which kills
-                // every movement-packet apply and leaves remote agents frozen.
-                string actionName1 = GetActionNameWithCode(Action0Index);
-                if (actionName1 != null)
-                {
-                    agent.SetActionChannel(0, ActionIndexCache.Create(actionName1), additionalFlags: (AnimFlags)Action0Flag, startProgress: Action0Progress);
-                }
-            }
-            // otherwise continue the existing animation
-            else
-            {
-                agent.SetCurrentActionProgress(0, Action0Progress);
-            }
-
-            // apply the animation on channel 1 if none exists
-            if (agent.GetCurrentAction(1) == ActionIndexCache.act_none || agent.GetCurrentAction(1).Index != Action1Index)
-            {
-                string actionName2 = GetActionNameWithCode(Action1Index);
-                if (actionName2 != null)
-                {
-                    agent.SetActionChannel(1, ActionIndexCache.Create(actionName2), additionalFlags: (AnimFlags)Action1Flag, startProgress: Action1Progress);
-                }
-            }
-            // otherwise continue the existing animation
-            else
-            {
-                agent.SetCurrentActionProgress(1, Action1Progress);
-            }
+            ApplyActionChannel(agent, 0, Action0Index, Action0Flag, Action0Progress, updateProgress: true);
+            ApplyActionChannel(agent, 1, Action1Index, Action1Flag, Action1Progress, updateProgress: true);
 
             // Set the movement flags to none
             agent.MovementFlags = 0U;
@@ -120,6 +68,56 @@ namespace Missions.Agents.Packets
             //    // otherwise just cancel it
             //    agent.SetActionChannel(1, ActionIndexCache.act_none, ignorePriority: true, startProgress: 100);
             //}
+        }
+
+        public void ApplyMovementActions(Agent agent)
+        {
+            ApplyMovementActionChannel(agent, 0, Action0CodeType, Action0Index, Action0Flag, Action0Progress);
+            ApplyMovementActionChannel(agent, 1, Action1CodeType, Action1Index, Action1Flag, Action1Progress);
+        }
+
+        internal static bool IsMovementAction(Agent.ActionCodeType type)
+        {
+            return type == Agent.ActionCodeType.Other || type == Agent.ActionCodeType.Idle;
+        }
+
+        internal static void ApplyActionChannel(
+            Agent agent,
+            int channelNo,
+            int actionIndex,
+            ulong actionFlag,
+            float actionProgress,
+            bool updateProgress)
+        {
+            if (agent.GetCurrentAction(channelNo).Index != actionIndex)
+            {
+                agent.SetActionChannel(
+                    channelNo,
+                    new ActionIndexCache(actionIndex),
+                    additionalFlags: (AnimFlags)actionFlag,
+                    startProgress: actionProgress);
+            }
+            else if (updateProgress)
+            {
+                agent.SetCurrentActionProgress(channelNo, actionProgress);
+            }
+        }
+
+        private static void ApplyMovementActionChannel(
+            Agent agent,
+            int channelNo,
+            int actionCodeType,
+            int actionIndex,
+            ulong actionFlag,
+            float actionProgress)
+        {
+            if (!IsMovementAction((Agent.ActionCodeType)actionCodeType))
+                return;
+
+            if (!IsMovementAction(agent.GetCurrentActionType(channelNo)))
+                return;
+
+            ApplyActionChannel(agent, channelNo, actionIndex, actionFlag, actionProgress, updateProgress: false);
         }
 
         [ProtoMember(1)]

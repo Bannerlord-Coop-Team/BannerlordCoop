@@ -28,8 +28,8 @@ public interface IAgentActionHandler : IPacketHandler, IDisposable
 /// the full action state every tick and re-applying it (which lost one-frame triggers, fought the local
 /// animation, and churned the skeleton), this diffs each owned agent's action channels ON THE GAME THREAD and,
 /// only when a DISCRETE action changes, broadcasts it <see cref="DeliveryMethod.ReliableOrdered"/>. The receiver
-/// applies it ONCE and lets the engine advance it. Locomotion (walk/run/idle) is skipped — it is reproduced from
-/// the synced <c>MovementInputVector</c>.
+/// applies it ONCE and lets the engine advance it. Locomotion (walk/run/idle) is skipped here — it rides in the
+/// continuous movement packet with the synced <c>MovementInputVector</c>.
 /// </summary>
 public class AgentActionHandler : IAgentActionHandler
 {
@@ -109,7 +109,7 @@ public class AgentActionHandler : IAgentActionHandler
                             || IsDiscreteAction(agent.GetCurrentActionType(1));
 
             // Broadcast entering/holding a discrete action, or leaving one (its END). Pure locomotion changes
-            // (walk<->run<->idle) are skipped — the puppet reproduces those from the synced movement input.
+            // (walk<->run<->idle) are skipped here — the movement packet carries those alongside movement input.
             bool broadcast = nowDiscrete || (hadState && last.WasDiscrete);
 
             _lastActions[info.AgentId] = new ActionState(action0, action1, nowDiscrete);
@@ -166,10 +166,10 @@ public class AgentActionHandler : IAgentActionHandler
     }
 
     // Discrete actions worth replicating explicitly. Pure locomotion (Idle / the generic Other bucket that
-    // walk/run fall into) is reproduced on the puppet from the synced MovementInputVector, so it is NOT sent.
+    // walk/run fall into) rides in the movement packet, so it is NOT sent as a reliable action event.
     private static bool IsDiscreteAction(Agent.ActionCodeType type)
     {
-        return type != Agent.ActionCodeType.Other && type != Agent.ActionCodeType.Idle;
+        return !AgentActionData.IsMovementAction(type);
     }
 
     public void Dispose()
