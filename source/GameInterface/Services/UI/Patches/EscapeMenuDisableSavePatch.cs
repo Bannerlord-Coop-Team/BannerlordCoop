@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using HarmonyLib;
 using SandBox.View.Map;
 using System;
@@ -14,8 +14,8 @@ namespace GameInterface.Services.UI.Patches
     [HarmonyPatch(typeof(MapScreen), "GetEscapeMenuItems")]
     internal class EscapeMenuDisableSavePatch
     {
-        private const int SaveButtonIndex = 3;
-        private const int SaveAsButtonIndex = 4;
+        private const int SaveButtonIndex = 4;
+        private const int SaveAsButtonIndex = 5;
 
         // EscapeMenuItemVM.RefreshValues() recomputes IsDisabled from the item's disabled-func
         // on every refresh, so simply setting IsDisabled = true would be overwritten. Instead

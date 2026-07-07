@@ -98,6 +98,10 @@ public class MissionModule : Module
             .InstancePerLifetimeScope()
             .AutoActivate();
 
+        // Slots spawned agents into their team formation so vanilla's formation markers/order-targeting see
+        // them. Injected into the battle spawn sub-services (stateless, so transient lifetime is moot).
+        builder.RegisterType<AgentFormationAssigner>().As<IAgentFormationAssigner>().InstancePerDependency();
+
         builder.RegisterType<NetworkAgentRegistry>().As<INetworkAgentRegistry>().InstancePerLifetimeScope();
         //builder.RegisterType<NetworkMissileRegistry>().As<INetworkMissileRegistry>().InstancePerDependency();
         builder.RegisterType<MissileHandler>().As<IMissileHandler>().InstancePerDependency();

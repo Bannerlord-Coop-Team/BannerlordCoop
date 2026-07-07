@@ -81,6 +81,8 @@ namespace IntroServer.Config
 
         public string Token => P2PToken;
 
+        public bool IsTunneled => false;
+
         public TimeSpan ConnectionTimeout => DisconnectTimeout;
 
         public int MaxPacketsInQueue => 10000;

@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.PacketHandlers;
@@ -20,6 +20,10 @@ public interface IAgentMovementHandler : IPacketHandler, IDisposable
 {
     /// <summary>Per-frame position smoother for received puppets; ticked by CoopMissionController.OnMissionTick.</summary>
     IAgentPositionInterpolator Interpolator { get; }
+
+    /// <summary>Receive side for masterless-horse movement (<see cref="MountMovementPacket"/>); the send side
+    /// is this handler's poll. Exposed so the packet flow is reachable in tests.</summary>
+    IPacketHandler MountMovementApplier { get; }
 }
 
 public class AgentMovementHandler : IAgentMovementHandler
@@ -56,6 +60,11 @@ public class AgentMovementHandler : IAgentMovementHandler
     private readonly AgentPositionInterpolator _interpolator = new AgentPositionInterpolator();
     public IAgentPositionInterpolator Interpolator => _interpolator;
 
+    // Masterless-horse movement receive side. Owned here (registered/removed with this handler) so both
+    // movement streams share one deterministic lifecycle; the poll below is its send side.
+    private readonly MountMovementApplier _mountMovementApplier;
+    public IPacketHandler MountMovementApplier => _mountMovementApplier;
+
     // Dispose is called deterministically on mission teardown (CoopMissionController.OnEndMissionInternal); this
     // guards against a second call (the GC finalizer, or the DI scope also disposing this transient handler).
     private bool _disposed;
@@ -82,6 +91,9 @@ public class AgentMovementHandler : IAgentMovementHandler
         this.messageBroker.Subscribe<MissionPeerDisconnected>(Handle_PeerDisconnected);
 
         this.packetManager.RegisterPacketHandler(this);
+
+        _mountMovementApplier = new MountMovementApplier(agentRegistry, _interpolator);
+        this.packetManager.RegisterPacketHandler(_mountMovementApplier);
 
         poller = new Poller(PollAgents, PollingInterval);
         poller.Start();
@@ -114,6 +126,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         _interpolator.Clear();
 
         packetManager.RemovePacketHandler(this);
+        packetManager.RemovePacketHandler(_mountMovementApplier);
         messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
         messageBroker.Unsubscribe<MissionPeerLeft>(Handle_PeerLeft);
         messageBroker.Unsubscribe<MissionPeerDisconnected>(Handle_PeerDisconnected);
@@ -132,20 +145,32 @@ public class AgentMovementHandler : IAgentMovementHandler
 
         // Collect every agent we have authority over, then broadcast them in MTU-safe chunks. One packet
         // per agent floods the mesh and the receiver's game-thread queue at battle scale (the GameThread
-        // lockup); one packet for ALL of them overflows the unreliable MTU ceiling.
+        // lockup); one packet for ALL of them overflows the unreliable MTU ceiling. The single registry pass
+        // partitions the two movement streams: troops as AgentData, masterless registered horses as
+        // standalone AgentMountData (a ridden horse's pose rides inside its rider's AgentData instead).
         var ids = new List<Guid>();
         var data = new List<AgentData>();
+        List<Guid> mountIds = null;
+        List<AgentMountData> mountData = null;
 
         foreach (var agentInfo in agentRegistry.GetAgents(controllerIdProvider.ControllerId))
         {
             Agent agent = agentInfo.Agent;
             // Skip agents whose native object is already gone (dead/removed but not yet deregistered):
-            // building AgentData calls into the agent (GetCurrentActionType, etc.), which throws an
+            // building the snapshot calls into the agent (GetCurrentActionType, etc.), which throws an
             // AccessViolationException on a freed agent. Mirrors the IsActive() guard on the apply path.
-            if (agent != null && agent.Mission != null && agent.IsActive())
+            if (agent == null || agent.Mission == null || !agent.IsActive()) continue;
+            if (!ShouldBroadcastMovement(agent)) continue;
+
+            if (agent.IsMount)
+            {
+                (mountIds ??= new List<Guid>()).Add(agentInfo.AgentId);
+                (mountData ??= new List<AgentMountData>()).Add(new AgentMountData(agent));
+            }
+            else
             {
                 ids.Add(agentInfo.AgentId);
-                data.Add(new AgentData(agent));
+                data.Add(new AgentData(agent, GetRegisteredMountId(agent)));
             }
         }
 
@@ -157,6 +182,18 @@ public class AgentMovementHandler : IAgentMovementHandler
             ids.CopyTo(start, idChunk, 0, count);
             data.CopyTo(start, dataChunk, 0, count);
             client.SendAll(new MovementPacket(idChunk, dataChunk));
+        }
+
+        if (mountIds == null) return;
+
+        for (int start = 0; start < mountIds.Count; start += MaxAgentsPerMovementPacket)
+        {
+            int count = Math.Min(MaxAgentsPerMovementPacket, mountIds.Count - start);
+            var idChunk = new Guid[count];
+            var dataChunk = new AgentMountData[count];
+            mountIds.CopyTo(start, idChunk, 0, count);
+            mountData.CopyTo(start, dataChunk, 0, count);
+            client.SendAll(new MountMovementPacket(idChunk, dataChunk));
         }
     }
 
@@ -222,11 +259,11 @@ public class AgentMovementHandler : IAgentMovementHandler
     }
 
     // [Game thread] Replicate the owner's mount/dismount onto its puppet. The per-tick AgentData reports
-    // whether the owner is mounted (MountData != null); without acting on the transition a puppet stays
-    // stuck on its horse after the owner dismounts (and never re-mounts). MountAgent is set directly
-    // (controller-independent — puppets have no controller to process a mount/dismount input flag); the
-    // movement sync then keeps the rider/horse positioned. AgentData.Apply still syncs the mount's pose
-    // while both are mounted.
+    // whether the owner is mounted (MountData != null) and WHICH horse (MountId, when it's registered);
+    // without acting on the transition a puppet stays stuck on its horse after the owner dismounts (and
+    // never re-mounts). MountAgent is set directly (controller-independent — puppets have no controller to
+    // process a mount/dismount input flag); the movement sync then keeps the rider/horse positioned.
+    // AgentData.Apply still syncs the mount's pose while both are mounted.
     private void SyncMountState(Agent agent, AgentData data)
     {
         bool ownerMounted = data.MountData != null;
@@ -241,11 +278,59 @@ public class AgentMovementHandler : IAgentMovementHandler
         }
         else if (ownerMounted && !agent.HasMount)
         {
-            // Owner re-mounted: put the puppet back on the horse it left, if it's still around and free.
-            if (_dismountedHorses.TryGetValue(agent, out var horse) && horse != null && horse.IsActive() && horse.RiderAgent == null)
+            // Owner (re)mounted: prefer the exact horse it reports (registered mounts carry their id); fall
+            // back to the one the puppet last left for unregistered horses.
+            Agent horse = ResolveRegisteredHorse(data.MountData.MountId);
+            if (horse == null) _dismountedHorses.TryGetValue(agent, out horse);
+            if (horse != null && horse.IsActive() && horse.RiderAgent == null)
                 agent.MountAgent = horse;
             _dismountedHorses.Remove(agent);
         }
+        else if (ownerMounted && agent.HasMount)
+        {
+            // Owner switched horses (dismount + different re-mount inside one poll interval): the reported
+            // mount id no longer matches the horse the puppet sits on — move it over so damage routed by the
+            // horse's id keeps hitting what players actually see.
+            Agent reported = ResolveRegisteredHorse(data.MountData.MountId);
+            if (reported != null && !ReferenceEquals(reported, agent.MountAgent)
+                && reported.IsActive() && reported.RiderAgent == null)
+            {
+                _interpolator.Forget(agent.MountAgent);
+                agent.MountAgent = reported;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Whether an owned, active, registered agent's movement is broadcast as its OWN packet. Troops always
+    /// are. A registered MOUNT is only while it has no live rider: a ridden horse's pose rides in its rider's
+    /// MountData (a second stream would fight it), but a masterless one has nothing else driving it — without
+    /// its own packets each client's local horse AI wanders its copy and the positions diverge, so its owner
+    /// stays authoritative over it the same way it is for a troop. (Public and static so the selection rule is
+    /// testable headless; called under the poll's IsActive guard.)
+    /// </summary>
+    public static bool ShouldBroadcastMovement(Agent agent)
+    {
+        if (!agent.IsMount) return true;
+        return !(agent.RiderAgent is Agent rider && rider.IsActive());
+    }
+
+    // The local agent behind a mount's network id; null when the id is empty/unknown or resolves to a
+    // non-mount (a stale id after the registry entry was replaced).
+    private Agent ResolveRegisteredHorse(Guid mountId)
+    {
+        if (mountId == Guid.Empty) return null;
+        if (!agentRegistry.TryGetAgentInfo(mountId, out var info)) return null;
+        return info.Agent != null && info.Agent.IsMount ? info.Agent : null;
+    }
+
+    // The registry id of the agent's current mount, or Guid.Empty when on foot / the horse isn't registered.
+    private Guid GetRegisteredMountId(Agent agent)
+    {
+        var mount = agent.MountAgent;
+        if (mount != null && agentRegistry.TryGetAgentInfo(mount, out var mountInfo))
+            return mountInfo.AgentId;
+        return Guid.Empty;
     }
 
     private void Handle_PeerEntered(MessagePayload<NetworkMissionPeerEntered> payload)

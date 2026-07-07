@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Locations.Messages;
@@ -6,7 +6,6 @@ using HarmonyLib;
 using SandBox;
 using Serilog;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Locations;
@@ -26,11 +25,6 @@ namespace GameInterface.Services.Locations.Patches;
 internal class PlayerLocationEntryPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<PlayerLocationEntryPatches>();
-
-    // OpenIndoorMission fires several times per entry; track the missions we have already attached the
-    // P2P behaviors to so we attach exactly once. ConditionalWeakTable lets the mission be GC'd freely.
-    private static readonly ConditionalWeakTable<Mission, object> AttachedMissions =
-        new ConditionalWeakTable<Mission, object>();
 
     [HarmonyPatch(nameof(SandBoxMissions.OpenIndoorMission),
         new[] { typeof(string), typeof(int), typeof(Location), typeof(CharacterObject) })]
@@ -109,7 +103,9 @@ internal class PlayerLocationEntryPatches
     private static void AttachLocationBehaviors(Mission mission)
     {
         if (mission == null) return;
-        if (AttachedMissions.TryGetValue(mission, out _)) return;
+
+        // OpenIndoorMission fires several times per entry; the tracker dedupes so we attach exactly once.
+        if (LocationMissionTracker.IsLocationMission(mission)) return;
 
         if (ContainerProvider.TryResolve(out IEnumerable<ILocationMissionBehavior> behaviors) == false)
         {
@@ -117,7 +113,7 @@ internal class PlayerLocationEntryPatches
             return;
         }
 
-        AttachedMissions.Add(mission, null);
+        LocationMissionTracker.TryRegister(mission);
 
         foreach (var behavior in behaviors)
         {

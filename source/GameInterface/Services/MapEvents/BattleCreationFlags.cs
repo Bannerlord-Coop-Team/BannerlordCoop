@@ -1,4 +1,4 @@
-namespace GameInterface.Services.MapEvents;
+﻿namespace GameInterface.Services.MapEvents;
 
 /// <summary>
 /// Snapshot of the <see cref="TaleWorlds.CampaignSystem.Encounters.PlayerEncounter"/> "force" flags that
@@ -11,7 +11,7 @@ namespace GameInterface.Services.MapEvents;
 /// The remaining branch conditions in <c>StartBattleInternal</c> depend only on party/settlement state, which
 /// the server re-evaluates directly from the resolved parties (see <see cref="MapEventBattleFactory"/>).
 /// </remarks>
-internal readonly struct BattleCreationFlags
+public readonly struct BattleCreationFlags
 {
     public readonly bool ForceRaid;
     public readonly bool ForceSallyOut;

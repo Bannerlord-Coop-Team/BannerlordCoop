@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MapEvents;
@@ -44,6 +44,7 @@ public class PuppetSpawner : IPuppetSpawner
     private readonly IBattleSession session;
     private readonly ICasualtyAttributionMap casualties;
     private readonly IBattleDeploymentCoordinator deployment;
+    private readonly IAgentFormationAssigner formationAssigner;
 
     // Puppet spawns from the host's catch-up burst can arrive while THIS client's mission is still loading
     // (before MissionCombatantsLogic creates the teams). An agent built with a null team later NREs the
@@ -58,7 +59,8 @@ public class PuppetSpawner : IPuppetSpawner
         ICoopMissionComponent coopMissionComponent,
         IBattleSession session,
         ICasualtyAttributionMap casualties,
-        IBattleDeploymentCoordinator deployment)
+        IBattleDeploymentCoordinator deployment,
+        IAgentFormationAssigner formationAssigner)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -66,6 +68,7 @@ public class PuppetSpawner : IPuppetSpawner
         this.session = session;
         this.casualties = casualties;
         this.deployment = deployment;
+        this.formationAssigner = formationAssigner;
 
         messageBroker.Subscribe<NetworkSpawnBattleAgents>(Handle_NetworkSpawnBattleAgents);
     }
@@ -167,6 +170,8 @@ public class PuppetSpawner : IPuppetSpawner
         agent.FadeIn();
         if (data.Health > 0) agent.Health = data.Health;
 
+        formationAssigner.Assign(agent, data.FormationIndex);
+
         // Adopt our own hero as the controllable main agent of this mission.
         if (isOwnAgent)
         {
@@ -184,6 +189,20 @@ public class PuppetSpawner : IPuppetSpawner
         }
 
         registry.TryRegisterAgent(data.OwnerControllerId, data.AgentId, agent);
+
+        // The owner registered its cavalry's horse with its own network id; our engine spawned a matching
+        // horse implicitly (same equipment) inside SpawnAgent. Register OUR copy under the same id, so mount
+        // hits route by the horse's identity and its death broadcast finds it. No casualty record — a horse
+        // is not a roster troop. If the puppet unexpectedly spawned on foot, the id just stays unmapped here
+        // and hits on the (nonexistent) horse can't occur anyway.
+        if (data.MountAgentId != Guid.Empty)
+        {
+            if (agent.MountAgent is Agent mount)
+                registry.TryRegisterAgent(data.OwnerControllerId, data.MountAgentId, mount);
+            else
+                Logger.Warning("[BattleSync] Spawn record for {AgentId} carries mount {MountId} but the puppet spawned unmounted", data.AgentId, data.MountAgentId);
+        }
+
         // Key the casualty on the troop's CHARACTER through the object manager (never a raw StringId).
         objectManager.TryGetId(character, out var troopCharacterId);
         casualties.Record(data.AgentId, data.MapEventPartyId, data.TroopSeed, troopCharacterId);

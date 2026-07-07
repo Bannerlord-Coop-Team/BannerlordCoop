@@ -17,7 +17,8 @@ namespace Common.PacketHandlers
         PropertyAutoSync,
         SaveData,
         Relay,
-        AgentAction
+        AgentAction,
+        MountMovement
     }
 
     public interface IPacket

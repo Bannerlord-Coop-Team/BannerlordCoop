@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Common;
 using Common.Messaging;
 using Common.Network;
@@ -6,9 +6,11 @@ using Common.Util;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using GameInterface.Services.Kingdoms;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Interfaces;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -114,8 +116,19 @@ public class ClientSettlementExitEnterHandler : IHandler
             using (new AllowedThread())
             {
                 settlementInterface.StartSettlementEncounter(party, settlement);
+
+                if (ShouldShowRaidOccupiedMenu(party, settlement))
+                    GameMenu.SwitchToMenu("raid_occupied");
             }
         });
+    }
+
+    private static bool ShouldShowRaidOccupiedMenu(MobileParty party, Settlement settlement)
+    {
+        if (party?.Party?.MapEvent != null)
+            return false;
+
+        return settlement?.Party?.MapEvent?.IsActiveSlowVillageRaid() == true;
     }
 
     private void Handle(MessagePayload<NetworkEndSettlementEncounter> obj)
@@ -126,6 +139,11 @@ public class ClientSettlementExitEnterHandler : IHandler
             {
                 var mainParty = MobileParty.MainParty;
                 objectManager.TryGetId(mainParty, out var partyId);
+                if (!string.IsNullOrEmpty(obj.What.PartyId) && obj.What.PartyId != partyId)
+                {
+                    return;
+                }
+
                 if (settlementTracker.TryConsumeLeave(mainParty, partyId))
                 {
                     return;

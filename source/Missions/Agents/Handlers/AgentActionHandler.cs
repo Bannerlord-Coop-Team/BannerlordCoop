@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.PacketHandlers;
 using Common.Util;
@@ -90,6 +90,12 @@ public class AgentActionHandler : IAgentActionHandler
         {
             Agent agent = info.Agent;
             if (agent == null || agent.Mission == null || !agent.IsActive() || agent.Health <= 0)
+                continue;
+
+            // Registered MOUNTS are not action-synced: a ridden horse's channel-1 action already rides in its
+            // rider's MountData (a second stream would fight it), and a masterless one isn't movement-synced
+            // either — its registry entry exists for damage routing and death sync only.
+            if (agent.IsMount)
                 continue;
 
             int action0 = agent.GetCurrentAction(0).Index;
