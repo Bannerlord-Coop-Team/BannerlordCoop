@@ -36,17 +36,6 @@ public sealed class MirrorAgent
     public Vec3 LookDirection { get; set; }
     public Vec2 MovementDirection { get; set; }
     public Vec2 InputVector { get; set; }
-    public Agent.MovementControlFlag MovementFlags { get; set; }
-    public Agent.EventControlFlag EventControlFlags { get; set; }
-    public bool CrouchMode { get; set; }
-    public int Action0Index { get; set; } = -1;
-    public int Action1Index { get; set; } = -1;
-    public Agent.ActionCodeType Action0Type { get; set; } = Agent.ActionCodeType.Idle;
-    public Agent.ActionCodeType Action1Type { get; set; } = Agent.ActionCodeType.Idle;
-    public AnimFlags Action0Flags { get; set; }
-    public AnimFlags Action1Flags { get; set; }
-    public float Action0Progress { get; set; }
-    public float Action1Progress { get; set; }
 }
 
 /// <summary>

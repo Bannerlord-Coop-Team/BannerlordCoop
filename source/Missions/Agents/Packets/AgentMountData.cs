@@ -28,13 +28,17 @@ namespace Missions.Agents.Packets
             // (fed MountPosition by AgentMovementHandler). Everything below is per-packet mount state/animation.
             mountAgent.SetMovementDirection(MountMovementDirection);
 
-            AgentActionData.ApplyActionChannel(
-                mountAgent,
-                1,
-                MountAction1Index,
-                MountAction1Flag,
-                MountAction1Progress,
-                updateProgress: true);
+            //Currently not doing anything afaik
+            if (mountAgent.GetCurrentAction(1) == ActionIndexCache.act_none || mountAgent.GetCurrentAction(1).Index != MountAction1Index)
+            {
+                string mActionName2 = AgentActionData.GetActionNameWithCode(MountAction1Index);
+                if (mActionName2 != null)
+                    mountAgent.SetActionChannel(1, ActionIndexCache.Create(mActionName2), additionalFlags: (AnimFlags)MountAction1Flag, startProgress: MountAction1Progress);
+            }
+            else
+            {
+                mountAgent.SetCurrentActionProgress(1, MountAction1Progress);
+            }
             mountAgent.LookDirection = MountLookDirection;
             mountAgent.MovementInputVector = MountInputVector;
         }

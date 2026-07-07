@@ -490,47 +490,6 @@ public class BattleMountIdentityTests : MissionTestEnvironment
         });
     }
 
-    [Fact]
-    public void MovementActionSync_AppliesLocomotion_WithoutOverwritingDiscreteActions()
-    {
-        using var fixture = new MissionEngineFixture();
-        var peer = Clients.First();
-        SetControllerId(peer, "peer");
-
-        peer.Call(() =>
-        {
-            var mock = fixture.CreateMission(peer);
-            BasicCharacterObject character = Game.Current.PlayerTroop;
-            var ownerAgent = mock.SpawnAgent(new AgentBuildData(character).Controller(AgentControllerType.AI));
-            var puppet = mock.SpawnAgent(new AgentBuildData(character).Controller(AgentControllerType.None));
-
-            Assert.True(AgentMirror.TryGet(ownerAgent, out var ownerMirror));
-            Assert.True(AgentMirror.TryGet(puppet, out var puppetMirror));
-
-            ownerMirror.Action0Type = Agent.ActionCodeType.Other;
-            ownerMirror.Action0Index = 123;
-            ownerMirror.Action0Flags = (AnimFlags)7;
-            ownerMirror.Action0Progress = 0.35f;
-            puppetMirror.Action0Type = Agent.ActionCodeType.Idle;
-            puppetMirror.Action0Index = -1;
-
-            new AgentActionData(ownerAgent).ApplyMovementActions(puppet);
-
-            Assert.Equal(123, puppetMirror.Action0Index);
-            Assert.Equal((AnimFlags)7, puppetMirror.Action0Flags);
-            Assert.Equal(0.35f, puppetMirror.Action0Progress);
-
-            ownerMirror.Action0Type = Agent.ActionCodeType.Other;
-            ownerMirror.Action0Index = 456;
-            puppetMirror.Action0Type = Agent.ActionCodeType.ReleaseMelee;
-            puppetMirror.Action0Index = 999;
-
-            new AgentActionData(ownerAgent).ApplyMovementActions(puppet);
-
-            Assert.Equal(999, puppetMirror.Action0Index);
-        });
-    }
-
     /// <summary>Host-migration adoption moves a mount's AUTHORITY to the new host (so routing and death sync
     /// keep answering) but must not turn the horse into an AI combatant with a formation.</summary>
     [Fact]
