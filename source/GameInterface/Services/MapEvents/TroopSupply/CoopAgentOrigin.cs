@@ -1,5 +1,8 @@
+using Common.Messaging;
+using GameInterface.Services.MapEventParties.Messages;
 using Helpers;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -12,7 +15,8 @@ namespace GameInterface.Services.MapEvents.TroopSupply;
 /// non-heroes, which leaves <c>BattleCombatant</c> null so the engine can't put an enemy soldier on a team
 /// (it never spawns) and can't recognise the player's hero (the player isn't attached). Casualty hooks are
 /// no-ops: deaths flow through the existing <c>Agent.Die</c> → server path, so applying them here too would
-/// double-count.
+/// double-count. Score hits are the exception — they have no other path, so <c>OnScoreHit</c> reports them
+/// to the server (see the method).
 /// </summary>
 public class CoopAgentOrigin : IAgentOriginBase
 {
@@ -97,7 +101,38 @@ public class CoopAgentOrigin : IAgentOriginBase
     public void SetKilled() { }
     public void SetRouted(bool isOrderRetreat) { }
     public void OnAgentRemoved(float agentHealth) { }
-    void IAgentOriginBase.OnScoreHit(BasicCharacterObject victim, BasicCharacterObject formationCaptain, int damage, bool isFatal, bool isTeamKill, WeaponComponentData attackerWeapon) { }
+
+    // Unlike the casualty hooks above, score hits have NO other path to the map event party in a coop battle
+    // (the native PartyGroupAgentOrigin → supplier chain is substituted away), so this is where they are
+    // reported. Fires exactly once per blow across the mesh — a blow is applied only on the victim owner's
+    // client (BattleBlowInterceptPatch routes the rest), and that client's BattleAgentLogic.OnAgentHit calls
+    // the ATTACKER's origin, ours for troops and puppets alike. The server accounts the hit against the
+    // authoritative roster (the descriptor seed is server-minted, so it resolves there) and the resulting
+    // ContributionToBattle comes back through autosync.
+    void IAgentOriginBase.OnScoreHit(BasicCharacterObject victim, BasicCharacterObject formationCaptain, int damage, bool isFatal, bool isTeamKill, WeaponComponentData attackerWeapon)
+    {
+        if (isTeamKill || damage <= 0) return;
+        if (victim is not CharacterObject attackedTroop) return;
+
+        var mapEventParty = FindMapEventParty();
+        if (mapEventParty == null) return;
+
+        MessageBroker.Instance.Publish(this, new OnTroopScoreHitAttempted(
+            mapEventParty, _descriptor.UniqueSeed, attackedTroop, damage, isFatal, isSimulatedHit: false));
+    }
+
+    // The map event party this troop fights under, resolved lazily: the origin outlives battle setup, and
+    // during teardown the party's side is already null — then the hit is simply not reported.
+    private MapEventParty FindMapEventParty()
+    {
+        var side = _party?.MapEventSide;
+        if (side == null) return null;
+
+        foreach (var mapEventParty in side.Parties)
+            if (mapEventParty.Party == _party) return mapEventParty;
+
+        return null;
+    }
 
     public void SetBanner(Banner banner) => _banner = banner;
 
