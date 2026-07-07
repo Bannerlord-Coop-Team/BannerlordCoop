@@ -74,11 +74,16 @@ public class SiegeDebugCommand
             {
                 return $"No hostile lord party available to besiege {settlement.Name}; pass a partyId explicitly";
             }
-
-            besieger.Position = settlement.GatePosition;
         }
 
+        // Put the besieger at the gate and commit its AI to the siege. Without SetMoveBesiegeSettlement
+        // the party's DefaultBehavior stays whatever it was (raid/patrol) and it walks off on its next
+        // think; SetDoNotMakeNewDecisions holds it on this debug siege instead of re-deciding away.
+        besieger.Position = settlement.GatePosition;
+        besieger.SetMoveBesiegeSettlement(settlement, MobileParty.NavigationType.Default);
         Campaign.Current.SiegeEventManager.StartSiegeEvent(settlement, besieger);
+        besieger.Ai.SetDoNotMakeNewDecisions(true);
+
         return $"{besieger.Name} ({besieger.StringId}) is now besieging {settlement.Name}";
     }
 
