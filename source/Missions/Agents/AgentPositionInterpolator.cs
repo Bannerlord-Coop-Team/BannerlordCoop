@@ -1,6 +1,4 @@
-﻿using Common.Logging;
-using Serilog;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
@@ -40,12 +38,9 @@ public interface IAgentPositionInterpolator
 /// </summary>
 public class AgentPositionInterpolator : IAgentPositionInterpolator
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<AgentPositionInterpolator>();
-
     // Snap only when the replicated owner is far enough away that local locomotion has clearly diverged.
     private const float RiderSnapDistance = 6f;
     private const float MountSnapDistance = 12f;
-    private const float DiagnosticInterval = 2f;
     private const float StaleTargetSeconds = 1f;
     // Exponential ease rate for the mounted-puppet position follow: fraction MountedFollowRate*dt of the gap is
     // closed each frame, so it tracks the owner with a small lag and settles when the owner stops.
@@ -54,7 +49,6 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     private readonly Dictionary<Agent, TargetFrame> _targets = new Dictionary<Agent, TargetFrame>();
     // Reused scratch list so eviction doesn't allocate every tick.
     private readonly List<Agent> _evict = new List<Agent>();
-    private float diagnosticElapsed;
     private float elapsed;
 
     public void SetRiderTarget(Agent agent, Vec3 targetPosition, Vec2 movementDirection)
@@ -90,10 +84,6 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         elapsed += dt;
         if (_targets.Count == 0) return;
 
-        var foot = new DiagnosticBucket();
-        var mounted = new DiagnosticBucket();
-        var mounts = new DiagnosticBucket();
-
         foreach (var pair in _targets)
         {
             Agent agent = pair.Key;
@@ -105,38 +95,26 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                 continue;
             }
 
-            // Tolerances are constant per kind, so derive them from the agent instead of storing them per target:
-            // a mount/mounted rider tolerates more slack before we snap; an on-foot rider is held tighter.
-            bool isMountedRider = agent.MountAgent != null;
-            bool isMount = agent.IsMount;
-            float snapDistance = isMount || isMountedRider ? MountSnapDistance : RiderSnapDistance;
-            DiagnosticBucket bucket = isMount ? mounts : (isMountedRider ? mounted : foot);
-
-            Vec3 target = pair.Value.Position;
-            float dist = agent.Position.Distance(target);
-            bucket.Track(dist);
-
+            // A stale target (owner stopped reporting) expires instead of pinning the puppet to an old position.
             if (elapsed - pair.Value.UpdatedAt > StaleTargetSeconds)
             {
-                bucket.Stale++;
                 _evict.Add(agent);
                 continue;
             }
 
-            if (isMountedRider)
+            // Mounted riders are eased onto their horse's reported position directly, so they don't use snapDistance.
+            if (agent.MountAgent != null)
             {
                 FollowMounted(agent, pair.Value, dt);
                 continue;
             }
 
-            if (dist <= snapDistance)
-            {
+            // A mount tolerates more slack before we snap; an on-foot rider is held tighter.
+            float snapDistance = agent.IsMount ? MountSnapDistance : RiderSnapDistance;
+            if (agent.Position.Distance(pair.Value.Position) <= snapDistance)
                 MoveTowardTarget(agent, pair.Value);
-                continue;
-            }
-
-            Teleport(agent, pair.Value);
-            bucket.Snaps++;
+            else
+                Teleport(agent, pair.Value);
         }
 
         if (_evict.Count > 0)
@@ -144,30 +122,6 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             foreach (Agent agent in _evict)
                 _targets.Remove(agent);
             _evict.Clear();
-        }
-
-        diagnosticElapsed += dt;
-        if (diagnosticElapsed >= DiagnosticInterval)
-        {
-            diagnosticElapsed = 0f;
-            int tracked = foot.Tracked + mounted.Tracked + mounts.Tracked;
-            if (tracked > 0)
-            {
-                Logger.Debug(
-                    "[PuppetTargetDiag] foot={FootCount}/{FootSnaps}/{FootStale}/{FootMax:0.00} mounted={MountedCount}/{MountedSnaps}/{MountedStale}/{MountedMax:0.00} mounts={MountCount}/{MountSnaps}/{MountStale}/{MountMax:0.00}",
-                    foot.Tracked,
-                    foot.Snaps,
-                    foot.Stale,
-                    foot.MaxDistance,
-                    mounted.Tracked,
-                    mounted.Snaps,
-                    mounted.Stale,
-                    mounted.MaxDistance,
-                    mounts.Tracked,
-                    mounts.Snaps,
-                    mounts.Stale,
-                    mounts.MaxDistance);
-            }
         }
     }
 
@@ -249,20 +203,5 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         public bool HasMountSnapPosition { get; }
         public Vec3 MountSnapPosition { get; }
         public float UpdatedAt { get; }
-    }
-
-    private class DiagnosticBucket
-    {
-        public int Tracked { get; private set; }
-        public int Snaps { get; set; }
-        public int Stale { get; set; }
-        public float MaxDistance { get; private set; }
-
-        public void Track(float distance)
-        {
-            Tracked++;
-            if (distance > MaxDistance)
-                MaxDistance = distance;
-        }
     }
 }
