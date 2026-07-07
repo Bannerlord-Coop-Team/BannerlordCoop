@@ -11,6 +11,9 @@ public interface IAgentPositionInterpolator
     /// <summary>Record the latest target frame the owner reported for a rider puppet.</summary>
     void SetRiderTarget(Agent agent, Vec3 targetPosition, Vec2 movementDirection);
 
+    /// <summary>Record the latest target frame the owner reported for a mounted rider puppet.</summary>
+    void SetMountedRiderTarget(Agent agent, Vec3 targetPosition, Vec2 movementDirection, Vec3 mountSnapPosition);
+
     /// <summary>Record the latest target frame the owner reported for a mount puppet (wider tolerances).</summary>
     void SetMountTarget(Agent mountAgent, Vec3 targetPosition, Vec2 movementDirection);
 
@@ -42,22 +45,30 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     private const float RiderSnapDistance = 6f;
     private const float MountSnapDistance = 12f;
     private const float DiagnosticInterval = 2f;
+    private const float StaleTargetSeconds = 1f;
 
     private readonly Dictionary<Agent, TargetFrame> _targets = new Dictionary<Agent, TargetFrame>();
     // Reused scratch list so eviction doesn't allocate every tick.
     private readonly List<Agent> _evict = new List<Agent>();
     private float diagnosticElapsed;
+    private float elapsed;
 
     public void SetRiderTarget(Agent agent, Vec3 targetPosition, Vec2 movementDirection)
     {
         if (agent == null) return;
-        _targets[agent] = new TargetFrame(targetPosition, movementDirection);
+        _targets[agent] = new TargetFrame(targetPosition, movementDirection, hasMountSnapPosition: false, Vec3.Zero, elapsed);
+    }
+
+    public void SetMountedRiderTarget(Agent agent, Vec3 targetPosition, Vec2 movementDirection, Vec3 mountSnapPosition)
+    {
+        if (agent == null) return;
+        _targets[agent] = new TargetFrame(targetPosition, movementDirection, hasMountSnapPosition: true, mountSnapPosition, elapsed);
     }
 
     public void SetMountTarget(Agent mountAgent, Vec3 targetPosition, Vec2 movementDirection)
     {
         if (mountAgent == null) return;
-        _targets[mountAgent] = new TargetFrame(targetPosition, movementDirection);
+        _targets[mountAgent] = new TargetFrame(targetPosition, movementDirection, hasMountSnapPosition: false, Vec3.Zero, elapsed);
     }
 
     public void Forget(Agent agent)
@@ -71,12 +82,13 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
 
     public void Tick(float dt)
     {
-        if (_targets.Count == 0 || dt <= 0f) return;
+        if (dt <= 0f) return;
+        elapsed += dt;
+        if (_targets.Count == 0) return;
 
-        int tracked = 0;
-        int targetFrames = 0;
-        int snaps = 0;
-        float maxDistance = 0f;
+        var foot = new DiagnosticBucket();
+        var mounted = new DiagnosticBucket();
+        var mounts = new DiagnosticBucket();
 
         foreach (var pair in _targets)
         {
@@ -89,31 +101,32 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                 continue;
             }
 
-            // Skip mounted riders; their position is already driven by the mount's position.
-            if (agent.MountAgent != null)
-                continue;
-
-            tracked++;
-
             // Tolerances are constant per kind, so derive them from the agent instead of storing them per target:
-            // a mount tolerates more slack before we snap; a rider is held tighter.
+            // a mount/mounted rider tolerates more slack before we snap; an on-foot rider is held tighter.
+            bool isMountedRider = agent.MountAgent != null;
             bool isMount = agent.IsMount;
-            float snapDistance = isMount ? MountSnapDistance : RiderSnapDistance;
+            float snapDistance = isMount || isMountedRider ? MountSnapDistance : RiderSnapDistance;
+            DiagnosticBucket bucket = isMount ? mounts : (isMountedRider ? mounted : foot);
 
             Vec3 target = pair.Value.Position;
             float dist = agent.Position.Distance(target);
-            if (dist > maxDistance)
-                maxDistance = dist;
+            bucket.Track(dist);
+
+            if (elapsed - pair.Value.UpdatedAt > StaleTargetSeconds)
+            {
+                bucket.Stale++;
+                _evict.Add(agent);
+                continue;
+            }
 
             if (dist <= snapDistance)
             {
                 MoveTowardTarget(agent, pair.Value);
-                targetFrames++;
                 continue;
             }
 
             Teleport(agent, pair.Value);
-            snaps++;
+            bucket.Snaps++;
         }
 
         if (_evict.Count > 0)
@@ -127,14 +140,23 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         if (diagnosticElapsed >= DiagnosticInterval)
         {
             diagnosticElapsed = 0f;
+            int tracked = foot.Tracked + mounted.Tracked + mounts.Tracked;
             if (tracked > 0)
             {
                 Logger.Debug(
-                    "[PuppetTargetDiag] tracked={Tracked} targetFrames={TargetFrames} snaps={Snaps} maxDist={MaxDistance:0.00}",
-                    tracked,
-                    targetFrames,
-                    snaps,
-                    maxDistance);
+                    "[PuppetTargetDiag] foot={FootCount}/{FootSnaps}/{FootStale}/{FootMax:0.00} mounted={MountedCount}/{MountedSnaps}/{MountedStale}/{MountedMax:0.00} mounts={MountCount}/{MountSnaps}/{MountStale}/{MountMax:0.00}",
+                    foot.Tracked,
+                    foot.Snaps,
+                    foot.Stale,
+                    foot.MaxDistance,
+                    mounted.Tracked,
+                    mounted.Snaps,
+                    mounted.Stale,
+                    mounted.MaxDistance,
+                    mounts.Tracked,
+                    mounts.Snaps,
+                    mounts.Stale,
+                    mounts.MaxDistance);
             }
         }
     }
@@ -164,7 +186,20 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     {
         var lookDirection = agent.LookDirection;
         var movementDirection = agent.GetMovementDirection();
-        agent.TeleportToPosition(target.Position);
+        if (agent.MountAgent != null && target.HasMountSnapPosition)
+        {
+            Teleport(agent.MountAgent, new TargetFrame(
+                target.MountSnapPosition,
+                target.MovementDirection,
+                hasMountSnapPosition: false,
+                Vec3.Zero,
+                target.UpdatedAt));
+        }
+        else
+        {
+            agent.TeleportToPosition(target.Position);
+        }
+
         agent.LookDirection = lookDirection;
         agent.SetMovementDirection(movementDirection);
         MoveTowardTarget(agent, target);
@@ -172,13 +207,34 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
 
     private struct TargetFrame
     {
-        public TargetFrame(Vec3 position, Vec2 movementDirection)
+        public TargetFrame(Vec3 position, Vec2 movementDirection, bool hasMountSnapPosition, Vec3 mountSnapPosition, float updatedAt)
         {
             Position = position;
             MovementDirection = movementDirection;
+            HasMountSnapPosition = hasMountSnapPosition;
+            MountSnapPosition = mountSnapPosition;
+            UpdatedAt = updatedAt;
         }
 
         public Vec3 Position { get; }
         public Vec2 MovementDirection { get; }
+        public bool HasMountSnapPosition { get; }
+        public Vec3 MountSnapPosition { get; }
+        public float UpdatedAt { get; }
+    }
+
+    private class DiagnosticBucket
+    {
+        public int Tracked { get; private set; }
+        public int Snaps { get; set; }
+        public int Stale { get; set; }
+        public float MaxDistance { get; private set; }
+
+        public void Track(float distance)
+        {
+            Tracked++;
+            if (distance > MaxDistance)
+                MaxDistance = distance;
+        }
     }
 }

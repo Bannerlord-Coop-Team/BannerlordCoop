@@ -237,15 +237,15 @@ public class AgentMovementHandler : IAgentMovementHandler
                     // correction bound to the ~10ms poll cadence); push the latest targets it eases toward.
                     if (agent.HasMount && data.MountData != null)
                     {
-                        // Mounted: rider + horse are a rigid rig, and the rider's synced position IS the saddle
-                        // position. Interpolate ONLY the mount and let the rider ride along — teleporting the
-                        // rider independently every frame forces the engine to re-seat it, which snaps the
-                        // mount's orientation. Drop any stale rider target left from before it mounted.
-                        _interpolator.Forget(agent);
-                        _interpolator.SetMountTarget(
-                            agent.MountAgent,
-                            data.MountData.MountPosition,
-                            data.MountData.MountMovementDirection);
+                        // Mounted: feed target frames to the rider, since the mount is driven through its rider.
+                        // Keep the mount position only for rare large-gap snaps and drop any stale direct-horse
+                        // target from before the puppet mounted.
+                        _interpolator.Forget(agent.MountAgent);
+                        _interpolator.SetMountedRiderTarget(
+                            agent,
+                            data.Position,
+                            data.MovementDirection,
+                            data.MountData.MountPosition);
                     }
                     else
                     {
