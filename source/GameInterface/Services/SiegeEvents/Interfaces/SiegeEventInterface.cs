@@ -202,6 +202,18 @@ internal class SiegeEventInterface : ISiegeEventInterface
         var currentMenu = Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId;
         if (currentMenu != null && (currentMenu.StartsWith("menu_settlement_taken") || currentMenu == "siege_aftermath_contextual_summary")) return;
 
+        // menu_settlement_taken_on_init routes on _besiegerParty == MainParty to reach the leader submenu
+        // that carries Devastate/Pillage/Mercy. The client's OnMapEventEnded prefix sets those fields, but
+        // it doesn't run for a battle the server auto-resolved, so set them here or the router falls
+        // through to the Continue-only participant submenu. The apply itself stays server-owned.
+        var aftermathBehavior = Campaign.Current?.GetCampaignBehavior<SiegeAftermathCampaignBehavior>();
+        if (aftermathBehavior != null)
+        {
+            aftermathBehavior._besiegerParty = leaderParty;
+            aftermathBehavior._prevSettlementOwnerClan = settlement.OwnerClan;
+            aftermathBehavior._wasPlayerArmyMember = false;
+        }
+
         using (new AllowedThread())
         {
             if (Campaign.Current?.CurrentMenuContext != null)
