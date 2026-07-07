@@ -84,7 +84,7 @@ internal class SiegeEventCampaignBehaviorPatches
             float bestScore = float.MinValue;
             foreach (var item in strategies)
             {
-                float score = Campaign.Current.Models.SiegeEventModel.GetSiegeStrategyScore(siegeEvent, side, item) * (0.5f + 0.5f * MBRandom.RandomFloat);
+                float score = Campaign.Current.Models.SiegeEventModel.GetSiegeStrategyScore(siegeEvent, side, item) * (0.5f + (0.5f * MBRandom.RandomFloat));
                 if (score > bestScore)
                 {
                     bestScore = score;

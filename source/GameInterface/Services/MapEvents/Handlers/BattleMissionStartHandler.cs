@@ -347,7 +347,6 @@ internal class BattleMissionStartHandler : IHandler
         }
     }
 
-
     /// <summary>[Client] Re-validates everything a mission open depends on: the encounter can end (or
     /// another mission can open) between the server round-trip and the queued open running, and a
     /// finalized battle keeps PlayerEncounter.Battle set while releasing the main party. The

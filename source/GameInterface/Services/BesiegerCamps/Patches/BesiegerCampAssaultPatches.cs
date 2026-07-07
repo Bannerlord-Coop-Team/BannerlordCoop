@@ -79,8 +79,8 @@ internal class BesiegerCampAssaultPatches
         {
             int equipmentsBuilt = Campaign.Current.Models.CombatSimulationModel.GetNumberOfEquipmentsBuilt(settlement);
             powerRatio *= (float)MathF.Min(3, equipmentsBuilt) / 3f;
-            float equipmentProgress = Campaign.Current.Models.CombatSimulationModel.GetMaximumSiegeEquipmentProgress(settlement) + 0.25f * (float)(5 - equipmentsBuilt);
-            powerRatio *= 1f - 0.85f * (equipmentProgress * equipmentProgress);
+            float equipmentProgress = Campaign.Current.Models.CombatSimulationModel.GetMaximumSiegeEquipmentProgress(settlement) + (0.25f * (float)(5 - equipmentsBuilt));
+            powerRatio *= 1f - (0.85f * (equipmentProgress * equipmentProgress));
             float assaultChance = powerRatio * 0.1f;
             __result = defenderStrength == 0f || MBRandom.RandomFloat < assaultChance;
         }
