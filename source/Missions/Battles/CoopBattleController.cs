@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Entity;
@@ -54,11 +54,17 @@ public class CoopBattleController : CoopMissionController
     private readonly IBattleInstanceLifecycle lifecycle;
     private readonly IOwnedAgentReplicator replicator;
     private readonly IAgentDeathReporter deathReporter;
+    private readonly IAgentRoutReporter routReporter;
     private readonly IPuppetSpawner puppetSpawner;
     private readonly IPuppetDeathApplier puppetDeathApplier;
+    private readonly IPuppetRoutApplier puppetRoutApplier;
     private readonly IBattleDamageRouter damageRouter;
     private readonly IBattleAuthorityMigrator authorityMigrator;
     private readonly IReinforcementFielder reinforcementFielder;
+    private readonly ISiegeEngineDeploymentReplicator siegeEngineDeployment;
+    private readonly ISiegeMachineStateReplicator siegeMachineState;
+    private readonly ISiegeEngineStateReporter siegeEngineStateReporter;
+    private readonly IBattleHostRegistry hostRegistryRef;
     private readonly ISupplyProgressReporter supplyReporter;
     private readonly BattleTeamDiagnostics diagnostics = new BattleTeamDiagnostics();
 
@@ -81,16 +87,22 @@ public class CoopBattleController : CoopMissionController
         lifecycle = new BattleInstanceLifecycle(network, relayNetwork, messageBroker, objectManager, coopMissionComponent, session);
         replicator = new OwnedAgentReplicator(network, messageBroker, objectManager, coopMissionComponent, session, casualties, deployment);
         deathReporter = new AgentDeathReporter(network, relayNetwork, messageBroker, objectManager, coopMissionComponent, session, casualties);
+        routReporter = new AgentRoutReporter(network, messageBroker, coopMissionComponent, session, casualties);
         puppetSpawner = new PuppetSpawner(messageBroker, objectManager, coopMissionComponent, session, casualties, deployment);
         puppetDeathApplier = new PuppetDeathApplier(messageBroker, coopMissionComponent, casualties);
+        puppetRoutApplier = new PuppetRoutApplier(messageBroker, coopMissionComponent, casualties);
         damageRouter = new BattleDamageRouter(network, messageBroker, coopMissionComponent, session);
         authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment);
         reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, session, deployment);
+        siegeEngineDeployment = new SiegeEngineDeploymentReplicator(network, messageBroker, session);
+        siegeMachineState = new SiegeMachineStateReplicator(network, messageBroker, session);
         supplyReporter = new SupplyProgressReporter(relayNetwork, session);
 
+        hostRegistryRef = hostRegistry;
         Session = session;
         Deployment = deployment;
         ResultCommitter = new BattleResultCommitter(objectManager, session, hostRegistry);
+        siegeEngineStateReporter = new SiegeEngineStateReporter(objectManager, session, hostRegistry, relayNetwork);
     }
 
     public override void Dispose()
@@ -98,12 +110,21 @@ public class CoopBattleController : CoopMissionController
         lifecycle.Dispose();
         replicator.Dispose();
         deathReporter.Dispose();
+        routReporter.Dispose();
         puppetSpawner.Dispose();
         puppetDeathApplier.Dispose();
+        puppetRoutApplier.Dispose();
         damageRouter.Dispose();
         authorityMigrator.Dispose();
         reinforcementFielder.Dispose();
+        siegeEngineDeployment.Dispose();
+        siegeMachineState.Dispose();
         Deployment.Dispose();
+
+        // OnMissionTick sets these each frame; reset them here (their owner) so a stale authority
+        // never bleeds into the next siege before the first tick refreshes it.
+        SiegeMissionAuthorityGate.IsLocalAuthority = false;
+        SiegeMissionAuthorityGate.IsAuthorityKnown = false;
 
         base.Dispose();
     }
@@ -112,7 +133,17 @@ public class CoopBattleController : CoopMissionController
     {
         base.OnMissionTick(dt);
 
+        // The mission host is the single siege authority (engine deployment and machine simulation);
+        // host election can settle after the mission opens, so keep the patch-visible flags current
+        // instead of latching them once. Siege missions only, so field battles never touch the gate.
+        if (Mission?.IsSiegeBattle == true)
+        {
+            SiegeMissionAuthorityGate.IsLocalAuthority = Session.IsLocalHost;
+            SiegeMissionAuthorityGate.IsAuthorityKnown = hostRegistryRef.TryGet(Session.InstanceId, out _);
+        }
+
         puppetSpawner.DrainPendingPuppets();
+        siegeMachineState.Tick(dt);
         diagnostics.Tick(dt);
         supplyReporter.Tick(dt);
     }
@@ -143,8 +174,11 @@ public class CoopBattleController : CoopMissionController
         // Catch a mid-battle joiner up on the activation state (a no-op while the battle is not live)...
         Deployment.CatchUpJoiner(controllerId);
 
-        // ...and on the live battle itself: replay the agents WE own so the joiner spawns matching puppets.
+        // ...and on the live battle itself: replay the agents WE own so the joiner spawns matching puppets,
+        // plus the siege engine placement when we are the deployer (a no-op in field battles).
         replicator.ReplicateCurrentAgentsTo(controllerId);
+        siegeEngineDeployment.CatchUpJoiner(controllerId);
+        siegeMachineState.CatchUpJoiner(controllerId);
     }
 
     protected override void HandleJoinInfo(NetPeer peer, NetworkMissionJoinInfo joinInfo)
@@ -156,6 +190,9 @@ public class CoopBattleController : CoopMissionController
 
     protected override void OnLeaving()
     {
+        // Report engine states before the commit, so the server applies them while the siege still exists.
+        siegeEngineStateReporter.ReportIfHost();
+
         // Commit the concluded battle's result to the campaign BEFORE tearing the instance down, so the server
         // captures losers / awards the win and finalizes the encounter.
         ResultCommitter.CommitIfHost();

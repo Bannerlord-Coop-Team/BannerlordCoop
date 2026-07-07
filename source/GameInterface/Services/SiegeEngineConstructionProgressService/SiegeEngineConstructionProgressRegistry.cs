@@ -8,6 +8,7 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
+using GameInterface.Services.SiegeEngines;
 namespace GameInterface.Services.SiegeEngineConstructionProgressService;
 
 internal class SiegeEngineConstructionProgressRegistry : AutoRegistryBase<SiegeEngineConstructionProgress>
@@ -23,23 +24,51 @@ internal class SiegeEngineConstructionProgressRegistry : AutoRegistryBase<SiegeE
 
     public override void RegisterAllObjects()
     {
-        var siegeEvents = Campaign.Current?.SiegeEventManager?.SiegeEvents;
-        if (siegeEvents == null) return;
-
-        foreach (var siegeEvent in siegeEvents)
+        foreach (var siegeEvent in SiegeContainerLookup.ActiveSieges())
         {
-            var settlement = siegeEvent?.BesiegedSettlement;
-            if (settlement == null) continue;
+            var settlementId = siegeEvent.BesiegedSettlement.StringId;
+            foreach (var engineSide in SiegeContainerLookup.EngineContainers(siegeEvent))
+            {
+                RegisterSide(settlementId, engineSide.Side, engineSide.Container);
+            }
+        }
+    }
 
-            var progress = siegeEvent?.BesiegerCamp?.SiegeEngines?.SiegePreparations;
-            if (progress == null) continue;
+    // Save order is stable across machines, so list indexes give the joiner the same derived ids the
+    // server computes. Removed engines are included because a redeploy can bring them back.
+    private void RegisterSide(string settlementId, string side, SiegeEnginesContainer container)
+    {
+        if (container == null) return;
 
-            RegisterExistingObject(settlement.StringId, progress);
+        if (container.SiegePreparations != null)
+        {
+            RegisterExistingObject($"{settlementId}_prep_{side}", container.SiegePreparations);
+        }
+
+        for (int i = 0; i < container.DeployedSiegeEngines.Count; i++)
+        {
+            RegisterExistingObject($"{settlementId}_deployed_{side}_{i}", container.DeployedSiegeEngines[i]);
+        }
+
+        for (int i = 0; i < container.ReservedSiegeEngines.Count; i++)
+        {
+            RegisterExistingObject($"{settlementId}_reserved_{side}_{i}", container.ReservedSiegeEngines[i]);
+        }
+
+        for (int i = 0; i < container.RemovedSiegeEngines.Count; i++)
+        {
+            var removed = container.RemovedSiegeEngines[i]?.SiegeEngine;
+            if (removed == null) continue;
+
+            RegisterExistingObject($"{settlementId}_removed_{side}_{i}", removed);
         }
     }
 
     public override void OnClientCreated(SiegeEngineConstructionProgress obj, string id)
     {
+        // Every vanilla constructor sets RedeploymentProgress to 1f; the shell default of 0f would
+        // leave IsBeingRedeployed true and the engine permanently inactive on this client.
+        obj.RedeploymentProgress = 1f;
     }
 
     public override void OnClientDestroyed(SiegeEngineConstructionProgress obj, string id)

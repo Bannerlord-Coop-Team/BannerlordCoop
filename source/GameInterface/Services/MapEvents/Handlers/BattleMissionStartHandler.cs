@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -14,12 +14,15 @@ using System.Collections.Concurrent;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encounters;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.MapEvents.Handlers;
 
@@ -52,6 +55,11 @@ internal class BattleMissionStartHandler : IHandler
     private readonly ConcurrentDictionary<string, int> mapEventTerrainSeeds = new ConcurrentDictionary<string, int>();
     private readonly Random terrainSeedRandom = new Random();
 
+    // Server-side: the siege mission inputs (wall level, wall HPs, engine lists) snapshotted once per map event,
+    // so a joiner entering mid-assault loads the same scene as the first entrant even though the campaign-side
+    // container keeps syncing. Evicted with the terrain seed when the event finalizes.
+    private readonly ConcurrentDictionary<string, NetworkStartSiegeMission> siegeMissionSnapshots = new ConcurrentDictionary<string, NetworkStartSiegeMission>();
+
     public BattleMissionStartHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
@@ -65,6 +73,7 @@ internal class BattleMissionStartHandler : IHandler
 
         messageBroker.Subscribe<NetworkBattleStartRequest>(Handle_NetworkBattleStartRequest);
         messageBroker.Subscribe<NetworkStartAttackMission>(Handle_NetworkStartAttackMission);
+        messageBroker.Subscribe<NetworkStartSiegeMission>(Handle_NetworkStartSiegeMission);
         messageBroker.Subscribe<MapEventFinalized>(Handle_MapEventFinalized);
     }
 
@@ -72,14 +81,18 @@ internal class BattleMissionStartHandler : IHandler
     {
         messageBroker.Unsubscribe<NetworkBattleStartRequest>(Handle_NetworkBattleStartRequest);
         messageBroker.Unsubscribe<NetworkStartAttackMission>(Handle_NetworkStartAttackMission);
+        messageBroker.Unsubscribe<NetworkStartSiegeMission>(Handle_NetworkStartSiegeMission);
         messageBroker.Unsubscribe<MapEventFinalized>(Handle_MapEventFinalized);
     }
 
-    /// <summary>The battle ended — drop its cached terrain seed (server-side; a no-op on a client's empty map).</summary>
+    /// <summary>The battle ended — drop its cached mission inputs (server-side; a no-op on a client's empty maps).</summary>
     private void Handle_MapEventFinalized(MessagePayload<MapEventFinalized> payload)
     {
         if (objectManager.TryGetId(payload.What.MapEvent, out var mapEventId))
+        {
             mapEventTerrainSeeds.TryRemove(mapEventId, out _);
+            siegeMissionSnapshots.TryRemove(mapEventId, out _);
+        }
     }
 
     /// <summary>[Server] Handle a battle-start request for the live-mission mode: gate it, make the sides
@@ -113,6 +126,16 @@ internal class BattleMissionStartHandler : IHandler
                 if (!objectManager.TryGetObject(payload.What.MapEventId, out MapEvent mapEvent))
                     return;
 
+                // The lords-hall stage is not supported: CurrentSiegeState never advances past OnTheWalls in
+                // co-op (SiegeMissionEndPatches), so this only trips on a save that carried the state in.
+                // Rejected before the arbiter claim so the event stays open for auto-resolve.
+                if (mapEvent.IsSiegeAssault && mapEvent.MapEventSettlement?.CurrentSiegeState == Settlement.SiegeState.InTheLordsHall)
+                {
+                    Logger.Error("Rejecting siege mission for {MapEventId}: lords-hall stage is not supported", payload.What.MapEventId);
+                    network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
+                    return;
+                }
+
                 // Server-authoritative mode gate: accept the live mission only if no auto-resolve simulation already
                 // owns this event. On reject, don't make the sides mission-ready or reply — the requesting client
                 // waits for NetworkStartAttackMission to open the mission, so it simply stays at the encounter menu.
@@ -140,7 +163,15 @@ internal class BattleMissionStartHandler : IHandler
                 // flow, rather than re-entrantly during the blocking wait.
                 network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, true));
 
-                network.Send(requester, new NetworkStartAttackMission(randomTerrainSeed));
+                if (mapEvent.IsSiegeAssault)
+                {
+                    var snapshot = siegeMissionSnapshots.GetOrAdd(payload.What.MapEventId, _ => BuildSiegeMissionSnapshot(payload.What.MapEventId, mapEvent));
+                    network.Send(requester, snapshot);
+                }
+                else
+                {
+                    network.Send(requester, new NetworkStartAttackMission(randomTerrainSeed));
+                }
 
                 // Claim the event for the mission mode on every client, so one still sitting at the encounter menu
                 // greys out the auto-resolve option — a map event is fought as a live mission XOR an auto-resolve,
@@ -239,44 +270,126 @@ internal class BattleMissionStartHandler : IHandler
         GameThread.Run(() => OpenAttackMission(randomTerrainSeed));
     }
 
+    /// <summary>[Server] Snapshot the mission-defining siege inputs for one map event.</summary>
+    private static NetworkStartSiegeMission BuildSiegeMissionSnapshot(string mapEventId, MapEvent mapEvent)
+    {
+        var settlement = mapEvent.MapEventSettlement;
+        var siegeEvent = settlement.SiegeEvent;
+        int wallLevel = settlement.Town.GetWallLevel();
+
+        var attackerEngines = SiegeEngineStateConverter.ToEngineStates(siegeEvent.GetPreparedAndActiveSiegeEngines(siegeEvent.GetSiegeEventSide(BattleSideEnum.Attacker)));
+        var defenderEngines = SiegeEngineStateConverter.ToEngineStates(siegeEvent.GetPreparedAndActiveSiegeEngines(siegeEvent.GetSiegeEventSide(BattleSideEnum.Defender)));
+
+        return new NetworkStartSiegeMission(mapEventId, wallLevel,
+            settlement.SettlementWallSectionHitPointsRatioList.ToArray(), attackerEngines, defenderEngines);
+    }
+
+    private void Handle_NetworkStartSiegeMission(MessagePayload<NetworkStartSiegeMission> payload)
+    {
+        var message = payload.What;
+        GameThread.Run(() => OpenSiegeMission(message));
+    }
+
+    private static void OpenSiegeMission(NetworkStartSiegeMission payload)
+    {
+        try
+        {
+            if (!TryGetValidBattle(nameof(NetworkStartSiegeMission), out var battle))
+                return;
+
+            var settlement = battle.MapEventSettlement;
+            if (settlement == null)
+            {
+                Logger.Warning("Received {Message} but the battle has no settlement, not opening siege mission", nameof(NetworkStartSiegeMission));
+                return;
+            }
+
+            // The scene is the fixed settlement scene keyed by wall level — no terrain seed on the siege
+            // path. Mirrors vanilla CreateSandBoxMissionInitializerRecord; atmosphere is client-local,
+            // same tolerance as the field path.
+            string sceneName = settlement.LocationComplex.GetLocationWithId("center").GetSceneName(payload.WallLevel);
+            var rec = new MissionInitializerRecord(sceneName)
+            {
+                SceneLevels = Campaign.Current.Models.LocationModel.GetUpgradeLevelTag(payload.WallLevel) + " siege",
+                DamageToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier(),
+                DamageFromPlayerToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier(),
+                PlayingInCampaignMode = true,
+                AtmosphereOnCampaign = Campaign.Current.Models.MapWeatherModel.GetAtmosphereModel(MobileParty.MainParty.Position),
+                TerrainType = (int)Campaign.Current.MapSceneWrapper.GetFaceTerrainType(MobileParty.MainParty.CurrentNavigationFace),
+                DecalAtlasGroup = 3,
+            };
+
+            var attackerWeapons = SiegeEngineStateConverter.ToMissionWeapons(payload.AttackerEngines);
+            var defenderWeapons = SiegeEngineStateConverter.ToMissionWeapons(payload.DefenderEngines);
+
+            if (BattleSpawnConfig.Enabled)
+            {
+                BattleSpawnGate.BeginBattle(payload.MapEventId);
+                Logger.Information("[BattleSync] Engaged spawn gate in OpenSiegeMission: mapEvent={MapEventId}", payload.MapEventId);
+            }
+
+            // No native fallback: SandBoxMissions.OpenSiegeMissionWithDeployment would size to whole-side
+            // counts and never attach the coop behaviors, so a missing launcher is a hard error.
+            if (ContainerProvider.TryResolve(out ICoopSiegeBattleLauncher siegeLauncher))
+            {
+                siegeLauncher.OpenCoopSiegeBattle(rec, payload.WallHitPointRatios, attackerWeapons, defenderWeapons);
+            }
+            else
+            {
+                Logger.Error("[BattleSync] ICoopSiegeBattleLauncher unavailable; cannot open the siege mission");
+            }
+        }
+        catch (Exception e)
+        {
+            // GameThread runs queued actions unguarded, so a throw from here
+            // would escape into the game's main tick and crash it.
+            Logger.Error(e, "Failed to open the siege mission for {Message}", nameof(NetworkStartSiegeMission));
+        }
+    }
+
+
+    /// <summary>[Client] Re-validates everything a mission open depends on: the encounter can end (or
+    /// another mission can open) between the server round-trip and the queued open running, and a
+    /// finalized battle keeps PlayerEncounter.Battle set while releasing the main party. The
+    /// MissionState check covers a second start queued in the same frame (it is set synchronously by
+    /// the state push, unlike Mission.Current).</summary>
+    private static bool TryGetValidBattle(string messageName, out MapEvent battle)
+    {
+        battle = null;
+        if (Campaign.Current == null)
+        {
+            Logger.Warning("Received {Message} but the campaign was not loaded, not opening the mission", messageName);
+            return false;
+        }
+
+        battle = PlayerEncounter.Battle;
+        if (battle == null)
+        {
+            Logger.Warning("Received {Message} but PlayerEncounter.Battle was null, not opening the mission", messageName);
+            return false;
+        }
+
+        if (MobileParty.MainParty?.MapEvent == null)
+        {
+            Logger.Warning("Received {Message} but the main party is no longer in a map event, not opening the mission", messageName);
+            return false;
+        }
+
+        if (MissionState.Current != null)
+        {
+            Logger.Warning("Received {Message} but a mission is already open, not opening the mission", messageName);
+            return false;
+        }
+
+        return true;
+    }
+
     private static void OpenAttackMission(int randomTerrainSeed)
     {
         try
         {
-            // The encounter can end (or another mission can open) between the server
-            // round-trip and this running, so everything the mission depends on is
-            // re-validated here rather than at message arrival.
-            if (Campaign.Current == null)
-            {
-                Logger.Warning("Received {Message} but the campaign was not loaded, not opening battle mission", nameof(NetworkStartAttackMission));
+            if (!TryGetValidBattle(nameof(NetworkStartAttackMission), out var battle))
                 return;
-            }
-
-            var battle = PlayerEncounter.Battle;
-            if (battle == null)
-            {
-                Logger.Warning("Received {Message} but PlayerEncounter.Battle was null, not opening battle mission", nameof(NetworkStartAttackMission));
-                return;
-            }
-
-            // A finalized battle keeps PlayerEncounter.Battle set but releases the
-            // main party from the map event, which the mission setup dereferences.
-            if (MobileParty.MainParty?.MapEvent == null)
-            {
-                Logger.Warning("Received {Message} but the main party is no longer in a map event, not opening battle mission", nameof(NetworkStartAttackMission));
-                return;
-            }
-
-            // Pressing attack again while the request is in flight produces a second
-            // mission start; opening on top of the running mission corrupts the game
-            // state stack. MissionState.Current is set synchronously by the state
-            // push, unlike Mission.Current which is only set on the mission's first
-            // tick, so it also covers two mission starts queued in the same frame.
-            if (MissionState.Current != null)
-            {
-                Logger.Warning("Received {Message} but a mission is already open, not opening battle mission", nameof(NetworkStartAttackMission));
-                return;
-            }
 
             bool isNavalEncounter = PlayerEncounter.IsNavalEncounter();
             CampaignVec2 position = MobileParty.MainParty.Position;

@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -19,6 +19,7 @@ using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.MapEvents.Handlers;
 
@@ -174,6 +175,17 @@ internal class BattleFinalizeHandler : IHandler
             // don't leak per battle. Done before FinalizeEventAux clears the parties, so the flatten-cache
             // cleanup can still enumerate them. No-op on a client (its ledger is never populated).
             reserveBuilder.ForgetMapEvent(mapEvent);
+
+            // A siege assault that ends without a victor (attackers retreated or abandoned the fight)
+            // keeps the siege in vanilla; a bare finalize would lift it. Victories finalize normally:
+            // attacker victory captures the settlement, defender victory breaks the siege.
+            if (mapEvent.IsSiegeAssault
+                && mapEvent.BattleState != BattleState.AttackerVictory
+                && mapEvent.BattleState != BattleState.DefenderVictory)
+            {
+                mapEvent._keepSiegeEvent = true;
+                mapEvent.AttackerSide?.LeaderParty?.MobileParty?.RecalculateShortTermBehavior();
+            }
 
             mapEvent.FinalizeEventAux();
         }, blocking: true);

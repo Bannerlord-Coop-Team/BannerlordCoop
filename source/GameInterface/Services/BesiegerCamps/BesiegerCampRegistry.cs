@@ -4,13 +4,13 @@ using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Library;
 
+using GameInterface.Services.SiegeEngines;
 namespace GameInterface.Services.BesiegerCamps;
 internal class BesiegerCampRegistry : AutoRegistryBase<BesiegerCamp>
 {
@@ -21,20 +21,21 @@ internal class BesiegerCampRegistry : AutoRegistryBase<BesiegerCamp>
 
     public override IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(BesiegerCamp));
 
-    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+    // Called by SiegeEvent.FinalizeSiegeEvent on every siege-end path, so the camp id is released
+    // together with its siege event instead of leaking until the settlement's next siege.
+    public override IEnumerable<MethodBase> DestroyMethods => new MethodBase[]
+    {
+        AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.FinalizeSiegeEvent))
+    };
 
     public override void RegisterAllObjects()
     {
-        var siegeEvents = Campaign.Current?.SiegeEventManager?.SiegeEvents;
-        if (siegeEvents == null)
+        foreach (var siegeEvent in SiegeContainerLookup.ActiveSieges())
         {
-            Logger.Error("Unable to register BesiegerCamps because SiegeEvents are not available");
-            return;
-        }
+            var camp = siegeEvent.BesiegerCamp;
+            if (camp == null) continue;
 
-        foreach (var camp in siegeEvents.Select(s => s?.BesiegerCamp).Where(c => c != null))
-        {
-            RegisterExistingObject(camp.SiegeEvent.BesiegedSettlement.StringId, camp);
+            RegisterExistingObject(siegeEvent.BesiegedSettlement.StringId, camp);
         }
     }
 

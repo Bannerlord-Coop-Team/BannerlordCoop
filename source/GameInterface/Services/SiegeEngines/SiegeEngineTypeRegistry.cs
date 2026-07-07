@@ -22,21 +22,9 @@ internal class SiegeEngineTypeRegistry : AutoRegistryBase<SiegeEngineType>
 
     public override void RegisterAllObjects()
     {
-        var siegeEvents = Campaign.Current?.SiegeEventManager?.SiegeEvents;
-        if (siegeEvents == null)
+        foreach (var siegeEvent in SiegeContainerLookup.ActiveSieges())
         {
-            Logger.Error("Unable to register siege engine types when SiegeEvents is null");
-            return;
-        }
-
-        foreach (var siegeEvent in siegeEvents)
-        {
-            var settlement = siegeEvent?.BesiegedSettlement;
-            if (settlement == null)
-            {
-                Logger.Error("Unable to register siege engine type: BesiegedSettlement is null");
-                continue;
-            }
+            var settlement = siegeEvent.BesiegedSettlement;
 
             var siegeEngine = siegeEvent?.BesiegerCamp?.SiegeEngines?.SiegePreparations?.SiegeEngine;
             if (siegeEngine == null)

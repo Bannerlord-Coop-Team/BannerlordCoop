@@ -42,11 +42,14 @@ internal class SetWallHitPointsSettlementPatch
 
     internal static void RunSetWallSectionHitPointsRatioAtIndex(Settlement settlement, int index, float hitPointsRatio)
     {
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             using (new AllowedThread())
             {
                 settlement.SettlementWallSectionHitPointsRatioList[index] = MBMath.ClampFloat(hitPointsRatio, 0f, 1f);
+                // Broken-wall meshes only refresh on a visual-dirty settlement; vanilla dirties inside
+                // the server-only bombardment tick, so this apply has to do it here.
+                settlement.Party?.SetVisualAsDirty();
             }
         });
     }

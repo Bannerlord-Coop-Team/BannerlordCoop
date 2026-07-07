@@ -1,4 +1,4 @@
-using Autofac;
+﻿using Autofac;
 using GameInterface.Services.Locations;
 using GameInterface.Services.MapEvents;
 using Missions.Agents.Handlers;
@@ -71,6 +71,12 @@ public class MissionModule : Module
         // SandBox mission behaviors. Stateless, so a single per-scope instance is fine.
         builder.RegisterType<CoopFieldBattleLauncher>()
             .As<ICoopFieldBattleLauncher>()
+            .InstancePerLifetimeScope();
+
+        // Builds the coop walls-assault siege mission (mirrors SandBoxMissions.OpenSiegeMissionWithDeployment
+        // with the same coop swaps). Resolved by the GameInterface battle flow as ICoopSiegeBattleLauncher.
+        builder.RegisterType<CoopSiegeBattleLauncher>()
+            .As<ICoopSiegeBattleLauncher>()
             .InstancePerLifetimeScope();
 
         // Battle host election + assignment store. BattleHostRegistry holds the per-map-event host/successor

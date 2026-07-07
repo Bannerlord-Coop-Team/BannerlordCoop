@@ -20,6 +20,7 @@ using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Settlements.Interfaces;
+using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Time.Interfaces;
 using GameInterface.Services.TroopRosters.Interfaces;
@@ -96,6 +97,7 @@ internal abstract class TestComponentBase
         RegisterMock<IMobilePartyInterface>(builder);
         RegisterMock<IGameStateInterface>(builder);
         RegisterMock<ISettlementInterface>(builder);
+        RegisterMock<ISiegeEventInterface>(builder);
         RegisterMock<IAttachmentIdMapper>(builder);
         RegisterMock<IAutoRegistryFactory>(builder);
         RegisterMock<IBattleTroopReserveBuilder>(builder);
