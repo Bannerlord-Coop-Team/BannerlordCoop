@@ -49,10 +49,10 @@ internal class BattleCasualtyHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MapEventParty>(msg.MapEventPartyId, out var mapEventParty))
                 return;
 
-            // Drop casualties that arrive after the battle has finalized. Finalize clears the party's
-            // battle rosters, so a late wound applied to a now-stale index throws IndexOutOfRange and
-            // corrupts the finalize (leaving a stuck encounter). A real-time victory — the enemy routing —
-            // ends the battle while the mission's casualty stream is still draining, which is what triggers it.
+            // Drop casualties for a map event that already finalized: finalize clears the party's battle
+            // rosters, so there is no live troop left to apply the kill/wound to. A real-time victory (the
+            // enemy routing) ends the battle while the mission's casualty stream is still draining, so a few
+            // reports can arrive after the finalize.
             var mapEvent = mapEventParty.Party?.MapEvent;
             if (mapEvent == null || mapEvent.IsFinalized)
                 return;

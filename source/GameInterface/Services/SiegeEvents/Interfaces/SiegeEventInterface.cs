@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using Common.Util;
+using GameInterface.Services.SiegeEvents.Handlers;
 using GameInterface.Services.SiegeEvents.Patches;
 using Serilog;
 using System.Linq;
@@ -202,8 +203,14 @@ internal class SiegeEventInterface : ISiegeEventInterface
         // client can't pause, so its encounter would otherwise roll the choice menu out to the town menu.
         SiegeCaptureMenuHoldPatch.HoldFor(settlement);
 
-        // Mid-mission the exit flow opens the settlement menus itself.
-        if (TaleWorlds.MountAndBlade.Mission.Current != null) return;
+        // Real-time assault capture: the prompt arrives while the battle mission is still tearing down, which is
+        // too early to touch PlayerEncounter. Park the transition and let SiegeCaptureTransitionRetryHandler
+        // re-run it on the next CampaignTick once the mission has fully popped back to the map.
+        if (TaleWorlds.MountAndBlade.MissionState.Current != null)
+        {
+            SiegeCaptureTransitionRetryHandler.Arm(leaderParty, settlement);
+            return;
+        }
 
         var currentMenu = Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId;
         if (currentMenu != null && (currentMenu.StartsWith("menu_settlement_taken") || currentMenu == "siege_aftermath_contextual_summary")) return;
@@ -222,27 +229,31 @@ internal class SiegeEventInterface : ISiegeEventInterface
 
         using (new AllowedThread())
         {
-            // Fallback only: when this client ran the native PlayerEncounter.DoEnd capture flow it already
-            // established the settlement encounter (and opened menu_settlement_taken), so re-establishing it
-            // here would re-init the live encounter and bounce the menu out to "town". Only build the
-            // encounter when there is none, e.g. this client didn't run the battle simulation. AllowedThread
-            // stands the co-op EncounterManager patch down so it runs locally instead of round-tripping.
-            if (PlayerEncounter.Current == null)
+            // A live PlayerEncounter here is never the settlement-taken one (that menu returned above). On the
+            // real-time path it is the STALE pre-mission siege encounter the mission popped back to, whose map
+            // event the server already destroyed, so its dead "encounter" menu NREs on the null MapEvent. Finish
+            // it first. The auto-resolve path reaches here with no encounter, so only the rebuild below runs.
+            if (PlayerEncounter.Current != null)
             {
-                if (MobileParty.MainParty.CurrentSettlement != settlement)
-                {
-                    EnterSettlementAction.ApplyForParty(MobileParty.MainParty, settlement);
-                }
-                EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
+                if (MobileParty.MainParty.Party._mapEventSide != null)
+                    MobileParty.MainParty.Party._mapEventSide = null;
+                PlayerEncounter.Finish(forcePlayerOutFromSettlement: false);
+            }
 
-                if (Campaign.Current?.CurrentMenuContext != null)
-                {
-                    GameMenu.SwitchToMenu("menu_settlement_taken");
-                }
-                else
-                {
-                    GameMenu.ActivateGameMenu("menu_settlement_taken");
-                }
+            // AllowedThread stands the co-op EncounterManager patch down so this runs locally, not round-tripped.
+            if (MobileParty.MainParty.CurrentSettlement != settlement)
+            {
+                EnterSettlementAction.ApplyForParty(MobileParty.MainParty, settlement);
+            }
+            EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
+
+            if (Campaign.Current?.CurrentMenuContext != null)
+            {
+                GameMenu.SwitchToMenu("menu_settlement_taken");
+            }
+            else
+            {
+                GameMenu.ActivateGameMenu("menu_settlement_taken");
             }
         }
     }
