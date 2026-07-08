@@ -44,7 +44,7 @@ internal class SallyOutsCampaignBehaviorPatches
         // the garrison always out-ratios it. Logs the ingredients + outcome so the next run shows the cause.
         var besieger = settlement.SiegeEvent.BesiegerCamp.LeaderParty;
         Logger.Information("[SallyDiag] {Settlement}: besieger={Besieger} count={Count} strength={Strength} aggr={Aggr} inSettlement={InSettlement} atWar={AtWar} garrison={Garrison} -> salliedOut={Sallied}",
-            settlement.Name?.ToString(), besieger?.Name?.ToString(), besieger?.MemberRoster.TotalManCount, besieger?.Party.TotalStrength,
+            settlement.Name?.ToString(), besieger?.Name?.ToString(), besieger?.MemberRoster.TotalManCount, besieger?.Party.EstimatedStrength,
             besieger?.Aggressiveness, besieger?.CurrentSettlement != null, besieger?.MapFaction?.IsAtWarWith(settlement.MapFaction),
             settlement.Town.GarrisonParty?.MemberRoster.TotalManCount, salliedOut);
 
