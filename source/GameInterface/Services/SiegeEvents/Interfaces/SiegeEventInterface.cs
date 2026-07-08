@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using Common.Util;
+using GameInterface.Services.SiegeEvents.Patches;
 using Serilog;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -196,6 +197,11 @@ internal class SiegeEventInterface : ISiegeEventInterface
     public void PromptLocalAftermathChoice(MobileParty leaderParty, Settlement settlement)
     {
         if (leaderParty != MobileParty.MainParty) return;
+
+        // Hold the aftermath menu open until the player picks (see SiegeCaptureMenuHoldPatch): a co-op
+        // client can't pause, so its encounter would otherwise roll the choice menu out to the town menu.
+        SiegeCaptureMenuHoldPatch.HoldFor(settlement);
+
         // Mid-mission the exit flow opens the settlement menus itself.
         if (TaleWorlds.MountAndBlade.Mission.Current != null) return;
 

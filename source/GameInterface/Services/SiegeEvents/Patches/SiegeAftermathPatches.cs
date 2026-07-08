@@ -198,6 +198,9 @@ internal class SiegeAftermathPatches
 
         if (ModInformation.IsClient)
         {
+            // The player made the choice; stop holding the menu (SiegeCaptureMenuHoldPatch) so the
+            // encounter can advance to the settlement normally.
+            SiegeCaptureMenuHoldPatch.Release(settlement);
             MessageBroker.Instance.Publish(null, new SiegeAftermathAttempted(attackerParty, settlement, (int)aftermathType));
             return false;
         }
