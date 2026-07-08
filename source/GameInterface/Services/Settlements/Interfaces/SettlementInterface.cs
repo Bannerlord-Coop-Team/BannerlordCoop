@@ -97,8 +97,12 @@ internal class SettlementInterface : ISettlementInterface
         // CurrentSettlement, it does not reposition. Without this the party is still on the settlement
         // when the encounter ends, so EncounterManager.HandleEncounterForMobileParty immediately re-fires
         // StartSettlementEncounter and the player is put right back in.
-        if (mainParty.CurrentSettlement != null)
-            mainParty.Position = mainParty.CurrentSettlement.GatePosition;
+        // Fall back to the encounter settlement: after a co-op siege capture the party sits in a
+        // settlement encounter without CurrentSettlement set, so it would otherwise leave from the
+        // besieger-camp position instead of the gate.
+        var leftSettlement = mainParty.CurrentSettlement ?? Settlement.CurrentSettlement;
+        if (leftSettlement != null)
+            mainParty.Position = leftSettlement.GatePosition;
 
         try
         {
