@@ -176,7 +176,9 @@ namespace Missions.View
             this.IsLoadingSaves = false;
             */
 
-            base.Initialize();
+            // v1.4.7 made save loading async; block so SaveGroups is populated
+            // before FilterSaveGames runs.
+            base.InitializeAsync().GetAwaiter().GetResult();
             FilterSaveGames();
 
             //RefreshValues();

@@ -3,7 +3,6 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
-using GameInterface.Registry.Auto;
 using GameInterface.Services.MobileParties.Messages.Lifetime;
 using GameInterface.Services.ObjectManager;
 using Serilog;
@@ -69,11 +68,14 @@ internal class PartyLifetimeHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(defeatedParty, out var defeatedPartyId))
             return;
 
+        // No InstanceDestroyed publish here: this runs in DestroyPartyAction.Apply's prefix, and
+        // vanilla always finishes the destroy with MobileParty.RemoveParty, whose postfix
+        // (MobilePartyRegistry.DestroyMethods) publishes it. Publishing here too unregistered the
+        // party before the vanilla teardown ran, failing every id lookup during it, and made the
+        // postfix publish a guaranteed duplicate.
         network.SendAll(new NetworkApplyDestroyParty(
             victoriousPartyBaseId,
             defeatedPartyId));
-
-        messageBroker.Publish(this, new InstanceDestroyed<MobileParty>(defeatedParty));
     }
 
     private void Handle_DestroyParty(MessagePayload<NetworkApplyDestroyParty> payload)
@@ -192,11 +194,11 @@ internal class PartyLifetimeHandler : IHandler
             disbandedPartyId,
             settlementId);
 
+        // No InstanceDestroyed publish here for the same reason as Handle_PartyDestroyed: vanilla
+        // ApplyForDisbanding also ends in MobileParty.RemoveParty, whose postfix publishes it.
         network.SendAll(new NetworkPartyDisbanded(
             disbandedPartyId,
             settlementId));
-
-        messageBroker.Publish(this, new InstanceDestroyed<MobileParty>(party));
     }
 
     private void Handle_NetworkPartyDisbanded(MessagePayload<NetworkPartyDisbanded> payload)

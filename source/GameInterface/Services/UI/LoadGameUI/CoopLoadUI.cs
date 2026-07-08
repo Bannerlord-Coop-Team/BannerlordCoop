@@ -4,6 +4,7 @@ using SandBox.View;
 using SandBox.ViewModelCollection.SaveLoad;
 using System;
 using System.Linq;
+using TaleWorlds.CampaignSystem.Extensions;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Engine.GauntletUI;
@@ -41,6 +42,9 @@ namespace Coop.UI.LoadGameUI
 
 		public new void ExecuteSaveLoad()
 		{
+            if (IsCorrupted || IsDisabled)
+                return;
+
             if (Game.Current != null)
             {
                 ScreenManager.PopScreen();
@@ -48,7 +52,8 @@ namespace Coop.UI.LoadGameUI
                 GameStateManager.Current = Module.CurrentModule.GlobalGameStateManager;
             }
 
-            MessageBroker.Instance.Publish(this, new HostSaveGame(Save.Name));
+            // The handler decides spawn-managed (Steam) vs in-process hosting.
+            MessageBroker.Instance.Publish(this, new AttemptHost(Save.Name));
         }
 	}
 
@@ -57,18 +62,57 @@ namespace Coop.UI.LoadGameUI
 		private new SelectedGameVM CurrentSelectedSave;
         public CoopLoadUI() : base(false, false)
         {
-            Initialize();
-
-            foreach (var group in SaveGroups)
-            {
-                var saves = group.SavedGamesList;
-                for (int i = 0; i < saves.Count; i++)
-                {
-                    saves[i] = new SelectedGameVM(saves[i].Save, IsSaving, OnDeleteSavedGame, OnSaveSelection, OnCancelLoadSave, ExecuteDone);
-                }
-            }
-            OnSaveSelection(GetSavedGames().FirstOrDefault());
+            InitializeSandboxSaves();
+            OnSaveSelection(GetSavedGames()?.FirstOrDefault());
             RefreshValues();
+        }
+
+        // Replaces SaveLoadVM.InitializeAsync (async as of v1.4.7): synchronous so the
+        // list exists before the screen shows, restricted to sandbox campaigns, and
+        // builds SelectedGameVM entries directly instead of re-wrapping the base list.
+        private void InitializeSandboxSaves()
+        {
+            var categorizedGroupName = new TextObject("{=nVGqjtaa}Campaign {ID}", null);
+            var uncategorizedGroupName = new TextObject("{=uncategorized_save}Uncategorized", null);
+
+            var saves = MBSaveLoad.GetSaveFiles(save => !save.IsCorrupted && IsSandboxSave(save));
+
+            int campaignNumber = 0;
+            foreach (var group in saves
+                .GroupBy(save => save.MetaData.GetUniqueGameId())
+                .OrderByDescending(g => g.Max(save => save.MetaData.GetCreationTime())))
+            {
+                var groupVM = new SavedGameGroupVM();
+                if (string.IsNullOrWhiteSpace(group.Key))
+                {
+                    groupVM.IdentifierID = uncategorizedGroupName.ToString();
+                }
+                else
+                {
+                    campaignNumber++;
+                    categorizedGroupName.SetTextVariable("ID", campaignNumber);
+                    groupVM.IdentifierID = categorizedGroupName.ToString();
+                }
+
+                foreach (var save in group.OrderByDescending(s => s.MetaData.GetCreationTime()))
+                {
+                    groupVM.SavedGamesList.Add(new SelectedGameVM(save, IsSaving, OnDeleteSavedGame, OnSaveSelection, OnCancelLoadSave, ExecuteDone));
+                }
+
+                SaveGroups.Add(groupVM);
+            }
+
+            CanCreateNewSave = !MBSaveLoad.IsMaxNumberOfSavesReached();
+            IsSearchAvailable = true;
+        }
+
+        // Sandbox sessions start with the StoryMode module deactivated
+        // (StoryModeViewSubModule.OnBeforeGameStart), so a save listing StoryMode
+        // among its modules is a story campaign.
+        private static bool IsSandboxSave(SaveGameFileInfo save)
+        {
+            return !save.MetaData.GetModules()
+                .Any(module => string.Equals(module, "StoryMode", StringComparison.OrdinalIgnoreCase));
         }
 
         private new void OnSaveSelection(SavedGameVM saveGame)
@@ -120,7 +164,7 @@ namespace Coop.UI.LoadGameUI
             }, null, ""), false);
         }
 
-        private MBBindingList<SavedGameVM> GetSavedGames() => SaveGroups.FirstOrDefault().SavedGamesList;
+        private MBBindingList<SavedGameVM> GetSavedGames() => SaveGroups.FirstOrDefault()?.SavedGamesList;
 	}
 
 	public class CoopLoadScreen : SaveLoadScreen
@@ -202,5 +246,4 @@ namespace Coop.UI.LoadGameUI
             Utilities.SetForceVsync(false);
         }
     }
-
 }

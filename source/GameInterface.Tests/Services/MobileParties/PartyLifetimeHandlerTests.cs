@@ -15,6 +15,8 @@ namespace GameInterface.Tests.Services.MobileParties;
 /// Unit tests for the server send-side of party destruction replication in
 /// <see cref="PartyLifetimeHandler"/>. A party destroyed with a null destroyer (e.g. vanilla
 /// patrol culling) must still be replicated to clients instead of leaving a zombie party behind.
+/// The handler must never publish <see cref="InstanceDestroyed{T}"/> itself: registry teardown is
+/// owned by the MobileParty.RemoveParty postfix, which vanilla runs after the destroy completes.
 /// </summary>
 public class PartyLifetimeHandlerTests
 {
@@ -45,9 +47,8 @@ public class PartyLifetimeHandlerTests
         Assert.Null(sent.VictoriousPartyId);
         Assert.Equal("defeated-1", sent.DefeatedPartyId);
         messageBroker.Verify(
-            b => b.Publish(It.IsAny<object>(),
-                It.Is<InstanceDestroyed<MobileParty>>(m => ReferenceEquals(m.Instance, defeated))),
-            Times.Once);
+            b => b.Publish(It.IsAny<object>(), It.IsAny<InstanceDestroyed<MobileParty>>()),
+            Times.Never);
     }
 
     [Fact]
@@ -65,9 +66,8 @@ public class PartyLifetimeHandlerTests
         Assert.Equal("defeated-1", sent.DefeatedPartyId);
         network.Verify(n => n.SendAll(It.IsAny<IMessage>()), Times.Once);
         messageBroker.Verify(
-            b => b.Publish(It.IsAny<object>(),
-                It.Is<InstanceDestroyed<MobileParty>>(m => ReferenceEquals(m.Instance, defeated))),
-            Times.Once);
+            b => b.Publish(It.IsAny<object>(), It.IsAny<InstanceDestroyed<MobileParty>>()),
+            Times.Never);
     }
 
     [Fact]

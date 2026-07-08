@@ -1,6 +1,8 @@
-﻿using LiteNetLib;
+﻿using Common.Util;
+using LiteNetLib;
+using System;
+using System.Net;
 using System.Reflection;
-using System.Runtime.Serialization;
 
 namespace E2E.Tests.Environment.Extensions;
 
@@ -10,6 +12,12 @@ namespace E2E.Tests.Environment.Extensions;
 internal static class NetPeerExtensions
 {
     private static readonly FieldInfo Id = typeof(NetPeer).GetField(nameof(NetPeer.Id))!;
+    private static readonly ConstructorInfo Ctor = typeof(NetPeer).GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance, new Type[]
+    {
+        typeof(NetManager),
+        typeof(IPEndPoint),
+        typeof(int),
+    })!;
     public static void SetId(this NetPeer peer, int id)
     {
         Id.SetValue(peer, id);
@@ -17,14 +25,16 @@ internal static class NetPeerExtensions
 
     public static NetPeer CreatePeer()
     {
-        return (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
+        return ObjectHelper.SkipConstructor<NetPeer>();
     }
 
     public static NetPeer CreatePeer(int id)
     {
         var newPeer = CreatePeer();
+        var manager = new NetManager(null);
+        var endPoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), 5555 + id);
 
-        newPeer.SetId(id);
+        Ctor.Invoke(newPeer, new object[] { manager, endPoint, id });
 
         return newPeer;
     }
