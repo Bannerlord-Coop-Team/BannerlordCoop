@@ -59,7 +59,6 @@ namespace Coop.UI.LoadGameUI
 
 	class CoopLoadUI : SaveLoadVM
 	{
-		private new SelectedGameVM CurrentSelectedSave;
         public CoopLoadUI() : base(false, false)
         {
             InitializeSandboxSaves();
@@ -117,30 +116,28 @@ namespace Coop.UI.LoadGameUI
 
         private new void OnSaveSelection(SavedGameVM saveGame)
         {
-            var save = (SelectedGameVM)saveGame;
-            if (save != CurrentSelectedSave)
+            if (saveGame != CurrentSelectedSave)
             {
                 if (CurrentSelectedSave != null)
                 {
                     CurrentSelectedSave.IsSelected = false;
                 }
-                CurrentSelectedSave = save;
+                // The movie's details panel (hero tableau via MainHeroVisualCode, banner,
+                // stats) binds the base CurrentSelectedSave [DataSourceProperty]; it must
+                // be set through the property so the binding refreshes.
+                CurrentSelectedSave = saveGame;
                 if (CurrentSelectedSave != null)
                 {
                     CurrentSelectedSave.IsSelected = true;
                 }
-                IsActionEnabled = CurrentSelectedSave != null;
+                IsAnyItemSelected = CurrentSelectedSave != null;
+                IsActionEnabled = IsAnyItemSelected && !CurrentSelectedSave.IsCorrupted && !CurrentSelectedSave.IsDisabled;
             }
         }
 
         public new void ExecuteLoadSave()
         {
-            var currentSelectedSave = CurrentSelectedSave;
-            if (currentSelectedSave == null)
-            {
-                return;
-            }
-            currentSelectedSave.ExecuteSaveLoad();
+            (CurrentSelectedSave as SelectedGameVM)?.ExecuteSaveLoad();
         }
 
         private new void ExecuteDone()

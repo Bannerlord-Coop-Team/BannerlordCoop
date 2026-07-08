@@ -30,7 +30,7 @@ namespace ServerHeadless
         private static Action _requestShutdown;
 
         /// <summary>Local console verbs, also offered to tab completion alongside the game commands.</summary>
-        private static readonly string[] BuiltinCommands = { "help", "list", "commands", "quit", "exit", "stop" };
+        private static readonly string[] BuiltinCommands = { "help", "list", "commands", "events", "nav", "quit", "exit", "stop" };
 
         /// <summary>
         /// Registers the game commands and starts the console frontend: the pinned-prompt
@@ -120,6 +120,9 @@ namespace ServerHeadless
                 case "nav":
                     PrintNavQuery(args);
                     return;
+                case "events":
+                    PrintMapEvents();
+                    return;
                 case "quit":
                 case "exit":
                 case "stop":
@@ -156,9 +159,56 @@ namespace ServerHeadless
             }
 
             var parts = args.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+
+            // "nav towns": town positions + their grid cells, for picking pathfinding test points.
+            if (parts.Length >= 1 && parts[0].Equals("towns", StringComparison.OrdinalIgnoreCase))
+            {
+                PrintTowns(grid);
+                return;
+            }
+
+            // "nav wet": every party currently positioned on a water face — who they are, whether
+            // the position says land, their navigation capability and current behavior. The tool
+            // for "parties are walking across water" reports.
+            if (parts.Length >= 1 && parts[0].Equals("wet", StringComparison.OrdinalIgnoreCase))
+            {
+                PrintWetParties(grid);
+                return;
+            }
+
+            // "nav holes x y r": count off-mesh cells (navmesh holes, e.g. settlement footprints)
+            // in a box of radius r around a position, with the hole extents.
+            if (parts.Length >= 4 && parts[0].Equals("holes", StringComparison.OrdinalIgnoreCase)
+                && float.TryParse(parts[1], out float hx) && float.TryParse(parts[2], out float hy)
+                && float.TryParse(parts[3], out float hr))
+            {
+                int offMesh = 0, total = 0;
+                float minX = float.MaxValue, maxX = float.MinValue, minY = float.MaxValue, maxY = float.MinValue;
+                for (float dy = -hr; dy <= hr; dy += grid.CellSize)
+                {
+                    for (float dx = -hr; dx <= hr; dx += grid.CellSize)
+                    {
+                        total++;
+                        var pt = new TaleWorlds.Library.Vec2(hx + dx, hy + dy);
+                        if (grid.OrdinalAt(pt) < 0)
+                        {
+                            offMesh++;
+                            if (pt.x < minX) minX = pt.x;
+                            if (pt.x > maxX) maxX = pt.x;
+                            if (pt.y < minY) minY = pt.y;
+                            if (pt.y > maxY) maxY = pt.y;
+                        }
+                    }
+                }
+                Console.WriteLine(offMesh > 0
+                    ? $"holes around ({hx:0.#},{hy:0.#}) r={hr:0.#}: {offMesh}/{total} off-mesh, extents ({minX:0.#},{minY:0.#})-({maxX:0.#},{maxY:0.#})"
+                    : $"holes around ({hx:0.#},{hy:0.#}) r={hr:0.#}: none ({total} cells all on-mesh)");
+                return;
+            }
+
             if (parts.Length < 2 || !float.TryParse(parts[0], out float x) || !float.TryParse(parts[1], out float y))
             {
-                Console.WriteLine("Usage: nav <x> <y> [x2 y2]");
+                Console.WriteLine("Usage: nav towns | nav <x> <y> [x2 y2]");
                 return;
             }
 
@@ -181,12 +231,111 @@ namespace ServerHeadless
                 if (ok)
                 {
                     int wet = points.Count(p => grid.IsWaterAt(p));
-                    Console.WriteLine($"land path OK: cost={cost:0.#}, {points.Count} waypoints, {wet} on water");
+                    // Parties lerp straight between consecutive path points, so every chord must
+                    // be walkable; a blocked segment means the path cuts a navmesh hole
+                    // (settlement) or excluded terrain. The final hop is reported separately —
+                    // a destination inside a settlement hole is legitimate.
+                    int blocked = 0;
+                    var prev = from;
+                    for (int i = 0; i < points.Count - 1; i++)
+                    {
+                        if (!grid.IsLineClear(prev, points[i], Bootstrap.HeadlessNavGrid.DefaultLandExclusions))
+                        {
+                            blocked++;
+                            Console.WriteLine($"  blocked segment {i}: ({prev.x:0.##},{prev.y:0.##}) -> ({points[i].x:0.##},{points[i].y:0.##}) " +
+                                              $"[fromTerrain={grid.TerrainAt(prev)} toTerrain={grid.TerrainAt(points[i])}]");
+                        }
+                        prev = points[i];
+                    }
+                    bool lastHopClear = points.Count == 0 ||
+                        grid.IsLineClear(prev, points[points.Count - 1], Bootstrap.HeadlessNavGrid.DefaultLandExclusions);
+                    Console.WriteLine($"land path OK: cost={cost:0.#}, {points.Count} waypoints, {wet} on water, " +
+                                      $"{blocked} blocked segments, last hop clear: {lastHopClear}");
                 }
                 else
                 {
                     Console.WriteLine("land path FAILED");
                 }
+
+                // The AI's view: same query with the PartyNavigationModel's full invalid-terrain
+                // list (rivers, mountains, canyons... — much stricter than the sea-only default).
+                var model = TaleWorlds.CampaignSystem.Campaign.Current?.Models?.PartyNavigationModel;
+                var aiExclusions = model?.GetInvalidTerrainTypesForNavigationType(
+                    TaleWorlds.CampaignSystem.Party.MobileParty.NavigationType.Default);
+                if (aiExclusions != null)
+                {
+                    var aiPoints = new System.Collections.Generic.List<TaleWorlds.Library.Vec2>();
+                    bool aiOk = grid.TryFindPath(from, to, aiExclusions, 10, 10, aiPoints, out float aiCost);
+                    Console.WriteLine(aiOk
+                        ? $"AI path OK: cost={aiCost:0.#}, {aiPoints.Count} waypoints"
+                        : "AI path FAILED");
+                }
+            }
+        }
+
+        /// <summary>Active map events (battles, raids, sieges) — the server-side truth behind map icons.</summary>
+        private static void PrintMapEvents()
+        {
+            var campaign = TaleWorlds.CampaignSystem.Campaign.Current;
+            var events = campaign?.MapEventManager?.MapEvents;
+            if (events == null)
+            {
+                Console.WriteLine("No campaign.");
+                return;
+            }
+
+            foreach (var e in events.ToList())
+            {
+                string attacker = e.AttackerSide?.LeaderParty?.Name?.ToString() ?? "?";
+                string defender = e.DefenderSide?.LeaderParty?.Name?.ToString() ?? "?";
+                var pos = e.Position.ToVec2();
+                string place = e.MapEventSettlement?.Name?.ToString() ?? $"({pos.x:0.#},{pos.y:0.#})";
+                Console.WriteLine($"  {e.EventType}: {attacker} vs {defender} at {place}");
+            }
+            Console.WriteLine($"{events.Count} active map event(s)");
+        }
+
+        private static void PrintWetParties(Bootstrap.HeadlessNavGrid grid)
+        {
+            var campaign = TaleWorlds.CampaignSystem.Campaign.Current;
+            if (campaign?.MobileParties == null)
+            {
+                Console.WriteLine("No campaign.");
+                return;
+            }
+
+            int count = 0;
+            foreach (var party in campaign.MobileParties.ToList())
+            {
+                var pos = party.Position.ToVec2();
+                bool offMesh = grid.OrdinalAt(pos) < 0;
+                if (!offMesh && !grid.IsWaterAt(pos)) continue;
+
+                count++;
+                var target = party.TargetPosition.ToVec2();
+                Console.WriteLine(
+                    $"  {party.StringId} \"{party.Name}\" at ({pos.x:0.#},{pos.y:0.#}) " +
+                    $"{(offMesh ? "OFF-MESH" : "water")} IsOnLand={party.Position.IsOnLand} " +
+                    $"navCap={party.NavigationCapability} behavior={party.ShortTermBehavior} " +
+                    $"target=({target.x:0.#},{target.y:0.#})");
+            }
+            Console.WriteLine($"{count} part(ies) on water/off-mesh of {campaign.MobileParties.Count}");
+        }
+
+        private static void PrintTowns(Bootstrap.HeadlessNavGrid grid)
+        {
+            var campaign = TaleWorlds.CampaignSystem.Campaign.Current;
+            if (campaign == null)
+            {
+                Console.WriteLine("No campaign.");
+                return;
+            }
+
+            foreach (var settlement in campaign.Settlements.Where(s => s.IsTown))
+            {
+                var p = settlement.GatePosition.ToVec2();
+                Console.WriteLine($"  {settlement.StringId} \"{settlement.Name}\" at ({p.x:0.#},{p.y:0.#}) " +
+                                  $"ordinal={grid.OrdinalAt(p)} terrain={grid.TerrainAt(p)}");
             }
         }
 

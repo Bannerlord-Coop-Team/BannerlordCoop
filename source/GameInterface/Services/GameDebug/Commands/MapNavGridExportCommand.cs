@@ -8,6 +8,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
@@ -80,20 +82,81 @@ public class MapNavGridExportCommand
             faces.Add((face.FaceIndex, face.FaceGroupIndex, face.FaceIslandIndex, (int)terrain, center, z));
         }
 
-        // Position grid: which face covers each cell center (-1 = off-mesh).
+        // Position grid: which face covers each cell (-1 = off-mesh). Sampled with the STRICT
+        // containment query GetNavigationMeshForPosition (null pointer when no face contains the
+        // position) — the face-index queries snap to the NEAREST face, which painted settlement
+        // footprints (navmesh holes) as walkable.
+        //
+        // Cells whose center lands on path-INVALID terrain (river, mountain, canyon — the
+        // PartyNavigationModel's list) are SUPERSAMPLED: probe offset points and from above, and
+        // prefer any path-valid face the cell touches. Fords and bridges are thin slivers
+        // (1-7 cells at 1u before this) and elevated bridge decks lose the z=0 probe to the river
+        // face underneath — center-only sampling left river crossings unusable and the AI could
+        // not path over them.
+        var navigationModel = Campaign.Current.Models.PartyNavigationModel;
+        bool IsPathValid(int ordinal) => navigationModel.IsTerrainTypeValidForNavigationType(
+            (TerrainType)faces[ordinal].terrain, MobileParty.NavigationType.Default);
+
         int width = (int)Math.Ceiling((max.x - min.x) / cellSize) + 1;
         int height = (int)Math.Ceiling((max.y - min.y) / cellSize) + 1;
         var grid = new int[width * height];
+        long offMesh = 0;
+        long supersampled = 0;
+        float heightLimit = maxHeight + 200f;
+        float highZ = maxHeight + 50f;
+
+        int ProbeOrdinal(float x, float y, float z)
+        {
+            var p3 = new Vec3(x, y, z);
+            UIntPtr facePtr = mapScene.Scene.GetNavigationMeshForPosition(in p3, out _, heightLimit, false);
+            if (facePtr == UIntPtr.Zero) return -1;
+            PathFaceRecord record = mapScene.Scene.GetPathFaceRecordFromNavMeshFacePointer(facePtr);
+            return record.FaceIndex >= 0 && faceOrdinalByIndex.TryGetValue(record.FaceIndex, out int ordinal)
+                ? ordinal
+                : -1;
+        }
+
+        float off = 0.35f * cellSize;
+        var offsets = new[]
+        {
+            new Vec2(-off, -off), new Vec2(off, -off), new Vec2(-off, off), new Vec2(off, off),
+        };
+
         for (int gy = 0; gy < height; gy++)
         {
             for (int gx = 0; gx < width; gx++)
             {
-                var pos = new CampaignVec2(new Vec2(min.x + gx * cellSize, min.y + gy * cellSize), true);
-                PathFaceRecord face = mapScene.GetFaceIndex(in pos);
-                grid[gy * width + gx] =
-                    face.FaceIndex >= 0 && faceOrdinalByIndex.TryGetValue(face.FaceIndex, out int ordinal)
-                        ? ordinal
-                        : -1;
+                float x = min.x + gx * cellSize;
+                float y = min.y + gy * cellSize;
+
+                int cell = ProbeOrdinal(x, y, 0f);
+                if (cell < 0 || !IsPathValid(cell))
+                {
+                    // Look for a walkable face this cell touches: from above at the center (an
+                    // elevated bridge deck shadowed by the water face below), then the corners at
+                    // both heights (thin ford slivers off the cell center).
+                    supersampled++;
+                    int best = cell;
+                    var probes = new (float px, float py, float pz)[]
+                    {
+                        (x, y, highZ),
+                        (x + offsets[0].x, y + offsets[0].y, 0f), (x + offsets[1].x, y + offsets[1].y, 0f),
+                        (x + offsets[2].x, y + offsets[2].y, 0f), (x + offsets[3].x, y + offsets[3].y, 0f),
+                        (x + offsets[0].x, y + offsets[0].y, highZ), (x + offsets[1].x, y + offsets[1].y, highZ),
+                        (x + offsets[2].x, y + offsets[2].y, highZ), (x + offsets[3].x, y + offsets[3].y, highZ),
+                    };
+                    foreach (var (px, py, pz) in probes)
+                    {
+                        int candidate = ProbeOrdinal(px, py, pz);
+                        if (candidate < 0) continue;
+                        if (best < 0) best = candidate;
+                        if (IsPathValid(candidate)) { best = candidate; break; }
+                    }
+                    cell = best;
+                }
+
+                if (cell < 0) offMesh++;
+                grid[gy * width + gx] = cell;
             }
         }
 
@@ -136,7 +199,9 @@ public class MapNavGridExportCommand
         }
 
         string report = $"NavGrid exported: '{file}' — scene '{sceneName}', {faces.Count:N0} faces, " +
-                        $"{width}x{height} cells @ {cellSize:0.##}u. Copy to the headless server's CoopMapData folder.";
+                        $"{width}x{height} cells @ {cellSize:0.##}u ({offMesh:N0} off-mesh, " +
+                        $"{100.0 * offMesh / (width * (long)height):0.0}%; {supersampled:N0} supersampled). " +
+                        "Copy to the headless server's CoopMapData folder.";
         Logger.Information(report);
         return report;
     }

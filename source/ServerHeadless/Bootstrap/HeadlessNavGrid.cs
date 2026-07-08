@@ -53,16 +53,39 @@ namespace ServerHeadless.Bootstrap
         private int[] _grid;
         private Dictionary<int, int> _ordinalByFaceIndex;
 
-        // A* scratch buffers, reused across queries. NOT thread-confined: the Coop mod's
-        // parallel campaign tick (ParallelRobustnessPatches.ParallelTickMovingParties) issues
-        // pathfinds from worker threads concurrently, so searches serialize on _searchLock —
-        // racing threads desync the parallel heap lists and corrupt the search state.
-        private readonly object _searchLock = new object();
-        private float[] _gScore;
-        private int[] _cameFrom;
-        private int[] _visitStamp;
-        private int _currentStamp;
-        private readonly List<int> _openHeap = new List<int>();
+        // Per-thread A* scratch: the Coop mod's parallel campaign tick
+        // (ParallelRobustnessPatches.ParallelTickMovingParties) pathfinds from many worker
+        // threads at once. Shared buffers corrupt under that race, and serializing behind a
+        // lock stalls the whole tick once live-war AI load saturates pathfinding — so every
+        // thread gets its own buffers (~5MB each at Main_map size).
+        private sealed class SearchScratch
+        {
+            public float[] GScore;
+            public int[] CameFrom;
+            public int[] VisitStamp;
+            public int Stamp;
+            public readonly List<int> OpenHeap = new List<int>();
+            public readonly List<float> HeapScores = new List<float>();
+        }
+
+        [ThreadStatic] private static SearchScratch _threadScratch;
+
+        private SearchScratch GetScratch()
+        {
+            var scratch = _threadScratch;
+            int cells = Width * Height;
+            if (scratch == null || scratch.GScore.Length != cells)
+            {
+                scratch = new SearchScratch
+                {
+                    GScore = new float[cells],
+                    CameFrom = new int[cells],
+                    VisitStamp = new int[cells],
+                };
+                _threadScratch = scratch;
+            }
+            return scratch;
+        }
 
         /// <summary>Max A* expansions before giving up (a full cross-map corridor is far below this).</summary>
         private const int MaxExpansions = 120_000;
@@ -249,9 +272,6 @@ namespace ServerHeadless.Bootstrap
                 grid._grid[i] = reader.ReadInt32();
             }
 
-            grid._gScore = new float[cells];
-            grid._cameFrom = new int[cells];
-            grid._visitStamp = new int[cells];
             grid.ComputeRegions();
             return grid;
         }
@@ -397,8 +417,8 @@ namespace ServerHeadless.Bootstrap
             int endCell = CellOf(end);
             if (startCell < 0 || endCell < 0) return false;
 
-            // Endpoints just off the walkable layer (settlement interiors, gates) snap before the
-            // connectivity check, matching how movement queries treat them.
+            // A start just off the walkable layer (party parked at a settlement, or stranded on
+            // water) snaps before the connectivity check so it can still score/escape.
             if (!IsCellAllowed(startCell, excludedTerrains))
             {
                 if (!TryGetNearestAllowedPoint(start, excludedTerrains, CellSize * 8f, out var snapped)) return false;
@@ -406,6 +426,12 @@ namespace ServerHeadless.Bootstrap
             }
             if (!IsCellAllowed(endCell, excludedTerrains))
             {
+                // Only OFF-MESH ends (settlement-interior holes) snap. An end on EXCLUDED
+                // terrain must answer unreachable like the native query: this is the AI's
+                // candidate-target validator (NavigationHelper.FindReachablePointAroundPosition),
+                // and snapping water points onto the shore "validated" sea positions as
+                // patrol/flee targets — land parties then walked across water to reach them.
+                if (_grid[endCell] >= 0) return false;
                 if (!TryGetNearestAllowedPoint(end, excludedTerrains, CellSize * 8f, out var snapped)) return false;
                 endCell = CellOf(snapped);
             }
@@ -565,6 +591,12 @@ namespace ServerHeadless.Bootstrap
                 }
                 startCell = CellOf(snapped);
             }
+            // The point the path actually delivers the party to. An OFF-MESH destination
+            // (settlement-interior hole) stays the true target — gates legitimately sit past the
+            // walkable boundary. A destination on EXCLUDED terrain (water for land movement) is
+            // clamped to the snapped shore point instead: delivering the raw point walked land
+            // parties onto the sea for the final hop.
+            Vec2 finalPoint = end;
             if (!IsCellAllowed(endCell, excludedTerrains))
             {
                 if (!TryGetNearestAllowedPoint(end, excludedTerrains, CellSize * 8f, out var snapped))
@@ -572,12 +604,13 @@ namespace ServerHeadless.Bootstrap
                     TrackFail(ref _failSnap, "end-snap", start, end);
                     return false;
                 }
+                if (_grid[endCell] >= 0) finalPoint = snapped;
                 endCell = CellOf(snapped);
             }
             if (startCell == endCell)
             {
-                waypoints?.Add(end);
-                cost = start.Distance(end);
+                waypoints?.Add(finalPoint);
+                cost = start.Distance(finalPoint);
                 return true;
             }
 
@@ -588,139 +621,197 @@ namespace ServerHeadless.Bootstrap
                 return false;
             }
 
-            // Everything above only reads the grid; the search and the reconstruction below use
-            // the shared scratch buffers, so they run one at a time.
-            lock (_searchLock)
+            var s = GetScratch();
+            unchecked { s.Stamp++; }
+            s.OpenHeap.Clear();
+            s.HeapScores.Clear();
+
+            // Weighted A* (epsilon inflation): trades a few percent of path optimality for a
+            // several-fold cut in expansions — this runs live inside campaign ticking.
+            const float HeuristicWeight = 1.2f;
+            const float Sqrt2 = 1.41421356f;
+            int endGx = endCell % Width, endGy = endCell / Width;
+
+            s.GScore[startCell] = 0f;
+            s.CameFrom[startCell] = -1;
+            s.VisitStamp[startCell] = s.Stamp;
+            HeapPush(s, startCell, 0f);
+
+            int expansions = 0;
+            bool found = false;
+            while (s.OpenHeap.Count > 0)
             {
-                unchecked { _currentStamp++; }
-                _openHeap.Clear();
-                _heapScores.Clear();
+                int current = HeapPop(s);
+                if (current == endCell) { found = true; break; }
+                if (++expansions > MaxExpansions) break;
 
-                // Weighted A* (epsilon inflation): trades a few percent of path optimality for a
-                // several-fold cut in expansions — this runs live inside campaign ticking.
-                const float HeuristicWeight = 1.2f;
-                const float Sqrt2 = 1.41421356f;
-                int endGx = endCell % Width, endGy = endCell / Width;
+                int cgx = current % Width, cgy = current / Width;
+                bool currentWater = IsWater((TerrainType)Faces[_grid[current]].Terrain);
+                float currentG = s.GScore[current];
 
-                _gScore[startCell] = 0f;
-                _cameFrom[startCell] = -1;
-                _visitStamp[startCell] = _currentStamp;
-                HeapPush(startCell, 0f);
-
-                int expansions = 0;
-                bool found = false;
-                while (_openHeap.Count > 0)
+                for (int dy = -1; dy <= 1; dy++)
                 {
-                    int current = HeapPop();
-                    if (current == endCell) { found = true; break; }
-                    if (++expansions > MaxExpansions) break;
-
-                    int cgx = current % Width, cgy = current / Width;
-                    bool currentWater = IsWater((TerrainType)Faces[_grid[current]].Terrain);
-                    float currentG = _gScore[current];
-
-                    for (int dy = -1; dy <= 1; dy++)
+                    int ngy = cgy + dy;
+                    if (ngy < 0 || ngy >= Height) continue;
+                    for (int dx = -1; dx <= 1; dx++)
                     {
-                        int ngy = cgy + dy;
-                        if (ngy < 0 || ngy >= Height) continue;
-                        for (int dx = -1; dx <= 1; dx++)
+                        if (dx == 0 && dy == 0) continue;
+                        int ngx = cgx + dx;
+                        if (ngx < 0 || ngx >= Width) continue;
+                        int neighbor = ngy * Width + ngx;
+
+                        int ordinal = _grid[neighbor];
+                        if (ordinal < 0 || IsExcluded(Faces[ordinal].Terrain, excludedTerrains)) continue;
+
+                        // No corner cutting: a diagonal step is only legal when both
+                        // orthogonal neighbors are too, otherwise the movement chord clips
+                        // the corner of a blocked cell (parties lerp straight between
+                        // waypoints, and line-of-sight validation samples at half-cell
+                        // resolution — it rightly rejects such chords).
+                        if (dx != 0 && dy != 0)
                         {
-                            if (dx == 0 && dy == 0) continue;
-                            int ngx = cgx + dx;
-                            if (ngx < 0 || ngx >= Width) continue;
-                            int neighbor = ngy * Width + ngx;
-
-                            int ordinal = _grid[neighbor];
-                            if (ordinal < 0 || IsExcluded(Faces[ordinal].Terrain, excludedTerrains)) continue;
-
-                            float step = (dx != 0 && dy != 0) ? CellSize * Sqrt2 : CellSize;
-
-                            // Land<->sea transitions cost extra, mirroring the native pathfinder's
-                            // region-switch parameters (naval navigation).
-                            bool neighborWater = IsWater((TerrainType)Faces[ordinal].Terrain);
-                            if (!currentWater && neighborWater) step += landToSeaCost;
-                            else if (currentWater && !neighborWater) step += seaToLandCost;
-
-                            float tentative = currentG + step;
-                            if (_visitStamp[neighbor] == _currentStamp && tentative >= _gScore[neighbor]) continue;
-
-                            _gScore[neighbor] = tentative;
-                            _cameFrom[neighbor] = current;
-                            _visitStamp[neighbor] = _currentStamp;
-
-                            // Octile-distance heuristic in grid space — no square roots.
-                            int adx = ngx > endGx ? ngx - endGx : endGx - ngx;
-                            int ady = ngy > endGy ? ngy - endGy : endGy - ngy;
-                            int hi = adx > ady ? adx : ady;
-                            int lo = adx > ady ? ady : adx;
-                            float heuristic = (hi + (Sqrt2 - 1f) * lo) * CellSize * HeuristicWeight;
-
-                            HeapPush(neighbor, tentative + heuristic);
+                            if (!IsCellAllowed(cgy * Width + ngx, excludedTerrains) ||
+                                !IsCellAllowed(ngy * Width + cgx, excludedTerrains)) continue;
                         }
+
+                        float step = (dx != 0 && dy != 0) ? CellSize * Sqrt2 : CellSize;
+
+                        // Land<->sea transitions cost extra, mirroring the native pathfinder's
+                        // region-switch parameters (naval navigation).
+                        bool neighborWater = IsWater((TerrainType)Faces[ordinal].Terrain);
+                        if (!currentWater && neighborWater) step += landToSeaCost;
+                        else if (currentWater && !neighborWater) step += seaToLandCost;
+
+                        float tentative = currentG + step;
+                        if (s.VisitStamp[neighbor] == s.Stamp && tentative >= s.GScore[neighbor]) continue;
+
+                        s.GScore[neighbor] = tentative;
+                        s.CameFrom[neighbor] = current;
+                        s.VisitStamp[neighbor] = s.Stamp;
+
+                        // Octile-distance heuristic in grid space — no square roots.
+                        int adx = ngx > endGx ? ngx - endGx : endGx - ngx;
+                        int ady = ngy > endGy ? ngy - endGy : endGy - ngy;
+                        int hi = adx > ady ? adx : ady;
+                        int lo = adx > ady ? ady : adx;
+                        float heuristic = (hi + (Sqrt2 - 1f) * lo) * CellSize * HeuristicWeight;
+
+                        HeapPush(s, neighbor, tentative + heuristic);
                     }
                 }
-
-                if (!found) return false;
-
-                cost = _gScore[endCell];
-
-                if (waypoints != null)
-                {
-                    // Reconstruct (end -> start), then decimate to evenly spaced waypoints. Cell-to-cell
-                    // legality is already guaranteed by the search; movement between nearby waypoints
-                    // stays within the corridor at this spacing, and the caller's path buffer is small.
-                    var cells = new List<int>();
-                    for (int c = endCell; c != -1; c = _cameFrom[c]) cells.Add(c);
-                    cells.Reverse();
-
-                    int maxPoints = Math.Max(2, maxWaypoints);
-                    int step = Math.Max(1, (cells.Count + maxPoints - 1) / maxPoints);
-                    for (int i = step; i < cells.Count - 1; i += step)
-                    {
-                        waypoints.Add(CenterOf(cells[i]));
-                    }
-                    waypoints.Add(end);
-                }
-
-                return true;
             }
+
+            if (!found) return false;
+
+            cost = s.GScore[endCell];
+
+            if (waypoints != null)
+            {
+                var corridor = new List<int>();
+                for (int c = endCell; c != -1; c = s.CameFrom[c]) corridor.Add(c);
+                corridor.Reverse();
+
+                BuildWaypoints(corridor, start, finalPoint, excludedTerrains, waypoints, maxWaypoints);
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Emits the corridor as straight segments the party can walk literally: consecutive
+        /// waypoints always have line-of-sight over allowed cells (string pulling). The previous
+        /// every-Nth decimation cut corners — a chord between corridor cells skirting a settlement
+        /// navmesh hole crossed the hole, and parties walked straight through settlements.
+        /// </summary>
+        private void BuildWaypoints(List<int> corridor, Vec2 start, Vec2 end, int[] excludedTerrains, List<Vec2> waypoints, int maxWaypoints)
+        {
+            int budget = Math.Max(4, maxWaypoints);
+
+            // Anchor at the party's true position when it stands on allowed cells, so the very
+            // first chord is validated from where the party actually walks (positions sit off
+            // cell centers). A snapped, blocked start anchors at the first corridor cell instead.
+            int startCell = CellOf(start);
+            Vec2 anchorPos = startCell >= 0 && IsCellAllowed(startCell, excludedTerrains)
+                ? start
+                : CenterOf(corridor[0]);
+
+            int anchorIdx = 0;
+            while (anchorIdx < corridor.Count - 1 && waypoints.Count < budget - 2)
+            {
+                // Farthest corridor cell with clear line-of-sight from the anchor: extend in big
+                // jumps, halving on failure. The immediately next corridor cell is adjacent and
+                // always reachable, so `reach` never gets stuck.
+                int reach = anchorIdx + 1;
+                int jump = 64;
+                while (jump >= 1)
+                {
+                    int candidate = Math.Min(corridor.Count - 1, reach + jump);
+                    if (candidate > reach && IsLineClear(anchorPos, CenterOf(corridor[candidate]), excludedTerrains))
+                    {
+                        reach = candidate;
+                    }
+                    else
+                    {
+                        jump >>= 1;
+                    }
+                }
+
+                // The corridor end is visible from here; the closing chords below finish the path.
+                if (reach >= corridor.Count - 1) break;
+
+                anchorPos = CenterOf(corridor[reach]);
+                waypoints.Add(anchorPos);
+                anchorIdx = reach;
+            }
+
+            // Close on the true destination, which sits off the last corridor cell's center (and
+            // may legitimately be inside a settlement hole — gates are targets). If the direct
+            // chord from the anchor clips blocked cells, land on the last corridor cell first.
+            if (!IsLineClear(anchorPos, end, excludedTerrains))
+            {
+                waypoints.Add(CenterOf(corridor[corridor.Count - 1]));
+            }
+            waypoints.Add(end);
         }
 
         // Binary min-heap on f-score, storing cells; f stored alongside in a parallel list.
-        private readonly List<float> _heapScores = new List<float>();
-
-        private void HeapPush(int cell, float f)
+        // Operates on the calling thread's scratch — no shared state.
+        private static void HeapPush(SearchScratch s, int cell, float f)
         {
-            _openHeap.Add(cell);
-            _heapScores.Add(f);
-            int i = _openHeap.Count - 1;
+            var heap = s.OpenHeap;
+            var scores = s.HeapScores;
+            heap.Add(cell);
+            scores.Add(f);
+            int i = heap.Count - 1;
             while (i > 0)
             {
                 int parent = (i - 1) / 2;
-                if (_heapScores[parent] <= _heapScores[i]) break;
-                (_openHeap[parent], _openHeap[i]) = (_openHeap[i], _openHeap[parent]);
-                (_heapScores[parent], _heapScores[i]) = (_heapScores[i], _heapScores[parent]);
+                if (scores[parent] <= scores[i]) break;
+                (heap[parent], heap[i]) = (heap[i], heap[parent]);
+                (scores[parent], scores[i]) = (scores[i], scores[parent]);
                 i = parent;
             }
         }
 
-        private int HeapPop()
+        private static int HeapPop(SearchScratch s)
         {
-            int top = _openHeap[0];
-            int last = _openHeap.Count - 1;
-            _openHeap[0] = _openHeap[last];
-            _heapScores[0] = _heapScores[last];
-            _openHeap.RemoveAt(last);
-            _heapScores.RemoveAt(last);
+            var heap = s.OpenHeap;
+            var scores = s.HeapScores;
+            int top = heap[0];
+            int last = heap.Count - 1;
+            heap[0] = heap[last];
+            scores[0] = scores[last];
+            heap.RemoveAt(last);
+            scores.RemoveAt(last);
             int i = 0;
             while (true)
             {
                 int left = 2 * i + 1, right = 2 * i + 2, smallest = i;
-                if (left < _openHeap.Count && _heapScores[left] < _heapScores[smallest]) smallest = left;
-                if (right < _openHeap.Count && _heapScores[right] < _heapScores[smallest]) smallest = right;
+                if (left < heap.Count && scores[left] < scores[smallest]) smallest = left;
+                if (right < heap.Count && scores[right] < scores[smallest]) smallest = right;
                 if (smallest == i) break;
-                (_openHeap[smallest], _openHeap[i]) = (_openHeap[i], _openHeap[smallest]);
-                (_heapScores[smallest], _heapScores[i]) = (_heapScores[i], _heapScores[smallest]);
+                (heap[smallest], heap[i]) = (heap[i], heap[smallest]);
+                (scores[smallest], scores[i]) = (scores[i], scores[smallest]);
                 i = smallest;
             }
             return top;

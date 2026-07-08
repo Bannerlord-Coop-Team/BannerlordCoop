@@ -16,9 +16,12 @@ internal class PartyBaseRegistry : AutoRegistryBase<PartyBase>
     {
     }
 
-    public override IEnumerable<MethodBase> Constructors => new MethodBase[] {
-        AccessTools.Constructor(typeof(PartyBase), new Type[] { typeof(MobileParty), typeof(Settlement) })
-    };
+    // Intentionally empty: PartyBase creation replicates through PartyBaseLifetimeHandler's
+    // custom flow, which lets clients ADOPT the PartyBase they already construct for a new
+    // MobileParty instead of receiving a skip-constructed duplicate shell (the shell re-pointed
+    // MobileParty.Party and orphaned everything keyed by the original reference — party visuals
+    // in particular). The registry still owns join-time registration and the destroy flow.
+    public override IEnumerable<MethodBase> Constructors => Array.Empty<MethodBase>();
 
     public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
     public override void RegisterAllObjects()

@@ -622,6 +622,14 @@ namespace ServerHeadless
                 try
                 {
                     campaign.RealTick(dt);
+
+                    // The party-AI think pass (PartiesThink: aggression, raid/engage target
+                    // selection). Natively it runs as an engine-pumped AsyncTask registered in
+                    // MapScene.Load — both skipped headless — and RealTick only ever WAITS on
+                    // that task. Without this call lords never attack or raid, so no map events
+                    // (and no battle/raid icons) ever exist.
+                    campaign.LateAITickAux();
+
                     campaign.Tick();
 
                     // Pump the Coop server's main-thread work queue (network handlers etc.).

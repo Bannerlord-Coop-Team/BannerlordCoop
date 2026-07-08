@@ -1,4 +1,5 @@
 using HarmonyLib;
+using SandBox.GauntletUI.Map;
 using SandBox.View.Map.Managers;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -6,17 +7,39 @@ using TaleWorlds.CampaignSystem.MapEvents;
 namespace ServerHeadless.Bootstrap.Patches
 {
     /// <summary>
-    /// Map-event visuals are created by an <c>IMapEventVisualCreator</c> installed by the UI/scene
-    /// layer, which we don't run headless — so <see cref="VisualCreator.CreateMapEventVisual"/>
-    /// returns null and callers NRE (on load of a save with an in-progress battle, and whenever a
-    /// battle map event is created during ticking). Return a no-op visual instead.
+    /// Headless, the UI layer never installs an <c>IMapEventVisualCreator</c>, so
+    /// <see cref="VisualCreator.CreateMapEventVisual"/> would return null and callers NRE.
+    /// Construct the REAL <see cref="GauntletMapEventVisual"/> (with no UI delegates): its
+    /// constructor is what the Coop mod's GauntletMapEventVisualRegistry patches to replicate
+    /// battle/raid map icons to clients, and the <c>MapEvent.MapEventVisual</c> field sync can
+    /// only resolve ids for instances of that registered type. A private no-op stub here meant
+    /// clients never saw map-event icons from a headless server ("Failed to get id for ...
+    /// HeadlessMapEventVisual"). The class is safe headless: its constructor is pure managed,
+    /// and the ambient-sound path disables itself because <see cref="SoundManagerPatches"/>
+    /// resolves every sound index to -1.
     /// </summary>
     [HarmonyPatch(typeof(VisualCreator), nameof(VisualCreator.CreateMapEventVisual))]
     internal class VisualPatches
     {
-        static bool Prefix(ref IMapEventVisual __result)
+        static bool Prefix(MapEvent __0, ref IMapEventVisual __result)
         {
-            __result = HeadlessMapEventVisual.Instance;
+            __result = new GauntletMapEventVisual(__0, null, null, null);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// <see cref="TaleWorlds.Engine.SoundManager.GetEventGlobalIndex"/> is a native call (dead
+    /// headless) and runs inside type initializers (e.g. GauntletMapEventVisual's cctor resolves
+    /// its ambient battle sounds there) — an exception would poison those types. Return -1
+    /// ("no such sound"), which also self-disables every sound-playback branch keyed on it.
+    /// </summary>
+    [HarmonyPatch(typeof(TaleWorlds.Engine.SoundManager), nameof(TaleWorlds.Engine.SoundManager.GetEventGlobalIndex))]
+    internal class SoundManagerPatches
+    {
+        static bool Prefix(ref int __result)
+        {
+            __result = -1;
             return false;
         }
     }
@@ -34,15 +57,5 @@ namespace ServerHeadless.Bootstrap.Patches
             __result = null;
             return false;
         }
-    }
-
-    /// <summary>No-op <see cref="IMapEventVisual"/> for headless operation (no scene to render to).</summary>
-    internal sealed class HeadlessMapEventVisual : IMapEventVisual
-    {
-        public static readonly HeadlessMapEventVisual Instance = new HeadlessMapEventVisual();
-
-        public void Initialize(CampaignVec2 position, bool isVisible) { }
-        public void OnMapEventEnd() { }
-        public void SetVisibility(bool isVisible) { }
     }
 }
