@@ -16,7 +16,7 @@ public interface IAgentActionHandler : IPacketHandler, IDisposable
 {
     /// <summary>
     /// [Game thread] Detect discrete action changes on owned agents and broadcast them. Driven per-frame from
-    /// CoopMissionController.OnMissionTick (NOT a background poller): the game thread is the only place a
+    /// CoopMissionController.OnMissionTick: the game thread is the only place a
     /// one-frame action transition can be observed without racing the engine, and event capture must be exact.
     /// </summary>
     void PollActions();
@@ -138,27 +138,23 @@ public class AgentActionHandler : IAgentActionHandler
         var actionPacket = (AgentActionPacket)packet;
         if (actionPacket.AgentIds == null) return;
 
-        // Resolve the puppets to apply (skipping our own) on the network thread, then apply the whole batch in
-        // ONE game-thread action, matching AgentMovementHandler.
-        var toApply = new List<(Agent agent, AgentActionData data)>();
-        for (int i = 0; i < actionPacket.AgentIds.Length; i++)
-        {
-            var agentId = actionPacket.AgentIds[i];
-            if (agentRegistry.IsLocallyControlled(agentId)) continue;
-            if (!agentRegistry.TryGetAgentInfo(agentId, out var info)) continue;
-            toApply.Add((info.Agent, actionPacket.Actions[i]));
-        }
-
-        if (toApply.Count == 0) return;
-
+        // Resolve and apply the whole batch in ONE game-thread action, matching AgentMovementHandler.
+        // Resolving here keeps this ordered behind earlier game-thread spawn/register work.
         GameThread.RunSafe(() =>
         {
             if (Mission.Current == null) return;
 
             using (new AllowedThread())
             {
-                foreach (var (agent, data) in toApply)
+                for (int i = 0; i < actionPacket.AgentIds.Length; i++)
                 {
+                    var agentId = actionPacket.AgentIds[i];
+                    if (agentRegistry.IsLocallyControlled(agentId)) continue;
+                    if (!agentRegistry.TryGetAgentInfo(agentId, out var info)) continue;
+
+                    Agent agent = info.Agent;
+                    AgentActionData data = actionPacket.Actions[i];
+
                     // The agent may have become invalid between queueing and running; only apply while active.
                     if (agent == null || agent.Mission != Mission.Current || !agent.IsActive())
                         continue;

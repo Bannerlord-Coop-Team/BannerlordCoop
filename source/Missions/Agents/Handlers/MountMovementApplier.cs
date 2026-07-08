@@ -12,7 +12,7 @@ namespace Missions.Agents.Handlers;
 /// Receive side for <see cref="MountMovementPacket"/>: applies another owner's MASTERLESS-horse snapshots to
 /// our local copies of those horses, through the same <see cref="AgentMountData.ApplyMount"/> path a ridden
 /// horse's pose takes, and feeds the shared position interpolator. Send side lives in
-/// <see cref="AgentMovementHandler"/>'s poll (one registry pass partitions riders and riderless horses), which
+/// <see cref="AgentMovementHandler"/>'s movement tick (one registry pass partitions riders and riderless horses), which
 /// also owns this applier's packet-manager registration so the two movement handlers share one lifecycle —
 /// this class has no threads or subscriptions of its own.
 /// </summary>
@@ -42,8 +42,8 @@ public class MountMovementApplier : IPacketHandler
         {
             if (Mission.Current == null) return;
 
-            // Resolve the horses to apply (skipping our own) on the network thread, then apply the whole batch
-            // in ONE game-thread action — matching AgentMovementHandler.HandlePacket.
+            // Resolve and apply the whole batch in ONE game-thread action, matching
+            // AgentMovementHandler.HandlePacket.
             var toApply = new List<(Agent horse, AgentMountData data)>();
             for (int i = 0; i < movement.MountIds.Length; i++)
             {
@@ -71,7 +71,7 @@ public class MountMovementApplier : IPacketHandler
                         continue;
 
                     data.ApplyMount(horse);
-                    interpolator.SetMountTarget(horse, data.MountPosition);
+                    interpolator.SetMountTarget(horse, data.MountPosition, data.MountMovementDirection);
                 }
             }
         });

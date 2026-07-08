@@ -53,10 +53,14 @@ internal class PartyHealHandler : IHandler
 
     private void Handle_PartyHealQuarterDailyTick(MessagePayload<PartyHealQuarterDailyTick> obj)
     {
-        if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
+        var mobileParty = obj.What.MobileParty;
 
-        if (obj.What.MobileParty?.IsPlayerParty() != true) return;
+        // Vanilla's quarter-daily tick heals every party EXCEPT the main party, which the hourly
+        // tick covers instead. In coop every player party is a "main party" healed by
+        // Handle_PartyHealHourlyTick, so skip them here and heal everyone else — this previously
+        // filtered the wrong way around, leaving all NPC parties' wounded unhealed forever.
+        if (mobileParty == null || mobileParty.IsPlayerParty()) return;
 
-        obj.What.PartyHealCampaignBehavior.TryHealOrWoundParty(obj.What.MobileParty.Party, 4f);
+        obj.What.PartyHealCampaignBehavior.TryHealOrWoundParty(mobileParty.Party, 4f);
     }
 }
