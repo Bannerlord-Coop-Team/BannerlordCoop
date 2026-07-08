@@ -243,7 +243,6 @@ internal class PvPInteractionClientHandler : IHandler
         if (MobileParty.MainParty?.MapEvent != null)
             MobileParty.MainParty.Party._mapEventSide = null;
 
-
         // Finishing the encounter does not itself close the open game menu; exit it explicitly. Mirrors
         // BattleHandler.Handle_NetworkMapEventFinalized, the proven post-battle menu teardown.
         //if (Campaign.Current?.CurrentMenuContext != null)
