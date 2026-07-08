@@ -1,8 +1,6 @@
 ﻿using Common;
-using Common.Logging;
 using GameInterface.Services.Heroes.Extensions;
 using HarmonyLib;
-using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -19,8 +17,6 @@ namespace GameInterface.Services.Settlements.Patches;
 [HarmonyPatch(typeof(SallyOutsCampaignBehavior))]
 internal class SallyOutsCampaignBehaviorPatches
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<SallyOutsCampaignBehaviorPatches>();
-
     [HarmonyPatch(nameof(SallyOutsCampaignBehavior.CheckForSettlementSallyOut))]
     [HarmonyPrefix]
     private static bool CheckForSettlementSallyOutPrefix(SallyOutsCampaignBehavior __instance, Settlement settlement)
@@ -38,15 +34,6 @@ internal class SallyOutsCampaignBehaviorPatches
         if (defenseLeader != null && defenseLeader.IsPlayerHero() && defenseLeader.CurrentSettlement == settlement) return false;
 
         __instance.CheckSallyOut(settlement, checkForNavalSallyOut: false, out var salliedOut);
-
-        // TEMP [SallyDiag]: confirmed the sally scan skips the besieger because its CurrentSettlement is non-null
-        // (it reads as zero strength, so the garrison out-ratios it every check). Logs CurrentSettlement + behavior
-        // + outcome to verify the leave-on-siege-start fix holds and the party isn't re-entering the settlement.
-        var besieger = settlement.SiegeEvent.BesiegerCamp.LeaderParty;
-        Logger.Information("[SallyDiag] {Settlement}: besieger={Besieger} count={Count} strength={Strength} aggr={Aggr} curSettle={CurSettle} behavior={Behavior} atWar={AtWar} garrison={Garrison} -> salliedOut={Sallied}",
-            settlement.Name?.ToString(), besieger?.Name?.ToString(), besieger?.MemberRoster.TotalManCount, besieger?.Party.EstimatedStrength,
-            besieger?.Aggressiveness, besieger?.CurrentSettlement?.Name?.ToString(), besieger?.DefaultBehavior, besieger?.MapFaction?.IsAtWarWith(settlement.MapFaction),
-            settlement.Town.GarrisonParty?.MemberRoster.TotalManCount, salliedOut);
 
         if (!salliedOut && settlement.HasPort && settlement.SiegeEvent.IsBlockadeActive)
         {

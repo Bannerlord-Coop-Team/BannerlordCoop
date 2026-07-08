@@ -146,11 +146,6 @@ internal class BattleFinalizeHandler : IHandler
         {
             var playerPartyIds = FinalizeAndCollectPlayers(mapEvent);
 
-            // TEMP [UiDiag]: confirm the auto-finalize targets every winning player's party for the encounter
-            // close (a winner missing here would never be told to close). Remove once the stuck-screen is fixed.
-            Logger.Information("[UiDiag] MapEventConcluded {Id}: closing encounter for {Count} player party id(s): [{Ids}]",
-                payload.What.MapEventId, playerPartyIds.Length, string.Join(",", playerPartyIds));
-
             if (playerPartyIds.Length > 0)
                 network.SendAll(new NetworkClosePvpEncounter(playerPartyIds));
         }
