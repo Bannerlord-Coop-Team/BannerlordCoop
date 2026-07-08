@@ -12,6 +12,7 @@ using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Interfaces;
+using GameInterface.Services.SiegeEvents.Patches;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -224,8 +225,15 @@ internal class BattleFinalizeHandler : IHandler
         var ids = new List<string>();
         if (mapEvent?.AttackerSide == null || mapEvent.DefenderSide == null) return ids.ToArray();
 
+        // A player capturing a settlement keeps its encounter (it enters the settlement-taken flow), so
+        // exclude the capturing leader from the close list; the close's Finish + ExitToLast would tear
+        // down the settlement menu the aftermath prompt opens for it, and its ExitToLast is what lets the
+        // menu re-open a second time (the double loot menu).
+        SiegeAftermathPatches.TryGetPlayerCaptureLeader(mapEvent, out var capturingLeader, out _);
+
         foreach (var party in mapEvent.InvolvedParties)
         {
+            if (capturingLeader != null && party?.MobileParty == capturingLeader) continue;
             if (party?.MobileParty?.IsPlayerParty() == true && objectManager.TryGetId(party, out var id))
                 ids.Add(id);
         }

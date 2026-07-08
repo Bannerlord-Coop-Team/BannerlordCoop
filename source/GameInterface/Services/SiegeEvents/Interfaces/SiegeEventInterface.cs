@@ -216,6 +216,17 @@ internal class SiegeEventInterface : ISiegeEventInterface
 
         using (new AllowedThread())
         {
+            // Establish the settlement encounter like vanilla PlayerEncounter.DoEnd's siege-capture branch,
+            // so Settlement.CurrentSettlement resolves (the leader menu init reads it) and the party lands
+            // inside at the gate. The server closes this player's battle encounter for everyone else, but
+            // the capturing party is now excluded from that close. AllowedThread stands the co-op
+            // EncounterManager patch down so StartSettlementEncounter runs locally instead of round-tripping.
+            if (MobileParty.MainParty.CurrentSettlement != settlement)
+            {
+                EnterSettlementAction.ApplyForParty(MobileParty.MainParty, settlement);
+            }
+            EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
+
             if (Campaign.Current?.CurrentMenuContext != null)
             {
                 GameMenu.SwitchToMenu("menu_settlement_taken");
