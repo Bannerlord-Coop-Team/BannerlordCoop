@@ -49,6 +49,14 @@ internal class BattleCasualtyHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MapEventParty>(msg.MapEventPartyId, out var mapEventParty))
                 return;
 
+            // Drop casualties that arrive after the battle has finalized. Finalize clears the party's
+            // battle rosters, so a late wound applied to a now-stale index throws IndexOutOfRange and
+            // corrupts the finalize (leaving a stuck encounter). A real-time victory — the enemy routing —
+            // ends the battle while the mission's casualty stream is still draining, which is what triggers it.
+            var mapEvent = mapEventParty.Party?.MapEvent;
+            if (mapEvent == null || mapEvent.IsFinalized)
+                return;
+
             // The casualty is addressed by the troop character's coop object id (never a raw StringId);
             // resolve the character through the object manager.
             if (!objectManager.TryGetObjectWithLogging<CharacterObject>(msg.TroopCharacterId, out var troop))
