@@ -39,13 +39,13 @@ internal class SallyOutsCampaignBehaviorPatches
 
         __instance.CheckSallyOut(settlement, checkForNavalSallyOut: false, out var salliedOut);
 
-        // TEMP [SallyDiag]: pin why the garrison sallies against a much larger besieger. Vanilla's decision reads
-        // the besieger strength from a spatial scan; if the client besieger reads ~0 strength (or fails a filter),
-        // the garrison always out-ratios it. Logs the ingredients + outcome so the next run shows the cause.
+        // TEMP [SallyDiag]: confirmed the sally scan skips the besieger because its CurrentSettlement is non-null
+        // (it reads as zero strength, so the garrison out-ratios it every check). Logs CurrentSettlement + behavior
+        // + outcome to verify the leave-on-siege-start fix holds and the party isn't re-entering the settlement.
         var besieger = settlement.SiegeEvent.BesiegerCamp.LeaderParty;
-        Logger.Information("[SallyDiag] {Settlement}: besieger={Besieger} count={Count} strength={Strength} aggr={Aggr} inSettlement={InSettlement} atWar={AtWar} garrison={Garrison} -> salliedOut={Sallied}",
+        Logger.Information("[SallyDiag] {Settlement}: besieger={Besieger} count={Count} strength={Strength} aggr={Aggr} curSettle={CurSettle} behavior={Behavior} atWar={AtWar} garrison={Garrison} -> salliedOut={Sallied}",
             settlement.Name?.ToString(), besieger?.Name?.ToString(), besieger?.MemberRoster.TotalManCount, besieger?.Party.EstimatedStrength,
-            besieger?.Aggressiveness, besieger?.CurrentSettlement != null, besieger?.MapFaction?.IsAtWarWith(settlement.MapFaction),
+            besieger?.Aggressiveness, besieger?.CurrentSettlement?.Name?.ToString(), besieger?.DefaultBehavior, besieger?.MapFaction?.IsAtWarWith(settlement.MapFaction),
             settlement.Town.GarrisonParty?.MemberRoster.TotalManCount, salliedOut);
 
         if (!salliedOut && settlement.HasPort && settlement.SiegeEvent.IsBlockadeActive)

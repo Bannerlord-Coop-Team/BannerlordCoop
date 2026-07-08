@@ -94,6 +94,15 @@ internal class SiegeEventInterface : ISiegeEventInterface
 
     public void StartSiegeEvent(MobileParty besiegerParty, Settlement settlement)
     {
+        // A besieger camps outside the walls, so it must not be marked as inside a settlement. If it still is
+        // (e.g. it besieged a town it was visiting), leave first: vanilla's sally-out strength scan skips parties
+        // with a non-null CurrentSettlement, so a besieger left "inside" reads as zero strength and the garrison
+        // sallies against a phantom-weak besieger every check. Runs on the server with patches live, so it replicates.
+        if (besiegerParty.CurrentSettlement != null)
+        {
+            LeaveSettlementAction.ApplyForParty(besiegerParty);
+        }
+
         Campaign.Current.SiegeEventManager.StartSiegeEvent(settlement, besiegerParty);
     }
 
