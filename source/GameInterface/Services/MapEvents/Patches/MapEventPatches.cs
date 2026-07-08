@@ -147,8 +147,6 @@ internal class MapEventPatches
     [HarmonyPrefix]
     private static bool Prefix_OnBattleWon(MapEvent __instance)
     {
-        var containsPlayer = __instance._sides.Any(side => side.Parties.Any(party => party.Party.MobileParty.IsPlayerParty()));
-
         // Skip on client
         if (ModInformation.IsClient)
             return false;
@@ -161,6 +159,11 @@ internal class MapEventPatches
             // Run a custom implementation of MapEvent.CalculateAndCommitMapEventResults that broadcasts results to players
             var message = new CommitMapEventResults(__instance);
             MessageBroker.Instance.Publish(__instance, message);
+        }
+        else
+        {
+            // Mirror native OnBattleWon: a battle without players commits its results directly.
+            __instance.CalculateAndCommitMapEventResults();
         }
 
         IBattleObserver battleObserver = __instance.BattleObserver;

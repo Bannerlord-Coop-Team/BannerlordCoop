@@ -5,6 +5,7 @@ using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEvents.Data;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.PlayerCaptivityService.Patches;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
 using Serilog;
@@ -499,6 +500,12 @@ public class MapEventResultsInterface : IMapEventResultsInterface
     {
         // No prisoners are taken if one side retreated
         if (mapEvent.RetreatingSide != BattleSideEnum.None) return;
+
+        // The coop player capture used to run as a prefix on native MapEvent.CaptureDefeatedPartyMembers,
+        // which this reimplementation replaces — so it must be invoked explicitly. It runs FIRST because
+        // capturing a player clears that party's roster on the server (PlayerCaptivityServerHandler), so
+        // the loop below (which skips player heroes) cannot re-process or scatter the captured hero's men.
+        PlayerStartCaptivityPatches.CaptureDefeatedPlayerHeroes(winnerParties, defeatedParties);
 
         MBList<KeyValuePair<MapEventParty, float>> woundedCaptureChances;
         MBList<KeyValuePair<MapEventParty, float>> healthyCaptureChances;

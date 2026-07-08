@@ -54,7 +54,7 @@ internal class MapEventResultsHandler : IHandler
 
             mapEventResultsInterface.CalculateAndCommitMapEventResults(mapEvent, out NetworkPlayerLootData networkPlayerLootData);
 
-            var message = new NetworkCommitMapEventResults(mapEventId, networkPlayerLootData);
+            var message = new NetworkCommitMapEventResults(mapEventId, mapEvent.WinningSide, networkPlayerLootData);
             network.SendAll(message);
         });
     }
@@ -66,12 +66,21 @@ internal class MapEventResultsHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.MapEventId, out var mapEvent)) return;
+
+            // Only stage the encounter of a client whose own party fought this battle; an uninvolved client
+            // (no open encounter, or one for something unrelated — a town visit, a conversation) must not
+            // have its encounter state touched by another battle's results.
+            var playerEncounter = PlayerEncounter.Current;
+            if (playerEncounter == null) return;
+
+            var mainParty = PartyBase.MainParty;
+            if (mainParty?.MapEventSide?.MapEvent != mapEvent) return;
+
             var playerLootData = mapEventResultsInterface.UnpackPlayerLootData(data.PlayerLootData);
 
             // Set the encounter state ahead to start at applying results when a winning player leaves the battle
             // CaptureHeroes is the first EncounterState that doesn't rely on the MapEvent, which is already destroyed when a player leaves a battle
-            var playerEncounter = PlayerEncounter.Current;
-            if (mapEvent.WinningSide == PartyBase.MainParty.Side)
+            if (data.WinningSide == mainParty.Side)
             {
                 playerEncounter.EncounterState = PlayerEncounterState.CaptureHeroes;
             }
@@ -85,7 +94,7 @@ internal class MapEventResultsHandler : IHandler
                 // Add looted items to player encounter
                 foreach (var playerLootedItems in playerLootData.LootedItems)
                 {
-                    if (playerLootedItems.Key.Party != PartyBase.MainParty) continue;
+                    if (playerLootedItems.Key.Party != mainParty) continue;
 
                     playerEncounter.RosterToReceiveLootItems.Add(playerLootedItems.Value);
                 }
@@ -93,7 +102,7 @@ internal class MapEventResultsHandler : IHandler
                 // Add looted members to player encounter
                 foreach (var playerLootedMembers in playerLootData.LootedMembers)
                 {
-                    if (playerLootedMembers.Key.Party != PartyBase.MainParty) continue;
+                    if (playerLootedMembers.Key.Party != mainParty) continue;
 
                     playerEncounter.RosterToReceiveLootMembers.Add(playerLootedMembers.Value);
                 }
@@ -101,7 +110,7 @@ internal class MapEventResultsHandler : IHandler
                 // Add looted prisoners to player encounter
                 foreach (var playerLootedPrisoners in playerLootData.LootedPrisoners)
                 {
-                    if (playerLootedPrisoners.Key.Party != PartyBase.MainParty) continue;
+                    if (playerLootedPrisoners.Key.Party != mainParty) continue;
 
                     playerEncounter.RosterToReceiveLootPrisoners.Add(playerLootedPrisoners.Value);
                 }

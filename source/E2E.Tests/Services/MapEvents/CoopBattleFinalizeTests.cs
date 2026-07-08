@@ -5,6 +5,7 @@ using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -16,8 +17,10 @@ using Xunit.Abstractions;
 namespace E2E.Tests.Services.MapEvents;
 
 /// <summary>
-/// The "back up to the encounter" end of a coop battle: two allied players win a shared battle and their
-/// <c>PlayerEncounter</c>s must finalize and stay in sync with the server. Each client controls its own
+/// The "back up to the encounter" end of a coop battle: two allied players win a shared battle, the server
+/// finalizes the shared <see cref="MapEvent"/> and each player's <c>PlayerEncounter</c> is detached and staged
+/// for the battle-results pass (it is no longer force-finished; the <c>PlayerEncounter.Update</c> path drives
+/// the loot states and the finish in the live game). Each client controls its own
 /// <see cref="MobileParty.MainParty"/>, so per-client encounter paths run for real (see
 /// <see cref="MapEventTestBase.EnableHeadlessEncounterFinish"/>); only <c>GameMenu.ExitToLast</c> (no menu
 /// context exists headless) is mocked.
@@ -28,8 +31,12 @@ public class CoopBattleFinalizeTests : MapEventTestBase
 
     /// <summary>
     /// The explicit post-victory leave: the winning side leader finalizes, the server tears down the shared
-    /// <see cref="MapEvent"/> and tells both players to close, and each client's <c>PlayerEncounter.Finish</c>
-    /// runs headless. This is the wired path and passes.
+    /// <see cref="MapEvent"/>, replies to the leaver with <c>NetworkMapEventFinalized</c> (which finishes the
+    /// leaver's own encounter) and tells both players to close. Closing detaches each player's MainParty from
+    /// the battle but deliberately does NOT finish the local <c>PlayerEncounter</c> anymore: the ally's stays
+    /// open so the player backs out through the (now unblocked) encounter menu, with any pending battle-result
+    /// states driven by the <c>PlayerEncounter.Update</c> path (see
+    /// <c>PvPInteractionClientHandler.CloseEncounter</c> and <c>PlayerEncounterPatches.UpdatePrefix</c>).
     /// </summary>
     [Fact]
     public void BothPlayersLeave_FinalizesSharedEncounter_AndEachPlayerLeavesTheBattle()
@@ -73,22 +80,30 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         Assert.Contains(player2PartyBaseId, closeOnClient2);
 
         // Each player's client recognized its OWN MainParty in the close instruction and ran the close path,
-        // detaching it from the finalized battle and clearing the encounter (Finish ran headless).
+        // detaching it from the finalized battle.
         AssertMainPartyLeftBattle(Clients.First());
         AssertMainPartyLeftBattle(Clients.Last());
+
+        // The leaver's own encounter is finished by its NetworkMapEventFinalized reply (the explicit-leave
+        // teardown in BattleFinalizeHandler). The ally only receives the close instruction, which detaches its
+        // party but deliberately leaves the encounter open: the player backs out of the encounter menu
+        // themselves (GameMenuEncounterLeaveOnConditionPatch unblocks the leave once the MapEvent is gone).
         AssertHasPlayerEncounter(Clients.First(), expected: false);
-        AssertHasPlayerEncounter(Clients.Last(), expected: false);
+        AssertHasPlayerEncounter(Clients.Last(), expected: true);
     }
 
     /// <summary>
-    /// The coop auto-finalize on conclusion: a concluded battle finalizes the encounter with no explicit leave.
-    /// Both allied players win — a client commits the victory <see cref="BattleState"/>, the server applies it
-    /// (OnBattleWon) and, recognizing the conclusion (<c>MapEventConcluded</c>), finalizes the shared
-    /// <see cref="MapEvent"/> and tells every involved player to close; each client's <c>PlayerEncounter.Finish</c>
-    /// then runs headless. The test triggers NO leave / <c>MapEventFinalizeAttempted</c> / <c>Finish</c> itself.
+    /// The coop auto-finalize on conclusion: both allied players win — a client commits the victory
+    /// <see cref="BattleState"/>, the server applies it (OnBattleWon), broadcasts the authoritative battle
+    /// results (<c>NetworkCommitMapEventResults</c>) and, recognizing the conclusion (<c>MapEventConcluded</c>),
+    /// finalizes the shared <see cref="MapEvent"/> with no explicit leave. Each involved winner's
+    /// <c>PlayerEncounter</c> is NOT force-finished: it is staged to <see cref="PlayerEncounterState.CaptureHeroes"/>,
+    /// from which the <c>PlayerEncounter.Update</c> path (<c>PlayerEncounterInterface</c>) runs the loot states
+    /// and finishes the encounter in the live game. The test triggers NO leave /
+    /// <c>MapEventFinalizeAttempted</c> / <c>Finish</c> itself.
     /// </summary>
     [Fact]
-    public void BattleConcludesWithVictory_PlayerEncounterFinalizesWithoutExplicitLeave()
+    public void BattleConcludesWithVictory_StagesEachWinnersEncounterForBattleResults()
     {
         var (ctx, _, _, _) = SetupTwoAlliedPlayersInBattle();
 
@@ -121,12 +136,16 @@ public class CoopBattleFinalizeTests : MapEventTestBase
             mapEvent.BattleState = BattleState.AttackerVictory;
         }, disabled);
 
-        // The conclusion alone finalized the shared battle and each player's encounter — no explicit leave.
+        // The conclusion alone finalized the shared battle — no explicit leave.
         AssertMapEventRemoved(Server, ctx.MapEventId);
         foreach (var client in Clients)
             AssertMapEventRemoved(client, ctx.MapEventId);
-        AssertHasPlayerEncounter(Clients.First(), expected: false);
-        AssertHasPlayerEncounter(Clients.Last(), expected: false);
+
+        // Both winners' encounters survive the close and are staged for the battle-results pass. The commit
+        // message carries the winning side from the server, so the ally that never saw the BattleState locally
+        // (client SendAll only reaches the server) stages exactly like the committing client.
+        AssertPlayerEncounterState(Clients.First(), PlayerEncounterState.CaptureHeroes);
+        AssertPlayerEncounterState(Clients.Last(), PlayerEncounterState.CaptureHeroes);
     }
 
     /// <summary>
@@ -234,6 +253,17 @@ public class CoopBattleFinalizeTests : MapEventTestBase
     {
         client.Call(() =>
             Assert.Null(MobileParty.MainParty.Party.MapEventSide));
+    }
+
+    /// <summary>Asserts the client still has a <c>PlayerEncounter.Current</c> and that it was staged to the
+    /// given result state by the server's battle-result commit.</summary>
+    private static void AssertPlayerEncounterState(EnvironmentInstance client, PlayerEncounterState expected)
+    {
+        client.Call(() =>
+        {
+            Assert.NotNull(PlayerEncounter.Current);
+            Assert.Equal(expected, PlayerEncounter.Current.EncounterState);
+        });
     }
 
     private static void AssertMapEventRemoved(EnvironmentInstance instance, string mapEventId)
