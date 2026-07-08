@@ -1,6 +1,8 @@
 ﻿using Common;
+using Common.Logging;
 using GameInterface.Services.Heroes.Extensions;
 using HarmonyLib;
+using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -17,6 +19,8 @@ namespace GameInterface.Services.Settlements.Patches;
 [HarmonyPatch(typeof(SallyOutsCampaignBehavior))]
 internal class SallyOutsCampaignBehaviorPatches
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<SallyOutsCampaignBehaviorPatches>();
+
     [HarmonyPatch(nameof(SallyOutsCampaignBehavior.CheckForSettlementSallyOut))]
     [HarmonyPrefix]
     private static bool CheckForSettlementSallyOutPrefix(SallyOutsCampaignBehavior __instance, Settlement settlement)
@@ -34,6 +38,16 @@ internal class SallyOutsCampaignBehaviorPatches
         if (defenseLeader != null && defenseLeader.IsPlayerHero() && defenseLeader.CurrentSettlement == settlement) return false;
 
         __instance.CheckSallyOut(settlement, checkForNavalSallyOut: false, out var salliedOut);
+
+        // TEMP [SallyDiag]: pin why the garrison sallies against a much larger besieger. Vanilla's decision reads
+        // the besieger strength from a spatial scan; if the client besieger reads ~0 strength (or fails a filter),
+        // the garrison always out-ratios it. Logs the ingredients + outcome so the next run shows the cause.
+        var besieger = settlement.SiegeEvent.BesiegerCamp.LeaderParty;
+        Logger.Information("[SallyDiag] {Settlement}: besieger={Besieger} count={Count} strength={Strength} aggr={Aggr} inSettlement={InSettlement} atWar={AtWar} garrison={Garrison} -> salliedOut={Sallied}",
+            settlement.Name?.ToString(), besieger?.Name?.ToString(), besieger?.MemberRoster.TotalManCount, besieger?.Party.TotalStrength,
+            besieger?.Aggressiveness, besieger?.CurrentSettlement != null, besieger?.MapFaction?.IsAtWarWith(settlement.MapFaction),
+            settlement.Town.GarrisonParty?.MemberRoster.TotalManCount, salliedOut);
+
         if (!salliedOut && settlement.HasPort && settlement.SiegeEvent.IsBlockadeActive)
         {
             __instance.CheckSallyOut(settlement, checkForNavalSallyOut: true, out _);
