@@ -65,6 +65,18 @@ internal static class SiegeContainerLookup
         return null;
     }
 
+    /// <summary>The siege side that owns a container (attacker = besieger camp, defender = settlement).</summary>
+    public static ISiegeEventSide FindOwnerSide(SiegeEnginesContainer container)
+    {
+        foreach (var siegeEvent in ActiveSieges())
+        {
+            if (siegeEvent.BesiegerCamp?.SiegeEngines == container) return siegeEvent.BesiegerCamp;
+            if (siegeEvent.BesiegedSettlement.SiegeEngines == container) return siegeEvent.BesiegedSettlement;
+        }
+
+        return null;
+    }
+
     public static Settlement FindOwnerSettlement(SiegeEngineConstructionProgress siegeEngine)
     {
         foreach (var siegeEvent in ActiveSieges())

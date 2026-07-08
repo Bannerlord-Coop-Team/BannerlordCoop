@@ -42,6 +42,7 @@ internal class SiegeEnginesContainerHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<SiegeEngineConstructionProgress>(obj.SiegeEngineId, out var siegeEngine)) return;
 
             FillEngineType(siegeEngine, obj.EngineTypeId);
+            FillRangedSiegeEngine(container, siegeEngine);
             SiegeEnginesContainerPatches.RunDeploySiegeEngineAtIndex(container, siegeEngine, obj.Index);
             DirtyOwnerVisual(container);
         });
@@ -62,6 +63,19 @@ internal class SiegeEnginesContainerHandler : IHandler
         }
 
         ReflectionUtils.SetPrivateField(typeof(SiegeEngineConstructionProgress), nameof(SiegeEngineConstructionProgress.SiegeEngine), siegeEngine, engineType);
+    }
+
+    // Vanilla allocates the bombardment state in SiegeEvent.CreateSiegeObject when a ranged engine finishes
+    // building, which only the server's siege logic runs. The settlement's map visual derefs it every frame
+    // for each deployed ranged engine, so fill the client's engine here to match vanilla's fresh-deploy state.
+    private static void FillRangedSiegeEngine(SiegeEnginesContainer container, SiegeEngineConstructionProgress siegeEngine)
+    {
+        if (siegeEngine.SiegeEngine?.IsRanged != true || siegeEngine.RangedSiegeEngine != null) return;
+
+        var side = SiegeContainerLookup.FindOwnerSide(container);
+        if (side == null) return;
+
+        siegeEngine.SetRangedSiegeEngine(new RangedSiegeEngine(siegeEngine.SiegeEngine, side));
     }
 
     // The settlement's map visual only refreshes when dirtied, and vanilla dirties inside the
