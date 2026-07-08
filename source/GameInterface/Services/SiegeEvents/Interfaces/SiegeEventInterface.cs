@@ -216,24 +216,27 @@ internal class SiegeEventInterface : ISiegeEventInterface
 
         using (new AllowedThread())
         {
-            // Establish the settlement encounter like vanilla PlayerEncounter.DoEnd's siege-capture branch,
-            // so Settlement.CurrentSettlement resolves (the leader menu init reads it) and the party lands
-            // inside at the gate. The server closes this player's battle encounter for everyone else, but
-            // the capturing party is now excluded from that close. AllowedThread stands the co-op
-            // EncounterManager patch down so StartSettlementEncounter runs locally instead of round-tripping.
-            if (MobileParty.MainParty.CurrentSettlement != settlement)
+            // Fallback only: when this client ran the native PlayerEncounter.DoEnd capture flow it already
+            // established the settlement encounter (and opened menu_settlement_taken), so re-establishing it
+            // here would re-init the live encounter and bounce the menu out to "town". Only build the
+            // encounter when there is none, e.g. this client didn't run the battle simulation. AllowedThread
+            // stands the co-op EncounterManager patch down so it runs locally instead of round-tripping.
+            if (PlayerEncounter.Current == null)
             {
-                EnterSettlementAction.ApplyForParty(MobileParty.MainParty, settlement);
-            }
-            EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
+                if (MobileParty.MainParty.CurrentSettlement != settlement)
+                {
+                    EnterSettlementAction.ApplyForParty(MobileParty.MainParty, settlement);
+                }
+                EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
 
-            if (Campaign.Current?.CurrentMenuContext != null)
-            {
-                GameMenu.SwitchToMenu("menu_settlement_taken");
-            }
-            else
-            {
-                GameMenu.ActivateGameMenu("menu_settlement_taken");
+                if (Campaign.Current?.CurrentMenuContext != null)
+                {
+                    GameMenu.SwitchToMenu("menu_settlement_taken");
+                }
+                else
+                {
+                    GameMenu.ActivateGameMenu("menu_settlement_taken");
+                }
             }
         }
     }
