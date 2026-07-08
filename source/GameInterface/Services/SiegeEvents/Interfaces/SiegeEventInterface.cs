@@ -94,21 +94,7 @@ internal class SiegeEventInterface : ISiegeEventInterface
 
     public void StartSiegeEvent(MobileParty besiegerParty, Settlement settlement)
     {
-        // A besieger camps outside the walls, so it must not be marked as inside a settlement. If it still is
-        // (e.g. it besieged a town it was visiting), leave first: vanilla's sally-out strength scan skips parties
-        // with a non-null CurrentSettlement, so a besieger left "inside" reads as zero strength and the garrison
-        // sallies against a phantom-weak besieger every check. Runs on the server with patches live, so it replicates.
-        Logger.Information("[SallyDiag] StartSiegeEvent besieger={Party} CurrentSettlement before={Before}",
-            besiegerParty?.Name?.ToString(), besiegerParty?.CurrentSettlement?.Name?.ToString());
-        if (besiegerParty.CurrentSettlement != null)
-        {
-            LeaveSettlementAction.ApplyForParty(besiegerParty);
-        }
-
         Campaign.Current.SiegeEventManager.StartSiegeEvent(settlement, besiegerParty);
-
-        Logger.Information("[SallyDiag] StartSiegeEvent besieger={Party} CurrentSettlement after={After}",
-            besiegerParty?.Name?.ToString(), besiegerParty?.CurrentSettlement?.Name?.ToString());
     }
 
     public void JoinSiegeCamp(MobileParty party, Settlement settlement)
@@ -123,15 +109,6 @@ internal class SiegeEventInterface : ISiegeEventInterface
 
     public void StartLocalPlayerSiegePreparation()
     {
-        // A besieger camps outside the walls. If we besieged from inside the settlement, leave it first so the
-        // party isn't left marked as inside (the server's sally-out strength scan skips such parties, which reads
-        // our besieger as zero strength). Mirrors StartLocalPlayerJoinedSiege, which already leaves.
-        Logger.Information("[SallyDiag] StartLocalPlayerSiegePreparation: MainHero.CurrentSettlement={Cur}", Hero.MainHero?.CurrentSettlement?.Name?.ToString());
-        if (Hero.MainHero.CurrentSettlement != null)
-        {
-            PlayerEncounter.LeaveSettlement();
-        }
-
         if (PlayerEncounter.Current != null)
         {
             PlayerEncounter.Finish();
