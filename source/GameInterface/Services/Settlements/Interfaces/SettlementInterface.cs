@@ -62,6 +62,11 @@ internal class SettlementInterface : ISettlementInterface
 
     public void PartyEnterSettlement(MobileParty party, Settlement settlement)
     {
+        // A besieger stays outside the settlement it besieges (vanilla's HandleEncounterForMobileParty skips
+        // besiegers). A settlement-encounter round-trip that races the siege start would otherwise re-enter it,
+        // and the garrison sally-out scan then reads the besieger as zero strength and sallies every check.
+        if (party.BesiegedSettlement == settlement) return;
+
         EnterSettlementAction.ApplyForParty(party, settlement);
     }
 
@@ -74,6 +79,9 @@ internal class SettlementInterface : ISettlementInterface
 
     public void StartSettlementEncounter(MobileParty party, Settlement settlement)
     {
+        // Same invariant as PartyEnterSettlement: no settlement encounter for a party besieging this settlement.
+        if (party.BesiegedSettlement == settlement) return;
+
         var settlementParty = settlement.Party;
         if (settlementParty == null)
         {
