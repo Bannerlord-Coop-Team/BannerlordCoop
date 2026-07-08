@@ -94,6 +94,15 @@ internal class SiegeEventInterface : ISiegeEventInterface
 
     public void StartSiegeEvent(MobileParty besiegerParty, Settlement settlement)
     {
+        // Vanilla's besiege consequence calls PlayerEncounter.Finish() first, which leaves the settlement when the
+        // besieger is inside it. In co-op that Finish runs only on the client (under AllowedThread), so its leave
+        // never reaches the server - which then keeps the besieger marked inside, and vanilla's sally-out scan skips
+        // parties with CurrentSettlement != null (reading our besieger as zero strength). Leave here to match vanilla.
+        if (besiegerParty.CurrentSettlement != null)
+        {
+            LeaveSettlementAction.ApplyForParty(besiegerParty);
+        }
+
         Campaign.Current.SiegeEventManager.StartSiegeEvent(settlement, besiegerParty);
     }
 
