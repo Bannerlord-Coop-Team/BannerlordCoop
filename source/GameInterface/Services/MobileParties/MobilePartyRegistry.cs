@@ -111,7 +111,8 @@ internal class MobilePartyRegistry : AutoRegistryBase<MobileParty>
 
         messageBroker.Publish(this, new MobilePartyDestroyed(obj));
 
-        var message = new InstanceDestroyed<PartyBase>(obj.Party);
-        messageBroker.Publish(this, message);
+        // Sole publisher of the PartyBase teardown: PartyBaseRegistry.DestroyMethods is empty, so
+        // a PartyBase's lifetime ends with its party's, while everything is still registered.
+        messageBroker.Publish(this, new InstanceDestroyed<PartyBase>(obj.Party));
     }
 }
