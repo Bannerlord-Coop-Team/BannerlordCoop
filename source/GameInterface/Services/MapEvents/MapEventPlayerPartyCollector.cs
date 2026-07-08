@@ -1,5 +1,6 @@
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -13,7 +14,7 @@ internal static class MapEventPlayerPartyCollector
     {
         var ids = new HashSet<string>();
         if (mapEvent == null)
-            return new string[0];
+            return Array.Empty<string>();
 
         AddParties(mapEvent.InvolvedParties, objectManager, ids);
         AddSideParties(mapEvent.AttackerSide, objectManager, ids);
@@ -25,7 +26,7 @@ internal static class MapEventPlayerPartyCollector
     {
         var ids = new HashSet<string>();
 
-        foreach (var partyIds in partyIdGroups ?? System.Array.Empty<string[]>())
+        foreach (var partyIds in partyIdGroups ?? Array.Empty<string[]>())
         {
             if (partyIds == null)
                 continue;

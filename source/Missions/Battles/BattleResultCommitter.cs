@@ -23,9 +23,6 @@ public interface IBattleResultCommitter
     /// resolve the shared campaign battle for everyone.
     /// </summary>
     void CommitResolvedResult();
-
-    /// <summary>Compatibility alias for older callers; host-only gating was removed from the implementation.</summary>
-    void CommitIfHost();
 }
 
 /// <inheritdoc cref="IBattleResultCommitter"/>
@@ -42,11 +39,6 @@ public class BattleResultCommitter : IBattleResultCommitter
         this.objectManager = objectManager;
         this.session = session;
         this.hostRegistry = hostRegistry;
-    }
-
-    public void CommitIfHost()
-    {
-        CommitResolvedResult();
     }
 
     public void CommitResolvedResult()

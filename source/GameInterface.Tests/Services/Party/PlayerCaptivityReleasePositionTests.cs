@@ -113,6 +113,43 @@ public class PlayerCaptivityReleasePositionTests
     }
 
     [Fact]
+    public void CreatePlayerCaptivityReleaseEvents_PlayerPrisonerTransferred_KeepsRosterDelta()
+    {
+        var playerHero = ObjectHelper.SkipConstructor<Hero>();
+        var playerCharacter = ObjectHelper.SkipConstructor<CharacterObject>();
+        playerCharacter.HeroObject = playerHero;
+        var releasePosition = Position(1f, 2f);
+        var leftPrisonerDelta = new TroopRosterData(new[]
+        {
+            new TroopRosterElementData("player-character", -1, 0, 0),
+        });
+        var rightPrisonerDelta = new TroopRosterData(new[]
+        {
+            new TroopRosterElementData("player-character", 1, 0, 0),
+        });
+
+        SetupObject("player-character", playerCharacter);
+        MarkPlayerHero(playerHero, "player-hero");
+        try
+        {
+            var releaseEvents = handler.CreatePlayerCaptivityReleaseEvents(
+                leftPrisonerDelta,
+                rightPrisonerDelta,
+                releasePosition,
+                out var filteredLeftPrisonerDelta,
+                out var filteredRightPrisonerDelta);
+
+            Assert.Empty(releaseEvents);
+            Assert.Equal(-1, Assert.Single(filteredLeftPrisonerDelta.Data).Number);
+            Assert.Equal(1, Assert.Single(filteredRightPrisonerDelta.Data).Number);
+        }
+        finally
+        {
+            GetPlayerObjects().Remove(playerHero);
+        }
+    }
+
+    [Fact]
     public void NetworkCompleteDoneLogic_RoundTrip_PreservesReleaserPartyPosition()
     {
         var releasePosition = Position(44.75f, 91.125f);

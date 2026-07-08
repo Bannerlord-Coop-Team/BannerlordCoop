@@ -131,7 +131,7 @@ internal class BattleFinalizeHandler : IHandler
         // in live p2p hostile battles when player-party collection races teardown.
         if (playerPartyIds.Length > 0)
         {
-            SendClosePvpEncounter(playerPartyIds, mapEventId: payload.What.MapEventId);
+            PvpEncounterCloseSender.Send(network, messageBroker, this, playerPartyIds, mapEventId: payload.What.MapEventId);
             return;
         }
 
@@ -152,7 +152,7 @@ internal class BattleFinalizeHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging(payload.What.MapEventId, out MapEvent mapEvent))
         {
             if (!closeAlreadySent && knownPlayerPartyIds.Length > 0)
-                SendClosePvpEncounter(knownPlayerPartyIds, payload.What.SurrenderedPartyId, payload.What.MapEventId);
+                PvpEncounterCloseSender.Send(network, messageBroker, this, knownPlayerPartyIds, payload.What.SurrenderedPartyId, payload.What.MapEventId);
 
             return;
         }
@@ -167,7 +167,7 @@ internal class BattleFinalizeHandler : IHandler
             var playerPartyIds = FinalizeAndCollectPlayers(mapEvent, knownPlayerPartyIds);
 
             if (!closeAlreadySent && playerPartyIds.Length > 0)
-                SendClosePvpEncounter(playerPartyIds, payload.What.SurrenderedPartyId, payload.What.MapEventId);
+                PvpEncounterCloseSender.Send(network, messageBroker, this, playerPartyIds, payload.What.SurrenderedPartyId, payload.What.MapEventId);
         }
         catch (Exception e)
         {
@@ -262,18 +262,6 @@ internal class BattleFinalizeHandler : IHandler
 
         network.SendAll(new NetworkRaidBattleResetToVillage(playerPartyIds, settlementId));
         return true;
-    }
-
-    private void SendClosePvpEncounter(string[] playerPartyIds, string surrenderedPartyId = null, string mapEventId = null)
-    {
-        if (playerPartyIds == null || playerPartyIds.Length == 0)
-            return;
-
-        var message = new NetworkClosePvpEncounter(playerPartyIds, surrenderedPartyId, mapEventId);
-        network.SendAll(message);
-
-        if (ModInformation.IsServer)
-            messageBroker.Publish(this, message);
     }
 
     private void Handle_NetworkRaidBattleResetToVillage(MessagePayload<NetworkRaidBattleResetToVillage> payload)

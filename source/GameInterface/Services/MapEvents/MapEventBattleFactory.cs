@@ -1,5 +1,6 @@
 using Common.Logging;
 using Serilog;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -43,7 +44,7 @@ internal sealed class MapEventBattleFactory
         if (TryCreateMobileSettlementMapEvent(attacker, defender, mapEventManager, out mapEvent))
             return mapEvent;
 
-        return CreateFieldBattleEvent(attacker, defender);
+        return CreateFieldBattleEvent(attacker, defender, mapEventManager);
     }
 
     private static bool TryCreateForcedMapEvent(
@@ -159,7 +160,7 @@ internal sealed class MapEventBattleFactory
         return false;
     }
 
-    private static MapEvent CreateFieldBattleEvent(PartyBase attacker, PartyBase defender)
+    private static MapEvent CreateFieldBattleEvent(PartyBase attacker, PartyBase defender, MapEventManager mapEventManager)
     {
         var mapEvent = new MapEvent();
         if (Campaign.Current?.VisualCreator?.MapEventVisualCreator == null)
@@ -170,6 +171,10 @@ internal sealed class MapEventBattleFactory
             defender,
             new FieldBattleEventComponent(mapEvent),
             MapEvent.BattleTypes.FieldBattle);
+
+        if (!mapEventManager.MapEvents.Contains(mapEvent))
+            mapEventManager.OnMapEventCreated(mapEvent);
+
         return mapEvent;
     }
 

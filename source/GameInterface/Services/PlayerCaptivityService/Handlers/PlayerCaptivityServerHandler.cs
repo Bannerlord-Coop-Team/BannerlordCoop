@@ -13,7 +13,6 @@ using GameInterface.Services.PartyVisuals.Extensions;
 using GameInterface.Services.PartyVisuals.Messages;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
-using HarmonyLib;
 using Helpers;
 using LiteNetLib;
 using SandBox.View.Map.Managers;
@@ -184,7 +183,11 @@ internal class PlayerCaptivityServerHandler : IHandler
                 var playerPartyIds = MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, objectManager);
                 if (!objectManager.TryGetIdWithLogging(playerParty.Party, out var surrenderedPartyId)) return;
 
-                SendClosePvpEncounter(playerPartyIds, surrenderedPartyId, payload.What.MapEventId);
+                Logger.Information("[PvPEncounterClose] Server sending immediate surrender close: partyIds=[{PartyIds}] surrenderedPartyId={SurrenderedPartyId} mapEventId={MapEventId}",
+                    string.Join(",", playerPartyIds),
+                    surrenderedPartyId ?? "<none>",
+                    payload.What.MapEventId ?? "<none>");
+                PvpEncounterCloseSender.Send(network, messageBroker, this, playerPartyIds, surrenderedPartyId, payload.What.MapEventId);
                 mapEvent.DoSurrender(playerParty.Party.Side);
                 messageBroker.Publish(this, new MapEventConcluded(payload.What.MapEventId, playerPartyIds, surrenderedPartyId));
             }
@@ -193,23 +196,6 @@ internal class PlayerCaptivityServerHandler : IHandler
                 Logger.Error(ex, "Failed to surrender");
             }
         }, blocking: true);
-    }
-
-    private void SendClosePvpEncounter(string[] playerPartyIds, string surrenderedPartyId, string mapEventId)
-    {
-        if (playerPartyIds == null || playerPartyIds.Length == 0)
-            return;
-
-        Logger.Information("[PvPEncounterClose] Server sending immediate surrender close: partyIds=[{PartyIds}] surrenderedPartyId={SurrenderedPartyId} mapEventId={MapEventId}",
-            string.Join(",", playerPartyIds),
-            surrenderedPartyId ?? "<none>",
-            mapEventId ?? "<none>");
-
-        var message = new NetworkClosePvpEncounter(playerPartyIds, surrenderedPartyId, mapEventId);
-        network.SendAll(message);
-
-        if (ModInformation.IsServer)
-            messageBroker.Publish(this, message);
     }
 
     /// <summary>
@@ -443,8 +429,7 @@ internal class PlayerCaptivityServerHandler : IHandler
 
         using (new AllowedThread())
         {
-            AccessTools.Method(typeof(MobilePartyVisualManager), "RemovePartyVisualForParty")
-                .Invoke(MobilePartyVisualManager.Current, new object[] { party });
+            MobilePartyVisualManager.Current?.RemovePartyVisualForParty(party);
         }
 
         network.SendAll(new NetworkDestroyPartyVisual(visualId));

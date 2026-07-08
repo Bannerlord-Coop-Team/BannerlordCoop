@@ -135,7 +135,7 @@ internal class PlayerPartyHostileEncounterService : IPlayerPartyHostileEncounter
                 TakePrisonerAction.Apply(initiatorParty, responderHero);
             }
 
-            SendClosePvpEncounter(new[] { initiatorPartyId, responderPartyId }, responderPartyId);
+            PvpEncounterCloseSender.Send(network, messageBroker, this, new[] { initiatorPartyId, responderPartyId }, responderPartyId);
             return true;
         }
         catch (Exception e)
@@ -148,15 +148,6 @@ internal class PlayerPartyHostileEncounterService : IPlayerPartyHostileEncounter
                 responderPartyId);
             return false;
         }
-    }
-
-    private void SendClosePvpEncounter(string[] partyIds, string surrenderedPartyId = null)
-    {
-        var message = new NetworkClosePvpEncounter(partyIds, surrenderedPartyId);
-        network.SendAll(message);
-
-        if (ModInformation.IsServer)
-            messageBroker.Publish(this, message);
     }
 
     private bool TryResolvePlayerHero(PartyBase party, out Hero hero)

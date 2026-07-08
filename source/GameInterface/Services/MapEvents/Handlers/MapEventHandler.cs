@@ -80,6 +80,15 @@ internal class MapEventHandler : IHandler
                 "Applying network battle state change. BattleState={BattleState}",
                 battleState);
 
+            if (mapEvent.BattleState != BattleState.None)
+            {
+                mapEventLogger.DebugMapEvent(mapEvent,
+                    "Ignoring network battle state change because battle is already concluded. CurrentBattleState={CurrentBattleState}, IncomingBattleState={IncomingBattleState}",
+                    mapEvent.BattleState,
+                    battleState);
+                return;
+            }
+
             var playerPartyIds = MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, objectManager);
 
             try

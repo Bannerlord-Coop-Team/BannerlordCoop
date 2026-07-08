@@ -308,15 +308,34 @@ internal class PartyDoneLogicHandler : IHandler
         out TroopRosterData filteredRightPrisonerRosterData)
     {
         var releasedPlayerPrisoners = new List<Hero>();
-        filteredLeftPrisonerRosterData = FilterPlayerPrisonerReleaseDelta(leftPrisonerRosterData, releasedPlayerPrisoners);
-        filteredRightPrisonerRosterData = FilterPlayerPrisonerReleaseDelta(rightPrisonerRosterData, releasedPlayerPrisoners);
+        var transferredPlayerPrisoners = GetTransferredPlayerPrisoners(leftPrisonerRosterData, rightPrisonerRosterData);
+        filteredLeftPrisonerRosterData = FilterPlayerPrisonerReleaseDelta(leftPrisonerRosterData, transferredPlayerPrisoners, releasedPlayerPrisoners);
+        filteredRightPrisonerRosterData = FilterPlayerPrisonerReleaseDelta(rightPrisonerRosterData, transferredPlayerPrisoners, releasedPlayerPrisoners);
 
         return releasedPlayerPrisoners
             .Select(playerHero => new PlayerCaptivityEndedByServer(playerHero, EndCaptivityDetail.ReleasedByChoice, null, releaserPartyPosition))
             .ToList();
     }
 
-    private TroopRosterData FilterPlayerPrisonerReleaseDelta(TroopRosterData delta, List<Hero> releasedPlayerPrisoners)
+    private HashSet<string> GetTransferredPlayerPrisoners(params TroopRosterData[] prisonerRosterDeltas)
+    {
+        var transferredPlayerPrisoners = new HashSet<string>();
+        foreach (var delta in prisonerRosterDeltas)
+        {
+            foreach (var elementData in delta.Data ?? Array.Empty<TroopRosterElementData>())
+            {
+                if (elementData.Number > 0 && TryGetPlayerPrisonerHero(elementData, out _))
+                    transferredPlayerPrisoners.Add(elementData.CharacterId);
+            }
+        }
+
+        return transferredPlayerPrisoners;
+    }
+
+    private TroopRosterData FilterPlayerPrisonerReleaseDelta(
+        TroopRosterData delta,
+        HashSet<string> transferredPlayerPrisoners,
+        List<Hero> releasedPlayerPrisoners)
     {
         if (delta.Data == null) return delta;
 
@@ -324,10 +343,10 @@ internal class PartyDoneLogicHandler : IHandler
         foreach (var elementData in delta.Data)
         {
             if (elementData.Number < 0 &&
-                objectManager.TryGetObjectWithLogging<CharacterObject>(elementData.CharacterId, out var character) &&
-                character.HeroObject?.IsPlayerHero() == true)
+                TryGetPlayerPrisonerHero(elementData, out var playerHero) &&
+                !transferredPlayerPrisoners.Contains(elementData.CharacterId))
             {
-                releasedPlayerPrisoners.Add(character.HeroObject);
+                releasedPlayerPrisoners.Add(playerHero);
                 continue;
             }
 
@@ -337,5 +356,12 @@ internal class PartyDoneLogicHandler : IHandler
         return filtered.Count == delta.Data.Length
             ? delta
             : new TroopRosterData(filtered);
+    }
+
+    private bool TryGetPlayerPrisonerHero(TroopRosterElementData elementData, out Hero playerHero)
+    {
+        playerHero = null;
+        return objectManager.TryGetObjectWithLogging<CharacterObject>(elementData.CharacterId, out var character) &&
+               (playerHero = character.HeroObject)?.IsPlayerHero() == true;
     }
 }

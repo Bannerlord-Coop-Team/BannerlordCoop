@@ -1,4 +1,5 @@
 using Common.Messaging;
+using System;
 
 namespace GameInterface.Services.MapEvents.Messages;
 
@@ -17,7 +18,7 @@ internal readonly struct MapEventConcluded : IEvent
     public MapEventConcluded(string mapEventId, string[] playerPartyIds = null, string surrenderedPartyId = null)
     {
         MapEventId = mapEventId;
-        PlayerPartyIds = playerPartyIds ?? new string[0];
+        PlayerPartyIds = playerPartyIds ?? Array.Empty<string>();
         SurrenderedPartyId = surrenderedPartyId;
     }
 }

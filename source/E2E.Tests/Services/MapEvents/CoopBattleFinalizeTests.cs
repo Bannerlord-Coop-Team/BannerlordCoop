@@ -267,6 +267,32 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         AssertHasPlayerEncounter(Clients.Last(), expected: false);
     }
 
+    [Fact]
+    public void DuplicateBattleStateChange_AfterServerConclusion_DoesNotPublishSecondClose()
+    {
+        var (ctx, _, _, _) = SetupTwoAlliedPlayersInBattle();
+
+        int closeCount1 = 0, closeCount2 = 0;
+        Clients.First().Resolve<IMessageBroker>().Subscribe<NetworkClosePvpEncounter>(_ => closeCount1++);
+        Clients.Last().Resolve<IMessageBroker>().Subscribe<NetworkClosePvpEncounter>(_ => closeCount2++);
+
+        var disabled = BattleMenuSurrenderDisabledMethods()
+            .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)))
+            .ToList();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
+            mapEvent._battleState = BattleState.AttackerVictory;
+
+            Server.Resolve<IMessageBroker>().Publish(this, new NetworkChangeBattleState(ctx.MapEventId, BattleState.AttackerVictory));
+        }, disabled);
+
+        Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out _));
+        Assert.Equal(0, closeCount1);
+        Assert.Equal(0, closeCount2);
+    }
+
     /// <summary>
     /// The post-migration duplicate finalize (the live -1 roster bug): the host clicks "done" (finalize #1), host
     /// migration promotes another player, and that new host's own "done" sends finalize #2 for the SAME battle.
