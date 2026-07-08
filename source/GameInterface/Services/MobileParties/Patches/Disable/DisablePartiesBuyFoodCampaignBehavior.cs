@@ -10,7 +10,6 @@ namespace GameInterface.Services.MobileParties.Patches.Disable;
 [HarmonyPatch(typeof(PartiesBuyFoodCampaignBehavior))]
 internal class DisablePartiesBuyFoodCampaignBehavior
 {
-    // BuyFoodInternal & BuyFoodForArmy use IsMainParty which is handled by IsMainPartyPatch
     [HarmonyPatch(nameof(PartiesBuyFoodCampaignBehavior.RegisterEvents))]
     static bool Prefix() => ModInformation.IsServer;
 }
