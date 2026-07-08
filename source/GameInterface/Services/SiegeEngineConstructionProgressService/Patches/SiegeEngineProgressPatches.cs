@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
+using GameInterface.Services.SiegeEngines;
 using GameInterface.Services.SiegeEnginesConstructionProgress.Messages;
 using HarmonyLib;
 using Serilog;
@@ -55,6 +56,8 @@ internal class SiegeEngineProgressPatches
 
     internal static void RunSetProgress(SiegeEngineConstructionProgress siegeEngine, bool isRedeployment, float value)
     {
+        bool completed = value >= 1f && (isRedeployment ? siegeEngine.RedeploymentProgress : siegeEngine.Progress) < 1f;
+
         using (new AllowedThread())
         {
             if (isRedeployment)
@@ -65,6 +68,14 @@ internal class SiegeEngineProgressPatches
             {
                 siegeEngine.SetProgress(value);
             }
+        }
+
+        // Vanilla re-renders the besieged settlement when a construction completes, from the server-only siege
+        // tick. The client applies progress silently, so without this dirty the prep-complete platforms (and a
+        // finished engine's mesh) never show until something else happens to dirty the settlement visual.
+        if (completed)
+        {
+            SiegeContainerLookup.FindOwnerSettlement(siegeEngine)?.Party?.SetVisualAsDirty();
         }
     }
 }
