@@ -44,6 +44,11 @@ internal class BesiegerCampRegistry : AutoRegistryBase<BesiegerCamp>
     {
         // _besiegerParties is readonly (publicized for reading, not writing), so fill the client shell by reflection.
         ReflectionUtils.SetPrivateField(typeof(BesiegerCamp), nameof(BesiegerCamp._besiegerParties), obj, new MBList<MobileParty>());
+
+        // Vanilla allocates this in InitializeSiegeEventSide, which never runs on a client shell. The besieged
+        // settlement's map visual derefs the list every refresh (AddSiegeIconComponents), so a null here aborts
+        // the refresh before the siege platform meshes get their visibility and the engine slots stay unhittable.
+        obj._siegeEngineMissiles = new MBList<SiegeEvent.SiegeEngineMissile>();
     }
 
     public override void OnClientDestroyed(BesiegerCamp obj, string id)

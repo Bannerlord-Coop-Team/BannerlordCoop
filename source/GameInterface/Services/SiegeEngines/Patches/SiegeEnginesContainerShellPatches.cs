@@ -29,6 +29,14 @@ internal class SiegeEnginesContainerShellPatches
     private static void SettlementSetterPostfix(Settlement __instance)
     {
         InitializeShell(__instance.SiegeEngines, BattleSideEnum.Defender);
+
+        // Vanilla allocates this in InitializeSiegeEventSide, which only the server's siege start runs; the
+        // settlement's map visual derefs the list every refresh, so a client left with null aborts the refresh
+        // and the siege platform meshes never become hittable. Not readonly, so assign it directly.
+        if (__instance._siegeEngineMissiles == null)
+        {
+            __instance._siegeEngineMissiles = new MBList<SiegeEngineMissile>();
+        }
     }
 
     private static void InitializeShell(SiegeEnginesContainer container, BattleSideEnum side)
