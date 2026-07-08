@@ -29,9 +29,9 @@ namespace GameInterface.Services.UI.Patches
         // directly under "Load" (between "Load" and "Save And Exit").
         private const int ResyncButtonIndex = 6;
 
-        // Set by the button patch (which only runs for the map menu); consumed by the resize
+        // Set by custom button patches (which only run for the map menu); consumed by the resize
         // patch below.
-        internal static bool ResyncButtonInserted;
+        internal static bool CustomButtonInserted;
 
         [HarmonyPostfix]
         static void InsertResyncButton(List<EscapeMenuItemVM> __result)
@@ -46,17 +46,16 @@ namespace GameInterface.Services.UI.Patches
                 getIsDisabledAndReason: () => new Tuple<bool, TextObject>(false, new TextObject(string.Empty)),
                 isPositiveBehaviored: false));
 
-            ResyncButtonInserted = true;
+            CustomButtonInserted = true;
         }
     }
 
     /// <summary>
     /// Grows the campaign-map escape-menu background pillar so it fits its contents on
     /// clients. The stock "EscapeMenu" prefab fixes the pillar to the height of the 8
-    /// vanilla items, so the extra "Resync with server" item added by
-    /// <see cref="EscapeMenuResyncButtonPatch"/> overflows the bottom of the panel.
+    /// vanilla items, so extra co-op items overflow the bottom of the panel.
     /// Switching the panel's height policy to <see cref="SizePolicy.CoverChildren"/> makes
-    /// it size to its buttons (one row taller than vanilla for the client's 9 items), and
+    /// it size to its buttons, and
     /// the button list's bottom margin — which the stock prefab over-sizes for the
     /// fixed-height background — is trimmed so the last button sits just above the base cap
     /// instead of leaving dead space. A prefab override cannot be used because Bannerlord
@@ -83,8 +82,8 @@ namespace GameInterface.Services.UI.Patches
 
             // Character creation and the education screen use this same movie, so only resize
             // the map menu (the one the button was just added to).
-            if (!EscapeMenuResyncButtonPatch.ResyncButtonInserted) return;
-            EscapeMenuResyncButtonPatch.ResyncButtonInserted = false;
+            if (!EscapeMenuResyncButtonPatch.CustomButtonInserted) return;
+            EscapeMenuResyncButtonPatch.CustomButtonInserted = false;
 
             Widget panel = __result.RootWidget.FindChild(EscapeMenuPanelId, includeAllChildren: true);
             panel.HeightSizePolicy = SizePolicy.CoverChildren;

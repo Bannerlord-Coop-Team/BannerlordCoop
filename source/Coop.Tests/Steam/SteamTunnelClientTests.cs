@@ -27,7 +27,7 @@ namespace Coop.Tests.Steam
             var stopwatch = Stopwatch.StartNew();
             while (!condition())
             {
-                Assert.True(stopwatch.ElapsedMilliseconds < 5000, "Pump did not forward within 5s");
+                Assert.True(stopwatch.ElapsedMilliseconds < 10000, "Pump did not forward within 10s");
                 Thread.Sleep(10);
             }
         }

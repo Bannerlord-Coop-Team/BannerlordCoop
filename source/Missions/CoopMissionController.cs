@@ -47,6 +47,11 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
     {
         base.OnMissionTick(dt);
 
+        // Capture continuous movement on the game thread so each snapshot reads one coherent engine state. A
+        // background poll can race native movement/input updates and send a moved position with stale input,
+        // leaving peers to interpolate a sliding puppet with no locomotion animation.
+        coopMissionComponent.AgentMovementHandler.PollMovement(dt);
+
         // Smoothly reconcile received puppets toward their owners' last-reported positions every frame; the
         // per-packet correction was bound to the bursty ~10ms poll cadence and looked stepped. Subclasses that
         // override OnMissionTick call base (CoopBattleController does), and CoopLocationsController does not
@@ -54,8 +59,8 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         coopMissionComponent.AgentMovementHandler.Interpolator.Tick(dt);
 
         // Capture discrete action changes on the GAME thread (attacks, jumps, gestures...): a one-frame action
-        // transition can't be observed reliably from the background movement poller, so actions are event-synced
-        // from here instead of polled with movement.
+        // transition can't be observed reliably off-thread, so actions are event-synced from here instead of
+        // polled with movement.
         coopMissionComponent.AgentActionHandler.PollActions();
     }
 
@@ -91,10 +96,9 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
 
     public override void OnEndMissionInternal()
     {
-        // Detach the per-mission agent handlers FIRST. The movement handler stops its background poller before
-        // anything else tears down, so the poll loop isn't reading agents/mission state as they are freed (it
-        // races the game thread and crashes on freed native agents). Both detach deterministically here instead
-        // of leaking their poller/packet-handler registration until the GC finalizer runs.
+        // Detach the per-mission agent handlers FIRST, before mission state and native agents are freed. Both
+        // detach deterministically here instead of leaking their packet-handler registration until the GC
+        // finalizer runs.
         coopMissionComponent.AgentMovementHandler.Dispose();
         coopMissionComponent.AgentActionHandler.Dispose();
 

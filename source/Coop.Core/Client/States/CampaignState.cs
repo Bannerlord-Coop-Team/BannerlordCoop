@@ -7,6 +7,7 @@ using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.UI.Interfaces;
+using GameInterface.Services.UI.Messages;
 
 namespace Coop.Core.Client.States;
 
@@ -41,6 +42,7 @@ public class CampaignState : ClientStateBase
         // Tell the server we have fully entered the campaign so it flushes the broadcasts it withheld
         // for us (the per-peer ConnectionMessageQueue) and resumes sending the live world stream.
         network.SendAll(new NetworkPlayerCampaignEntered());
+        messageBroker.Publish(this, new PlayerKillFeedColorResendRequested());
 
         loadingInterface.HideLoadingScreen();
     }
