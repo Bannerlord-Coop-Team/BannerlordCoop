@@ -52,12 +52,49 @@ namespace ServerHeadless
         /// </summary>
         public static void HostSaveGameAsServer(string saveName)
         {
+            StartCoopServer(saveName);
+        }
+
+        /// <summary>
+        /// Starts the Coop server WITHOUT a save (a null save name makes StartAsServer stand up the
+        /// patches and server logic only), then begins a fresh sandbox campaign through the mod's
+        /// own <c>IGameStateInterface.StartNewGame()</c> — the same call the graphical host flow
+        /// makes. The campaign creation is queued on the game thread; the caller's load loop pumps
+        /// it and must auto-advance the setup states (see <see cref="HeadlessNewGame"/>).
+        /// </summary>
+        public static void HostNewGameAsServer()
+        {
+            StartCoopServer(saveName: null);
+
+            Type containerProviderType = Load("GameInterface", "GameInterface.ContainerProvider");
+            Type gameStateInterfaceType = Load("GameInterface", "GameInterface.Services.GameState.Interfaces.IGameStateInterface");
+
+            object[] resolveArgs = { null };
+            bool resolved = (bool)containerProviderType
+                .GetMethod("TryResolve", BindingFlags.Public | BindingFlags.Static)
+                .MakeGenericMethod(gameStateInterfaceType)
+                .Invoke(null, resolveArgs);
+            if (!resolved || resolveArgs[0] == null)
+            {
+                throw new InvalidOperationException("Could not resolve IGameStateInterface to start a new game.");
+            }
+
+            gameStateInterfaceType.GetMethod("StartNewGame").Invoke(resolveArgs[0], null);
+        }
+
+        /// <summary>
+        /// Publishes <c>HostSaveGame</c>, which runs <c>StartAsServer(saveName)</c> synchronously
+        /// headless: Harmony patches, the server container and logic, plus LoadGame when a save
+        /// name is given.
+        /// </summary>
+        private static void StartCoopServer(string saveName)
+        {
             Type coopType = Load("Coop.Core", "Coop.Core.CoopartiveMultiplayerExperience");
             _coop = Activator.CreateInstance(coopType);
 
             object broker = Broker();
             Type hostSaveGameType = Load("GameInterface", "GameInterface.Services.UI.Messages.HostSaveGame");
-            object hostSaveGame = Activator.CreateInstance(hostSaveGameType, saveName);
+            object hostSaveGame = Activator.CreateInstance(hostSaveGameType, new object[] { saveName });
             Publish(broker, _coop, hostSaveGameType, hostSaveGame);
         }
 
@@ -107,6 +144,35 @@ namespace ServerHeadless
             data = (byte[])resultsType.GetProperty("Data").GetValue(saveResults);
             campaignId = (string)resultsType.GetProperty("CampaignId").GetValue(saveResults);
             return (bool)resultsType.GetProperty("Success").GetValue(saveResults);
+        }
+
+        /// <summary>
+        /// Starts campaign time through the mod's server time-control API. The mod OWNS
+        /// <c>Campaign.TimeControlMode</c>: its Harmony patches drop raw property sets and its
+        /// getter returns the mod's own state, which initializes to Stop — so a fresh campaign sits
+        /// frozen (no party AI, no economy) until someone requests play. A dedicated server wants
+        /// time running once the campaign is ready; clients can still pause through their controls
+        /// (ServerSetTimeControl respects the mod's time policies and broadcasts the change).
+        /// </summary>
+        public static void StartCampaignTime()
+        {
+            Type containerProviderType = Load("GameInterface", "GameInterface.ContainerProvider");
+            Type timeControlInterfaceType = Load("GameInterface", "GameInterface.Services.Heroes.Interaces.ITimeControlInterface");
+            Type timeControlEnumType = Load("GameInterface", "GameInterface.Services.Heroes.Enum.TimeControlEnum");
+
+            object[] resolveArgs = { null };
+            bool resolved = (bool)containerProviderType
+                .GetMethod("TryResolve", BindingFlags.Public | BindingFlags.Static)
+                .MakeGenericMethod(timeControlInterfaceType)
+                .Invoke(null, resolveArgs);
+            if (!resolved || resolveArgs[0] == null)
+            {
+                Console.Error.WriteLine("[ServerHeadless] Could not resolve ITimeControlInterface; campaign time stays paused until a client requests play.");
+                return;
+            }
+
+            object playMode = Enum.Parse(timeControlEnumType, "Play_1x");
+            timeControlInterfaceType.GetMethod("ServerSetTimeControl").Invoke(resolveArgs[0], new[] { playMode });
         }
 
         /// <summary>Runs the Coop main-thread work queue (must be called on the game-loop thread).</summary>

@@ -25,6 +25,9 @@ namespace ServerHeadless.Bootstrap
 
         private static bool _initialized;
 
+        /// <summary>The resolved user-data root ("Game Saves", "CoopMapData" live beneath it).</summary>
+        public static string UserDataRoot { get; private set; }
+
         public static void Initialize(string applicationRoot)
         {
             if (_initialized) return;
@@ -38,7 +41,20 @@ namespace ServerHeadless.Bootstrap
 
             // The native engine normally installs the platform file helper; provide a managed one so
             // the save system can map virtual paths (User -> Documents\...) to real files.
-            TaleWorlds.Library.Common.PlatformFileHelper = new HeadlessPlatformFileHelper(applicationRoot);
+            var fileHelper = new HeadlessPlatformFileHelper(applicationRoot);
+            TaleWorlds.Library.Common.PlatformFileHelper = fileHelper;
+            UserDataRoot = fileHelper.UserRoot;
+            Console.WriteLine($"[ServerHeadless] User data root: {fileHelper.UserRoot}");
+
+            // The engine normally installs the native face generator; without one, world generation
+            // makes every generated hero bald (appearance lookups silently return nothing) and
+            // settlement population NREs on Monster lookups. Install the managed approximation.
+            TaleWorlds.Core.FaceGen._instance = new HeadlessFaceGen();
+
+            // Real terrain for the map queries: the nav grid exported from the real game
+            // (coop.debug.map.export_navgrid). Without it the map-scene patches fall back to
+            // terrain-blind stubs and parties path through water/mountains.
+            HeadlessNavGrid.TryLoad(fileHelper.UserRoot);
 
             // Apply every [HarmonyPatch] in this assembly (Bootstrap/Patches/*) — these neutralise
             // the native-only calls that would otherwise crash a headless process.

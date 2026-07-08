@@ -138,7 +138,7 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
-        public void NetworkTransferNewHero_UnregisteredCharacterObject_DoesNotBroadcast()
+        public void NetworkTransferNewHero_UnregisteredCharacterObject_DisconnectsJoinerOnly()
         {
             // Arrange — the hero's CharacterObject is not registered, so TryCreatePlayer must fail to resolve its id
             // (like a missing hero/party/clan) and nothing is broadcast.
@@ -150,9 +150,11 @@ namespace Coop.Tests.Server.Connections.States
                 playerPeer, new NetworkTransferNewHero("MyId", Array.Empty<byte>()));
             currentState.Handle_NetworkTransferNewHero(payload);
 
-            // Assert — the handler bails before broadcasting or advancing: the connection stays in
-            // CreateCharacterState and nothing is sent to any peer (neither the broadcast to other peers nor the
-            // id response to the joining peer).
+            // Assert — the handler rejects only the joining peer: it is disconnected, the connection stays in
+            // CreateCharacterState, and nothing is sent to any peer (neither the broadcast to other peers nor
+            // the id response to the joiner). The server's own game must keep running — a bad join used to
+            // end the whole session via GoToMainMenu.
+            Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
             Assert.IsType<CreateCharacterState>(connectionLogic.State);
             Assert.Empty(serverComponent.TestNetwork.SentNetworkMessages);
         }

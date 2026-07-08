@@ -12,19 +12,25 @@ namespace ServerHeadless.Bootstrap
     /// engine's <see cref="PlatformFileType"/>-rooted virtual paths onto real filesystem paths so
     /// the save system can enumerate and read <c>.sav</c> files headlessly.
     ///
-    /// <see cref="PlatformFileType.User"/> → Documents\Mount and Blade II Bannerlord (where the game
-    /// stores "Game Saves").
+    /// <see cref="PlatformFileType.User"/> → the server executable's directory, so the server's
+    /// saves ("Game Saves" beneath it) live WITH the server rather than in the operator's
+    /// Documents. Overridable with the <c>BANNERLORD_USER_DIR</c> environment variable — the
+    /// docker image sets it to /data so saves land on a mounted volume.
     /// </summary>
     internal sealed class HeadlessPlatformFileHelper : IPlatformFileHelper
     {
         private readonly string _userRoot;
         private readonly string _applicationRoot;
 
+        /// <summary>The resolved user-data root ("Game Saves" lives beneath it).</summary>
+        public string UserRoot => _userRoot;
+
         public HeadlessPlatformFileHelper(string applicationRoot)
         {
-            _userRoot = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                "Mount and Blade II Bannerlord");
+            string overrideRoot = Environment.GetEnvironmentVariable("BANNERLORD_USER_DIR");
+            _userRoot = !string.IsNullOrEmpty(overrideRoot)
+                ? overrideRoot
+                : AppDomain.CurrentDomain.BaseDirectory;
             _applicationRoot = applicationRoot;
         }
 
@@ -40,7 +46,13 @@ namespace ServerHeadless.Bootstrap
         }
 
         private string ResolveDir(PlatformDirectoryPath path)
-            => Path.Combine(Root(path.Type), path.Path ?? string.Empty);
+        {
+            // The engine composes its relative paths with Windows separators (e.g. the save
+            // system's directory is hardcoded as "Game Saves\"); on Linux a backslash is part of
+            // the file NAME, so normalize to the platform separator.
+            string relative = (path.Path ?? string.Empty).Replace('\\', Path.DirectorySeparatorChar);
+            return Path.Combine(Root(path.Type), relative);
+        }
 
         private string ResolveFile(PlatformFilePath path)
             => Path.Combine(ResolveDir(path.FolderPath), path.FileName ?? string.Empty);

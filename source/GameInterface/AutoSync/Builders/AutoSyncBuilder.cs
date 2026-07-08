@@ -88,6 +88,13 @@ public class AutoSyncBuilder
             assemblies.Add(Assembly.Load("System.Collections"));
             assemblies.Add(Assembly.Load("System.Reflection.Primitives"));
             assemblies.Add(Assembly.Load("System.Collections.Concurrent"));
+            // The game and Coop assemblies added below are net472 builds whose metadata
+            // references types in mscorlib/netstandard. CoreCLR ships both as facades;
+            // without them in the reference set Roslyn cannot unify e.g. System.Exception
+            // across assemblies ("type 'Exception' is defined in an assembly that is not
+            // referenced ... mscorlib") and the whole AutoSync compilation fails.
+            assemblies.Add(Assembly.Load("mscorlib"));
+            assemblies.Add(Assembly.Load("netstandard"));
         }
 
         assemblies.Add(typeof(Enumerable).Assembly);

@@ -1,0 +1,5 @@
+# Only the staged folders go into image build contexts. Everything else — most importantly the
+# multi-gigabyte mb2 junction to the game install — must never be shipped to the docker daemon.
+*
+!DockerAssembliesTemp
+!DockerServerTemp

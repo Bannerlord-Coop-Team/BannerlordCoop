@@ -117,6 +117,9 @@ namespace ServerHeadless
                 case "commands":
                     PrintCommands(args);
                     return;
+                case "nav":
+                    PrintNavQuery(args);
+                    return;
                 case "quit":
                 case "exit":
                 case "stop":
@@ -136,6 +139,54 @@ namespace ServerHeadless
             {
                 // A bad command must not take the server down; report it and keep ticking.
                 Console.Error.WriteLine($"[ServerHeadless] Command '{name}' failed: {ex}");
+            }
+        }
+
+        /// <summary>
+        /// Nav-grid diagnostics: <c>nav x y</c> prints the face under a position; <c>nav x1 y1 x2 y2</c>
+        /// additionally runs a pathfind between the two points.
+        /// </summary>
+        private static void PrintNavQuery(string args)
+        {
+            var grid = Bootstrap.HeadlessNavGrid.Instance;
+            if (grid == null)
+            {
+                Console.WriteLine("No nav grid loaded.");
+                return;
+            }
+
+            var parts = args.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 2 || !float.TryParse(parts[0], out float x) || !float.TryParse(parts[1], out float y))
+            {
+                Console.WriteLine("Usage: nav <x> <y> [x2 y2]");
+                return;
+            }
+
+            var from = new TaleWorlds.Library.Vec2(x, y);
+            var face = grid.FaceRecordAt(from);
+            Console.WriteLine($"({x:0.##},{y:0.##}): face={face.FaceIndex} group={face.FaceGroupIndex} island={face.FaceIslandIndex} " +
+                              $"terrain={grid.TerrainAt(from)} water={grid.IsWaterAt(from)}");
+
+            if (parts.Length >= 4 && float.TryParse(parts[2], out float x2) && float.TryParse(parts[3], out float y2))
+            {
+                var to = new TaleWorlds.Library.Vec2(x2, y2);
+                var toFace = grid.FaceRecordAt(to);
+                Console.WriteLine($"({x2:0.##},{y2:0.##}): face={toFace.FaceIndex} terrain={grid.TerrainAt(to)}");
+
+                bool landClear = grid.IsLineClear(from, to, Bootstrap.HeadlessNavGrid.DefaultLandExclusions);
+                Console.WriteLine($"land line clear: {landClear}");
+
+                var points = new System.Collections.Generic.List<TaleWorlds.Library.Vec2>();
+                bool ok = grid.TryFindPath(from, to, Bootstrap.HeadlessNavGrid.DefaultLandExclusions, 10, 10, points, out float cost);
+                if (ok)
+                {
+                    int wet = points.Count(p => grid.IsWaterAt(p));
+                    Console.WriteLine($"land path OK: cost={cost:0.#}, {points.Count} waypoints, {wet} on water");
+                }
+                else
+                {
+                    Console.WriteLine("land path FAILED");
+                }
             }
         }
 

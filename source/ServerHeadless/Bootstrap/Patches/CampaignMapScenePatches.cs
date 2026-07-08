@@ -30,9 +30,11 @@ namespace ServerHeadless.Bootstrap.Patches
             // _lastUpdatedNodeIndex assumes that size, so this must match to tick weather correctly.
             __instance.DefaultWeatherNodeDimension = 32;
 
-            Campaign.MapMinimumPosition = new Vec2(0f, 0f);
-            Campaign.MapMaximumPosition = new Vec2(1000f, 1000f);
-            Campaign.MapMaximumHeight = 100f;
+            // Real bounds when the exported nav grid is loaded; placeholders otherwise.
+            var grid = HeadlessNavGrid.Instance;
+            Campaign.MapMinimumPosition = grid?.Min ?? new Vec2(0f, 0f);
+            Campaign.MapMaximumPosition = grid?.Max ?? new Vec2(1000f, 1000f);
+            Campaign.MapMaximumHeight = grid?.MaxHeight ?? 100f;
             Campaign.MapDiagonal = Campaign.MapMinimumPosition.Distance(Campaign.MapMaximumPosition);
             Campaign.MapDiagonalSquared = Campaign.MapDiagonal * Campaign.MapDiagonal;
             // The original multiplies by Models.MapDistanceModel.RegionSwitchCostFromLandToSea, but
@@ -49,5 +51,12 @@ namespace ServerHeadless.Bootstrap.Patches
         [HarmonyPatch(typeof(Campaign), "CheckMapUpdate")]
         [HarmonyPrefix]
         static bool CheckMapUpdatePrefix() => false;
+
+        // Campaign.OnDestroy → MapScene.Destroy destructs the native agent renderer and scene.
+        // The headless wrapper installed above owns no native resources, and the native destructor
+        // NREs (it killed the server whenever anything ended the game). Skip the whole teardown.
+        [HarmonyPatch(typeof(MapScene), nameof(MapScene.Destroy))]
+        [HarmonyPrefix]
+        static bool DestroyPrefix() => false;
     }
 }

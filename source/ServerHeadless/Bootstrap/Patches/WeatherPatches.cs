@@ -24,4 +24,19 @@ namespace ServerHeadless.Bootstrap.Patches
             Campaign.Current?.Models?.MapWeatherModel?.InitializeCaches();
         }
     }
+
+    /// <summary>
+    /// Same cache, earlier moment, for the NEW-GAME path: world generation (OnNewGameCreated's
+    /// lord-party spawning) computes party strength, which consults the weather model — before the
+    /// session-launched event above has run. The map scene (and DefaultWeatherNodeDimension) are
+    /// already in place by now, so the caches can be allocated safely.
+    /// </summary>
+    [HarmonyPatch(typeof(Campaign), "OnNewGameCreated")]
+    internal class WeatherCacheNewGamePatches
+    {
+        static void Prefix()
+        {
+            Campaign.Current?.Models?.MapWeatherModel?.InitializeCaches();
+        }
+    }
 }

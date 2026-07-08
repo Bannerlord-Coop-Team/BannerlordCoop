@@ -1,0 +1,32 @@
+# Headless Bannerlord co-op server.
+#
+# The app is the net6.0 build of source/ServerHeadless; the game's managed assemblies and module
+# data are baked in from the staging folder (run .\DockerPrepareServer.ps1 first). Save games are
+# NOT baked in - they live on the /data volume ("Game Saves" beneath it). On start the server
+# hosts the newest save there (BANNERLORD_SAVE pins one by name); with no saves it starts a new
+# campaign from "default_new_game.sav" (a day-0 save made in the real game - place it on /data or
+# bake it next to the app). Autosaves write back to the volume every BANNERLORD_AUTOSAVE_MINUTES
+# (default 10, 0 disables) - so mount /data writable. Also put the exported map nav grid at
+# /data/CoopMapData/<scene>.navgrid (coop.debug.map.export_navgrid in the real game) or the
+# server paths terrain-blind.
+#
+# Build:  .\DockerPrepareServer.ps1
+#         docker build -f Dockerfile.server -t bannerlordcoop-server .
+# Run:    docker run -p 4200:4200/udp -v "C:\coop-server-data:/data" bannerlordcoop-server
+# (or use docker-compose.server.yml)
+#
+# .NET 6 specifically: the Coop serializers still use BinaryFormatter (disabled in 8+, removed
+# in 9), matching the CI test image.
+FROM mcr.microsoft.com/dotnet/runtime:6.0
+
+WORKDIR /server
+COPY DockerServerTemp/app ./app
+COPY DockerServerTemp/mb2 ./mb2
+
+# Saves are read from "$BANNERLORD_USER_DIR/Game Saves" (see HeadlessPlatformFileHelper).
+ENV BANNERLORD_USER_DIR=/data
+
+# LiteNetLib game traffic (UDP).
+EXPOSE 4200/udp
+
+ENTRYPOINT ["dotnet", "/server/app/ServerHeadless.dll", "/server/mb2/bin/Win64_Shipping_Client"]

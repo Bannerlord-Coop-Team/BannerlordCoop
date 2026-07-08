@@ -24,6 +24,29 @@ namespace ServerHeadless.Bootstrap
     {
         private const string Prefix = "[Headless Engine]";
 
+        /// <summary>
+        /// Assert messages that are expected headless and only flood the console:
+        /// - "Path finding target is not valid": MobileParty.ComputePath fires it whenever a
+        ///   target sits in a navmesh hole (settlement interiors); the party re-resolves next
+        ///   tick and movement is unaffected.
+        /// - "UnnamedMobileParty": world generation names parties after constructing them.
+        /// </summary>
+        private static readonly string[] SuppressedAsserts =
+        {
+            "Path finding target is not valid",
+            "UnnamedMobileParty",
+        };
+
+        private static bool IsSuppressed(string message)
+        {
+            if (string.IsNullOrEmpty(message)) return false;
+            foreach (string suppressed in SuppressedAsserts)
+            {
+                if (message.Contains(suppressed)) return true;
+            }
+            return false;
+        }
+
         public void ShowError(string message)
             => Console.Error.WriteLine($"{Prefix} ERROR: {message}");
 
@@ -41,7 +64,7 @@ namespace ServerHeadless.Bootstrap
 
         public void Assert(bool condition, string message, [CallerFilePath] string callerFile = "", [CallerMemberName] string callerMethod = "", [CallerLineNumber] int callerLine = 0)
         {
-            if (!condition)
+            if (!condition && !IsSuppressed(message))
             {
                 Console.Error.WriteLine($"{Prefix} ASSERT FAILED: {message} (at {callerMethod} in {callerFile}:{callerLine})");
             }
@@ -49,7 +72,7 @@ namespace ServerHeadless.Bootstrap
 
         public void SilentAssert(bool condition, string message = "", bool getDump = false, [CallerFilePath] string callerFile = "", [CallerMemberName] string callerMethod = "", [CallerLineNumber] int callerLine = 0)
         {
-            if (!condition)
+            if (!condition && !IsSuppressed(message))
             {
                 Console.Error.WriteLine($"{Prefix} ASSERT FAILED: {message} (at {callerMethod} in {callerFile}:{callerLine})");
             }

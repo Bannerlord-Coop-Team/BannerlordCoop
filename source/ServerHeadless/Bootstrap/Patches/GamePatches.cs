@@ -34,6 +34,11 @@ namespace ServerHeadless.Bootstrap.Patches
                 // Indexes skeleton bones via native Skeleton.GetBoneIndexFromName (rendering/missions
                 // only); not needed for the campaign-map simulation.
                 AccessTools.Method(typeof(MBGameManager), "OnGameInitializationFinished"),
+                // New-game loading step 2 calls the parameterless overload, a raw
+                // MBAPI.IMBGame.StartNew() native call (null headless). The static
+                // StartNewGame(MBGameManager) overload that pushes GameLoadingState must NOT be
+                // patched — the load/new-game flows are driven through it.
+                AccessTools.Method(typeof(MBGameManager), "StartNewGame", System.Type.EmptyTypes),
             };
         }
 

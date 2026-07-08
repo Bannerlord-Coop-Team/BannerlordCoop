@@ -1,0 +1,29 @@
+# Headless Bannerlord co-op server.
+#
+# First stage the image contents (game assemblies + module data + server build):
+#   .\DockerPrepareServer.ps1
+# Then:
+#   docker compose -f docker-compose.server.yml up --build
+#
+# Console commands: the server console falls back to plain line mode in a container.
+#   docker compose -f docker-compose.server.yml attach coop-server     (then e.g. "list coop.debug")
+services:
+  coop-server:
+    image: bannerlordcoop-server
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    ports:
+      - "4200:4200/udp"
+    environment:
+      # Default behavior: host the newest save in the data volume, or create a fresh campaign
+      # when there are none. Set BANNERLORD_SAVE to pin a specific save by name.
+      - BANNERLORD_SAVE=${BANNERLORD_SAVE:-}
+      # Minutes between autosaves (written into the data volume as rotating save slots).
+      - BANNERLORD_AUTOSAVE_MINUTES=${BANNERLORD_AUTOSAVE_MINUTES:-10}
+    volumes:
+      # The server's persistent data ("Game Saves" appears beneath it). Writable — autosaves
+      # land here, and they are what the next start resumes from.
+      - "${BANNERLORD_DATA_DIR:-./server-data}:/data"
+    # Keep stdin open so the operator console accepts commands via `docker attach`.
+    stdin_open: true
