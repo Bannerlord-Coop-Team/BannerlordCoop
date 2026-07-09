@@ -22,6 +22,8 @@ internal readonly struct NetworkPlayerPartyTradeOfferUpdated : ICommand
     public readonly string[] OfferedFiefs;
     [ProtoMember(7)]
     public readonly TroopRosterElementData[] OfferedPrisoners;
+    [ProtoMember(8)]
+    public readonly bool OfferedPeace;
 
     public NetworkPlayerPartyTradeOfferUpdated(
         string sessionId,
@@ -30,7 +32,8 @@ internal readonly struct NetworkPlayerPartyTradeOfferUpdated : ICommand
         TroopRosterElementData[] offeredTroops,
         int offeredGold = 0,
         string[] offeredFiefs = null,
-        TroopRosterElementData[] offeredPrisoners = null)
+        TroopRosterElementData[] offeredPrisoners = null,
+        bool offeredPeace = false)
     {
         SessionId = sessionId;
         PartyId = partyId;
@@ -39,5 +42,6 @@ internal readonly struct NetworkPlayerPartyTradeOfferUpdated : ICommand
         OfferedGold = offeredGold;
         OfferedFiefs = offeredFiefs ?? new string[0];
         OfferedPrisoners = offeredPrisoners ?? new TroopRosterElementData[0];
+        OfferedPeace = offeredPeace;
     }
 }

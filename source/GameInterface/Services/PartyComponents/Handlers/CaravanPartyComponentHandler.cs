@@ -69,24 +69,17 @@ internal class CaravanPartyComponentHandler : IHandler
     {
         var message = payload.What;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
-            try
-            {
-                if (!objectManager.TryGetObjectWithLogging<CaravanPartyComponent>(message.CaravanPartyComponentId, out var instance)) return;
+            if (!objectManager.TryGetObjectWithLogging<CaravanPartyComponent>(message.CaravanPartyComponentId, out var instance)) return;
 
-                Hero owner = null;
-                if (message.OwnerId != null &&
-                    !objectManager.TryGetObjectWithLogging(message.OwnerId, out owner)) return;
+            Hero owner = null;
+            if (message.OwnerId != null &&
+                !objectManager.TryGetObjectWithLogging(message.OwnerId, out owner)) return;
 
-                using (new AllowedThread())
-                {
-                    instance.Owner = owner;
-                }
-            }
-            catch (Exception e)
+            using (new AllowedThread())
             {
-                Logger.Error(e, "Failed to apply NetworkCaravanPartyOwnerChanged");
+                instance.Owner = owner;
             }
         });
     }
@@ -106,21 +99,14 @@ internal class CaravanPartyComponentHandler : IHandler
     {
         var message = payload.What;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
-            try
-            {
-                if (!objectManager.TryGetObjectWithLogging<CaravanPartyComponent>(message.CaravanPartyComponentId, out var instance)) return;
-                if (!objectManager.TryGetObjectWithLogging<Settlement>(message.SettlementId, out var settlement)) return;
+            if (!objectManager.TryGetObjectWithLogging<CaravanPartyComponent>(message.CaravanPartyComponentId, out var instance)) return;
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(message.SettlementId, out var settlement)) return;
 
-                using (new AllowedThread())
-                {
-                    instance.Settlement = settlement;
-                }
-            }
-            catch (Exception e)
+            using (new AllowedThread())
             {
-                Logger.Error(e, "Failed to apply NetworkCaravanPartySettlementChanged");
+                instance.Settlement = settlement;
             }
         });
     }
@@ -131,12 +117,14 @@ internal class CaravanPartyComponentHandler : IHandler
         var initArgs = payload.What.InitArgs;
 
         if (!objectManager.TryGetIdWithLogging(instance, out var caravanPartyComponentId)) return;
-        if (!objectManager.TryGetIdWithLogging(initArgs.CaravanLeader, out var caravanLeaderId)) return;
+
+        // caravanLeader may legitimately be null
+        string caravanLeaderId = null;
+        if (initArgs.CaravanLeader != null && !objectManager.TryGetIdWithLogging(initArgs.CaravanLeader, out caravanLeaderId)) return;
 
         string caravanItemRosterId = null;
         if (initArgs.CaravanItems != null && !objectManager.TryGetIdWithLogging(initArgs.CaravanItems, out caravanItemRosterId)) return;
         if (!objectManager.TryGetIdWithLogging(initArgs.PartyTemplateObject, out var partyTemplateObjectId)) return;
-
 
         network.SendAll(new NetworkUpdateCaravanPartyComponentInitArgs(
             caravanPartyComponentId,
@@ -150,27 +138,22 @@ internal class CaravanPartyComponentHandler : IHandler
     {
         var message = payload.What;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
-            try
+            if (!objectManager.TryGetObjectWithLogging<CaravanPartyComponent>(message.CaravanPartyComponentId, out var instance)) return;
+
+            Hero caravanLeader = null;
+            if (message.CaravanLeaderId != null && !objectManager.TryGetObjectWithLogging<Hero>(message.CaravanLeaderId, out caravanLeader)) return;
+
+            ItemRoster caravanItems = null;
+            if (message.CaravanItemRosterId != null && !objectManager.TryGetObjectWithLogging<ItemRoster>(message.CaravanItemRosterId, out caravanItems)) return;
+            if (!objectManager.TryGetObjectWithLogging<PartyTemplateObject>(message.PartyTemplateObjectId, out var partyTemplateObject)) return;
+
+            using (new AllowedThread())
             {
-                if (!objectManager.TryGetObjectWithLogging<CaravanPartyComponent>(message.CaravanPartyComponentId, out var instance)) return;
-                if (!objectManager.TryGetObjectWithLogging<Hero>(message.CaravanLeaderId, out var caravanLeader)) return;
+                var initArgs = new CaravanPartyComponent.InitializationArgs(partyTemplateObject, caravanLeader, caravanItems);
 
-                ItemRoster caravanItems = null;
-                if (message.CaravanItemRosterId != null && !objectManager.TryGetObjectWithLogging<ItemRoster>(message.CaravanItemRosterId, out caravanItems)) return;
-                if (!objectManager.TryGetObjectWithLogging<PartyTemplateObject>(message.PartyTemplateObjectId, out var partyTemplateObject)) return;
-
-                using (new AllowedThread())
-                {
-                    var initArgs = new CaravanPartyComponent.InitializationArgs(partyTemplateObject, caravanLeader, caravanItems);
-
-                    instance._initializationArgs = initArgs;
-                }
-            }
-            catch (Exception e)
-            {
-                Logger.Error(e, "Failed to apply NetworkUpdateCaravanPartyComponentInitArgs");
+                instance._initializationArgs = initArgs;
             }
         });
     }

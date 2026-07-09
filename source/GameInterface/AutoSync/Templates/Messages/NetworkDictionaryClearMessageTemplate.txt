@@ -1,0 +1,22 @@
+using Common.Messaging;
+using GameInterface.Utils.NetworkEvents;
+using ProtoBuf;
+using System.Collections.Generic;
+using System.Reflection;
+{{~ for library in Libraries ~}}
+using {{ library }};
+{{~ end ~}}
+
+namespace AutoSync;
+
+[ProtoContract(SkipConstructor = true)]
+public readonly struct Network_{{ MemberDeclaringTypeName}}_{{ MemberName }}_DictionaryClear : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string InstanceId;
+
+    public Network_{{ MemberDeclaringTypeName}}_{{ MemberName }}_DictionaryClear(string instanceId)
+    {
+        InstanceId = instanceId;
+    }
+}

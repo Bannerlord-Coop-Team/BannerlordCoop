@@ -14,8 +14,16 @@ internal readonly struct NetworkClosePvpEncounter : ICommand
     [ProtoMember(1)]
     public readonly string[] PartyIds;
 
-    public NetworkClosePvpEncounter(string[] partyIds)
+    [ProtoMember(2)]
+    public readonly string SurrenderedPartyId;
+
+    [ProtoMember(3)]
+    public readonly string MapEventId;
+
+    public NetworkClosePvpEncounter(string[] partyIds, string surrenderedPartyId = null, string mapEventId = null)
     {
         PartyIds = partyIds;
+        SurrenderedPartyId = surrenderedPartyId;
+        MapEventId = mapEventId;
     }
 }
