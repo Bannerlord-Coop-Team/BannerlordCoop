@@ -9,6 +9,7 @@ public class PlayerPartyInteractionCampaignBehavior : CampaignBehaviorBase
     private const string InitialToken = "coop_player_party_interaction_initial";
     private const string ServiceToken = "coop_player_party_interaction_services";
     private const string ResponderToken = "coop_player_party_interaction_responder";
+    private const string HostileConfirmToken = "coop_player_party_interaction_hostile_confirm";
     private const string InitiatorWaitToken = "coop_player_party_interaction_initiator_wait";
     private const string CloseToken = "close_window";
     private const int PlayerPartyDialogPriority = 10000;
@@ -64,6 +65,26 @@ public class PlayerPartyInteractionCampaignBehavior : CampaignBehaviorBase
             PlayerPartyDialogPriority,
             null);
 
+        starter.AddDialogLine(
+            "coop_player_party_interaction_hostile_confirm_line",
+            HostileConfirmToken,
+            HostileConfirmToken,
+            "{=coop_player_party_hostile_prompt}Eh? What do you want?",
+            () => IsPhase(PlayerPartyInteractionPhase.HostileDemandConfirm),
+            null,
+            PlayerPartyDialogPriority,
+            null);
+
+        starter.AddDialogLine(
+            "coop_player_party_interaction_hostile_responder_line",
+            RootToken,
+            ResponderToken,
+            "{=coop_player_party_hostile_offer_bubble}I offer you one chance to surrender or die",
+            () => IsPhase(PlayerPartyInteractionPhase.HostileDemandPending),
+            null,
+            PlayerPartyDialogPriority,
+            null);
+
         starter.AddPlayerLine(
             "coop_player_party_interaction_trade",
             InitialToken,
@@ -72,7 +93,7 @@ public class PlayerPartyInteractionCampaignBehavior : CampaignBehaviorBase
             () => PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.TradeProposal),
             () => PlayerPartyInteractionDialogState.Submit(PlayerPartyInteractionOption.TradeProposal),
             PlayerPartyDialogPriority,
-            null,
+            IsTradeProposalEnabled,
             null);
 
         starter.AddPlayerLine(
@@ -83,7 +104,18 @@ public class PlayerPartyInteractionCampaignBehavior : CampaignBehaviorBase
             () => PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.OfferServices),
             PlayerPartyInteractionDialogState.ShowServiceOptions,
             PlayerPartyDialogPriority,
-            null,
+            IsOfferServicesEnabled,
+            null);
+
+        starter.AddPlayerLine(
+            "coop_player_party_interaction_hostile_demand",
+            InitialToken,
+            HostileConfirmToken,
+            "{=VrnlUvV8}I'm here to deliver you my demands!",
+            () => PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.HostileDemand),
+            () => PlayerPartyInteractionDialogState.Submit(PlayerPartyInteractionOption.HostileDemand),
+            PlayerPartyDialogPriority,
+            IsHostileDemandEnabled,
             null);
 
         starter.AddPlayerLine(
@@ -109,6 +141,28 @@ public class PlayerPartyInteractionCampaignBehavior : CampaignBehaviorBase
             null);
 
         starter.AddPlayerLine(
+            "coop_player_party_interaction_hostile_confirm",
+            HostileConfirmToken,
+            InitiatorWaitToken,
+            "{=coop_player_party_hostile_offer}I offer you one chance to surrender or die.",
+            () => PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.ConfirmHostileDemand),
+            () => PlayerPartyInteractionDialogState.Submit(PlayerPartyInteractionOption.ConfirmHostileDemand),
+            PlayerPartyDialogPriority,
+            null,
+            null);
+
+        starter.AddPlayerLine(
+            "coop_player_party_interaction_hostile_cancel",
+            HostileConfirmToken,
+            CloseToken,
+            "{=coop_player_party_hostile_cancel}Forgive me. It's nothing.",
+            () => PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.CancelHostileDemand),
+            () => PlayerPartyInteractionDialogState.Submit(PlayerPartyInteractionOption.CancelHostileDemand),
+            PlayerPartyDialogPriority,
+            null,
+            null);
+
+        starter.AddPlayerLine(
             "coop_player_party_interaction_accept",
             ResponderToken,
             InitiatorWaitToken,
@@ -128,6 +182,28 @@ public class PlayerPartyInteractionCampaignBehavior : CampaignBehaviorBase
             () => PlayerPartyInteractionDialogState.Submit(PlayerPartyInteractionOption.DeclineProposal),
             PlayerPartyDialogPriority,
             null,
+            null);
+
+        starter.AddPlayerLine(
+            "coop_player_party_interaction_hostile_refuse",
+            ResponderToken,
+            CloseToken,
+            "{=jBN2LlgF}We'll fight to our last drop of blood!",
+            () => PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.RefuseHostileDemand),
+            () => PlayerPartyInteractionDialogState.Submit(PlayerPartyInteractionOption.RefuseHostileDemand),
+            PlayerPartyDialogPriority,
+            null,
+            null);
+
+        starter.AddPlayerLine(
+            "coop_player_party_interaction_hostile_yield",
+            ResponderToken,
+            CloseToken,
+            "{=coop_player_party_hostile_yield}I yield! Call your men off.",
+            () => PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.YieldHostileDemand),
+            () => PlayerPartyInteractionDialogState.Submit(PlayerPartyInteractionOption.YieldHostileDemand),
+            PlayerPartyDialogPriority,
+            IsYieldHostileDemandEnabled,
             null);
 
         starter.AddPlayerLine(
@@ -164,11 +240,23 @@ public class PlayerPartyInteractionCampaignBehavior : CampaignBehaviorBase
             null);
     }
 
+    private static bool IsTradeProposalEnabled(out TextObject explanation)
+        => PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.TradeProposal, out explanation);
+
+    private static bool IsOfferServicesEnabled(out TextObject explanation)
+        => PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.OfferServices, out explanation);
+
     private static bool IsJoinClanEnabled(out TextObject explanation)
         => PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.JoinClan, out explanation);
 
     private static bool IsVassalEnabled(out TextObject explanation)
         => PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Vassal, out explanation);
+
+    private static bool IsHostileDemandEnabled(out TextObject explanation)
+        => PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.HostileDemand, out explanation);
+
+    private static bool IsYieldHostileDemandEnabled(out TextObject explanation)
+        => PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.YieldHostileDemand, out explanation);
 
     private static bool IsPhase(params PlayerPartyInteractionPhase[] phases)
     {

@@ -1,8 +1,15 @@
+using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
+using Autofac;
 using Common.Messaging;
+using Common.Util;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
+using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -92,6 +99,136 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         AssertHasPlayerEncounter(Clients.Last(), expected: true);
     }
 
+    [Fact]
+    public void BothPlayersLeave_PvpBattleExitsEncounterMenuForBothPlayers()
+    {
+        var (ctx, _, player1PartyBaseId, player2PartyBaseId) = SetupTwoAlliedPlayersInBattle();
+
+        using var exitToLast = new GameMenuExitToLastCounter();
+
+        var client1 = Clients.First();
+        client1.Call(() =>
+        {
+            Assert.True(client1.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
+            client1.Resolve<IMessageBroker>().Publish(this, new MapEventFinalizeAttempted(mapEvent));
+        }, MapEventDisabledMethods);
+
+        Assert.Equal(2, exitToLast.Count);
+        Assert.Contains(player1PartyBaseId, exitToLast.PartyIds);
+        Assert.Contains(player2PartyBaseId, exitToLast.PartyIds);
+    }
+
+    [Fact]
+    public void RecipientSurrenders_PvpBattleClosesInitiatorEncounterMenu_AndKeepsRecipientCaptive()
+    {
+        var setup = SetupTwoOpposingPlayersInBattle();
+
+        string[] closeOnClient1 = null, closeOnClient2 = null;
+        Clients.First().Resolve<IMessageBroker>().Subscribe<NetworkClosePvpEncounter>(p => closeOnClient1 = p.What.PartyIds);
+        Clients.Last().Resolve<IMessageBroker>().Subscribe<NetworkClosePvpEncounter>(p => closeOnClient2 = p.What.PartyIds);
+
+        using var exitToLast = new GameMenuExitToLastCounter();
+
+        var recipientClient = Clients.Last();
+        recipientClient.Call(() =>
+        {
+            Assert.True(recipientClient.ObjectManager.TryGetObject<MapEvent>(setup.ctx.MapEventId, out var mapEvent));
+            recipientClient.Resolve<IMessageBroker>().Publish(this, new PlayerSurrendered(mapEvent, MobileParty.MainParty));
+        }, BattleMenuSurrenderDisabledMethods());
+
+        AssertMapEventRemoved(Server, setup.ctx.MapEventId);
+        foreach (var client in Clients)
+            AssertMapEventRemoved(client, setup.ctx.MapEventId);
+
+        Assert.NotNull(closeOnClient1);
+        Assert.NotNull(closeOnClient2);
+        Assert.Contains(setup.initiatorPartyBaseId, closeOnClient1);
+        Assert.Contains(setup.recipientPartyBaseId, closeOnClient1);
+        Assert.Contains(setup.initiatorPartyBaseId, closeOnClient2);
+        Assert.Contains(setup.recipientPartyBaseId, closeOnClient2);
+
+        AssertCaptivity(Server, setup.recipientHeroId, setup.initiatorPartyId);
+        foreach (var client in Clients)
+            AssertCaptivity(client, setup.recipientHeroId, setup.initiatorPartyId);
+
+        AssertMainPartyLeftBattle(Clients.First());
+        Assert.Equal(2, exitToLast.Count);
+        Assert.Equal(1, exitToLast.CountFor(setup.initiatorPartyBaseId));
+        Assert.Equal(1, exitToLast.CountFor(setup.recipientPartyBaseId));
+        Assert.Contains(setup.initiatorPartyBaseId, exitToLast.PartyIds);
+        Assert.Contains(setup.recipientPartyBaseId, exitToLast.PartyIds);
+    }
+
+    [Fact]
+    public void RecipientSurrenders_PvpBattleClosesHostAggressorEncounterMenu()
+    {
+        var setup = SetupTwoOpposingPlayersInBattle();
+        SetMainPartyInBattle(Server, setup.ctx.AttackerPartyId);
+        EnableHeadlessEncounterFinish(Server);
+
+        string[] closeOnServer = null;
+        Server.Resolve<IMessageBroker>().Subscribe<NetworkClosePvpEncounter>(p => closeOnServer = p.What.PartyIds);
+
+        using var exitToLast = new GameMenuExitToLastCounter();
+
+        var recipientClient = Clients.Last();
+        recipientClient.Call(() =>
+        {
+            Assert.True(recipientClient.ObjectManager.TryGetObject<MapEvent>(setup.ctx.MapEventId, out var mapEvent));
+            recipientClient.Resolve<IMessageBroker>().Publish(this, new PlayerSurrendered(mapEvent, MobileParty.MainParty));
+        }, BattleMenuSurrenderDisabledMethods());
+
+        Assert.NotNull(closeOnServer);
+        Assert.Contains(setup.initiatorPartyBaseId, closeOnServer);
+        Assert.Contains(setup.recipientPartyBaseId, closeOnServer);
+        AssertMainPartyLeftBattle(Server);
+        Assert.Contains(setup.initiatorPartyBaseId, exitToLast.PartyIds);
+    }
+
+    [Fact]
+    public void HostAggressorLeave_PvpBattleClosesHostEncounterMenu()
+    {
+        var setup = SetupTwoOpposingPlayersInBattle();
+        SetMainPartyInBattle(Server, setup.ctx.AttackerPartyId);
+        EnableHeadlessEncounterFinish(Server);
+
+        string[] closeOnServer = null;
+        Server.Resolve<IMessageBroker>().Subscribe<NetworkClosePvpEncounter>(p => closeOnServer = p.What.PartyIds);
+
+        using var exitToLast = new GameMenuExitToLastCounter();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(setup.ctx.MapEventId, out var mapEvent));
+            Server.Resolve<IMessageBroker>().Publish(this, new MapEventFinalizeAttempted(mapEvent));
+        }, MapEventDisabledMethods);
+
+        Assert.NotNull(closeOnServer);
+        Assert.Contains(setup.initiatorPartyBaseId, closeOnServer);
+        Assert.Contains(setup.recipientPartyBaseId, closeOnServer);
+        AssertMapEventRemoved(Server, setup.ctx.MapEventId);
+        AssertMainPartyLeftBattle(Server);
+        Assert.Contains(setup.initiatorPartyBaseId, exitToLast.PartyIds);
+    }
+
+    [Fact]
+    public void SpectatorBattleSimulationOpen_ClosesBattleEncounterMenu_WithoutEndingEncounter()
+    {
+        var setup = SetupTwoOpposingPlayersInBattle();
+        var spectatorClient = Clients.Last();
+        SetMockPlayerEncounter(spectatorClient, mapEventId: setup.ctx.MapEventId);
+
+        using var exitToLast = new GameMenuExitToLastCounter();
+
+        spectatorClient.Call(() =>
+        {
+            spectatorClient.Resolve<IMessageBroker>().Publish(this, new NetworkOpenBattleSimulation(setup.ctx.MapEventId));
+        }, MapEventDisabledMethods);
+
+        Assert.Equal(1, exitToLast.CountFor(setup.recipientPartyBaseId));
+        AssertHasPlayerEncounter(spectatorClient, expected: true);
+    }
+
     /// <summary>
     /// The coop auto-finalize on conclusion: both allied players win — a client commits the victory
     /// <see cref="BattleState"/>, the server applies it (OnBattleWon), broadcasts the authoritative battle
@@ -127,6 +264,7 @@ public class CoopBattleFinalizeTests : MapEventTestBase
             // Finalizing a battle WITH a winner teleports the defeated parties off the event, which needs a live
             // map scene (the no-winner leave test skips this) — the headless boundary for a concluded finalize.
             .Append(AccessTools.Method(typeof(MapEvent), "MovePartyToSuitablePositionOnMapEventFinalize"))
+            .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)))
             .ToList();
 
         var client1 = Clients.First();
@@ -146,6 +284,32 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         // (client SendAll only reaches the server) stages exactly like the committing client.
         AssertPlayerEncounterState(Clients.First(), PlayerEncounterState.CaptureHeroes);
         AssertPlayerEncounterState(Clients.Last(), PlayerEncounterState.CaptureHeroes);
+    }
+
+    [Fact]
+    public void DuplicateBattleStateChange_AfterServerConclusion_DoesNotPublishSecondClose()
+    {
+        var (ctx, _, _, _) = SetupTwoAlliedPlayersInBattle();
+
+        int closeCount1 = 0, closeCount2 = 0;
+        Clients.First().Resolve<IMessageBroker>().Subscribe<NetworkClosePvpEncounter>(_ => closeCount1++);
+        Clients.Last().Resolve<IMessageBroker>().Subscribe<NetworkClosePvpEncounter>(_ => closeCount2++);
+
+        var disabled = BattleMenuSurrenderDisabledMethods()
+            .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)))
+            .ToList();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
+            mapEvent._battleState = BattleState.AttackerVictory;
+
+            Server.Resolve<IMessageBroker>().Publish(this, new NetworkChangeBattleState(ctx.MapEventId, BattleState.AttackerVictory));
+        }, disabled);
+
+        Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out _));
+        Assert.Equal(0, closeCount1);
+        Assert.Equal(0, closeCount2);
     }
 
     /// <summary>
@@ -190,11 +354,52 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         Assert.Equal(1, closeCount2);
     }
 
+    private IReadOnlyList<MethodBase> BattleMenuSurrenderDisabledMethods()
+        => MapEventDisabledMethods
+            .Append(AccessTools.Method(typeof(DefaultBattleRewardModel), nameof(DefaultBattleRewardModel.GetCaptureMemberChancesForWinnerParties)))
+            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyCasualties"))
+            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyItems"))
+            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyPrisoners"))
+            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyShips"))
+            .Append(AccessTools.Method(typeof(MapEvent), "CalculateMapEventResults"))
+            .Append(AccessTools.Method(typeof(MapEvent), "CommitCalculatedMapEventResults"))
+            .Append(AccessTools.Method(typeof(MapEvent), "MovePartyToSuitablePositionOnMapEventFinalize"))
+            .ToList();
+
     /// <summary>
-    /// Builds a shared battle with two allied players on the winning (attacker) side and the AI defender on the
-    /// losing side, registers both as players, makes each client's <see cref="MobileParty.MainParty"/> its own
-    /// party (asserting it is in the battle), and enables headless <c>PlayerEncounter.Finish</c> on both clients.
-    /// Returns the map-event context, player 2's MobileParty id, and both players' PartyBase ids.
+    /// Builds a shared battle with two opposing player parties, registers both as players, makes each client's
+    /// <see cref="MobileParty.MainParty"/> its own party, and seeds the defender hero so surrender can capture it.
+    /// </summary>
+    private (
+        MapEventContext ctx,
+        string initiatorHeroId,
+        string recipientHeroId,
+        string initiatorPartyId,
+        string recipientPartyId,
+        string initiatorPartyBaseId,
+        string recipientPartyBaseId) SetupTwoOpposingPlayersInBattle()
+    {
+        var ctx = CreateServerMapEvent();
+        var initiatorHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var recipientHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var initiatorPartyBaseId = GetPartyBaseId(Server, ctx.AttackerPartyId);
+        var recipientPartyBaseId = GetPartyBaseId(Server, ctx.DefenderPartyId);
+
+        RegisterAsPlayerParty("1", initiatorHeroId, ctx.AttackerPartyId);
+        RegisterAsPlayerParty("2", recipientHeroId, ctx.DefenderPartyId);
+        PreparePlayerPartyForCapture(recipientHeroId, ctx.DefenderPartyId);
+
+        SetMainPartyInBattle(Clients.First(), ctx.AttackerPartyId);
+        SetMainPartyInBattle(Clients.Last(), ctx.DefenderPartyId);
+        EnableHeadlessEncounterFinish(Clients.First());
+        EnableHeadlessEncounterFinish(Clients.Last());
+
+        return (ctx, initiatorHeroId, recipientHeroId, ctx.AttackerPartyId, ctx.DefenderPartyId, initiatorPartyBaseId, recipientPartyBaseId);
+    }
+
+    /// <summary>
+    /// Builds a shared battle with two allied players on the winning attacker side and an AI defender on the
+    /// losing side, then returns the map-event context, player 2 MobileParty id, and both player PartyBase ids.
     /// </summary>
     private (MapEventContext ctx, string player2PartyId, string player1PartyBaseId, string player2PartyBaseId)
         SetupTwoAlliedPlayersInBattle()
@@ -235,6 +440,35 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         return (ctx, player2PartyId, player1PartyBaseId, player2PartyBaseId);
     }
 
+    private void PreparePlayerPartyForCapture(string heroId, string partyId)
+    {
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+
+            using (new AllowedThread())
+            {
+                party.MemberRoster.AddToCounts(hero.CharacterObject, 1);
+                hero.PartyBelongedTo = party;
+            }
+        }, MapEventDisabledMethods);
+    }
+
+    private static string GetPartyBaseId(EnvironmentInstance instance, string mobilePartyId)
+    {
+        string partyBaseId = null;
+
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var party));
+            Assert.True(instance.ObjectManager.TryGetId(party.Party, out partyBaseId));
+        });
+
+        Assert.NotNull(partyBaseId);
+        return partyBaseId;
+    }
+
     /// <summary>Makes <paramref name="partyId"/> the client's <see cref="MobileParty.MainParty"/> and asserts it
     /// is currently in the battle. Runs in the client's static scope, where <c>Campaign.Current</c> resolves to
     /// that client.</summary>
@@ -271,5 +505,45 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         instance.Call(() =>
             Assert.False(instance.ObjectManager.TryGetObject<MapEvent>(mapEventId, out _),
                 $"MapEvent {mapEventId} should be finalized/removed on {instance.GetType().Name}"));
+    }
+
+    private sealed class GameMenuExitToLastCounter : IDisposable
+    {
+        private readonly Harmony harmony = new("coop-battle-finalize-exit-to-last-counter");
+
+        public GameMenuExitToLastCounter()
+        {
+            exitToLastCount = 0;
+            exitToLastPartyIds.Clear();
+            harmony.Patch(
+                ExitToLastMethod,
+                prefix: new HarmonyMethod(typeof(CoopBattleFinalizeTests), nameof(CountGameMenuExitToLast)));
+        }
+
+        public int Count => exitToLastCount;
+        public IReadOnlyList<string> PartyIds => exitToLastPartyIds;
+
+        public int CountFor(string partyId) => exitToLastPartyIds.Count(id => id == partyId);
+
+        public void Dispose()
+        {
+            harmony.Unpatch(ExitToLastMethod, HarmonyPatchType.Prefix, harmony.Id);
+        }
+    }
+
+    private static readonly MethodInfo ExitToLastMethod = AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast));
+    private static int exitToLastCount;
+    private static readonly List<string> exitToLastPartyIds = new();
+
+    private static bool CountGameMenuExitToLast()
+    {
+        exitToLastCount++;
+        if (GameInterface.ContainerProvider.TryGetContainer(out var container) &&
+            container.Resolve<IObjectManager>().TryGetId(MobileParty.MainParty?.Party, out var partyId))
+        {
+            exitToLastPartyIds.Add(partyId);
+        }
+
+        return false;
     }
 }

@@ -120,8 +120,9 @@ internal static class PlayerPartyTradeContext
     public static bool CanReset()
         => !IsActive;
 
+    // Offer changes are allowed after acceptance because every valid change clears both confirmations.
     public static bool CanModifyOffer()
-        => !IsActive || (!LocalAccepted && !RemoteAccepted);
+        => true;
 
     public static void SetResetButton(ButtonWidget buttonWidget)
     {
@@ -168,6 +169,7 @@ internal static class PlayerPartyTradeContext
         if (!IsActive) return;
         if (isApplyingServerOffer || !CanModifyOffer()) return;
 
+        ResetAcceptance();
         MessageBroker.Instance.Publish(inventoryLogic, new PlayerPartyTradeOfferChanged(SessionId, inventoryLogic));
     }
 
@@ -176,6 +178,7 @@ internal static class PlayerPartyTradeContext
         if (!IsActive) return;
         if (isApplyingServerOffer || !CanModifyOffer()) return;
 
+        ResetAcceptance();
         MessageBroker.Instance.Publish(barterVM, new PlayerPartyTradeOfferChanged(SessionId, barterVM));
     }
 
@@ -226,6 +229,7 @@ internal static class PlayerPartyTradeContext
             ApplyFiefOffers(message, objectManager);
             ApplyPrisonerOffers(message, objectManager);
             ApplyTroopOffers(message, objectManager);
+            ApplyPeaceOffer(message, objectManager);
             RefreshBarterControls();
         }
         finally
@@ -239,7 +243,7 @@ internal static class PlayerPartyTradeContext
         if (activeBarterVM == null) return;
 
         activeBarterVM.DiplomaticLbl = string.Empty;
-        activeBarterVM.OtherLbl = "Troops";
+        activeBarterVM.OtherLbl = "Misc";
         activeBarterVM.LeftDiplomaticList?.Clear();
         activeBarterVM.RightDiplomaticList?.Clear();
         activeBarterVM.OfferLbl = "Accept";
@@ -255,6 +259,16 @@ internal static class PlayerPartyTradeContext
         if (resetButton == null) return;
 
         resetButton.IsDisabled = IsActive;
+    }
+
+    private static void ResetAcceptance()
+    {
+        if (!LocalAccepted && !RemoteAccepted) return;
+
+        LocalAccepted = false;
+        RemoteAccepted = false;
+        RefreshBarterControls();
+        PlayerPartyTradeOverlay.Instance.UpdateState(false, false);
     }
 
     private static bool IsLocalOfferMessage(NetworkPlayerPartyTradeOfferUpdated message, IObjectManager objectManager)
@@ -332,6 +346,17 @@ internal static class PlayerPartyTradeContext
 
             offeredTroops.TryGetValue(troopKey, out var offeredAmount);
             ApplyOfferedAmount(item, offeredAmount);
+        }
+    }
+
+    private static void ApplyPeaceOffer(NetworkPlayerPartyTradeOfferUpdated message, IObjectManager objectManager)
+    {
+        foreach (var item in GetAllBarterItems(activeBarterVM))
+        {
+            if (!IsOwnedByParty(item, message.PartyId, objectManager)) continue;
+            if (!(item.Barterable is PlayerPartyPeaceBarterable)) continue;
+
+            ApplyOfferedAmount(item, message.OfferedPeace ? 1 : 0);
         }
     }
 
