@@ -59,16 +59,20 @@ public class ArmyPatches
     [HarmonyPostfix]
     static void ArmyOwnerSetPostfix(Army __instance)
     {
-        if (ModInformation.IsClient)
+        if (!ModInformation.IsClient || __instance == null) return;
+
+        __instance.UpdateName();
+
+        if (__instance.LeaderParty == null) return;
+        if (MobileParty.MainParty == null) return;
+
+        if (__instance.LeaderParty == MobileParty.MainParty)
         {
-            __instance.UpdateName();
-            if (__instance.LeaderParty == MobileParty.MainParty)
-            {
-                var mapState = Game.Current.GameStateManager.GameStates
-                    .OfType<MapState>()
-                    .SingleOrDefault();
-                mapState?.OnArmyCreated(MobileParty.MainParty);
-            }
+            var game = Game.Current;
+            if (game?.GameStateManager == null) return;
+
+            var mapState = game.GameStateManager.GameStates?.OfType<MapState>().SingleOrDefault();
+            mapState?.OnArmyCreated(MobileParty.MainParty);
         }
     }
     [HarmonyPatch(typeof(Army), "set_Kingdom")]
