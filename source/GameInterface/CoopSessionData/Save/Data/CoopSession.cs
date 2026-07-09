@@ -5,6 +5,7 @@ using GameInterface.Services.Players.Data;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.Workshops;
 using ProtoBuf;
+using System;
 
 namespace GameInterface.CoopSessionData.Save.Data;
 
@@ -27,6 +28,18 @@ public interface ICoopSession
 [ProtoContract]
 public class CoopSession : ICoopSession
 {
+    // Shared "no data yet" shape for a fresh session (before any GameSaved/GameLoaded). A property,
+    // not a static instance, otherwise every caller aliases the same mutable dictionaries and
+    // AddPlayerKeys-style in-place edits leak into every other reader for the life of the process.
+    public static CoopSession Empty => new CoopSession(
+        string.Empty,
+        Array.Empty<Player>(),
+        new CraftingPlayerData(new(), new(), new()),
+        new WorkshopPlayerData(new()),
+        new CaravansPlayerData(new(), new()),
+        new AlleyPlayerData(new()),
+        new InteractionsPlayerData(new(), new(), new(), new()));
+
     [ProtoMember(1)]
     public string UniqueGameId { get; }
     [ProtoMember(2)]

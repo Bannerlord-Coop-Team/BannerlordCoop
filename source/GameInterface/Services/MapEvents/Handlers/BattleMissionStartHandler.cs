@@ -12,9 +12,7 @@ using Serilog;
 using System;
 using System.Collections.Concurrent;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encounters;
-using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -26,9 +24,9 @@ namespace GameInterface.Services.MapEvents.Handlers;
 /// <summary>
 /// Owns the live battle-mission start flow (split out of <see cref="BattleHandler"/>). On the server it answers the
 /// mission-mode <see cref="NetworkBattleStartRequest"/>: gate it against <see cref="ServerBattleModeArbiter"/>, apply
-/// the attack's hostile consequences, make the sides mission-ready, reply, tell the requester to open the mission
+/// the attack's hostile consequences, make the sides mission-ready, reply, broadcast the mission start
 /// (<see cref="NetworkStartAttackMission"/>), and claim the mission mode on every client
-/// (<see cref="NetworkBattleModeSet"/>). On the requesting client it opens the coop field-battle mission.
+/// (<see cref="NetworkBattleModeSet"/>). Clients in the map event open the coop field-battle mission.
 /// </summary>
 internal class BattleMissionStartHandler : IHandler
 {
@@ -38,14 +36,11 @@ internal class BattleMissionStartHandler : IHandler
     // client-side MBRandom.RandomInt(10000) roll this replaces.
     private const int MaxTerrainSeed = 10000;
 
-    // The -10 player-hostility relation penalty vanilla applies against the target faction leader
-    // when an attack first turns a faction hostile (the war block of BeHostileAction).
-    private const int PlayerHostilityRelationPenalty = -10;
-
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IMapEventLogger mapEventLogger;
+    private readonly IBattleMissionInitializerResolver missionInitializerResolver;
 
     // Server-side: terrain seed chosen once per map event and reused for every client that opens the same battle,
     // so they all use the same terrain seed. Keyed by map event id.
@@ -56,12 +51,14 @@ internal class BattleMissionStartHandler : IHandler
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        IMapEventLogger mapEventLogger)
+        IMapEventLogger mapEventLogger,
+        IBattleMissionInitializerResolver missionInitializerResolver)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.mapEventLogger = mapEventLogger;
+        this.missionInitializerResolver = missionInitializerResolver;
 
         messageBroker.Subscribe<NetworkBattleStartRequest>(Handle_NetworkBattleStartRequest);
         messageBroker.Subscribe<NetworkStartAttackMission>(Handle_NetworkStartAttackMission);
@@ -83,7 +80,7 @@ internal class BattleMissionStartHandler : IHandler
     }
 
     /// <summary>[Server] Handle a battle-start request for the live-mission mode: gate it, make the sides
-    /// mission-ready, send the requester the mission start, and reply. Requests for other modes are ignored here.</summary>
+    /// mission-ready, broadcast the mission start, and reply. Requests for other modes are ignored here.</summary>
     private void Handle_NetworkBattleStartRequest(MessagePayload<NetworkBattleStartRequest> payload)
     {
         if (ModInformation.IsClient)
@@ -106,16 +103,27 @@ internal class BattleMissionStartHandler : IHandler
         // Re-resolve the event at drain time: it may have finalized between this request
         // arriving and the queued action running, in which case a captured reference would
         // point at a torn-down event.
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
+            var operation = "resolve map event";
+
             try
             {
                 if (!objectManager.TryGetObject(payload.What.MapEventId, out MapEvent mapEvent))
                     return;
 
+                operation = "validate hostile action mode";
+                if (mapEvent.IsUnsupportedMultiPlayerHostileAction())
+                {
+                    Logger.Warning("Rejecting attack mission start for map event {MapEventId}: this hostile action does not support multiple player parties", payload.What.MapEventId);
+                    network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
+                    return;
+                }
+
                 // Server-authoritative mode gate: accept the live mission only if no auto-resolve simulation already
                 // owns this event. On reject, don't make the sides mission-ready or reply — the requesting client
                 // waits for NetworkStartAttackMission to open the mission, so it simply stays at the encounter menu.
+                operation = "claim mission mode";
                 if (!ServerBattleModeArbiter.TryClaimMission(payload.What.MapEventId))
                 {
                     mapEventLogger.DebugMapEvent(mapEvent, "Rejecting attack mission: an auto-resolve simulation is already underway for this event");
@@ -128,8 +136,10 @@ internal class BattleMissionStartHandler : IHandler
                 // Apply the diplomatic consequences of the client's attack (war / relation)
                 // authoritatively before the mission opens, reproducing the hostile-action head of
                 // vanilla EncounterAttackConsequence that neither the client nor the server runs.
+                operation = "apply attack hostile-action consequences";
                 ApplyClientAttackHostileConsequences(mapEvent, payload.What.AttackerPartyId);
 
+                operation = "make map event sides mission-ready";
                 foreach (var side in mapEvent._sides)
                 {
                     side.MakeReadyForMission(null);
@@ -138,85 +148,62 @@ internal class BattleMissionStartHandler : IHandler
                 // Reply first so the requesting client's blocked consequence unblocks before the mission-open
                 // message arrives — the mission then opens off the menu-consequence stack, as in the pre-coordinator
                 // flow, rather than re-entrantly during the blocking wait.
+                operation = "send battle start reply";
                 network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, true));
 
-                network.Send(requester, new NetworkStartAttackMission(randomTerrainSeed));
+                operation = "read campaign atmosphere";
+                AtmosphereInfo atmosphereOnCampaign = GetAtmosphereOnCampaign(mapEvent);
+
+                operation = "send attack mission start";
+                network.SendAll(new NetworkStartAttackMission(payload.What.MapEventId, randomTerrainSeed, atmosphereOnCampaign));
 
                 // Claim the event for the mission mode on every client, so one still sitting at the encounter menu
                 // greys out the auto-resolve option — a map event is fought as a live mission XOR an auto-resolve,
                 // never both (see BattleModeEncounterOptionsPatch / BattleModeRegistry).
+                operation = "send battle mode";
                 network.SendAll(new NetworkBattleModeSet(payload.What.MapEventId, (int)BattleStartMode.Mission));
             }
             catch (Exception e)
             {
-                Logger.Error(e, "Failed to make map event sides mission-ready for {Message}", nameof(NetworkBattleStartRequest));
+                Logger.Error(e, "Failed to {Operation} for {Message}", operation, nameof(NetworkBattleStartRequest));
                 network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
             }
-        });
+        }, context: nameof(Handle_NetworkBattleStartRequest));
+    }
+
+    private static AtmosphereInfo GetAtmosphereOnCampaign(MapEvent mapEvent)
+    {
+        var weatherModel = Campaign.Current?.Models?.MapWeatherModel;
+        if (weatherModel == null)
+            return default;
+
+        try
+        {
+            return weatherModel.GetAtmosphereModel(mapEvent.Position);
+        }
+        catch (Exception e)
+        {
+            Logger.Warning(e, "Failed to read campaign atmosphere for map event; using default atmosphere");
+            return default;
+        }
     }
 
     /// <summary>
     /// When a client attacks a not-already-hostile party, declares war on the target faction and
-    /// applies the player-hostility relation penalty against its leader — the war block of vanilla
+    /// applies the player-hostility relation penalty against its leader - the war block of vanilla
     /// MenuHelper.EncounterAttackConsequence (BeHostileAction.ApplyEncounterHostileAction), which
     /// neither the client (it defers to the server) nor the dedicated server (it never opens the
-    /// encounter menu) runs. Vanilla gates the war declaration on the attacker being the
-    /// single-player main party; the server is never that party, so it is reproduced explicitly for
-    /// the client attacker. Runs with patches live: the war declaration replicates through the
-    /// server-authoritative stance sync, and the relation change is applied server-authoritatively
-    /// like every other co-op relation change. The whole block sits behind the not-already-at-war
-    /// check, so repeated attack requests for the same battle apply it at most once.
+    /// encounter menu) runs.
     /// </summary>
     private void ApplyClientAttackHostileConsequences(MapEvent mapEvent, string attackerPartyId)
     {
-        try
+        if (!objectManager.TryGetObject(attackerPartyId, out MobileParty attackerMobileParty))
         {
-            // GameThread runs queued actions unguarded, so the campaign can have been torn down
-            // between the request arriving and this draining; the sibling OpenAttackMission guards
-            // the same way before dereferencing campaign state.
-            if (Campaign.Current == null)
-                return;
-
-            if (!objectManager.TryGetObject(attackerPartyId, out MobileParty attackerMobileParty))
-            {
-                Logger.Warning("Could not resolve attacker party {AttackerPartyId} for attack hostile-action consequences", attackerPartyId);
-                return;
-            }
-
-            var attackerParty = attackerMobileParty.Party;
-
-            // OpponentSide is only meaningful while the attacker is a side in this event.
-            if (attackerParty.MapEvent != mapEvent)
-                return;
-
-            var defenderParty = mapEvent.GetLeaderParty(attackerParty.OpponentSide);
-            if (defenderParty == null)
-                return;
-
-            var attackerFaction = attackerParty.MapFaction;
-            var defenderFaction = defenderParty.MapFaction;
-            if (attackerFaction == null || defenderFaction == null || attackerFaction == defenderFaction)
-                return;
-
-            if (Campaign.Current.Models.EncounterModel.IsEncounterExemptFromHostileActions(attackerParty, defenderParty))
-                return;
-
-            // Already hostile: nothing to declare, and this is what makes the consequence idempotent
-            // across the duplicate attack requests a client can send during the server round-trip.
-            if (FactionManager.IsAtWarAgainstFaction(attackerFaction, defenderFaction))
-                return;
-
-            if (attackerParty.LeaderHero != null && defenderFaction.Leader != null)
-            {
-                ChangeRelationAction.ApplyRelationChangeBetweenHeroes(attackerParty.LeaderHero, defenderFaction.Leader, PlayerHostilityRelationPenalty);
-            }
-
-            DeclareWarAction.ApplyByPlayerHostility(attackerFaction, defenderFaction);
+            Logger.Warning("Could not resolve attacker party {AttackerPartyId} for attack hostile-action consequences", attackerPartyId);
+            return;
         }
-        catch (Exception e)
-        {
-            Logger.Error(e, "Failed to apply attack hostile-action consequences");
-        }
+
+        MapEventHostileActionConsequences.Apply(mapEvent, attackerMobileParty.Party, "attack");
     }
 
     private int RollTerrainSeed()
@@ -235,11 +222,13 @@ internal class BattleMissionStartHandler : IHandler
         // Opening a mission pushes a screen, and ScreenManager only tolerates screen
         // changes from the main thread; doing it from the network thread races its
         // layer lists and crashes the game.
-        var randomTerrainSeed = payload.What.RandomTerrainSeed;
-        GameThread.Run(() => OpenAttackMission(randomTerrainSeed));
+        var message = payload.What;
+        GameThread.RunSafe(
+            () => OpenAttackMission(message.MapEventId, message.RandomTerrainSeed, message.AtmosphereOnCampaign),
+            context: nameof(Handle_NetworkStartAttackMission));
     }
 
-    private static void OpenAttackMission(int randomTerrainSeed)
+    private void OpenAttackMission(string mapEventId, int randomTerrainSeed, AtmosphereInfo atmosphereOnCampaign)
     {
         try
         {
@@ -256,6 +245,14 @@ internal class BattleMissionStartHandler : IHandler
             if (battle == null)
             {
                 Logger.Warning("Received {Message} but PlayerEncounter.Battle was null, not opening battle mission", nameof(NetworkStartAttackMission));
+                return;
+            }
+
+            if (!ContainerProvider.TryResolve(out IObjectManager objectManager) ||
+                !objectManager.TryGetId(battle, out var battleMapEventId) ||
+                battleMapEventId != mapEventId)
+            {
+                Logger.Warning("Received {Message} for map event {MapEventId}, but the local player is not in that battle; not opening battle mission", nameof(NetworkStartAttackMission), mapEventId);
                 return;
             }
 
@@ -278,48 +275,21 @@ internal class BattleMissionStartHandler : IHandler
                 return;
             }
 
-            bool isNavalEncounter = PlayerEncounter.IsNavalEncounter();
-            CampaignVec2 position = MobileParty.MainParty.Position;
-
-            IMapScene mapSceneWrapper = Campaign.Current.MapSceneWrapper;
-            MapPatchData mapPatchAtPosition = mapSceneWrapper.GetMapPatchAtPosition(position);
-
-            string battleScene = Campaign.Current.Models.SceneModel.GetBattleSceneForMapPatch(mapPatchAtPosition, isNavalEncounter);
-            MissionInitializerRecord rec2 = new MissionInitializerRecord(battleScene);
-            TerrainType faceTerrainType2 = Campaign.Current.MapSceneWrapper.GetFaceTerrainType(MobileParty.MainParty.CurrentNavigationFace);
-            rec2.TerrainType = (int)faceTerrainType2;
-            rec2.DamageToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier();
-            rec2.DamageFromPlayerToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier();
-            rec2.NeedsRandomTerrain = false;
-            rec2.PlayingInCampaignMode = true;
-
-            // Seed chosen server-side and carried in NetworkStartAttackMission so every
-            // client uses the same terrain seed for this battle.
-            rec2.RandomTerrainSeed = randomTerrainSeed;
-            rec2.AtmosphereOnCampaign = Campaign.Current.Models.MapWeatherModel.GetAtmosphereModel(MobileParty.MainParty.Position);
-            rec2.SceneHasMapPatch = true;
-            rec2.DecalAtlasGroup = 2;
-            rec2.PatchCoordinates = mapPatchAtPosition.normalizedCoordinates;
-            position = battle.AttackerSide.LeaderParty.Position;
-            Vec2 v2 = position.ToVec2();
-            position = battle.DefenderSide.LeaderParty.Position;
-            rec2.PatchEncounterDir = (v2 - position.ToVec2()).Normalized();
+            MissionInitializerRecord rec2 = missionInitializerResolver.Create(battle, randomTerrainSeed, atmosphereOnCampaign);
 
             // Engage the spawn gate BEFORE OpenBattleMission builds the mission — the deployment controller
             // spawns the initial wave during mission setup (inside OpenBattleMission), earlier than the
             // CoopBattleController attach. The gate only marks "a coop battle is active" for the spawn patches;
             // who fields which troops is decided by the server-fed reserves (CoopTroopSupplier).
-            if (BattleSpawnConfig.Enabled
-                && ContainerProvider.TryResolve(out IObjectManager battleObjectManager)
-                && battleObjectManager.TryGetId(battle, out var battleMapEventId))
+            if (BattleSpawnConfig.Enabled)
             {
                 BattleSpawnGate.BeginBattle(battleMapEventId);
                 Logger.Information("[BattleSync] Engaged spawn gate in OpenAttackMission: mapEvent={MapEventId}", battleMapEventId);
             }
 
-            // Coop opens a custom field-battle mission (per-client troop suppliers, no deployment phase) instead
-            // of the native one; the launcher lives in Missions and is resolved from the container. Fall back to
-            // the native mission only if it is somehow unavailable, so a misconfiguration still yields a battle.
+            // Coop opens a custom battle mission (per-client troop suppliers) instead of the native one; the
+            // launcher lives in Missions and is resolved from the container. Fall back to the native mission only
+            // if it is somehow unavailable, so a misconfiguration still yields a battle.
             if (ContainerProvider.TryResolve(out ICoopFieldBattleLauncher battleLauncher))
             {
                 battleLauncher.OpenCoopFieldBattle(rec2);

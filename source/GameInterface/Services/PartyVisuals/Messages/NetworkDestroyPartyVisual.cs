@@ -4,7 +4,7 @@ using ProtoBuf;
 namespace GameInterface.Services.PartyVisuals.Messages
 {
     [ProtoContract(SkipConstructor = true)]
-    internal record NetworkDestroyPartyVisual : ICommand
+    public record NetworkDestroyPartyVisual : ICommand
     {
         [ProtoMember(1)]
         public string PartyVisualId { get; }

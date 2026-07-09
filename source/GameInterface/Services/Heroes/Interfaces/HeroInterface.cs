@@ -6,9 +6,11 @@ using Common.Util;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players.Data;
 using SandBox.View.Map.Managers;
+using SandBox.View.Map.Visuals;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
@@ -153,6 +155,13 @@ internal class HeroInterface : IHeroInterface
         // "main_hero" id) and rename afterwards, that cache never learns about the assigned "PlayerN", so the next
         // hero computes — and collides with — the same id.
         assignNetworkIds(hero);
+
+        // The party's visual was created above inside this AllowedThread, which suppressed the patch that
+        // registers it. Register it under the party's derived id, now that the StringId is final, so the host
+        // and already-connected clients (which run this same unpack for a late joiner) resolve it by one id.
+        var partyVisual = party.Party.GetPartyVisual();
+        if (partyVisual != null)
+            objectManager.AddExisting($"{nameof(MobilePartyVisual)}_{party.StringId}", partyVisual);
 
         // The unpacked CharacterObject still carries the sender's MBGUID and IsRegistered flag. The Add* calls
         // below re-mint hero/party/clan ids, but a CharacterObject is owned by MBObjectManager, which only mints

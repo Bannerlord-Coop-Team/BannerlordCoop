@@ -2,7 +2,9 @@
 using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players.Data;
+using LiteNetLib;
 using Serilog;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -32,6 +34,29 @@ public interface IPlayerManager
     /// <param name="obj">The game object to look up</param>
     /// <returns>true if the object is player controlled</returns>
     bool Contains(object obj);
+
+    /// <summary>
+    /// Associates a connected peer with the (already registered) player behind
+    /// controllerId. Call once the peer's identity is known: on first character creation and
+    /// on every reconnect, since a rejoin gets a new NetPeer.
+    /// </summary>
+    void SetPeer(string controllerId, NetPeer peer);
+
+    /// <summary>
+    /// Removes a peer's association, for example, on disconnect. The Player
+    /// registration is untouched, only the live peer link is dropped.
+    /// </summary>
+    void ClearPeer(NetPeer peer);
+
+    /// <summary>
+    /// Resolves the Player currently controlled by a connected peer.
+    /// </summary>
+    bool TryGetPlayer(NetPeer peer, out Player player);
+
+    /// <summary>
+    /// Checks whether the given player has a connected peer.
+    /// </summary>
+    bool IsConnected(Player player);
 }
 
 /// <inheritdoc cref="IPlayerManager"/>
@@ -42,6 +67,7 @@ public class PlayerManager : IPlayerManager
     private readonly ILogger logger;
     private readonly IObjectManager objectManager;
     private readonly IControllerIdProvider controllerIdProvider;
+    private readonly ConcurrentDictionary<NetPeer, Player> peerToPlayer = new();
 
     public IReadOnlyCollection<Player> Players => _players;
     private readonly HashSet<Player> _players = new HashSet<Player>();
@@ -114,6 +140,31 @@ public class PlayerManager : IPlayerManager
     public static bool TryGetControlledObjectInfo(object obj, out ControlledObjectInfo info)
     {
         return PlayerObjects.TryGetValue(obj, out info);
+    }
+    public void SetPeer(string controllerId, NetPeer peer)
+    {
+        if (!TryGetPlayer(controllerId, out var player))
+        {
+            logger.Error("Cannot associate peer with unregistered controller {ControllerId}", controllerId);
+            return;
+        }
+
+        peerToPlayer[peer] = player;
+    }
+
+    public void ClearPeer(NetPeer peer)
+    {
+        peerToPlayer.TryRemove(peer, out _);
+    }
+
+    public bool TryGetPlayer(NetPeer peer, out Player player)
+    {
+        return peerToPlayer.TryGetValue(peer, out player);
+    }
+    public bool IsConnected(Player player)
+    {
+        return peerToPlayer.Any(kvp =>
+         kvp.Value == player && kvp.Key.ConnectionState == ConnectionState.Connected);
     }
 }
 

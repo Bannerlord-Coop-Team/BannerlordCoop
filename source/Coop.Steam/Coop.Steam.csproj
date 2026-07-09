@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>10</LangVersion>
+    <Platforms>x64</Platforms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Common\Common.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Compile against the vendored Steamworks.NET (same assembly identity as the copy the
+         game ships and loads); Private=false so the game's own copy binds at runtime and no
+         duplicate wrapper is deployed into the module. -->
+    <Reference Include="Steamworks.NET">
+      <HintPath>..\libs\Steamworks.NET.20.1.0\Steamworks.NET.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

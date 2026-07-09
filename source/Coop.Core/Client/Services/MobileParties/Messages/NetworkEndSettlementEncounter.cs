@@ -9,4 +9,15 @@ namespace Coop.Core.Client.Services.MobileParties.Messages;
 [ProtoContract(SkipConstructor = true)]
 internal class NetworkEndSettlementEncounter : ICommand
 {
+    [ProtoMember(1)]
+    public readonly string PartyId;
+
+    public NetworkEndSettlementEncounter()
+    {
+    }
+
+    public NetworkEndSettlementEncounter(string partyId)
+    {
+        PartyId = partyId;
+    }
 }

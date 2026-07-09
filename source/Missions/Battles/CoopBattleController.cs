@@ -48,7 +48,7 @@ public class CoopBattleController : CoopMissionController
     /// <summary>Deployment activation + reveal state (exposed for the join catch-up and tests).</summary>
     public IBattleDeploymentCoordinator Deployment { get; }
 
-    /// <summary>Commits a concluded battle's result to the campaign on mission end (host only).</summary>
+    /// <summary>Commits a concluded battle's result to the campaign on mission end.</summary>
     public IBattleResultCommitter ResultCommitter { get; }
 
     private readonly IBattleInstanceLifecycle lifecycle;
@@ -70,7 +70,8 @@ public class CoopBattleController : CoopMissionController
         IObjectManager objectManager,
         IPlayerManager playerManager,
         ICoopMissionComponent coopMissionComponent,
-        IBattleHostRegistry hostRegistry)
+        IBattleHostRegistry hostRegistry,
+        IAgentFormationAssigner formationAssigner)
         : base(network, messageBroker, objectManager, coopMissionComponent)
     {
         var session = new BattleSession(controllerIdProvider, hostRegistry);
@@ -81,11 +82,11 @@ public class CoopBattleController : CoopMissionController
         lifecycle = new BattleInstanceLifecycle(network, relayNetwork, messageBroker, objectManager, coopMissionComponent, session);
         replicator = new OwnedAgentReplicator(network, messageBroker, objectManager, coopMissionComponent, session, casualties, deployment);
         deathReporter = new AgentDeathReporter(network, relayNetwork, messageBroker, objectManager, coopMissionComponent, session, casualties);
-        puppetSpawner = new PuppetSpawner(messageBroker, objectManager, coopMissionComponent, session, casualties, deployment);
+        puppetSpawner = new PuppetSpawner(messageBroker, objectManager, coopMissionComponent, session, casualties, deployment, formationAssigner);
         puppetDeathApplier = new PuppetDeathApplier(messageBroker, coopMissionComponent, casualties);
         damageRouter = new BattleDamageRouter(network, messageBroker, coopMissionComponent, session);
-        authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment);
-        reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, session, deployment);
+        authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner);
+        reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, session, deployment, formationAssigner);
         supplyReporter = new SupplyProgressReporter(relayNetwork, session);
 
         Session = session;
@@ -158,7 +159,7 @@ public class CoopBattleController : CoopMissionController
     {
         // Commit the concluded battle's result to the campaign BEFORE tearing the instance down, so the server
         // captures losers / awards the win and finalizes the encounter.
-        ResultCommitter.CommitIfHost();
+        ResultCommitter.CommitResolvedResult();
 
         lifecycle.Leave();
     }

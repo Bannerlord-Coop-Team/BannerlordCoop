@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using Serilog;
@@ -54,6 +55,7 @@ internal class PlayerCaptivityClientHandler : IHandler
         messageBroker.Subscribe<PlayerSurrendered>(Handle_PlayerSurrendered);
         messageBroker.Subscribe<EndPlayerCaptivityAttempted>(Handle_EndPlayerCaptivityAttempted);
         messageBroker.Subscribe<NetworkPlayerCaptivityEnded>(Handle_NetworkPlayerCaptivityEnded);
+        messageBroker.Subscribe<NetworkPlayerCaptivityReleasePositionSet>(Handle_NetworkPlayerCaptivityReleasePositionSet);
     }
 
     public void Dispose()
@@ -62,6 +64,7 @@ internal class PlayerCaptivityClientHandler : IHandler
         messageBroker.Unsubscribe<PlayerSurrendered>(Handle_PlayerSurrendered);
         messageBroker.Unsubscribe<EndPlayerCaptivityAttempted>(Handle_EndPlayerCaptivityAttempted);
         messageBroker.Unsubscribe<NetworkPlayerCaptivityEnded>(Handle_NetworkPlayerCaptivityEnded);
+        messageBroker.Unsubscribe<NetworkPlayerCaptivityReleasePositionSet>(Handle_NetworkPlayerCaptivityReleasePositionSet);
     }
 
     /// <summary>
@@ -168,6 +171,13 @@ internal class PlayerCaptivityClientHandler : IHandler
 
         PlayerCaptivityLogger.Debug("Handle_PlayerSurrendered: requesting surrender of party={PartyId} in mapEvent={MapEventId}",
             playerPartyId, mapEventId);
+        Logger.Information(
+            "[PvPBattleEncounterTrace] Client submitting battle encounter surrender request; playerPartyId={PlayerPartyId} mapEventId={MapEventId} menu={Menu} encounter={Encounter} captive={Captive}",
+            playerPartyId,
+            mapEventId,
+            Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "<none>",
+            PlayerEncounter.Current != null,
+            PlayerCaptivity.IsCaptive);
 
         network.SendAll(new NetworkPlayerSurrendered(playerPartyId, mapEventId));
     }
@@ -245,5 +255,33 @@ internal class PlayerCaptivityClientHandler : IHandler
                 GameMenu.ExitToLast();
             }
         });
+    }
+
+    private void Handle_NetworkPlayerCaptivityReleasePositionSet(MessagePayload<NetworkPlayerCaptivityReleasePositionSet> payload)
+    {
+        if (ModInformation.IsServer) return;
+
+        var playerPartyId = payload.What.PlayerPartyId;
+        var releasePosition = payload.What.ReleasePosition;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(playerPartyId, out var playerParty))
+                return;
+
+            using (new AllowedThread())
+            {
+                playerParty.Position = releasePosition;
+                playerParty.SetMoveModeHold();
+                playerParty.ResetNavigationToHold();
+
+                if (!playerParty.IsCurrentlyAtSea)
+                {
+                    playerParty.Party.UpdateVisibilityAndInspected(playerParty.Position);
+                }
+
+                playerParty.Party.SetVisualAsDirty();
+            }
+        }, context: $"set released player party position {playerPartyId}");
     }
 }

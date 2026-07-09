@@ -16,6 +16,7 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -129,6 +130,12 @@ internal class BattleSimulationRunHandler : IHandler
             network.Send(requestingPeer, new NetworkBattleStartReply(payload.What.RequestId, false));
             return;
         }
+        if (mapEvent.IsUnsupportedMultiPlayerHostileAction())
+        {
+            Logger.Warning("Rejecting battle simulation for map event {MapEventId}: this hostile action does not support multiple player parties", mapEventId);
+            network.Send(requestingPeer, new NetworkBattleSimulationFinished(mapEventId));
+            return;
+        }
 
         // Server-authoritative mode gate: accept the auto-resolve only if no live mission already owns this event.
         // On reject the requesting client never opened its scoreboard (the prefix deferred it), so there is nothing
@@ -159,7 +166,7 @@ internal class BattleSimulationRunHandler : IHandler
 
         var observer = new ForwardingBattleObserver(objectManager);
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             // v1: simulate the full participating troop count (null), not the player's selected subset.
             // Set up before attaching the observer: setup fires +1 TroopNumberChanged calls to populate the
@@ -178,7 +185,7 @@ internal class BattleSimulationRunHandler : IHandler
                     PreviousObserver = previousObserver,
                 };
             }
-        }, blocking: true);
+        }, blocking: true, context: nameof(Handle_NetworkBattleStartRequest));
 
         // Mirror the simulation onto every other client in this map event. Each client opens the window only if its
         // own party is in the event; the requesting client and uninvolved clients ignore it. The requester keeps
@@ -210,18 +217,35 @@ internal class BattleSimulationRunHandler : IHandler
             return;
 
         // Publishing happens during the native AddPartyInternal, which already runs on the game thread; this
-        // only touches the simulation pool via the party object, so it is safe here. GameThread.Run runs inline
+        // only touches the simulation pool via the party object, so it is safe here. GameThread.RunSafe runs inline
         // when already on that thread.
-        GameThread.Run(() => 
+        GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetId(side.MapEvent, out var mapEventId))
                 return;
 
-            if (!activeSimulations.ContainsKey(mapEventId))
+            ActiveSimulation sim;
+            lock (simLock)
+            {
+                if (!activeSimulations.TryGetValue(mapEventId, out sim))
+                    return;
+            }
+
+            if (sim.MapEvent.IsUnsupportedMultiPlayerHostileAction())
+            {
+                EndSimulationSession(sim);
+                lock (simLock)
+                {
+                    activeSimulations.Remove(mapEventId);
+                }
+
+                network.SendAll(new NetworkBattleSimulationFinished(mapEventId));
+                mapEventLogger.DebugMapEvent(sim.MapEvent, "Stopped hostile-action battle simulation because an unsupported hostile-action player party joined");
                 return;
+            }
 
             AddPartyToActiveSimulation(side, joiningParty);
-        });
+        }, context: nameof(Handle_MapEventPartyBattlePartyAdded));
     }
 
     /// <summary>[Server, main thread] Allocate a late-joining party's troops into the live simulation pool.</summary>
@@ -297,8 +321,15 @@ internal class BattleSimulationRunHandler : IHandler
         NetworkBattleSimulationLoot lootMessage = default;
         var hasLoot = false;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
+            if (sim.MapEvent.IsUnsupportedMultiPlayerHostileAction())
+            {
+                EndSimulationSession(sim);
+                finished = true;
+                return;
+            }
+
             // Accumulate every round resolved in this advance into one update. Normal playback advances
             // a single round per call (one packet per round, as before), but a "skip" resolves the whole
             // remaining battle in one advance: batching keeps that from flooding the peer's outbound
@@ -338,7 +369,7 @@ internal class BattleSimulationRunHandler : IHandler
                 EndSimulationSession(sim);
                 finished = true;
             }
-        }, blocking: true);
+        }, blocking: true, context: nameof(Handle_NetworkAdvanceBattleSimulation));
 
         if (finished)
         {
@@ -349,9 +380,11 @@ internal class BattleSimulationRunHandler : IHandler
 
             mapEventLogger.DebugMapEvent(sim.MapEvent, "Server-side battle simulation finished. BattleState={BattleState}", sim.MapEvent.BattleState);
 
-            // Loot first so the client applies it before the finish closes the playback.
+            // Loot first so the client applies it before the finish closes the playback. Broadcast: every
+            // winning-side player (the pacer or a joiner) needs the loot flow; each client applies it only
+            // if its own party is among the winners.
             if (hasLoot)
-                network.Send(sim.Peer, lootMessage);
+                network.SendAll(lootMessage);
 
             network.SendAll(new NetworkBattleSimulationFinished(mapEventId));
         }
@@ -366,7 +399,7 @@ internal class BattleSimulationRunHandler : IHandler
 
         // Resolve and enqueue on the main thread: objectManager can be mutated by the main thread's
         // Add/Remove, and BattleSimulationReplay's round queue is drained on the main-thread tick.
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             // Rounds are broadcast to everyone; only clients actually playing this simulation (the pacer and the
             // in-event spectators) replay them. Checked here (not on the network thread) so it observes the Begin
@@ -396,7 +429,7 @@ internal class BattleSimulationRunHandler : IHandler
 
             if (resolved.Count > 0)
                 BattleSimulationReplay.EnqueueRound(resolved.ToArray());
-        });
+        }, context: nameof(Handle_NetworkBattleSimulationRound));
     }
 
     /// <summary>[Server] True when a player party is on the winning side, so a client needs the loot screen.</summary>
@@ -483,37 +516,58 @@ internal class BattleSimulationRunHandler : IHandler
             if (!objectManager.TryGetObject<MapEvent>(message.MapEventId, out var mapEvent))
                 return;
 
+            // Broadcast message: only a client whose own party is on the winning side runs the loot flow;
+            // losing or uninvolved spectators ignore it.
+            if (!IsWinningLootRecipient(message))
+                return;
+
             // Re-applying server-authoritative results; the roster patches must stand down during the apply.
             using (new AllowedThread())
             {
-                // The loot/capture chance models drop any winner with ContributionToBattle == 0, which is the
-                // case on the client (its simulation engine never ran). Restore the server's values first.
-                foreach (var winner in message.Winners ?? Array.Empty<BattleSimWinner>())
-                {
-                    if (!objectManager.TryGetObject<PartyBase>(winner.PartyId, out var winnerParty))
-                        continue;
-
-                    var winnerMapEventParty = FindMapEventParty(mapEvent, winnerParty);
-                    if (winnerMapEventParty != null)
-                        winnerMapEventParty._contributionToBattle = winner.ContributionToBattle;
-                }
-
-                foreach (var defeated in message.DefeatedParties ?? Array.Empty<BattleSimDefeatedParty>())
-                {
-                    if (!objectManager.TryGetObject<PartyBase>(defeated.PartyId, out var party))
-                        continue;
-
-                    var mapEventParty = FindMapEventParty(mapEvent, party);
-                    if (mapEventParty == null)
-                        continue;
-
-                    ApplyCasualties(mapEventParty.DiedInBattle, defeated.Died);
-                    ApplyCasualties(mapEventParty.WoundedInBattle, defeated.Wounded);
-                }
-
+                ApplyWinnerContributions(mapEvent, message.Winners);
+                ApplyDefeatedPartyCasualties(mapEvent, message.DefeatedParties);
                 mapEvent.BattleState = message.WinningState;
             }
         });
+    }
+
+    private bool IsWinningLootRecipient(NetworkBattleSimulationLoot message)
+    {
+        if (!objectManager.TryGetId(PartyBase.MainParty, out var mainPartyId))
+            return false;
+
+        return message.Winners?.Any(w => w.PartyId == mainPartyId) == true;
+    }
+
+    private void ApplyWinnerContributions(MapEvent mapEvent, BattleSimWinner[] winners)
+    {
+        // The loot/capture chance models drop any winner with ContributionToBattle == 0, which is the
+        // case on the client (its simulation engine never ran). Restore the server's values first.
+        foreach (var winner in winners ?? Array.Empty<BattleSimWinner>())
+        {
+            if (!objectManager.TryGetObject<PartyBase>(winner.PartyId, out var winnerParty))
+                continue;
+
+            var winnerMapEventParty = FindMapEventParty(mapEvent, winnerParty);
+            if (winnerMapEventParty != null)
+                winnerMapEventParty._contributionToBattle = winner.ContributionToBattle;
+        }
+    }
+
+    private void ApplyDefeatedPartyCasualties(MapEvent mapEvent, BattleSimDefeatedParty[] defeatedParties)
+    {
+        foreach (var defeated in defeatedParties ?? Array.Empty<BattleSimDefeatedParty>())
+        {
+            if (!objectManager.TryGetObject<PartyBase>(defeated.PartyId, out var party))
+                continue;
+
+            var mapEventParty = FindMapEventParty(mapEvent, party);
+            if (mapEventParty == null)
+                continue;
+
+            ApplyCasualties(mapEventParty.DiedInBattle, defeated.Died);
+            ApplyCasualties(mapEventParty.WoundedInBattle, defeated.Wounded);
+        }
     }
 
     private void ApplyCasualties(TroopRoster roster, BattleSimCasualty[] casualties)
@@ -544,7 +598,7 @@ internal class BattleSimulationRunHandler : IHandler
     private void Handle_NetworkBattleSimulationFinished(MessagePayload<NetworkBattleSimulationFinished> payload)
     {
         // Both the encounter state and the replay's finish flag belong to the main-thread tick.
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             // Broadcast to everyone; only a client actually playing this simulation finishes it.
             if (!BattleSimulationReplay.IsActiveFor(payload.What.MapEventId))
@@ -557,7 +611,7 @@ internal class BattleSimulationRunHandler : IHandler
             }
 
             BattleSimulationReplay.RequestFinish();
-        });
+        }, context: nameof(Handle_NetworkBattleSimulationFinished));
     }
 
     /// <summary>
@@ -572,7 +626,7 @@ internal class BattleSimulationRunHandler : IHandler
 
         var mapEventId = payload.What.MapEventId;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             // The initiator already has it open and is pacing it — it opened synchronously when the server accepted
             // its blocking request, marking the replay active.
@@ -589,6 +643,8 @@ internal class BattleSimulationRunHandler : IHandler
             if (PlayerEncounter.CurrentBattleSimulation != null)
                 return;
 
+            CloseEncounterMenuBehindSimulation();
+
             var mapState = Game.Current.GameStateManager.LastOrDefault<MapState>();
             if (mapState == null)
             {
@@ -603,7 +659,39 @@ internal class BattleSimulationRunHandler : IHandler
             mapState.StartBattleSimulation();
 
             mapEventLogger.DebugMapEvent(mapEvent, "Opened spectator battle simulation window");
-        });
+        }, context: nameof(Handle_NetworkOpenBattleSimulation));
+    }
+
+    private static void CloseEncounterMenuBehindSimulation()
+    {
+        var campaign = Campaign.Current;
+        var mapState = Game.Current?.GameStateManager?.ActiveState as MapState;
+        var menuContext = campaign?.CurrentMenuContext;
+
+        try
+        {
+            GameMenu.ExitToLast();
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "Failed to exit encounter menu before opening spectator battle simulation");
+        }
+
+        try
+        {
+            menuContext?.Destroy();
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "Failed to destroy encounter menu before opening spectator battle simulation");
+        }
+
+        if (mapState?.AtMenu == true)
+            mapState.ExitMenuMode();
+        if (mapState != null)
+            mapState.GameMenuId = null;
+        if (campaign?.MapStateData != null)
+            campaign.MapStateData.GameMenuId = null;
     }
 
     /// <summary>
@@ -626,7 +714,7 @@ internal class BattleSimulationRunHandler : IHandler
         if (orphaned.Count == 0)
             return;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             foreach (var entry in orphaned)
             {
@@ -649,7 +737,7 @@ internal class BattleSimulationRunHandler : IHandler
                 // that the pacing client (which would have driven it to completion) is gone.
                 network.SendAll(new NetworkBattleSimulationFinished(entry.Key));
             }
-        }, blocking: true);
+        }, blocking: true, context: nameof(Handle_PlayerDisconnected));
 
         lock (simLock)
         {

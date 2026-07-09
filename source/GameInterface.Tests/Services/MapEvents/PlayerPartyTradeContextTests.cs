@@ -41,19 +41,19 @@ public class PlayerPartyTradeContextTests : IDisposable
     }
 
     [Fact]
-    public void CanTransfer_BlocksAllTransfersAfterEitherPlayerAccepted()
+    public void CanTransfer_AllowsLocalTransfersAfterEitherPlayerAccepted()
     {
         PlayerPartyTradeContext.Begin("session-1");
         PlayerPartyTradeContext.UpdateAcceptance(localAccepted: false, remoteAccepted: true);
 
-        Assert.False(PlayerPartyTradeContext.CanTransfer(new TransferCommand
+        Assert.True(PlayerPartyTradeContext.CanTransfer(new TransferCommand
         {
             FromSide = InventoryLogic.InventorySide.PlayerInventory
         }));
 
         PlayerPartyTradeContext.UpdateAcceptance(localAccepted: true, remoteAccepted: false);
 
-        Assert.False(PlayerPartyTradeContext.CanTransfer(new TransferCommand
+        Assert.True(PlayerPartyTradeContext.CanTransfer(new TransferCommand
         {
             FromSide = InventoryLogic.InventorySide.PlayerInventory
         }));

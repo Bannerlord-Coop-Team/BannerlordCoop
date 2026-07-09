@@ -100,13 +100,20 @@ internal class SettlementInterface : ISettlementInterface
         if (mainParty.CurrentSettlement != null)
             mainParty.Position = mainParty.CurrentSettlement.GatePosition;
 
-        PlayerEncounter.Finish(true);
+        try
+        {
+            PlayerEncounter.Finish(true);
+        }
+        finally
+        {
+            Campaign.Current.PlayerEncounter = null;
+        }
 
         // Hold AFTER finishing: Finish -> LeaveSettlementAction resets party behavior, which would
         // otherwise clobber the hold and let the party walk straight back into the settlement.
         mainParty.SetMoveModeHold();
 
-        Campaign.Current.SaveHandler.SignalAutoSave();
+        Campaign.Current.SaveHandler?.SignalAutoSave();
     }
 
     public void OnPartyEnteredSettlement(Settlement settlement, MobileParty party)
