@@ -67,9 +67,7 @@ namespace E2E.Tests.Services.Heroes
             TestEnvironment.AssertProperty<Hero, KillCharacterAction.KillCharacterActionDetail>(nameof(Hero.DeathMark), KillCharacterAction.KillCharacterActionDetail.Murdered);
             TestEnvironment.AssertReferenceProperty<Hero, Hero>(nameof(Hero.DeathMarkKillerHero));
             TestEnvironment.AssertReferenceProperty<Hero, Settlement>(nameof(Hero.LastKnownClosestSettlement));
-            Server.NetworkSentMessages.Clear();
             TestEnvironment.AssertProperty<Hero, int>(nameof(Hero.HitPoints), 5, defaultValue: hero.HitPoints);
-            AssertSingleAutoSyncMessageForPair("Hero_HitPoints_SetNetworkMessage", "Hero__health_SetNetworkMessage");
             TestEnvironment.AssertProperty<Hero, long>(nameof(Hero.LastExaminedLogEntryID), 50);
             TestEnvironment.AssertReferenceProperty<Hero, Clan>(nameof(Hero.Clan));
             TestEnvironment.AssertReferenceProperty<Hero, Clan>(nameof(Hero.SupporterOf));

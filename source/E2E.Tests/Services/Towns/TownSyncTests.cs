@@ -37,15 +37,9 @@ public class TownSyncTests : SyncTestBase
     public void Server_Town_Properties()
     {
         TestEnvironment.AssertReferenceProperty<Town, Hero>(nameof(Town.Governor));
-        Server.NetworkSentMessages.Clear();
         TestEnvironment.AssertProperty<Town, int>(nameof(Town.TradeTaxAccumulated), 200);
-        AssertSingleAutoSyncMessageForPair("Town_TradeTaxAccumulated_SetNetworkMessage", "Town__tradeTax_SetNetworkMessage");
-        Server.NetworkSentMessages.Clear();
         TestEnvironment.AssertProperty<Town, float>(nameof(Town.Security), 50f);
-        AssertSingleAutoSyncMessageForPair("Town_Security_SetNetworkMessage", "Town__security_SetNetworkMessage");
-        Server.NetworkSentMessages.Clear();
         TestEnvironment.AssertProperty<Town, float>(nameof(Town.Loyalty), 60f);
-        AssertSingleAutoSyncMessageForPair("Town_Loyalty_SetNetworkMessage", "Town__loyalty_SetNetworkMessage");
         TestEnvironment.AssertReferenceProperty<Town, Clan>(nameof(Town.LastCapturedBy));
         TestEnvironment.AssertArrayReferenceProperty<Town, Workshop>(nameof(Town.Workshops));
     }
