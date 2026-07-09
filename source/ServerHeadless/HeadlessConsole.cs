@@ -176,6 +176,33 @@ namespace ServerHeadless
                 return;
             }
 
+            // "nav stuck": every party positioned on PATH-INVALID terrain (river, mountain,
+            // canyon... — the PartyNavigationModel's list). Spawn placement is more permissive
+            // than pathfinding, so parties can be placed where the AI cannot path from.
+            if (parts.Length >= 1 && parts[0].Equals("stuck", StringComparison.OrdinalIgnoreCase))
+            {
+                PrintStuckParties(grid);
+                return;
+            }
+
+            // "nav party <stringId or name fragment>": full navigation diagnosis of one party —
+            // position cell, snapped face record (and its LAYER group), cached navigation face,
+            // behavior and target. The tool for "party X is stuck holding" reports.
+            if (parts.Length >= 2 && parts[0].Equals("party", StringComparison.OrdinalIgnoreCase))
+            {
+                PrintPartyDiagnosis(grid, string.Join(" ", parts.Skip(1)));
+                return;
+            }
+
+            // "nav rescue": teleport parties stranded on off-mesh/path-invalid cells (legacy
+            // strandings from earlier pathfinding bugs, or naval-only spots) to the nearest
+            // walkable point. Operator-invoked one-time repair.
+            if (parts.Length >= 1 && parts[0].Equals("rescue", StringComparison.OrdinalIgnoreCase))
+            {
+                RescueStuckParties(grid);
+                return;
+            }
+
             // "nav holes x y r": count off-mesh cells (navmesh holes, e.g. settlement footprints)
             // in a box of radius r around a position, with the hole extents.
             if (parts.Length >= 4 && parts[0].Equals("holes", StringComparison.OrdinalIgnoreCase)
@@ -320,6 +347,144 @@ namespace ServerHeadless
                     $"target=({target.x:0.#},{target.y:0.#})");
             }
             Console.WriteLine($"{count} part(ies) on water/off-mesh of {campaign.MobileParties.Count}");
+        }
+
+        private static void PrintPartyDiagnosis(Bootstrap.HeadlessNavGrid grid, string query)
+        {
+            var campaign = TaleWorlds.CampaignSystem.Campaign.Current;
+            if (campaign?.MobileParties == null)
+            {
+                Console.WriteLine("No campaign.");
+                return;
+            }
+
+            var matches = campaign.MobileParties
+                .Where(p => (p.StringId?.IndexOf(query, StringComparison.OrdinalIgnoreCase) ?? -1) >= 0
+                         || (p.Name?.ToString()?.IndexOf(query, StringComparison.OrdinalIgnoreCase) ?? -1) >= 0)
+                .Take(5)
+                .ToList();
+            if (matches.Count == 0)
+            {
+                Console.WriteLine($"No party matches '{query}'.");
+                return;
+            }
+
+            foreach (var party in matches)
+            {
+                var pos = party.Position.ToVec2();
+                var snapped = grid.FaceRecordAt(pos);
+                var cached = party.CurrentNavigationFace;
+                var target = party.TargetPosition.ToVec2();
+                var targetFace = grid.FaceRecordAt(target);
+
+                Console.WriteLine($"  {party.StringId} \"{party.Name}\"");
+                Console.WriteLine($"    pos=({pos.x:0.#},{pos.y:0.#}) cell={(grid.OrdinalAt(pos) < 0 ? "OFF-MESH" : grid.TerrainAt(pos).ToString())} " +
+                                  $"posFace={snapped.FaceIndex}/g{snapped.FaceGroupIndex}/i{snapped.FaceIslandIndex} " +
+                                  $"IsOnLand={party.Position.IsOnLand} posValid={party.Position.IsValid()}");
+                Console.WriteLine($"    cachedNavFace={cached.FaceIndex}/g{cached.FaceGroupIndex}/i{cached.FaceIslandIndex} " +
+                                  $"navCap={party.NavigationCapability} desiredNav={party.DesiredAiNavigationType}");
+                Console.WriteLine($"    behavior={party.ShortTermBehavior} default={party.DefaultBehavior} " +
+                                  $"target=({target.x:0.#},{target.y:0.#}) targetFace={targetFace.FaceIndex}/g{targetFace.FaceGroupIndex} " +
+                                  $"targetSettlement={party.TargetSettlement?.Name?.ToString() ?? "-"}");
+                Console.WriteLine($"    army={party.Army?.Name?.ToString() ?? "-"} attachedTo={party.AttachedTo?.StringId ?? "-"} " +
+                                  $"inSettlement={party.CurrentSettlement?.Name?.ToString() ?? "-"} " +
+                                  $"isActive={party.IsActive} isMoving={party.IsMoving} speed={party.Speed:0.##}");
+            }
+        }
+
+        /// <summary>
+        /// Teleports every party stranded on off-mesh or path-invalid terrain to the nearest
+        /// walkable point (up to 64 cells away). Fixes legacy strandings left behind by earlier
+        /// pathfinding bugs and parties parked at naval-only shores.
+        /// </summary>
+        private static void RescueStuckParties(Bootstrap.HeadlessNavGrid grid)
+        {
+            var campaign = TaleWorlds.CampaignSystem.Campaign.Current;
+            var model = campaign?.Models?.PartyNavigationModel;
+            if (campaign?.MobileParties == null || model == null)
+            {
+                Console.WriteLine("No campaign.");
+                return;
+            }
+
+            var exclusions = model.GetInvalidTerrainTypesForNavigationType(
+                TaleWorlds.CampaignSystem.Party.MobileParty.NavigationType.Default);
+
+            int rescued = 0, unrescuable = 0, flagsFixed = 0;
+            foreach (var party in campaign.MobileParties.ToList())
+            {
+                if (party.CurrentSettlement != null || party.MapEvent != null) continue;
+
+                var pos = party.Position.ToVec2();
+                bool offMesh = grid.OrdinalAt(pos) < 0;
+                if (!offMesh && model.IsTerrainTypeValidForNavigationType(
+                        grid.TerrainAt(pos), TaleWorlds.CampaignSystem.Party.MobileParty.NavigationType.Default))
+                {
+                    // On walkable land but with a poisoned IsOnLand=false flag: CampaignVec2
+                    // .IsValid() then validates the land face against NAVAL rules (always false
+                    // in the default model), GetClosestSettlement asserts "Mobileparty is
+                    // nowhere to be found", and the lord AI holds forever. Naval transitions
+                    // never run headless, so the flag cannot self-heal.
+                    if (!party.Position.IsOnLand)
+                    {
+                        party.Position = new TaleWorlds.CampaignSystem.CampaignVec2(pos, true);
+                        flagsFixed++;
+                        Console.WriteLine($"  fixed IsOnLand for {party.StringId} \"{party.Name}\" at ({pos.x:0.#},{pos.y:0.#})");
+                    }
+                    continue;
+                }
+
+                if (grid.TryGetNearestAllowedPoint(pos, exclusions, 64f, out var found))
+                {
+                    // Server-authoritative teleport: the position set replicates to clients like
+                    // any other server-side move (the party re-thinks from the new spot).
+                    party.Position = new TaleWorlds.CampaignSystem.CampaignVec2(found, true);
+                    rescued++;
+                    Console.WriteLine($"  rescued {party.StringId} \"{party.Name}\" ({pos.x:0.#},{pos.y:0.#}) -> ({found.x:0.#},{found.y:0.#})");
+                }
+                else
+                {
+                    unrescuable++;
+                    Console.WriteLine($"  NO walkable point within 64u of {party.StringId} at ({pos.x:0.#},{pos.y:0.#})");
+                }
+            }
+            Console.WriteLine($"rescued {rescued} part(ies); fixed {flagsFixed} IsOnLand flag(s); {unrescuable} beyond rescue radius");
+        }
+
+        /// <summary>Parties standing on terrain the navigation model rejects for land pathing.</summary>
+        private static void PrintStuckParties(Bootstrap.HeadlessNavGrid grid)
+        {
+            var campaign = TaleWorlds.CampaignSystem.Campaign.Current;
+            var model = campaign?.Models?.PartyNavigationModel;
+            if (campaign?.MobileParties == null || model == null)
+            {
+                Console.WriteLine("No campaign.");
+                return;
+            }
+
+            int count = 0;
+            foreach (var party in campaign.MobileParties.ToList())
+            {
+                if (party.CurrentSettlement != null) continue; // parked in a settlement = fine
+
+                var pos = party.Position.ToVec2();
+                var terrain = grid.TerrainAt(pos);
+                bool offMesh = grid.OrdinalAt(pos) < 0;
+                if (!offMesh && model.IsTerrainTypeValidForNavigationType(
+                        terrain, TaleWorlds.CampaignSystem.Party.MobileParty.NavigationType.Default))
+                    continue;
+
+                count++;
+                if (count <= 30)
+                {
+                    var target = party.TargetPosition.ToVec2();
+                    Console.WriteLine(
+                        $"  {party.StringId} \"{party.Name}\" at ({pos.x:0.#},{pos.y:0.#}) " +
+                        $"{(offMesh ? "OFF-MESH" : terrain.ToString())} behavior={party.ShortTermBehavior} " +
+                        $"target=({target.x:0.#},{target.y:0.#})");
+                }
+            }
+            Console.WriteLine($"{count} part(ies) on path-invalid terrain of {campaign.MobileParties.Count}");
         }
 
         private static void PrintTowns(Bootstrap.HeadlessNavGrid grid)

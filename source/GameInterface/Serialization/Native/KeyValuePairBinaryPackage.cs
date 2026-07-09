@@ -84,6 +84,11 @@ namespace GameInterface.Serialization.Native
             foreach (string fieldName in StoredFields.Keys)
             {
                 var field = fields.FirstOrDefault(f => f.Name.Equals(fieldName));
+
+                // Skip fields packed on the other runtime's build of this type (net472 vs
+                // CoreCLR BCL field skew); inert when both sides run the same runtime.
+                if (field == null) continue;
+
                 field.SetValue((object)Object, StoredFields[fieldName].Unpack(binaryPackageFactory));
             }
         }

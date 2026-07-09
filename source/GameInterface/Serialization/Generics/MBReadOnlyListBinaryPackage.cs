@@ -49,12 +49,25 @@ namespace GameInterface.Serialization.Generics
 
             IsUnpacked = true;
             var type = Type.GetType(ObjectType);
+
+            // The stored name is the PACKER's AssemblyQualifiedName; surface a cross-runtime
+            // resolution failure identifiably instead of as an anonymous NRE below.
+            if (type == null)
+                throw new InvalidOperationException($"Could not resolve packed type '{ObjectType}' on this runtime");
+
             Object = FormatterServices.GetUninitializedObject(type);
             var fields = type.GetAllInstanceFields();
 
             foreach (string fieldName in StoredFields.Keys)
             {
                 var field = fields.FirstOrDefault(f => f.Name.Equals(fieldName));
+
+                // Cross-runtime field skew: a net472 client packs BCL fields (e.g. List<T>._syncRoot)
+                // that do not exist on the CoreCLR (Linux container) build of the same type — and
+                // vice versa. Skipping them is the contract; dereferencing kills the whole hero
+                // unpack and every new-character join. INERT when both sides run the same runtime
+                // (graphical host + Windows client): the field always resolves there.
+                if (field == null) continue;
 
                 if (type.IsValueType)
                 {

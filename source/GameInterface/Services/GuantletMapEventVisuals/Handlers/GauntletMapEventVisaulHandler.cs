@@ -79,6 +79,15 @@ internal class GauntletMapEventVisaulHandler : IHandler
             {
                 try
                 {
+                    // This message carries the event's authoritative position, so write it onto the
+                    // client's MapEvent as well. MapEvent.Position is assigned exactly once, inside
+                    // MapEvent.Initialize on the server — and on CoreCLR hosts (the Linux container)
+                    // the tiered JIT inlines that tiny property setter over the AutoSync detour, so
+                    // the Position property-sync never fires there (net472 hosts do send it; then
+                    // this is an idempotent duplicate). Without it every battle icon that reads
+                    // MapEvent.Position renders at the map origin.
+                    visual.MapEvent.Position = position;
+
                     // Initialize from this client's own map-event visibility, not the server's. The server
                     // force-spots every party (no main party) so its value is always visible; map-event icon
                     // visibility is local (see MapEventVisibilityClientPatch), and the vanilla IsVisible setter

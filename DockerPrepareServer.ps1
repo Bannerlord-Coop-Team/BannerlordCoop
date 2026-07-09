@@ -60,6 +60,64 @@ foreach ($module in $GameModules) {
     }
 }
 
+# JIT inlining guard: CoreCLR's tiered JIT inlines tiny property setters into their callers
+# OVER Harmony detours, so AutoSync property syncs whose setter has few call sites silently
+# never fire on the container (net472 hosts are unaffected; found via MapEvent.Position,
+# 2026-07-08). Stamp the staged copies of the game assemblies with the NoInlining method-impl
+# flag on every property setter so the JIT always calls through the detourable method entry.
+# Only the image's copies are modified - the installed game is never touched. Runs before the
+# Coop module is staged so our own assemblies keep normal optimization.
+$cecil = Get-ChildItem "$env:USERPROFILE\.nuget\packages\mono.cecil" -Recurse -Filter Mono.Cecil.dll |
+    Where-Object { $_.FullName -match '\\net40\\' } | Select-Object -First 1
+if ($null -eq $cecil) {
+    Write-Warning "Mono.Cecil not found in the NuGet cache - skipping the setter NoInlining stamp (property syncs may not fire on CoreCLR)."
+} else {
+    Add-Type -Path $cecil.FullName
+    $noInline = [Mono.Cecil.MethodImplAttributes]::NoInlining
+    $stampedMethods = 0
+    $stampedFiles = 0
+    foreach ($dll in Get-ChildItem "$TempDir\mb2" -Recurse -Filter *.dll) {
+        # Cecil resolves cross-assembly references while writing; a fresh resolver per file
+        # (disposed right after) keeps its cached read handles from blocking later writes to
+        # the very assemblies it resolved.
+        $resolver = New-Object Mono.Cecil.DefaultAssemblyResolver
+        $resolver.AddSearchDirectory("$TempDir\mb2\bin\Win64_Shipping_Client")
+        foreach ($module in $GameModules) {
+            if (Test-Path "$TempDir\mb2\Modules\$module\bin\Win64_Shipping_Client") {
+                $resolver.AddSearchDirectory("$TempDir\mb2\Modules\$module\bin\Win64_Shipping_Client")
+            }
+        }
+        $asm = $null
+        try {
+            $params = New-Object Mono.Cecil.ReaderParameters
+            $params.InMemory = $true
+            $params.AssemblyResolver = $resolver
+            $asm = [Mono.Cecil.AssemblyDefinition]::ReadAssembly($dll.FullName, $params)
+            $count = 0
+            foreach ($type in $asm.MainModule.GetTypes()) {
+                foreach ($method in $type.Methods) {
+                    if ($method.IsSetter -and -not $method.IsAbstract) {
+                        # MethodImplAttributes is a ushort enum; PS -bor yields Int32, so cast explicitly.
+                        $method.ImplAttributes = [Mono.Cecil.MethodImplAttributes]([uint16]$method.ImplAttributes -bor [uint16]$noInline)
+                        $count++
+                    }
+                }
+            }
+            if ($count -gt 0) {
+                $asm.Write($dll.FullName)
+                $stampedMethods += $count
+                $stampedFiles++
+            }
+        } catch {
+            Write-Warning "NoInlining stamp skipped for $($dll.Name): $_"
+        } finally {
+            if ($null -ne $asm) { $asm.Dispose() }
+            $resolver.Dispose()
+        }
+    }
+    Write-Host "Stamped NoInlining on $stampedMethods property setters across $stampedFiles game assemblies"
+}
+
 # The deployed Coop module, as-is
 Copy-Item "$MBModulesDir\Coop" -Destination "$TempDir\mb2\Modules\Coop" -Recurse
 

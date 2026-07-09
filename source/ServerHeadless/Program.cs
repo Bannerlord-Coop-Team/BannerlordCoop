@@ -568,6 +568,42 @@ namespace ServerHeadless
         }
 
         /// <summary>
+        /// Heals parties whose <c>Position.IsOnLand</c> is false while they stand on walkable
+        /// land. CampaignVec2.IsValid() validates such positions against NAVAL terrain rules
+        /// (always false in the default model), so HeroHelper.GetClosestSettlement asserts
+        /// "Mobileparty is nowhere to be found" and the party's AI holds forever. The flag is
+        /// only ever updated by the native embark/disembark transitions, which never run
+        /// headless — a stale flag (from a naval spawn or an old water-walking bug) can never
+        /// self-heal, so repair it once per load.
+        /// </summary>
+        private static void HealPositionFlags(Campaign campaign)
+        {
+            var grid = ServerHeadless.Bootstrap.HeadlessNavGrid.Instance;
+            var model = campaign?.Models?.PartyNavigationModel;
+            if (grid == null || campaign?.MobileParties == null || model == null) return;
+
+            int healed = 0;
+            foreach (var party in campaign.MobileParties.ToList())
+            {
+                if (party.Position.IsOnLand) continue;
+
+                var pos = party.Position.ToVec2();
+                if (grid.OrdinalAt(pos) < 0) continue;
+                if (!model.IsTerrainTypeValidForNavigationType(
+                        grid.TerrainAt(pos), TaleWorlds.CampaignSystem.Party.MobileParty.NavigationType.Default)) continue;
+
+                party.Position = new CampaignVec2(pos, true);
+                healed++;
+            }
+
+            if (healed > 0)
+            {
+                Console.WriteLine($"[ServerHeadless] Healed stale IsOnLand flags on {healed} part(ies) standing on walkable land " +
+                                  "(a false flag freezes the party's AI headless).");
+            }
+        }
+
+        /// <summary>
         /// Drives the campaign simulation. Mirrors MapState.OnMapModeTick: each frame calls
         /// <c>Campaign.RealTick(dt)</c> then <c>Campaign.Tick()</c> (the MapState UI Handler calls are
         /// null headless). Like the game's map screen, the timestep is variable: each tick advances
@@ -596,6 +632,8 @@ namespace ServerHeadless
             // 60-75% of wall-clock speed while clients rendered a true 60fps. Instead, measure how
             // long the previous iteration really took and feed that to RealTick, sleeping only the
             // remainder of the frame budget.
+            HealPositionFlags(campaign);
+
             TimeSpan targetFrame = TimeSpan.FromSeconds(1.0 / TicksPerSecond);
             var frameTimer = System.Diagnostics.Stopwatch.StartNew();
             var tpsTimer = System.Diagnostics.Stopwatch.StartNew();

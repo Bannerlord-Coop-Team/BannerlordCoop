@@ -295,6 +295,26 @@ namespace ServerHeadless.Bootstrap
             return cell < 0 ? -1 : _grid[cell];
         }
 
+        /// <summary>
+        /// Positions marginally outside the exported extent (settlement gates and encounter
+        /// points can sit a couple of units past the last navmesh face — e.g. (792,423) on
+        /// Main_map whose grid ends at x=790) clamp onto the edge; anything farther out is
+        /// genuinely off-map and stays a failed query.
+        /// </summary>
+        private bool TryClampIntoBounds(ref Vec2 pos)
+        {
+            float maxX = Min.x + (Width - 1) * CellSize;
+            float maxY = Min.y + (Height - 1) * CellSize;
+            float tolerance = CellSize * 4f;
+            if (pos.x < Min.x - tolerance || pos.x > maxX + tolerance ||
+                pos.y < Min.y - tolerance || pos.y > maxY + tolerance) return false;
+
+            pos = new Vec2(
+                Math.Min(Math.Max(pos.x, Min.x), maxX),
+                Math.Min(Math.Max(pos.y, Min.y), maxY));
+            return true;
+        }
+
         public PathFaceRecord FaceRecordAt(Vec2 pos)
         {
             int ordinal = OrdinalAt(pos);
@@ -415,6 +435,8 @@ namespace ServerHeadless.Bootstrap
 
             int startCell = CellOf(start);
             int endCell = CellOf(end);
+            if (startCell < 0 && TryClampIntoBounds(ref start)) startCell = CellOf(start);
+            if (endCell < 0 && TryClampIntoBounds(ref end)) endCell = CellOf(end);
             if (startCell < 0 || endCell < 0) return false;
 
             // A start just off the walkable layer (party parked at a settlement, or stranded on
@@ -426,12 +448,13 @@ namespace ServerHeadless.Bootstrap
             }
             if (!IsCellAllowed(endCell, excludedTerrains))
             {
-                // Only OFF-MESH ends (settlement-interior holes) snap. An end on EXCLUDED
-                // terrain must answer unreachable like the native query: this is the AI's
+                // A SEA end answers unreachable like the native query: this is the AI's
                 // candidate-target validator (NavigationHelper.FindReachablePointAroundPosition),
                 // and snapping water points onto the shore "validated" sea positions as
                 // patrol/flee targets — land parties then walked across water to reach them.
-                if (_grid[endCell] >= 0) return false;
+                // Other blocked ends (off-mesh settlement holes, the RuralArea ring around
+                // gates) snap like movement does — settlements must stay targetable.
+                if (_grid[endCell] >= 0 && IsWater((TerrainType)Faces[_grid[endCell]].Terrain)) return false;
                 if (!TryGetNearestAllowedPoint(end, excludedTerrains, CellSize * 8f, out var snapped)) return false;
                 endCell = CellOf(snapped);
             }
@@ -572,8 +595,14 @@ namespace ServerHeadless.Bootstrap
             List<Vec2> waypoints, out float cost, int maxWaypoints)
         {
             cost = 0f;
+            // The requested destination survives edge-clamping: a target 2u past the exported
+            // extent is real, walkable map in the live game, and parties must reach the true
+            // point for settlement/encounter radii to trigger.
+            Vec2 requestedEnd = end;
             int startCell = CellOf(start);
             int endCell = CellOf(end);
+            if (startCell < 0 && TryClampIntoBounds(ref start)) startCell = CellOf(start);
+            if (endCell < 0 && TryClampIntoBounds(ref end)) endCell = CellOf(end);
             if (startCell < 0 || endCell < 0)
             {
                 TrackFail(ref _failOutOfBounds, "out-of-bounds", start, end);
@@ -591,12 +620,14 @@ namespace ServerHeadless.Bootstrap
                 }
                 startCell = CellOf(snapped);
             }
-            // The point the path actually delivers the party to. An OFF-MESH destination
-            // (settlement-interior hole) stays the true target — gates legitimately sit past the
-            // walkable boundary. A destination on EXCLUDED terrain (water for land movement) is
-            // clamped to the snapped shore point instead: delivering the raw point walked land
-            // parties onto the sea for the final hop.
-            Vec2 finalPoint = end;
+            // The point the path actually delivers the party to. Only a SEA destination clamps
+            // to the snapped shore point (delivering the raw point walked land parties onto the
+            // ocean for the final hop). Every other blocked destination — off-mesh settlement
+            // holes AND soft-invalid terrain like the RuralArea ring around gates — keeps the
+            // TRUE target: parties must physically reach it to trigger settlement encounters.
+            // Clamping those left lords parked a few units short of every gate, re-pathing to
+            // the same spot until their AI gave up and held forever.
+            Vec2 finalPoint = requestedEnd;
             if (!IsCellAllowed(endCell, excludedTerrains))
             {
                 if (!TryGetNearestAllowedPoint(end, excludedTerrains, CellSize * 8f, out var snapped))
@@ -604,7 +635,7 @@ namespace ServerHeadless.Bootstrap
                     TrackFail(ref _failSnap, "end-snap", start, end);
                     return false;
                 }
-                if (_grid[endCell] >= 0) finalPoint = snapped;
+                if (_grid[endCell] >= 0 && IsWater((TerrainType)Faces[_grid[endCell]].Terrain)) finalPoint = snapped;
                 endCell = CellOf(snapped);
             }
             if (startCell == endCell)

@@ -93,6 +93,13 @@ namespace GameInterface.Serialization
             {
                 var field = fields.FirstOrDefault(f => f.Name.Equals(fieldName));
 
+                // Cross-runtime field skew: a net472 client packs BCL fields that do not exist
+                // on the CoreCLR (Linux container) build of the same type — and vice versa.
+                // Skipping them is the contract; dereferencing kills the whole graph unpack and
+                // every new-character join against the container. INERT when both sides run the
+                // same runtime (graphical host + Windows client): the field always resolves.
+                if (field == null) continue;
+
                 if (type.IsValueType)
                 {
                     object boxed = Object;
