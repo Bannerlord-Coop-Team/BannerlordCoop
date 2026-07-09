@@ -80,5 +80,4 @@ public class MobilePartyPropertyTests : SyncTestBase
             Assert.Equal(500, clientParty.PartyTradeGold);
         }
     }
-
 }
