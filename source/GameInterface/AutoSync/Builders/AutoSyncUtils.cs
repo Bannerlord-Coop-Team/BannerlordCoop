@@ -45,8 +45,8 @@ public static class AutoSyncUtils
             GetNamespace(memberType)
         };
 
-        if (memberType.IsArray || memberType.IsGenericType)
-            libraries.Add(GetNamespace(GetElementType(memberType)));
+        foreach (var elementType in GetElementTypes(memberType))
+            libraries.Add(GetNamespace(elementType));
 
         return TemplateParser.Parse("Messages.LocalSetMessageTemplate",
             new
@@ -65,6 +65,12 @@ public static class AutoSyncUtils
             return $"{GetSimpleTypeName(type.GetElementType())}[]";
         else if (type.IsGenericType)
         {
+            if (type.Name.ToLower().Contains("dictionary"))
+            {
+                var genericArguments = type.GetGenericArguments();
+                return $"Dictionary<{GetSimpleTypeName(genericArguments[0])}, {GetSimpleTypeName(genericArguments[1])}>";
+            }
+
             var arg = GetSimpleTypeName(type.GetGenericArguments()[0]);
             if (type.Name.ToLower().Contains("mblist")) return $"MBList<{arg}>";
             if (type.Name.ToLower().Contains("list")) return $"List<{arg}>";
@@ -105,18 +111,22 @@ public static class AutoSyncUtils
             throw new NotSupportedException($"Unsupported MemberInfo of type {memberInfo.MemberType} for GetLibraries");
         }
 
-        if (memberType.IsArray || memberType.IsGenericType)
+        foreach (var elementType in GetElementTypes(memberType))
         {
-            yield return GetNamespace(GetElementType(memberType));
+            yield return GetNamespace(elementType);
         }
         yield return GetNamespace(memberType);
     }
 
-    private static Type GetElementType(Type type)
+    private static IEnumerable<Type> GetElementTypes(Type type)
     {
+        // Multi-argument generics (e.g. Dictionary<TKey, TValue>) need every argument's namespace
         if (type.IsArray)
-            return type.GetElementType();
-        else
-            return type.GetGenericArguments()[0];
+            yield return type.GetElementType();
+        else if (type.IsGenericType)
+        {
+            foreach (var argument in type.GetGenericArguments())
+                yield return argument;
+        }
     }
 }

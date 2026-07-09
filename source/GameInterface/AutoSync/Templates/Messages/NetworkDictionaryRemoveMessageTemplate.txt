@@ -1,4 +1,4 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using GameInterface.Utils.NetworkEvents;
 using ProtoBuf;
 using System.Collections.Generic;
@@ -10,17 +10,17 @@ using {{ library }};
 namespace AutoSync
 {
     [ProtoContract(SkipConstructor = true)]
-    public record {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage : GenericNetworkEvent<{{ MemberDeclaringType}}, {{ MemberType }}>
+    public record {{ MemberDeclaringTypeName}}_{{ MemberName }}_RemoveNetworkMessage : GenericNetworkEvent<{{ MemberDeclaringType}}, {{ KeyType }}>
     {
         [ProtoMember(1)]
         public override string InstanceId { get; set; }
 
         [ProtoMember(2)]
-        public List<byte[]> Value { get; set; }
+        public {{ KeyWireType }} Key { get; set; }
 
-        public {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage(string instanceId, List<byte[]> value) : base(instanceId)
+        public {{ MemberDeclaringTypeName}}_{{ MemberName }}_RemoveNetworkMessage(string instanceId, {{ KeyWireType }} key) : base(instanceId)
         {
-            Value = value;
+            Key = key;
         }
     }
 }
