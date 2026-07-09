@@ -253,6 +253,54 @@ public class E2ETestEnvironment : IDisposable
     }
 
     /// <summary>
+    /// Gets the dictionary add intercept from the given <paramref name="member"/>.
+    /// Dictionary intercepts take (instance, dictionary, ...) argument order.
+    /// </summary>
+    /// <param name="member">Member to get intercept from</param>
+    /// <returns>Dictionary add intercept as <see cref="MethodInfo"/></returns>
+    public MethodInfo GetDictionaryAddIntercept(MemberInfo member)
+    {
+        Assert.True(GenericPatchHelpers.DictionaryAddInterceptCache.TryGetValue(member, out var intercept));
+        return intercept;
+    }
+
+    /// <summary>
+    /// Gets the dictionary indexer set intercept from the given <paramref name="member"/>.
+    /// Dictionary intercepts take (instance, dictionary, ...) argument order.
+    /// </summary>
+    /// <param name="member">Member to get intercept from</param>
+    /// <returns>Dictionary indexer set intercept as <see cref="MethodInfo"/></returns>
+    public MethodInfo GetDictionarySetItemIntercept(MemberInfo member)
+    {
+        Assert.True(GenericPatchHelpers.DictionarySetItemInterceptCache.TryGetValue(member, out var intercept));
+        return intercept;
+    }
+
+    /// <summary>
+    /// Gets the dictionary remove intercept from the given <paramref name="member"/>.
+    /// Dictionary intercepts take (instance, dictionary, ...) argument order.
+    /// </summary>
+    /// <param name="member">Member to get intercept from</param>
+    /// <returns>Dictionary remove intercept as <see cref="MethodInfo"/></returns>
+    public MethodInfo GetDictionaryRemoveIntercept(MemberInfo member)
+    {
+        Assert.True(GenericPatchHelpers.DictionaryRemoveInterceptCache.TryGetValue(member, out var intercept));
+        return intercept;
+    }
+
+    /// <summary>
+    /// Gets the dictionary clear intercept from the given <paramref name="member"/>.
+    /// Dictionary intercepts take (instance, dictionary) argument order.
+    /// </summary>
+    /// <param name="member">Member to get intercept from</param>
+    /// <returns>Dictionary clear intercept as <see cref="MethodInfo"/></returns>
+    public MethodInfo GetDictionaryClearIntercept(MemberInfo member)
+    {
+        Assert.True(GenericPatchHelpers.DictionaryClearInterceptCache.TryGetValue(member, out var intercept));
+        return intercept;
+    }
+
+    /// <summary>
     /// Assert if the given field with a ValueType is properly synced between server and clients
     /// </summary>
     /// <typeparam name="TInstance">Type of instance that is tested</typeparam>

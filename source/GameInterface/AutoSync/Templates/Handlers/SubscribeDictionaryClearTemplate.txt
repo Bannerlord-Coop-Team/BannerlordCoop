@@ -1,0 +1,30 @@
+// Clear mutates the existing dictionary instance in place - deliberately distinct from the
+// whole-dictionary replacement above, which swaps the member to a new instance
+SubscribeTracked((MessagePayload<Local_{{ MemberDeclaringTypeName }}_{{ MemberName }}_DictionaryClear> payload) =>
+{
+    var data = payload.What;
+
+    if (!objectManager.TryGetIdWithLogging(data.Instance, out var instanceId))
+        return;
+
+    {{~ if Debug ~}}
+    Logger.Debug("[Server] Broadcasting clear dictionary {MemberName}", "{{MemberDeclaringType}}.{{MemberName}}");
+    {{~ end ~}}
+    network.SendAll(new Network_{{ MemberDeclaringTypeName }}_{{ MemberName }}_DictionaryClear(instanceId));
+});
+
+SubscribeTracked((MessagePayload<Network_{{ MemberDeclaringTypeName}}_{{ MemberName }}_DictionaryClear> payload) =>
+{
+    var data = payload.What;
+
+    MarshalApply(() =>
+    {
+        if (!objectManager.TryGetObjectWithLogging(data.InstanceId, out {{ MemberDeclaringType }} instance))
+            return;
+
+        {{~ if Debug ~}}
+        Logger.Debug("[Client] Clearing Dictionary {MemberName}", "{{MemberDeclaringType}}.{{MemberName}}");
+        {{~ end ~}}
+        instance.{{ MemberName }}.Clear();
+    });
+});

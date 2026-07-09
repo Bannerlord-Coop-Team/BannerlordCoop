@@ -1,6 +1,7 @@
 ﻿using ProtoBuf.Meta;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
@@ -31,6 +32,7 @@ public class SurrogateCollection : ISurrogateCollection
             AddSurrogate<EquipmentElement, EquipmentElementSurrogate>();
             AddSurrogate<PropertyOwner<TraitObject>, PropertyOwnerSurrogate>();
             AddSurrogate<ItemRosterElement, ItemRosterElementSurrogate>();
+            AddSurrogate<ItemData, ItemDataSurrogate>();
 
             AddSurrogate<ExplainedNumber, ExplainedNumberSurrogate>();
             AddSurrogate<ExplainedNumber.StatExplainer, StatExplainerSurrogate>();
