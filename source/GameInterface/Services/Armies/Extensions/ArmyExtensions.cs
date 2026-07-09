@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -28,5 +29,24 @@ internal static class ArmyExtensions
         }
 
         return id;
+    }
+
+    /// <summary>
+    /// Checks to see if an army includes at least one player party.
+    /// </summary>
+    public static bool IsPlayerArmy(this Army army)
+    {
+        if (army is null)
+        {
+            Logger.Error("{parameterName} was null", nameof(army));
+            return false;
+        }
+
+        foreach (var party in army.LeaderParty.AttachedParties)
+        {
+            if (party.IsPlayerParty()) return true;
+        }
+
+        return false;
     }
 }
