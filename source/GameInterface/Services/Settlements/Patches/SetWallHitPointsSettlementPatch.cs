@@ -46,10 +46,19 @@ internal class SetWallHitPointsSettlementPatch
         {
             using (new AllowedThread())
             {
-                settlement.SettlementWallSectionHitPointsRatioList[index] = MBMath.ClampFloat(hitPointsRatio, 0f, 1f);
-                // Broken-wall meshes only refresh on a visual-dirty settlement; vanilla dirties inside
-                // the server-only bombardment tick, so this apply has to do it here.
-                settlement.Party?.SetVisualAsDirty();
+                var ratios = settlement.SettlementWallSectionHitPointsRatioList;
+                bool wasBroken = ratios[index] <= 0f;
+                float clamped = MBMath.ClampFloat(hitPointsRatio, 0f, 1f);
+                ratios[index] = clamped;
+
+                // A wall section only swaps between its solid and broken mesh when its ratio crosses 0
+                // (RefreshWallState), so only a visual-dirty on that flip changes anything. Dirtying on every
+                // ratio delta instead makes SettlementVisualManager destroy and re-create every siege engine
+                // entity at its rest orientation each hit, which snaps aiming engines back and reads as jitter.
+                if (wasBroken != (clamped <= 0f))
+                {
+                    settlement.Party?.SetVisualAsDirty();
+                }
             }
         });
     }

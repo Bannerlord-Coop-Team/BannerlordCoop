@@ -43,6 +43,7 @@ internal class SiegeEnginesContainerPatches
             return false;
         }
 
+        SiegeEngineRegistration.EnsureRegistered(siegeEngine, nameof(SiegeEnginesContainer.DeploySiegeEngineAtIndex));
         MessageBroker.Instance.Publish(__instance, new SiegeEngineDeployed(__instance, siegeEngine, index));
         return true;
     }
@@ -104,6 +105,7 @@ internal class SiegeEnginesContainerPatches
             return false;
         }
 
+        SiegeEngineRegistration.EnsureRegistered(siegeEngine, nameof(SiegeEnginesContainer.AddPrebuiltEngineToReserve));
         MessageBroker.Instance.Publish(__instance, new SiegeEngineReserveAdded(__instance, siegeEngine));
         return true;
     }
@@ -120,6 +122,7 @@ internal class SiegeEnginesContainerPatches
             return false;
         }
 
+        SiegeEngineRegistration.EnsureRegistered(siegeEngine, nameof(SiegeEnginesContainer.RemovedSiegeEngineFromReservedSiegeEngines));
         MessageBroker.Instance.Publish(__instance, new SiegeEngineReserveRemoved(__instance, siegeEngine));
         return true;
     }

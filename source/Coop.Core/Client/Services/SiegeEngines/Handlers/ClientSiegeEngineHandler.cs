@@ -28,6 +28,8 @@ internal class ClientSiegeEngineHandler : IHandler
         messageBroker.Subscribe<NetworkChangeSiegeEngineReserveAdded>(HandleReserveAdded);
         messageBroker.Subscribe<NetworkChangeSiegeEngineReserveRemoved>(HandleReserveRemoved);
         messageBroker.Subscribe<NetworkChangeSiegeEngineProgress>(HandleProgress);
+        messageBroker.Subscribe<NetworkChangeSiegeEngineHitpoints>(HandleHitpoints);
+        messageBroker.Subscribe<NetworkAddSiegeEngineMissile>(HandleMissileAdded);
         messageBroker.Subscribe<SiegeEngineDeployRequested>(HandleDeployRequested);
         messageBroker.Subscribe<SiegeEngineRemovalRequested>(HandleRemovalRequested);
     }
@@ -62,6 +64,20 @@ internal class ClientSiegeEngineHandler : IHandler
         messageBroker.Publish(this, new ChangeSiegeEngineProgress(obj.SiegeEngineId, obj.IsRedeployment, obj.Value));
     }
 
+    private void HandleHitpoints(MessagePayload<NetworkChangeSiegeEngineHitpoints> payload)
+    {
+        var obj = payload.What;
+        messageBroker.Publish(this, new ChangeSiegeEngineHitpoints(obj.SiegeEngineId, obj.Hitpoints, obj.MaxHitPoints));
+    }
+
+    private void HandleMissileAdded(MessagePayload<NetworkAddSiegeEngineMissile> payload)
+    {
+        var obj = payload.What;
+        messageBroker.Publish(this, new ApplySiegeEngineMissile(obj.SiegeEventId, obj.Side, obj.ShooterEngineTypeId,
+            obj.ShooterSlotIndex, obj.TargetType, obj.TargetSlotIndex, obj.TargetSiegeEngineId,
+            obj.CollisionTicks, obj.FireTicks, obj.HitSuccessful));
+    }
+
     // Runs on the game thread already — published from the production-popup container patch; only resolves an id and sends, so no GameThread.RunSafe.
     private void HandleDeployRequested(MessagePayload<SiegeEngineDeployRequested> payload)
     {
@@ -88,6 +104,7 @@ internal class ClientSiegeEngineHandler : IHandler
         messageBroker.Unsubscribe<NetworkChangeSiegeEngineReserveAdded>(HandleReserveAdded);
         messageBroker.Unsubscribe<NetworkChangeSiegeEngineReserveRemoved>(HandleReserveRemoved);
         messageBroker.Unsubscribe<NetworkChangeSiegeEngineProgress>(HandleProgress);
+        messageBroker.Unsubscribe<NetworkChangeSiegeEngineHitpoints>(HandleHitpoints);
         messageBroker.Unsubscribe<SiegeEngineDeployRequested>(HandleDeployRequested);
         messageBroker.Unsubscribe<SiegeEngineRemovalRequested>(HandleRemovalRequested);
     }

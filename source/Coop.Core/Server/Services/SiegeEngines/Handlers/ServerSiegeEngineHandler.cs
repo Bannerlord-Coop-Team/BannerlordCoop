@@ -1,6 +1,4 @@
-﻿using System.Linq;
-using Common;
-using Common.Logging;
+﻿using Common;
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.SiegeEngines.Messages;
@@ -9,12 +7,9 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.SiegeEngines.Messages;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.SiegeEnginesConstructionProgress.Messages;
-using Serilog;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
-using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
 namespace Coop.Core.Server.Services.SiegeEngines.Handlers;
 
@@ -24,8 +19,6 @@ namespace Coop.Core.Server.Services.SiegeEngines.Handlers;
 /// </summary>
 internal class ServerSiegeEngineHandler : IHandler
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<ServerSiegeEngineHandler>();
-
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
@@ -42,6 +35,8 @@ internal class ServerSiegeEngineHandler : IHandler
         messageBroker.Subscribe<SiegeEngineReserveAdded>(HandleReserveAdded);
         messageBroker.Subscribe<SiegeEngineReserveRemoved>(HandleReserveRemoved);
         messageBroker.Subscribe<SiegeEngineProgressChanged>(HandleProgress);
+        messageBroker.Subscribe<SiegeEngineHitpointsChanged>(HandleHitpoints);
+        messageBroker.Subscribe<SiegeEngineMissileAdded>(HandleMissileAdded);
         messageBroker.Subscribe<NetworkRequestDeploySiegeEngine>(HandleDeployRequest);
         messageBroker.Subscribe<NetworkRequestRemoveSiegeEngine>(HandleRemoveRequest);
     }
@@ -121,46 +116,34 @@ internal class ServerSiegeEngineHandler : IHandler
     {
         var obj = payload.What;
 
-        if (!objectManager.TryGetId(obj.SiegeEngine, out var siegeEngineId))
-        {
-            LogUnregisteredProgress(obj);
-            return;
-        }
+        if (!objectManager.TryGetIdWithLogging(obj.SiegeEngine, out var siegeEngineId)) return;
 
         network.SendAll(new NetworkChangeSiegeEngineProgress(siegeEngineId, obj.IsRedeployment, obj.Value));
     }
 
-    // TEMP diagnostic: some ticking construction progress isn't in the co-op registry, so its progress can't
-    // broadcast. Name the engine type, role, side and settlement so we can register the creation path that misses it.
-    private static void LogUnregisteredProgress(SiegeEngineProgressChanged obj)
+    // Runs on the game thread already — published from the hitpoints patch / late registration; resolves an id and broadcasts.
+    private void HandleHitpoints(MessagePayload<SiegeEngineHitpointsChanged> payload)
     {
-        var progress = obj.SiegeEngine;
-        string role = "none", side = "none", settlement = "none";
+        var obj = payload.What;
 
-        foreach (var siegeEvent in Campaign.Current?.SiegeEventManager?.SiegeEvents ?? Enumerable.Empty<SiegeEvent>())
-        {
-            if (siegeEvent?.BesiegedSettlement == null) continue;
+        if (!objectManager.TryGetIdWithLogging(obj.SiegeEngine, out var siegeEngineId)) return;
 
-            if (Locate(siegeEvent.BesiegerCamp?.SiegeEngines, progress, out role)) { side = "attacker"; settlement = siegeEvent.BesiegedSettlement.StringId; break; }
-            if (Locate(siegeEvent.BesiegedSettlement.SiegeEngines, progress, out role)) { side = "defender"; settlement = siegeEvent.BesiegedSettlement.StringId; break; }
-        }
-
-        Logger.Error("[ProgressDiag] unregistered progress engine={Engine} redeploy={Redeploy} value={Value:0.00} constructed={Constructed} role={Role} side={Side} settlement={Settlement}",
-            progress.SiegeEngine?.StringId ?? "null", obj.IsRedeployment, obj.Value, progress.IsConstructed, role, side, settlement);
+        network.SendAll(new NetworkChangeSiegeEngineHitpoints(siegeEngineId, obj.Hitpoints, obj.MaxHitPoints));
     }
 
-    private static bool Locate(SiegeEnginesContainer container, SiegeEngineConstructionProgress progress, out string role)
+    // Runs on the game thread already — published from the bombardment patch; resolves ids and broadcasts the visual missile.
+    private void HandleMissileAdded(MessagePayload<SiegeEngineMissileAdded> payload)
     {
-        role = "none";
-        if (container == null) return false;
+        var obj = payload.What;
 
-        if (container.SiegePreparations == progress) { role = "prep"; return true; }
-        for (int i = 0; i < container.DeployedSiegeEngines.Count; i++)
-            if (container.DeployedSiegeEngines[i] == progress) { role = "deployed[" + i + "]"; return true; }
-        for (int i = 0; i < container.ReservedSiegeEngines.Count; i++)
-            if (container.ReservedSiegeEngines[i] == progress) { role = "reserved[" + i + "]"; return true; }
+        if (!objectManager.TryGetIdWithLogging(obj.SiegeEvent, out var siegeEventId)) return;
 
-        return false;
+        string targetEngineId = null;
+        if (obj.TargetSiegeEngine != null) objectManager.TryGetId(obj.TargetSiegeEngine, out targetEngineId);
+
+        network.SendAll(new NetworkAddSiegeEngineMissile(siegeEventId, (int)obj.Side, obj.ShooterType?.StringId,
+            obj.ShooterSlotIndex, (int)obj.TargetType, obj.TargetSlotIndex, targetEngineId,
+            obj.CollisionTicks, obj.FireTicks, obj.HitSuccessful));
     }
 
     public void Dispose()
@@ -170,6 +153,8 @@ internal class ServerSiegeEngineHandler : IHandler
         messageBroker.Unsubscribe<SiegeEngineReserveAdded>(HandleReserveAdded);
         messageBroker.Unsubscribe<SiegeEngineReserveRemoved>(HandleReserveRemoved);
         messageBroker.Unsubscribe<SiegeEngineProgressChanged>(HandleProgress);
+        messageBroker.Unsubscribe<SiegeEngineHitpointsChanged>(HandleHitpoints);
+        messageBroker.Unsubscribe<SiegeEngineMissileAdded>(HandleMissileAdded);
         messageBroker.Unsubscribe<NetworkRequestDeploySiegeEngine>(HandleDeployRequest);
         messageBroker.Unsubscribe<NetworkRequestRemoveSiegeEngine>(HandleRemoveRequest);
     }

@@ -2,7 +2,6 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.SiegeEngines;
 using GameInterface.Services.SiegeEnginesConstructionProgress.Messages;
 using GameInterface.Services.SiegeEnginesConstructionProgress.Patches;
 using Serilog;
@@ -25,6 +24,7 @@ internal class SiegeEngineProgressHandler : IHandler
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         messageBroker.Subscribe<ChangeSiegeEngineProgress>(HandleProgress);
+        messageBroker.Subscribe<ChangeSiegeEngineHitpoints>(HandleHitpoints);
     }
 
     private void HandleProgress(MessagePayload<ChangeSiegeEngineProgress> payload)
@@ -35,14 +35,29 @@ internal class SiegeEngineProgressHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<SiegeEngineConstructionProgress>(obj.SiegeEngineId, out var siegeEngine)) return;
 
+            // RunSetProgress dirties the settlement visual itself, but only on the completion tick that flips
+            // IsActive. Dirtying on every 1% tick here forces SettlementVisualManager to destroy and re-create
+            // every siege engine entity at its rest orientation each message, which snaps aiming engines back
+            // and reads as rotation jitter on the client.
             SiegeEngineProgressPatches.RunSetProgress(siegeEngine, obj.IsRedeployment, obj.Value);
-            // Engine icons on the campaign map key on IsActive (progress-derived); refresh the owner.
-            SiegeContainerLookup.FindOwnerSettlement(siegeEngine)?.Party?.SetVisualAsDirty();
+        });
+    }
+
+    private void HandleHitpoints(MessagePayload<ChangeSiegeEngineHitpoints> payload)
+    {
+        var obj = payload.What;
+        // Resolve on the game thread so the lookup stays ordered behind deferred registrations.
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<SiegeEngineConstructionProgress>(obj.SiegeEngineId, out var siegeEngine)) return;
+
+            SiegeEngineProgressPatches.RunSetHitpoints(siegeEngine, obj.Hitpoints, obj.MaxHitPoints);
         });
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<ChangeSiegeEngineProgress>(HandleProgress);
+        messageBroker.Unsubscribe<ChangeSiegeEngineHitpoints>(HandleHitpoints);
     }
 }

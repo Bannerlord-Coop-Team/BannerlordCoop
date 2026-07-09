@@ -36,6 +36,32 @@ internal class SiegeEngineProgressPatches
         return HandleSet(__instance, __instance.RedeploymentProgress, redeploymentProgress, isRedeployment: true);
     }
 
+    // Hitpoints replicate here (register-then-broadcast, applied on the game thread) rather than through the
+    // generic property auto-sync, which dropped values set before an engine had a network id. The property
+    // setter is hooked (not the SetHitpoints method) so the constructor's direct "Hitpoints = MaxHitPoints"
+    // initial assignment is caught too, not just battle damage.
+    [HarmonyPatch(nameof(SiegeEngineConstructionProgress.Hitpoints), MethodType.Setter)]
+    [HarmonyPrefix]
+    private static bool HitpointsSetterPrefix(SiegeEngineConstructionProgress __instance, float value)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+        if (ModInformation.IsClient)
+        {
+            Logger.Error("Client tried to set siege engine hitpoints outside a synced flow");
+            return false;
+        }
+
+        if (__instance.Hitpoints != value)
+        {
+            SiegeEngineRegistration.EnsureRegistered(__instance, nameof(SiegeEngineConstructionProgress.Hitpoints));
+            // MaxHitPoints is assigned just before Hitpoints in the constructor, so it is already current here.
+            MessageBroker.Instance.Publish(__instance, new SiegeEngineHitpointsChanged(__instance, value, __instance.MaxHitPoints));
+        }
+
+        return true;
+    }
+
     private static bool HandleSet(SiegeEngineConstructionProgress instance, float oldValue, float newValue, bool isRedeployment)
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
@@ -48,6 +74,7 @@ internal class SiegeEngineProgressPatches
 
         if ((int)(oldValue * 100f) != (int)(newValue * 100f))
         {
+            SiegeEngineRegistration.EnsureRegistered(instance, isRedeployment ? nameof(SiegeEngineConstructionProgress.SetRedeploymentProgress) : nameof(SiegeEngineConstructionProgress.SetProgress));
             MessageBroker.Instance.Publish(instance, new SiegeEngineProgressChanged(instance, isRedeployment, newValue));
         }
 
@@ -76,6 +103,17 @@ internal class SiegeEngineProgressPatches
         if (completed)
         {
             SiegeContainerLookup.FindOwnerSettlement(siegeEngine)?.Party?.SetVisualAsDirty();
+        }
+    }
+
+    internal static void RunSetHitpoints(SiegeEngineConstructionProgress siegeEngine, float hitpoints, float maxHitPoints)
+    {
+        using (new AllowedThread())
+        {
+            // MaxHitPoints has no setter method; the publicizer exposes its private setter, and it is no longer
+            // auto-synced, so assigning it directly here does not re-trigger a patch.
+            siegeEngine.MaxHitPoints = maxHitPoints;
+            siegeEngine.SetHitpoints(hitpoints);
         }
     }
 }
