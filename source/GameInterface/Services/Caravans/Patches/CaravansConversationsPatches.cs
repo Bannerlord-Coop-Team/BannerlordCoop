@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Caravans.Messages;
+using GameInterface.Services.ItemRosters.Interfaces;
 using HarmonyLib;
 using Helpers;
 using System.Collections.Generic;
@@ -152,7 +153,8 @@ internal class CaravansConversationsPatches
     public static bool ConversationCaravanSurrenderLeaveOnConsequencePrefix(ref CaravansCampaignBehavior __instance)
     {
         // Call helper function to implement vanilla open loot screen logic
-        OpenLootScreen(MobileParty.ConversationParty, out var caravanHasItems, out var itemRosterElements);
+        ContainerProvider.TryResolve<IItemRosterInterface>(out var itemRosterInterface);
+        itemRosterInterface.OpenPartyLootScreen(MobileParty.ConversationParty, out var caravanHasItems, out var itemRosterElements);
 
         // Locally set player interaction, and then save in CoopSession on server
         __instance.SetPlayerInteraction(MobileParty.ConversationParty, CaravansCampaignBehavior.PlayerInteraction.Hostile);
@@ -172,7 +174,8 @@ internal class CaravansConversationsPatches
         MobileParty encounteredMobileParty = PlayerEncounter.EncounteredMobileParty;
 
         // Call helper function to implement vanilla open loot screen logic
-        OpenLootScreen(encounteredMobileParty, out var caravanHasItems, out var itemRosterElements);
+        ContainerProvider.TryResolve<IItemRosterInterface>(out var itemRosterInterface);
+        itemRosterInterface.OpenPartyLootScreen(encounteredMobileParty, out var caravanHasItems, out var itemRosterElements);
 
         // Open prisoner transfer screen
         using (new AllowedThread())
@@ -196,6 +199,7 @@ internal class CaravansConversationsPatches
         return false;
     }
 
+    /*
     private static void OpenLootScreen(MobileParty encounterParty, out bool caravanHasItems, out ItemRosterElement[] itemRosterElements)
     {
         ItemRoster itemRoster = null;
@@ -226,4 +230,5 @@ internal class CaravansConversationsPatches
             });
         }
     }
+    */
 }
