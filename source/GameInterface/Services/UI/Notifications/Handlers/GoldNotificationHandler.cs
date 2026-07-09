@@ -163,7 +163,7 @@ internal class GoldNotificationHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.LeaderHeroId, out var leaderHero)) return;
 
             // Only notify client of plundered gold for their hero
-            if (leaderHero == Hero.MainHero) return;
+            if (leaderHero != Hero.MainHero) return;
 
             MBTextManager.SetTextVariable("GOLD", data.PlunderedGold);
             MBInformationManager.AddQuickInformation(GameTexts.FindText("str_plunder_gain_message", null), 0, null, null, "");

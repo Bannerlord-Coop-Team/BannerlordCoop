@@ -168,10 +168,10 @@ internal class MapEventPartyPatches
     }
 
     [HarmonyPatch(nameof(MapEventParty.CommitGoldChanges))]
-    [HarmonyPostfix]
-    public static void CommitGoldChangesPostfix(MapEventParty __instance)
+    [HarmonyPrefix]
+    public static bool CommitGoldChangesPrefix(MapEventParty __instance)
     {
-        if (ModInformation.IsClient) return;
+        if (ModInformation.IsClient) return false;
 
         // Plundering gold is a different message to the regular gold change
         Hero leaderHero = __instance.Party.LeaderHero;
@@ -179,5 +179,7 @@ internal class MapEventPartyPatches
         {
             MessageBroker.Instance.Publish(__instance, new NotifyGoldPlundered(leaderHero, __instance.PlunderedGold));
         }
+
+        return true;
     }
 }
