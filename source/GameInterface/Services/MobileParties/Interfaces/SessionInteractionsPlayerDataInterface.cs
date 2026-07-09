@@ -7,6 +7,7 @@ using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.Engine;
 
 namespace GameInterface.Services.MobileParties.Interfaces;
 
@@ -19,7 +20,7 @@ public interface ISessionInteractionsPlayerDataInterface : IGameAbstraction
     void RemoveInteractedVillagersForAllPlayers(string mobilePartyId);
     void RemoveInteractedCaravanForAllPlayers(string mobilePartyId);
     void RemoveInteractedBanditsForAllPlayers(string mobilePartyId);
-    void RemoveInteractedPatrolForAllPlayers(string mobilePartyId);
+    void RemoveInteractedPatrolForAllPlayers(string settlementId);
     void AddPlayerKeys(string playerHeroId);
 }
 
@@ -54,6 +55,23 @@ public class SessionInteractionsPlayerDataInterface : ISessionInteractionsPlayer
         });
     }
 
+    private void SetPlayerInteraction(string playerHeroId, string settlementId, CampaignTime interactionTime, Dictionary<string, Dictionary<string, long>> interactionDictionary)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!IsPlayerHeroIdValid(playerHeroId)) return;
+
+            long numTicks = interactionTime._numTicks;
+
+            if (interactionDictionary[playerHeroId].ContainsKey(settlementId))
+            {
+                interactionDictionary[playerHeroId][settlementId] = numTicks;
+                return;
+            }
+            interactionDictionary[playerHeroId].Add(settlementId, numTicks);
+        });
+    }
+
     public void SetPlayerVillagersInteraction(string playerHeroId, string mobilePartyId, VillagerCampaignBehavior.PlayerInteraction interaction)
     {
         SetPlayerInteraction(playerHeroId, mobilePartyId, (int)interaction, InteractionsPlayerData.PlayerInteractedVillagers);
@@ -71,22 +89,24 @@ public class SessionInteractionsPlayerDataInterface : ISessionInteractionsPlayer
 
     public void SetPlayerPatrolInteraction(string playerHeroId, string settlementId, CampaignTime interactionTime)
     {
-        GameThread.RunSafe(() =>
-        {
-            if (!IsPlayerHeroIdValid(playerHeroId)) return;
-
-            long numTicks = interactionTime._numTicks;
-
-            if (InteractionsPlayerData.PlayerInteractedPatrols[playerHeroId].ContainsKey(settlementId))
-            {
-                InteractionsPlayerData.PlayerInteractedPatrols[playerHeroId][settlementId] = numTicks;
-                return;
-            }
-            InteractionsPlayerData.PlayerInteractedPatrols[playerHeroId].Add(settlementId, numTicks);
-        });
+        SetPlayerInteraction(playerHeroId, settlementId, interactionTime, InteractionsPlayerData.PlayerInteractedPatrols);
     }
 
     private void RemoveInteractedPartyForAllPlayers(string mobilePartyId, Dictionary<string, Dictionary<string, int>> interactionDictionary)
+    {
+        foreach (var player in playerManager.Players)
+        {
+            string playerHeroId = player.HeroId;
+            if (!interactionDictionary.ContainsKey(playerHeroId)) continue;
+
+            if (interactionDictionary[playerHeroId].ContainsKey(mobilePartyId))
+            {
+                interactionDictionary[playerHeroId].Remove(mobilePartyId);
+            }
+        }
+    }
+
+    private void RemoveInteractedPartyForAllPlayers(string mobilePartyId, Dictionary<string, Dictionary<string, long>> interactionDictionary)
     {
         foreach (var player in playerManager.Players)
         {
@@ -115,18 +135,9 @@ public class SessionInteractionsPlayerDataInterface : ISessionInteractionsPlayer
         RemoveInteractedPartyForAllPlayers(mobilePartyId, InteractionsPlayerData.PlayerInteractedBandits);
     }
 
-    public void RemoveInteractedPatrolForAllPlayers(string mobilePartyId)
+    public void RemoveInteractedPatrolForAllPlayers(string settlementId)
     {
-        foreach (var player in playerManager.Players)
-        {
-            string playerHeroId = player.HeroId;
-            if (!InteractionsPlayerData.PlayerInteractedPatrols.ContainsKey(playerHeroId)) continue;
-
-            if (InteractionsPlayerData.PlayerInteractedPatrols[playerHeroId].ContainsKey(mobilePartyId))
-            {
-                InteractionsPlayerData.PlayerInteractedPatrols[playerHeroId].Remove(mobilePartyId);
-            }
-        }
+        RemoveInteractedPartyForAllPlayers(settlementId, InteractionsPlayerData.PlayerInteractedPatrols);
     }
 
     public void AddPlayerKeys(string playerHeroId)
