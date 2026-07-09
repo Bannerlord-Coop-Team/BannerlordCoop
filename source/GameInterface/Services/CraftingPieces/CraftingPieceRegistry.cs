@@ -25,7 +25,7 @@ internal class CraftingPieceRegistry : AutoRegistryBase<CraftingPiece>
     {
         foreach (var craftingPiece in MBObjectManager.Instance.GetObjects<CraftingPiece>(x => true))
         {
-            objectManager.AddExisting(craftingPiece.StringId, craftingPiece);
+            RegisterExistingObject(craftingPiece.StringId, craftingPiece);
         }
     }
 

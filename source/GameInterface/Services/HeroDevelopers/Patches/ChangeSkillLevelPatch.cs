@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using GameInterface.Policies;
 using GameInterface.Services.HeroDevelopers.Messages;
 using HarmonyLib;
 using Serilog;
@@ -17,6 +18,9 @@ namespace GameInterface.Services.HeroDevelopers.Patches
         [HarmonyPrefix]
         public static bool ChangeSkillLevelFromXpChange(ref HeroDeveloper __instance, SkillObject skill, int changeAmount, bool shouldNotify = false)
         {
+            // Call original if we call this function
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
             // Publish message with data
             var message = new SkillLevelChange(__instance, skill, changeAmount, shouldNotify);
             MessageBroker.Instance.Publish(__instance, message);

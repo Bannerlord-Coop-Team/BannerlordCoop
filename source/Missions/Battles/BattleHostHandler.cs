@@ -4,7 +4,9 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.MapEvents.TroopSupply.Messages;
 using GameInterface.Services.ObjectManager;
@@ -189,6 +191,11 @@ internal class BattleHostHandler : IHandler
 
         var controllerId = payload.What.ControllerId;
         var mapEventId = payload.What.InstanceId;
+
+        // Release before a later battle-start request can be handled on this poll thread. The reliable ordered
+        // stream guarantees the departure is published first, but the host/reserve cleanup below runs next frame.
+        if (payload.What.IsInstanceEmpty && ServerBattleModeArbiter.ReleaseMission(mapEventId))
+            network.SendAll(new NetworkBattleModeSet(mapEventId, (int)BattleStartMode.Unclaimed));
 
         // Mutates the shared assignment, so run on the main thread (serializes with election).
         GameThread.RunSafe(() =>

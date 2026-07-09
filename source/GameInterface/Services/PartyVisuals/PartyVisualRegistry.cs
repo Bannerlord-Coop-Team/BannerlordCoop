@@ -30,15 +30,6 @@ internal class PartyVisualRegistry : AutoRegistryBase<MobilePartyVisual>
             return;
         }
 
-        //foreach (var party in MobileParty.All)
-        //{
-        //    var mobilePartyVisual = party.Party.GetPartyVisual();
-
-        //    if (mobilePartyVisual == null) continue;
-
-        //    objectManager.AddExisting(party.StringId, mobilePartyVisual);
-        //}
-
         foreach (MobilePartyVisual visual in visualManager._visualsFlattened)
         {
             var party = visual.MapEntity.MobileParty;

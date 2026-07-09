@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using GameInterface.Policies;
 using GameInterface.Services.HeroDevelopers.Messages;
 using HarmonyLib;
 using Serilog;
@@ -17,6 +18,9 @@ namespace GameInterface.Services.HeroDevelopers.Patches
         [HarmonyPrefix]
         public static bool SetSkillXp(ref HeroDeveloper __instance, PropertyObject skill, float value)
         {
+            // Call original if we call this function
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
             SkillObject skillObject = (SkillObject) skill;
 
             // Publish message with data

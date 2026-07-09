@@ -1,4 +1,4 @@
-using HarmonyLib;
+﻿using HarmonyLib;
 using SandBox.Missions.MissionLogics;
 using TaleWorlds.CampaignSystem.MapEvents;
 
@@ -19,6 +19,7 @@ namespace GameInterface.Services.MapEvents.Patches;
 /// The guard only fires in a coop battle; during a healthy fight the battle's own event has a live tracker and
 /// vanilla runs normally.
 /// </summary>
+[HarmonyPatch]
 internal class BattleAgentLogicNullMapEventPatches
 {
     [HarmonyPatch(typeof(BattleAgentLogic), nameof(BattleAgentLogic.OnScoreHit))]

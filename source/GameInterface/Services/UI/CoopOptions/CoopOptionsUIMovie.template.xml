@@ -1,0 +1,45 @@
+<Prefab>
+  <Window>
+    <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent">
+      <Children>
+        <Standard.Background/>
+
+        <Standard.TopPanel Parameter.Title="@MovieTextHeader"/>
+
+        <ListPanel WidthSizePolicy="Fixed" SuggestedWidth="840" HeightSizePolicy="CoverChildren"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="-80"
+                   LayoutImp.LayoutMethod="VerticalTopToBottom">
+          <Children>
+            <ListPanel DataSource="{Tabs}" WidthSizePolicy="CoverChildren" HeightSizePolicy="Fixed" SuggestedHeight="66"
+                       HorizontalAlignment="Center" MarginBottom="24" StackLayout.LayoutMethod="HorizontalLeftToRight">
+              <ItemTemplate>
+                <ButtonWidget DoNotPassEventsToChildren="true" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed"
+                              SuggestedWidth="270" SuggestedHeight="58" Brush="Header.Tab.Center"
+                              Command.Click="ExecuteSelection" IsSelected="@IsSelected" UpdateChildrenStates="true">
+                  <Children>
+                    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                                Brush="Clan.TabControl.Text" Brush.TextHorizontalAlignment="Center"
+                                Brush.TextVerticalAlignment="Center" Text="@Name"/>
+                  </Children>
+                </ButtonWidget>
+              </ItemTemplate>
+            </ListPanel>
+
+            <!-- COOP_OPTIONS_PROVIDER:Providers/KillFeedTab/KillFeedTab.xml -->
+
+            <ListPanel WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
+                       HorizontalAlignment="Center" MarginTop="36"
+                       LayoutImp.LayoutMethod="HorizontalLeftToRight">
+              <Children>
+                <Standard.Button Brush="Standard.BackButton" HorizontalAlignment="Center" SuggestedWidth="128"
+                                 Command.Click="ActionCancel" SuggestedHeight="64" MarginRight="24"/>
+                <Standard.Button HorizontalAlignment="Center" SuggestedWidth="156" IsVisible="@IsApplyButtonVisible"
+                                 Command.Click="ActionApply" Parameter.Text="@ApplyButtonText" SuggestedHeight="64"/>
+              </Children>
+            </ListPanel>
+          </Children>
+        </ListPanel>
+      </Children>
+    </Widget>
+  </Window>
+</Prefab>

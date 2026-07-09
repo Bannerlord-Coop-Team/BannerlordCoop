@@ -7,6 +7,8 @@ using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
+using System.Collections.Generic;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.Core;
 
@@ -35,6 +37,9 @@ internal class MapEventPartyHandler : IHandler
         messageBroker.Subscribe<OnTroopRoutedAttempted>(Handle_OnTroopRoutedAttempted);
         messageBroker.Subscribe<NetworkTroopRouted>(Handle_NetworkTroopRouted);
 
+        messageBroker.Subscribe<OnTroopScoreHitAttempted>(Handle_OnTroopScoreHitAttempted);
+        messageBroker.Subscribe<NetworkTroopScoreHit>(Handle_NetworkTroopScoreHit);
+
         // Client
         messageBroker.Subscribe<RequestMapEventPartyUpdate>(Handle_RequestMapEventPartyUpdate);
         messageBroker.Subscribe<NetworkRequestMapEventPartyUpdate>(Handle_NetworkRequestMapEventPartyUpdate);
@@ -56,6 +61,9 @@ internal class MapEventPartyHandler : IHandler
 
         messageBroker.Unsubscribe<OnTroopRoutedAttempted>(Handle_OnTroopRoutedAttempted);
         messageBroker.Unsubscribe<NetworkTroopRouted>(Handle_NetworkTroopRouted);
+
+        messageBroker.Unsubscribe<OnTroopScoreHitAttempted>(Handle_OnTroopScoreHitAttempted);
+        messageBroker.Unsubscribe<NetworkTroopScoreHit>(Handle_NetworkTroopScoreHit);
     }
 
     private void Handle_RequestMapEventPartyUpdate(MessagePayload<RequestMapEventPartyUpdate> payload)
@@ -142,9 +150,6 @@ internal class MapEventPartyHandler : IHandler
     {
         var obj = payload.What;
 
-        // OnTroopKilled mutates the roster the game loop reads, so it is deferred to the
-        // main thread. OnTroopKilled is Harmony-patched, so AllowedThread silences the
-        // client prefix to stop it re-running and rebroadcasting in a loop.
         GameThread.Run(() =>
         {
             try
@@ -153,11 +158,18 @@ internal class MapEventPartyHandler : IHandler
                     return;
 
                 var troopDescriptor = new UniqueTroopDescriptor(obj.TroopSeed);
-                var troop = mapEventParty._roster[troopDescriptor].Troop;
 
-                using (new AllowedThread())
+                if (ModInformation.IsServer)
                 {
                     mapEventParty.OnTroopKilled(troopDescriptor);
+                }
+                else
+                {
+                    // Only the scoreboard tally; Party.MemberRoster arrives separately.
+                    using (new AllowedThread())
+                    {
+                        mapEventParty.Troops.OnTroopKilled(troopDescriptor);
+                    }
                 }
             }
             catch (Exception ex)
@@ -183,9 +195,6 @@ internal class MapEventPartyHandler : IHandler
     {
         var obj = payload.What;
 
-        // OnTroopWounded mutates the roster the game loop reads, so it is deferred to the
-        // main thread. OnTroopWounded is Harmony-patched, so AllowedThread silences the
-        // client prefix to stop it re-running and rebroadcasting in a loop.
         GameThread.Run(() =>
         {
             try
@@ -195,9 +204,17 @@ internal class MapEventPartyHandler : IHandler
 
                 var troopDescriptor = new UniqueTroopDescriptor(obj.TroopSeed);
 
-                using (new AllowedThread())
+                if (ModInformation.IsServer)
                 {
                     mapEventParty.OnTroopWounded(troopDescriptor);
+                }
+                else
+                {
+                    // Only the scoreboard tally; Party.MemberRoster arrives separately.
+                    using (new AllowedThread())
+                    {
+                        mapEventParty.Troops.OnTroopWounded(troopDescriptor);
+                    }
                 }
             }
             catch (Exception ex)
@@ -205,6 +222,72 @@ internal class MapEventPartyHandler : IHandler
                 Logger.Error(ex, "Error handling NetworkTroopWounded message for MapEventParty with ID {MapEventPartyId}", obj.MapEventPartyId);
             }
         });
+    }
+
+    private void Handle_OnTroopScoreHitAttempted(MessagePayload<OnTroopScoreHitAttempted> payload)
+    {
+        var obj = payload.What;
+
+        // The host plays on the server process: its own live-battle hits (CoopAgentOrigin) are applied
+        // directly — there is no other machine to report to.
+        if (ModInformation.IsServer)
+        {
+            ApplyTroopScoreHit(obj.MapEventParty, obj.TroopSeed, obj.AttackedTroop, obj.Damage, obj.IsFatal, obj.IsSimulatedHit);
+            return;
+        }
+
+        if (!objectManager.TryGetIdWithLogging(obj.MapEventParty, out var mapEventPartyId))
+            return;
+
+        if (!objectManager.TryGetIdWithLogging(obj.AttackedTroop, out var attackedTroopId))
+            return;
+
+        network.SendAll(new NetworkTroopScoreHit(mapEventPartyId, obj.TroopSeed, attackedTroopId, obj.Damage, obj.IsFatal, obj.IsSimulatedHit));
+    }
+
+    private void Handle_NetworkTroopScoreHit(MessagePayload<NetworkTroopScoreHit> payload)
+    {
+        // Server-authoritative: clients receive the resulting contribution through the
+        // MapEventParty._contributionToBattle autosync and the roster xp through the roster sync.
+        if (ModInformation.IsClient) return;
+
+        var obj = payload.What;
+
+        GameThread.Run(() =>
+        {
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging(obj.MapEventPartyId, out MapEventParty mapEventParty))
+                    return;
+
+                if (!objectManager.TryGetObjectWithLogging(obj.AttackedTroopId, out CharacterObject attackedTroop))
+                    return;
+
+                ApplyTroopScoreHit(mapEventParty, obj.TroopSeed, attackedTroop, obj.Damage, obj.IsFatal, obj.IsSimulatedHit);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Error handling NetworkTroopScoreHit message for MapEventParty with ID {MapEventPartyId}", obj.MapEventPartyId);
+            }
+        });
+    }
+
+    // [Server] Run the original scorer (the prefix lets the server through): roster xp, the hero combat-hit
+    // event and ContributionToBattle, whose field store the autosync intercepts and broadcasts to every
+    // client. The attacker's weapon is not carried over the wire; null is what the native simulation path
+    // passes too, so the models tolerate it.
+    private void ApplyTroopScoreHit(MapEventParty mapEventParty, int troopSeed, CharacterObject attackedTroop, int damage, bool isFatal, bool isSimulatedHit)
+    {
+        try
+        {
+            mapEventParty.OnTroopScoreHit(new UniqueTroopDescriptor(troopSeed), attackedTroop, damage, isFatal, isTeamKill: false, null, isSimulatedHit);
+        }
+        catch (KeyNotFoundException)
+        {
+            // The roster was re-flattened since the reporter captured the seed; a lost hit only shaves a
+            // little xp/contribution, unlike a lost casualty, so drop it rather than guess a troop.
+            Logger.Warning("Score hit for seed {TroopSeed} dropped: no matching troop in party {Party}'s roster", troopSeed, mapEventParty.Party?.Id);
+        }
     }
 
     private void Handle_OnTroopRoutedAttempted(MessagePayload<OnTroopRoutedAttempted> payload)
@@ -223,9 +306,6 @@ internal class MapEventPartyHandler : IHandler
     {
         var obj = payload.What;
 
-        // OnTroopRouted mutates the roster the game loop reads, so it is deferred to the
-        // main thread. OnTroopRouted is Harmony-patched, so AllowedThread silences the
-        // client prefix to stop it re-running and rebroadcasting in a loop.
         GameThread.Run(() =>
         {
             try
@@ -235,9 +315,18 @@ internal class MapEventPartyHandler : IHandler
 
                 var troopDescriptor = new UniqueTroopDescriptor(obj.TroopSeed);
 
-                using (new AllowedThread())
+                if (ModInformation.IsServer)
                 {
                     mapEventParty.OnTroopRouted(troopDescriptor);
+                }
+                // Only the scoreboard tally (non-hero routs only, matching vanilla);
+                // Party.MemberRoster arrives separately.
+                else if (!mapEventParty.Troops[troopDescriptor].Troop.IsHero)
+                {
+                    using (new AllowedThread())
+                    {
+                        mapEventParty.Troops.OnTroopRouted(troopDescriptor);
+                    }
                 }
             }
             catch (Exception ex)

@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using GameInterface.Policies;
 using GameInterface.Services.HeroDevelopers.Messages;
 using HarmonyLib;
 using Serilog;
@@ -16,6 +17,9 @@ namespace GameInterface.Services.HeroDevelopers.Patches
         [HarmonyPrefix]
         public static bool GainRawXp(ref HeroDeveloper __instance, float rawXp, bool shouldNotify)
         {
+            // Call original if we call this function
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
             // Publish message with data
             var message = new RawXpGain(__instance, rawXp, shouldNotify);
             MessageBroker.Instance.Publish(__instance, message);

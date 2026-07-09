@@ -2,13 +2,20 @@ using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using GameInterface.Services.MapEventParties.Messages;
+using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.PartyBases.Extensions;
+using GameInterface.Services.PartyVisuals.Extensions;
+using GameInterface.Services.PartyVisuals.Messages;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using Helpers;
 using LiteNetLib;
+using SandBox.View.Map.Managers;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -120,6 +127,7 @@ internal class PlayerCaptivityServerHandler : IHandler
         EmptyRoster(playerParty.MemberRoster);
         EmptyRoster(playerParty.PrisonRoster);
         playerParty.IsActive = false;
+        RemoveVisual(playerParty);
         playerParty.ChangePartyLeader(null);
     }
 
@@ -172,8 +180,16 @@ internal class PlayerCaptivityServerHandler : IHandler
         {
             try
             {
+                var playerPartyIds = MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, objectManager);
+                if (!objectManager.TryGetIdWithLogging(playerParty.Party, out var surrenderedPartyId)) return;
+
+                Logger.Information("[PvPEncounterClose] Server sending immediate surrender close: partyIds=[{PartyIds}] surrenderedPartyId={SurrenderedPartyId} mapEventId={MapEventId}",
+                    string.Join(",", playerPartyIds),
+                    surrenderedPartyId ?? "<none>",
+                    payload.What.MapEventId ?? "<none>");
+                PvpEncounterCloseSender.Send(network, messageBroker, this, playerPartyIds, surrenderedPartyId, payload.What.MapEventId);
                 mapEvent.DoSurrender(playerParty.Party.Side);
-                mapEvent.FinalizeEvent();
+                messageBroker.Publish(this, new MapEventConcluded(payload.What.MapEventId, playerPartyIds, surrenderedPartyId));
             }
             catch (Exception ex)
             {
@@ -259,9 +275,12 @@ internal class PlayerCaptivityServerHandler : IHandler
         PlayerCaptivityLogger.Debug("Handle_PlayerCaptivityEndedByServer: hero={HeroId} party={PartyId} detail={Detail}",
             playerHero.StringId, playerParty.StringId, payload.What.Detail);
 
-        // The party was pinned to the captor while captive (Handle_CampaignTick), so its current position is
-        // where the release happens.
-        ReleasePlayerFromCaptivity(playerHero, playerParty, payload.What.Detail, payload.What.Facilitator, playerParty.Position);
+        var captorParty = playerHero.PartyBelongedToAsPrisoner;
+        var releasePosition = payload.What.HasReleasePosition
+            ? payload.What.ReleasePosition
+            : GetReleasePosition(captorParty, playerParty.Position);
+
+        ReleasePlayerFromCaptivity(playerHero, playerParty, payload.What.Detail, payload.What.Facilitator, releasePosition);
     }
 
     /// <summary>
@@ -347,8 +366,8 @@ internal class PlayerCaptivityServerHandler : IHandler
 
         if (playerHero.IsAlive)
         {
-            playerParty.IsActive = true;
             playerParty.Position = releasePosition;
+            playerParty.IsActive = true;
             playerParty.IgnoreForHours(4);
             playerParty.Party.SetAsCameraFollowParty();
             playerParty.SetMoveModeHold();
@@ -370,11 +389,77 @@ internal class PlayerCaptivityServerHandler : IHandler
             {
                 playerParty.Party.UpdateVisibilityAndInspected(playerParty.Position);
             }
+            SyncReleasePosition(playerParty, releasePosition);
 
             // Rebuild the map mesh after the roster/leader/position are restored, so the freed party's map
             // figure reflects its (re-mounted) state rather than the stale on-foot captive mesh.
             playerParty.Party.SetVisualAsDirty();
+            RecreateVisual(playerParty);
         }
+    }
+
+    private CampaignVec2 GetReleasePosition(PartyBase captorParty, CampaignVec2 fallbackPosition)
+    {
+        if (captorParty == null)
+            return fallbackPosition;
+
+        if (captorParty.IsSettlement)
+            return captorParty.Settlement.GatePosition;
+
+        if (captorParty.IsMobile)
+            return captorParty.MobileParty.Position;
+
+        return captorParty.Position;
+    }
+
+    private void SyncReleasePosition(MobileParty playerParty, CampaignVec2 releasePosition)
+    {
+        if (!objectManager.TryGetIdWithLogging(playerParty, out string playerPartyId)) return;
+
+        network.SendAll(new NetworkPlayerCaptivityReleasePositionSet(playerPartyId, releasePosition));
+    }
+
+    private void RemoveVisual(MobileParty party)
+    {
+        var partyVisual = party.Party.GetPartyVisual();
+        if (partyVisual == null) return;
+        if (!objectManager.TryGetIdWithLogging(partyVisual, out string visualId)) return;
+
+        objectManager.Remove(partyVisual);
+
+        using (new AllowedThread())
+        {
+            MobilePartyVisualManager.Current?.RemovePartyVisualForParty(party);
+        }
+
+        network.SendAll(new NetworkDestroyPartyVisual(visualId));
+    }
+
+    private void RecreateVisual(MobileParty party)
+    {
+        RemoveVisual(party);
+
+        if (!objectManager.TryGetIdWithLogging(party, out string mobilePartyId)) return;
+
+        using (new AllowedThread())
+        {
+            party.CreateNewPartyVisual();
+        }
+
+        var partyVisual = party.Party.GetPartyVisual();
+        if (partyVisual == null)
+        {
+            Logger.Error("CreateNewPartyVisual did not produce a visual for party {PartyId}", party.StringId);
+            return;
+        }
+
+        if (!objectManager.AddNewObject(partyVisual, out var visualId))
+        {
+            Logger.Error("Failed to register recreated visual for party {PartyId}", party.StringId);
+            return;
+        }
+
+        network.SendAll(new NetworkCreatePartyVisual(visualId, mobilePartyId));
     }
 
     /// <summary>

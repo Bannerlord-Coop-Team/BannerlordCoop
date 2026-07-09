@@ -5,7 +5,8 @@ using TaleWorlds.Core;
 namespace GameInterface.Services.MapEvents.Messages.Start;
 
 /// <summary>
-/// [Server -&gt; Client] Sent to the winning client right before <see cref="NetworkBattleSimulationFinished"/>.
+/// [Server -&gt; Client] Broadcast right before <see cref="NetworkBattleSimulationFinished"/>; applied only by
+/// clients whose own party is among <see cref="Winners"/> (the pacer and any joined players on the winning side).
 /// The client replays the defeated parties' casualties onto its own map event and applies the winning
 /// <see cref="BattleState"/>, which lets the native <c>PlayerEncounter</c> result flow run locally in
 /// player context — rolling the player-facing loot and opening the loot screen, the same path a real

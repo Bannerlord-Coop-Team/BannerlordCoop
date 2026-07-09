@@ -8,13 +8,11 @@ using GameInterface.Services.Inventory.Interfaces;
 using GameInterface.Services.Inventory.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Interfaces;
-using GameInterface.Services.UI.Notifications.Messages;
 using GameInterface.Services.Workshops.Messages;
 using HarmonyLib;
 using Helpers;
 using LiteNetLib;
 using Serilog;
-using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -74,11 +72,12 @@ internal class TradeHandler : IHandler
 
         if (!objectManager.TryGetIdWithLogging(what.ToRoster, out var toRosterId)) return;
         if (!objectManager.TryGetIdWithLogging(what.Hero, out var heroId)) return;
+        if (!objectManager.TryGetIdWithLogging(what.OwnerParty, out var ownerPartyId)) return;
         if (!objectManager.TryGetIdWithLogging(what.TroopRoster, out var troopRosterId)) return;
         if (!objectManager.TryGetIdWithLogging(what.InitialCharacterEquipment.HeroObject, out var initialHeroId)) return;
 
-        string mobilePartyId = null;
-        if (what.Party is not null && !objectManager.TryGetIdWithLogging(what.Party, out mobilePartyId)) return;
+        string currentMobilePartyId = null;
+        if (what.CurrentMobileParty is not null && !objectManager.TryGetIdWithLogging(what.CurrentMobileParty, out currentMobilePartyId)) return;
 
         string currentSettlementComponentId = null;
         if (what.CurrentSettlementComponent is not null && 
@@ -87,7 +86,7 @@ internal class TradeHandler : IHandler
         var boughtItems = ResolveTradeItemIds(what.BoughtItems);
         var soldItems = ResolveTradeItemIds(what.SoldItems);
 
-        var characterIdEquipmentsData = ResolveCharacterIdEquipmentsData(what.Party, what.InitialCharacterEquipment);
+        var characterIdEquipmentsData = ResolveCharacterIdEquipmentsData(what.OwnerParty, what.InitialCharacterEquipment);
 
         var troopRosterData = troopRosterInterface.PackTroopRosterData(what.TroopRoster);
 
@@ -105,7 +104,8 @@ internal class TradeHandler : IHandler
             initialHeroId,
             what.TotalAmount,
             what.MerchantGold,
-            mobilePartyId,
+            ownerPartyId,
+            currentMobilePartyId,
             currentSettlementComponentId is null,
             currentSettlementComponentId,
             boughtItems,
@@ -122,88 +122,84 @@ internal class TradeHandler : IHandler
         var message = payload.What;
         var peer = payload.Who as NetPeer;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
-            try
+            ItemRoster fromRoster = null;
+            if (!message.IsFromItemRosterNull && !objectManager.TryGetObjectWithLogging<ItemRoster>(message.FromItemRosterId, out fromRoster)) return;
+
+            if (!objectManager.TryGetObjectWithLogging<ItemRoster>(message.ToItemRosterId, out var toRoster)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(message.HeroId, out var hero)) return;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(message.OwnerPartyId, out var ownerParty)) return;
+            if (!objectManager.TryGetObjectWithLogging<TroopRoster>(message.TroopRosterId, out var troopRoster)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(message.InitialHeroId, out var initialHero)) return;
+
+            SettlementComponent currentSettlementComponent = null;
+            if (!message.IsSettlementComponentNull &&
+                !objectManager.TryGetObjectWithLogging<SettlementComponent>(message.CurrentSettlementComponentId, out currentSettlementComponent)) return;
+
+            MobileParty currentMobileParty = null;
+            if (message.CurrentMobilePartyId != null && !objectManager.TryGetObjectWithLogging<MobileParty>(message.CurrentMobilePartyId, out currentMobileParty)) return;
+
+            var boughtItems = ResolveTradeItems(message.BoughtItems);
+            var soldItems = ResolveTradeItems(message.SoldItems);
+            ResolveCharacterEquipmentsData(message.CharacterIdEquipmentsData, out var characterEquipmentsData);
+
+            var fromItemRosterData = message.FromItemRosterData;
+            var toItemRosterData = message.ToItemRosterData;
+            var totalAmount = message.TotalAmount;
+
+            // Undo any purchases that are no longer present in the roster
+            // When looting, taken items are treated as bought items. Don't need to manage changed rosters in these cases
+            if (fromRoster != null)
             {
-                ItemRoster fromRoster = null;
-                if (!message.IsFromItemRosterNull && !objectManager.TryGetObjectWithLogging<ItemRoster>(message.FromItemRosterId, out fromRoster)) return;
-
-                if (!objectManager.TryGetObjectWithLogging<ItemRoster>(message.ToItemRosterId, out var toRoster)) return;
-                if (!objectManager.TryGetObjectWithLogging<Hero>(message.HeroId, out var hero)) return;
-                if (!objectManager.TryGetObjectWithLogging<MobileParty>(message.PartyId, out var mobileParty)) return;
-                if (!objectManager.TryGetObjectWithLogging<TroopRoster>(message.TroopRosterId, out var troopRoster)) return;
-                if (!objectManager.TryGetObjectWithLogging<Hero>(message.InitialHeroId, out var initialHero)) return;
-
-                SettlementComponent currentSettlementComponent = null;
-                if (!message.IsSettlementComponentNull &&
-                    !objectManager.TryGetObjectWithLogging<SettlementComponent>(message.CurrentSettlementComponentId, out currentSettlementComponent)) return;
-
-                var boughtItems = ResolveTradeItems(message.BoughtItems);
-                var soldItems = ResolveTradeItems(message.SoldItems);
-                ResolveCharacterEquipmentsData(message.CharacterIdEquipmentsData, out var characterEquipmentsData);
-
-                var fromItemRosterData = message.FromItemRosterData;
-                var toItemRosterData = message.ToItemRosterData;
-                var totalAmount = message.TotalAmount;
-
-                // Undo any purchases that are no longer present in the roster
-                // When looting, taken items are treated as bought items. Don't need to manage changed rosters in these cases
-                if (fromRoster != null)
+                foreach (var boughtItem in boughtItems)
                 {
-                    foreach (var boughtItem in boughtItems)
+                    int difference = fromRoster.GetItemNumber(boughtItem.Item1.EquipmentElement.Item) - boughtItem.Item1.Amount;
+
+                    if (difference < 0)
                     {
-                        int difference = fromRoster.GetItemNumber(boughtItem.Item1.EquipmentElement.Item) - boughtItem.Item1.Amount;
+                        int fromRosterDataIndex = fromItemRosterData.FindIndex(rosterElement => rosterElement.EquipmentElement.Equals(boughtItem.Item1));
+                        if (fromRosterDataIndex >= 0) fromItemRosterData[fromRosterDataIndex].Amount -= difference;
+                        else fromItemRosterData.AddItem(new ItemRosterElement(boughtItem.Item1.EquipmentElement, -difference));
 
-                        if (difference < 0)
-                        {
-                            int fromRosterDataIndex = fromItemRosterData.FindIndex(rosterElement => rosterElement.EquipmentElement.Equals(boughtItem.Item1));
-                            if (fromRosterDataIndex >= 0) fromItemRosterData[fromRosterDataIndex].Amount -= difference;
-                            else fromItemRosterData.AddItem(new ItemRosterElement(boughtItem.Item1.EquipmentElement, -difference));
+                        int toRosterDataIndex = toItemRosterData.FindIndex(rosterElement => rosterElement.EquipmentElement.Equals(boughtItem.Item1));
+                        if (toRosterDataIndex >= 0) toItemRosterData[toRosterDataIndex].Amount += difference;
+                        else toItemRosterData.AddItem(new ItemRosterElement(boughtItem.Item1.EquipmentElement, difference));
 
-                            int toRosterDataIndex = toItemRosterData.FindIndex(rosterElement => rosterElement.EquipmentElement.Equals(boughtItem.Item1));
-                            if (toRosterDataIndex >= 0) toItemRosterData[toRosterDataIndex].Amount += difference;
-                            else toItemRosterData.AddItem(new ItemRosterElement(boughtItem.Item1.EquipmentElement, difference));
-
-                            totalAmount -= boughtItem.Item2;
-                        }
+                        totalAmount -= boughtItem.Item2;
                     }
                 }
-
-                // Update rosters with new data
-                if (toRoster != null) inventoryLogicInterface.UpdateRosterWithData(toRoster, toItemRosterData);
-                if (fromRoster != null) inventoryLogicInterface.UpdateRosterWithData(fromRoster, fromItemRosterData);
-                else if (message.IsManagingWarehouse)
-                {
-                    // Manage warehouse rosters separately as they involve more complicated logic
-                    MessageBroker.Instance.Publish(this, new WarehouseRosterManaged(payload.Who as NetPeer, hero, currentSettlementComponent.Settlement, fromItemRosterData));
-                }
-        
-                // Update hero equipment with new data
-                inventoryLogicInterface.UpdateEquipmentWithData(mobileParty, characterEquipmentsData, initialHero);
-                network.SendAll(new UpdateEquipmentClients(message.CharacterIdEquipmentsData, message.PartyId, message.InitialHeroId));
-
-                // Update troop roster for if items were donated
-                troopRosterInterface.UpdateWithData(troopRoster, message.TroopRosterData, hero);
-
-                inventoryLogicInterface.ApplyDoneLogic(
-                    fromRoster,
-                    toRoster,
-                    message.IsTrading,
-                    message.CanGainXpFromDiscarding,
-                    hero,
-                    totalAmount,
-                    message.MerchantGold,
-                    mobileParty,
-                    currentSettlementComponent,
-                    boughtItems,
-                    soldItems
-                );
             }
-            catch (Exception e)
+
+            // Update rosters with new data
+            if (toRoster != null) inventoryLogicInterface.UpdateRosterWithData(toRoster, toItemRosterData);
+            if (fromRoster != null) inventoryLogicInterface.UpdateRosterWithData(fromRoster, fromItemRosterData);
+            else if (message.IsManagingWarehouse)
             {
-                logger.Error(e, "Failed to apply {Message}", nameof(CompleteTrade));
+                // Manage warehouse rosters separately as they involve more complicated logic
+                MessageBroker.Instance.Publish(this, new WarehouseRosterManaged(payload.Who as NetPeer, hero, currentSettlementComponent.Settlement, fromItemRosterData));
             }
+
+            // Update hero equipment with new data
+            inventoryLogicInterface.UpdateEquipmentWithData(ownerParty, characterEquipmentsData, initialHero);
+            network.SendAll(new UpdateEquipmentClients(message.CharacterIdEquipmentsData, message.OwnerPartyId, message.InitialHeroId));
+
+            // Update troop roster for if items were donated
+            troopRosterInterface.UpdateWithData(troopRoster, message.TroopRosterData, hero);
+
+            inventoryLogicInterface.ApplyDoneLogic(
+                fromRoster,
+                toRoster,
+                message.IsTrading,
+                message.CanGainXpFromDiscarding,
+                hero,
+                totalAmount,
+                message.MerchantGold,
+                currentMobileParty,
+                currentSettlementComponent,
+                boughtItems,
+                soldItems
+            );
         });
     }
 
@@ -213,18 +209,11 @@ internal class TradeHandler : IHandler
         {
             using (new AllowedThread())
             {
-                try
-                {
-                    if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
-                    if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.InitialHeroId, out var initialHero)) return;
+                if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
+                if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.InitialHeroId, out var initialHero)) return;
 
-                    ResolveCharacterEquipmentsData(obj.What.CharacterIdEquipmentsData, out var characterEquipmentsData);
-                    inventoryLogicInterface.UpdateEquipmentWithData(mobileParty, characterEquipmentsData, initialHero);
-                }
-                catch (Exception e)
-                {
-                    logger.Error(e, "Failed to apply {Message}", nameof(UpdateEquipmentClients));
-                }
+                ResolveCharacterEquipmentsData(obj.What.CharacterIdEquipmentsData, out var characterEquipmentsData);
+                inventoryLogicInterface.UpdateEquipmentWithData(mobileParty, characterEquipmentsData, initialHero);
             }
         });
     }

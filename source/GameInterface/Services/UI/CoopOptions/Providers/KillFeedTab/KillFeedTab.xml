@@ -1,0 +1,11 @@
+<ListPanel DataSource="{SelectedTab}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+           LayoutImp.LayoutMethod="VerticalTopToBottom">
+  <Children>
+    <ListPanel DataSource="{Sections}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+               LayoutImp.LayoutMethod="VerticalTopToBottom">
+      <ItemTemplate>
+        <!-- COOP_OPTIONS_SECTION:Sections/KillFeedSection.xml -->
+      </ItemTemplate>
+    </ListPanel>
+  </Children>
+</ListPanel>

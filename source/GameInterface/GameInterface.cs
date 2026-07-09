@@ -59,7 +59,9 @@ public class GameInterface : IGameInterface
 
     public void UnpatchAll()
     {
-        // Unpatching is disabled due to double ctor patch bug
+        // Unpatching is disabled due to double ctor patch bug. CoopartiveMultiplayerExperience.DestroyContainer
+        // relies on patches staying live through container disposal (it clears ContainerProvider before disposing
+        // instead of unpatching) - if this is ever re-enabled, revisit that ordering.
         return;
 
         patchCollector.UnpatchAll();
