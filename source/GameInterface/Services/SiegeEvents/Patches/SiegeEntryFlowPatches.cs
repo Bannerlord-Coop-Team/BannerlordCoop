@@ -43,6 +43,30 @@ internal class SiegeEntryFlowPatches
         return false;
     }
 
+    // The besieger leader's "Lead an assault" (and the follower "Send troops" order) locally start an encounter
+    // and the Siege MapEvent, which the client can't create. Route it to the server, which runs
+    // ApplyStartAssaultAgainstWalls authoritatively; the besieger's encounter is established by the resulting
+    // NetworkPromptSiegeAssault, not here.
+    [HarmonyPatch(typeof(SiegeEventCampaignBehavior), nameof(SiegeEventCampaignBehavior.menu_siege_strategies_lead_assault_on_consequence))]
+    [HarmonyPrefix]
+    private static bool LeadAssaultConsequencePrefix()
+    {
+        if (ModInformation.IsServer) return true;
+
+        MessageBroker.Instance.Publish(null, new AssaultSiegeAttempted(MobileParty.MainParty, MobileParty.MainParty.BesiegedSettlement));
+        return false;
+    }
+
+    [HarmonyPatch(typeof(SiegeEventCampaignBehavior), nameof(SiegeEventCampaignBehavior.menu_order_an_assault_on_consequence))]
+    [HarmonyPrefix]
+    private static bool OrderAssaultConsequencePrefix()
+    {
+        if (ModInformation.IsServer) return true;
+
+        MessageBroker.Instance.Publish(null, new AssaultSiegeAttempted(MobileParty.MainParty, MobileParty.MainParty.BesiegedSettlement));
+        return false;
+    }
+
     [HarmonyPatch(typeof(SiegeEventCampaignBehavior), nameof(SiegeEventCampaignBehavior.LeaveSiege))]
     [HarmonyPrefix]
     private static bool LeaveSiegePrefix()

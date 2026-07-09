@@ -46,6 +46,9 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     private readonly Dictionary<int, UsableMachine> machinesById = new Dictionary<int, UsableMachine>();
     private readonly Dictionary<int, NetworkSiegeMachineState> lastSent = new Dictionary<int, NetworkSiegeMachineState>();
     private readonly HashSet<int> deactivated = new HashSet<int>();
+    // States that arrived before their MissionObject registered (catch-up during a peer's scene load);
+    // re-applied once the object appears. Keyed by machine id, latest state wins.
+    private readonly Dictionary<int, NetworkSiegeMachineState> pendingByMachineId = new Dictionary<int, NetworkSiegeMachineState>();
     private Mission trackedMission;
     private int trackedObjectCount;
     private float pollTimer;
@@ -73,6 +76,7 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         pollTimer = 0f;
 
         RefreshMachineCache();
+        DrainPendingMachineStates();
 
         // Until the election result is stored, "not host" means "unknown" — take no irreversible step.
         if (!SiegeMissionAuthorityGate.IsAuthorityKnown) return;
@@ -97,6 +101,7 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         {
             lastSent.Clear();
             deactivated.Clear();
+            pendingByMachineId.Clear();
         }
 
         trackedMission = mission;
@@ -160,10 +165,44 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
 
         foreach (var machine in machines)
         {
+            // Keep the primary siege weapons (rams/towers/ladders) live on a peer: it still runs its own attacker
+            // AI, and BehaviorAssaultWalls strips deactivated primary weapons then MaxBy-crashes on the empty set.
+            // Their authoritative state still rides the host's per-tick BroadcastChangedStates.
+            if (machine is IPrimarySiegeWeapon) continue;
+
             if (!deactivated.Add(machine.Id.Id)) continue;
 
             machine.Deactivate();
         }
+    }
+
+    // Re-apply buffered states whose MissionObject has now registered. Runs on every client each poll; the
+    // host's buffer stays empty (it never receives these), so this is a no-op there.
+    private void DrainPendingMachineStates()
+    {
+        if (pendingByMachineId.Count == 0) return;
+
+        List<int> applied = null;
+        foreach (var pending in pendingByMachineId)
+        {
+            if (!machinesById.TryGetValue(pending.Key, out var machine)) continue;
+
+            SiegeMissionAuthorityGate.SuppressCapture = true;
+            try
+            {
+                Apply(machine, pending.Value);
+            }
+            finally
+            {
+                SiegeMissionAuthorityGate.SuppressCapture = false;
+            }
+
+            if (applied == null) applied = new List<int>();
+            applied.Add(pending.Key);
+        }
+
+        if (applied == null) return;
+        foreach (var id in applied) pendingByMachineId.Remove(id);
     }
 
     private static void ReadState(UsableMachine machine, out float hitPoints, out int destructionState,
@@ -211,7 +250,9 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
                 RefreshMachineCache();
                 if (!machinesById.TryGetValue(obj.MachineId, out machine))
                 {
-                    Logger.Warning("[BattleSync] No siege machine with id {MachineId} in this mission", obj.MachineId);
+                    // The MissionObject isn't registered yet (catch-up during scene load); buffer and re-apply
+                    // from Tick once RefreshMachineCache sees it, instead of dropping it permanently.
+                    pendingByMachineId[obj.MachineId] = obj;
                     return;
                 }
             }

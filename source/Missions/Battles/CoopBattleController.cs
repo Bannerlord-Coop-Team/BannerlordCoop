@@ -144,6 +144,7 @@ public class CoopBattleController : CoopMissionController
         }
 
         puppetSpawner.DrainPendingPuppets();
+        siegeEngineDeployment.DrainPending();
         siegeMachineState.Tick(dt);
         diagnostics.Tick(dt);
         supplyReporter.Tick(dt);

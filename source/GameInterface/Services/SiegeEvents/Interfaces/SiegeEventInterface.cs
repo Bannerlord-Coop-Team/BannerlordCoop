@@ -66,6 +66,12 @@ public interface ISiegeEventInterface : IGameAbstraction
     void PromptSiegeDefense(MobileParty attackerParty, Settlement settlement);
 
     /// <summary>
+    /// Establishes the besieging player's encounter for a starting wall assault by adopting the replicated
+    /// assault map event, so it can then enter the mission.
+    /// </summary>
+    void PromptSiegeAssault(MobileParty attackerParty, Settlement settlement);
+
+    /// <summary>
     /// Records the aftermath the server applied so the local settlement-taken menus narrate it.
     /// </summary>
     void SetLocalAftermathNarration(int aftermathType);
@@ -201,6 +207,31 @@ internal class SiegeEventInterface : ISiegeEventInterface
 
             PlayerEncounter.Start();
             PlayerEncounter.Current.Init(attackerParty.Party, settlement.Party, settlement);
+        }
+    }
+
+    public void PromptSiegeAssault(MobileParty attackerParty, Settlement settlement)
+    {
+        // The besieging player adopts the already-replicated assault map event as its player encounter. Mirrors
+        // the attacker branch of vanilla StartSettlementEncounter, which never runs here because the server
+        // created and replicated the event. Only the parameterless PlayerEncounter.Init() adopts
+        // MainParty.MapEvent (via InitAux); the 3-arg overload the defender uses re-creates the siege event for
+        // an attacker (attacker == MainParty), which would desync it.
+        if (MobileParty.MainParty?.BesiegedSettlement != settlement) return;
+
+        var mapEvent = settlement.Party?.MapEvent;
+        if (mapEvent == null || !mapEvent.IsSiegeAssault) return;
+        if (MobileParty.MainParty.MapEvent == null) return;
+
+        using (new AllowedThread())
+        {
+            if (PlayerEncounter.Current != null)
+            {
+                PlayerEncounter.Finish(forcePlayerOutFromSettlement: false);
+            }
+
+            PlayerEncounter.Start();
+            PlayerEncounter.Init();
         }
     }
 

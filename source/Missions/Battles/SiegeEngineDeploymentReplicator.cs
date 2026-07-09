@@ -22,6 +22,9 @@ public interface ISiegeEngineDeploymentReplicator : IDisposable
 {
     /// <summary>[Host] Replay every placement so far to a joining controller.</summary>
     void CatchUpJoiner(string controllerId);
+
+    /// <summary>[Game thread] Retry placements that arrived before their deployment point had loaded.</summary>
+    void DrainPending();
 }
 
 /// <inheritdoc cref="ISiegeEngineDeploymentReplicator"/>
@@ -38,6 +41,10 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
     // so a successor promoted after host migration can still catch joiners up. Game-thread only.
     private readonly List<KeyValuePair<int, string>> placements = new List<KeyValuePair<int, string>>();
 
+    // Placements that arrived before their DeploymentPoint registered (catch-up during a peer's scene load);
+    // re-applied by DrainPending once the point appears. Per-point, latest wins; cleared with the replicator.
+    private readonly List<KeyValuePair<int, string>> pending = new List<KeyValuePair<int, string>>();
+
     public SiegeEngineDeploymentReplicator(IBattleNetwork network, IMessageBroker messageBroker, IBattleSession session)
     {
         this.network = network;
@@ -52,6 +59,7 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
     {
         messageBroker.Unsubscribe<SiegeEnginePlacementChanged>(Handle_PlacementChanged);
         messageBroker.Unsubscribe<NetworkSiegeEnginePlacement>(Handle_NetworkPlacement);
+        pending.Clear();
         // SuppressCapture is toggled around this replicator's own applies, so it resets here; the
         // authority flags are owned by CoopBattleController (which sets them each tick) and reset there.
         SiegeMissionAuthorityGate.SuppressCapture = false;
@@ -92,42 +100,79 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
                 return;
             }
 
-            var point = Mission.Current.MissionObjects
-                .OfType<DeploymentPoint>()
-                .FirstOrDefault(candidate => candidate.Id.Id == obj.PointId);
-            if (point == null)
+            if (!TryApplyPlacement(obj.PointId, obj.WeaponTypeName))
             {
-                Logger.Error("[BattleSync] No deployment point with id {PointId} in this mission", obj.PointId);
-                return;
-            }
-
-            Record(obj.PointId, obj.WeaponTypeName);
-
-            SiegeMissionAuthorityGate.SuppressCapture = true;
-            try
-            {
-                if (string.IsNullOrEmpty(obj.WeaponTypeName))
-                {
-                    if (point.DeployedWeapon != null) point.Disband();
-                }
-                else
-                {
-                    var weaponType = point.DeployableWeaponTypes.FirstOrDefault(type => type.Name == obj.WeaponTypeName);
-                    if (weaponType == null)
-                    {
-                        Logger.Error("[BattleSync] Point {PointId} has no deployable weapon of type {Type}", obj.PointId, obj.WeaponTypeName);
-                        return;
-                    }
-
-                    if (point.DeployedWeapon != null) point.Disband();
-                    point.Deploy(weaponType);
-                }
-            }
-            finally
-            {
-                SiegeMissionAuthorityGate.SuppressCapture = false;
+                // The DeploymentPoint isn't registered yet (catch-up during scene load); buffer and retry from
+                // the controller tick once it appears, instead of dropping it permanently.
+                StashPending(obj.PointId, obj.WeaponTypeName);
             }
         });
+    }
+
+    // Returns true once the point is resolved (whether or not the weapon type turned out valid); false only
+    // while the DeploymentPoint has not loaded yet, so the caller buffers and retries.
+    private bool TryApplyPlacement(int pointId, string weaponTypeName)
+    {
+        var point = Mission.Current.MissionObjects
+            .OfType<DeploymentPoint>()
+            .FirstOrDefault(candidate => candidate.Id.Id == pointId);
+        if (point == null) return false;
+
+        Record(pointId, weaponTypeName);
+
+        SiegeMissionAuthorityGate.SuppressCapture = true;
+        try
+        {
+            if (string.IsNullOrEmpty(weaponTypeName))
+            {
+                if (point.DeployedWeapon != null) point.Disband();
+            }
+            else
+            {
+                var weaponType = point.DeployableWeaponTypes.FirstOrDefault(type => type.Name == weaponTypeName);
+                if (weaponType == null)
+                {
+                    Logger.Error("[BattleSync] Point {PointId} has no deployable weapon of type {Type}", pointId, weaponTypeName);
+                    return true;
+                }
+
+                if (point.DeployedWeapon != null) point.Disband();
+                point.Deploy(weaponType);
+            }
+        }
+        finally
+        {
+            SiegeMissionAuthorityGate.SuppressCapture = false;
+        }
+
+        return true;
+    }
+
+    private void StashPending(int pointId, string weaponTypeName)
+    {
+        for (int i = 0; i < pending.Count; i++)
+        {
+            if (pending[i].Key == pointId)
+            {
+                pending[i] = new KeyValuePair<int, string>(pointId, weaponTypeName);
+                return;
+            }
+        }
+
+        pending.Add(new KeyValuePair<int, string>(pointId, weaponTypeName));
+    }
+
+    public void DrainPending()
+    {
+        if (pending.Count == 0 || Mission.Current == null) return;
+
+        for (int i = pending.Count - 1; i >= 0; i--)
+        {
+            if (TryApplyPlacement(pending[i].Key, pending[i].Value))
+            {
+                pending.RemoveAt(i);
+            }
+        }
     }
 
     public void CatchUpJoiner(string controllerId)

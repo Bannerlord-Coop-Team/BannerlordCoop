@@ -39,6 +39,8 @@ internal class ClientSiegeEntryHandler : IHandler
         messageBroker.Subscribe<NetworkJoinSiegeCampApproved>(HandleJoinApproved);
         messageBroker.Subscribe<NetworkBreakSiegeApproved>(HandleBreakApproved);
         messageBroker.Subscribe<NetworkPromptSiegeDefense>(HandleDefensePrompt);
+        messageBroker.Subscribe<AssaultSiegeAttempted>(HandleAssaultAttempt);
+        messageBroker.Subscribe<NetworkPromptSiegeAssault>(HandleAssaultPrompt);
         messageBroker.Subscribe<NetworkSnapSiegeCampPartyPosition>(HandleCampPositionSnap);
     }
 
@@ -69,6 +71,31 @@ internal class ClientSiegeEntryHandler : IHandler
             // No AllowedThread wrapper: the method scopes it per section, so the non-joinable
             // defender's settlement leave routes through the normal co-op leave flow.
             siegeEventInterface.PromptSiegeDefense(attackerParty, settlement);
+        });
+    }
+
+    // Runs on the game thread already — SiegeEntryFlowPatches publishes AssaultSiegeAttempted from the assault
+    // menu consequence, and this only resolves ids and sends the request, so no GameThread.RunSafe is needed.
+    private void HandleAssaultAttempt(MessagePayload<AssaultSiegeAttempted> payload)
+    {
+        var obj = payload.What;
+
+        if (!objectManager.TryGetIdWithLogging(obj.Party, out var partyId)) return;
+        if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
+
+        network.SendAll(new NetworkRequestSiegeAssault(partyId, settlementId));
+    }
+
+    private void HandleAssaultPrompt(MessagePayload<NetworkPromptSiegeAssault> payload)
+    {
+        var obj = payload.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.AttackerPartyId, out var attackerParty)) return;
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.SettlementId, out var settlement)) return;
+
+            siegeEventInterface.PromptSiegeAssault(attackerParty, settlement);
         });
     }
 
@@ -168,6 +195,8 @@ internal class ClientSiegeEntryHandler : IHandler
         messageBroker.Unsubscribe<NetworkJoinSiegeCampApproved>(HandleJoinApproved);
         messageBroker.Unsubscribe<NetworkBreakSiegeApproved>(HandleBreakApproved);
         messageBroker.Unsubscribe<NetworkPromptSiegeDefense>(HandleDefensePrompt);
+        messageBroker.Unsubscribe<AssaultSiegeAttempted>(HandleAssaultAttempt);
+        messageBroker.Unsubscribe<NetworkPromptSiegeAssault>(HandleAssaultPrompt);
         messageBroker.Unsubscribe<NetworkSnapSiegeCampPartyPosition>(HandleCampPositionSnap);
     }
 }

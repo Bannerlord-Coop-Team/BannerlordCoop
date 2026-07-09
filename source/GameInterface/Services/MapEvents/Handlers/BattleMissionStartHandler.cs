@@ -180,7 +180,10 @@ internal class BattleMissionStartHandler : IHandler
                 {
                     operation = "send siege mission snapshot";
                     var snapshot = siegeMissionSnapshots.GetOrAdd(payload.What.MapEventId, _ => BuildSiegeMissionSnapshot(payload.What.MapEventId, mapEvent));
-                    network.Send(requester, snapshot);
+                    // Broadcast like the field path: every involved player (co-besiegers, a player defender) opens the
+                    // mission and joins the leader-hosted assault. Non-involved clients self-filter in OpenSiegeMission
+                    // (TryGetValidBattle needs their own PlayerEncounter.Battle), so only participants open it.
+                    network.SendAll(snapshot);
                 }
                 else
                 {

@@ -10,6 +10,7 @@ using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.SiegeEvents.Messages;
 using LiteNetLib;
 using Serilog;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
@@ -39,6 +40,7 @@ internal class ServerSiegeEntryHandler : IHandler
         messageBroker.Subscribe<NetworkRequestBesiegeSettlement>(HandleBesiege);
         messageBroker.Subscribe<NetworkRequestJoinSiegeCamp>(HandleJoin);
         messageBroker.Subscribe<NetworkRequestBreakSiege>(HandleBreak);
+        messageBroker.Subscribe<NetworkRequestSiegeAssault>(HandleAssault);
         messageBroker.Subscribe<SiegeAssaultStarted>(HandleAssaultStarted);
         messageBroker.Subscribe<SiegeCampPositionRolled>(HandleCampPosition);
     }
@@ -53,6 +55,49 @@ internal class ServerSiegeEntryHandler : IHandler
 
         // Broadcast; each client checks locally whether its party is inside the settlement.
         network.SendAll(new NetworkPromptSiegeDefense(attackerPartyId, settlementId));
+        // Also prompt the besieging players to adopt the replicated assault as their encounter so they can enter it.
+        network.SendAll(new NetworkPromptSiegeAssault(attackerPartyId, settlementId));
+    }
+
+    private void HandleAssault(MessagePayload<NetworkRequestSiegeAssault> payload)
+    {
+        var obj = payload.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.PartyId, out _)) return;
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.SettlementId, out var settlement)) return;
+
+            var camp = settlement.SiegeEvent?.BesiegerCamp;
+            if (camp == null)
+            {
+                Logger.Error("Party {PartyId} tried to assault {SettlementId} which is not under siege", obj.PartyId, obj.SettlementId);
+                return;
+            }
+
+            // Create the assault authoritatively with patches LIVE so the map event registers + replicates and
+            // SiegeAssaultPromptPatches fires SiegeAssaultStarted (broadcasting the attacker/defender prompts). The
+            // camp leader is the authoritative attacker, matching vanilla lead_assault_on_consequence.
+            if (settlement.Party.MapEvent == null)
+            {
+                // SiegeEntryFlowPatches only reroutes the assault menu consequence, so the vanilla
+                // preparation-complete on_condition is bypassed; enforce it authoritatively here.
+                if (!camp.IsPreparationComplete)
+                {
+                    Logger.Warning("Party {PartyId} tried to assault {SettlementId} before siege preparations completed", obj.PartyId, obj.SettlementId);
+                    return;
+                }
+
+                StartBattleAction.ApplyStartAssaultAgainstWalls(camp.LeaderParty, settlement);
+                return;
+            }
+
+            // Assault already live (e.g. a repeat click): re-broadcast the prompt so a besieger still catching up enters it.
+            if (settlement.Party.MapEvent.IsSiegeAssault && objectManager.TryGetId(camp.LeaderParty, out var leaderId))
+            {
+                network.SendAll(new NetworkPromptSiegeAssault(leaderId, obj.SettlementId));
+            }
+        });
     }
 
     // Runs on the game thread already — published from the party-joined-siege patch; only resolves an id and broadcasts, so no GameThread.RunSafe.
@@ -138,6 +183,7 @@ internal class ServerSiegeEntryHandler : IHandler
         messageBroker.Unsubscribe<NetworkRequestBesiegeSettlement>(HandleBesiege);
         messageBroker.Unsubscribe<NetworkRequestJoinSiegeCamp>(HandleJoin);
         messageBroker.Unsubscribe<NetworkRequestBreakSiege>(HandleBreak);
+        messageBroker.Unsubscribe<NetworkRequestSiegeAssault>(HandleAssault);
         messageBroker.Unsubscribe<SiegeAssaultStarted>(HandleAssaultStarted);
         messageBroker.Unsubscribe<SiegeCampPositionRolled>(HandleCampPosition);
     }
