@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.ObjectManager;
@@ -79,6 +80,17 @@ internal class MapEventHandler : IHandler
                 "Applying network battle state change. BattleState={BattleState}",
                 battleState);
 
+            if (mapEvent.BattleState != BattleState.None)
+            {
+                mapEventLogger.DebugMapEvent(mapEvent,
+                    "Ignoring network battle state change because battle is already concluded. CurrentBattleState={CurrentBattleState}, IncomingBattleState={IncomingBattleState}",
+                    mapEvent.BattleState,
+                    battleState);
+                return;
+            }
+
+            var playerPartyIds = MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, objectManager);
+
             try
             {
                 mapEvent.BattleState = battleState;
@@ -92,7 +104,7 @@ internal class MapEventHandler : IHandler
             // native setter runs above, so the player no longer has to leave the post-battle menu. Hand off to
             // BattleHandler for the server-authoritative teardown + the close instruction to every player.
             if (battleState == BattleState.AttackerVictory || battleState == BattleState.DefenderVictory)
-                messageBroker.Publish(this, new MapEventConcluded(mapEventId));
+                messageBroker.Publish(this, new MapEventConcluded(mapEventId, playerPartyIds));
         });
     }
 

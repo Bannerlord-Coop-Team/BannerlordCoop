@@ -1,8 +1,12 @@
 using Common;
+using Common.Logging;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
+using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
@@ -26,8 +30,10 @@ namespace GameInterface.Services.MapEvents.Patches;
 [HarmonyPatch]
 internal class BattleModeEncounterOptionsPatch
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<BattleModeEncounterOptionsPatch>();
     private static readonly TextObject MissionUnderwayTooltip = new("{=!}A battle is already underway.");
     private static readonly TextObject SimulationUnderwayTooltip = new("{=!}A battle simulation is already underway.");
+    private static readonly TextObject EncounterUnavailableTooltip = new("{=!}The battle encounter is no longer available.");
 
     // Live-mission launch options, greyed while a simulation runs (launch_mission is the shared catch-all every
     // mission path funnels through). Trailing comment = in-game label.
@@ -74,7 +80,7 @@ internal class BattleModeEncounterOptionsPatch
         // Server never opens the menu; mode trackers are client state.
         if (ModInformation.IsServer) return;
 
-        var mapEvent = PlayerEncounter.Battle ?? MobileParty.MainParty?.MapEvent;
+        var mapEvent = GetPlayerEncounterBattle() ?? MobileParty.MainParty?.MapEvent;
         if (mapEvent == null) return;
 
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return;
@@ -96,5 +102,50 @@ internal class BattleModeEncounterOptionsPatch
             __0.IsEnabled = false;
             __0.Tooltip = SimulationUnderwayTooltip;
         }
+    }
+
+    [HarmonyFinalizer]
+    static Exception Finalizer(MenuCallbackArgs __0, MethodBase __originalMethod, ref bool __result, Exception __exception)
+    {
+        if (__exception == null) return null;
+        if (ModInformation.IsServer) return __exception;
+        if (!IsEncounterMenuRefresh()) return __exception;
+
+        __result = false;
+        if (__0 != null)
+        {
+            __0.IsEnabled = false;
+            __0.Tooltip = EncounterUnavailableTooltip;
+        }
+
+        Logger.Warning(
+            __exception,
+            "[PvPEncounterClose] Suppressed encounter menu option condition exception; method={Method} state={State}",
+            __originalMethod?.Name ?? "<unknown>",
+            DescribeEncounterState());
+        return null;
+    }
+
+    private static bool IsEncounterMenuRefresh()
+        => Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId == "encounter" ||
+           PlayerEncounter.Current != null ||
+           MobileParty.MainParty?.MapEvent != null;
+
+    private static MapEvent GetPlayerEncounterBattle()
+    {
+        try
+        {
+            return PlayerEncounter.Battle;
+        }
+        catch (NullReferenceException)
+        {
+            return null;
+        }
+    }
+
+    private static string DescribeEncounterState()
+    {
+        var encounter = PlayerEncounter.Current;
+        return $"menu={Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "<none>"}; encounter={(encounter != null)}; mainPartyMapEvent={(MobileParty.MainParty?.MapEvent != null)}; battle={(GetPlayerEncounterBattle() != null)}; attacker={(encounter?._attackerParty != null)}; defender={(encounter?._defenderParty != null)}";
     }
 }

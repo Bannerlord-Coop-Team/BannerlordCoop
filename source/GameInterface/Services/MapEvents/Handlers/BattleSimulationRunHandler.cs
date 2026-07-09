@@ -16,6 +16,7 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -642,6 +643,8 @@ internal class BattleSimulationRunHandler : IHandler
             if (PlayerEncounter.CurrentBattleSimulation != null)
                 return;
 
+            CloseEncounterMenuBehindSimulation();
+
             var mapState = Game.Current.GameStateManager.LastOrDefault<MapState>();
             if (mapState == null)
             {
@@ -657,6 +660,38 @@ internal class BattleSimulationRunHandler : IHandler
 
             mapEventLogger.DebugMapEvent(mapEvent, "Opened spectator battle simulation window");
         }, context: nameof(Handle_NetworkOpenBattleSimulation));
+    }
+
+    private static void CloseEncounterMenuBehindSimulation()
+    {
+        var campaign = Campaign.Current;
+        var mapState = Game.Current?.GameStateManager?.ActiveState as MapState;
+        var menuContext = campaign?.CurrentMenuContext;
+
+        try
+        {
+            GameMenu.ExitToLast();
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "Failed to exit encounter menu before opening spectator battle simulation");
+        }
+
+        try
+        {
+            menuContext?.Destroy();
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "Failed to destroy encounter menu before opening spectator battle simulation");
+        }
+
+        if (mapState?.AtMenu == true)
+            mapState.ExitMenuMode();
+        if (mapState != null)
+            mapState.GameMenuId = null;
+        if (campaign?.MapStateData != null)
+            campaign.MapStateData.GameMenuId = null;
     }
 
     /// <summary>

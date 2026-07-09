@@ -48,7 +48,7 @@ public class CoopBattleController : CoopMissionController
     /// <summary>Deployment activation + reveal state (exposed for the join catch-up and tests).</summary>
     public IBattleDeploymentCoordinator Deployment { get; }
 
-    /// <summary>Commits a concluded battle's result to the campaign on mission end (host only).</summary>
+    /// <summary>Commits a concluded battle's result to the campaign on mission end.</summary>
     public IBattleResultCommitter ResultCommitter { get; }
 
     private readonly IBattleInstanceLifecycle lifecycle;
@@ -159,7 +159,7 @@ public class CoopBattleController : CoopMissionController
     {
         // Commit the concluded battle's result to the campaign BEFORE tearing the instance down, so the server
         // captures losers / awards the win and finalizes the encounter.
-        ResultCommitter.CommitIfHost();
+        ResultCommitter.CommitResolvedResult();
 
         lifecycle.Leave();
     }

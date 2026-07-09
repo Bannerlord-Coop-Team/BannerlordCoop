@@ -1,5 +1,7 @@
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MapEvents.Messages.Conversation;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,6 +17,8 @@ public static class PlayerPartyInteractionDialogState
     private const BindingFlags InstanceBindingFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
     private const string MapConversationVmTypeName = "TaleWorlds.CampaignSystem.ViewModelCollection.Map.MapConversation.MapConversationVM";
 
+    private static readonly ILogger Logger = LogManager.GetLogger(typeof(PlayerPartyInteractionDialogState));
+
     private static NetworkPlayerPartyInteractionState currentState;
     private static bool hasState;
 
@@ -26,6 +30,7 @@ public static class PlayerPartyInteractionDialogState
     public static PlayerPartyInteractionProposal Proposal => hasState ? currentState.Proposal : PlayerPartyInteractionProposal.None;
     public static bool InitiatorAcceptedTrade => hasState && currentState.InitiatorAcceptedTrade;
     public static bool ResponderAcceptedTrade => hasState && currentState.ResponderAcceptedTrade;
+    public static bool IsHostile => hasState && currentState.IsHostile;
     public static bool HasActiveState => hasState;
 
     internal static void Apply(NetworkPlayerPartyInteractionState state)
@@ -62,6 +67,12 @@ public static class PlayerPartyInteractionDialogState
             return true;
         }
 
+        if (option == PlayerPartyInteractionOption.OfferServices && IsHostile)
+        {
+            explanation = new TextObject("{=coop_player_party_interaction_hostile_disabled}Not available while hostile");
+            return false;
+        }
+
         explanation = new TextObject("{=coop_player_party_interaction_disabled}This option is not available.");
         return false;
     }
@@ -76,6 +87,10 @@ public static class PlayerPartyInteractionDialogState
                 return $"Awaiting response from {OtherPlayerName}...";
             case PlayerPartyInteractionPhase.ProposalPending:
                 return GetProposalText();
+            case PlayerPartyInteractionPhase.HostileDemandConfirm:
+                return "Eh? What do you want?";
+            case PlayerPartyInteractionPhase.HostileDemandPending:
+                return "I offer you one chance to surrender or die";
             case PlayerPartyInteractionPhase.TradeActive:
                 return "Let us review the trade.";
             case PlayerPartyInteractionPhase.OfferServices:
@@ -87,16 +102,42 @@ public static class PlayerPartyInteractionDialogState
 
     public static void Submit(PlayerPartyInteractionOption option)
     {
-        if (!IsOptionEnabled(option)) return;
+        var enabled = IsOptionEnabled(option);
+        Logger.Information(
+            "[P2POptionTrace] Local player-party dialog option clicked; sessionId={SessionId} partyId={PartyId} otherPartyId={OtherPartyId} option={Option} enabled={Enabled} phase={Phase} proposal={Proposal} isHostile={IsHostile}",
+            SessionId ?? "<none>",
+            PartyId ?? "<none>",
+            OtherPartyId ?? "<none>",
+            option,
+            enabled,
+            Phase,
+            Proposal,
+            IsHostile);
+
+        if (!enabled) return;
 
         MessageBroker.Instance.Publish(null, new PlayerPartyInteractionOptionSelected(SessionId, PartyId, option));
     }
 
     public static void ShowServiceOptions()
     {
+        var enabled = HasActiveState &&
+                      Phase == PlayerPartyInteractionPhase.InitialOptions &&
+                      IsOptionEnabled(PlayerPartyInteractionOption.OfferServices);
+        Logger.Information(
+            "[P2POptionTrace] Local player-party dialog option clicked; sessionId={SessionId} partyId={PartyId} otherPartyId={OtherPartyId} option={Option} enabled={Enabled} phase={Phase} proposal={Proposal} isHostile={IsHostile}",
+            SessionId ?? "<none>",
+            PartyId ?? "<none>",
+            OtherPartyId ?? "<none>",
+            PlayerPartyInteractionOption.OfferServices,
+            enabled,
+            Phase,
+            Proposal,
+            IsHostile);
+
         if (!HasActiveState) return;
         if (Phase != PlayerPartyInteractionPhase.InitialOptions) return;
-        if (!HasOption(PlayerPartyInteractionOption.OfferServices)) return;
+        if (!IsOptionEnabled(PlayerPartyInteractionOption.OfferServices)) return;
 
         currentState = new NetworkPlayerPartyInteractionState(
             currentState.SessionId,
@@ -111,7 +152,8 @@ public static class PlayerPartyInteractionDialogState
             currentState.ResponderAcceptedTrade,
             currentState.PartyItems,
             currentState.OtherPartyItems,
-            GetLocalServiceEnabledOptions());
+            GetLocalServiceEnabledOptions(),
+            currentState.IsHostile);
 
         RefreshConversation();
     }
@@ -126,6 +168,8 @@ public static class PlayerPartyInteractionDialogState
                 return "(COMING SOON) I wish to offer my services in your clan.";
             case PlayerPartyInteractionProposal.Vassal:
                 return "I wish to swear my allegiance to your majesty.";
+            case PlayerPartyInteractionProposal.HostileDemand:
+                return "I offer you one chance to surrender or die";
             default:
                 return $"{OtherPlayerName} has made a proposal.";
         }
