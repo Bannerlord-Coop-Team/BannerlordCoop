@@ -167,25 +167,4 @@ internal class VillagerConversationsPatches
 
         return false;
     }
-
-    /*
-    private static void OpenLootScreen(MobileParty encounterParty, out ItemRosterElement[] itemRosterElements)
-    {
-        ItemRoster itemRoster = null;
-        using (new AllowedThread())
-        {
-            itemRoster = new ItemRoster(encounterParty.ItemRoster);
-
-            itemRosterElements = itemRoster._data;
-
-            if (itemRoster.Count > 0)
-            {
-                InventoryScreenHelper.OpenScreenAsLoot(new Dictionary<PartyBase, ItemRoster>
-                {
-                    { PartyBase.MainParty, itemRoster }
-                });
-            }
-        }
-    }
-    */
 }

@@ -198,37 +198,4 @@ internal class CaravansConversationsPatches
 
         return false;
     }
-
-    /*
-    private static void OpenLootScreen(MobileParty encounterParty, out bool caravanHasItems, out ItemRosterElement[] itemRosterElements)
-    {
-        ItemRoster itemRoster = null;
-        using (new AllowedThread())
-        {
-            itemRoster = new ItemRoster(encounterParty.ItemRoster);
-        }
-
-        itemRosterElements = itemRoster._data;
-
-        caravanHasItems = false;
-        for (int i = 0; i < itemRoster.Count; i++)
-        {
-            if (itemRoster.GetElementNumber(i) > 0)
-            {
-                caravanHasItems = true;
-                break;
-            }
-        }
-        if (caravanHasItems)
-        {
-            InventoryScreenHelper.OpenScreenAsLoot(new Dictionary<PartyBase, ItemRoster>
-            {
-                {
-                    PartyBase.MainParty,
-                    itemRoster
-                }
-            });
-        }
-    }
-    */
 }
