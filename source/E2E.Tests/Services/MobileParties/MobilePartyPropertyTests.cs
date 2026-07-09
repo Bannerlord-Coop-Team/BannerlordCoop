@@ -13,11 +13,15 @@ namespace E2E.Tests.Services.MobileParties;
 public class MobilePartyPropertyTests : SyncTestBase
 {
     private string MobilePartyId;
+    private string FirstParentPartyId;
+    private string SecondParentPartyId;
     private string LordPartyId;
 
     public MobilePartyPropertyTests(ITestOutputHelper output) : base(output)
     {
         MobilePartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        FirstParentPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        SecondParentPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         TestEnvironment.CreateRegisteredObject<Settlement>();
         TestEnvironment.CreateRegisteredObject<MobilePartyAi>();
         TestEnvironment.CreateRegisteredObject<BesiegerCamp>(new System.Collections.Generic.List<System.Reflection.MethodBase>
@@ -48,7 +52,9 @@ public class MobilePartyPropertyTests : SyncTestBase
         TestEnvironment.AssertProperty<MobileParty, bool>(nameof(MobileParty.ShouldJoinPlayerBattles), true);
         TestEnvironment.AssertProperty<MobileParty, bool>(nameof(MobileParty.IsDisbanding), true);
         TestEnvironment.AssertReferenceProperty<MobileParty, Settlement>(nameof(MobileParty.CurrentSettlement));
-        TestEnvironment.AssertReferenceProperty<MobileParty, MobileParty>(nameof(MobileParty.AttachedTo));
+        Server.NetworkSentMessages.Clear();
+        TestEnvironment.AssertReferenceProperty<MobileParty, MobileParty>(nameof(MobileParty.AttachedTo), MobilePartyId, FirstParentPartyId);
+        AssertSingleAutoSyncMessageForPair("MobileParty_AttachedTo_SetNetworkMessage", "MobileParty__attachedTo_SetNetworkMessage");
         //TestEnvironment.AssertReferenceProperty<MobileParty, BesiegerCamp>(nameof(MobileParty.BesiegerCamp));
         TestEnvironment.AssertReferenceProperty<MobileParty, Hero>(nameof(MobileParty.Scout));
         TestEnvironment.AssertReferenceProperty<MobileParty, Hero>(nameof(MobileParty.Engineer));
@@ -56,6 +62,19 @@ public class MobilePartyPropertyTests : SyncTestBase
         TestEnvironment.AssertReferenceProperty<MobileParty, Hero>(nameof(MobileParty.Surgeon));
         TestEnvironment.AssertProperty<MobileParty, float>(nameof(MobileParty.RecentEventsMorale), 5f);
         TestEnvironment.AssertProperty<MobileParty, Vec2>(nameof(MobileParty.EventPositionAdder), new Vec2(2,2));
+    }
+
+    [Fact]
+    public void Server_MobileParty_AttachedTo_ReparentsAndDetaches()
+    {
+        SetAttachedTo(FirstParentPartyId);
+        AssertAttachmentState(FirstParentPartyId, SecondParentPartyId);
+
+        SetAttachedTo(SecondParentPartyId);
+        AssertAttachmentState(SecondParentPartyId, FirstParentPartyId);
+
+        SetAttachedTo(null);
+        AssertAttachmentState(null, FirstParentPartyId, SecondParentPartyId);
     }
 
     [Fact]
@@ -76,6 +95,52 @@ public class MobilePartyPropertyTests : SyncTestBase
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(LordPartyId, out var clientParty));
             Assert.Equal(500, clientParty.LeaderHero.Gold);
             Assert.Equal(500, clientParty.PartyTradeGold);
+        }
+    }
+
+    private void SetAttachedTo(string? parentPartyId)
+    {
+        Server.NetworkSentMessages.Clear();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(MobilePartyId, out var childParty));
+
+            MobileParty? parentParty = null;
+            if (parentPartyId != null)
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(parentPartyId, out parentParty));
+            }
+
+            childParty.AttachedTo = parentParty;
+        });
+        AssertSingleAutoSyncMessageForPair("MobileParty_AttachedTo_SetNetworkMessage", "MobileParty__attachedTo_SetNetworkMessage");
+    }
+
+    private void AssertAttachmentState(string? parentPartyId, params string[] detachedParentPartyIds)
+    {
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(MobilePartyId, out var childParty));
+
+                if (parentPartyId == null)
+                {
+                    Assert.Null(childParty.AttachedTo);
+                }
+                else
+                {
+                    Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(parentPartyId, out var parentParty));
+                    Assert.Same(parentParty, childParty.AttachedTo);
+                    Assert.Single(parentParty.AttachedParties, attachedParty => ReferenceEquals(attachedParty, childParty));
+                }
+
+                foreach (var detachedParentPartyId in detachedParentPartyIds)
+                {
+                    Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(detachedParentPartyId, out var detachedParentParty));
+                    Assert.DoesNotContain(childParty, detachedParentParty.AttachedParties);
+                }
+            });
         }
     }
 }

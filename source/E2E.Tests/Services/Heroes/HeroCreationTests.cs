@@ -57,6 +57,26 @@ public class HeroCreationTests : IDisposable
             Assert.True(client.ObjectManager.TryGetObject<Hero>(newHeroStringId, out var newHero));
 
             Assert.Equal(serverHero?.FirstName.Value, newHero.FirstName.Value);
+            Assert.Equal(serverHero?.HitPoints, newHero.HitPoints);
+        }
+    }
+
+    [Fact]
+    public void ServerCreateBareHero_PreservesDefaultHealthOnClients()
+    {
+        var server = TestEnvironment.Server;
+        Hero? serverHero = null;
+
+        server.Call(() => serverHero = new Hero());
+
+        Assert.NotNull(serverHero);
+        Assert.True(server.ObjectManager.TryGetId(serverHero, out var heroId));
+        Assert.Equal(1, serverHero._health);
+
+        foreach (var client in TestEnvironment.Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(heroId, out var clientHero));
+            Assert.Equal(serverHero._health, clientHero._health);
         }
     }
 

@@ -67,7 +67,9 @@ namespace E2E.Tests.Services.Heroes
             TestEnvironment.AssertProperty<Hero, KillCharacterAction.KillCharacterActionDetail>(nameof(Hero.DeathMark), KillCharacterAction.KillCharacterActionDetail.Murdered);
             TestEnvironment.AssertReferenceProperty<Hero, Hero>(nameof(Hero.DeathMarkKillerHero));
             TestEnvironment.AssertReferenceProperty<Hero, Settlement>(nameof(Hero.LastKnownClosestSettlement));
+            Server.NetworkSentMessages.Clear();
             TestEnvironment.AssertProperty<Hero, int>(nameof(Hero.HitPoints), 5, defaultValue: hero.HitPoints);
+            AssertSingleAutoSyncMessageForPair("Hero_HitPoints_SetNetworkMessage", "Hero__health_SetNetworkMessage");
             TestEnvironment.AssertProperty<Hero, long>(nameof(Hero.LastExaminedLogEntryID), 50);
             TestEnvironment.AssertReferenceProperty<Hero, Clan>(nameof(Hero.Clan));
             TestEnvironment.AssertReferenceProperty<Hero, Clan>(nameof(Hero.SupporterOf));
@@ -90,8 +92,6 @@ namespace E2E.Tests.Services.Heroes
         [Fact]
         public void Server_Hero_Fields()
         {
-            // Hero._health is initialized to 100 in the constructor
-            TestEnvironment.AssertField<Hero, int>(nameof(Hero._health), 5, defaultValue: 100);
             // Hero.Culture is initialized by HeroCreator.CreateSpecialHero(); clear it first so the pre-check passes
             Server.ObjectManager.TryGetObject<Hero>(HeroId, out var hero);
             HarmonyLib.AccessTools.Field(typeof(Hero), nameof(Hero.Culture)).SetValue(hero, null);

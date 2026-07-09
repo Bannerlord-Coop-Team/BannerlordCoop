@@ -17,6 +17,15 @@ namespace E2E.Tests.Util
             TestEnvironment = new E2ETestEnvironment(output);
         }
 
+        internal void AssertSingleAutoSyncMessageForPair(string retainedMessageName, string removedMessageName)
+        {
+            var sentMessage = Assert.Single(
+                Server.NetworkSentMessages,
+                message => message.GetType().Name == retainedMessageName || message.GetType().Name == removedMessageName);
+
+            Assert.Equal(retainedMessageName, sentMessage.GetType().Name);
+        }
+
         public void Dispose()
         {
             TestEnvironment.Dispose();
