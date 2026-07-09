@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyComponents.Data;
 using GameInterface.Services.PartyComponents.Messages;
@@ -264,11 +265,28 @@ internal class PartyComponentHandler : IHandler
                 Hero newLeader = null;
                 if (obj.NewLeaderId != null && !objectManager.TryGetObjectWithLogging<Hero>(obj.NewLeaderId, out newLeader)) return;
 
+                var mobileParty = partyComponent.MobileParty;
+                var isPlayerParty = mobileParty != null && mobileParty.IsPlayerParty();
+
                 using (new AllowedThread())
                 {
-                    partyComponent.OnChangePartyLeader(newLeader);
-                    partyComponent.Party?.SetVisualAsDirty();
+                    if (isPlayerParty)
+                    {
+                        // Player parties need the full vanilla path for leaderless hold and event dispatch.
+                        partyComponent.ChangePartyLeader(newLeader);
+                    }
+                    else
+                    {
+                        partyComponent.OnChangePartyLeader(newLeader);
+                    }
                 }
+
+                var party = partyComponent.Party;
+                if (party == null) return;
+
+                if (isPlayerParty && Campaign.Current != null && MobileParty.MainParty != null && !mobileParty.IsCurrentlyAtSea)
+                    party.UpdateVisibilityAndInspected(mobileParty.Position, 0f);
+                party.SetVisualAsDirty();
             }
             catch (Exception e)
             {
