@@ -59,7 +59,7 @@ public class ArmyPatches
     [HarmonyPostfix]
     static void ArmyOwnerSetPostfix(Army __instance)
     {
-        if (!ModInformation.IsClient || __instance == null) return;
+        if (ModInformation.IsServer || __instance == null) return;
 
         __instance.UpdateName();
 
