@@ -48,7 +48,6 @@ internal class HeroRegistry : AutoRegistryBase<Hero>
     {
         using(new AllowedThread())
         {
-            // SkipConstructor bypasses Hero's default health initialization on live-created client mirrors.
             obj._health = 1;
             //obj.Init();
             AccessTools.Field(typeof(Hero), nameof(Hero._children)).SetValue(obj, new MBList<Hero>());
