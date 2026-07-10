@@ -42,6 +42,8 @@ internal class ServerSiegeEntryHandler : IHandler
         messageBroker.Subscribe<NetworkRequestBreakSiege>(HandleBreak);
         messageBroker.Subscribe<NetworkRequestSiegeAssault>(HandleAssault);
         messageBroker.Subscribe<SiegeAssaultStarted>(HandleAssaultStarted);
+        messageBroker.Subscribe<SiegePreparationStarted>(HandlePreparationStarted);
+        messageBroker.Subscribe<SiegeEndedWithoutBattle>(HandleSiegeEnded);
         messageBroker.Subscribe<SiegeCampPositionRolled>(HandleCampPosition);
     }
 
@@ -57,6 +59,30 @@ internal class ServerSiegeEntryHandler : IHandler
         network.SendAll(new NetworkPromptSiegeDefense(attackerPartyId, settlementId));
         // Also prompt the besieging players to adopt the replicated assault as their encounter so they can enter it.
         network.SendAll(new NetworkPromptSiegeAssault(attackerPartyId, settlementId));
+    }
+
+    // Runs on the game thread already — published from the StartSiegeEvent postfix, after the whole siege
+    // graph was broadcast, so the prompt arrives behind it on the reliable-ordered channel.
+    private void HandlePreparationStarted(MessagePayload<SiegePreparationStarted> payload)
+    {
+        var obj = payload.What;
+
+        if (!objectManager.TryGetIdWithLogging(obj.BesiegerParty, out var attackerPartyId)) return;
+        if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
+
+        // Broadcast; each client checks locally whether its party is inside the settlement.
+        network.SendAll(new NetworkPromptSiegePreparation(attackerPartyId, settlementId));
+    }
+
+    // Runs on the game thread already — published from the FinalizeSiegeEvent postfix, behind the
+    // replicated siege teardown.
+    private void HandleSiegeEnded(MessagePayload<SiegeEndedWithoutBattle> payload)
+    {
+        var obj = payload.What;
+
+        if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
+
+        network.SendAll(new NetworkPromptSiegeEnded(settlementId, obj.BesiegerDefeated));
     }
 
     private void HandleAssault(MessagePayload<NetworkRequestSiegeAssault> payload)
@@ -185,6 +211,8 @@ internal class ServerSiegeEntryHandler : IHandler
         messageBroker.Unsubscribe<NetworkRequestBreakSiege>(HandleBreak);
         messageBroker.Unsubscribe<NetworkRequestSiegeAssault>(HandleAssault);
         messageBroker.Unsubscribe<SiegeAssaultStarted>(HandleAssaultStarted);
+        messageBroker.Unsubscribe<SiegePreparationStarted>(HandlePreparationStarted);
+        messageBroker.Unsubscribe<SiegeEndedWithoutBattle>(HandleSiegeEnded);
         messageBroker.Unsubscribe<SiegeCampPositionRolled>(HandleCampPosition);
     }
 }

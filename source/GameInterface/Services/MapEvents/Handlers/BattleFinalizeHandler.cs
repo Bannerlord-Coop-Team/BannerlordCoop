@@ -188,6 +188,18 @@ internal class BattleFinalizeHandler : IHandler
                 mapEvent.AttackerSide?.LeaderParty?.MobileParty?.RecalculateShortTermBehavior();
             }
 
+            // Vanilla silently re-crowns AttackerSide.LeaderParty to whichever party is first in the
+            // list if the leader's party ever left and rejoined the event; capture and the aftermath
+            // prompt key on it, so re-assert the besieger camp leader before finalizing.
+            if (mapEvent.IsSiegeAssault && mapEvent.AttackerSide != null)
+            {
+                var campLeader = mapEvent.MapEventSettlement?.SiegeEvent?.BesiegerCamp?.LeaderParty?.Party;
+                if (campLeader != null && mapEvent.AttackerSide.LeaderParty != campLeader)
+                {
+                    mapEvent.AttackerSide.LeaderParty = campLeader;
+                }
+            }
+
             mapEvent.FinalizeEventAux();
             MoveRaidAttackersToSettlementGate(raidAttackers, raidSettlement);
         }, blocking: true, context: nameof(FinalizeAndCollectPlayers));
@@ -229,6 +241,15 @@ internal class BattleFinalizeHandler : IHandler
         foreach (var party in mapEvent.InvolvedParties)
         {
             if (capturingLeader != null && party?.MobileParty == capturingLeader) continue;
+
+            // A winning inside defender keeps its encounter too: vanilla already parked it on the
+            // siege_attacker_defeated menu, whose Return option re-enters the settlement; the close
+            // would tear that down and show the gates menu while the party is still inside.
+            if (mapEvent.IsSiegeAssault
+                && mapEvent.BattleState == BattleState.DefenderVictory
+                && party?.Side == BattleSideEnum.Defender
+                && party.MobileParty?.CurrentSettlement == mapEvent.MapEventSettlement) continue;
+
             if (party?.MobileParty?.IsPlayerParty() == true && objectManager.TryGetId(party, out var id))
                 ids.Add(id);
         }

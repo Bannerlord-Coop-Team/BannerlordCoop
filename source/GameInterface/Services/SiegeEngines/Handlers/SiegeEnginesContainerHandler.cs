@@ -73,7 +73,11 @@ internal class SiegeEnginesContainerHandler : IHandler
         if (siegeEngine.SiegeEngine?.IsRanged != true || siegeEngine.RangedSiegeEngine != null) return;
 
         var side = SiegeContainerLookup.FindOwnerSide(container);
-        if (side == null) return;
+        if (side == null)
+        {
+            Logger.Error("Deployed ranged siege engine {EngineType} has no owning siege side; bombardment state stays unset", siegeEngine.SiegeEngine.StringId);
+            return;
+        }
 
         siegeEngine.SetRangedSiegeEngine(new RangedSiegeEngine(siegeEngine.SiegeEngine, side));
     }

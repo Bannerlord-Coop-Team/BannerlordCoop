@@ -271,7 +271,7 @@
     <!--<Publicize Include="TaleWorlds.MountAndBlade.Launcher.Library"/>                                                         -->
     <!--<Publicize Include="TaleWorlds.MountAndBlade.Launcher.Steam"/>                                                           -->
     <!--<Publicize Include="TaleWorlds.MountAndBlade.View, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64"/>      -->
-    <!--<Publicize Include="TaleWorlds.MountAndBlade.ViewModelCollection"/>                                                      -->
+    <Publicize Include="TaleWorlds.MountAndBlade.ViewModelCollection" />
     <!--<Publicize Include="TaleWorlds.NavigationSystem"/>                                                                       -->
     <!--<Publicize Include="TaleWorlds.Network"/>                                                                                -->
     <Publicize Include="TaleWorlds.ObjectSystem" />                                                                           

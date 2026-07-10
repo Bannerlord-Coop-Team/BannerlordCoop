@@ -77,6 +77,21 @@ internal static class SiegeContainerLookup
         return null;
     }
 
+    /// <summary>The siege side whose container holds an engine (deployed or reserve).</summary>
+    public static ISiegeEventSide FindOwnerSide(SiegeEngineConstructionProgress siegeEngine)
+    {
+        foreach (var siegeEvent in ActiveSieges())
+        {
+            var camp = siegeEvent.BesiegerCamp;
+            if (camp?.SiegeEngines != null && Owns(camp.SiegeEngines, siegeEngine)) return camp;
+
+            var settlement = siegeEvent.BesiegedSettlement;
+            if (settlement.SiegeEngines != null && Owns(settlement.SiegeEngines, siegeEngine)) return settlement;
+        }
+
+        return null;
+    }
+
     public static Settlement FindOwnerSettlement(SiegeEngineConstructionProgress siegeEngine)
     {
         foreach (var siegeEvent in ActiveSieges())

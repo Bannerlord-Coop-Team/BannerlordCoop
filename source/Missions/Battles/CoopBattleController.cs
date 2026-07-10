@@ -10,6 +10,7 @@ using Missions.Data;
 using Missions.Messages;
 using Serilog;
 using System;
+using TaleWorlds.MountAndBlade;
 
 namespace Missions.Battles;
 
@@ -63,8 +64,12 @@ public class CoopBattleController : CoopMissionController
     private readonly IReinforcementFielder reinforcementFielder;
     private readonly ISiegeEngineDeploymentReplicator siegeEngineDeployment;
     private readonly ISiegeMachineStateReplicator siegeMachineState;
+    private readonly ISiegeWeaponFireReplicator siegeWeaponFire;
     private readonly ISiegeEngineStateReporter siegeEngineStateReporter;
     private readonly IBattleHostRegistry hostRegistryRef;
+
+    // Whether the pre-live hold on vanilla's battle-end checks has been lifted (see OnMissionTick).
+    private bool endConditionHoldReleased;
     private readonly ISupplyProgressReporter supplyReporter;
     private readonly BattleTeamDiagnostics diagnostics = new BattleTeamDiagnostics();
 
@@ -96,7 +101,8 @@ public class CoopBattleController : CoopMissionController
         authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner);
         reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, session, deployment, formationAssigner);
         siegeEngineDeployment = new SiegeEngineDeploymentReplicator(network, messageBroker, session);
-        siegeMachineState = new SiegeMachineStateReplicator(network, messageBroker, session);
+        siegeMachineState = new SiegeMachineStateReplicator(network, messageBroker, session, coopMissionComponent.AgentRegistry);
+        siegeWeaponFire = new SiegeWeaponFireReplicator(network, messageBroker, coopMissionComponent.AgentRegistry);
         supplyReporter = new SupplyProgressReporter(relayNetwork, session);
 
         hostRegistryRef = hostRegistry;
@@ -120,12 +126,16 @@ public class CoopBattleController : CoopMissionController
         reinforcementFielder.Dispose();
         siegeEngineDeployment.Dispose();
         siegeMachineState.Dispose();
+        siegeWeaponFire.Dispose();
         Deployment.Dispose();
 
         // OnMissionTick sets these each frame; reset them here (their owner) so a stale authority
         // never bleeds into the next siege before the first tick refreshes it.
         SiegeMissionAuthorityGate.IsLocalAuthority = false;
         SiegeMissionAuthorityGate.IsAuthorityKnown = false;
+        SiegeMissionAuthorityGate.ResetClaimedMachines();
+        BattleConclusionGate.IsInCoopBattleMission = false;
+        BattleConclusionGate.IsLocalBattleHost = false;
 
         base.Dispose();
     }
@@ -141,6 +151,25 @@ public class CoopBattleController : CoopMissionController
         {
             SiegeMissionAuthorityGate.IsLocalAuthority = Session.IsLocalHost;
             SiegeMissionAuthorityGate.IsAuthorityKnown = hostRegistryRef.TryGet(Session.InstanceId, out _);
+        }
+
+        // Only the battle host's mission conclusion may relay to the server (every coop battle mission).
+        BattleConclusionGate.IsInCoopBattleMission = true;
+        BattleConclusionGate.IsLocalBattleHost = Session.IsLocalHost;
+
+        // Vanilla's end checks unlock at the LOCAL deployment finish, but a peer's enemies arrive as
+        // the battle host's puppets — a peer committing before the host has fielded anything reads an
+        // empty enemy side as "the enemy ran away" and concludes a bogus victory. Hold the end
+        // conditions until the battle is live (the host released the NPC AI); vanilla resumes then.
+        if (!endConditionHoldReleased)
+        {
+            var battleEndLogic = Mission?.GetMissionBehavior<BattleEndLogic>();
+            if (battleEndLogic != null)
+            {
+                bool battleLive = Deployment.IsActivated;
+                battleEndLogic.ChangeCanCheckForEndCondition(battleLive);
+                if (battleLive) endConditionHoldReleased = true;
+            }
         }
 
         puppetSpawner.DrainPendingPuppets();

@@ -36,11 +36,41 @@ internal class SiegeDeploymentPatches
         return SiegeMissionAuthorityGate.IsLocalAuthority;
     }
 
-    // Empties the engine list of the deployment UI (and the "you can still deploy" prompt) for
-    // non-deployers; their troop Order of Battle is untouched.
+    // The Start Battle teardown disables (and hides) every player-side engine whose weapon isn't
+    // deployed. A non-deployer can commit before the deployer's placements arrive, which would
+    // sweep engines mid-replication and permanently drop the late placements (the deployable-
+    // weapons list filters on !IsDisabled). Only the deployer tears down natively; everyone else
+    // sweeps once its deployment-finished announcement arrives, when the placement set is final
+    // (SiegeEngineDeploymentReplicator).
+    [HarmonyPatch(typeof(SiegeDeploymentHandler), nameof(SiegeDeploymentHandler.RemoveDeploymentPoints))]
+    [HarmonyPrefix]
+    private static bool RemoveDeploymentPointsPrefix()
+    {
+        if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return true;
+        if (SiegeMissionAuthorityGate.SuppressCapture) return true;
+
+        return SiegeMissionAuthorityGate.IsLocalAuthority;
+    }
+
+    // Empties the engine list of the deployment UI for non-deployers; their troop Order of Battle
+    // is untouched.
     [HarmonyPatch(typeof(SiegeDeploymentHandler), nameof(SiegeDeploymentHandler.GetMaxDeployableWeaponCountOfPlayer))]
     [HarmonyPostfix]
     private static void GetMaxDeployableCountPostfix(ref int __result)
+    {
+        if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return;
+
+        if (!SiegeMissionAuthorityGate.IsLocalAuthority)
+        {
+            __result = 0;
+        }
+    }
+
+    // The "You can still deploy siege engines" ready-up inquiry (and the remaining-count badge) reads
+    // this second count method, not the max-count one above; zero it for non-deployers too.
+    [HarmonyPatch(typeof(SiegeDeploymentHandler), nameof(SiegeDeploymentHandler.GetDeployableWeaponCountOfPlayer))]
+    [HarmonyPostfix]
+    private static void GetDeployableCountPostfix(ref int __result)
     {
         if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return;
 

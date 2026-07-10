@@ -102,8 +102,26 @@ internal class SiegeEngineProgressPatches
         // finished engine's mesh) never show until something else happens to dirty the settlement visual.
         if (completed)
         {
+            FillRangedSiegeEngine(siegeEngine);
             SiegeContainerLookup.FindOwnerSettlement(siegeEngine)?.Party?.SetVisualAsDirty();
         }
+    }
+
+    // Vanilla allocates the bombardment state in SiegeEvent.CreateSiegeObject when construction completes,
+    // inside the server-only siege tick. The settlement's map visual derefs RangedSiegeEngine every frame for
+    // each deployed ranged engine, so a client engine completing without it freezes the map on a per-frame NRE.
+    private static void FillRangedSiegeEngine(SiegeEngineConstructionProgress siegeEngine)
+    {
+        if (siegeEngine.SiegeEngine?.IsRanged != true || siegeEngine.RangedSiegeEngine != null) return;
+
+        var side = SiegeContainerLookup.FindOwnerSide(siegeEngine);
+        if (side == null)
+        {
+            Logger.Error("Completed ranged siege engine {EngineType} has no owning siege side; bombardment state stays unset", siegeEngine.SiegeEngine.StringId);
+            return;
+        }
+
+        siegeEngine.SetRangedSiegeEngine(new RangedSiegeEngine(siegeEngine.SiegeEngine, side));
     }
 
     internal static void RunSetHitpoints(SiegeEngineConstructionProgress siegeEngine, float hitpoints, float maxHitPoints)

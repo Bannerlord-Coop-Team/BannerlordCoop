@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Util;
 using GameInterface.Services.SiegeEvents.Handlers;
 using GameInterface.Services.SiegeEvents.Patches;
@@ -64,6 +65,24 @@ public interface ISiegeEventInterface : IGameAbstraction
     /// party is inside the assaulted settlement.
     /// </summary>
     void PromptSiegeDefense(MobileParty attackerParty, Settlement settlement);
+
+    /// <summary>
+    /// Switches this player to the vanilla siege-preparation menu when its party is inside a
+    /// settlement a siege just started against.
+    /// </summary>
+    void PromptSiegePreparation(MobileParty attackerParty, Settlement settlement);
+
+    /// <summary>
+    /// Frees this player from the siege-preparation menus when the siege dissolved without a battle.
+    /// </summary>
+    void PromptSiegeEnded(Settlement settlement, bool besiegerDefeated);
+
+    /// <summary>
+    /// [Game thread] Rebuilds the local in-settlement state for a player whose reloaded party is
+    /// inside a settlement: the encounter the headless server's save doesn't carry, and the siege
+    /// menus when the settlement is besieged.
+    /// </summary>
+    void RestoreReloadedPlayerInSettlement();
 
     /// <summary>
     /// Establishes the besieging player's encounter for a starting wall assault by adopting the replicated
@@ -179,6 +198,115 @@ internal class SiegeEventInterface : ISiegeEventInterface
         Patches.SiegeAftermathPatches.PendingAftermaths.TryRemove(settlement, out _);
 
         SiegeAftermathAction.ApplyAftermath(party, settlement, (SiegeAftermathAction.SiegeAftermath)aftermathType, pending.PreviousOwnerClan, pending.Contributions);
+    }
+
+    public void RestoreReloadedPlayerInSettlement()
+    {
+        // The queued restore can land a frame before the map state is active; try again next frame.
+        if (!(GameStateManager.Current?.ActiveState is TaleWorlds.CampaignSystem.GameState.MapState))
+        {
+            GameThread.RunSafe(RestoreReloadedPlayerInSettlement);
+            return;
+        }
+
+        var settlement = MobileParty.MainParty?.CurrentSettlement;
+        if (settlement?.Party == null) return;
+
+        // The headless server's save carries no player encounter for this hero; without one the
+        // per-tick generic state menu resolves to the wrong screens (the besieger menu during a
+        // siege, the gates menu otherwise).
+        if (PlayerEncounter.Current == null)
+        {
+            using (new AllowedThread())
+            {
+                PlayerEncounter.Start();
+                PlayerEncounter.Current.Init(PartyBase.MainParty, settlement.Party, settlement);
+            }
+        }
+
+        var siegeEvent = settlement.SiegeEvent;
+        if (siegeEvent == null) return;
+
+        // An assault is already live: adopt the defender encounter like the live prompt does.
+        if (settlement.Party.MapEvent != null)
+        {
+            var assaultAttacker = siegeEvent.BesiegerCamp?.LeaderParty;
+            if (assaultAttacker != null) PromptSiegeDefense(assaultAttacker, settlement);
+            return;
+        }
+
+        if (siegeEvent.BesiegerCamp?.LeaderParty == null) return;
+
+        // A campaign tick may already have parked us on the besieger menu (there was no waiting
+        // encounter at that point); switch regardless — this is the vanilla inside-defender
+        // preparation menu.
+        using (new AllowedThread())
+        {
+            if (Campaign.Current.CurrentMenuContext == null)
+            {
+                GameMenu.ActivateGameMenu("encounter_interrupted_siege_preparations");
+            }
+            else
+            {
+                GameMenu.SwitchToMenu("encounter_interrupted_siege_preparations");
+            }
+        }
+    }
+
+    public void PromptSiegePreparation(MobileParty attackerParty, Settlement settlement)
+    {
+        // Vanilla switches an inside player via the wait-menu interrupt tick, which only runs while
+        // campaign time flows; a co-op client parked at the static town menu never re-evaluates its
+        // menu, so the replicated prompt drives the same switch.
+        if (MobileParty.MainParty?.CurrentSettlement != settlement) return;
+        if (settlement.SiegeEvent?.BesiegerCamp?.LeaderParty == null) return;
+
+        // A location scene (tavern etc.) owns the screen; vanilla never delivers this interrupt
+        // there because time freezes in scenes, so skip rather than fight the scene.
+        if (TaleWorlds.MountAndBlade.MissionState.Current != null)
+        {
+            Logger.Information("Skipped the siege preparation prompt at {Settlement}: a mission is running", settlement.StringId);
+            return;
+        }
+
+        // Vanilla's own wait-menu interrupt may already have switched us.
+        var currentMenu = Campaign.Current.CurrentMenuContext?.GameMenu?.StringId;
+        if (currentMenu == "encounter_interrupted_siege_preparations" || currentMenu == "menu_siege_strategies") return;
+
+        using (new AllowedThread())
+        {
+            if (currentMenu == null)
+            {
+                GameMenu.ActivateGameMenu("encounter_interrupted_siege_preparations");
+            }
+            else
+            {
+                GameMenu.SwitchToMenu("encounter_interrupted_siege_preparations");
+            }
+        }
+    }
+
+    public void PromptSiegeEnded(Settlement settlement, bool besiegerDefeated)
+    {
+        // Frees an inside player parked on the siege-preparation menus, whose leave option derefs
+        // the now-torn-down SiegeEvent; the vanilla end menus have no init logic, so they are safe
+        // after the replicated teardown.
+        if (MobileParty.MainParty?.CurrentSettlement != settlement) return;
+
+        var currentMenu = Campaign.Current.CurrentMenuContext?.GameMenu?.StringId;
+        if (currentMenu != "encounter_interrupted_siege_preparations" && currentMenu != "menu_siege_strategies") return;
+
+        using (new AllowedThread())
+        {
+            // The player joined the defense locally (PlayerSiege.StartPlayerSiege); clear its siege
+            // map state so the visuals and camera release with the menu.
+            if (PlayerSiege.PlayerSiegeEvent != null && PlayerSiege.BesiegedSettlement == settlement)
+            {
+                PlayerSiege.FinalizePlayerSiege();
+            }
+
+            GameMenu.SwitchToMenu(besiegerDefeated ? "siege_attacker_defeated" : "siege_attacker_left");
+        }
     }
 
     public void PromptSiegeDefense(MobileParty attackerParty, Settlement settlement)

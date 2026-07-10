@@ -1,4 +1,4 @@
-﻿using GameInterface.AutoSync;
+using GameInterface.AutoSync;
 
 namespace GameInterface.Services.SiegeEnginesConstructionProgress
 {
@@ -10,8 +10,9 @@ namespace GameInterface.Services.SiegeEnginesConstructionProgress
             // use the threshold sync in SiegeEngineProgressPatches, and Hitpoints/MaxHitPoints now replicate
             // there too (register-then-broadcast, applied on the game thread): the generic property sync dropped
             // values set before an engine had a network id (the constructor's initial hitpoints, and battle
-            // damage that raced the engine's late registration). RangedSiegeEngine is server-only bombardment
-            // state never read on clients, and the readonly SiegeEngine field rides on the deploy/reserve type id.
+            // damage that raced the engine's late registration). RangedSiegeEngine is read by the settlement's
+            // map visual every frame, so clients allocate it on completion (SiegeEngineProgressPatches) and on
+            // deploy (SiegeEnginesContainerHandler); the readonly SiegeEngine field rides on the deploy/reserve type id.
         }
     }
 }

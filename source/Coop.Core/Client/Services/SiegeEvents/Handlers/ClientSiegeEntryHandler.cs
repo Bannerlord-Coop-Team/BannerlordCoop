@@ -39,6 +39,8 @@ internal class ClientSiegeEntryHandler : IHandler
         messageBroker.Subscribe<NetworkJoinSiegeCampApproved>(HandleJoinApproved);
         messageBroker.Subscribe<NetworkBreakSiegeApproved>(HandleBreakApproved);
         messageBroker.Subscribe<NetworkPromptSiegeDefense>(HandleDefensePrompt);
+        messageBroker.Subscribe<NetworkPromptSiegePreparation>(HandlePreparationPrompt);
+        messageBroker.Subscribe<NetworkPromptSiegeEnded>(HandleSiegeEndedPrompt);
         messageBroker.Subscribe<AssaultSiegeAttempted>(HandleAssaultAttempt);
         messageBroker.Subscribe<NetworkPromptSiegeAssault>(HandleAssaultPrompt);
         messageBroker.Subscribe<NetworkSnapSiegeCampPartyPosition>(HandleCampPositionSnap);
@@ -56,6 +58,31 @@ internal class ClientSiegeEntryHandler : IHandler
             {
                 party.Position = obj.Position;
             }
+        });
+    }
+
+    private void HandlePreparationPrompt(MessagePayload<NetworkPromptSiegePreparation> payload)
+    {
+        var obj = payload.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.AttackerPartyId, out var attackerParty)) return;
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.SettlementId, out var settlement)) return;
+
+            siegeEventInterface.PromptSiegePreparation(attackerParty, settlement);
+        });
+    }
+
+    private void HandleSiegeEndedPrompt(MessagePayload<NetworkPromptSiegeEnded> payload)
+    {
+        var obj = payload.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.SettlementId, out var settlement)) return;
+
+            siegeEventInterface.PromptSiegeEnded(settlement, obj.BesiegerDefeated);
         });
     }
 
@@ -195,6 +222,8 @@ internal class ClientSiegeEntryHandler : IHandler
         messageBroker.Unsubscribe<NetworkJoinSiegeCampApproved>(HandleJoinApproved);
         messageBroker.Unsubscribe<NetworkBreakSiegeApproved>(HandleBreakApproved);
         messageBroker.Unsubscribe<NetworkPromptSiegeDefense>(HandleDefensePrompt);
+        messageBroker.Unsubscribe<NetworkPromptSiegePreparation>(HandlePreparationPrompt);
+        messageBroker.Unsubscribe<NetworkPromptSiegeEnded>(HandleSiegeEndedPrompt);
         messageBroker.Unsubscribe<AssaultSiegeAttempted>(HandleAssaultAttempt);
         messageBroker.Unsubscribe<NetworkPromptSiegeAssault>(HandleAssaultPrompt);
         messageBroker.Unsubscribe<NetworkSnapSiegeCampPartyPosition>(HandleCampPositionSnap);

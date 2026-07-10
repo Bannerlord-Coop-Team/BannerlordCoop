@@ -37,6 +37,16 @@ internal class BattleBlowInterceptPatch
 
         if (__instance == null) return true;
 
+        // A missile blow credited to a puppet (another client's agent) is the replicated cosmetic siege stone;
+        // its owner routes the real agent damage, so drop it here. Wall damage lands on a different path, so the
+        // peer's walls still break from their own replica shot.
+        if (blow.IsMissile)
+        {
+            var shooter = Mission.Current?.FindAgentWithIndex(blow.OwnerId);
+            if (shooter != null && shooter.Controller == AgentControllerType.None)
+                return false;
+        }
+
         bool isMount = !__instance.IsHuman;
         if (isMount)
         {
