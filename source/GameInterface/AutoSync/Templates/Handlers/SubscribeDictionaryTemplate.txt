@@ -1,0 +1,114 @@
+// Whole-dictionary replacement (member reassignment)
+Subscribe<{{MemberType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetLocalMessage>((instanceId, data) =>
+{
+    var keys = new List<{{KeyWireType}}>();
+    var values = new List<{{ValueWireType}}>();
+    foreach (var pair in data.Value)
+    {
+        {{~ if KeyByValue ~}}
+        var keyData = {{KeySerializeMethod}}(pair.Key);
+        {{~ else ~}}
+        if (pair.Key == null) continue;
+        if (!objectManager.TryGetId(pair.Key, out string keyData)) continue;
+        {{~ end ~}}
+        {{~ if ValueByValue ~}}
+        var valueData = {{ValueSerializeMethod}}(pair.Value);
+        {{~ else ~}}
+        if (pair.Value == null) continue;
+        if (!objectManager.TryGetId(pair.Value, out string valueData)) continue;
+        {{~ end ~}}
+        keys.Add(keyData);
+        values.Add(valueData);
+    }
+    {{~ if Debug ~}}
+    Logger.Debug("[Server] Broadcasting dictionary set {MemberName}", "{{MemberDeclaringType}}.{{MemberName}}");
+    {{~ end ~}}
+    network.SendAll(new {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage(instanceId, keys, values));
+});
+SubscribeNetwork<{{MemberType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage>((instance, data) =>
+{
+    var newValue = new {{MemberType}}();
+    // protobuf-net deserializes empty lists as null
+    var count = data.Keys == null ? 0 : data.Keys.Count;
+    for (int i = 0; i < count; i++)
+    {
+        {{~ if KeyByValue ~}}
+        var key = {{KeyDeserializeMethod}}(data.Keys[i]);
+        {{~ else ~}}
+        if (!objectManager.TryGetObject<{{KeyType}}>(data.Keys[i], out {{KeyType}} key)) continue;
+        {{~ end ~}}
+        {{~ if ValueByValue ~}}
+        var value = {{ValueDeserializeMethod}}(data.Values[i]);
+        {{~ else ~}}
+        if (!objectManager.TryGetObject<{{ValueType}}>(data.Values[i], out {{ValueType}} value)) continue;
+        {{~ end ~}}
+        newValue[key] = value;
+    }
+    {{~ if Debug ~}}
+    Logger.Debug("[Client] Applying dictionary set {MemberName}", "{{MemberDeclaringType}}.{{MemberName}}");
+    {{~ end ~}}
+    {{~ if ReadOnly ~}}
+    AccessTools.Field(typeof({{MemberDeclaringType}}), "{{MemberName}}").SetValue(instance, newValue);
+    {{~ else ~}}
+    instance.{{MemberName}} = newValue;
+    {{~ end ~}}
+});
+// Upsert: Add and indexer set both publish this message; the client applies via the indexer so a
+// redelivered add cannot throw on a duplicate key
+SubscribeTracked((MessagePayload<{{ MemberDeclaringTypeName}}_{{ MemberName }}_UpsertLocalMessage> payload) =>
+{
+    var data = payload.What;
+
+    if (!objectManager.TryGetIdWithLogging(data.Instance, out var instanceId)) return;
+
+    {{~ if KeyByValue ~}}
+    var keyData = {{KeySerializeMethod}}(data.Key);
+    {{~ else ~}}
+    if (!objectManager.TryGetIdWithLogging(data.Key, out string keyData)) return;
+    {{~ end ~}}
+    {{~ if ValueByValue ~}}
+    var valueData = {{ValueSerializeMethod}}(data.Value);
+    {{~ else ~}}
+    if (!objectManager.TryGetIdWithLogging(data.Value, out string valueData)) return;
+    {{~ end ~}}
+    {{~ if Debug ~}}
+    Logger.Debug("[Server] Broadcasting dictionary upsert {MemberName}", "{{MemberDeclaringType}}.{{MemberName}}");
+    {{~ end ~}}
+    network.SendAll(new {{ MemberDeclaringTypeName}}_{{ MemberName }}_UpsertNetworkMessage(instanceId, keyData, valueData));
+});
+SubscribeNetwork<{{ValueType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_UpsertNetworkMessage>((instance, data) =>
+{
+    {{~ if KeyByValue ~}}
+    var key = {{KeyDeserializeMethod}}(data.Key);
+    {{~ else ~}}
+    if (!objectManager.TryGetObject<{{KeyType}}>(data.Key, out {{KeyType}} key)) return;
+    {{~ end ~}}
+    {{~ if ValueByValue ~}}
+    var value = {{ValueDeserializeMethod}}(data.Value);
+    {{~ else ~}}
+    if (!objectManager.TryGetObject<{{ValueType}}>(data.Value, out {{ValueType}} value)) return;
+    {{~ end ~}}
+    instance.{{ MemberName }}[key] = value;
+});
+// Remove by key
+Subscribe<{{KeyType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_RemoveLocalMessage>((instanceId, data) =>
+{
+    {{~ if KeyByValue ~}}
+    var keyData = {{KeySerializeMethod}}(data.Value);
+    {{~ else ~}}
+    if (!objectManager.TryGetIdWithLogging(data.Value, out string keyData)) return;
+    {{~ end ~}}
+    {{~ if Debug ~}}
+    Logger.Debug("[Server] Broadcasting dictionary remove {MemberName}", "{{MemberDeclaringType}}.{{MemberName}}");
+    {{~ end ~}}
+    network.SendAll(new {{ MemberDeclaringTypeName}}_{{ MemberName }}_RemoveNetworkMessage(instanceId, keyData));
+});
+SubscribeNetwork<{{KeyType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_RemoveNetworkMessage>((instance, data) =>
+{
+    {{~ if KeyByValue ~}}
+    var key = {{KeyDeserializeMethod}}(data.Key);
+    {{~ else ~}}
+    if (!objectManager.TryGetObject<{{KeyType}}>(data.Key, out {{KeyType}} key)) return;
+    {{~ end ~}}
+    instance.{{ MemberName }}.Remove(key);
+});

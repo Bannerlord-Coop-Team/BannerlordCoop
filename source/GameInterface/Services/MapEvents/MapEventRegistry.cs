@@ -5,13 +5,18 @@ using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.MapEvents;
 
@@ -73,13 +78,17 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 
     public override void OnClientDestroyed(MapEvent obj, string id)
     {
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
-            // Captured before FinishBattle clears it. Also gates the reward-snapshot capture below; the PvP
-            // encounter close itself is driven server-side via NetworkClosePvpEncounter, not from this teardown.
-            bool localPartyWasInvolved = MobileParty.MainParty?.MapEvent == obj;
             // The action is deferred, so the campaign can be torn down (disconnect, save-load) before it runs.
-            if (Campaign.Current == null) return;
+            if (Campaign.Current == null)
+            {
+                return;
+            }
+
+            // Captured before FinishBattle clears it; used as a last-resort client close when the server close
+            // message fails to unwind the native encounter menu before the event disappears underneath it.
+            bool localPartyWasInvolved = IsLocalPartyInMapEvent(obj);
 
             using (new AllowedThread())
             {
@@ -129,13 +138,157 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
                 Campaign.Current.MapEventManager.Tick();
             }
 
-            Logger.Debug("[MapEvent] {Who}: OnClientDestroyed {Id}: involved={Involved} mainPartyMapEvent={Me} menu={Menu}",
-                Hero.MainHero?.Name?.ToString() ?? "?",
-                id,
-                localPartyWasInvolved,
-                MobileParty.MainParty?.MapEvent != null,
-                Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "<none>");
-        });
+            CloseDestroyedMapEventEncounterIfNeeded(id, localPartyWasInvolved);
+        }, context: nameof(OnClientDestroyed));
+    }
+
+    private bool IsLocalPartyInMapEvent(MapEvent mapEvent)
+    {
+        var mainParty = MobileParty.MainParty;
+        if (mainParty == null || mapEvent == null)
+            return false;
+
+        if (mainParty.MapEvent == mapEvent)
+            return true;
+
+        var encounter = PlayerEncounter.Current;
+        var battle = GetPlayerEncounterBattle();
+        var encounteredBattle = GetPlayerEncounterEncounteredBattle();
+        if (encounter?._mapEvent == mapEvent || battle == mapEvent || encounteredBattle == mapEvent)
+            return true;
+
+        var party = mainParty.Party;
+        foreach (var side in mapEvent._sides ?? new MapEventSide[0])
+        {
+            if (side?.Parties == null)
+                continue;
+
+            foreach (var mapEventParty in side.Parties)
+            {
+                if (mapEventParty?.Party == party)
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void CloseDestroyedMapEventEncounterIfNeeded(string mapEventId, bool localPartyWasInvolved)
+    {
+        if (!localPartyWasInvolved)
+        {
+            return;
+        }
+
+        if (MissionState.Current != null)
+        {
+            return;
+        }
+
+        if (PlayerCaptivity.IsCaptive)
+        {
+            return;
+        }
+
+        if (!HasEncounterMenuToClose())
+        {
+            return;
+        }
+
+        if (MobileParty.MainParty?.Party?.MapEventSide != null)
+            MobileParty.MainParty.Party._mapEventSide = null;
+
+        if (PlayerEncounter.Current != null)
+        {
+            PlayerEncounter.LeaveEncounter = true;
+            try
+            {
+                PlayerEncounter.Finish(true);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "[PvPEncounterClose] MapEvent destroy fallback PlayerEncounter.Finish failed; forcing PlayerEncounter null anyway. mapEventId={MapEventId}", mapEventId);
+            }
+            finally
+            {
+                Campaign.Current.PlayerEncounter = null;
+            }
+        }
+
+        ForceCloseCurrentEncounterMenu();
+    }
+
+    private static bool HasEncounterMenuToClose()
+    {
+        var mapState = Game.Current?.GameStateManager?.ActiveState as MapState;
+        return PlayerEncounter.Current != null ||
+               Campaign.Current?.CurrentMenuContext != null ||
+               mapState?.AtMenu == true;
+    }
+
+    private static MapEvent GetPlayerEncounterBattle()
+    {
+        try
+        {
+            return PlayerEncounter.Battle;
+        }
+        catch (NullReferenceException)
+        {
+            return null;
+        }
+    }
+
+    private static MapEvent GetPlayerEncounterEncounteredBattle()
+    {
+        try
+        {
+            return PlayerEncounter.EncounteredBattle;
+        }
+        catch (NullReferenceException)
+        {
+            return null;
+        }
+    }
+
+    private void ForceCloseCurrentEncounterMenu()
+    {
+        var campaign = Campaign.Current;
+        var mapState = Game.Current?.GameStateManager?.ActiveState as MapState;
+        var menuContext = campaign?.CurrentMenuContext;
+
+        try
+        {
+            GameMenu.ExitToLast();
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "[PvPEncounterClose] Failed to exit current menu during forced close");
+        }
+
+        try
+        {
+            menuContext?.Destroy();
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "[PvPEncounterClose] Failed to destroy current menu context during forced close");
+        }
+
+        ExitMapMenuMode(campaign, mapState);
+
+        if (campaign?.MapStateData != null)
+            campaign.MapStateData.GameMenuId = null;
+    }
+
+    private static void ExitMapMenuMode(Campaign campaign, MapState mapState)
+    {
+        if (mapState?.AtMenu == true)
+            mapState.ExitMenuMode();
+
+        if (mapState != null)
+            mapState.GameMenuId = null;
+        if (campaign?.MapStateData != null)
+            campaign.MapStateData.GameMenuId = null;
     }
 
     public override void OnServerCreated(MapEvent obj, string id)

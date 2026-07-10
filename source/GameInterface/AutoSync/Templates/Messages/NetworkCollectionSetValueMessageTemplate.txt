@@ -18,7 +18,7 @@ namespace AutoSync
         [ProtoMember(2)]
         public List<byte[]> Value { get; set; }
 
-        public {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage(string instanceId, List<(byte[]> value) : base(instanceId)
+        public {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage(string instanceId, List<byte[]> value) : base(instanceId)
         {
             Value = value;
         }

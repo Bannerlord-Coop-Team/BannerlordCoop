@@ -9,6 +9,7 @@ using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 
@@ -35,6 +36,9 @@ internal class GoldNotificationHandler : IHandler
 
         messageBroker.Subscribe<NotifyDailyGoldChange>(Handle_NotifyDailyGoldChange);
         messageBroker.Subscribe<NetworkNotifyDailyGoldChange>(Handle_NetworkNotifyDailyGoldChange);
+
+        messageBroker.Subscribe<NotifyGoldPlundered>(Handle_NotifyGoldPlundered);
+        messageBroker.Subscribe<NetworkNotifyGoldPlundered>(Handle_NetworkNotifyGoldPlundered);
     }
 
     public void Dispose()
@@ -44,6 +48,9 @@ internal class GoldNotificationHandler : IHandler
 
         messageBroker.Unsubscribe<NotifyDailyGoldChange>(Handle_NotifyDailyGoldChange);
         messageBroker.Unsubscribe<NetworkNotifyDailyGoldChange>(Handle_NetworkNotifyDailyGoldChange);
+
+        messageBroker.Unsubscribe<NotifyGoldPlundered>(Handle_NotifyGoldPlundered);
+        messageBroker.Unsubscribe<NetworkNotifyGoldPlundered>(Handle_NetworkNotifyGoldPlundered);
     }
 
     private void Handle_NotifyGoldChanged(MessagePayload<NotifyGoldChanged> obj)
@@ -132,6 +139,34 @@ internal class GoldNotificationHandler : IHandler
             textObject.SetTextVariable("GOLD_ICON", "{=!}<img src=\"General\\Icons\\Coin@2x\" extend=\"6\">");
             string soundEventPath = (goldChange > 0) ? "event:/ui/notification/coins_positive" : ((goldChange == 0) ? string.Empty : "event:/ui/notification/coins_negative");
             InformationManager.DisplayMessage(new InformationMessage(textObject.ToString(), soundEventPath));
+        });
+    }
+
+    private void Handle_NotifyGoldPlundered(MessagePayload<NotifyGoldPlundered> obj)
+    {
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(data.LeaderHero, out var leaderHeroId)) return;
+
+            network.SendAll(new NetworkNotifyGoldPlundered(leaderHeroId, data.PlunderedGold));
+        });
+    }
+
+    private void Handle_NetworkNotifyGoldPlundered(MessagePayload<NetworkNotifyGoldPlundered> obj)
+    {
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.LeaderHeroId, out var leaderHero)) return;
+
+            // Only notify client of plundered gold for their hero
+            if (leaderHero != Hero.MainHero) return;
+
+            MBTextManager.SetTextVariable("GOLD", data.PlunderedGold);
+            MBInformationManager.AddQuickInformation(GameTexts.FindText("str_plunder_gain_message", null), 0, null, null, "");
         });
     }
 }

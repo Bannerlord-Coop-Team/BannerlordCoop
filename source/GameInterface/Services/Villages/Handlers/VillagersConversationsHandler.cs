@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.ItemRosters.Interfaces;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Villages.Messages;
@@ -24,17 +25,20 @@ internal class VillagersConversationsHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface;
+    private readonly IItemRosterInterface itemRosterInterface;
 
     public VillagersConversationsHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface)
+        ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface,
+        IItemRosterInterface itemRosterInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.sessionInteractionsPlayerDataInterface = sessionInteractionsPlayerDataInterface;
+        this.itemRosterInterface = itemRosterInterface;
 
         messageBroker.Subscribe<SetPlayerVillagersInteraction>(Handle_SetPlayerVillagersInteraction);
         messageBroker.Subscribe<NetworkSetPlayerVillagersInteraction>(Handle_NetworkSetPlayerVillagersInteraction);
@@ -173,14 +177,7 @@ internal class VillagersConversationsHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var conversationParty)) return;
 
-            ItemRoster itemRoster = new();
-            if (obj.What.ItemRosterElements != null) // Empty array transferred as null object, guard against NRE if empty
-            {
-                foreach (var itemRosterElement in obj.What.ItemRosterElements)
-                {
-                    itemRoster.Add(itemRosterElement);
-                }
-            }
+            var itemRoster = itemRosterInterface.GetItemRosterFromData(obj.What.ItemRosterElements);
 
             if (itemRoster.Count > 0)
             {
@@ -218,14 +215,10 @@ internal class VillagersConversationsHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var conversationParty)) return;
 
-            ItemRoster itemRoster = new();
-            if (obj.What.ItemRosterData != null) // Empty array transferred as null object, guard against NRE if empty
-            {
-                foreach (var itemRosterElement in obj.What.ItemRosterData)
-                {
-                    itemRoster.Add(itemRosterElement);
-                }
-            }
+            // Guard against looting a villager party again that has already been looted recently
+            if (villagerBehavior._lootedVillagers.ContainsKey(conversationParty)) return;
+
+            var itemRoster = itemRosterInterface.GetItemRosterFromData(obj.What.ItemRosterData);
 
             GiveGoldAction.ApplyForPartyToCharacter(conversationParty.Party, mainHero, obj.What.Amount, false);
             if (!itemRoster.IsEmpty<ItemRosterElement>())
@@ -266,14 +259,10 @@ internal class VillagersConversationsHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var conversationParty)) return;
 
-            ItemRoster itemRoster = new();
-            if (obj.What.ItemRosterElements != null) // Empty array transferred as null object, guard against NRE if empty
-            {
-                foreach (var itemRosterElement in obj.What.ItemRosterElements)
-                {
-                    itemRoster.Add(itemRosterElement);
-                }
-            }
+            // Guard against looting a villager party again that has already been looted recently
+            if (villagerBehavior._lootedVillagers.ContainsKey(conversationParty)) return;
+
+            var itemRoster = itemRosterInterface.GetItemRosterFromData(obj.What.ItemRosterElements);
 
             if (itemRoster.Count > 0)
             {

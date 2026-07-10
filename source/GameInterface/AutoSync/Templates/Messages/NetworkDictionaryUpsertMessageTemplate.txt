@@ -1,0 +1,30 @@
+using Common.Messaging;
+using GameInterface.Utils.NetworkEvents;
+using ProtoBuf;
+using System.Collections.Generic;
+using System.Reflection;
+{{~ for library in Libraries ~}}
+using {{ library }};
+{{~ end ~}}
+
+namespace AutoSync
+{
+    [ProtoContract(SkipConstructor = true)]
+    public record {{ MemberDeclaringTypeName}}_{{ MemberName }}_UpsertNetworkMessage : GenericNetworkEvent<{{ MemberDeclaringType}}, {{ ValueType }}>
+    {
+        [ProtoMember(1)]
+        public override string InstanceId { get; set; }
+
+        [ProtoMember(2)]
+        public {{ KeyWireType }} Key { get; set; }
+
+        [ProtoMember(3)]
+        public {{ ValueWireType }} Value { get; set; }
+
+        public {{ MemberDeclaringTypeName}}_{{ MemberName }}_UpsertNetworkMessage(string instanceId, {{ KeyWireType }} key, {{ ValueWireType }} value) : base(instanceId)
+        {
+            Key = key;
+            Value = value;
+        }
+    }
+}

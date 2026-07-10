@@ -14,11 +14,6 @@ using TaleWorlds.CampaignSystem.Settlements;
 namespace GameInterface.Services.PartyComponents.Patches;
 
 [HarmonyPatch(typeof(VillagerPartyComponent))]
-internal class VillagerPartyComponentPatches
-{
-}
-
-[HarmonyPatch(typeof(VillagerPartyComponent))]
 public class VillagerPartyComponentTranspilers
 {
     private static readonly ILogger Logger = LogManager.GetLogger<VillagerPartyComponentTranspilers>();

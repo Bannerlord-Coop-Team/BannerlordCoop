@@ -18,11 +18,25 @@ internal readonly struct PlayerCaptivityEndedByServer : IEvent
     public readonly Hero PrisonerHero;
     public readonly EndCaptivityDetail Detail;
     public readonly Hero Facilitator;
+    public readonly CampaignVec2 ReleasePosition;
+    public readonly bool HasReleasePosition;
 
     public PlayerCaptivityEndedByServer(Hero prisonerHero, EndCaptivityDetail detail, Hero facilitator)
+        : this(prisonerHero, detail, facilitator, default, false)
+    {
+    }
+
+    public PlayerCaptivityEndedByServer(Hero prisonerHero, EndCaptivityDetail detail, Hero facilitator, CampaignVec2 releasePosition)
+        : this(prisonerHero, detail, facilitator, releasePosition, true)
+    {
+    }
+
+    private PlayerCaptivityEndedByServer(Hero prisonerHero, EndCaptivityDetail detail, Hero facilitator, CampaignVec2 releasePosition, bool hasReleasePosition)
     {
         PrisonerHero = prisonerHero;
         Detail = detail;
         Facilitator = facilitator;
+        ReleasePosition = releasePosition;
+        HasReleasePosition = hasReleasePosition;
     }
 }

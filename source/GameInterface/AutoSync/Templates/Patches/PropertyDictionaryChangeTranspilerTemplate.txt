@@ -1,0 +1,2 @@
+[HarmonyTranspiler]
+static IEnumerable<CodeInstruction> {{MemberName}}ChangeTranspiler(IEnumerable<CodeInstruction> instructions) => DictionaryPropertyChangeTranspiler<{{KeyType}}, {{ValueType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_UpsertLocalMessage, {{ MemberDeclaringTypeName}}_{{ MemberName }}_RemoveLocalMessage, Local_{{ MemberDeclaringTypeName}}_{{ MemberName }}_DictionaryClear>(instructions, "{{MemberName}}");

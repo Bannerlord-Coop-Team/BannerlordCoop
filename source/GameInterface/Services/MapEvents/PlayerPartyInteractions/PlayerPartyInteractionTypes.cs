@@ -8,7 +8,9 @@ public enum PlayerPartyInteractionPhase
     WaitingForProposal,
     WaitingForResponse,
     ProposalPending,
-    TradeActive
+    TradeActive,
+    HostileDemandConfirm,
+    HostileDemandPending
 }
 
 public enum PlayerPartyInteractionOption
@@ -20,7 +22,12 @@ public enum PlayerPartyInteractionOption
     Vassal,
     AcceptProposal,
     DeclineProposal,
-    Leave
+    Leave,
+    HostileDemand,
+    ConfirmHostileDemand,
+    CancelHostileDemand,
+    RefuseHostileDemand,
+    YieldHostileDemand
 }
 
 public enum PlayerPartyInteractionProposal
@@ -28,7 +35,8 @@ public enum PlayerPartyInteractionProposal
     None,
     Trade,
     JoinClan,
-    Vassal
+    Vassal,
+    HostileDemand
 }
 
 public enum PlayerPartyInteractionOutcomeType
@@ -42,7 +50,9 @@ public enum PlayerPartyInteractionOutcomeType
     VassalAccepted,
     VassalDeclined,
     Rejected,
-    Disconnected
+    Disconnected,
+    HostileDemandAccepted,
+    HostileDemandYielded
 }
 
 public enum PlayerPartyInteractionDeniedReason

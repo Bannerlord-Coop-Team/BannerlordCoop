@@ -14,7 +14,9 @@ internal sealed class PlayerPartyInteractionSession
     public string ResponderName { get; }
     public NetPeer InitiatorPeer { get; }
     public NetPeer ResponderPeer { get; set; }
+    public bool IsHostile { get; }
     public PlayerPartyInteractionProposal Proposal { get; set; }
+    public bool HostileDemandConfirmed { get; set; }
     public bool InitiatorAcceptedTrade { get; set; }
     public bool ResponderAcceptedTrade { get; set; }
     public ItemRosterElementData[] InitiatorOfferedItems { get; set; } = new ItemRosterElementData[0];
@@ -27,6 +29,8 @@ internal sealed class PlayerPartyInteractionSession
     public TroopRosterElementData[] ResponderOfferedPrisoners { get; set; } = new TroopRosterElementData[0];
     public TroopRosterElementData[] InitiatorOfferedTroops { get; set; } = new TroopRosterElementData[0];
     public TroopRosterElementData[] ResponderOfferedTroops { get; set; } = new TroopRosterElementData[0];
+    public bool InitiatorOfferedPeace { get; set; }
+    public bool ResponderOfferedPeace { get; set; }
 
     public HashSet<PlayerPartyInteractionOption> InitiatorOptions { get; } = new HashSet<PlayerPartyInteractionOption>();
     public HashSet<PlayerPartyInteractionOption> InitiatorEnabledOptions { get; } = new HashSet<PlayerPartyInteractionOption>();
@@ -37,7 +41,8 @@ internal sealed class PlayerPartyInteractionSession
         string responderPartyId,
         string initiatorName,
         string responderName,
-        NetPeer initiatorPeer)
+        NetPeer initiatorPeer,
+        bool isHostile = false)
     {
         SessionId = sessionId;
         InitiatorPartyId = initiatorPartyId;
@@ -45,6 +50,7 @@ internal sealed class PlayerPartyInteractionSession
         InitiatorName = initiatorName;
         ResponderName = responderName;
         InitiatorPeer = initiatorPeer;
+        IsHostile = isHostile;
     }
 
     public bool ContainsParty(string partyId)
@@ -65,7 +71,8 @@ internal sealed class PlayerPartyInteractionSession
         TroopRosterElementData[] offeredTroops,
         int offeredGold,
         string[] offeredFiefs,
-        TroopRosterElementData[] offeredPrisoners)
+        TroopRosterElementData[] offeredPrisoners,
+        bool offeredPeace)
     {
         if (partyId == InitiatorPartyId)
         {
@@ -74,6 +81,7 @@ internal sealed class PlayerPartyInteractionSession
             InitiatorOfferedGold = offeredGold;
             InitiatorOfferedFiefs = offeredFiefs ?? new string[0];
             InitiatorOfferedPrisoners = offeredPrisoners ?? new TroopRosterElementData[0];
+            InitiatorOfferedPeace = offeredPeace;
             return;
         }
 
@@ -84,6 +92,7 @@ internal sealed class PlayerPartyInteractionSession
             ResponderOfferedGold = offeredGold;
             ResponderOfferedFiefs = offeredFiefs ?? new string[0];
             ResponderOfferedPrisoners = offeredPrisoners ?? new TroopRosterElementData[0];
+            ResponderOfferedPeace = offeredPeace;
         }
     }
 }

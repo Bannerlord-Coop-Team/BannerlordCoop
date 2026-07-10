@@ -31,6 +31,8 @@ internal readonly struct PlayerPartyInteractionOutcome
     public readonly TroopRosterElementData[] ResponderOfferedPrisoners;
     public readonly TroopRosterElementData[] InitiatorOfferedTroops;
     public readonly TroopRosterElementData[] ResponderOfferedTroops;
+    public readonly bool InitiatorOfferedPeace;
+    public readonly bool ResponderOfferedPeace;
 
     public PlayerPartyInteractionOutcome(PlayerPartyInteractionSession session, PlayerPartyInteractionOutcomeType outcomeType)
     {
@@ -48,6 +50,8 @@ internal readonly struct PlayerPartyInteractionOutcome
         ResponderOfferedPrisoners = session.ResponderOfferedPrisoners ?? new TroopRosterElementData[0];
         InitiatorOfferedTroops = session.InitiatorOfferedTroops ?? new TroopRosterElementData[0];
         ResponderOfferedTroops = session.ResponderOfferedTroops ?? new TroopRosterElementData[0];
+        InitiatorOfferedPeace = session.InitiatorOfferedPeace;
+        ResponderOfferedPeace = session.ResponderOfferedPeace;
     }
 }
 
@@ -81,6 +85,8 @@ internal class PlayerPartyInteractionOutcomeHandler
             case PlayerPartyInteractionOutcomeType.Left:
             case PlayerPartyInteractionOutcomeType.Rejected:
             case PlayerPartyInteractionOutcomeType.Disconnected:
+            case PlayerPartyInteractionOutcomeType.HostileDemandAccepted:
+            case PlayerPartyInteractionOutcomeType.HostileDemandYielded:
                 // All the above lead to ending the interaction, however we may intend to have them lead to different
                 // logic in the future.
                 break;
@@ -180,6 +186,20 @@ internal class PlayerPartyInteractionOutcomeHandler
 
         ApplyOffer(initiatorParty, responderParty, initiatorOffer);
         ApplyOffer(responderParty, initiatorParty, responderOffer);
+
+        if (outcome.InitiatorOfferedPeace && outcome.ResponderOfferedPeace)
+            ApplyPeace(initiatorParty, responderParty);
+    }
+
+    private static void ApplyPeace(PartyBase initiatorParty, PartyBase responderParty)
+    {
+        if (!PlayerPartyPeaceBarterable.CanOfferPeace(initiatorParty, responderParty)) return;
+
+        var initiatorFaction = PlayerPartyPeaceBarterable.GetMapFaction(initiatorParty);
+        var responderFaction = PlayerPartyPeaceBarterable.GetMapFaction(responderParty);
+        if (initiatorFaction == null || responderFaction == null || initiatorFaction == responderFaction) return;
+
+        MakePeaceAction.Apply(initiatorFaction, responderFaction);
     }
 
     private AcceptedTradeOffer BuildAcceptedOffer(
