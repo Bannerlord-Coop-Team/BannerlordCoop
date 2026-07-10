@@ -10,6 +10,8 @@ using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MobileParties.Messages;
+using GameInterface.Services.PartyComponents.Messages;
 using GameInterface.Services.Stances.Messages;
 using GameInterface.Services.Villages.Interfaces;
 using GameInterface.Services.TroopRosters.Data;
@@ -1142,6 +1144,10 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         AssertPartyManCount(Server, responderMobilePartyId, 0);
         AssertHostileEncounterTornDown(Server, initiatorPartyId);
         AssertCapturedPlayerPartyParked(Server, responderPartyId);
+        var leaderChanged = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkChangePartyLeader>());
+        Assert.Equal(responderMobilePartyId, leaderChanged.MobilePartyId);
+        Assert.Null(leaderChanged.LeaderHeroId);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPartyComponentLeaderChanged>());
         foreach (var syncedClient in Clients)
         {
             Assert.Contains(syncedClient.InternalMessages.GetMessages<DeclareWarChanged>(), message =>
@@ -1323,10 +1329,13 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
             Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(partyId, out var party));
 
+            // Match the live capture path: vanilla removes the captured leader before PrisonerTaken
+            // reaches the coop parking handler.
             using (new AllowedThread())
             {
                 party.MobileParty.MemberRoster.AddToCounts(hero.CharacterObject, 1);
                 hero.PartyBelongedTo = party.MobileParty;
+                party.MobileParty.ChangePartyLeader(hero);
             }
         });
     }
