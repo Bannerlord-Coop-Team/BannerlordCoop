@@ -14,6 +14,7 @@ using static GameInterface.Services.ObjectManager.ObjectManager;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Handlers;
@@ -30,8 +31,9 @@ namespace GameInterface.Services.MobileParties.Handlers;
 internal class MobilePartyBehaviorHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyBehaviorHandler>();
+    private const float OwnerPositionResyncThreshold = 1f;
 
-    private readonly Dictionary<string, PartyBehaviorUpdateData> latestPredictions = new Dictionary<string, PartyBehaviorUpdateData>();
+    private readonly Dictionary<string, long> latestIssuedSequences = new Dictionary<string, long>();
     private readonly IMessageBroker messageBroker;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IMobilePartyInterface mobilePartyInterface;
@@ -96,7 +98,11 @@ internal class MobilePartyBehaviorHandler : IHandler
         if (ModInformation.IsClient)
         {
             data.OriginControllerId = controllerId;
-            latestPredictions[partyId] = data;
+            long sequence = latestIssuedSequences.TryGetValue(partyId, out var latestSequence)
+                ? checked(latestSequence + 1)
+                : 1;
+            data.OriginRequestSequence = sequence;
+            latestIssuedSequences[partyId] = sequence;
         }
 
         messageBroker.Publish(this, new ControlledPartyBehaviorUpdated(data));
@@ -118,13 +124,15 @@ internal class MobilePartyBehaviorHandler : IHandler
                     !string.IsNullOrEmpty(data.OriginControllerId) &&
                     string.Equals(data.OriginControllerId, controllerIdProvider.ControllerId, StringComparison.Ordinal);
 
-                bool isPredictionAcknowledgement = false;
-                if (isSelfEcho && latestPredictions.TryGetValue(data.MobilePartyId, out var latestPrediction))
+                bool isLatestPredictionAcknowledgement = false;
+                if (isSelfEcho)
                 {
-                    if (!MatchesPrediction(data, latestPrediction))
+                    var partyId = Compact(data.MobilePartyId, typeof(MobileParty));
+                    if (!latestIssuedSequences.TryGetValue(partyId, out var latestSequence) ||
+                        !IsLatestPredictionAcknowledgement(data.OriginRequestSequence, latestSequence))
                         return;
 
-                    isPredictionAcknowledgement = true;
+                    isLatestPredictionAcknowledgement = true;
                 }
 
                 PartyBase partyBase = null;
@@ -150,8 +158,8 @@ internal class MobilePartyBehaviorHandler : IHandler
 
                     if (ModInformation.IsClient)
                     {
-                        // A matching prediction echo restores behavior without rewinding movement.
-                        if (!isPredictionAcknowledgement)
+                        // Keep normal prediction lead, but reconcile real drift from the latest acknowledgement.
+                        if (ShouldApplyOwnerPosition(isLatestPredictionAcknowledgement, party.Position, data.PartyPosition))
                             party.Position = data.PartyPosition;
                     }
                     else
@@ -168,13 +176,18 @@ internal class MobilePartyBehaviorHandler : IHandler
         });
     }
 
-    internal static bool MatchesPrediction(PartyBehaviorUpdateData update, PartyBehaviorUpdateData prediction)
+    internal static bool IsLatestPredictionAcknowledgement(long acknowledgementSequence, long latestIssuedSequence)
     {
-        return update.NewAiBehavior == prediction.NewAiBehavior &&
-            update.HasTarget == prediction.HasTarget &&
-            string.Equals(update.InteractablePointId, prediction.InteractablePointId, StringComparison.Ordinal) &&
-            update.BestTargetPoint.IsOnLand == prediction.BestTargetPoint.IsOnLand &&
-            update.BestTargetPoint.X.Equals(prediction.BestTargetPoint.X) &&
-            update.BestTargetPoint.Y.Equals(prediction.BestTargetPoint.Y);
+        return acknowledgementSequence > 0 && acknowledgementSequence == latestIssuedSequence;
+    }
+
+    internal static bool ShouldApplyOwnerPosition(
+        bool isLatestPredictionAcknowledgement,
+        CampaignVec2 ownerPosition,
+        CampaignVec2 serverPosition)
+    {
+        return !isLatestPredictionAcknowledgement ||
+            ownerPosition.IsOnLand != serverPosition.IsOnLand ||
+            ownerPosition.Distance(serverPosition) > OwnerPositionResyncThreshold;
     }
 }

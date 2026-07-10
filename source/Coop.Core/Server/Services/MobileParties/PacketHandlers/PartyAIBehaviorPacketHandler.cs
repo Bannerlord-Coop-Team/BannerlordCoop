@@ -73,6 +73,9 @@ internal class RequestMobilePartyBehaviorPacketHandler : IPacketHandler
 
         public PartyBehaviorCoalescedPayload(PartyBehaviorUpdateData data)
         {
+            if (string.IsNullOrEmpty(data.OriginControllerId))
+                data.OriginRequestSequence = 0;
+
             this.data = data;
         }
 
@@ -88,7 +91,10 @@ internal class RequestMobilePartyBehaviorPacketHandler : IPacketHandler
 
             var latestData = latest.data;
             if (string.IsNullOrEmpty(data.OriginControllerId))
+            {
                 latestData.OriginControllerId = null;
+                latestData.OriginRequestSequence = 0;
+            }
 
             return new PartyBehaviorCoalescedPayload(latestData);
         }

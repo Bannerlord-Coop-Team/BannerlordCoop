@@ -37,6 +37,7 @@ public class PartyBehaviorTest
         var data = new PartyBehaviorUpdateData("Test_Party", default, default, default, default, default, default, default, default)
         {
             OriginControllerId = originControllerId,
+            OriginRequestSequence = 7,
         };
         var message = new ControlledPartyBehaviorUpdated(data);
 
@@ -49,10 +50,12 @@ public class PartyBehaviorTest
         // Assert
         var update = Assert.Single(server.InternalMessages.GetMessages<UpdatePartyBehavior>());
         Assert.Equal(originControllerId, update.BehaviorUpdateData.OriginControllerId);
+        Assert.Equal(7, update.BehaviorUpdateData.OriginRequestSequence);
 
         var packet = Assert.Single(client1.Resolve<MockClient>().NetworkSentPackets.GetPackets<RequestMobilePartyBehaviorPacket>());
         Assert.Equal(DeliveryMethod.ReliableOrdered, packet.DeliveryMethod);
         Assert.Equal(originControllerId, packet.BehaviorUpdateData.OriginControllerId);
+        Assert.Equal(7, packet.BehaviorUpdateData.OriginRequestSequence);
 
         // Only publishes on the server
         foreach (var client in TestEnvironment.Clients)
@@ -99,10 +102,12 @@ public class PartyBehaviorTest
         var first = new PartyBehaviorUpdateData("Test_Party", AiBehavior.EngageParty, "Test_Target", default, true, default, default, default, default)
         {
             OriginControllerId = originControllerId,
+            OriginRequestSequence = 1,
         };
         var latest = new PartyBehaviorUpdateData("Test_Party", AiBehavior.GoToPoint, null, default, false, default, default, default, default)
         {
             OriginControllerId = originControllerId,
+            OriginRequestSequence = 2,
         };
 
         var server = TestEnvironment.Server;
@@ -120,15 +125,18 @@ public class PartyBehaviorTest
         var sent = Assert.Single(server.NetworkSentMessages.GetMessages<NetworkUpdatePartyBehavior>());
         Assert.Equal(AiBehavior.GoToPoint, sent.BehaviorUpdateData.NewAiBehavior);
         Assert.Equal(originControllerId, sent.BehaviorUpdateData.OriginControllerId);
+        Assert.Equal(2, sent.BehaviorUpdateData.OriginRequestSequence);
 
         var serialized = server.EnsureSerializable(sent);
         Assert.Equal(originControllerId, serialized.BehaviorUpdateData.OriginControllerId);
+        Assert.Equal(2, serialized.BehaviorUpdateData.OriginRequestSequence);
 
         foreach (var client in TestEnvironment.Clients)
         {
             var update = Assert.Single(client.InternalMessages.GetMessages<UpdatePartyBehavior>());
             Assert.Equal(AiBehavior.GoToPoint, update.BehaviorUpdateData.NewAiBehavior);
             Assert.Equal(originControllerId, update.BehaviorUpdateData.OriginControllerId);
+            Assert.Equal(2, update.BehaviorUpdateData.OriginRequestSequence);
         }
     }
 
@@ -142,15 +150,18 @@ public class PartyBehaviorTest
         const string originControllerId = "Controller_1";
         const string compactPartyId = "Test_Party";
         const string fullPartyId = "MobileParty_Test_Party";
+        var firstPosition = new CampaignVec2(new Vec2(4f, 2f), true);
         var gatePosition = new CampaignVec2(new Vec2(42f, 24f), true);
-        var first = new PartyBehaviorUpdateData(compactPartyId, AiBehavior.EngageParty, null, gatePosition, false, gatePosition, default, gatePosition, default)
+        var first = new PartyBehaviorUpdateData(compactPartyId, AiBehavior.EngageParty, null, gatePosition, false, firstPosition, default, gatePosition, default)
         {
             OriginControllerId = originControllerId,
+            OriginRequestSequence = 1,
         };
         var authoritative = new PartyBehaviorUpdateData(fullPartyId, AiBehavior.None, null, gatePosition, false, gatePosition, default, gatePosition, default);
         var latest = new PartyBehaviorUpdateData(compactPartyId, AiBehavior.GoToPoint, null, gatePosition, false, gatePosition, default, gatePosition, default)
         {
             OriginControllerId = originControllerId,
+            OriginRequestSequence = 3,
         };
 
         var server = TestEnvironment.Server;
@@ -165,10 +176,12 @@ public class PartyBehaviorTest
         var sent = Assert.Single(server.NetworkSentMessages.GetMessages<NetworkUpdatePartyBehavior>());
         Assert.Equal(AiBehavior.GoToPoint, sent.BehaviorUpdateData.NewAiBehavior);
         Assert.Null(sent.BehaviorUpdateData.OriginControllerId);
+        Assert.Equal(0, sent.BehaviorUpdateData.OriginRequestSequence);
         AssertPosition(gatePosition, sent.BehaviorUpdateData.PartyPosition);
 
         var serialized = server.EnsureSerializable(sent);
         Assert.Null(serialized.BehaviorUpdateData.OriginControllerId);
+        Assert.Equal(0, serialized.BehaviorUpdateData.OriginRequestSequence);
         AssertPosition(gatePosition, serialized.BehaviorUpdateData.PartyPosition);
 
         foreach (var client in TestEnvironment.Clients)
@@ -176,30 +189,60 @@ public class PartyBehaviorTest
             var update = Assert.Single(client.InternalMessages.GetMessages<UpdatePartyBehavior>());
             Assert.Equal(AiBehavior.GoToPoint, update.BehaviorUpdateData.NewAiBehavior);
             Assert.Null(update.BehaviorUpdateData.OriginControllerId);
+            Assert.Equal(0, update.BehaviorUpdateData.OriginRequestSequence);
             AssertPosition(gatePosition, update.BehaviorUpdateData.PartyPosition);
         }
     }
 
-    [Fact]
-    public void MatchesPrediction_DistinguishesMapTargets()
+    [Theory]
+    [InlineData(1, 3, false)]
+    [InlineData(2, 3, false)]
+    [InlineData(3, 3, true)]
+    [InlineData(4, 3, false)]
+    [InlineData(0, 0, false)]
+    public void IsLatestPredictionAcknowledgement_RequiresExactPositiveSequence(
+        long acknowledgementSequence,
+        long latestIssuedSequence,
+        bool expected)
     {
-        var predictedPoint = new CampaignVec2(new Vec2(42f, 24f), true);
-        var stalePoint = new CampaignVec2(new Vec2(12f, 8f), true);
-        var prediction = new PartyBehaviorUpdateData("Test_Party", AiBehavior.GoToPoint, null, predictedPoint, false, default, default, default, default);
-        var matchingEcho = new PartyBehaviorUpdateData("Test_Party", AiBehavior.GoToPoint, null, predictedPoint, false, default, default, default, default);
-        var staleEcho = new PartyBehaviorUpdateData("Test_Party", AiBehavior.GoToPoint, null, stalePoint, false, default, default, default, default);
-
-        Assert.True(MobilePartyBehaviorHandler.MatchesPrediction(matchingEcho, prediction));
-        Assert.False(MobilePartyBehaviorHandler.MatchesPrediction(staleEcho, prediction));
+        Assert.Equal(
+            expected,
+            MobilePartyBehaviorHandler.IsLatestPredictionAcknowledgement(acknowledgementSequence, latestIssuedSequence));
     }
 
     [Fact]
-    public void MatchesPrediction_TreatsInvalidTargetsAsEquivalent()
+    public void ShouldApplyOwnerPosition_LatestAcknowledgementKeepsSmallPredictionLead()
     {
-        var prediction = new PartyBehaviorUpdateData("Test_Party", AiBehavior.None, null, CampaignVec2.Invalid, false, default, default, default, default);
-        var echo = new PartyBehaviorUpdateData("Test_Party", AiBehavior.None, null, CampaignVec2.Invalid, false, default, default, default, default);
+        var ownerPosition = new CampaignVec2(new Vec2(42f, 24f), true);
+        var serverPosition = new CampaignVec2(new Vec2(41.75f, 24f), true);
 
-        Assert.True(MobilePartyBehaviorHandler.MatchesPrediction(echo, prediction));
+        Assert.False(MobilePartyBehaviorHandler.ShouldApplyOwnerPosition(true, ownerPosition, serverPosition));
+    }
+
+    [Fact]
+    public void ShouldApplyOwnerPosition_LatestAcknowledgementCorrectsLargeDrift()
+    {
+        var ownerPosition = new CampaignVec2(new Vec2(42f, 24f), true);
+        var serverPosition = new CampaignVec2(new Vec2(40f, 24f), true);
+
+        Assert.True(MobilePartyBehaviorHandler.ShouldApplyOwnerPosition(true, ownerPosition, serverPosition));
+    }
+
+    [Fact]
+    public void ShouldApplyOwnerPosition_LatestAcknowledgementCorrectsNavigationLayer()
+    {
+        var ownerPosition = new CampaignVec2(new Vec2(42f, 24f), true);
+        var serverPosition = new CampaignVec2(new Vec2(42f, 24f), false);
+
+        Assert.True(MobilePartyBehaviorHandler.ShouldApplyOwnerPosition(true, ownerPosition, serverPosition));
+    }
+
+    [Fact]
+    public void ShouldApplyOwnerPosition_AuthoritativeUpdateAlwaysApplies()
+    {
+        var position = new CampaignVec2(new Vec2(42f, 24f), true);
+
+        Assert.True(MobilePartyBehaviorHandler.ShouldApplyOwnerPosition(false, position, position));
     }
 
     private static void AssertPosition(CampaignVec2 expected, CampaignVec2 actual)

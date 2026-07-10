@@ -43,6 +43,9 @@ public struct PartyBehaviorUpdateData
     [ProtoMember(12)]
     public string OriginControllerId { get; set; }
 
+    [ProtoMember(13)]
+    public long OriginRequestSequence { get; set; }
+
     public PartyBehaviorUpdateData(
         string mobilePartyId,
         AiBehavior newAiBehavior,
@@ -64,5 +67,6 @@ public struct PartyBehaviorUpdateData
         TargetPosition = targetPosition;
         DesiredAiNavigationType = desiredAiNavigationType;
         OriginControllerId = null;
+        OriginRequestSequence = 0;
     }
 }
