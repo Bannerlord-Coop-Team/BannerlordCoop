@@ -40,6 +40,9 @@ internal class OtherNotificationsHandler : IHandler
         messageBroker.Subscribe<NotifyAnimalsBred>(Handle_NotifyAnimalsBred);
         messageBroker.Subscribe<NetworkNotifyAnimalsBred>(Handle_NetworkNotifyAnimalsBred);
 
+        messageBroker.Subscribe<NotifyFoundItemOnMap>(Handle_NotifyFoundItemOnMap);
+        messageBroker.Subscribe<NetworkNotifyFoundItemOnMap>(Handle_NetworkNotifyFoundItemOnMap);
+
         messageBroker.Subscribe<NetworkNotifyRemovedSupporter>(Handle_NetworkNotifyRemovedSupporter);
     }
 
@@ -53,6 +56,9 @@ internal class OtherNotificationsHandler : IHandler
 
         messageBroker.Unsubscribe<NotifyAnimalsBred>(Handle_NotifyAnimalsBred);
         messageBroker.Unsubscribe<NetworkNotifyAnimalsBred>(Handle_NetworkNotifyAnimalsBred);
+
+        messageBroker.Unsubscribe<NotifyFoundItemOnMap>(Handle_NotifyFoundItemOnMap);
+        messageBroker.Unsubscribe<NetworkNotifyFoundItemOnMap>(Handle_NetworkNotifyFoundItemOnMap);
 
         messageBroker.Unsubscribe<NetworkNotifyRemovedSupporter>(Handle_NetworkNotifyRemovedSupporter);
     }
@@ -123,6 +129,31 @@ internal class OtherNotificationsHandler : IHandler
             TextObject textObject = new TextObject("{=vl9bawa7}{COUNT} {?(COUNT > 1)}{PLURAL(ANIMAL_NAME)} are{?}{ANIMAL_NAME} is{\\?} added to your party.", null);
             textObject.SetTextVariable("COUNT", obj.What.NumberBred);
             textObject.SetTextVariable("ANIMAL_NAME", obj.What.BredAnimal.EquipmentElement.Item.Name);
+            InformationManager.DisplayMessage(new InformationMessage(textObject.ToString()));
+        });
+    }
+
+    private void Handle_NotifyFoundItemOnMap(MessagePayload<NotifyFoundItemOnMap> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
+
+            network.SendAll(new NetworkNotifyFoundItemOnMap(mobilePartyId, obj.What.Count, obj.What.ItemName));
+        });
+    }
+
+    private void Handle_NetworkNotifyFoundItemOnMap(MessagePayload<NetworkNotifyFoundItemOnMap> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
+
+            if (mobileParty != MobileParty.MainParty) return;
+
+            TextObject textObject = new TextObject("{=vl9bawa7}{COUNT} {?(COUNT > 1)}{PLURAL(ANIMAL_NAME)} are{?}{ANIMAL_NAME} is{\\?} added to your party.", null);
+            textObject.SetTextVariable("COUNT", obj.What.Count);
+            textObject.SetTextVariable("ANIMAL_NAME", obj.What.ItemName);
             InformationManager.DisplayMessage(new InformationMessage(textObject.ToString()));
         });
     }
