@@ -1,6 +1,7 @@
 ﻿using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
@@ -90,6 +91,8 @@ namespace E2E.Tests.Services.Heroes
         [Fact]
         public void Server_Hero_Fields()
         {
+            var assertHelper = TestEnvironment.CreateAssertHelper<Hero>(HeroId);
+
             // Hero._health is initialized to 100 in the constructor
             TestEnvironment.AssertField<Hero, int>(nameof(Hero._health), 5, defaultValue: 100);
             // Hero.Culture is initialized by HeroCreator.CreateSpecialHero(); clear it first so the pre-check passes
@@ -97,6 +100,11 @@ namespace E2E.Tests.Services.Heroes
             HarmonyLib.AccessTools.Field(typeof(Hero), nameof(Hero.Culture)).SetValue(hero, null);
             TestEnvironment.AssertReferenceField<Hero, CultureObject>(nameof(Hero.Culture));
             TestEnvironment.AssertField<Hero, float>(nameof(Hero._power), 4.4f, defaultValue: hero._power);
+
+            assertHelper.AssertPropertyOwnerField<Hero, TraitObject>(nameof(Hero._heroTraits));
+            assertHelper.AssertPropertyOwnerField<Hero, PerkObject>(nameof(Hero._heroPerks));
+            assertHelper.AssertPropertyOwnerField<Hero, SkillObject>(nameof(Hero._heroSkills));
+            assertHelper.AssertPropertyOwnerField<Hero, CharacterAttribute>(nameof(Hero._characterAttributes));
         }
     }
 }

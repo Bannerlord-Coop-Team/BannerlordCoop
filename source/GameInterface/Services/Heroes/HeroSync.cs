@@ -73,6 +73,10 @@ namespace GameInterface.Services.Heroes
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._health)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero.Culture)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._power)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._heroTraits)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._heroPerks)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._heroSkills)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._characterAttributes)));
         }
     }
 }
