@@ -67,8 +67,9 @@ internal class TradeHandler : IHandler
         // Don't update warehouse rosters directly if managing a warehouse, server uses CoopSession.WorkshopPlayerData
         // Not all left rosters need to be managed by server so no need to check result of resolving it
         // e.g. Discarding items in default inventory screen only needs to save the right roster
+        // Don't need to log the check here, from roster can not resolve legimately
         string fromRosterId = null;
-        if (!isManagingWarehouse) objectManager.TryGetIdWithLogging(what.FromRoster, out fromRosterId);
+        if (!isManagingWarehouse) objectManager.TryGetId(what.FromRoster, out fromRosterId);
 
         if (!objectManager.TryGetIdWithLogging(what.ToRoster, out var toRosterId)) return;
         if (!objectManager.TryGetIdWithLogging(what.Hero, out var heroId)) return;
@@ -76,8 +77,8 @@ internal class TradeHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(what.TroopRoster, out var troopRosterId)) return;
         if (!objectManager.TryGetIdWithLogging(what.InitialCharacterEquipment.HeroObject, out var initialHeroId)) return;
 
-        string currentMobilePartyId = null;
-        if (what.CurrentMobileParty is not null && !objectManager.TryGetIdWithLogging(what.CurrentMobileParty, out currentMobilePartyId)) return;
+        // CurrentMobileParty can be already destroyed when this logic runs. Attempt to get an id without logging
+        objectManager.TryGetId(what.CurrentMobileParty, out var currentMobilePartyId);
 
         string currentSettlementComponentId = null;
         if (what.CurrentSettlementComponent is not null && 

@@ -1,28 +1,32 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.ObjectManager;
 using Missions.Messages;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
+using TaleWorlds.MountAndBlade;
 
 namespace Missions.Battles;
 
 /// <summary>
 /// Owner-side death reporting for a coop battle: when one of OUR authoritative agents dies
-/// (<see cref="BattleAgentDied"/>, published by <c>BattleAgentDiedPatch</c>), tell every client to kill its
+/// (<see cref="BattleAgentDied"/>, captured from the mission death callback), tell every client to kill its
 /// puppet of it and tell the server to account the casualty against the map-event party roster, then drop the
 /// agent from the registry so the movement handler stops broadcasting it. A puppet death (from an applied
 /// broadcast) is ignored — its authority is the owner, not us — so there is no echo. Registered MOUNTS flow
-/// through here too (BattleAgentDiedPatch fires for any agent): they broadcast like troops so the horse dies
+/// through here too (the mission callback fires for any agent): they broadcast like troops so the horse dies
 /// on every client, but carry no casualty attribution, so no server roster report is sent for them.
 /// </summary>
 public interface IAgentDeathReporter : IDisposable
 {
+    void OnAgentRemoved(Agent affectedAgent, Agent affectorAgent, AgentState agentState, KillingBlow killingBlow);
 }
 
 /// <inheritdoc cref="IAgentDeathReporter"/>
@@ -63,6 +67,25 @@ public class AgentDeathReporter : IAgentDeathReporter
         messageBroker.Unsubscribe<BattleAgentDied>(Handle_BattleAgentDied);
     }
 
+    public void OnAgentRemoved(Agent affectedAgent, Agent affectorAgent, AgentState agentState, KillingBlow killingBlow)
+    {
+        if (!BattleSpawnConfig.Enabled) return;
+        if (!BattleSpawnGate.IsCoopBattleActive) return;
+        if (BattleSpawnGate.IsReplicatedDeath(affectedAgent)) return;
+        if (agentState != AgentState.Killed && agentState != AgentState.Unconscious) return;
+
+        var deathAction = killingBlow.IsValid ? killingBlow.DeathAction : -1;
+
+        messageBroker.Publish(affectedAgent,
+            new BattleAgentDied(
+                affectedAgent,
+                affectorAgent,
+                agentState == AgentState.Unconscious,
+                killingBlow.InflictedDamage,
+                killingBlow.VictimBodyPart,
+                deathAction));
+    }
+
     private void Handle_BattleAgentDied(MessagePayload<BattleAgentDied> payload)
     {
         var registry = coopMissionComponent.AgentRegistry;
@@ -80,6 +103,13 @@ public class AgentDeathReporter : IAgentDeathReporter
                 return;
             }
 
+            Guid affectorAgentId = Guid.Empty;
+            if (payload.What.AffectorAgent != null
+                && registry.TryGetAgentInfo(payload.What.AffectorAgent, out var affectorInfo))
+            {
+                affectorAgentId = affectorInfo.AgentId;
+            }
+
             var attribution = casualties.GetOrDefault(info.AgentId);
 
             // Only wound player heros
@@ -92,10 +122,16 @@ public class AgentDeathReporter : IAgentDeathReporter
             }
 
             Logger.Information("[DeathDiag] Broadcasting death of agent {AgentId} (wounded={Wounded}) to the battle mesh", info.AgentId, wounded);
-            network.SendAll(new NetworkBattleAgentDied(info.AgentId, wounded));
+            network.SendAll(new NetworkBattleAgentDied(
+                info.AgentId,
+                wounded,
+                affectorAgentId,
+                payload.What.InflictedDamage,
+                payload.What.VictimBodyPart,
+                payload.What.DeathAction));
 
             // Owner-authoritative casualty: tell the server to account this troop's death/wound against its
-            // map-event party roster. The host's own mission accounting is suppressed during a coop battle
+            // map-event party roster. The server-side mission accounting is suppressed during a coop battle
             // (MapEventPartyPatches), so this is the single source. On a client, SendAll targets the server.
             if (attribution.MapEventPartyId != null)
                 relayNetwork.SendAll(new NetworkRequestBattleCasualty(attribution.MapEventPartyId, attribution.TroopCharacterId, wounded));

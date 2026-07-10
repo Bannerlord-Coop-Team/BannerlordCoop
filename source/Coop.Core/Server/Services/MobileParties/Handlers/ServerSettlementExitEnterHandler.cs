@@ -7,6 +7,7 @@ using Coop.Core.Server.Services.MobileParties.Messages;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
+using static GameInterface.Services.ObjectManager.ObjectManager;
 using GameInterface.Services.Settlements.Interfaces;
 using LiteNetLib;
 using Serilog;
@@ -64,7 +65,9 @@ public class ServerSettlementExitEnterHandler : IHandler
 
         // Tell the other clients to apply the entry synchronously here, so the broadcast does not depend
         // on the game-loop pump (the server's own apply below is marshalled onto the game thread).
-        network.SendAllBut(peer, new NetworkPartyEnterSettlement(payload.SettlementId, payload.PartyId));
+        network.SendAllBut(peer, new NetworkPartyEnterSettlement(
+            Compact(payload.SettlementId, typeof(Settlement)),
+            Compact(payload.PartyId, typeof(MobileParty))));
 
         GameThread.RunSafe(() =>
         {
@@ -91,7 +94,8 @@ public class ServerSettlementExitEnterHandler : IHandler
         // slightly differently from ai or other clients parties
         network.Send(peer, new NetworkEndSettlementEncounter());
 
-        network.SendAllBut(peer, new NetworkPartyLeaveSettlement(payload.PartyId));
+        network.SendAllBut(peer, new NetworkPartyLeaveSettlement(
+            Compact(payload.PartyId, typeof(MobileParty))));
 
         GameThread.RunSafe(() =>
         {
@@ -107,6 +111,9 @@ public class ServerSettlementExitEnterHandler : IHandler
 
         if (!objectManager.TryGetIdWithLogging(payload.Settlement, out var settlementId)) return;
         if (!objectManager.TryGetIdWithLogging(payload.MobileParty, out var mobilePartyId)) return;
+
+        settlementId = Compact(settlementId, typeof(Settlement));
+        mobilePartyId = Compact(mobilePartyId, typeof(MobileParty));
 
         network.SendAll(new NetworkPartyEnterSettlement(settlementId, mobilePartyId));
 
@@ -124,7 +131,8 @@ public class ServerSettlementExitEnterHandler : IHandler
             return;
         }
 
-        network.SendAll(new NetworkPartyLeaveSettlement(mobilePartyId));
+        network.SendAll(new NetworkPartyLeaveSettlement(
+            Compact(mobilePartyId, typeof(MobileParty))));
 
         settlementInterface.OnPartyLeftSettlement(payload.MobileParty);
     }
