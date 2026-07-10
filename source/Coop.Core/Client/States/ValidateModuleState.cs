@@ -5,8 +5,8 @@ using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Messages;
-using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.Modules;
+using GameInterface.Services.UI.Interfaces;
 
 namespace Coop.Core.Client.States;
 
@@ -19,7 +19,7 @@ public class ValidateModuleState : ClientStateBase
     private readonly INetwork network;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly ICoopFinalizer coopFinalizer;
-    private readonly IGameStateInterface gameStateInterface;
+    private readonly ILoadingInterface loadingInterface;
 
     public ValidateModuleState(
         IClientLogic logic,
@@ -27,14 +27,14 @@ public class ValidateModuleState : ClientStateBase
         INetwork network,
         IControllerIdProvider controllerIdProvider,
         ICoopFinalizer coopFinalizer,
-        IGameStateInterface gameStateInterface,
+        ILoadingInterface loadingInterface,
         IModuleInfoProvider moduleInfoProvider) : base(logic)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.controllerIdProvider = controllerIdProvider;
         this.coopFinalizer = coopFinalizer;
-        this.gameStateInterface = gameStateInterface;
+        this.loadingInterface = loadingInterface;
         messageBroker.Subscribe<NetworkModuleVersionsValidated>(Handle_NetworkModuleVersionsValidated);
         messageBroker.Subscribe<NetworkClientValidated>(Handle_NetworkClientValidated);
         messageBroker.Subscribe<CharacterCreationStarted>(Handle_CharacterCreationStarted);
@@ -101,6 +101,8 @@ public class ValidateModuleState : ClientStateBase
 
     public override void Disconnect()
     {
+        loadingInterface.HideLoadingScreen();
+
         // Finalize tears down coop (EndCoopMode -> DestroyContainer), which disposes the container the
         // state machine resolves from — so do NOT SetState afterwards (it would resolve from a disposed
         // container and throw). This matches the teardown in the other states (e.g. CampaignState).
