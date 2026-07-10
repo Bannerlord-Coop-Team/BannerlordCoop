@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyComponents.Data;
 using GameInterface.Services.PartyComponents.Messages;
@@ -242,6 +243,14 @@ internal class PartyComponentHandler : IHandler
     {
         var obj = payload.What;
 
+        var mobileParty = obj.Instance.MobileParty;
+        // Player-party components may be unregistered; the mobile-party message also refreshes their visuals.
+        if (mobileParty != null && mobileParty.IsPlayerParty())
+        {
+            messageBroker.Publish(this, new PartyLeaderChanged(mobileParty, obj.NewLeader));
+            return;
+        }
+
         if (!objectManager.TryGetIdWithLogging(obj.Instance, out var partyComponentId)) return;
 
         // NewLeader can be null (when a party is disbanded)
@@ -265,28 +274,11 @@ internal class PartyComponentHandler : IHandler
                 Hero newLeader = null;
                 if (obj.NewLeaderId != null && !objectManager.TryGetObjectWithLogging<Hero>(obj.NewLeaderId, out newLeader)) return;
 
-                var mobileParty = partyComponent.MobileParty;
-                var isPlayerParty = mobileParty != null && mobileParty.IsPlayerParty();
-
                 using (new AllowedThread())
                 {
-                    if (isPlayerParty)
-                    {
-                        // Player parties need the full vanilla path for leaderless hold and event dispatch.
-                        partyComponent.ChangePartyLeader(newLeader);
-                    }
-                    else
-                    {
-                        partyComponent.OnChangePartyLeader(newLeader);
-                    }
+                    partyComponent.OnChangePartyLeader(newLeader);
+                    partyComponent.Party?.SetVisualAsDirty();
                 }
-
-                var party = partyComponent.Party;
-                if (party == null) return;
-
-                if (isPlayerParty && Campaign.Current != null && MobileParty.MainParty != null && !mobileParty.IsCurrentlyAtSea)
-                    party.UpdateVisibilityAndInspected(mobileParty.Position, 0f);
-                party.SetVisualAsDirty();
             }
             catch (Exception e)
             {
