@@ -76,6 +76,21 @@ internal class PlayerStartCaptivityPatches
         if (__instance.RetreatingSide != BattleSideEnum.None)
             return true;
 
+        CaptureDefeatedPlayerHeroes(winnerParties, defeatedParties);
+
+        return true;
+    }
+
+    /// <summary>
+    /// Takes every defeated player hero prisoner, resolving the hero from the player registry. Must run
+    /// BEFORE the AI capture loop — the native one (via <see cref="Prefix_CaptureDefeatedPartyMembers"/>) or
+    /// the coop reimplementation (<c>MapEventResultsInterface.CaptureDefeatedPartyMembers</c>), which skips
+    /// player heroes and relies on this having already run — because <see cref="TakePrisonerAction.Apply"/>
+    /// clears the player party's roster on the server (PlayerCaptivityServerHandler), so the loop can no
+    /// longer re-process or scatter the captured hero's men.
+    /// </summary>
+    internal static void CaptureDefeatedPlayerHeroes(MBReadOnlyList<MapEventParty> winnerParties, MBReadOnlyList<MapEventParty> defeatedParties)
+    {
         foreach (var party in defeatedParties)
         {
             var defeatedParty = party.Party?.MobileParty;
@@ -92,8 +107,8 @@ internal class PlayerStartCaptivityPatches
                 continue;
             }
 
-            // OnBattleWon commits the results twice on the server (the coop OnBattleWon prefix, then native
-            // OnBattleWon for a non-player map event), so this prefix can run twice for the same battle. Skip
+            // The capture can be reached more than once for the same battle (e.g. a surrender applies the
+            // victory immediately and the client's battle-state relay then re-applies the same state). Skip
             // a hero already taken prisoner on the first pass to avoid a duplicate capture.
             if (playerHero.IsPrisoner)
                 continue;
@@ -110,8 +125,6 @@ internal class PlayerStartCaptivityPatches
             }
             TakePrisonerAction.Apply(captorParty, playerHero);
         }
-
-        return true;
     }
 
     private static bool TryResolveCaptorParty(MBReadOnlyList<MapEventParty> winnerParties, out PartyBase captorParty)
@@ -127,6 +140,21 @@ internal class PlayerStartCaptivityPatches
 
             if (captor == null || party.ContributionToBattle > captor.ContributionToBattle)
                 captor = party;
+        }
+
+        // No winner has men left (e.g. a raid repelled by a village whose settlement party holds no
+        // troops). Native's chance-based capture has no man-count requirement, so fall back to the
+        // highest-contribution winner rather than leaving the defeated player uncaptured.
+        if (captor == null)
+        {
+            foreach (var party in winnerParties)
+            {
+                if (party?.Party == null)
+                    continue;
+
+                if (captor == null || party.ContributionToBattle > captor.ContributionToBattle)
+                    captor = party;
+            }
         }
 
         if (captor == null)

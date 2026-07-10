@@ -1,10 +1,11 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.ObjectManager;
 using Missions.Messages;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 
@@ -49,6 +50,14 @@ internal class BattleCasualtyHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MapEventParty>(msg.MapEventPartyId, out var mapEventParty))
                 return;
 
+            var mapEvent = mapEventParty.Party?.MapEventSide?.MapEvent;
+            if (mapEvent == null || mapEvent.IsFinalized)
+            {
+                Logger.Information("[BattleSync] Casualty for {Char} in party {Party} dropped: map event is no longer active",
+                    msg.TroopCharacterId, msg.MapEventPartyId);
+                return;
+            }
+
             // The casualty is addressed by the troop character's coop object id (never a raw StringId);
             // resolve the character through the object manager.
             if (!objectManager.TryGetObjectWithLogging<CharacterObject>(msg.TroopCharacterId, out var troop))
@@ -71,12 +80,30 @@ internal class BattleCasualtyHandler : IHandler
 
                     if (msg.Wounded)
                     {
-                        mapEventParty.OnTroopWounded(element.Descriptor);
+                        try
+                        {
+                            mapEventParty.OnTroopWounded(element.Descriptor);
+                        }
+                        catch (IndexOutOfRangeException e)
+                        {
+                            Logger.Warning(e, "[BattleSync] Casualty for {Char} in party {Party} dropped: roster no longer has the troop",
+                                msg.TroopCharacterId, msg.MapEventPartyId);
+                            return;
+                        }
                         messageBroker.Publish(this, new OnTroopWoundedAttempted(mapEventParty, element.Descriptor.UniqueSeed));
                     }
                     else
                     {
-                        mapEventParty.OnTroopKilled(element.Descriptor);
+                        try
+                        {
+                            mapEventParty.OnTroopKilled(element.Descriptor);
+                        }
+                        catch (IndexOutOfRangeException e)
+                        {
+                            Logger.Warning(e, "[BattleSync] Casualty for {Char} in party {Party} dropped: roster no longer has the troop",
+                                msg.TroopCharacterId, msg.MapEventPartyId);
+                            return;
+                        }
                         messageBroker.Publish(this, new OnTroopKilledAttempted(mapEventParty, element.Descriptor.UniqueSeed));
                     }
                     return;

@@ -60,26 +60,7 @@ namespace GameInterface.Services.Heroes.Handlers
                 {
                     CharacterRelationManager.SetHeroRelation(hero1, hero2, payload.Value);
                 }
-
-                NotifyLocalPlayer(hero1, hero2, delta, payload.Value);
             }, context: $"apply hero relation {payload.Hero1Id}<->{payload.Hero2Id}");
-        }
-
-        // Show the relation-change quick info on the client whose own hero is involved (the sync applies
-        // the value silently via SetHeroRelation, so vanilla's OnHeroRelationChanged popup never fires).
-        private static void NotifyLocalPlayer(Hero hero1, Hero hero2, int delta, int newValue)
-        {
-            if (delta == 0) return;
-
-            var mainHero = Hero.MainHero;
-            if (mainHero == null || (hero1 != mainHero && hero2 != mainHero)) return;
-
-            var other = hero1 == mainHero ? hero2 : hero1;
-            var text = new TextObject("{=coop_relation_changed}Relation with {HERO}: {AMOUNT} (now {TOTAL})");
-            text.SetTextVariable("HERO", other.Name);
-            text.SetTextVariable("AMOUNT", (delta > 0 ? "+" : "") + delta);
-            text.SetTextVariable("TOTAL", newValue);
-            MBInformationManager.AddQuickInformation(text, 0, other.CharacterObject, null, "event:/ui/notification/relation");
         }
     }
 }

@@ -4,6 +4,7 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
+using static GameInterface.Services.ObjectManager.ObjectManager;
 using HarmonyLib;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -69,6 +70,7 @@ internal class VolunteerTypesHandler : IHandler
         foreach (KeyValuePair<Hero, CharacterObject[]> keyValuePair in obj.What.UpdatedVolunteerTypes)
         {
             if (!objectManager.TryGetIdWithLogging(keyValuePair.Key, out var currentHeroId)) continue;
+            currentHeroId = Compact(currentHeroId, typeof(Hero));
 
             CharacterObject[] volunteerTypes = keyValuePair.Value;
             string[] volunteerTypeIds = new string[volunteerTypes.Length];
@@ -77,7 +79,7 @@ internal class VolunteerTypesHandler : IHandler
                 CharacterObject character = volunteerTypes[i];
                 if (character != null && objectManager.TryGetIdWithLogging(character, out var currentCharacterId))
                 {
-                    volunteerTypeIds[i] = currentCharacterId;
+                    volunteerTypeIds[i] = Compact(currentCharacterId, typeof(CharacterObject));
                 }
                 else
                 {

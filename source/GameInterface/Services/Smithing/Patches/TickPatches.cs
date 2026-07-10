@@ -4,6 +4,7 @@ using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Smithing.Messages;
 using HarmonyLib;
+using SandBox.Objects.Usables;
 using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -12,6 +13,7 @@ using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.Smithing.Patches
 {
@@ -94,5 +96,12 @@ namespace GameInterface.Services.Smithing.Patches
             // Run on server
             return true;
         }
+    }
+
+    [HarmonyPatch(typeof(SmithingMachine), nameof(SmithingMachine.OnTick))]
+    internal static class SmithingMachinePatches
+    {
+        [HarmonyPrefix]
+        private static bool Prefix() => Mission.Current?.MissionEnded != true;
     }
 }
