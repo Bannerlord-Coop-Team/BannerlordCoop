@@ -1,17 +1,17 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using Autofac;
 using Common.Messaging;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
-using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -23,11 +23,15 @@ using Xunit.Abstractions;
 namespace E2E.Tests.Services.MapEvents;
 
 /// <summary>
-/// The "back up to the encounter" end of a coop battle: two allied players win a shared battle and their
-/// <c>PlayerEncounter</c>s must finalize and stay in sync with the server. Each client controls its own
-/// <see cref="MobileParty.MainParty"/>, so per-client encounter paths run for real (see
-/// <see cref="MapEventTestBase.EnableHeadlessEncounterFinish"/>); only <c>GameMenu.ExitToLast</c> (no menu
-/// context exists headless) is mocked.
+/// The "back up to the encounter" end of a coop battle. The close instruction never force-finishes a player's
+/// <c>PlayerEncounter</c>: on a concluded battle each winner's encounter is detached and staged for the
+/// battle-results pass, which the <c>PlayerEncounter.Update</c> path drives (loot states and the finish) in the
+/// live game — force-finishing would skip the map event results screens. An encounter with no results to show
+/// (the battle was left rather than concluded) is instead finished by the client's map-event-destroy fallback
+/// (<c>MapEventRegistry.CloseDestroyedMapEventEncounterIfNeeded</c>) once the shared event is gone from under
+/// its menu. Each client controls its own <see cref="MobileParty.MainParty"/>, so per-client encounter paths
+/// run for real (see <see cref="MapEventTestBase.EnableHeadlessEncounterFinish"/>); only
+/// <c>GameMenu.ExitToLast</c> (no menu context exists headless) is mocked where noted.
 /// </summary>
 public class CoopBattleFinalizeTests : MapEventTestBase
 {
@@ -35,8 +39,13 @@ public class CoopBattleFinalizeTests : MapEventTestBase
 
     /// <summary>
     /// The explicit post-victory leave: the winning side leader finalizes, the server tears down the shared
-    /// <see cref="MapEvent"/> and tells both players to close, and each client's <c>PlayerEncounter.Finish</c>
-    /// runs headless. This is the wired path and passes.
+    /// <see cref="MapEvent"/> and tells both players to close. The close instruction itself only detaches each
+    /// player's MainParty from the battle — it never touches the local <c>PlayerEncounter</c>, whose unwind is
+    /// owned by the <c>PlayerEncounter.Update</c> path so pending battle-result states can still run (see
+    /// <c>PvPInteractionClientHandler.CloseEncounter</c> and <c>PlayerEncounterPatches.UpdatePrefix</c>). A
+    /// leave like this stages no results, so each player's encounter — left open at a menu whose battle no
+    /// longer exists — is finished by the client's map-event-destroy fallback
+    /// (<c>MapEventRegistry.CloseDestroyedMapEventEncounterIfNeeded</c>).
     /// </summary>
     [Fact]
     public void BothPlayersLeave_FinalizesSharedEncounter_AndEachPlayerLeavesTheBattle()
@@ -54,7 +63,7 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         Clients.Last().Resolve<IMessageBroker>().Subscribe<NetworkClosePvpEncounter>(p => closeOnClient2 = p.What.PartyIds);
 
         // The winning side leader leaves the victory screen -> the coop finalize round-trip. PlayerEncounter.Finish
-        // runs for real; only the finalize handler's unconditional GameMenu.ExitToLast is mocked.
+        // runs for real; only GameMenu.ExitToLast (no menu context exists headless) is mocked.
         var disabled = MapEventDisabledMethods
             .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)))
             .ToList();
@@ -80,9 +89,14 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         Assert.Contains(player2PartyBaseId, closeOnClient2);
 
         // Each player's client recognized its OWN MainParty in the close instruction and ran the close path,
-        // detaching it from the finalized battle and clearing the encounter (Finish ran headless).
+        // detaching it from the finalized battle.
         AssertMainPartyLeftBattle(Clients.First());
         AssertMainPartyLeftBattle(Clients.Last());
+
+        // Neither player has battle results staged (the battle was left, not concluded), so the map-event-destroy
+        // fallback finished both players' now-menuless encounters when the shared event was torn down. A concluded
+        // battle instead keeps each winner's encounter open for the battle-results pass — see
+        // BattleConcludesWithVictory_StagesEachWinnersEncounterForBattleResults.
         AssertHasPlayerEncounter(Clients.First(), expected: false);
         AssertHasPlayerEncounter(Clients.Last(), expected: false);
     }
@@ -90,7 +104,14 @@ public class CoopBattleFinalizeTests : MapEventTestBase
     [Fact]
     public void BothPlayersLeave_PvpBattleExitsEncounterMenuForBothPlayers()
     {
-        var (ctx, _, player1PartyBaseId, player2PartyBaseId) = SetupTwoAlliedPlayersInBattle();
+        var (ctx, _, _, _) = SetupTwoAlliedPlayersInBattle();
+
+        // Each player sits in a local post-battle encounter at an encounter menu. The close instruction never
+        // exits menus itself; it is the map-event-destroy fallback on each client
+        // (MapEventRegistry.CloseDestroyedMapEventEncounterIfNeeded) that unwinds the menu left over a battle
+        // that no longer exists — once per player, in that player's own scope.
+        SetMockPlayerEncounter(Clients.First());
+        SetMockPlayerEncounter(Clients.Last());
 
         using var exitToLast = new GameMenuExitToLastCounter();
 
@@ -102,14 +123,18 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         }, MapEventDisabledMethods);
 
         Assert.Equal(2, exitToLast.Count);
-        Assert.Contains(player1PartyBaseId, exitToLast.PartyIds);
-        Assert.Contains(player2PartyBaseId, exitToLast.PartyIds);
+        Assert.Equal(1, exitToLast.CountFor(Clients.First()));
+        Assert.Equal(1, exitToLast.CountFor(Clients.Last()));
     }
 
     [Fact]
     public void RecipientSurrenders_PvpBattleClosesInitiatorEncounterMenu_AndKeepsRecipientCaptive()
     {
         var setup = SetupTwoOpposingPlayersInBattle();
+
+        // Both players sit in a local encounter at the battle's encounter menu when the surrender resolves.
+        SetMockPlayerEncounter(Clients.First());
+        SetMockPlayerEncounter(Clients.Last());
 
         string[] closeOnClient1 = null, closeOnClient2 = null;
         Clients.First().Resolve<IMessageBroker>().Subscribe<NetworkClosePvpEncounter>(p => closeOnClient1 = p.What.PartyIds);
@@ -140,15 +165,24 @@ public class CoopBattleFinalizeTests : MapEventTestBase
             AssertCaptivity(client, setup.recipientHeroId, setup.initiatorPartyId);
 
         AssertMainPartyLeftBattle(Clients.First());
+
+        // Each player's now-dead encounter menu is exited exactly once, by the map-event-destroy fallback in
+        // that player's own scope. (In the live game the surrendered recipient is locally captive by teardown
+        // time and the fallback defers to the captivity UI; the harness's test hero is not the local main hero,
+        // so its exit runs here too.)
         Assert.Equal(2, exitToLast.Count);
-        Assert.Equal(1, exitToLast.CountFor(setup.initiatorPartyBaseId));
-        Assert.Equal(1, exitToLast.CountFor(setup.recipientPartyBaseId));
-        Assert.Contains(setup.initiatorPartyBaseId, exitToLast.PartyIds);
-        Assert.Contains(setup.recipientPartyBaseId, exitToLast.PartyIds);
+        Assert.Equal(1, exitToLast.CountFor(Clients.First()));
+        Assert.Equal(1, exitToLast.CountFor(Clients.Last()));
     }
 
+    /// <summary>
+    /// The host playing as the aggressor is a player like any other: when the recipient surrenders, the close
+    /// instruction must reach the host's own (server) instance and detach its party from the battle. No menu
+    /// exit is forced on the host — the map-event-destroy fallback is a client-side path, and the host's
+    /// encounter unwind is driven by its own local <c>PlayerEncounter.Update</c> flow.
+    /// </summary>
     [Fact]
-    public void RecipientSurrenders_PvpBattleClosesHostAggressorEncounterMenu()
+    public void RecipientSurrenders_PvpBattleClosesHostAggressorEncounter()
     {
         var setup = SetupTwoOpposingPlayersInBattle();
         SetMainPartyInBattle(Server, setup.ctx.AttackerPartyId);
@@ -156,8 +190,6 @@ public class CoopBattleFinalizeTests : MapEventTestBase
 
         string[] closeOnServer = null;
         Server.Resolve<IMessageBroker>().Subscribe<NetworkClosePvpEncounter>(p => closeOnServer = p.What.PartyIds);
-
-        using var exitToLast = new GameMenuExitToLastCounter();
 
         var recipientClient = Clients.Last();
         recipientClient.Call(() =>
@@ -170,11 +202,16 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         Assert.Contains(setup.initiatorPartyBaseId, closeOnServer);
         Assert.Contains(setup.recipientPartyBaseId, closeOnServer);
         AssertMainPartyLeftBattle(Server);
-        Assert.Contains(setup.initiatorPartyBaseId, exitToLast.PartyIds);
     }
 
+    /// <summary>
+    /// The host playing as the aggressor leaves the battle: the finalize runs directly on the server, and the
+    /// close instruction is also published locally so the host's own party detaches through the same path as
+    /// any client's. No menu exit is forced on the host (see
+    /// <see cref="RecipientSurrenders_PvpBattleClosesHostAggressorEncounter"/>).
+    /// </summary>
     [Fact]
-    public void HostAggressorLeave_PvpBattleClosesHostEncounterMenu()
+    public void HostAggressorLeave_PvpBattleClosesHostEncounter()
     {
         var setup = SetupTwoOpposingPlayersInBattle();
         SetMainPartyInBattle(Server, setup.ctx.AttackerPartyId);
@@ -182,8 +219,6 @@ public class CoopBattleFinalizeTests : MapEventTestBase
 
         string[] closeOnServer = null;
         Server.Resolve<IMessageBroker>().Subscribe<NetworkClosePvpEncounter>(p => closeOnServer = p.What.PartyIds);
-
-        using var exitToLast = new GameMenuExitToLastCounter();
 
         Server.Call(() =>
         {
@@ -196,7 +231,6 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         Assert.Contains(setup.recipientPartyBaseId, closeOnServer);
         AssertMapEventRemoved(Server, setup.ctx.MapEventId);
         AssertMainPartyLeftBattle(Server);
-        Assert.Contains(setup.initiatorPartyBaseId, exitToLast.PartyIds);
     }
 
     [Fact]
@@ -213,19 +247,22 @@ public class CoopBattleFinalizeTests : MapEventTestBase
             spectatorClient.Resolve<IMessageBroker>().Publish(this, new NetworkOpenBattleSimulation(setup.ctx.MapEventId));
         }, MapEventDisabledMethods);
 
-        Assert.Equal(1, exitToLast.CountFor(setup.recipientPartyBaseId));
+        Assert.Equal(1, exitToLast.CountFor(spectatorClient));
         AssertHasPlayerEncounter(spectatorClient, expected: true);
     }
 
     /// <summary>
-    /// The coop auto-finalize on conclusion: a concluded battle finalizes the encounter with no explicit leave.
-    /// Both allied players win — a client commits the victory <see cref="BattleState"/>, the server applies it
-    /// (OnBattleWon) and, recognizing the conclusion (<c>MapEventConcluded</c>), finalizes the shared
-    /// <see cref="MapEvent"/> and tells every involved player to close; each client's <c>PlayerEncounter.Finish</c>
-    /// then runs headless. The test triggers NO leave / <c>MapEventFinalizeAttempted</c> / <c>Finish</c> itself.
+    /// The coop auto-finalize on conclusion: both allied players win — a client commits the victory
+    /// <see cref="BattleState"/>, the server applies it (OnBattleWon), broadcasts the authoritative battle
+    /// results (<c>NetworkCommitMapEventResults</c>) and, recognizing the conclusion (<c>MapEventConcluded</c>),
+    /// finalizes the shared <see cref="MapEvent"/> with no explicit leave. Each involved winner's
+    /// <c>PlayerEncounter</c> is NOT force-finished: it is staged to <see cref="PlayerEncounterState.CaptureHeroes"/>,
+    /// from which the <c>PlayerEncounter.Update</c> path (<c>PlayerEncounterInterface</c>) runs the loot states
+    /// and finishes the encounter in the live game. The test triggers NO leave /
+    /// <c>MapEventFinalizeAttempted</c> / <c>Finish</c> itself.
     /// </summary>
     [Fact]
-    public void BattleConcludesWithVictory_PlayerEncounterFinalizesWithoutExplicitLeave()
+    public void BattleConcludesWithVictory_StagesEachWinnersEncounterForBattleResults()
     {
         var (ctx, _, _, _) = SetupTwoAlliedPlayersInBattle();
 
@@ -250,6 +287,12 @@ public class CoopBattleFinalizeTests : MapEventTestBase
             // map scene (the no-winner leave test skips this) — the headless boundary for a concluded finalize.
             .Append(AccessTools.Method(typeof(MapEvent), "MovePartyToSuitablePositionOnMapEventFinalize"))
             .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)))
+            // On a conclusion the winners' clients are still inside their battle mission when the server tears
+            // the shared event down, so the map-event-destroy fallback (which finishes an encounter left at a
+            // dead menu) defers to the mission flow (MissionState.Current != null) and the staged encounter
+            // survives to drive the results screens. Headless there is no mission, so silence the fallback to
+            // model that — the staged encounter must NOT be finished, or the results screens would be skipped.
+            .Append(AccessTools.Method(typeof(MapEventRegistry), "CloseDestroyedMapEventEncounterIfNeeded"))
             .ToList();
 
         var client1 = Clients.First();
@@ -259,12 +302,16 @@ public class CoopBattleFinalizeTests : MapEventTestBase
             mapEvent.BattleState = BattleState.AttackerVictory;
         }, disabled);
 
-        // The conclusion alone finalized the shared battle and each player's encounter — no explicit leave.
+        // The conclusion alone finalized the shared battle — no explicit leave.
         AssertMapEventRemoved(Server, ctx.MapEventId);
         foreach (var client in Clients)
             AssertMapEventRemoved(client, ctx.MapEventId);
-        AssertHasPlayerEncounter(Clients.First(), expected: false);
-        AssertHasPlayerEncounter(Clients.Last(), expected: false);
+
+        // Both winners' encounters survive the close and are staged for the battle-results pass. The commit
+        // message carries the winning side from the server, so the ally that never saw the BattleState locally
+        // (client SendAll only reaches the server) stages exactly like the committing client.
+        AssertPlayerEncounterState(Clients.First(), PlayerEncounterState.CaptureHeroes);
+        AssertPlayerEncounterState(Clients.Last(), PlayerEncounterState.CaptureHeroes);
     }
 
     [Fact]
@@ -470,6 +517,17 @@ public class CoopBattleFinalizeTests : MapEventTestBase
             Assert.Null(MobileParty.MainParty.Party.MapEventSide));
     }
 
+    /// <summary>Asserts the client still has a <c>PlayerEncounter.Current</c> and that it was staged to the
+    /// given result state by the server's battle-result commit.</summary>
+    private static void AssertPlayerEncounterState(EnvironmentInstance client, PlayerEncounterState expected)
+    {
+        client.Call(() =>
+        {
+            Assert.NotNull(PlayerEncounter.Current);
+            Assert.Equal(expected, PlayerEncounter.Current.EncounterState);
+        });
+    }
+
     private static void AssertMapEventRemoved(EnvironmentInstance instance, string mapEventId)
     {
         instance.Call(() =>
@@ -477,6 +535,13 @@ public class CoopBattleFinalizeTests : MapEventTestBase
                 $"MapEvent {mapEventId} should be finalized/removed on {instance.GetType().Name}"));
     }
 
+    /// <summary>
+    /// Counts <see cref="GameMenu.ExitToLast"/> calls and attributes each to the instance whose container was
+    /// active at call time. Attribution is deliberately container-based, not party-based: a handler that sends
+    /// a message to another instance mid-flight leaves that instance's game statics behind
+    /// (EnvironmentInstance.StaticScope restores the container but not the game statics), so ambient state
+    /// like <see cref="MobileParty.MainParty"/> is unreliable inside the prefix while the container is not.
+    /// </summary>
     private sealed class GameMenuExitToLastCounter : IDisposable
     {
         private readonly Harmony harmony = new("coop-battle-finalize-exit-to-last-counter");
@@ -484,16 +549,17 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         public GameMenuExitToLastCounter()
         {
             exitToLastCount = 0;
-            exitToLastPartyIds.Clear();
+            exitToLastContainers.Clear();
             harmony.Patch(
                 ExitToLastMethod,
                 prefix: new HarmonyMethod(typeof(CoopBattleFinalizeTests), nameof(CountGameMenuExitToLast)));
         }
 
         public int Count => exitToLastCount;
-        public IReadOnlyList<string> PartyIds => exitToLastPartyIds;
 
-        public int CountFor(string partyId) => exitToLastPartyIds.Count(id => id == partyId);
+        /// <summary>How many exits ran in the scope of <paramref name="instance"/>.</summary>
+        public int CountFor(EnvironmentInstance instance) =>
+            exitToLastContainers.Count(container => ReferenceEquals(container, instance.Container));
 
         public void Dispose()
         {
@@ -503,15 +569,14 @@ public class CoopBattleFinalizeTests : MapEventTestBase
 
     private static readonly MethodInfo ExitToLastMethod = AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast));
     private static int exitToLastCount;
-    private static readonly List<string> exitToLastPartyIds = new();
+    private static readonly List<object> exitToLastContainers = new();
 
     private static bool CountGameMenuExitToLast()
     {
         exitToLastCount++;
-        if (GameInterface.ContainerProvider.TryGetContainer(out var container) &&
-            container.Resolve<IObjectManager>().TryGetId(MobileParty.MainParty?.Party, out var partyId))
+        if (GameInterface.ContainerProvider.TryGetContainer(out var container))
         {
-            exitToLastPartyIds.Add(partyId);
+            exitToLastContainers.Add(container);
         }
 
         return false;

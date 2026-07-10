@@ -12,9 +12,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
@@ -144,18 +147,33 @@ internal class MapEventPatches
     [HarmonyPrefix]
     private static bool Prefix_OnBattleWon(MapEvent __instance)
     {
-        var containsPlayer = __instance._sides.Any(side => side.Parties.Any(party => party.Party.MobileParty.IsPlayerParty()));
-
         // Skip on client
         if (ModInformation.IsClient)
             return false;
 
+        // Need to calculate map event results before committing changes
+        __instance.CalculateMapEventResults();
+
         if (__instance.ContainsPlayerParty())
         {
+            // Run a custom implementation of MapEvent.CalculateAndCommitMapEventResults that broadcasts results to players
+            var message = new CommitMapEventResults(__instance);
+            MessageBroker.Instance.Publish(__instance, message);
+        }
+        else
+        {
+            // Mirror native OnBattleWon: a battle without players commits its results directly.
             __instance.CalculateAndCommitMapEventResults();
         }
 
-        return true;
+        IBattleObserver battleObserver = __instance.BattleObserver;
+        if (battleObserver == null)
+        {
+            return false;
+        }
+        battleObserver.BattleResultsReady();
+
+        return false;
     }
 
     [HarmonyPatch("CommitCalculatedMapEventResults")]

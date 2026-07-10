@@ -8,6 +8,7 @@ using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
+using static GameInterface.Services.ObjectManager.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
 using System;
@@ -149,7 +150,9 @@ public class ServerKingdomHandler : IHandler
             }
         });
 
-        network.SendAll(new NetworkPartyEnterSettlement(settlementId, partyId));
+        network.SendAll(new NetworkPartyEnterSettlement(
+            Compact(settlementId, typeof(Settlement)),
+            Compact(partyId, typeof(MobileParty))));
     }
 
     private static void RunSettlementMutation(Action action)

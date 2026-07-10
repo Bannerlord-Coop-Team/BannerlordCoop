@@ -1,6 +1,9 @@
 // Whole-dictionary replacement (member reassignment)
 Subscribe<{{MemberType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetLocalMessage>((instanceId, data) =>
 {
+    // A whole-dictionary replacement must follow any earlier buffered element updates.
+    sendCoalescer?.FlushInstance(instanceId, network);
+
     var keys = new List<{{KeyWireType}}>();
     var values = new List<{{ValueWireType}}>();
     foreach (var pair in data.Value)
@@ -10,6 +13,7 @@ Subscribe<{{MemberType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetLocal
         {{~ else ~}}
         if (pair.Key == null) continue;
         if (!objectManager.TryGetId(pair.Key, out string keyData)) continue;
+        keyData = ObjectManager.Compact(keyData, typeof({{KeyType}}));
         {{~ end ~}}
         {{~ if ValueByValue ~}}
         var valueData = {{ValueSerializeMethod}}(pair.Value);
@@ -65,16 +69,39 @@ SubscribeTracked((MessagePayload<{{ MemberDeclaringTypeName}}_{{ MemberName }}_U
     var keyData = {{KeySerializeMethod}}(data.Key);
     {{~ else ~}}
     if (!objectManager.TryGetIdWithLogging(data.Key, out string keyData)) return;
+    keyData = ObjectManager.Compact(keyData, typeof({{KeyType}}));
     {{~ end ~}}
-    {{~ if ValueByValue ~}}
-    var valueData = {{ValueSerializeMethod}}(data.Value);
-    {{~ else ~}}
+    {{~ if !ValueByValue ~}}
     if (!objectManager.TryGetIdWithLogging(data.Value, out string valueData)) return;
     {{~ end ~}}
     {{~ if Debug ~}}
     Logger.Debug("[Server] Broadcasting dictionary upsert {MemberName}", "{{MemberDeclaringType}}.{{MemberName}}");
     {{~ end ~}}
-    network.SendAll(new {{ MemberDeclaringTypeName}}_{{ MemberName }}_UpsertNetworkMessage(instanceId, keyData, valueData));
+    Func<IMessage> buildMessage = () => new {{ MemberDeclaringTypeName}}_{{ MemberName }}_UpsertNetworkMessage(
+        instanceId,
+        keyData,
+        {{~ if ValueByValue ~}}
+        {{ValueSerializeMethod}}(data.Value));
+        {{~ else ~}}
+        valueData);
+        {{~ end ~}}
+
+    if (sendCoalescer == null)
+    {
+        // Clients do not register a coalescer. This fallback also keeps generated handlers usable
+        // in small standalone test hosts.
+        network.SendAll(buildMessage());
+        return;
+    }
+
+    {{~ if KeyByValue ~}}
+    var coalesceMember = Convert.ToBase64String(keyData);
+    {{~ else ~}}
+    var coalesceMember = keyData;
+    {{~ end ~}}
+    sendCoalescer.Enqueue(
+        new CoalesceKey("AutoSync.Dictionary.{{MemberDeclaringTypeName}}.{{MemberName}}", instanceId, coalesceMember),
+        new SnapshotPayload(buildMessage));
 });
 SubscribeNetwork<{{ValueType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_UpsertNetworkMessage>((instance, data) =>
 {
@@ -93,10 +120,14 @@ SubscribeNetwork<{{ValueType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_Up
 // Remove by key
 Subscribe<{{KeyType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_RemoveLocalMessage>((instanceId, data) =>
 {
+    // Preserve mutation order: pending upserts must arrive before this remove.
+    sendCoalescer?.FlushInstance(instanceId, network);
+
     {{~ if KeyByValue ~}}
     var keyData = {{KeySerializeMethod}}(data.Value);
     {{~ else ~}}
     if (!objectManager.TryGetIdWithLogging(data.Value, out string keyData)) return;
+    keyData = ObjectManager.Compact(keyData, typeof({{KeyType}}));
     {{~ end ~}}
     {{~ if Debug ~}}
     Logger.Debug("[Server] Broadcasting dictionary remove {MemberName}", "{{MemberDeclaringType}}.{{MemberName}}");

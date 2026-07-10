@@ -8,6 +8,7 @@ using GameInterface.Services.Caravans.Messages;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
+using static GameInterface.Services.ObjectManager.ObjectManager;
 using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -220,6 +221,7 @@ internal class CaravansCampaignBehaviorHandler : IHandler
     private void Handle_UpdateTradeActionLogsForParty(MessagePayload<UpdateTradeActionLogsForParty> obj)
     {
         if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
+        mobilePartyId = Compact(mobilePartyId, typeof(MobileParty));
 
         var tradeActionLogsData = new List<TradeActionLogData>();
         foreach (var tradeActionLog in obj.What.TradeActionLogs)
@@ -273,6 +275,9 @@ internal class CaravansCampaignBehaviorHandler : IHandler
 
         string soldSettlementId = null;
         if (tradeActionLog.SoldSettlement != null && !objectManager.TryGetIdWithLogging(tradeActionLog.SoldSettlement, out soldSettlementId)) return false;
+
+        boughtSettlementId = Compact(boughtSettlementId, typeof(Settlement));
+        soldSettlementId = Compact(soldSettlementId, typeof(Settlement));
 
         tradeActionLogData = new TradeActionLogData(
             boughtSettlementId,

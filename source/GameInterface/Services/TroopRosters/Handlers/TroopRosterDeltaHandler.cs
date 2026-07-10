@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
+using static GameInterface.Services.ObjectManager.ObjectManager;
 using GameInterface.Services.TroopRosters.Messages;
 using Serilog;
 using System;
@@ -106,6 +107,7 @@ internal class TroopRosterDeltaHandler : IHandler
         // Resolve silently: an unregistered roster is a scratch/dummy roster (see TryResolve) with nothing
         // to replicate, not an error.
         if (!objectManager.TryGetId(payload.What.TroopRoster, out var rosterId)) return;
+        rosterId = Compact(rosterId, typeof(TroopRoster));
         network.SendAll(new NetworkTroopRosterRemoveZeroCounts(rosterId));
     }
 
@@ -124,7 +126,10 @@ internal class TroopRosterDeltaHandler : IHandler
         characterId = null;
         if (roster == null || character == null) return false;
         if (!objectManager.TryGetId(roster, out rosterId)) return false;
-        return objectManager.TryGetIdWithLogging(character, out characterId);
+        if (!objectManager.TryGetIdWithLogging(character, out characterId)) return false;
+        rosterId = Compact(rosterId, typeof(TroopRoster));
+        characterId = Compact(characterId, typeof(CharacterObject));
+        return true;
     }
 
     private void Handle_NetworkAddCounts(MessagePayload<NetworkTroopRosterAddCounts> payload)
