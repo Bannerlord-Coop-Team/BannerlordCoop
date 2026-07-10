@@ -22,7 +22,7 @@ internal class DisableFindingItemOnMapBehavior
 [HarmonyPatch(typeof(FindingItemOnMapBehavior))]
 internal class FindingItemOnMapBehaviorPatches
 {
-    [HarmonyPatch(nameof(FindingItemOnMapBehavior))]
+    [HarmonyPatch(nameof(FindingItemOnMapBehavior.DailyTickParty))]
     [HarmonyPrefix]
     public static bool DailyTickPartyPrefix(FindingItemOnMapBehavior __instance, MobileParty party)
     {
