@@ -428,20 +428,8 @@ internal class PvPInteractionClientHandler : IHandler
             return;
         }
 
-        if (PlayerEncounter.Current != null)
-        {
-            PlayerEncounter.LeaveEncounter = true;
-            try
-            {
-                PlayerEncounter.Finish(true);
-            }
-            finally
-            {
-                Campaign.Current.PlayerEncounter = null;
-            }
-        }
-
-        ForceCloseCurrentEncounterMenu();
+        // Leaving an encounter is handled by PlayerEncounter.Update, which is required to bring up loot screens and more
+        // Do not finish the PlayerEncounter here
     }
 
     private void ForceEndCurrentMission()
@@ -461,36 +449,6 @@ internal class PvPInteractionClientHandler : IHandler
         {
             Logger.Error(ex, "[PvPEncounterClose] ForceEndCurrentMission failed");
         }
-    }
-
-    private void ForceCloseCurrentEncounterMenu()
-    {
-        var campaign = Campaign.Current;
-        var mapState = Game.Current?.GameStateManager?.ActiveState as MapState;
-        var menuContext = campaign?.CurrentMenuContext;
-
-        try
-        {
-            GameMenu.ExitToLast();
-        }
-        catch (Exception ex)
-        {
-            Logger.Warning(ex, "[PvPEncounterClose] Failed to exit current menu during forced close");
-        }
-
-        try
-        {
-            menuContext?.Destroy();
-        }
-        catch (Exception ex)
-        {
-            Logger.Warning(ex, "[PvPEncounterClose] Failed to destroy current menu context during forced close");
-        }
-
-        ExitMapMenuMode(campaign, mapState);
-
-        if (campaign?.MapStateData != null)
-            campaign.MapStateData.GameMenuId = null;
     }
 
     private static void ExitMapMenuMode(Campaign campaign, MapState mapState)

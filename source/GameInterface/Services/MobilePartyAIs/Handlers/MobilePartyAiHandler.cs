@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.MobilePartyAIs.Messages;
 using GameInterface.Services.ObjectManager;
+using static GameInterface.Services.ObjectManager.ObjectManager;
 using Serilog;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -40,6 +41,7 @@ internal class MobilePartyAiHandler : IHandler
         {
             return;
         }
+        partyAiId = Compact(partyAiId, typeof(MobilePartyAi));
 
         if (interactablePoint is null)
         {
@@ -58,6 +60,7 @@ internal class MobilePartyAiHandler : IHandler
         {
             return;
         }
+        interactablePointId = Compact(interactablePointId, typeof(PartyBase));
 
         network.SendAll(new UpdateAiBehaviorInteractablePoint(partyAiId, interactablePointId));
     }
