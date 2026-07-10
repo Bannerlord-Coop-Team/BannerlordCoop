@@ -125,9 +125,6 @@
     <Publicize Include="TaleWorlds.SaveSystem" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\ServerHeadless\Bootstrap\Patches\RaidPatches.cs" Link="Services\ServerHeadless\RaidPatches.cs" />
-  </ItemGroup>
-  <ItemGroup>
     <Folder Include="AutoSync\Snapshots\" />
   </ItemGroup>
 </Project>
