@@ -1,4 +1,7 @@
-﻿using HarmonyLib;
+﻿using Common;
+using HarmonyLib;
+using System.Collections.Generic;
+using System.Reflection;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
 namespace GameInterface.Services.Heroes.Patches.Disable;
@@ -6,6 +9,12 @@ namespace GameInterface.Services.Heroes.Patches.Disable;
 [HarmonyPatch(typeof(RomanceCampaignBehavior))]
 internal class DisableRomanceCampaignBehavior
 {
-    [HarmonyPatch(nameof(RomanceCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static IEnumerable<MethodBase> TargetMethods() => new MethodBase[]
+    {
+        AccessTools.Method(typeof(RomanceCampaignBehavior), nameof(RomanceCampaignBehavior.DailyTick)),
+        AccessTools.Method(typeof(RomanceCampaignBehavior), nameof(RomanceCampaignBehavior.DailyTickClan))
+    };
+
+    [HarmonyPrefix]
+    static bool Prefix() => ModInformation.IsServer;
 }
