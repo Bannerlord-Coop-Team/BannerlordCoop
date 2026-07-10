@@ -143,7 +143,6 @@ internal class ServerVillageHostileActionHandler : IHandler
                 continue;
 
             network.SendAll(new NetworkEndSettlementEncounter(player.MobilePartyId));
-            network.SendAll(new NetworkPartyLeaveSettlement(player.MobilePartyId));
             settlementInterface.PartyLeaveSettlement(playerParty);
         }
     }
