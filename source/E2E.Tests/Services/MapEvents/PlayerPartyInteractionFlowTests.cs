@@ -241,7 +241,9 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         });
     }
 
-    [Fact]
+    [Theory]
+    [InlineData(2)]
+    [InlineData(3)]
     public void OfferServices_WithEligibleClanAndKingdomLeader_EnablesVassal(int initiatorClanTier)
     {
         var (client1, _, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
