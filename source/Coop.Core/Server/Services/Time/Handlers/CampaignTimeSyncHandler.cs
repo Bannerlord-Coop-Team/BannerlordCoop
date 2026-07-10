@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Server.Services.Time.Messages;
@@ -13,14 +13,14 @@ namespace Coop.Core.Server.Services.Time.Handlers;
 /// Periodically broadcasts the authoritative campaign time to all clients.
 /// </summary>
 /// <remarks>
-/// Once per second the server reads the current <c>MapTimeTracker</c> tick value and
+/// Four times per second the server reads the current <c>MapTimeTracker</c> tick value and
 /// sends a <see cref="CampaignTimeUpdated"/> message to every connected client.
 /// </remarks>
 public class CampaignTimeSyncHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<CampaignTimeSyncHandler>();
 
-    private const double PublishIntervalMs = 1000d;
+    private const double PublishIntervalMs = 250d;
 
     private readonly INetwork network;
     private readonly IMapTimeTrackerInterface mapTimeTrackerInterface;

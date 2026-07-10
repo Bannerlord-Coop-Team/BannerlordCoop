@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using Coop.Core.Server.Services.Time.Messages;
 using GameInterface.Services.Time.Interfaces;
@@ -7,8 +7,8 @@ using Serilog;
 namespace Coop.Core.Client.Services.Time.Handlers;
 
 /// <summary>
-/// Receives authoritative campaign time from the server and smoothly corrects
-/// the client's local campaign time toward it.
+/// Receives authoritative campaign time from the server and paces the client's
+/// campaign simulation toward it.
 /// </summary>
 public class CampaignTimeSyncHandler : IHandler
 {

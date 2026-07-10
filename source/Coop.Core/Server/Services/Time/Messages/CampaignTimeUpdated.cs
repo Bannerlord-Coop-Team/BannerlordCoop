@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
 
 namespace Coop.Core.Server.Services.Time.Messages;
@@ -7,8 +7,8 @@ namespace Coop.Core.Server.Services.Time.Messages;
 /// Authoritative campaign time broadcast from the server to all clients.
 /// </summary>
 /// <remarks>
-/// Sent once per second by the server. Clients smoothly interpolate their
-/// local <c>MapTimeTracker</c> tick value toward <see cref="ServerTicks"/>.
+/// Sent four times per second by the server. Clients use it to keep their
+/// campaign simulation paced with the authoritative server.
 /// </remarks>
 [ProtoContract(SkipConstructor = true)]
 public sealed class CampaignTimeUpdated : IEvent

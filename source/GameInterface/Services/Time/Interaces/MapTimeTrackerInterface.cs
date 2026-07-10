@@ -1,11 +1,7 @@
-using Common;
-using Common.Logging;
-using Serilog;
+﻿using Common;
 using System;
 using System.Threading;
-using System.Timers;
 using TaleWorlds.CampaignSystem;
-using Timer = System.Timers.Timer;
 
 namespace GameInterface.Services.Time.Interfaces;
 
@@ -22,13 +18,17 @@ public interface IMapTimeTrackerInterface : IGameAbstraction
     bool TryGetCurrentTicks(out long ticks);
 
     /// <summary>
-    /// Smoothly corrects the local campaign time toward <paramref name="serverTicks"/>.
-    /// Interpolates <c>_numTicks</c> from its current value to the server value over 1 second,
-    /// updating every 0.25 seconds. A new call cancels any interpolation already in progress
-    /// and restarts from the current local tick value.
+    /// Corrects the client campaign simulation toward <paramref name="serverTicks"/>.
     /// </summary>
     /// <param name="serverTicks">The authoritative server tick value to converge toward.</param>
     void SyncCampaignTime(long serverTicks);
+
+    /// <summary>
+    /// Applies the pending server-time correction to the current client simulation frame.
+    /// </summary>
+    /// <param name="campaign">The campaign whose frame delta and map time are being corrected.</param>
+    /// <param name="realDt">The real-time frame delta passed to the campaign tick.</param>
+    void ApplyClientSimulationTime(Campaign campaign, float realDt);
 
     /// <summary>
     /// Advances the campaign time forward by the given number of ticks.
@@ -39,21 +39,22 @@ public interface IMapTimeTrackerInterface : IGameAbstraction
 }
 
 /// <inheritdoc cref="IMapTimeTrackerInterface"/>
-internal class MapTimeTrackerInterface : IMapTimeTrackerInterface, IDisposable
+internal class MapTimeTrackerInterface : IMapTimeTrackerInterface
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<MapTimeTrackerInterface>();
+    internal const float CorrectionWindowSeconds = 0.25f;
+    internal const float HeartbeatTimeoutSeconds = 0.75f;
+    private const float MapSecondsPerCampaignDelta = 4320f;
 
-    private const double InterpolationDurationMs = 1000d;
-    private const double InterpolationIntervalMs = 250d;
-    private const int TotalSteps = 4;
-
-    private readonly object interpolationLock = new object();
-
-    private Timer interpolationTimer;
-    private long startTicks;
-    private long targetTicks;
-    private long previousTicks;
-    private int currentStep;
+    private bool hasServerTime;
+    private bool hasPendingHardSync;
+    private bool hasPendingServerTime;
+    private bool skipNextHeartbeatAgeIncrement;
+    private long previousServerTicks;
+    private long pendingServerTicks;
+    private double remainingCorrectionTicks;
+    private double correctionTicksPerSecond;
+    private double correctionAccumulator;
+    private float secondsSinceHeartbeat;
 
     public bool TryGetCurrentTicks(out long ticks)
     {
@@ -70,86 +71,156 @@ internal class MapTimeTrackerInterface : IMapTimeTrackerInterface, IDisposable
 
     public void SyncCampaignTime(long serverTicks)
     {
-        var tracker = Campaign.Current?.MapTimeTracker;
-        if (tracker == null) return;
-
-        lock (interpolationLock)
+        GameThread.RunSafe(() =>
         {
-            // A newer server update replaces any currently-running interpolation,
-            // restarting from the current local tick value.
-            StopTimer();
+            var tracker = Campaign.Current?.MapTimeTracker;
+            if (tracker == null) return;
 
-            startTicks = tracker._numTicks;
-            previousTicks = startTicks;
-            targetTicks = serverTicks;
-            currentStep = 0;
+            long maxServerProgressTicks = CampaignTime.Hours(6f).NumTicks;
+            if (maxServerProgressTicks <= 0L) return;
 
-            interpolationTimer = new Timer(InterpolationIntervalMs) { AutoReset = true };
-            interpolationTimer.Elapsed += OnInterpolationStep;
-            interpolationTimer.Start();
-        }
+            BeginCorrection(serverTicks, maxServerProgressTicks);
+        }, context: nameof(MapTimeTrackerInterface));
     }
 
-    private void OnInterpolationStep(object sender, ElapsedEventArgs e)
+    public void ApplyClientSimulationTime(Campaign campaign, float realDt)
     {
-        lock (interpolationLock)
+        if (campaign == null) throw new ArgumentNullException(nameof(campaign));
+
+        var tracker = campaign.MapTimeTracker;
+        if (TryConsumeHardSync(out long hardSyncTicks))
         {
-            // Ignore stale callbacks from a timer that has already been replaced/stopped.
-            if (sender != interpolationTimer) return;
-
-            currentStep++;
-
-            double t = currentStep * InterpolationIntervalMs / InterpolationDurationMs;
-            if (t > 1d) t = 1d;
-
-            long newTicks = (long)(startTicks + (targetTicks - startTicks) * t);
-            long deltaTicks = newTicks - previousTicks;
-            previousTicks = newTicks;
-
-            // Field writes happen on the game thread, the only place MapTimeTracker is ticked.
-            GameThread.Run(() =>
-            {
-                var tracker = Campaign.Current?.MapTimeTracker;
-                if (tracker == null) return;
-
-                tracker._deltaTimeInTicks = deltaTicks;
-                tracker._numTicks = newTicks;
-            });
-
-            if (currentStep >= TotalSteps)
-            {
-                StopTimer();
-            }
+            tracker._numTicks = hardSyncTicks;
+            tracker._deltaTimeInTicks = 0L;
+            campaign._dt = 0f;
+            return;
         }
+
+        long originalDeltaTicks = tracker._deltaTimeInTicks;
+        PrepareCorrection(tracker._numTicks);
+        long correctionTicks = GetTickCorrection(originalDeltaTicks, realDt);
+        if (correctionTicks == 0) return;
+
+        long correctedDeltaTicks = originalDeltaTicks + correctionTicks;
+        tracker._numTicks += correctionTicks;
+        tracker._deltaTimeInTicks = correctedDeltaTicks;
+        campaign._dt = correctedDeltaTicks / (MapSecondsPerCampaignDelta * CampaignTime.TimeTicksPerSecond);
     }
 
     public void AdvanceTime(long ticks)
     {
-        // Field write happens on the game thread, the only place MapTimeTracker is ticked.
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             var tracker = Campaign.Current?.MapTimeTracker;
             if (tracker == null) return;
 
             tracker._numTicks += ticks;
-        });
+        }, context: nameof(MapTimeTrackerInterface));
     }
 
-    private void StopTimer()
+    internal bool BeginCorrection(long serverTicks, long maxServerProgressTicks)
     {
-        if (interpolationTimer == null) return;
+        secondsSinceHeartbeat = 0f;
+        skipNextHeartbeatAgeIncrement = true;
 
-        interpolationTimer.Elapsed -= OnInterpolationStep;
-        interpolationTimer.Stop();
-        interpolationTimer.Dispose();
-        interpolationTimer = null;
-    }
+        bool isDiscontinuity = hasServerTime == false ||
+            serverTicks < previousServerTicks ||
+            serverTicks - previousServerTicks > maxServerProgressTicks;
 
-    public void Dispose()
-    {
-        lock (interpolationLock)
+        hasServerTime = true;
+        previousServerTicks = serverTicks;
+        pendingServerTicks = serverTicks;
+        hasPendingHardSync = hasPendingHardSync || isDiscontinuity;
+        hasPendingServerTime = false;
+        remainingCorrectionTicks = 0d;
+        correctionTicksPerSecond = 0d;
+        correctionAccumulator = 0d;
+
+        if (hasPendingHardSync)
         {
-            StopTimer();
+            return true;
         }
+
+        hasPendingServerTime = true;
+        return false;
+    }
+
+    internal bool TryConsumeHardSync(out long serverTicks)
+    {
+        serverTicks = pendingServerTicks;
+        if (hasPendingHardSync == false) return false;
+
+        hasPendingHardSync = false;
+        skipNextHeartbeatAgeIncrement = false;
+        return true;
+    }
+
+    internal void PrepareCorrection(long localTicks)
+    {
+        if (hasPendingServerTime == false) return;
+
+        hasPendingServerTime = false;
+        remainingCorrectionTicks = pendingServerTicks - localTicks;
+        correctionTicksPerSecond = remainingCorrectionTicks / CorrectionWindowSeconds;
+    }
+
+    internal long GetTickCorrection(long localDeltaTicks, float realDt)
+    {
+        if (hasServerTime == false || realDt <= 0f) return 0L;
+
+        if (skipNextHeartbeatAgeIncrement)
+        {
+            skipNextHeartbeatAgeIncrement = false;
+        }
+        else
+        {
+            secondsSinceHeartbeat += realDt;
+        }
+        if (localDeltaTicks <= 0L) return 0L;
+
+        if (secondsSinceHeartbeat > HeartbeatTimeoutSeconds)
+        {
+            return -localDeltaTicks;
+        }
+
+        if (remainingCorrectionTicks == 0d) return 0L;
+
+        double requestedCorrection = correctionTicksPerSecond * realDt;
+        requestedCorrection = Math.Max(-localDeltaTicks, Math.Min(localDeltaTicks, requestedCorrection));
+
+        if (remainingCorrectionTicks > 0d)
+        {
+            if (requestedCorrection <= 0d) return 0L;
+            requestedCorrection = Math.Min(remainingCorrectionTicks, requestedCorrection);
+        }
+        else
+        {
+            if (requestedCorrection >= 0d) return 0L;
+            requestedCorrection = Math.Max(remainingCorrectionTicks, requestedCorrection);
+        }
+
+        correctionAccumulator += requestedCorrection;
+
+        long correctionTicks = (long)correctionAccumulator;
+        correctionTicks = Math.Max(-localDeltaTicks, Math.Min(localDeltaTicks, correctionTicks));
+
+        if (remainingCorrectionTicks > 0d)
+        {
+            correctionTicks = Math.Min((long)remainingCorrectionTicks, correctionTicks);
+        }
+        else
+        {
+            correctionTicks = Math.Max((long)remainingCorrectionTicks, correctionTicks);
+        }
+
+        correctionAccumulator -= correctionTicks;
+        remainingCorrectionTicks -= correctionTicks;
+
+        if (remainingCorrectionTicks == 0d)
+        {
+            correctionAccumulator = 0d;
+        }
+
+        return correctionTicks;
     }
 }
