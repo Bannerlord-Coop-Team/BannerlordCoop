@@ -5,6 +5,8 @@ using Common.Network;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.UI.Notifications.Messages;
 using Serilog;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Extensions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -37,6 +39,8 @@ internal class OtherNotificationsHandler : IHandler
 
         messageBroker.Subscribe<NotifyAnimalsBred>(Handle_NotifyAnimalsBred);
         messageBroker.Subscribe<NetworkNotifyAnimalsBred>(Handle_NetworkNotifyAnimalsBred);
+
+        messageBroker.Subscribe<NetworkNotifyRemovedSupporter>(Handle_NetworkNotifyRemovedSupporter);
     }
 
     public void Dispose()
@@ -49,6 +53,8 @@ internal class OtherNotificationsHandler : IHandler
 
         messageBroker.Unsubscribe<NotifyAnimalsBred>(Handle_NotifyAnimalsBred);
         messageBroker.Unsubscribe<NetworkNotifyAnimalsBred>(Handle_NetworkNotifyAnimalsBred);
+
+        messageBroker.Unsubscribe<NetworkNotifyRemovedSupporter>(Handle_NetworkNotifyRemovedSupporter);
     }
 
     private void Handle_NotifyAnimalsSlaughteredToEat(MessagePayload<NotifyAnimalsSlaughteredToEat> obj)
@@ -118,6 +124,21 @@ internal class OtherNotificationsHandler : IHandler
             textObject.SetTextVariable("COUNT", obj.What.NumberBred);
             textObject.SetTextVariable("ANIMAL_NAME", obj.What.BredAnimal.EquipmentElement.Item.Name);
             InformationManager.DisplayMessage(new InformationMessage(textObject.ToString()));
+        });
+    }
+
+    private void Handle_NetworkNotifyRemovedSupporter(MessagePayload<NetworkNotifyRemovedSupporter> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.NotableId, out var notable)) return;
+            if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.SupportedClanId, out var supportedClan)) return;
+
+            if (supportedClan != Clan.PlayerClan) return;
+
+            TextObject textObject = new TextObject("{=aaOIjHeP}{NOTABLE.NAME} no longer supports your clan as your relationship deteriorated too much.", null);
+            textObject.SetCharacterProperties("NOTABLE", notable.CharacterObject, false);
+            InformationManager.DisplayMessage(new InformationMessage(textObject.ToString(), new Color(0f, 1f, 0f, 1f)));
         });
     }
 }

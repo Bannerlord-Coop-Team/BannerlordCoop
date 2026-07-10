@@ -1,7 +1,9 @@
 ﻿using Common;
 using Common.Logging;
+using Common.Network;
 using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.UI.Notifications.Messages;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -39,11 +41,14 @@ internal class HeroRelationsInterface : IHeroRelationsInterface
 {
     private static readonly ILogger Logger = LogManager.GetLogger<HeroRelationsInterface>();
     private readonly IObjectManager objectManager;
+    private readonly INetwork network;
 
     public HeroRelationsInterface(
-        IObjectManager objectManager)
+        IObjectManager objectManager,
+        INetwork network)
     {
         this.objectManager = objectManager;
+        this.network = network;
     }
 
     public void UpdateNotableRelations(Hero notable)
@@ -131,14 +136,17 @@ internal class HeroRelationsInterface : IHeroRelationsInterface
             int relation2 = notable.GetRelation(notable.SupporterOf.Leader);
             if (relation2 < 0 || MBRandom.RandomFloat < (50f - (float)relation2) / 500f)
             {
+                var supportedClan = notable.SupporterOf;
+
                 bool flag = notable.SupporterOf.IsPlayerClan(); // Instead of Clan.PlayerClan
                 notable.SupporterOf = null;
                 if (flag)
                 {
-                    // TODO Notify player of notable no longer supporting clan
-                    //TextObject textObject = new TextObject("{=aaOIjHeP}{NOTABLE.NAME} no longer supports your clan as your relationship deteriorated too much.", null);
-                    //textObject.SetCharacterProperties("NOTABLE", obj.What.Notable.CharacterObject, false);
-                    //InformationManager.DisplayMessage(new InformationMessage(textObject.ToString(), new Color(0f, 1f, 0f, 1f)));
+                    if (!objectManager.TryGetIdWithLogging(notable, out var notableId)) return;
+                    if (!objectManager.TryGetIdWithLogging(supportedClan, out var supportedClanId)) return;
+
+                    // Notify clients of a notable no longer supporting a player clan
+                    network.SendAll(new NetworkNotifyRemovedSupporter(notableId, supportedClanId));
                 }
             }
         });
