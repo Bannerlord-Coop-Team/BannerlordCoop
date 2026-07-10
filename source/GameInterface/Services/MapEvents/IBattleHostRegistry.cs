@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Missions.Battles;
+namespace GameInterface.Services.MapEvents;
 
 /// <summary>
 /// Immutable host assignment for a single battle map event: the authoritative host and the ordered

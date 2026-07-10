@@ -1,7 +1,7 @@
 using GameInterface.Services.Entity;
 using System.Collections.Generic;
 
-namespace Missions.Battles;
+namespace GameInterface.Services.MapEvents;
 
 /// <inheritdoc cref="IBattleHostRegistry"/>
 public class BattleHostRegistry : IBattleHostRegistry

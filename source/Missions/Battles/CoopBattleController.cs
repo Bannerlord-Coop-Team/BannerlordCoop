@@ -158,26 +158,55 @@ public class CoopBattleController : CoopMissionController
         BattleConclusionGate.IsInCoopBattleMission = true;
         BattleConclusionGate.IsLocalBattleHost = Session.IsLocalHost;
 
-        // Vanilla's end checks unlock at the LOCAL deployment finish, but a peer's enemies arrive as
-        // the battle host's puppets — a peer committing before the host has fielded anything reads an
-        // empty enemy side as "the enemy ran away" and concludes a bogus victory. Hold the end
-        // conditions until the battle is live (the host released the NPC AI); vanilla resumes then.
+        // Drain before the end-condition gate below so a release sees this tick's fresh puppets.
+        puppetSpawner.DrainPendingPuppets();
+
+        // Vanilla's end checks unlock at the LOCAL deployment finish, but a side whose troops arrive as
+        // another client's puppets can be empty long after activation (own-party troops stay withheld
+        // until their owner's commit), and the retreat check latches "everyone ran away" on an empty
+        // side. Hold the end conditions until the battle is live AND both sides actually field a live
+        // agent here; the release is one-shot, so a later real depletion still concludes normally.
         if (!endConditionHoldReleased)
         {
             var battleEndLogic = Mission?.GetMissionBehavior<BattleEndLogic>();
             if (battleEndLogic != null)
             {
-                bool battleLive = Deployment.IsActivated;
+                bool battleLive = Deployment.IsActivated && BothSidesFielded();
                 battleEndLogic.ChangeCanCheckForEndCondition(battleLive);
                 if (battleLive) endConditionHoldReleased = true;
             }
         }
 
-        puppetSpawner.DrainPendingPuppets();
         siegeEngineDeployment.DrainPending(dt);
         siegeMachineState.Tick(dt);
         diagnostics.Tick(dt);
         supplyReporter.Tick(dt);
+    }
+
+    // A side counts as fielded once some team of it has a live human agent (puppets qualify; they join
+    // teams like any agent). Mirrors CoopBattleDepletionPatch's live-agent count.
+    private bool BothSidesFielded()
+    {
+        bool attackerFielded = false;
+        bool defenderFielded = false;
+        foreach (var team in Mission.Teams)
+        {
+            if (team.Side != BattleSideEnum.Attacker && team.Side != BattleSideEnum.Defender) continue;
+            if (team.Side == BattleSideEnum.Attacker && attackerFielded) continue;
+            if (team.Side == BattleSideEnum.Defender && defenderFielded) continue;
+
+            foreach (var agent in team.ActiveAgents)
+            {
+                if (!agent.IsHuman) continue;
+                if (team.Side == BattleSideEnum.Attacker) attackerFielded = true;
+                else defenderFielded = true;
+                break;
+            }
+
+            if (attackerFielded && defenderFielded) return true;
+        }
+
+        return attackerFielded && defenderFielded;
     }
 
     public override void OnAgentRemoved(Agent affectedAgent, Agent affectorAgent, AgentState agentState, KillingBlow killingBlow)

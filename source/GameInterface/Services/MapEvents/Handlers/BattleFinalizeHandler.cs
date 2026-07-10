@@ -12,6 +12,7 @@ using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.SiegeEvents.Patches;
 using LiteNetLib;
@@ -57,6 +58,8 @@ internal class BattleFinalizeHandler : IHandler
     private readonly IMapEventLogger mapEventLogger;
     private readonly IBattleTroopReserveBuilder reserveBuilder;
     private readonly ISettlementInterface settlementInterface;
+    private readonly IBattleHostRegistry hostRegistry;
+    private readonly IPlayerManager playerManager;
 
     public BattleFinalizeHandler(
         IMessageBroker messageBroker,
@@ -64,7 +67,9 @@ internal class BattleFinalizeHandler : IHandler
         INetwork network,
         IMapEventLogger mapEventLogger,
         IBattleTroopReserveBuilder reserveBuilder,
-        ISettlementInterface settlementInterface)
+        ISettlementInterface settlementInterface,
+        IBattleHostRegistry hostRegistry,
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -72,6 +77,8 @@ internal class BattleFinalizeHandler : IHandler
         this.mapEventLogger = mapEventLogger;
         this.reserveBuilder = reserveBuilder;
         this.settlementInterface = settlementInterface;
+        this.hostRegistry = hostRegistry;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<MapEventFinalizeAttempted>(Handle_MapEventFinalizeAttempted);
         messageBroker.Subscribe<NetworkMapEventFinalizeAttempted>(Handle_NetworkMapEventFinalizeAttempted);
@@ -110,6 +117,21 @@ internal class BattleFinalizeHandler : IHandler
     private void Handle_NetworkMapEventFinalizeAttempted(MessagePayload<NetworkMapEventFinalizeAttempted> payload)
     {
         var requester = payload.Who as NetPeer;
+
+        // Only the elected battle host may finalize a live shared battle: a client whose local mission
+        // concluded early still runs vanilla's FinalizeEvent back on the map, and applying that here
+        // would tear the battle down under everyone else (forced encounter close mid-mission). No reply
+        // on a refusal — the finalized reply would pull the refused client off the menu vanilla parked
+        // it on. Server-local publishes (requester null) and battles with no elected host pass.
+        if (requester != null && hostRegistry.TryGet(payload.What.MapEventId, out var hostAssignment)
+            && playerManager.TryGetPlayer(requester, out var requestingPlayer)
+            && requestingPlayer.ControllerId != hostAssignment.HostControllerId)
+        {
+            Logger.Information("Refused finalize of {MapEventId} from non-host {ControllerId}",
+                payload.What.MapEventId, requestingPlayer.ControllerId);
+            return;
+        }
+
         if (!objectManager.TryGetObjectWithLogging(payload.What.MapEventId, out MapEvent mapEvent))
         {
             if (requester != null)

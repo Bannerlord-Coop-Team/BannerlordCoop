@@ -2,6 +2,7 @@
 using Common.Network;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using SandBox.Missions.MissionLogics;
 using Serilog;
