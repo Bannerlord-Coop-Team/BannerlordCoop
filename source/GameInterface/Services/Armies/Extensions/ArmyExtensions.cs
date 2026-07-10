@@ -42,6 +42,8 @@ internal static class ArmyExtensions
             return false;
         }
 
+        if (army.LeaderParty.IsPlayerParty()) return true;
+
         foreach (var party in army.LeaderParty.AttachedParties)
         {
             if (party.IsPlayerParty()) return true;
