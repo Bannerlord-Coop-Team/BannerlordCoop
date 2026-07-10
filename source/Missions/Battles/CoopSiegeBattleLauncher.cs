@@ -81,7 +81,14 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
         Hero defenderLeader = MapEvent.PlayerMapEvent.DefenderSide.LeaderParty.LeaderHero;
         TextObject defenderGeneralName = defenderLeader?.Name;
 
-        var mission = MissionState.OpenNew("SiegeMissionWithDeployment", rec, (InitializeMissionBehaviorsDelegate)delegate
+        // Seed the vanilla siege scene's random wall dressing off the map-event id so every client
+        // pre-destroys the same wall pieces (SiegeDestructionSeedPatch brackets ArrangeDestructedMeshes,
+        // which runs synchronously inside OpenNew below).
+        SiegeSceneDestructionGate.Begin(mapEventId);
+        Mission mission;
+        try
+        {
+            mission = MissionState.OpenNew("SiegeMissionWithDeployment", rec, (InitializeMissionBehaviorsDelegate)delegate
         {
             var defenderSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, objectManager);
             var attackerSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Attacker, objectManager);
@@ -147,7 +154,12 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
             behaviors.Add(new CoopSiegeDeploymentMissionController(isPlayerAttacker));
 
             return behaviors.ToArray();
-        }, true, true);
+            }, true, true);
+        }
+        finally
+        {
+            SiegeSceneDestructionGate.End();
+        }
 
         behaviorAttacher.Attach(mission);
 
