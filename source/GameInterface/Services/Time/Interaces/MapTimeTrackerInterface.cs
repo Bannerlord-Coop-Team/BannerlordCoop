@@ -1,4 +1,6 @@
 ﻿using Common;
+using Common.Logging;
+using Serilog;
 using System;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
@@ -41,8 +43,20 @@ public interface IMapTimeTrackerInterface : IGameAbstraction
 /// <inheritdoc cref="IMapTimeTrackerInterface"/>
 internal class MapTimeTrackerInterface : IMapTimeTrackerInterface
 {
+    private enum CampaignTimePacingState
+    {
+        Normal,
+        Slowing,
+        PausedForServer,
+        PausedForHeartbeat,
+        CatchingUp,
+    }
+
+    private static ILogger Logger => LogManager.GetLogger<MapTimeTrackerInterface>();
+
     internal const float CorrectionWindowSeconds = 0.25f;
     internal const float HeartbeatTimeoutSeconds = 0.75f;
+    private const float PacingLogDebounceSeconds = CorrectionWindowSeconds * 2f;
     private const float MapSecondsPerCampaignDelta = 4320f;
 
     private bool hasServerTime;
@@ -55,6 +69,9 @@ internal class MapTimeTrackerInterface : IMapTimeTrackerInterface
     private double correctionTicksPerSecond;
     private double correctionAccumulator;
     private float secondsSinceHeartbeat;
+    private float candidatePacingStateSeconds;
+    private CampaignTimePacingState loggedPacingState = CampaignTimePacingState.Normal;
+    private CampaignTimePacingState candidatePacingState = CampaignTimePacingState.Normal;
 
     public bool TryGetCurrentTicks(out long ticks)
     {
@@ -90,6 +107,7 @@ internal class MapTimeTrackerInterface : IMapTimeTrackerInterface
         var tracker = campaign.MapTimeTracker;
         if (TryConsumeHardSync(out long hardSyncTicks))
         {
+            LogHardSync(tracker._numTicks, hardSyncTicks);
             tracker._numTicks = hardSyncTicks;
             tracker._deltaTimeInTicks = 0L;
             campaign._dt = 0f;
@@ -99,9 +117,10 @@ internal class MapTimeTrackerInterface : IMapTimeTrackerInterface
         long originalDeltaTicks = tracker._deltaTimeInTicks;
         PrepareCorrection(tracker._numTicks);
         long correctionTicks = GetTickCorrection(originalDeltaTicks, realDt);
+        long correctedDeltaTicks = originalDeltaTicks + correctionTicks;
+        UpdatePacingDiagnostics(tracker._numTicks + correctionTicks, originalDeltaTicks, correctedDeltaTicks, realDt);
         if (correctionTicks == 0) return;
 
-        long correctedDeltaTicks = originalDeltaTicks + correctionTicks;
         tracker._numTicks += correctionTicks;
         tracker._deltaTimeInTicks = correctedDeltaTicks;
         campaign._dt = correctedDeltaTicks / (MapSecondsPerCampaignDelta * CampaignTime.TimeTicksPerSecond);
@@ -152,6 +171,7 @@ internal class MapTimeTrackerInterface : IMapTimeTrackerInterface
 
         hasPendingHardSync = false;
         skipNextHeartbeatAgeIncrement = false;
+        ResetPacingDiagnostics();
         return true;
     }
 
@@ -222,5 +242,82 @@ internal class MapTimeTrackerInterface : IMapTimeTrackerInterface
         }
 
         return correctionTicks;
+    }
+
+    private static CampaignTimePacingState DeterminePacingState(
+        long originalDeltaTicks,
+        long correctedDeltaTicks,
+        bool heartbeatStale)
+    {
+        if (heartbeatStale) return CampaignTimePacingState.PausedForHeartbeat;
+        if (correctedDeltaTicks == 0L && originalDeltaTicks > 0L) return CampaignTimePacingState.PausedForServer;
+        if (correctedDeltaTicks < originalDeltaTicks) return CampaignTimePacingState.Slowing;
+        if (correctedDeltaTicks > originalDeltaTicks) return CampaignTimePacingState.CatchingUp;
+        return CampaignTimePacingState.Normal;
+    }
+
+    private void UpdatePacingDiagnostics(
+        long clientTicks,
+        long originalDeltaTicks,
+        long correctedDeltaTicks,
+        float realDt)
+    {
+        if (hasServerTime == false || originalDeltaTicks <= 0L || realDt <= 0f) return;
+
+        bool heartbeatStale = secondsSinceHeartbeat > HeartbeatTimeoutSeconds;
+        CampaignTimePacingState pacingState = DeterminePacingState(
+            originalDeltaTicks,
+            correctedDeltaTicks,
+            heartbeatStale);
+
+        if (pacingState == candidatePacingState)
+        {
+            candidatePacingStateSeconds += realDt;
+        }
+        else
+        {
+            candidatePacingState = pacingState;
+            candidatePacingStateSeconds = realDt;
+        }
+
+        bool enteredHeartbeatPause = pacingState == CampaignTimePacingState.PausedForHeartbeat &&
+            loggedPacingState != CampaignTimePacingState.PausedForHeartbeat;
+        bool shouldLog = pacingState != loggedPacingState &&
+            (enteredHeartbeatPause || candidatePacingStateSeconds >= PacingLogDebounceSeconds);
+        if (shouldLog == false) return;
+
+        double speedMultiplier = correctedDeltaTicks / (double)originalDeltaTicks;
+        Logger.Information(
+            "[CampaignPacing] {PreviousPacingState} -> {PacingState}; " +
+            "ServerTicks={ServerTicks}, ClientTicks={ClientTicks}, ServerMinusClientTicks={ServerMinusClientTicks}, " +
+            "HeartbeatAgeSeconds={HeartbeatAgeSeconds:0.000}, VanillaDeltaTicks={VanillaDeltaTicks}, " +
+            "AppliedDeltaTicks={AppliedDeltaTicks}, SpeedMultiplier={SpeedMultiplier:0.00}x",
+            loggedPacingState,
+            pacingState,
+            pendingServerTicks,
+            clientTicks,
+            pendingServerTicks - clientTicks,
+            secondsSinceHeartbeat,
+            originalDeltaTicks,
+            correctedDeltaTicks,
+            speedMultiplier);
+
+        loggedPacingState = pacingState;
+    }
+
+    private static void LogHardSync(long clientTicks, long serverTicks)
+    {
+        Logger.Information(
+            "[CampaignPacing] HardSync; ServerTicks={ServerTicks}, ClientTicksBeforeSync={ClientTicksBeforeSync}, CorrectionTicks={CorrectionTicks}",
+            serverTicks,
+            clientTicks,
+            serverTicks - clientTicks);
+    }
+
+    private void ResetPacingDiagnostics()
+    {
+        candidatePacingStateSeconds = 0f;
+        loggedPacingState = CampaignTimePacingState.Normal;
+        candidatePacingState = CampaignTimePacingState.Normal;
     }
 }
