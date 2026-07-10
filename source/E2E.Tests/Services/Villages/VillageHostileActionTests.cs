@@ -53,8 +53,6 @@ namespace E2E.Tests.Services.Villages;
 
 public class VillageHostileActionTests : MapEventTestBase
 {
-    private sealed class MobileParty { }
-    
     private static int peerPortCounter;
 
     public VillageHostileActionTests(ITestOutputHelper output) : base(output)
@@ -185,7 +183,7 @@ public class VillageHostileActionTests : MapEventTestBase
         Assert.Equal(otherMobilePartyId, endEncounter.PartyId);
         Assert.All(
             Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>(),
-            message => Assert.Equal(ObjectManager.Compact(otherMobilePartyId, typeOf(MobileParty)), message.PartyId));
+            message => Assert.Equal(ObjectManager.Compact(otherMobilePartyId, typeof(MobileParty)), message.PartyId));
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>());
 
         Server.Call(() =>
