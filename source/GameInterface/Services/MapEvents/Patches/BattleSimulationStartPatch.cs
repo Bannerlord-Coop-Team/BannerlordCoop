@@ -4,10 +4,13 @@ using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MapEvents.Patches;
@@ -44,11 +47,18 @@ internal class BattleSimulationStartPatch
         if (ModInformation.IsServer)
             return true;
 
+        Logger.Information(
+            "[PvPBattleEncounterTrace] Battle encounter option clicked: order attack; party={PartyId} mapEvent={MapEventId} menu={Menu} encounter={Encounter}",
+            DescribePartyForTrace(MobileParty.MainParty?.Party),
+            DescribeMapEventForTrace(GetCurrentMapEventForTrace()),
+            Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "<none>",
+            PlayerEncounter.Current != null);
+
         var coordinator = BattleStartCoordinator.Instance;
         if (coordinator == null)
             return true; // not wired (shouldn't happen in a live session) — fall back to native behavior
 
-        var mapEvent = PlayerEncounter.Battle ?? MobileParty.MainParty?.MapEvent;
+        var mapEvent = GetPlayerEncounterBattleForTrace() ?? MobileParty.MainParty?.MapEvent;
         if (mapEvent == null)
             return true;
 
@@ -65,5 +75,44 @@ internal class BattleSimulationStartPatch
         // Accepted: become the pacer before the scoreboard opens, then let the native consequence open it.
         BattleSimulationReplay.Begin(mapEventId, spectator: false);
         return true;
+    }
+
+    private static MapEvent GetCurrentMapEventForTrace()
+    {
+        return GetPlayerEncounterBattleForTrace() ?? MobileParty.MainParty?.MapEvent;
+    }
+
+    private static MapEvent GetPlayerEncounterBattleForTrace()
+    {
+        try
+        {
+            return PlayerEncounter.Battle;
+        }
+        catch (NullReferenceException)
+        {
+            return null;
+        }
+    }
+
+    private static string DescribePartyForTrace(PartyBase party)
+    {
+        if (party == null)
+            return "<null>";
+
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) && objectManager.TryGetId(party, out var partyId))
+            return partyId;
+
+        return party.MobileParty?.StringId ?? party.Name?.ToString() ?? "<unregistered-party>";
+    }
+
+    private static string DescribeMapEventForTrace(MapEvent mapEvent)
+    {
+        if (mapEvent == null)
+            return "<null>";
+
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) && objectManager.TryGetId(mapEvent, out var mapEventId))
+            return mapEventId;
+
+        return mapEvent.StringId ?? "<unregistered-map-event>";
     }
 }

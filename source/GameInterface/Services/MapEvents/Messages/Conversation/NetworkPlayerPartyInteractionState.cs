@@ -34,6 +34,8 @@ internal readonly struct NetworkPlayerPartyInteractionState : ICommand
     public readonly ItemRosterElementData[] OtherPartyItems;
     [ProtoMember(13)]
     public readonly PlayerPartyInteractionOption[] EnabledOptions;
+    [ProtoMember(14)]
+    public readonly bool IsHostile;
 
     public NetworkPlayerPartyInteractionState(
         string sessionId,
@@ -48,7 +50,8 @@ internal readonly struct NetworkPlayerPartyInteractionState : ICommand
         bool responderAcceptedTrade = false,
         ItemRosterElementData[] partyItems = null,
         ItemRosterElementData[] otherPartyItems = null,
-        PlayerPartyInteractionOption[] enabledOptions = null)
+        PlayerPartyInteractionOption[] enabledOptions = null,
+        bool isHostile = false)
     {
         SessionId = sessionId;
         PartyId = partyId;
@@ -63,5 +66,6 @@ internal readonly struct NetworkPlayerPartyInteractionState : ICommand
         PartyItems = partyItems ?? new ItemRosterElementData[0];
         OtherPartyItems = otherPartyItems ?? new ItemRosterElementData[0];
         EnabledOptions = enabledOptions ?? Options;
+        IsHostile = isHostile;
     }
 }

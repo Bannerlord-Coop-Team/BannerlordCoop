@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -17,6 +17,8 @@ public sealed class MirrorAgent
     public float Health { get; set; } = 100f;
     public bool IsActive { get; set; } = true;
     public bool IsHuman { get; set; } = true;
+    public bool WasKilled { get; set; }
+    public int DeathAction { get; set; } = -1;
     public Vec3 Position { get; set; }
     public BasicCharacterObject Character { get; set; }
     public Team Team { get; set; }

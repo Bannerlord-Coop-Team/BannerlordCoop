@@ -1,8 +1,9 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
@@ -16,7 +17,6 @@ using GameInterface.Services.SiegeEvents.Patches;
 using LiteNetLib;
 using Serilog;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
@@ -33,8 +33,8 @@ namespace GameInterface.Services.MapEvents.Handlers;
 /// Owns finalizing a map event and tearing its encounter down (split out of <see cref="BattleHandler"/>). The
 /// server finalizes on an explicit leave (<see cref="NetworkMapEventFinalizeAttempted"/>) and automatically on a
 /// concluded victory (<see cref="MapEventConcluded"/>), deduping so <c>FinalizeEventAux</c> never runs twice, and
-/// tells every involved player to close its encounter (<see cref="NetworkClosePvpEncounter"/>). The client tears its
-/// own encounter down on <see cref="NetworkMapEventFinalized"/> and clears the recorded battle mode there.
+/// tells every involved player to close its encounter (<see cref="NetworkClosePvpEncounter"/>). The requester-only
+/// <see cref="NetworkMapEventFinalized"/> reply remains as the no-player-party fallback.
 /// </summary>
 internal class BattleFinalizeHandler : IHandler
 {
@@ -97,6 +97,12 @@ internal class BattleFinalizeHandler : IHandler
             mapEventLogger.DebugMapEvent(payload.What.MapEvent, "Map event finalize attempted. Sending network message to finalize map event on all clients.");
 
         var message = new NetworkMapEventFinalizeAttempted(mapEventId);
+        if (ModInformation.IsServer)
+        {
+            Handle_NetworkMapEventFinalizeAttempted(new MessagePayload<NetworkMapEventFinalizeAttempted>(payload.Who, message));
+            return;
+        }
+
         network.SendAll(message);
     }
 
@@ -105,7 +111,11 @@ internal class BattleFinalizeHandler : IHandler
         var requester = payload.Who as NetPeer;
         if (!objectManager.TryGetObjectWithLogging(payload.What.MapEventId, out MapEvent mapEvent))
         {
-            network.Send(requester, new NetworkMapEventFinalized());
+            if (requester != null)
+                network.Send(requester, new NetworkMapEventFinalized());
+            else
+                messageBroker.Publish(this, new NetworkMapEventFinalized());
+
             return;
         }
 
@@ -117,25 +127,36 @@ internal class BattleFinalizeHandler : IHandler
 
         var playerPartyIds = FinalizeAndCollectPlayers(mapEvent);
 
-        network.Send(requester, new NetworkMapEventFinalized());
+        // Tell every involved player party to close its encounter menu through the same path. The legacy
+        // requester-only finalized reply tears down a different local path and can leave a stale encounter menu
+        // in live p2p hostile battles when player-party collection races teardown.
+        if (playerPartyIds.Length > 0)
+        {
+            PvpEncounterCloseSender.Send(network, messageBroker, this, playerPartyIds, mapEventId: payload.What.MapEventId);
+            return;
+        }
 
-        // PvP (more than one player party): tell every involved player party to close its encounter menu.
-        if (playerPartyIds.Length > 1)
-            network.SendAll(new NetworkClosePvpEncounter(playerPartyIds));
+        network.Send(requester, new NetworkMapEventFinalized());
     }
 
     /// <summary>
     /// [Server] A battle reached a victory state — finalize it and close EVERY involved player's encounter, so a
     /// concluded coop battle tears down without the player leaving the post-battle menu (the auto-finalize on
-    /// conclusion). The explicit-leave path above keeps its single-player <c>NetworkMapEventFinalized</c> reply;
-    /// here there is no leaver, so the close instruction covers all involved players directly.
+    /// conclusion). There is no single leaver here, so the close instruction covers all involved players directly.
     /// </summary>
     private void Handle_MapEventConcluded(MessagePayload<MapEventConcluded> payload)
     {
         if (ModInformation.IsClient) return;
 
+        var knownPlayerPartyIds = MapEventPlayerPartyCollector.Combine(payload.What.PlayerPartyIds);
+        var closeAlreadySent = !string.IsNullOrEmpty(payload.What.SurrenderedPartyId);
         if (!objectManager.TryGetObjectWithLogging(payload.What.MapEventId, out MapEvent mapEvent))
+        {
+            if (!closeAlreadySent && knownPlayerPartyIds.Length > 0)
+                PvpEncounterCloseSender.Send(network, messageBroker, this, knownPlayerPartyIds, payload.What.SurrenderedPartyId, payload.What.MapEventId);
+
             return;
+        }
 
         if (MapEventConfig.Debug)
             mapEventLogger.DebugMapEvent(mapEvent, "Battle concluded; auto-finalizing and closing every involved player's encounter.");
@@ -144,10 +165,10 @@ internal class BattleFinalizeHandler : IHandler
         // and tear down the campaign tick.
         try
         {
-            var playerPartyIds = FinalizeAndCollectPlayers(mapEvent);
+            var playerPartyIds = FinalizeAndCollectPlayers(mapEvent, knownPlayerPartyIds);
 
-            if (playerPartyIds.Length > 0)
-                network.SendAll(new NetworkClosePvpEncounter(playerPartyIds));
+            if (!closeAlreadySent && playerPartyIds.Length > 0)
+                PvpEncounterCloseSender.Send(network, messageBroker, this, playerPartyIds, payload.What.SurrenderedPartyId, payload.What.MapEventId);
         }
         catch (Exception e)
         {
@@ -160,15 +181,21 @@ internal class BattleFinalizeHandler : IHandler
     /// first (finalize clears them) so they get a reliable server-addressed encounter close instead of each
     /// racing its own local teardown. <see cref="GameThread.Run"/> runs inline when already on the game thread.
     /// </summary>
-    private string[] FinalizeAndCollectPlayers(MapEvent mapEvent)
+    private string[] FinalizeAndCollectPlayers(MapEvent mapEvent, string[] knownPlayerPartyIds = null)
     {
         if (!TryMarkFinalized(mapEvent))
-            return Array.Empty<string>();
+            return MapEventPlayerPartyCollector.Combine(knownPlayerPartyIds);
 
         string[] playerPartyIds = null;
         GameThread.RunSafe(() =>
         {
-            playerPartyIds = CollectPlayerPartyIds(mapEvent);
+            playerPartyIds = MapEventPlayerPartyCollector.Combine(
+                knownPlayerPartyIds,
+                MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, objectManager));
+
+            var excludedIds = CollectExcludedPlayerPartyIds(mapEvent);
+            if (excludedIds.Count > 0)
+                playerPartyIds = playerPartyIds.Where(id => !excludedIds.Contains(id)).ToArray();
             var raidSettlement = GetRaidFinalizationSettlement(mapEvent);
             var raidAttackers = GetRaidAttackerPlayerParties(mapEvent);
 
@@ -226,37 +253,30 @@ internal class BattleFinalizeHandler : IHandler
         return true;
     }
 
-    /// <summary>[Server] Ids of the player parties on both sides of the event, captured before finalize clears them.</summary>
-    private string[] CollectPlayerPartyIds(MapEvent mapEvent)
+    // [Server, game thread] Player parties that must keep their encounter through the finalize:
+    // a capturing leader enters the settlement-taken flow, and a winning inside defender sits on
+    // its vanilla victory menu — the close's Finish + ExitToLast would tear either down.
+    private HashSet<string> CollectExcludedPlayerPartyIds(MapEvent mapEvent)
     {
-        var ids = new List<string>();
-        if (mapEvent?.AttackerSide == null || mapEvent.DefenderSide == null) return ids.ToArray();
+        var excluded = new HashSet<string>();
+        if (mapEvent?.AttackerSide == null || mapEvent.DefenderSide == null) return excluded;
 
-        // A player capturing a settlement keeps its encounter (it enters the settlement-taken flow), so
-        // exclude the capturing leader from the close list; the close's Finish + ExitToLast would tear
-        // down the settlement menu the aftermath prompt opens for it, and its ExitToLast is what lets the
-        // menu re-open a second time (the double loot menu).
         SiegeAftermathPatches.TryGetPlayerCaptureLeader(mapEvent, out var capturingLeader, out _);
 
         foreach (var party in mapEvent.InvolvedParties)
         {
-            if (capturingLeader != null && party?.MobileParty == capturingLeader) continue;
-
-            // A winning inside defender keeps its encounter too: vanilla already parked it on the
-            // siege_attacker_defeated menu, whose Return option re-enters the settlement; the close
-            // would tear that down and show the gates menu while the party is still inside.
-            if (mapEvent.IsSiegeAssault
+            bool isCapturingLeader = capturingLeader != null && party?.MobileParty == capturingLeader;
+            bool isWinningInsideDefender = mapEvent.IsSiegeAssault
                 && mapEvent.BattleState == BattleState.DefenderVictory
                 && party?.Side == BattleSideEnum.Defender
-                && party.MobileParty?.CurrentSettlement == mapEvent.MapEventSettlement) continue;
+                && party.MobileParty?.CurrentSettlement == mapEvent.MapEventSettlement;
+            if (!isCapturingLeader && !isWinningInsideDefender) continue;
 
-            if (party?.MobileParty?.IsPlayerParty() == true && objectManager.TryGetId(party, out var id))
-                ids.Add(id);
+            if (objectManager.TryGetId(party, out var id)) excluded.Add(id);
         }
 
-        return ids.ToArray();
+        return excluded;
     }
-
     private bool TryFinalizeRaidDefenderVictoryToVillage(MapEvent mapEvent)
     {
         var shouldReset = false;
@@ -277,7 +297,7 @@ internal class BattleFinalizeHandler : IHandler
                     return;
 
                 var involvedParties = CollectInvolvedParties(mapEvent);
-                playerPartyIds = CollectPlayerPartyIds(mapEvent);
+                playerPartyIds = MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, objectManager);
 
                 reserveBuilder.ForgetMapEvent(mapEvent);
                 mapEvent.FinalizeEventAux();

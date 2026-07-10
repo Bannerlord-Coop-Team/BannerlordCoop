@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Caravans.Interfaces;
 using GameInterface.Services.Caravans.Messages;
+using GameInterface.Services.ItemRosters.Interfaces;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.ObjectManager;
 using Serilog;
@@ -29,19 +30,22 @@ internal class CaravansConversationsHandler : IHandler
     private readonly INetwork network;
     private readonly ISessionCaravansPlayerDataInterface sessionCaravansPlayerDataInterface;
     private readonly ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface;
+    private readonly IItemRosterInterface itemRosterInterface;
 
     public CaravansConversationsHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
         ISessionCaravansPlayerDataInterface sessionCaravansPlayerDataInterface,
-        ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface)
+        ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface,
+        IItemRosterInterface itemRosterInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.sessionCaravansPlayerDataInterface = sessionCaravansPlayerDataInterface;
         this.sessionInteractionsPlayerDataInterface = sessionInteractionsPlayerDataInterface;
+        this.itemRosterInterface = itemRosterInterface;
 
         messageBroker.Subscribe<ChangeCaravanHomeSettlement>(Handle_ChangeCaravanHomeSettlement);
         messageBroker.Subscribe<NetworkChangeCaravanHomeSettlement>(Handle_NetworkChangeCaravanHomeSettlement);
@@ -153,7 +157,7 @@ internal class CaravansConversationsHandler : IHandler
     private void Handle_NetworkApplyHostileCaravanInteraction(MessagePayload<NetworkApplyHostileCaravanInteraction> obj)
     {
         sessionInteractionsPlayerDataInterface.SetPlayerCaravanInteraction(obj.What.MainHeroId, obj.What.ConversationPartyId, CaravansCampaignBehavior.PlayerInteraction.Hostile);
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
@@ -222,14 +226,7 @@ internal class CaravansConversationsHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var conversationParty)) return;
 
-            ItemRoster itemRoster = new();
-            if (obj.What.ItemRosterData != null) // Empty array transferred as null object, guard against NRE if empty
-            {
-                foreach (var itemRosterElement in obj.What.ItemRosterData)
-                {
-                    itemRoster.Add(itemRosterElement);
-                }
-            }
+            var itemRoster = itemRosterInterface.GetItemRosterFromData(obj.What.ItemRosterData);
 
             GiveGoldAction.ApplyForPartyToCharacter(conversationParty.Party, mainHero, obj.What.Amount, false);
             if (!itemRoster.IsEmpty<ItemRosterElement>())
@@ -268,14 +265,7 @@ internal class CaravansConversationsHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var conversationParty)) return;
 
-            ItemRoster itemRoster = new();
-            if (obj.What.ItemRosterElements != null) // Empty array transferred as null object, guard against NRE if empty
-            {
-                foreach (var itemRosterElement in obj.What.ItemRosterElements)
-                {
-                    itemRoster.Add(itemRosterElement);
-                }
-            }
+            var itemRoster = itemRosterInterface.GetItemRosterFromData(obj.What.ItemRosterElements);
 
             if (obj.What.CaravanHasItems)
             {
@@ -314,14 +304,7 @@ internal class CaravansConversationsHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var conversationParty)) return;
 
-            ItemRoster itemRoster = new();
-            if (obj.What.ItemRosterElements != null) // Empty array transferred as null object, guard against NRE if empty
-            {
-                foreach (var itemRosterElement in obj.What.ItemRosterElements)
-                {
-                    itemRoster.Add(itemRosterElement);
-                }
-            }
+            var itemRoster = itemRosterInterface.GetItemRosterFromData(obj.What.ItemRosterElements);
 
             if (obj.What.CaravanHasItems)
             {

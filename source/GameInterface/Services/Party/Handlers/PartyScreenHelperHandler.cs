@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Clans.Messages;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEventParties;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Messages;
@@ -229,6 +230,7 @@ internal class PartyScreenHelperHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            releasedPrisonerRoster = FilterPlayerPrisonerReleases(releasedPrisonerRoster);
             if (!releasedPrisonerRoster.IsEmpty<FlattenedTroopRosterElement>())
             {
                 EndCaptivityAction.ApplyByReleasedByChoice(releasedPrisonerRoster);
@@ -238,5 +240,23 @@ internal class PartyScreenHelperHandler : IHandler
                 TakePrisonerAction.ApplyByTakenFromPartyScreen(takenPrisonerRoster);
             }
         });
+    }
+
+    private FlattenedTroopRoster FilterPlayerPrisonerReleases(FlattenedTroopRoster releasedPrisonerRoster)
+    {
+        var nonPlayerRoster = new FlattenedTroopRoster(4);
+
+        foreach (var element in releasedPrisonerRoster)
+        {
+            var hero = element.Troop?.HeroObject;
+            if (hero != null && hero.IsPlayerHero())
+            {
+                continue;
+            }
+
+            nonPlayerRoster[element.Descriptor] = element;
+        }
+
+        return nonPlayerRoster;
     }
 }

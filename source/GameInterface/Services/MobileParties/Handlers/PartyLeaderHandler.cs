@@ -70,7 +70,11 @@ internal class PartyLeaderHandler : IHandler
                 mobileParty.ChangePartyLeader(newLeader);
             }
 
-            // The leader drives the party's map figure; rebuild it so the change is reflected visually.
+            // The leader drives the party's map figure; refresh and rebuild it so the change is reflected visually.
+            if (mobileParty.Party == null) return;
+
+            if (Campaign.Current != null && MobileParty.MainParty != null && !mobileParty.IsCurrentlyAtSea)
+                mobileParty.Party.UpdateVisibilityAndInspected(mobileParty.Position, 0f);
             mobileParty.Party.SetVisualAsDirty();
         });
     }

@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Entity;
@@ -10,6 +10,7 @@ using Missions.Data;
 using Missions.Messages;
 using Serilog;
 using System;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Battles;
@@ -49,7 +50,7 @@ public class CoopBattleController : CoopMissionController
     /// <summary>Deployment activation + reveal state (exposed for the join catch-up and tests).</summary>
     public IBattleDeploymentCoordinator Deployment { get; }
 
-    /// <summary>Commits a concluded battle's result to the campaign on mission end (host only).</summary>
+    /// <summary>Commits a concluded battle's result to the campaign on mission end.</summary>
     public IBattleResultCommitter ResultCommitter { get; }
 
     private readonly IBattleInstanceLifecycle lifecycle;
@@ -179,6 +180,13 @@ public class CoopBattleController : CoopMissionController
         supplyReporter.Tick(dt);
     }
 
+    public override void OnAgentRemoved(Agent affectedAgent, Agent affectorAgent, AgentState agentState, KillingBlow killingBlow)
+    {
+        base.OnAgentRemoved(affectedAgent, affectorAgent, agentState, killingBlow);
+
+        deathReporter.OnAgentRemoved(affectedAgent, affectorAgent, agentState, killingBlow);
+    }
+
     // The local player just finished their own deployment (Start Battle): the coordinator announces it to the
     // mesh (and marks the battle live if we are the host); on the FIRST commit we reveal the withheld own-party
     // troops at their deployed positions (requirement #4) — inline, on this same game-thread call, before the
@@ -226,7 +234,7 @@ public class CoopBattleController : CoopMissionController
 
         // Commit the concluded battle's result to the campaign BEFORE tearing the instance down, so the server
         // captures losers / awards the win and finalizes the encounter.
-        ResultCommitter.CommitIfHost();
+        ResultCommitter.CommitResolvedResult();
 
         lifecycle.Leave();
     }
