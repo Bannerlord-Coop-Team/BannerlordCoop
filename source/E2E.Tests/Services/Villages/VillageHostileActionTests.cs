@@ -53,7 +53,6 @@ namespace E2E.Tests.Services.Villages;
 
 public class VillageHostileActionTests : MapEventTestBase
 {
-
     private sealed class MobileParty { }
     
     private static int peerPortCounter;
