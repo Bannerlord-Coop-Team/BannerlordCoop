@@ -78,6 +78,12 @@ public interface ISiegeEventInterface : IGameAbstraction
     void PromptSiegeEnded(Settlement settlement, bool besiegerDefeated);
 
     /// <summary>
+    /// Seat a winning inside defender on the siege-defeated menu after the assault, which the replicated
+    /// event teardown otherwise bypasses (the winner falls through to the settlement arrival menu).
+    /// </summary>
+    void PromptSiegeDefenderVictory(Settlement settlement);
+
+    /// <summary>
     /// [Game thread] Rebuilds the local in-settlement state for a player whose reloaded party is
     /// inside a settlement: the encounter the headless server's save doesn't carry, and the siege
     /// menus when the settlement is besieged.
@@ -307,6 +313,47 @@ internal class SiegeEventInterface : ISiegeEventInterface
             }
 
             GameMenu.SwitchToMenu(besiegerDefeated ? "siege_attacker_defeated" : "siege_attacker_left");
+        }
+    }
+
+    public void PromptSiegeDefenderVictory(Settlement settlement)
+    {
+        if (settlement == null || MobileParty.MainParty == null) return;
+
+        using (new AllowedThread())
+        {
+            // The player joined the defense locally (PlayerSiege); clear its siege map state so the camera
+            // and visuals release with the menu.
+            if (PlayerSiege.PlayerSiegeEvent != null && PlayerSiege.BesiegedSettlement == settlement)
+            {
+                PlayerSiege.FinalizePlayerSiege();
+            }
+
+            // Finish the stale pre-assault siege encounter whose map event the server already destroyed.
+            if (PlayerEncounter.Current != null)
+            {
+                if (MobileParty.MainParty.Party._mapEventSide != null)
+                    MobileParty.MainParty.Party._mapEventSide = null;
+                PlayerEncounter.Finish(forcePlayerOutFromSettlement: false);
+            }
+
+            // The server holds this defender inside the settlement; reconcile the local copy (which the assault
+            // may have left outside) so siege_attacker_defeated's "Return to {SETTLEMENT}" resolves. AllowedThread
+            // keeps the enter local, not round-tripped.
+            if (MobileParty.MainParty.CurrentSettlement != settlement)
+            {
+                EnterSettlementAction.ApplyForParty(MobileParty.MainParty, settlement);
+            }
+            EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
+
+            if (Campaign.Current?.CurrentMenuContext != null)
+            {
+                GameMenu.SwitchToMenu("siege_attacker_defeated");
+            }
+            else
+            {
+                GameMenu.ActivateGameMenu("siege_attacker_defeated");
+            }
         }
     }
 

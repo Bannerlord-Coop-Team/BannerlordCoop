@@ -222,6 +222,19 @@ internal class BattleFinalizeHandler : IHandler
             var raidSettlement = GetRaidFinalizationSettlement(mapEvent);
             var raidAttackers = GetRaidAttackerPlayerParties(mapEvent);
 
+            // A winning inside defender is kept off the close above, but nothing seats it on the siege-defeated
+            // menu: the server tears the SiegeEvent/MapEvent down via replication, bypassing vanilla's local
+            // siege-end routing, so the winner falls through to the settlement arrival menu. Capture its parties
+            // + settlement now (finalize clears them) and prompt after finalize (below), behind the event destroy.
+            string defenderVictorySettlementId = null;
+            string[] defenderVictoryPartyIds = null;
+            if (mapEvent.IsSiegeAssault && mapEvent.BattleState == BattleState.DefenderVictory)
+            {
+                defenderVictoryPartyIds = CollectWinningInsideDefenderPartyIds(mapEvent);
+                if (defenderVictoryPartyIds.Length > 0)
+                    objectManager.TryGetId(mapEvent.MapEventSettlement, out defenderVictorySettlementId);
+            }
+
             // The battle is over — drop its server-side troop reserves (ledger entry + flatten cache) so they
             // don't leak per battle. Done before FinalizeEventAux clears the parties, so the flatten-cache
             // cleanup can still enumerate them. No-op on a client (its ledger is never populated).
@@ -252,6 +265,10 @@ internal class BattleFinalizeHandler : IHandler
 
             mapEvent.FinalizeEventAux();
             MoveRaidAttackersToSettlementGate(raidAttackers, raidSettlement);
+
+            // After the destroy (same game thread, so behind it on the reliable-ordered channel).
+            if (!string.IsNullOrEmpty(defenderVictorySettlementId))
+                network.SendAll(new NetworkPromptSiegeDefenderVictory(defenderVictorySettlementId, defenderVictoryPartyIds));
         }, blocking: true, context: nameof(FinalizeAndCollectPlayers));
         return playerPartyIds ?? Array.Empty<string>();
     }
@@ -299,6 +316,23 @@ internal class BattleFinalizeHandler : IHandler
         }
 
         return excluded;
+    }
+
+    // [Server, game thread] The winning inside-defender player parties, for the siege-defeated-menu prompt.
+    private string[] CollectWinningInsideDefenderPartyIds(MapEvent mapEvent)
+    {
+        List<string> ids = null;
+        foreach (var party in mapEvent.InvolvedParties)
+        {
+            if (party?.Side != BattleSideEnum.Defender) continue;
+            if (party.MobileParty?.CurrentSettlement != mapEvent.MapEventSettlement) continue;
+            if (!objectManager.TryGetId(party, out var id)) continue;
+
+            if (ids == null) ids = new List<string>();
+            ids.Add(id);
+        }
+
+        return ids?.ToArray() ?? Array.Empty<string>();
     }
     private bool TryFinalizeRaidDefenderVictoryToVillage(MapEvent mapEvent)
     {
