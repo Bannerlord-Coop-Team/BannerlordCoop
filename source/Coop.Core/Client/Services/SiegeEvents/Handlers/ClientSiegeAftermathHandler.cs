@@ -51,7 +51,9 @@ internal class ClientSiegeAftermathHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            siegeEventInterface.SetLocalAftermathNarration(obj.AftermathType);
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.SettlementId, out var settlement)) return;
+
+            siegeEventInterface.SetLocalAftermathNarration(settlement, obj.AftermathType);
         });
     }
 

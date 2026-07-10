@@ -6,13 +6,9 @@ namespace GameInterface.Services.SiegeEnginesConstructionProgress
     {
         public SiegeEngineConstructionProgressSync(AutoSyncRegistry autoSyncBuilder)
         {
-            // Nothing on a siege engine uses the generic per-set property sync. Progress/RedeploymentProgress
-            // use the threshold sync in SiegeEngineProgressPatches, and Hitpoints/MaxHitPoints now replicate
-            // there too (register-then-broadcast, applied on the game thread): the generic property sync dropped
-            // values set before an engine had a network id (the constructor's initial hitpoints, and battle
-            // damage that raced the engine's late registration). RangedSiegeEngine is read by the settlement's
-            // map visual every frame, so clients allocate it on completion (SiegeEngineProgressPatches) and on
-            // deploy (SiegeEnginesContainerHandler); the readonly SiegeEngine field rides on the deploy/reserve type id.
+            // Deliberately empty: every siege engine field replicates through SiegeEngineProgressPatches
+            // and the deploy/reserve messages, because the generic property sync drops values set before
+            // the engine has a network id (initial hitpoints, damage racing its late registration).
         }
     }
 }

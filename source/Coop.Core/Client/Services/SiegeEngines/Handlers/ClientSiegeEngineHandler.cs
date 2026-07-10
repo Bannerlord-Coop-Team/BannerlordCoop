@@ -105,6 +105,7 @@ internal class ClientSiegeEngineHandler : IHandler
         messageBroker.Unsubscribe<NetworkChangeSiegeEngineReserveRemoved>(HandleReserveRemoved);
         messageBroker.Unsubscribe<NetworkChangeSiegeEngineProgress>(HandleProgress);
         messageBroker.Unsubscribe<NetworkChangeSiegeEngineHitpoints>(HandleHitpoints);
+        messageBroker.Unsubscribe<NetworkAddSiegeEngineMissile>(HandleMissileAdded);
         messageBroker.Unsubscribe<SiegeEngineDeployRequested>(HandleDeployRequested);
         messageBroker.Unsubscribe<SiegeEngineRemovalRequested>(HandleRemovalRequested);
     }

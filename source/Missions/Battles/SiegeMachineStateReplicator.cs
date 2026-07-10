@@ -12,19 +12,9 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Battles;
 
 /// <summary>
-/// Replicates the gameplay state of siege machines between the mission clients. The mission host
-/// simulates every machine by default (its agents man them; see SiegeMachineAuthorityPatches), but a
-/// client whose player mans a machine claims that machine's simulation for itself — its own
-/// troops then crew it and its shots/movement replicate like the host's — and the host hands an
-/// idle ranged or movement machine (ram/tower) to the client whose troops are its natural crew, so
-/// a formation next to a mangonel crews it and an attacker's ram advances even when the host is a
-/// defender with no attacker agents of its own. This service polls machine state a
-/// few times a second, broadcasts changes for the machines this client simulates, applies received
-/// state, and arbitrates the per-machine claims. Nothing irreversible happens until the host election
-/// result is known, and a client promoted to host reactivates the machines it had deactivated.
-/// Ranged machine aim and projectiles stay simulator-local visuals; agent damage from them routes
-/// through the existing owner-authoritative blow path, and wall/gate/machine damage stays with the
-/// host, arriving as the hit point and destruction state synced here.
+/// Replicates siege machine state between the mission clients. The mission host simulates every
+/// machine by default; a client claims one by manning it, or is granted an idle one whose natural
+/// crew is its troops. Simulators broadcast weapon/aim/movement state, damage stays host-owned.
 /// </summary>
 public interface ISiegeMachineStateReplicator : IDisposable
 {
@@ -94,6 +84,10 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     private readonly Dictionary<int, float> regrantCooldown = new Dictionary<int, float>();
     // [Peer] Grace left on an unsolicited (crew-proximity) grant before the unused-release clock starts.
     private readonly Dictionary<int, float> grantGrace = new Dictionary<int, float>();
+    // [Host] Per-poll snapshot of grant-eligible agents, built once and reused for every candidate
+    // machine instead of re-walking Mission.Agents per machine.
+    private readonly List<CrewCandidate> crewCandidates = new List<CrewCandidate>();
+    private bool crewSnapshotValid;
     private Mission trackedMission;
     private int trackedObjectCount;
     private float pollTimer;
@@ -331,14 +325,11 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     }
 
     // [Host] Hand an idle machine's simulation to the client whose troops are its natural crew,
-    // instead of walking our own across the map. The controller with the most same-side agents
-    // wins (at least two, and never on a tie with us, so a lone roaming player can't pull a machine
-    // its client cannot man); the winner must hold for a few polls, and a machine with a seated
-    // crew is left alone. Attacker-side machines count crew mission-wide: their crew cannot walk
-    // over BEFORE the grant (the manning scan only runs on the simulator), and a defender host has
-    // no attacker agents of its own at all — its copies would sit unmanned forever.
+    // instead of walking our own across the map. The winner must hold for a few polls, and a
+    // machine with a seated crew is left alone.
     private void EvaluateProximityCrewGrants(float elapsed)
     {
+        crewSnapshotValid = false;
         foreach (var machine in machines)
         {
             if (!(machine is SiegeWeapon siegeWeapon) || !IsGrantableMachine(machine)) continue;
@@ -449,29 +440,55 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         return false;
     }
 
-    // The controller with the most same-side human agents within CrewSearchRadius (mission-wide for
-    // attacker-side machines); ties go to us.
+    // The controller with the most same-side human agents within CrewSearchRadius; ties go to us.
+    // An attacker-side machine with no decisive nearby crew falls back to a mission-wide count: its
+    // crew cannot walk over BEFORE the grant (the manning scan only runs on the simulator), and a
+    // defender host has no attacker agents of its own at all.
     private string FindDominantCrewController(SiegeWeapon machine)
     {
-        bool missionWide = machine.Side == BattleSideEnum.Attacker;
-        var machinePosition = machine.GameEntity.GlobalPosition;
-        Dictionary<string, int> counts = null;
-        foreach (var agent in Mission.Current.Agents)
+        if (!crewSnapshotValid)
         {
-            if (!agent.IsHuman || !agent.IsActive() || agent.IsRunningAway) continue;
-            if (agent.Team == null || agent.Team.Side != machine.Side) continue;
-            if (!missionWide && (agent.Position - machinePosition).LengthSquared > CrewSearchRadius * CrewSearchRadius) continue;
-
-            var controller = agentRegistry.TryGetAgentInfo(agent, out var info)
-                ? info.CurrentAuthority
-                : session.OwnControllerId;
-            if (string.IsNullOrEmpty(controller)) continue;
-
-            if (counts == null) counts = new Dictionary<string, int>();
-            counts.TryGetValue(controller, out var count);
-            counts[controller] = count + 1;
+            BuildCrewSnapshot();
+            crewSnapshotValid = true;
         }
 
+        var machinePosition = machine.GameEntity.GlobalPosition;
+        bool missionWideFallback = machine.Side == BattleSideEnum.Attacker;
+        Dictionary<string, int> nearCounts = null;
+        Dictionary<string, int> totalCounts = null;
+        foreach (var candidate in crewCandidates)
+        {
+            if (candidate.Side != machine.Side) continue;
+
+            if (missionWideFallback)
+            {
+                if (totalCounts == null) totalCounts = new Dictionary<string, int>();
+                totalCounts.TryGetValue(candidate.Controller, out var total);
+                totalCounts[candidate.Controller] = total + 1;
+            }
+
+            if ((candidate.Position - machinePosition).LengthSquared > CrewSearchRadius * CrewSearchRadius) continue;
+
+            if (nearCounts == null) nearCounts = new Dictionary<string, int>();
+            nearCounts.TryGetValue(candidate.Controller, out var near);
+            nearCounts[candidate.Controller] = near + 1;
+        }
+
+        // A real nearby crew (ours included) outranks the fallback, so with two attacker players a
+        // machine goes to whoever is standing at it, not the bigger army across the map.
+        var nearWinner = PickCrewWinner(nearCounts);
+        if (nearWinner != null && (nearWinner != session.OwnControllerId || HasOwnCount(nearCounts))) return nearWinner;
+
+        return missionWideFallback ? PickCrewWinner(totalCounts) : nearWinner;
+    }
+
+    private bool HasOwnCount(Dictionary<string, int> counts)
+    {
+        return counts != null && counts.TryGetValue(session.OwnControllerId, out var own) && own > 0;
+    }
+
+    private string PickCrewWinner(Dictionary<string, int> counts)
+    {
         if (counts == null) return null;
 
         string winner = null;
@@ -489,6 +506,30 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         if (winner != session.OwnControllerId && (best < 2 || ownCount >= best)) return session.OwnControllerId;
 
         return winner;
+    }
+
+    private void BuildCrewSnapshot()
+    {
+        crewCandidates.Clear();
+        foreach (var agent in Mission.Current.Agents)
+        {
+            if (!agent.IsHuman || !agent.IsActive() || agent.IsRunningAway) continue;
+            if (agent.Team == null) continue;
+
+            var controller = agentRegistry.TryGetAgentInfo(agent, out var info)
+                ? info.CurrentAuthority
+                : session.OwnControllerId;
+            if (string.IsNullOrEmpty(controller)) continue;
+
+            crewCandidates.Add(new CrewCandidate { Controller = controller, Side = agent.Team.Side, Position = agent.Position });
+        }
+    }
+
+    private struct CrewCandidate
+    {
+        public string Controller;
+        public BattleSideEnum Side;
+        public TaleWorlds.Library.Vec3 Position;
     }
 
     // [Peer] Claim a machine when our player mounts it; release it back to the host once nothing
@@ -737,6 +778,10 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         {
             if (Mission.Current == null || session.IsLocalHost) return;
 
+            // Refresh BEFORE mutating, like every sibling handler: on a freshly-opened mission the
+            // refresh takes the mission-change clear branch, which would wipe the claim just written.
+            RefreshMachineCache();
+
             if (string.IsNullOrEmpty(obj.ControllerId))
             {
                 claimedMachines.Remove(obj.MachineId);
@@ -754,7 +799,6 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             }
 
             pendingClaimSeconds.Remove(obj.MachineId);
-            RefreshMachineCache();
             PushClaimsToGate();
             RefreshMachineGates();
         });
@@ -915,8 +959,10 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             if (!machinesById.TryGetValue(obj.MachineId, out var machine))
             {
                 // A net-zero MissionObjects churn (an item spawned and despawned within a poll) can hide
-                // a newly-added machine from the count-gated cache; force a rebuild before giving up.
-                trackedMission = null;
+                // a newly-added machine from the count-gated cache; force a list rebuild before giving up.
+                // Only the count is poked: nulling trackedMission takes the mission-change branch, which
+                // wipes every claim and buffered state.
+                trackedObjectCount = -1;
                 RefreshMachineCache();
                 if (!machinesById.TryGetValue(obj.MachineId, out machine))
                 {

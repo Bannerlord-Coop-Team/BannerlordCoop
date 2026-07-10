@@ -13,8 +13,9 @@ namespace GameInterface.Services.MapEvents;
 /// </summary>
 public static class SiegeMissionAuthorityGate
 {
-    /// <summary>[Game thread] This client is the mission host.</summary>
-    public static bool IsLocalAuthority;
+    /// <summary>This client is the mission host. Written on the game thread, read on the parallel
+    /// tick threads (SiegeWeapon.TickAux via the authority patches), hence volatile like the claim sets.</summary>
+    public static volatile bool IsLocalAuthority;
 
     /// <summary>True once the host election result is stored locally; until then IsLocalAuthority
     /// being false means "unknown", and irreversible steps (auto-deploys, machine deactivation) wait.</summary>

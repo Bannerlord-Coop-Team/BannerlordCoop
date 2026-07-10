@@ -91,9 +91,10 @@ public interface ISiegeEventInterface : IGameAbstraction
     void PromptSiegeAssault(MobileParty attackerParty, Settlement settlement);
 
     /// <summary>
-    /// Records the aftermath the server applied so the local settlement-taken menus narrate it.
+    /// Records the aftermath the server applied so the local settlement-taken menus narrate it, and
+    /// releases the capture-menu hold for the settlement (the choice is resolved).
     /// </summary>
-    void SetLocalAftermathNarration(int aftermathType);
+    void SetLocalAftermathNarration(Settlement settlement, int aftermathType);
 
     /// <summary>
     /// Opens the settlement-taken choice menu when this client leads the parked aftermath and its
@@ -426,8 +427,12 @@ internal class SiegeEventInterface : ISiegeEventInterface
         }
     }
 
-    public void SetLocalAftermathNarration(int aftermathType)
+    public void SetLocalAftermathNarration(Settlement settlement, int aftermathType)
     {
+        // The choice is resolved (ours, or the server auto-applied a stale one); without this release a
+        // client whose pick never happened keeps bouncing its town menu back to menu_settlement_taken.
+        SiegeCaptureMenuHoldPatch.Release(settlement);
+
         var behavior = Campaign.Current?.GetCampaignBehavior<SiegeAftermathCampaignBehavior>();
         if (behavior == null) return;
 

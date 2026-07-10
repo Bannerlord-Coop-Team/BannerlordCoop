@@ -26,7 +26,11 @@ public interface ISiegeEngineDeploymentReplicator : IDisposable
     void CatchUpJoiner(string controllerId);
 
     /// <summary>[Game thread] Retry placements that arrived before their deployment point had loaded.</summary>
-    void DrainPending();
+    void DrainPending(float dt);
+
+    /// <summary>[Game thread] The local player committed deployment; recorded so a joiner catch-up can
+    /// re-tell it the deployer finished (the one-shot broadcast predates the join).</summary>
+    void MarkLocalDeploymentFinished();
 }
 
 /// <inheritdoc cref="ISiegeEngineDeploymentReplicator"/>
@@ -53,6 +57,11 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
     // placements wait for their point to load. Game-thread only.
     private bool sweepRequested;
     private bool sweepDone;
+    private bool localDeploymentFinished;
+    // How long placements have sat unappliable while the mission runs; past the deadline they are dropped
+    // (with an error naming them) so one never-registering point can't hold the sweep off forever.
+    private float pendingStallSeconds;
+    private const float PendingStallDeadlineSeconds = 15f;
 
     public SiegeEngineDeploymentReplicator(IBattleNetwork network, IMessageBroker messageBroker, IBattleSession session)
     {
@@ -116,6 +125,12 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
                 // The DeploymentPoint isn't registered yet (catch-up during scene load); buffer and retry from
                 // the controller tick once it appears, instead of dropping it permanently.
                 StashPending(obj.PointId, obj.WeaponTypeName);
+            }
+            else
+            {
+                // A direct apply supersedes any stale buffered placement for the same point, which
+                // DrainPending would otherwise re-apply over it.
+                RemovePending(obj.PointId);
             }
         });
     }
@@ -186,7 +201,20 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
         pending.Add(new KeyValuePair<int, string>(pointId, weaponTypeName));
     }
 
-    public void DrainPending()
+    private void RemovePending(int pointId)
+    {
+        for (int i = pending.Count - 1; i >= 0; i--)
+        {
+            if (pending[i].Key == pointId) pending.RemoveAt(i);
+        }
+    }
+
+    public void MarkLocalDeploymentFinished()
+    {
+        localDeploymentFinished = true;
+    }
+
+    public void DrainPending(float dt)
     {
         if (Mission.Current == null) return;
 
@@ -196,6 +224,23 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
             {
                 pending.RemoveAt(i);
             }
+        }
+
+        // A placement still buffered while the mission runs means its DeploymentPoint never registered
+        // here; drop it after the deadline instead of holding the sweep off for the whole battle.
+        if (pending.Count > 0 && Mission.Current.CurrentState == Mission.State.Continuing)
+        {
+            pendingStallSeconds += dt;
+            if (pendingStallSeconds >= PendingStallDeadlineSeconds)
+            {
+                foreach (var stalled in pending)
+                    Logger.Error("[BattleSync] Dropping siege engine placement for point {PointId} ({Type}): its deployment point never registered", stalled.Key, stalled.Value);
+                pending.Clear();
+            }
+        }
+        else
+        {
+            pendingStallSeconds = 0f;
         }
 
         // The sweep must also wait for the mission to be running: pre-AfterStart there is no PlayerTeam
@@ -218,11 +263,9 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
             var type = MissionSiegeWeaponsController.GetWeaponType(weapon);
             if (type?.Name != weaponTypeName) continue;
 
-            weapon.IsDisabled = false;
-            Mission.Current.ActivateMissionObject(weapon);
-            weapon.GameEntity.SetVisibilityExcludeParents(true);
-            weapon.GameEntity.SetPhysicsState(true, false);
-            weapon.SetScriptComponentToTick(weapon.GetTickRequirement());
+            // Vanilla's own inverse of the teardown's SetDisabledAndMakeInvisible: activate, un-disable,
+            // visibility and physics back on, tick requirements refreshed down the entity tree.
+            weapon.SetEnabledAndMakeVisible();
             Logger.Information("[BattleSync] Restored swept weapon {Type} at point {PointId}", weaponTypeName, point.Id.Id);
             return type;
         }
@@ -243,7 +286,7 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
             if (Mission.Current == null || !Mission.Current.IsSiegeBattle) return;
 
             sweepRequested = true;
-            DrainPending();
+            DrainPending(0f);
         });
     }
 
@@ -299,6 +342,14 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
 
             if (placements.Count > 0)
                 Logger.Information("[BattleSync] Replayed {Count} siege engine placement(s) to joining {Controller}", placements.Count, controllerId);
+
+            // The deployment-finished broadcast is one-shot, so a client joining after it never sweeps its
+            // undeployed engines (or re-latches its siege tactic); re-tell the joiner, after the placements
+            // above so the set it sweeps against is final.
+            if (localDeploymentFinished)
+            {
+                network.Send(controllerId, new NetworkBattleDeploymentFinished(session.OwnControllerId));
+            }
         });
     }
 }

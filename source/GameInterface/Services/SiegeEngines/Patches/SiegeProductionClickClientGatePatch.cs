@@ -35,8 +35,14 @@ internal class SiegeProductionClickClientGatePatch
             return true;
         }
 
-        // Vanilla no-ops when the slot already holds the clicked engine.
-        if (poi.Machine != null && poi.Machine.SiegeEngine == machine.Engine) return false;
+        // Vanilla ends every machine click with IsEnabled = false, dismissing the selection popup; the
+        // skipped original never runs, so close it here on each gated path.
+        if (poi.Machine != null && poi.Machine.SiegeEngine == machine.Engine)
+        {
+            // Vanilla no-ops when the slot already holds the clicked engine.
+            __instance.IsEnabled = false;
+            return false;
+        }
 
         var side = PlayerSiege.PlayerSide;
         if (machine.IsReserveOption && poi.Machine != null)
@@ -49,6 +55,7 @@ internal class SiegeProductionClickClientGatePatch
             MessageBroker.Instance.Publish(machine, new SiegeEngineDeployRequested(siege, side, machine.Engine, poi.MachineIndex));
         }
 
+        __instance.IsEnabled = false;
         return false;
     }
 }

@@ -1,10 +1,8 @@
 ﻿using Common;
-using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using Missions.Messages;
-using Serilog;
 using System;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
@@ -29,8 +27,6 @@ public interface ISiegeWeaponFireReplicator : IDisposable
 /// <inheritdoc cref="ISiegeWeaponFireReplicator"/>
 public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<SiegeWeaponFireReplicator>();
-
     private readonly IBattleNetwork network;
     private readonly IMessageBroker messageBroker;
     private readonly INetworkAgentRegistry registry;
@@ -68,10 +64,6 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
         if (fire.Shooter != null && registry.TryGetAgentInfo(fire.Shooter, out var info))
             shooterId = info.AgentId;
 
-        // TEMP diagnostic: confirms the host captures + broadcasts, and whether the pilot resolved to an id.
-        Logger.Information("[SiegeFireDiag] host fire machine={Machine} shooter={Shooter} item={Item}",
-            fire.Weapon.Id.Id, shooterId, fire.MissileItem?.StringId ?? "null");
-
         network.SendAll(new NetworkSiegeWeaponFired(
             fire.Weapon.Id.Id, shooterId, fire.Position, fire.Direction, fire.Orientation, fire.BaseSpeed, fire.Speed, fire.MissileItem?.StringId));
     }
@@ -87,10 +79,7 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
             // The machine's simulator fired natively; everyone else replays it.
             if (SiegeMissionAuthorityGate.IsMachineSimulatedLocally(msg.MachineId)) return;
 
-            var weapon = FindWeapon(msg.MachineId);
-            // TEMP diagnostic: confirms the peer received the shot and resolved the machine.
-            Logger.Information("[SiegeFireDiag] peer recv machine={Machine} found={Found} shooter={Shooter} item={Item}",
-                msg.MachineId, weapon != null, msg.ShooterAgentId, msg.MissileItemId ?? "null");
+            var weapon = FindMissionObject<RangedSiegeWeapon>(msg.MachineId);
             if (weapon == null) return;
 
             PlayFireAnimation(weapon);
@@ -98,11 +87,11 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
         });
     }
 
-    private static RangedSiegeWeapon FindWeapon(int machineId)
+    private static T FindMissionObject<T>(int id) where T : MissionObject
     {
         foreach (var missionObject in Mission.Current.MissionObjects)
         {
-            if (missionObject is RangedSiegeWeapon weapon && weapon.Id.Id == machineId) return weapon;
+            if (missionObject is T match && match.Id.Id == id) return match;
         }
         return null;
     }
@@ -140,11 +129,7 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
             // fly. Any inert puppet keeps the blow-drop guarantee — it keys on Controller.None, not on the
             // shooter's identity. AddCustomMissile cannot take a null shooter.
             shooter = FindStandInShooter();
-            if (shooter == null)
-            {
-                Logger.Information("[SiegeFireDiag] peer spawn skipped machine={Machine}: no shooter stand-in", weapon.Id.Id);
-                return;
-            }
+            if (shooter == null) return;
         }
 
         var missileItem = MBObjectManager.Instance.GetObject<ItemObject>(msg.MissileItemId);
@@ -153,8 +138,6 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
         // Ammo count 1 matches the simulator's own launch exactly (physics-inert, cosmetic parity).
         var missileWeapon = new MissionWeapon(missileItem, null, null, 1);
         Mission.Current.AddCustomMissile(shooter, missileWeapon, msg.Position, msg.Direction, msg.Orientation, msg.BaseSpeed, msg.Speed, addRigidBody: false, weapon);
-        // TEMP diagnostic: confirms the cosmetic stone actually spawned.
-        Logger.Information("[SiegeFireDiag] peer spawn machine={Machine} item={Item}", weapon.Id.Id, msg.MissileItemId);
     }
 
     private static Agent FindStandInShooter()
@@ -167,14 +150,16 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
         return null;
     }
 
-    // [Host] our ram struck the gate — broadcast so peers play the swing (their unmanned ram never strikes).
+    // [Simulator] our ram struck the gate — broadcast so everyone else plays the swing (their unmanned ram
+    // never strikes).
     private void Handle_LocalRamHit(MessagePayload<RamHitStarted> payload)
     {
         var hit = payload.What;
         network.SendAll(new NetworkRamHit(hit.Ram.Id.Id, hit.PowerStage, hit.Progress));
     }
 
-    // [Peer] the host's ram struck — play the ram body swing animation.
+    // The simulator's ram struck — play the ram body swing animation. Rams are crew-grantable, so the
+    // gate is per-machine: the host must replay a client-simulated ram's swing too.
     private void Handle_NetworkRamHit(MessagePayload<NetworkRamHit> payload)
     {
         var msg = payload.What;
@@ -182,14 +167,14 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
         GameThread.RunSafe(() =>
         {
             if (Mission.Current == null) return;
-            if (SiegeMissionAuthorityGate.IsLocalAuthority) return;
+            if (SiegeMissionAuthorityGate.IsMachineSimulatedLocally(msg.MachineId)) return;
 
-            var ram = FindRam(msg.MachineId);
+            var ram = FindMissionObject<BatteringRam>(msg.MachineId);
             var body = ram?._batteringRamBody?.GetFirstScriptOfType<SynchedMissionObject>();
             if (body == null) return;
 
             // Mirror BatteringRam.StartHitAnimationWithProgress's body animation; the crew's pull animation
-            // rides the normal agent sync for the host's troops.
+            // rides the normal agent sync for the simulator's troops.
             body.SetAnimationAtChannelSynched(RamHitAnimation(msg.PowerStage), 0);
             if (msg.Progress > 0f) body.SetAnimationChannelParameterSynched(0, msg.Progress);
         });
@@ -202,23 +187,17 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
         _ => "batteringram_fire_weakest",
     };
 
-    private static BatteringRam FindRam(int machineId)
-    {
-        foreach (var missionObject in Mission.Current.MissionObjects)
-        {
-            if (missionObject is BatteringRam ram && ram.Id.Id == machineId) return ram;
-        }
-        return null;
-    }
-
-    // [Host] a ram struck a gate hard enough to react — broadcast so peers replay the flinch + sound.
+    // [Simulator] our ram hit a gate — broadcast the hit with its damage so the host applies it to the
+    // authoritative gate and everyone replays the reaction.
     private void Handle_LocalGateHit(MessagePayload<GateHitByRam> payload)
     {
-        network.SendAll(new NetworkGateHit(payload.What.Gate.Id.Id));
+        network.SendAll(new NetworkGateHit(payload.What.Gate.Id.Id, payload.What.Ram.Id.Id, payload.What.Damage));
     }
 
-    // [Peer] replay the gate hit reaction: door/plank flinch, heavy-hit particles, and the impact sound. Damage
-    // and destruction level are synced separately, so this only plays the reaction, mirroring CastleGate.OnHitTaken.
+    // A granted ram strikes only on its simulator, so the host (gate authority — gates are never claimed)
+    // applies the carried damage through vanilla TriggerOnHit: its own OnHitTaken plays the reaction and
+    // the synced hit points/destruction carry the damage to everyone. Other peers replay the cosmetic
+    // reaction, mirroring CastleGate.OnHitTaken's condition.
     private void Handle_NetworkGateHit(MessagePayload<NetworkGateHit> payload)
     {
         var msg = payload.What;
@@ -226,10 +205,22 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
         GameThread.RunSafe(() =>
         {
             if (Mission.Current == null) return;
-            if (SiegeMissionAuthorityGate.IsLocalAuthority) return;
+            if (SiegeMissionAuthorityGate.IsMachineSimulatedLocally(msg.RamId)) return;
 
-            var gate = FindGate(msg.GateId);
+            var gate = FindMissionObject<CastleGate>(msg.GateId);
             if (gate == null) return;
+
+            if (SiegeMissionAuthorityGate.IsMachineSimulatedLocally(msg.GateId))
+            {
+                var ram = FindMissionObject<BatteringRam>(msg.RamId);
+                if (ram == null || gate.DestructionComponent == null) return;
+
+                gate.DestructionComponent.TriggerOnHit(null, msg.Damage, gate.GameEntity.GlobalPosition,
+                    gate.GameEntity.GetGlobalFrame().rotation.f, in MissionWeapon.Invalid, -1, ram);
+                return;
+            }
+
+            if (msg.Damage < 200 || gate.State != CastleGate.GateState.Closed) return;
 
             gate._door?.SetAnimationAtChannelSynched(gate.HitAnimationName, 0);
             gate._plank?.SetAnimationAtChannelSynched(gate.PlankHitAnimationName, 0);
@@ -237,14 +228,5 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
             Mission.Current.MakeSound(SoundEvent.GetEventIdFromString("event:/mission/siege/door/hit"),
                 gate.GameEntity.GlobalPosition, soundCanBePredicted: false, isReliable: true, -1, -1);
         });
-    }
-
-    private static CastleGate FindGate(int gateId)
-    {
-        foreach (var missionObject in Mission.Current.MissionObjects)
-        {
-            if (missionObject is CastleGate gate && gate.Id.Id == gateId) return gate;
-        }
-        return null;
     }
 }

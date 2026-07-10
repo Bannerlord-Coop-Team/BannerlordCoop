@@ -1,10 +1,8 @@
 ﻿using Common;
-using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.SiegeEnginesConstructionProgress.Messages;
 using GameInterface.Services.SiegeEnginesConstructionProgress.Patches;
-using Serilog;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
 namespace GameInterface.Services.SiegeEnginesConstructionProgress.Handlers;
@@ -14,8 +12,6 @@ namespace GameInterface.Services.SiegeEnginesConstructionProgress.Handlers;
 /// </summary>
 internal class SiegeEngineProgressHandler : IHandler
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<SiegeEngineProgressHandler>();
-
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
 

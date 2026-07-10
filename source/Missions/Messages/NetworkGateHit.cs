@@ -4,18 +4,24 @@ using ProtoBuf;
 namespace Missions.Messages;
 
 /// <summary>
-/// Mission host to peers: a battering ram struck a gate hard enough for the gate hit reaction. The peer replays
-/// the door/plank flinch animation, the heavy-hit particles and the impact sound on that gate — its own gate
-/// never runs OnHit, so nothing reacts otherwise. Gate damage/destruction is synced separately.
+/// Ram simulator to everyone: its battering ram struck a gate. The host applies the damage to the
+/// authoritative gate (vanilla TriggerOnHit, which also plays its reaction); other peers replay the
+/// door/plank flinch, heavy-hit particles and impact sound — their own gate never runs OnHit.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public class NetworkGateHit : IEvent
 {
     [ProtoMember(1)]
     public int GateId { get; }
+    [ProtoMember(2)]
+    public int RamId { get; }
+    [ProtoMember(3)]
+    public int Damage { get; }
 
-    public NetworkGateHit(int gateId)
+    public NetworkGateHit(int gateId, int ramId, int damage)
     {
         GateId = gateId;
+        RamId = ramId;
+        Damage = damage;
     }
 }

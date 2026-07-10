@@ -157,10 +157,15 @@ public class BattleDeploymentCoordinator : IBattleDeploymentCoordinator
         }
 
         // The engine deployer finished: its placements are final here (same ReliableOrdered channel).
+        // This handler runs on the poll thread while the commit path runs on the game thread; marshal
+        // the flag work there so the deployerFinished/committed pair is read and written on one thread.
         if (session.IsHostController(payload.What.ControllerId) && !session.IsLocalHost)
         {
-            deployerFinished = true;
-            if (committed) RelatchSiegeTactic();
+            GameThread.RunSafe(() =>
+            {
+                deployerFinished = true;
+                if (committed) RelatchSiegeTactic();
+            });
         }
     }
 

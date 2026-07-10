@@ -36,12 +36,9 @@ internal class SiegeDeploymentPatches
         return SiegeMissionAuthorityGate.IsLocalAuthority;
     }
 
-    // The Start Battle teardown disables (and hides) every player-side engine whose weapon isn't
-    // deployed. A non-deployer can commit before the deployer's placements arrive, which would
-    // sweep engines mid-replication and permanently drop the late placements (the deployable-
-    // weapons list filters on !IsDisabled). Only the deployer tears down natively; everyone else
-    // sweeps once its deployment-finished announcement arrives, when the placement set is final
-    // (SiegeEngineDeploymentReplicator).
+    // Only the deployer runs the Start Battle teardown natively: a non-deployer committing first would
+    // sweep engines mid-replication and permanently drop the late placements. Everyone else sweeps once
+    // the deployer's deployment-finished announcement arrives (SiegeEngineDeploymentReplicator).
     [HarmonyPatch(typeof(SiegeDeploymentHandler), nameof(SiegeDeploymentHandler.RemoveDeploymentPoints))]
     [HarmonyPrefix]
     private static bool RemoveDeploymentPointsPrefix()

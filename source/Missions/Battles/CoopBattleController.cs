@@ -174,7 +174,7 @@ public class CoopBattleController : CoopMissionController
         }
 
         puppetSpawner.DrainPendingPuppets();
-        siegeEngineDeployment.DrainPending();
+        siegeEngineDeployment.DrainPending(dt);
         siegeMachineState.Tick(dt);
         diagnostics.Tick(dt);
         supplyReporter.Tick(dt);
@@ -194,6 +194,8 @@ public class CoopBattleController : CoopMissionController
     public override void OnDeploymentFinished()
     {
         base.OnDeploymentFinished();
+
+        siegeEngineDeployment.MarkLocalDeploymentFinished();
 
         if (Deployment.OnLocalDeploymentFinished())
             replicator.BroadcastOwnDeployedTroops();
