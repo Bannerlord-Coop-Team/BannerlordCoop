@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MapEvents;
@@ -113,8 +113,8 @@ public class BattleDamageRouter : IBattleDamageRouter
     // [Owner] Another client's troop hit one of OUR agents — a troop, or a registered horse addressed by its
     // own id. (IsMount is the fallback for an UNregistered horse, addressed via its rider's id; the rider's
     // current MountAgent is resolved here at apply time.) Re-apply the real blow through Agent.RegisterBlow so
-    // the engine resolves damage, hit reaction, ragdoll and (if lethal) death, which BattleAgentDiedPatch picks
-    // up for the normal death/casualty sync. Non-owners ignore it. No synthetic blow.
+    // the engine resolves damage, hit reaction, ragdoll and lethal death. AgentDeathReporter then sends
+    // the normal death/casualty sync. Non-owners ignore it. No synthetic blow.
     private void Handle_NetworkApplyBattleDamage(MessagePayload<NetworkApplyBattleDamage> payload)
     {
         var registry = coopMissionComponent.AgentRegistry;

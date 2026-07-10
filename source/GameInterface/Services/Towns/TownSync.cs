@@ -21,13 +21,13 @@ internal class TownSync : IAutoSync
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town.Buildings)));
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town.BuildingsInProgress)));
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town.BoostBuildingProcess)));
-        AutoSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._tradeTax)));
+        //AutoSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._tradeTax))); // Handled by coalescer
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town.InRebelliousState)));
         //AutoSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._marketData))); // readonly
 
         //// Properties
         AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.Governor)));
-        AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.TradeTaxAccumulated)));
+        //AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.TradeTaxAccumulated))); // Handled by coalescer
         AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.Security)));
         AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.Loyalty)));
         AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.LastCapturedBy)));
