@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using GameInterface.Utils.Commands;
 using Serilog;
 using System;
@@ -11,11 +11,10 @@ using static TaleWorlds.Library.CommandLineFunctionality;
 namespace GameInterface.Services.MapEvents.Commands;
 
 /// <summary>
-/// [Host debug] Battle-outcome test commands: kill one enemy, the whole enemy team, or the whole host (player)
-/// team in the current battle mission. Run these on the HOST — it owns the AI/enemy agents, so each kill goes
-/// through the coop death path (<c>Agent.Die</c> → <c>BattleAgentDiedPatch</c> → the death broadcast + the
-/// server-roster casualty), exactly like <c>coop.debug.mapevent.kms</c>. Agents owned by other clients (puppets)
-/// only die locally on the host, since the host isn't their authority.
+/// Battle-outcome test commands: kill one enemy, the whole enemy team, or the local player team in the current
+/// battle mission. Run the direct kill commands on the battle-authority client because it owns the AI/enemy
+/// agents, so each kill goes through the coop death path: <c>Agent.Die</c>, the mission death callback,
+/// the death broadcast, and the server-roster casualty, exactly like <c>coop.debug.mapevent.kms</c>.
 /// </summary>
 internal class BattleTeamKillCommands
 {
@@ -25,7 +24,7 @@ internal class BattleTeamKillCommands
 @"Usage:
   coop.debug.mapevent.kill_enemy
 
-Kills one live enemy-team agent in the current battle (host-side).";
+Kills one live enemy-team agent in the current battle (battle-authority side).";
 
     [CommandLineArgumentFunction("kill_enemy", "coop.debug.mapevent")]
     public static string KillOneEnemy(List<string> args)
@@ -57,7 +56,7 @@ Kills one live enemy-team agent in the current battle (host-side).";
 @"Usage:
   coop.debug.mapevent.kill_enemy_team
 
-Kills every live enemy-team agent in the current battle (host-side). Useful for testing a coop battle WIN.";
+Kills every live enemy-team agent in the current battle (battle-authority side). Useful for testing a coop battle WIN.";
 
     [CommandLineArgumentFunction("kill_enemy_team", "coop.debug.mapevent")]
     public static string KillEnemyTeam(List<string> args)
@@ -80,7 +79,7 @@ Kills every live enemy-team agent in the current battle (host-side). Useful for 
 @"Usage:
   coop.debug.mapevent.kill_own_team
 
-Kills every live agent on the host's own (player) team in the current battle (host-side). Useful for testing a
+Kills every live agent on the local player team in the current battle (battle-authority side). Useful for testing a
 coop battle LOSS.";
 
     [CommandLineArgumentFunction("kill_own_team", "coop.debug.mapevent")]
@@ -101,7 +100,7 @@ coop battle LOSS.";
         if (ex != null)
             return CommandHelpers.FormatException("Kill own team", ex);
 
-        return $"Killed {killed} agent(s) on the host's own team.";
+        return $"Killed {killed} agent(s) on the local player team.";
     }
 
     /// <summary>Live agents on any team hostile to the player (host) team.</summary>
