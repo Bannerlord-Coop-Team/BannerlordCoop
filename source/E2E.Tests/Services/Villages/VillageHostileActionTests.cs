@@ -182,7 +182,7 @@ public class VillageHostileActionTests : MapEventTestBase
         Assert.Equal(otherMobilePartyId, endEncounter.PartyId);
         Assert.All(
             Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>(),
-            message => Assert.Equal(otherMobilePartyId, message.PartyId));
+            message => Assert.Equal(otherMobilePartyId, Compact(message.PartyId, typeOf(MobileParty)));
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>());
 
         Server.Call(() =>
