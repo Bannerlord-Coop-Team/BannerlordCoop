@@ -13,6 +13,7 @@ using GameInterface.Services.ObjectManager;
 using static GameInterface.Services.ObjectManager.ObjectManager;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Handlers;
@@ -30,11 +31,7 @@ internal class MobilePartyBehaviorHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyBehaviorHandler>();
 
-    // Owner-party position resync threshold, in campaign-map units. The per-click prediction lead is
-    // a small fraction of a unit while map features sit tens of units apart, so 1 unit stays above
-    // normal prediction drift but still catches a genuine desync.
-    private const float OwnerPositionResyncThreshold = 1f;
-
+    private readonly Dictionary<string, PartyBehaviorUpdateData> latestPredictions = new Dictionary<string, PartyBehaviorUpdateData>();
     private readonly IMessageBroker messageBroker;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IMobilePartyInterface mobilePartyInterface;
@@ -94,7 +91,13 @@ internal class MobilePartyBehaviorHandler : IHandler
             party.DefaultBehavior,
             party.TargetPosition,
             party.DesiredAiNavigationType
-         );
+        );
+
+        if (ModInformation.IsClient)
+        {
+            data.OriginControllerId = controllerId;
+            latestPredictions[partyId] = data;
+        }
 
         messageBroker.Publish(this, new ControlledPartyBehaviorUpdated(data));
     }
@@ -107,11 +110,25 @@ internal class MobilePartyBehaviorHandler : IHandler
         {
             try
             {
-                PartyBase partyBase = null;
-                if (data.HasTarget && !objectManager.TryGetObject(data.InteractablePointId, out partyBase))
+                if (!objectManager.TryGetObjectWithLogging(data.MobilePartyId, out MobileParty party))
                     return;
 
-                if (!objectManager.TryGetObject(data.MobilePartyId, out MobileParty party))
+                bool isSelfEcho = ModInformation.IsClient &&
+                    party.IsControlledByThisInstance() &&
+                    !string.IsNullOrEmpty(data.OriginControllerId) &&
+                    string.Equals(data.OriginControllerId, controllerIdProvider.ControllerId, StringComparison.Ordinal);
+
+                bool isPredictionAcknowledgement = false;
+                if (isSelfEcho && latestPredictions.TryGetValue(data.MobilePartyId, out var latestPrediction))
+                {
+                    if (!MatchesPrediction(data, latestPrediction))
+                        return;
+
+                    isPredictionAcknowledgement = true;
+                }
+
+                PartyBase partyBase = null;
+                if (data.HasTarget && !objectManager.TryGetObjectWithLogging(data.InteractablePointId, out partyBase))
                     return;
 
                 // The apply drives the Harmony-patched SetAiBehavior path; the AutoSync
@@ -133,16 +150,9 @@ internal class MobilePartyBehaviorHandler : IHandler
 
                     if (ModInformation.IsClient)
                     {
-                        // The local player's own party is client-predicted and runs slightly ahead of the
-                        // server's relayed position; snapping it mid-move is the jitter. Snap when it's at rest,
-                        // on a nav-layer (land/sea) change, or once it's drifted far enough to be a real desync.
-                        if (!party.IsControlledByThisInstance() ||
-                            !party.IsMoving ||
-                            party.Position.IsOnLand != data.PartyPosition.IsOnLand ||
-                            party.Position.Distance(data.PartyPosition) > OwnerPositionResyncThreshold)
-                        {
+                        // A matching prediction echo restores behavior without rewinding movement.
+                        if (!isPredictionAcknowledgement)
                             party.Position = data.PartyPosition;
-                        }
                     }
                     else
                     {
@@ -156,5 +166,15 @@ internal class MobilePartyBehaviorHandler : IHandler
                 Logger.Error(e, "Failed to apply {Message}", nameof(UpdatePartyBehavior));
             }
         });
+    }
+
+    internal static bool MatchesPrediction(PartyBehaviorUpdateData update, PartyBehaviorUpdateData prediction)
+    {
+        return update.NewAiBehavior == prediction.NewAiBehavior &&
+            update.HasTarget == prediction.HasTarget &&
+            string.Equals(update.InteractablePointId, prediction.InteractablePointId, StringComparison.Ordinal) &&
+            update.BestTargetPoint.IsOnLand == prediction.BestTargetPoint.IsOnLand &&
+            update.BestTargetPoint.X.Equals(prediction.BestTargetPoint.X) &&
+            update.BestTargetPoint.Y.Equals(prediction.BestTargetPoint.Y);
     }
 }

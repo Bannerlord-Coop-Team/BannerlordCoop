@@ -69,7 +69,8 @@ public static class PartyBehaviorPatch
             }
         }
 
-        return false;
+        // Clients apply their own behavior immediately; matching server echoes are acknowledgements.
+        return ModInformation.IsClient;
     }
 
     private static bool BehaviorIsSame(

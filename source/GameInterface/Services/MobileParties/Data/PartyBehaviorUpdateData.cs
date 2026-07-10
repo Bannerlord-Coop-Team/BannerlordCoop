@@ -39,6 +39,10 @@ public struct PartyBehaviorUpdateData
     [ProtoMember(11)]
     public readonly MobileParty.NavigationType DesiredAiNavigationType;
 
+    // Server-authored updates leave the origin null.
+    [ProtoMember(12)]
+    public string OriginControllerId { get; set; }
+
     public PartyBehaviorUpdateData(
         string mobilePartyId,
         AiBehavior newAiBehavior,
@@ -59,5 +63,6 @@ public struct PartyBehaviorUpdateData
         DefaultBehavior = defaultBehavior;
         TargetPosition = targetPosition;
         DesiredAiNavigationType = desiredAiNavigationType;
+        OriginControllerId = null;
     }
 }
