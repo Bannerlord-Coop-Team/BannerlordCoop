@@ -241,11 +241,13 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         });
     }
 
-    [Fact]
-    public void OfferServices_WithTierTwoClanAndKingdomLeader_EnablesVassal()
+    [Theory]
+    [InlineData(2)]
+    [InlineData(3)]
+    public void OfferServices_WithEligibleClanAndKingdomLeader_EnablesVassal(int initiatorClanTier)
     {
         var (client1, _, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
-        SetupResponderKingdomLeader(initiatorPartyId, responderPartyId, initiatorClanTier: 2);
+        SetupResponderKingdomLeader(initiatorPartyId, responderPartyId, initiatorClanTier);
 
         RequestInteraction(client1, initiatorPartyId, responderPartyId);
         var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
@@ -307,7 +309,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Fact]
-    public void VassalServiceProposal_AcceptedByResponder_EndsWithoutJoiningKingdom()
+    public void VassalServiceProposal_AcceptedByKingdomLeader_JoinsKingdomOnAllInstances()
     {
         var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
         SetupResponderKingdomLeader(initiatorPartyId, responderPartyId, initiatorClanTier: 2);
@@ -318,12 +320,10 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             s.SessionId == sessionId &&
             s.PartyId == initiatorPartyId &&
             s.Phase == PlayerPartyInteractionPhase.InitialOptions);
-        string? initialKingdomId = null;
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
-            var initialKingdom = initiatorParty.LeaderHero.Clan.Kingdom;
-            initialKingdomId = initialKingdom?.StringId;
+            Assert.Null(initiatorParty.LeaderHero.Clan.Kingdom);
         });
 
         OpenServiceOptions(client1, initialState);
@@ -334,18 +334,21 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         var ended = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>().Single();
         Assert.Equal(PlayerPartyInteractionOutcomeType.VassalAccepted, ended.OutcomeType);
 
-        Server.Call(() =>
+        foreach (var instance in new[] { Server, client1, client2 })
         {
-            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
-            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
+                Assert.True(instance.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
 
-            var currentKingdom = initiatorParty.LeaderHero.Clan.Kingdom;
-            var currentKingdomId = currentKingdom?.StringId;
+                var initiatorClan = initiatorParty.LeaderHero.Clan;
+                var responderKingdom = responderParty.LeaderHero.Clan.Kingdom;
 
-            Assert.Equal(initialKingdomId, currentKingdomId);
-            Assert.NotEqual(responderParty.LeaderHero.Clan.Kingdom, currentKingdom);
-            Assert.False(initiatorParty.LeaderHero.Clan.IsUnderMercenaryService);
-        });
+                Assert.Same(responderKingdom, initiatorClan.Kingdom);
+                Assert.Contains(initiatorClan, responderKingdom.Clans);
+                Assert.False(initiatorClan.IsUnderMercenaryService);
+            });
+        }
     }
 
     [Theory]
