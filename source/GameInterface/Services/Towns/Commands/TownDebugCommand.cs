@@ -109,6 +109,7 @@ public class TownDebugCommand
         sb.AppendFormat("GarrisonAutoRecruitmentIsEnabled: '{0}'\n", town.GarrisonAutoRecruitmentIsEnabled);
         sb.AppendFormat("Food stock '{0}' : \n", fief.FoodStocks);
         sb.AppendFormat("TradeTaxAccumulated: '{0}'\n", town.TradeTaxAccumulated);
+        sb.AppendFormat("_tradeTax: '{0}'\n", town._tradeTax);
         sb.AppendFormat("Sold Items: \n");
         Town.SellLog[] logList = town._soldItems;
         if (logList != null)

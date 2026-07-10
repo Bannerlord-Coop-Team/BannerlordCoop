@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using Common.Network.Coalescing;
 using Coop.Core.Server.Services.Towns.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Towns.Messages;
@@ -11,15 +12,20 @@ namespace Coop.Core.Server.Services.Towns.Handlers
     /// </summary>
     public class ServerTownHandler : IHandler
     {
+        // Coalescer channel for per-town trade-tax updates; only the latest accumulated value per town is sent each tick.
+        private const string TownTradeTaxAccumulatedChannel = "TownTradeTaxAccumulated";
+
         private readonly IMessageBroker messageBroker;
         private readonly INetwork network;
         private readonly IObjectManager objectManager;
+        private readonly ISendCoalescer coalescer;
 
-        public ServerTownHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
+        public ServerTownHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager, ISendCoalescer coalescer)
         {
             this.messageBroker = messageBroker;
             this.network = network;
             this.objectManager = objectManager;
+            this.coalescer = coalescer;
 
             // This handles an internal message
             messageBroker.Subscribe<TownGovernorChanged>(HandleTownGovernor);
@@ -128,7 +134,9 @@ namespace Coop.Core.Server.Services.Towns.Handlers
             var networkChangeTownTradeTaxAccumulated =
                 new NetworkChangeTownTradeTaxAccumulated(townId, payload.TradeTaxAccumulated);
 
-            network.SendAll(networkChangeTownTradeTaxAccumulated);
+            // Coalesce per town: repeated trade-tax changes to one town collapse into a single latest-wins send per tick.
+            var key = new CoalesceKey(TownTradeTaxAccumulatedChannel, townId);
+            coalescer.Enqueue(key, new LatestWinsPayload(networkChangeTownTradeTaxAccumulated));
         }
 
         private void HandleTownGovernor(MessagePayload<TownGovernorChanged> obj)
