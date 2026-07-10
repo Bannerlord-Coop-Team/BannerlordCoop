@@ -25,6 +25,7 @@ using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Villages.Commands;
 using GameInterface.Services.Villages.Data;
 using GameInterface.Services.Villages.Interfaces;
@@ -52,6 +53,9 @@ namespace E2E.Tests.Services.Villages;
 
 public class VillageHostileActionTests : MapEventTestBase
 {
+
+    private sealed class MobileParty { }
+    
     private static int peerPortCounter;
 
     public VillageHostileActionTests(ITestOutputHelper output) : base(output)
@@ -182,7 +186,7 @@ public class VillageHostileActionTests : MapEventTestBase
         Assert.Equal(otherMobilePartyId, endEncounter.PartyId);
         Assert.All(
             Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>(),
-            message => Assert.Equal(otherMobilePartyId, Compact(message.PartyId, typeOf(MobileParty)));
+            message => Assert.Equal(otherMobilePartyId, ObjectManager.Compact(message.PartyId, typeOf(MobileParty)));
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>());
 
         Server.Call(() =>
