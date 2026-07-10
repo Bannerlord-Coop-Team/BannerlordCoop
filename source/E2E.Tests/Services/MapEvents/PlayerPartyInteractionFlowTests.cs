@@ -1329,8 +1329,6 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
             Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(partyId, out var party));
 
-            // Match the live capture path: vanilla removes the captured leader before PrisonerTaken
-            // reaches the coop parking handler.
             using (new AllowedThread())
             {
                 party.MobileParty.MemberRoster.AddToCounts(hero.CharacterObject, 1);

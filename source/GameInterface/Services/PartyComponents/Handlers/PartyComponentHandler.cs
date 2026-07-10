@@ -244,7 +244,6 @@ internal class PartyComponentHandler : IHandler
         var obj = payload.What;
 
         var mobileParty = obj.Instance.MobileParty;
-        // Player-party components may be unregistered; the mobile-party message also refreshes their visuals.
         if (mobileParty != null && mobileParty.IsPlayerParty())
         {
             messageBroker.Publish(this, new PartyLeaderChanged(mobileParty, obj.NewLeader));

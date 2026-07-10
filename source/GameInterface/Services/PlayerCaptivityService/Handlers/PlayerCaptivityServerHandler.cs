@@ -128,8 +128,6 @@ internal class PlayerCaptivityServerHandler : IHandler
         EmptyRoster(playerParty.PrisonRoster);
         playerParty.IsActive = false;
         RemoveVisual(playerParty);
-        // Native TakePrisonerAction already removes the captured party leader before publishing
-        // PrisonerTaken. Keep this as a fallback without broadcasting a redundant null -> null change.
         if (playerParty.LeaderHero != null)
             playerParty.ChangePartyLeader(null);
     }
