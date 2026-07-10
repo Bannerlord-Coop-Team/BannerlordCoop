@@ -43,8 +43,9 @@ public struct PartyBehaviorUpdateData
     [ProtoMember(12)]
     public string OriginControllerId { get; set; }
 
-    [ProtoMember(13)]
-    public long OriginRequestSequence { get; set; }
+    // Field 13 was OriginRequestSequence in an earlier development build.
+    [ProtoMember(14)]
+    public bool ForcePosition { get; set; }
 
     public PartyBehaviorUpdateData(
         string mobilePartyId,
@@ -67,6 +68,6 @@ public struct PartyBehaviorUpdateData
         TargetPosition = targetPosition;
         DesiredAiNavigationType = desiredAiNavigationType;
         OriginControllerId = null;
-        OriginRequestSequence = 0;
+        ForcePosition = false;
     }
 }

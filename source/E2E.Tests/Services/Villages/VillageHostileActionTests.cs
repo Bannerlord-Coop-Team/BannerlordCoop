@@ -1,7 +1,6 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
 using Common.Network;
-using Common.Network.Coalescing;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using System.Collections.Generic;
 using Coop.Core.Server.Services.ItemRosters.Messages;
@@ -912,8 +911,6 @@ public class VillageHostileActionTests : MapEventTestBase
             .ToList();
 
         client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkMapEventFinalizeAttempted(mapEventId!)), disabledMethods);
-        Server.Call(() => Server.Resolve<ISendCoalescer>().Flush(Server.Resolve<INetwork>()));
-
         AssertRaidPartyMovedToVillageGate(Server, mobilePartyId, target.SettlementId);
         foreach (var syncedClient in Clients)
         {

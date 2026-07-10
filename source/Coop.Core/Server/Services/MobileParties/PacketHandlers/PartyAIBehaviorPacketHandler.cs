@@ -1,13 +1,12 @@
 ﻿using Common.Messaging;
+using Common.Network;
 using Common.Network.Coalescing;
 using Common.PacketHandlers;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Packets;
-using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using static GameInterface.Services.ObjectManager.ObjectManager;
 using LiteNetLib;
-using System;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace Coop.Core.Server.Services.MobileParties.PacketHandlers;
@@ -25,15 +24,18 @@ internal class RequestMobilePartyBehaviorPacketHandler : IPacketHandler
     private readonly IPacketManager packetManager;
     private readonly ISendCoalescer coalescer;
     private readonly IMessageBroker messageBroker;
+    private readonly INetwork network;
 
     public RequestMobilePartyBehaviorPacketHandler(
         IPacketManager packetManager,
         ISendCoalescer coalescer,
-        IMessageBroker messageBroker)
+        IMessageBroker messageBroker,
+        INetwork network)
     {
         this.packetManager = packetManager;
         this.coalescer = coalescer;
         this.messageBroker = messageBroker;
+        this.network = network;
         packetManager.RegisterPacketHandler(this);
 
         messageBroker.Subscribe<PartyBehaviorUpdated>(Handle_PartyBehaviorUpdated);
@@ -61,44 +63,9 @@ internal class RequestMobilePartyBehaviorPacketHandler : IPacketHandler
 
         // Coalesce per party: repeated behavior changes to one party collapse into a single latest-wins send per tick.
         var key = new CoalesceKey(PartyBehaviorUpdateChannel, Compact(data.MobilePartyId, typeof(MobileParty)));
-        coalescer.Enqueue(key, new PartyBehaviorCoalescedPayload(data));
-    }
+        coalescer.Enqueue(key, new LatestWinsPayload(new NetworkUpdatePartyBehavior(data)));
 
-    /// <summary>
-    /// Keeps the latest behavior while retaining server authority across a merged tick.
-    /// </summary>
-    private sealed class PartyBehaviorCoalescedPayload : ICoalescedPayload
-    {
-        private readonly PartyBehaviorUpdateData data;
-
-        public PartyBehaviorCoalescedPayload(PartyBehaviorUpdateData data)
-        {
-            if (string.IsNullOrEmpty(data.OriginControllerId))
-                data.OriginRequestSequence = 0;
-
-            this.data = data;
-        }
-
-        public ICoalescedPayload Merge(ICoalescedPayload incoming)
-        {
-            if (incoming is not PartyBehaviorCoalescedPayload latest)
-            {
-                throw new ArgumentException(
-                    $"Cannot merge {incoming?.GetType().Name ?? "null"} into {nameof(PartyBehaviorCoalescedPayload)}; " +
-                    "a coalesce key must use a single payload type.",
-                    nameof(incoming));
-            }
-
-            var latestData = latest.data;
-            if (string.IsNullOrEmpty(data.OriginControllerId))
-            {
-                latestData.OriginControllerId = null;
-                latestData.OriginRequestSequence = 0;
-            }
-
-            return new PartyBehaviorCoalescedPayload(latestData);
-        }
-
-        public IMessage ToMessage() => new NetworkUpdatePartyBehavior(data);
+        if (data.ForcePosition)
+            coalescer.FlushInstance(key.InstanceId, network);
     }
 }

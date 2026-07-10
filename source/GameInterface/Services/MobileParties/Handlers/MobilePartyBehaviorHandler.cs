@@ -31,9 +31,8 @@ namespace GameInterface.Services.MobileParties.Handlers;
 internal class MobilePartyBehaviorHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyBehaviorHandler>();
-    private const float OwnerPositionResyncThreshold = 1f;
 
-    private readonly Dictionary<string, long> latestIssuedSequences = new Dictionary<string, long>();
+    private readonly Dictionary<string, PartyBehaviorUpdateData> latestPredictions = new Dictionary<string, PartyBehaviorUpdateData>();
     private readonly IMessageBroker messageBroker;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IMobilePartyInterface mobilePartyInterface;
@@ -66,8 +65,6 @@ internal class MobilePartyBehaviorHandler : IHandler
         var party = obj.What.PartyAi._mobileParty;
         var interactablePoint = obj.What.InteractablePoint;
 
-        var controllerId = controllerIdProvider.ControllerId;
-
         if (!objectManager.TryGetId(partyAi._mobileParty, out var partyId))
             return;
 
@@ -97,12 +94,8 @@ internal class MobilePartyBehaviorHandler : IHandler
 
         if (ModInformation.IsClient)
         {
-            data.OriginControllerId = controllerId;
-            long sequence = latestIssuedSequences.TryGetValue(partyId, out var latestSequence)
-                ? checked(latestSequence + 1)
-                : 1;
-            data.OriginRequestSequence = sequence;
-            latestIssuedSequences[partyId] = sequence;
+            data.OriginControllerId = controllerIdProvider.ControllerId;
+            latestPredictions[partyId] = data;
         }
 
         messageBroker.Publish(this, new ControlledPartyBehaviorUpdated(data));
@@ -124,16 +117,9 @@ internal class MobilePartyBehaviorHandler : IHandler
                     !string.IsNullOrEmpty(data.OriginControllerId) &&
                     string.Equals(data.OriginControllerId, controllerIdProvider.ControllerId, StringComparison.Ordinal);
 
-                bool isLatestPredictionAcknowledgement = false;
-                if (isSelfEcho)
-                {
-                    var partyId = Compact(data.MobilePartyId, typeof(MobileParty));
-                    if (!latestIssuedSequences.TryGetValue(partyId, out var latestSequence) ||
-                        !IsLatestPredictionAcknowledgement(data.OriginRequestSequence, latestSequence))
-                        return;
-
-                    isLatestPredictionAcknowledgement = true;
-                }
+                // Reapply the newest local command if an authoritative update arrived before its echo.
+                if (!TrySelectBehaviorUpdate(isSelfEcho, latestPredictions, ref data))
+                    return;
 
                 PartyBase partyBase = null;
                 if (data.HasTarget && !objectManager.TryGetObjectWithLogging(data.InteractablePointId, out partyBase))
@@ -158,8 +144,13 @@ internal class MobilePartyBehaviorHandler : IHandler
 
                     if (ModInformation.IsClient)
                     {
-                        // Keep normal prediction lead, but reconcile real drift from the latest acknowledgement.
-                        if (ShouldApplyOwnerPosition(isLatestPredictionAcknowledgement, party.Position, data.PartyPosition))
+                        // Moving parties already simulate the replicated target, so an in-flight snapshot is stale.
+                        if (ShouldApplyAuthoritativePosition(
+                            isSelfEcho,
+                            data.ForcePosition,
+                            party.PartyMoveMode == MoveModeType.Hold,
+                            party.Position,
+                            data.PartyPosition))
                             party.Position = data.PartyPosition;
                     }
                     else
@@ -176,18 +167,26 @@ internal class MobilePartyBehaviorHandler : IHandler
         });
     }
 
-    internal static bool IsLatestPredictionAcknowledgement(long acknowledgementSequence, long latestIssuedSequence)
+    internal static bool TrySelectBehaviorUpdate(
+        bool isSelfEcho,
+        IReadOnlyDictionary<string, PartyBehaviorUpdateData> latestPredictions,
+        ref PartyBehaviorUpdateData data)
     {
-        return acknowledgementSequence > 0 && acknowledgementSequence == latestIssuedSequence;
+        if (!isSelfEcho)
+            return true;
+
+        var partyId = Compact(data.MobilePartyId, typeof(MobileParty));
+        return latestPredictions.TryGetValue(partyId, out data);
     }
 
-    internal static bool ShouldApplyOwnerPosition(
-        bool isLatestPredictionAcknowledgement,
-        CampaignVec2 ownerPosition,
-        CampaignVec2 serverPosition)
+    internal static bool ShouldApplyAuthoritativePosition(
+        bool isSelfEcho,
+        bool forcePosition,
+        bool isHolding,
+        CampaignVec2 currentPosition,
+        CampaignVec2 authoritativePosition)
     {
-        return !isLatestPredictionAcknowledgement ||
-            ownerPosition.IsOnLand != serverPosition.IsOnLand ||
-            ownerPosition.Distance(serverPosition) > OwnerPositionResyncThreshold;
+        return !isSelfEcho &&
+            (forcePosition || isHolding || currentPosition.IsOnLand != authoritativePosition.IsOnLand);
     }
 }
