@@ -40,6 +40,7 @@ public class SurrogateCollection : ISurrogateCollection
 
             AddSurrogate<Vec3, Vec3Surrogate>();
             AddSurrogate<Mat3, Mat3Surrogate>();
+            AddSurrogate<MatrixFrame, MatrixFrameSurrogate>();
             AddSurrogate<Blow, BlowSurrogate>();
             AddSurrogate<AttackCollisionData, AttackCollisionDataSurrogate>();
             AddSurrogate<SunInformation, SunInformationSurrogate>();
@@ -54,6 +55,7 @@ public class SurrogateCollection : ISurrogateCollection
             AddSurrogate<PostProcessInformation, PostProcessInformationSurrogate>();
             AddSurrogate<AtmosphereInfo, AtmosphereInfoSurrogate>();
             AddSurrogate<MissionInitializerRecord, MissionInitializerRecordSurrogate>();
+            AddSurrogate<WeaponComponentData, WeaponComponentDataSurrogate>();
         }
     }
 

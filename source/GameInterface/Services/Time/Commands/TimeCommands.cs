@@ -50,6 +50,6 @@ internal class TimeCommands
         mapTimeTrackerInterface.AdvanceTime(ticks);
 
         return $"Advanced campaign time forward by {days} day(s) ({ticks} ticks). " +
-            $"Connected clients should interpolate to catch up over the next second.";
+            $"Connected clients should apply the jump on the next time update.";
     }
 }

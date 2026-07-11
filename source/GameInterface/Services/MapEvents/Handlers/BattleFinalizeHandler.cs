@@ -564,7 +564,12 @@ internal class BattleFinalizeHandler : IHandler
             mobileParty.Position,
             mobileParty.DefaultBehavior,
             mobileParty.TargetPosition,
-            mobileParty.DesiredAiNavigationType);
+            mobileParty.DesiredAiNavigationType)
+        {
+            ForcePosition = true,
+        };
+
+        // The gate reset must reach clients before the encounter close allows another map command.
         messageBroker.Publish(this, new PartyBehaviorUpdated(ref data));
     }
 

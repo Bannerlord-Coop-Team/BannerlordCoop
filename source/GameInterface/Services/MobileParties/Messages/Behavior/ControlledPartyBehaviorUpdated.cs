@@ -6,7 +6,7 @@ namespace GameInterface.Services.MobileParties.Messages.Behavior;
 
 /// <summary>
 /// The behavior of a controlled party has been updated.
-/// Must be confirmed by the server before the change is applied.
+/// Must be sent to the server for replication.
 /// </summary>
 /// <seealso cref="MobilePartyBehaviorHandler"/>
 public record ControlledPartyBehaviorUpdated : IEvent

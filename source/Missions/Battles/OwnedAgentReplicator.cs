@@ -252,6 +252,9 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         int formationIndex = agent.Formation != null ? (int)agent.Formation.FormationIndex : -1;
         var data = new BattleAgentSpawnData(agentId, characterId, agent.Position, side, agent.Health, owner, mapEventPartyId, troopSeed, mountAgentId, formationIndex);
 
+        // Populate MapEvent's UpgradeTroopTracker with spawned agent to handle on the server during battle.
+        messageBroker.Publish(this, new TrackTroopForUpgrades(mapEventPartyId, characterId));
+
         // Requirement #4 "hidden everywhere until deployed": while we are still placing our own formations our
         // own-party troops are spawned locally (so we can deploy them) but NOT replicated, so other clients never
         // see them mid-deployment. They are broadcast at their deployed positions when we commit (see

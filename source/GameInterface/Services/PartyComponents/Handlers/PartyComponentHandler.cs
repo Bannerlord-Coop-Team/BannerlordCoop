@@ -3,6 +3,8 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyComponents.Data;
 using GameInterface.Services.PartyComponents.Messages;
@@ -270,6 +272,13 @@ internal class PartyComponentHandler : IHandler
     private void Handle_PartyComponentLeaderChanged(MessagePayload<PartyComponentLeaderChanged> payload)
     {
         var obj = payload.What;
+
+        var mobileParty = obj.Instance.MobileParty;
+        if (mobileParty != null && mobileParty.IsPlayerParty())
+        {
+            messageBroker.Publish(this, new PartyLeaderChanged(mobileParty, obj.NewLeader));
+            return;
+        }
 
         if (!objectManager.TryGetIdWithLogging(obj.Instance, out var partyComponentId)) return;
 
