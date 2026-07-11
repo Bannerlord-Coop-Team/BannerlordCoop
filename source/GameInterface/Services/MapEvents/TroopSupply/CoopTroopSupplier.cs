@@ -283,7 +283,7 @@ public class CoopTroopSupplier : IMissionTroopSupplier
         // CoopAgentOrigin carries the troop's party for ALL troops (SimpleAgentOrigin gives non-heroes a null
         // party → no team → no spawn) and the server's descriptor, so every client agrees on troop identity.
         var party = ResolveParty(partyId);
-        var origin = new CoopAgentOrigin(character, party, -1, null, new UniqueTroopDescriptor(entry.Seed));
+        var origin = new CoopAgentOrigin(character, party, -1, null, new UniqueTroopDescriptor(entry.Seed), partyId);
         if (party == null)
             Logger.Warning("[TroopSupply] {Side} origin char={Char} (isHero={Hero}) got NULL party — partyId {PartyId} unresolvable → no team / not player-commanded",
                 Side, entry.CharacterId, character.IsHero, partyId);

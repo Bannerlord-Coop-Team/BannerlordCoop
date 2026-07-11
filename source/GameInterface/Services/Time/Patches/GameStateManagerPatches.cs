@@ -2,7 +2,6 @@
 using SandBox.View.Map;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.Core;
-using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.Time.Patches
@@ -24,21 +23,23 @@ namespace GameInterface.Services.Time.Patches
                 if (mapState == null) return;
 
                 // Co-op keeps the (now backgrounded) map ticking so the world keeps simulating
-                // without pausing while another screen (clan, kingdom, inventory, etc.) is on top.
-                // That tick still reads game-key input from the map's scene layer (navigation, time
-                // control, ...) because the layer's "keys allowed" flag stays stale-true while the
-                // map isn't the top screen (ScreenManager only refreshes top-screen / global layers).
-                // While a text inquiry (e.g. the "Change Clan Name" box) is open we want those
-                // keystrokes to go to the text box, so suppress the backgrounded map's keyboard input
-                // for this tick and restore it afterwards. (IsKeysAllowed also gates the controller;
-                // mouse input is already inert on a backgrounded map.)
-                var mapInput = InformationManager.IsAnyInquiryActive() ? MapScreen.Instance?.SceneLayer?.Input : null;
-                bool keysAllowed = mapInput?.IsKeysAllowed ?? false;
-                if (mapInput != null) mapInput.IsKeysAllowed = false;
-
-                mapState.OnTick(dt);
-
-                if (mapInput != null) mapInput.IsKeysAllowed = keysAllowed;
+                // without pausing while another screen (clan, kingdom, inventory, crafting, etc.) is on top.
+                // Unlike vanilla, that forced tick also runs the inactive map handler's UI/input callbacks.
+                // Those callbacks read stale input and can take focus from the active screen, which triggers
+                // map hotkeys while typing and immediately clears fields such as the blacksmith weapon name.
+                // Temporarily detach the handler so campaign simulation keeps ticking without the inactive
+                // map UI. Always restore it in finally: if OnTick throws and the handler stays null, later map
+                // input and lifecycle callbacks would remain broken for the rest of the session.
+                var handler = mapState.Handler;
+                mapState.Handler = null;
+                try
+                {
+                    mapState.OnTick(dt);
+                }
+                finally
+                {
+                    mapState.Handler = handler;
+                }
             }
         }
     }

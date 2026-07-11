@@ -10,6 +10,7 @@ using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GuantletMapEventVisuals;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Kingdoms;
@@ -21,6 +22,7 @@ using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Settlements.Interfaces;
+using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Time.Interfaces;
 using GameInterface.Services.TroopRosters.Interfaces;
@@ -98,9 +100,13 @@ internal abstract class TestComponentBase
         RegisterMock<IMobilePartyInterface>(builder);
         RegisterMock<IGameStateInterface>(builder);
         RegisterMock<ISettlementInterface>(builder);
+        RegisterMock<ISiegeEventInterface>(builder);
         RegisterMock<IAttachmentIdMapper>(builder);
         RegisterMock<IAutoRegistryFactory>(builder);
         RegisterMock<IBattleTroopReserveBuilder>(builder);
+        // BattleHostHandler (MissionModule, auto-activated) needs the registry, which the real
+        // containers get from GameInterfaceModule — not loaded here.
+        RegisterMock<IBattleHostRegistry>(builder);
         RegisterMock<IMapEventBattleSizeCorrection>(builder);
         RegisterMock<IRaidAiInterventionConfigInterface>(builder);
         RegisterMock<IVillageHostileActionInterface>(builder);

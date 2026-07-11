@@ -138,8 +138,17 @@ public class PuppetSpawner : IPuppetSpawner
 
         if (party == null)
         {
-            Logger.Warning("[BattleSync] Puppet skipped: unresolved party {Party} for agent {AgentId}", data.MapEventPartyId, data.AgentId);
-            return false;
+            // An unattributed spawn record must still produce a body — a puppet that never spawns is an
+            // invisible enemy (and re-buffering forever spams the log every tick). Fall back to any
+            // involved party on the agent's side; only the scoreboard attribution degrades.
+            party = ResolveFallbackParty(data.Side);
+            if (party == null)
+            {
+                Logger.Warning("[BattleSync] Puppet skipped: unresolved party {Party} for agent {AgentId}", data.MapEventPartyId, data.AgentId);
+                return false;
+            }
+
+            Logger.Warning("[BattleSync] Puppet {AgentId} spawned with a fallback {Side} party; {Party} unresolved", data.AgentId, data.Side, data.MapEventPartyId);
         }
 
         var origin = new CoopAgentOrigin(character, party, -1, null, new UniqueTroopDescriptor(data.TroopSeed));
@@ -252,6 +261,20 @@ public class PuppetSpawner : IPuppetSpawner
     {
         if (mapEventPartyId != null && objectManager.TryGetObject<MapEventParty>(mapEventPartyId, out var mapEventParty))
             return mapEventParty?.Party;
+        return null;
+    }
+
+    // Any involved party of the given side, for a spawn record whose own party never resolved here.
+    private static PartyBase ResolveFallbackParty(BattleSideEnum side)
+    {
+        var mapEvent = MobileParty.MainParty?.MapEvent;
+        if (mapEvent == null || side == BattleSideEnum.None) return null;
+
+        foreach (var involved in mapEvent.GetMapEventSide(side).Parties)
+        {
+            if (involved?.Party != null) return involved.Party;
+        }
+
         return null;
     }
 

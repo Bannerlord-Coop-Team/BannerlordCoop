@@ -3,7 +3,21 @@
 {{~ if Debug ~}}
 	Logger.Debug("[Server] Sending network message for {type}", "{{MemberName}}");
 {{~ end ~}}
+{{~ if Coalesce ~}}
+	var message = new {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage(instanceId, RawSerializer.Serialize(data.Value));
+	if (sendCoalescer == null)
+	{
+		// Clients register no coalescer; this also keeps generated handlers usable in standalone test hosts.
+		network.SendAll(message);
+		return;
+	}
+	// Absolute-value set, so latest-wins: the client only needs the final value per tick.
+	sendCoalescer.Enqueue(
+		new CoalesceKey("AutoSync.SetValue.{{MemberDeclaringTypeName}}.{{MemberName}}", instanceId),
+		new LatestWinsPayload(message));
+{{~ else ~}}
 	network.SendAll(new {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage(instanceId, RawSerializer.Serialize(data.Value)));
+{{~ end ~}}
 });
 
 {{~ if ReadOnly ~}}

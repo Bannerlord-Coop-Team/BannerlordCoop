@@ -229,12 +229,20 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         // Our coop spawns carry a CoopAgentOrigin (the custom supplier's origin), NOT the native
         // PartyGroupAgentOrigin — read the party + descriptor seed from it. Checking for the native type here
         // left attribution null, so the death report was skipped and the map-event roster never decremented.
-        if (agent.Origin is CoopAgentOrigin origin && origin.Party != null)
+        if (agent.Origin is CoopAgentOrigin origin)
         {
             troopSeed = origin.UniqueSeed;
-            var mapEventParty = ResolveMapEventParty(origin.Party);
-            if (mapEventParty != null && objectManager.TryGetId(mapEventParty, out var mepId))
-                mapEventPartyId = mepId;
+
+            // The origin carries the server's MapEventParty id directly; re-deriving it from the local
+            // map-event membership missed whole parties (a garrison whose wrapper never resolved here),
+            // and an unattributed spawn record is never spawned as a puppet on the other clients.
+            mapEventPartyId = origin.MapEventPartyId;
+            if (mapEventPartyId == null && origin.Party != null)
+            {
+                var mapEventParty = ResolveMapEventParty(origin.Party);
+                if (mapEventParty != null && objectManager.TryGetId(mapEventParty, out var mepId))
+                    mapEventPartyId = mepId;
+            }
         }
         // The casualty keys on the troop's CHARACTER — exactly `characterId`, the CharacterObject's object-manager
         // id we also carry in the spawn data.
@@ -243,6 +251,9 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         BattleSideEnum side = agent.Team != null ? agent.Team.Side : BattleSideEnum.None;
         int formationIndex = agent.Formation != null ? (int)agent.Formation.FormationIndex : -1;
         var data = new BattleAgentSpawnData(agentId, characterId, agent.Position, side, agent.Health, owner, mapEventPartyId, troopSeed, mountAgentId, formationIndex);
+
+        // Populate MapEvent's UpgradeTroopTracker with spawned agent to handle on the server during battle.
+        messageBroker.Publish(this, new TrackTroopForUpgrades(mapEventPartyId, characterId));
 
         // Requirement #4 "hidden everywhere until deployed": while we are still placing our own formations our
         // own-party troops are spawned locally (so we can deploy them) but NOT replicated, so other clients never

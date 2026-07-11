@@ -15,8 +15,6 @@ internal class TownSync : IAutoSync
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._isCastle)));
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town.GarrisonAutoRecruitmentIsEnabled)));
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._ownerClan)));
-        AutoSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._security)));
-        AutoSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._loyalty)));
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._tradeBoundVillagesCache)));
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town.Buildings)));
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town.BuildingsInProgress)));

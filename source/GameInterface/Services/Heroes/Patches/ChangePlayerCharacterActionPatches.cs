@@ -1,6 +1,9 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Heroes.Messages;
 using HarmonyLib;
+using SandBox.GauntletUI.Map;
+using SandBox.View.Map;
+using SandBox.ViewModelCollection.Nameplate;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Naval;
@@ -82,6 +85,21 @@ internal class ChangePlayerCharacterActionPatches
         mainParty.Party.SetVisualAsDirty();
         Campaign.Current.MainHeroIllDays = -1;
 
+        // Nameplate relations were initialized against the save's previous main hero. The native VM
+        // does not listen for player-character changes, so refresh its cached friendly/enemy state now.
+        RefreshSettlementNameplateRelations();
+
         return false;
+    }
+
+    private static void RefreshSettlementNameplateRelations()
+    {
+        var nameplates = MapScreen.Instance?.GetMapView<GauntletMapSettlementNameplateView>()?._dataSource;
+        RefreshSettlementNameplateRelations(nameplates);
+    }
+
+    internal static void RefreshSettlementNameplateRelations(SettlementNameplatesVM nameplates)
+    {
+        nameplates?.RefreshRelationsOfNameplates();
     }
 }

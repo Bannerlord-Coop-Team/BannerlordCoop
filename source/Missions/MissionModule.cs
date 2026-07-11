@@ -73,14 +73,15 @@ public class MissionModule : Module
             .As<ICoopFieldBattleLauncher>()
             .InstancePerLifetimeScope();
 
-        // Battle host election + assignment store. BattleHostRegistry holds the per-map-event host/successor
-        // assignment (queried by the spawn path and, later, host migration); BattleHostHandler elects on the
-        // server and stores the broadcast on clients. Both live for the whole session (like MissionContext),
-        // and BattleHostHandler is AutoActivated so it subscribes up front on both client and server.
-        builder.RegisterType<BattleHostRegistry>()
-            .As<IBattleHostRegistry>()
+        // Builds the coop walls-assault siege mission (mirrors SandBoxMissions.OpenSiegeMissionWithDeployment
+        // with the same coop swaps). Resolved by the GameInterface battle flow as ICoopSiegeBattleLauncher.
+        builder.RegisterType<CoopSiegeBattleLauncher>()
+            .As<ICoopSiegeBattleLauncher>()
             .InstancePerLifetimeScope();
 
+        // Battle host election: elects on the server, stores the broadcast on clients, AutoActivated so it
+        // subscribes up front on both. The assignment store itself (IBattleHostRegistry) is registered by
+        // GameInterfaceModule — its handlers gate finalizes/conclusions on it too.
         builder.RegisterType<BattleHostHandler>()
             .AsSelf()
             .InstancePerLifetimeScope()

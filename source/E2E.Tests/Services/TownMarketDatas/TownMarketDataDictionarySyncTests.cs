@@ -1,3 +1,5 @@
+using Common.Network;
+using Common.Network.Coalescing;
 using E2E.Tests.Util;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -58,6 +60,9 @@ public class TownMarketDataDictionarySyncTests : SyncTestBase
         }
     }
 
+    void FlushServerCoalescer() =>
+        Server.Call(() => Server.Resolve<ISendCoalescer>().Flush(Server.Resolve<INetwork>()));
+
     [Fact]
     public void Server_Dictionary_SetItemData_GameMethod_Syncs()
     {
@@ -74,6 +79,8 @@ public class TownMarketDataDictionarySyncTests : SyncTestBase
 
             Assert.Single(serverMarketData._itemDict);
         });
+
+        FlushServerCoalescer();
 
         // Assert
         AssertClientCounts(1);
@@ -104,6 +111,8 @@ public class TownMarketDataDictionarySyncTests : SyncTestBase
             Assert.Single(serverMarketData._itemDict);
         });
 
+        FlushServerCoalescer();
+
         // Assert
         AssertClientCounts(1);
         AssertClientsHave(categoryId, itemData);
@@ -128,6 +137,8 @@ public class TownMarketDataDictionarySyncTests : SyncTestBase
             Assert.Single(serverMarketData._itemDict);
         });
 
+        FlushServerCoalescer();
+
         // Assert
         AssertClientCounts(1);
         AssertClientsHave(categoryId, itemData);
@@ -144,6 +155,8 @@ public class TownMarketDataDictionarySyncTests : SyncTestBase
 
             serverMarketData.SetItemData(serverCategory, new ItemData(1f, 2f, 3, 4));
         });
+
+        FlushServerCoalescer();
 
         AssertClientCounts(1);
 
@@ -184,6 +197,8 @@ public class TownMarketDataDictionarySyncTests : SyncTestBase
             Assert.Equal(2, serverMarketData._itemDict.Count);
         });
 
+        FlushServerCoalescer();
+
         AssertClientCounts(2);
 
         // Act — clear the dictionary on the server through the generated dictionary clear intercept.
@@ -200,6 +215,77 @@ public class TownMarketDataDictionarySyncTests : SyncTestBase
         });
 
         // Assert
+        AssertClientCounts(0);
+    }
+
+    [Fact]
+    public void Server_Dictionary_RepeatedUpserts_CoalesceToLatestValue()
+    {
+        var latest = new ItemData(9f, 10f, 11, 12);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject(MarketDataId, out TownMarketData serverMarketData));
+            Assert.True(Server.ObjectManager.TryGetObject(categoryId, out ItemCategory serverCategory));
+
+            serverMarketData.SetItemData(serverCategory, new ItemData(1f, 2f, 3, 4));
+            serverMarketData.SetItemData(serverCategory, new ItemData(5f, 6f, 7, 8));
+            serverMarketData.SetItemData(serverCategory, latest);
+
+            Assert.True(Server.Resolve<ISendCoalescer>().HasPending);
+        });
+
+        // Upserts are delayed until the server-tick flush.
+        AssertClientCounts(0);
+
+        FlushServerCoalescer();
+
+        AssertClientCounts(1);
+        AssertClientsHave(categoryId, latest);
+    }
+
+    [Fact]
+    public void Server_Dictionary_IdenticalValueTypeAssignment_IsNotQueued()
+    {
+        var itemData = new ItemData(1f, 2f, 3, 4);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject(MarketDataId, out TownMarketData serverMarketData));
+            Assert.True(Server.ObjectManager.TryGetObject(categoryId, out ItemCategory serverCategory));
+            serverMarketData.SetItemData(serverCategory, itemData);
+        });
+        FlushServerCoalescer();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject(MarketDataId, out TownMarketData serverMarketData));
+            Assert.True(Server.ObjectManager.TryGetObject(categoryId, out ItemCategory serverCategory));
+            serverMarketData.SetItemData(serverCategory, itemData);
+
+            Assert.False(Server.Resolve<ISendCoalescer>().HasPending);
+        });
+    }
+
+    [Fact]
+    public void Server_Dictionary_RemoveFlushesPendingUpsertBeforeRemove()
+    {
+        var fieldInfo = AccessTools.Field(typeof(TownMarketData), nameof(TownMarketData._itemDict));
+        var removeIntercept = TestEnvironment.GetDictionaryRemoveIntercept(fieldInfo);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject(MarketDataId, out TownMarketData serverMarketData));
+            Assert.True(Server.ObjectManager.TryGetObject(categoryId, out ItemCategory serverCategory));
+
+            serverMarketData.SetItemData(serverCategory, new ItemData(1f, 2f, 3, 4));
+            Assert.True((bool)removeIntercept.Invoke(
+                null,
+                new object[] { serverMarketData, serverMarketData._itemDict, serverCategory }));
+        });
+
+        // A later tick flush must not resurrect the entry after the remove.
+        FlushServerCoalescer();
         AssertClientCounts(0);
     }
 }

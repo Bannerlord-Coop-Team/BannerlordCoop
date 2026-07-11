@@ -7,6 +7,9 @@ SubscribeTracked((MessagePayload<Local_{{ MemberDeclaringTypeName }}_{{ MemberNa
     if (!objectManager.TryGetIdWithLogging(data.Instance, out var instanceId))
         return;
 
+    // Preserve mutation order: pending upserts must arrive before this clear.
+    sendCoalescer?.FlushInstance(instanceId, network);
+
     {{~ if Debug ~}}
     Logger.Debug("[Server] Broadcasting clear dictionary {MemberName}", "{{MemberDeclaringType}}.{{MemberName}}");
     {{~ end ~}}

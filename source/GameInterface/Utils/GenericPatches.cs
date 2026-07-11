@@ -844,7 +844,15 @@ namespace GameInterface.Utils
                 return;
             }
 
+            // Value-type dictionary entries represent an absolute value. Reassigning an identical
+            // value cannot change the receiver, so avoid publishing a redundant network update.
+            bool unchanged = typeof(TValue).IsValueType &&
+                dict.TryGetValue(key, out TValue existingValue) &&
+                EqualityComparer<TValue>.Default.Equals(existingValue, value);
+
             dict[key] = value;
+
+            if (unchanged) return;
 
             var message = (TMessage)Activator.CreateInstance(typeof(TMessage), instance, key, value);
             MessageBroker.Instance.Publish(instance, message);
