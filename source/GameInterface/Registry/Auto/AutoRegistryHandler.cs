@@ -87,8 +87,6 @@ class AutoRegistryHandler<T> : IHandler where T : class
     {
         // TODO drop on loading clients
 
-        // Every received create/apply/destroy is queued in ReliableOrdered arrival order. The final
-        // MapEvent initialization packet can therefore act as a real game-thread commit barrier.
         GameThread.RunSafe(() =>
         {
             var newInstance = ObjectHelper.SkipConstructor<T>();

@@ -46,17 +46,14 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
     private static readonly ILogger Logger = LogManager.GetLogger<MapEventInitializationBarrier>();
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
-    private readonly IMapEventBattleSizeCorrection battleSizeCorrection;
     private readonly Dictionary<MapEvent, State> states = new Dictionary<MapEvent, State>();
 
     public MapEventInitializationBarrier(
         INetwork network,
-        IObjectManager objectManager,
-        IMapEventBattleSizeCorrection battleSizeCorrection)
+        IObjectManager objectManager)
     {
         this.network = network;
         this.objectManager = objectManager;
-        this.battleSizeCorrection = battleSizeCorrection;
     }
 
     public bool IsPending(MapEvent mapEvent) => mapEvent != null &&
@@ -190,7 +187,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         AddPartyToSide(side, party);
         if (TryDeferAttachment(root, side, party, afterCommit)) return;
 
-        PublishPartyAttachment(root, side, party, afterCommit);
+        PublishPartyAttachment(side, party, afterCommit);
     }
 
     private static void AddPartyToSide(MapEventSide side, MapEventParty party)
@@ -221,7 +218,6 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
     }
 
     private void PublishPartyAttachment(
-        MapEvent root,
         MapEventSide side,
         MapEventParty party,
         Action afterCommit)
@@ -233,7 +229,6 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         }
 
         afterCommit?.Invoke();
-        battleSizeCorrection.TryCorrect(root);
     }
 
     public void DetachClient(MapEventSide side, MapEventParty party)
@@ -363,13 +358,9 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         RemoveFromManager(mapEvent);
         RollBackPartyEdges(mapEvent, state.Owned);
 
-        var visuals = state.Owned.OfType<GauntletMapEventVisual>().ToArray();
-        foreach (var visual in visuals)
-            battleSizeCorrection.Clear(visual);
-
         if (ModInformation.IsClient)
         {
-            foreach (var visual in visuals)
+            foreach (var visual in state.Owned.OfType<GauntletMapEventVisual>().ToArray())
             {
                 try
                 {
@@ -400,9 +391,6 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         {
             visual.Initialize(position, visual.MapEvent.IsVisible);
         }
-
-        if (visual.MapEvent.IsFieldBattle || visual.MapEvent.IsSallyOut)
-            battleSizeCorrection.Register(visual);
     }
 
     private static bool IsComplete(MapEvent mapEvent, State state) =>

@@ -14,7 +14,6 @@ namespace GameInterface.Services.GuantletMapEventVisuals;
 
 internal class GauntletMapEventVisualRegistry : AutoRegistryBase<GauntletMapEventVisual>
 {
-    private readonly IMapEventBattleSizeCorrection mapEventBattleSizeCorrection;
     private readonly IMapEventInitializationBarrier initializationBarrier;
 
     public override bool Debug => true;
@@ -22,11 +21,9 @@ internal class GauntletMapEventVisualRegistry : AutoRegistryBase<GauntletMapEven
         ILogger logger,
         IAutoRegistryFactory autoRegistryFactory,
         IObjectManager objectManager,
-        IMapEventBattleSizeCorrection mapEventBattleSizeCorrection,
         IMapEventInitializationBarrier initializationBarrier)
         : base(logger, autoRegistryFactory, objectManager)
     {
-        this.mapEventBattleSizeCorrection = mapEventBattleSizeCorrection;
         this.initializationBarrier = initializationBarrier;
     }
 
@@ -87,9 +84,6 @@ internal class GauntletMapEventVisualRegistry : AutoRegistryBase<GauntletMapEven
         {
             initializationBarrier.EndVisual(obj);
         }
-
-        // Drop any pending ambient battle-size correction for this ended battle.
-        mapEventBattleSizeCorrection.Clear(obj);
     }
 
     public override void OnServerCreated(GauntletMapEventVisual obj, string id)

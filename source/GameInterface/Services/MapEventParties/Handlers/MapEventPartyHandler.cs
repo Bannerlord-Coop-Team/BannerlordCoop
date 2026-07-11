@@ -122,7 +122,6 @@ internal class MapEventPartyHandler : IHandler
                 if (!objectManager.TryGetObjectWithLogging<MapEventParty>(obj.MapEventPartyId, out var mapEventParty))
                     return;
 
-                // Troop ids are themselves created through the same ordered game-thread queue.
                 mapEventParty._roster = FlattenedTroopSerializer.Deserialize(obj.FlattenedTroops, objectManager);
 
                 messageBroker.Publish(this, new MapEventTroopsUpdated(mapEventParty));

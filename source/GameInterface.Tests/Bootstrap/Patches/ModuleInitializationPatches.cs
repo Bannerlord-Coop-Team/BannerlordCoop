@@ -1,4 +1,5 @@
 ﻿using HarmonyLib;
+using System.IO;
 using System.Reflection;
 using TaleWorlds.Library;
 using TaleWorlds.ModuleManager;
@@ -6,9 +7,8 @@ using TaleWorlds.ModuleManager;
 namespace GameInterface.Tests.Bootstrap.Patches;
 
 /// <summary>
-/// Keeps the in-process test game bootstrap deterministic when it runs outside the Bannerlord
-/// launcher. The testhost has no launcher parameters file, so the vanilla version probe returns an
-/// invalid version and newly installed DLC modules terminate the process during compatibility checks.
+/// The testhost has no launcher parameters file, so resolve the installed game version from the
+/// Native module metadata used by the same test bootstrap.
 /// </summary>
 [HarmonyPatch(typeof(ApplicationVersion), nameof(ApplicationVersion.FromParametersFile))]
 internal static class TestApplicationVersionPatch
@@ -16,7 +16,9 @@ internal static class TestApplicationVersionPatch
     [HarmonyPrefix]
     private static bool Prefix(ref ApplicationVersion __result)
     {
-        __result = ApplicationVersion.FromString("v1.4.7");
+        var nativeModule = new ModuleInfo();
+        nativeModule.LoadWithFullPath(Path.Combine(BasePath.Name, "Modules", "Native"));
+        __result = nativeModule.Version;
         return false;
     }
 }
