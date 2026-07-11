@@ -323,8 +323,10 @@ public class WorkshopPurchaseConversationTests : IDisposable
         }
     }
 
-    private static void AssertHeroGold(EnvironmentInstance instance, string heroId, int expectedGold)
+    private void AssertHeroGold(EnvironmentInstance instance, string heroId, int expectedGold)
     {
+        // Hero.Gold is coalesced; drain the buffer before reading it on a client.
+        TestEnvironment.FlushCoalescer();
         instance.Call(() =>
         {
             Assert.True(instance.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
@@ -332,8 +334,10 @@ public class WorkshopPurchaseConversationTests : IDisposable
         });
     }
 
-    private static void AssertWorkshopOwnedByBuyer(EnvironmentInstance instance, PurchaseState state, int expectedBuyerGold, int expectedSellerGold)
+    private void AssertWorkshopOwnedByBuyer(EnvironmentInstance instance, PurchaseState state, int expectedBuyerGold, int expectedSellerGold)
     {
+        // buyer/seller Gold is coalesced; drain the buffer before reading it on a client.
+        TestEnvironment.FlushCoalescer();
         instance.Call(() =>
         {
             Assert.True(instance.ObjectManager.TryGetObject<Workshop>(state.WorkshopId, out var workshop));
