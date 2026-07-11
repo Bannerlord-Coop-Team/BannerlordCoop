@@ -99,18 +99,18 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
                 // already replicated the battle results.
 
                 // Snapshot MainParty's reward figures before nulling any side removes it from obj's party lists;
-                // GetBattleRewardsPrefix falls back to this after teardown. Best-effort — GetPlayerBattleContributionRate
-                // reads PartiesOnSide(PlayerSide), which throws once the side is torn down, and that must not abort the teardown.
+                // GetBattleRewardsPrefix falls back to this after teardown. Best-effort and guarded so a snapshot
+                // failure can never abort the teardown below.
                 if (localPartyWasInvolved)
                 {
                     try
                     {
-                        var mainPartyEventParty = obj.FindMapEventParty(PartyBase.MainParty);
+                        var mainPartyEventParty = obj.FindMapEventParty(PartyBase.MainParty, out var mainPartySide);
 
                         if (mainPartyEventParty != null
                             && ContainerProvider.TryResolve<IMainPartyBattleRewardsCache>(out var rewardsCache))
                         {
-                            rewardsCache.Capture(obj, mainPartyEventParty, obj.GetPlayerBattleContributionRate());
+                            rewardsCache.Capture(obj, mainPartyEventParty, mainPartySide.GetPartyContributionRate(mainPartyEventParty));
                         }
                     }
                     catch (Exception ex)

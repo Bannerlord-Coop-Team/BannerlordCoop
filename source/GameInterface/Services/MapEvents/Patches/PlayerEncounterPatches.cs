@@ -131,9 +131,9 @@ internal class PlayerEncounterPatches
     }
 
     // Vanilla looks up MainParty's MapEventParty via PartiesOnSide(PlayerSide), which indexes _sides by
-    // (int)PlayerSide and throws once MapEventRegistry.OnClientDestroyed nulls MainParty's MapEventSide first
-    // (PlayerSide becomes BattleSideEnum.None). Search both sides for MainParty directly instead; if teardown
-    // already removed it from both, fall back to the snapshot OnClientDestroyed captured before nulling it.
+    // (int)PlayerSide and throws once a teardown nulls MainParty's MapEventSide (PlayerSide becomes
+    // BattleSideEnum.None). Search both sides for MainParty directly, and read its loot rate off the side it's
+    // on — never via PlayerSide. If teardown already removed it from both, fall back to the OnClientDestroyed snapshot.
     [HarmonyPatch(nameof(PlayerEncounter.GetBattleRewards))]
     [HarmonyPrefix]
     private static bool GetBattleRewardsPrefix(PlayerEncounter __instance, out ExplainedNumber renownChange,
@@ -143,14 +143,14 @@ internal class PlayerEncounterPatches
         var mapEvent = __instance._mapEvent;
         playerEarnedFigurehead = __instance.PlayerLootedFigurehead;
 
-        var mapEventParty = mapEvent.FindMapEventParty(PartyBase.MainParty);
+        var mapEventParty = mapEvent.FindMapEventParty(PartyBase.MainParty, out var mainPartySide);
 
         if (mapEventParty != null)
         {
             renownChange = mapEventParty.GainedRenownExplained;
             influenceChange = mapEventParty.GainedInfluenceExplained;
             moraleChange = mapEventParty.GainedMoraleExplained;
-            playerEarnedLootRate = mapEvent.GetPlayerBattleContributionRate();
+            playerEarnedLootRate = mainPartySide.GetPartyContributionRate(mapEventParty);
             return false;
         }
 
