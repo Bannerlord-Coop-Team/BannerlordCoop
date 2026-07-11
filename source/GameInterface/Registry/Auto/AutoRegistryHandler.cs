@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
@@ -15,18 +16,21 @@ class AutoRegistryHandler<T> : IHandler where T : class
     public IMessageBroker MessageBroker { get; }
     public INetwork Network { get; }
     public IObjectManager ObjectManager { get; }
+    public IMapEventInitializationTracker MapEventInitializationTracker { get; }
     ILogger Logger { get; } = LogManager.GetLogger<AutoRegistryHandler<T>>();
 
     public AutoRegistryHandler(
         AutoRegistryBase<T> registry,
         IMessageBroker messageBroker,
         INetwork network,
-        IObjectManager objectManager)
+        IObjectManager objectManager,
+        IMapEventInitializationTracker mapEventInitializationTracker)
     {
         Registry = registry;
         MessageBroker = messageBroker;
         Network = network;
         ObjectManager = objectManager;
+        MapEventInitializationTracker = mapEventInitializationTracker;
 
         MessageBroker.Subscribe<InstanceCreated<T>>(Handle_InstanceCreated);
         MessageBroker.Subscribe<NetworkCreateInstance<T>>(Handle_NetworkCreateInstance);
@@ -61,6 +65,13 @@ class AutoRegistryHandler<T> : IHandler where T : class
             return;
         }
 
+        // Registration and the registry callback are still required while an aggregate MapEvent graph is
+        // being built. Only the ordinary per-object create packet is deferred, and the pending marker must
+        // be visible before OnServerCreated can trigger any patched setters.
+        bool deferNetworkCreate = MapEventInitializationTracker.TryDefer(
+            payload.What.Instance,
+            payload.What.ConstructorArguments);
+
 
         if (Registry.Debug)
         {
@@ -80,7 +91,10 @@ class AutoRegistryHandler<T> : IHandler where T : class
             Logger.Error(ex, "Failed to run OnClientCreated for {MessageType}", payload.What.GetType());
         }
 
-        Network.SendAll(new NetworkCreateInstance<T>(id));
+        if (!deferNetworkCreate)
+        {
+            Network.SendAll(new NetworkCreateInstance<T>(id));
+        }
     }
 
     private void Handle_NetworkCreateInstance(MessagePayload<NetworkCreateInstance<T>> payload)
@@ -126,7 +140,16 @@ class AutoRegistryHandler<T> : IHandler where T : class
 
     private void Handle_InstanceDestroyed(MessagePayload<InstanceDestroyed<T>> payload)
     {
-        if (!ObjectManager.TryGetIdWithLogging(payload.What.Instance, out string id)) return;
+        if (!ObjectManager.TryGetId(payload.What.Instance, out string id))
+        {
+            // AbortBuild deliberately unregisters pending visuals before ending their local creator/UI
+            // publication. Their lifetime postfix still fires, but no peer ever saw a create packet, so
+            // there is neither an id to remove nor a destroy packet to send.
+            if (MapEventInitializationTracker.IsPending(payload.What.Instance)) return;
+
+            ObjectManager.TryGetIdWithLogging(payload.What.Instance, out _);
+            return;
+        }
 
         try
         {

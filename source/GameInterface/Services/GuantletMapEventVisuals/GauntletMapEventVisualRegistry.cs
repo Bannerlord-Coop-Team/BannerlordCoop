@@ -75,7 +75,7 @@ internal class GauntletMapEventVisualRegistry : AutoRegistryBase<GauntletMapEven
     {
         using (new AllowedThread())
         {
-            obj.OnMapEventEnd();
+            GauntletMapEventVisualLifecycle.TryEnd(obj);
         }
 
         // Drop any pending ambient battle-size correction for this ended battle.

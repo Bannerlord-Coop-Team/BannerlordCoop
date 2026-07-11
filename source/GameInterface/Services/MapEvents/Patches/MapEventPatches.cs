@@ -15,7 +15,6 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 
@@ -40,13 +39,11 @@ internal class MapEventPatches
 
         var partiesAdded = new List<MapEventParty>();
 
-        __instance.TroopUpgradeTracker = new TroopUpgradeTracker();
         MapEventSide[] sides = __instance._sides;
         for (int i = 0; i < sides.Length; i++)
         {
             foreach (var existingParty in sides[i].Parties)
             {
-                __instance.TroopUpgradeTracker.AddParty(existingParty);
                 partiesAdded.Add(existingParty);
             }
         }

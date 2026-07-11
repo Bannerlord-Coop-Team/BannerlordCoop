@@ -8,7 +8,9 @@ using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 
@@ -58,6 +60,8 @@ internal class MapEventSideRegistry : AutoRegistryBase<MapEventSide>
             .SetValue(obj, new MBList<MapEventParty>());
 
         obj._nearbyPartiesAddedToPlayerMapEvent = new MBList<MobileParty>();
+        obj._siegeEngineList = new MBList<(SiegeEngineType, Ship)>();
+        obj.SimulationShipList = new MBList<Ship>();
     }
 
     public override void OnClientDestroyed(MapEventSide obj, string id)

@@ -1,6 +1,8 @@
 ﻿using Common;
 using Common.Util;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.GuantletMapEventVisuals;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
@@ -24,10 +26,23 @@ namespace GameInterface.Services.MapEvents;
 /// </summary>
 internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 {
+    private static readonly FieldInfo MapEventsField =
+        AccessTools.Field(typeof(MapEventManager), "_mapEvents");
+
+    private readonly IMapEventInitializationTracker initializationTracker;
+    private readonly IMapEventBattleSizeCorrection mapEventBattleSizeCorrection;
+
     public override bool Debug => true;
-    public MapEventRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+    public MapEventRegistry(
+        ILogger logger,
+        IAutoRegistryFactory autoRegistryFactory,
+        IObjectManager objectManager,
+        IMapEventInitializationTracker initializationTracker,
+        IMapEventBattleSizeCorrection mapEventBattleSizeCorrection)
         : base(logger, autoRegistryFactory, objectManager)
     {
+        this.initializationTracker = initializationTracker;
+        this.mapEventBattleSizeCorrection = mapEventBattleSizeCorrection;
     }
 
     public override IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(MapEvent));
@@ -50,6 +65,10 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
             if (mapEvent.StringId == null) continue;
 
             RegisterExistingObject(mapEvent.StringId, mapEvent);
+
+            // Save-loaded and late-join graphs bypass aggregate hydration, but root teardown must still
+            // own every nested registration exactly as it does for a freshly initialized aggregate.
+            initializationTracker.RegisterCommittedGraph(mapEvent, MapEventGraph.Enumerate(mapEvent));
         }
     }
 
@@ -62,70 +81,70 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
             obj.WonRounds = new MBList<BattleSideEnum>();
         }
 
-        // OnMapEventCreated adds to MapEventManager._mapEvents, the list the main-thread map tick
-        // (MapEventManager.Tick) walks every frame. This callback runs on the network thread, so defer
-        // the add to the main thread — matching OnClientDestroyed — so it can't race that iteration and
-        // leave a torn/null slot the tick dereferences.
-        GameThread.RunSafe(() =>
-        {
-            using (new AllowedThread())
-            {
-                Campaign.Current.MapEventManager.OnMapEventCreated(obj);
-            }
-        });
+        // The aggregate initializer adds the event to MapEventManager only after its complete graph is wired.
     }
 
     public override void OnClientDestroyed(MapEvent obj, string id)
     {
-        GameThread.RunSafe(() =>
+        // Root destruction owns every aggregate-only nested registration. Remove the complete id graph
+        // before later queued packets can resolve a component, party, tracker or casualty roster whose
+        // root is already gone.
+        initializationTracker.DestroyGraph(obj);
+
+        // AutoRegistryHandler already invokes this callback inside its ordered game-thread action. Do
+        // not enqueue another action: a following aggregate may legitimately attach the same PartyBase
+        // to a new event, and delayed cleanup of this old root must never detach that newer edge.
+        if (Campaign.Current == null)
         {
-            // The action is deferred, so the campaign can be torn down (disconnect, save-load) before it runs.
-            if (Campaign.Current == null)
+            return;
+        }
+
+        // Captured before FinishBattle clears it; used as a last-resort client close when the server close
+        // message fails to unwind the native encounter menu before the event disappears underneath it.
+        bool localPartyWasInvolved = IsLocalPartyInMapEvent(obj);
+
+        using (new AllowedThread())
+        {
+            // Clear each involved party's battle state directly: the event's own FinalizeEventAux
+            // short-circuits on IsFinalized, and PartyBase.MapEventSide isn't synced. Nulling MapEventSide
+            // makes MobileParty.MapEvent null and SetVisualAsDirty re-marks the figure, dropping it out of
+            // the fighting animation. The full vanilla finalize is deliberately not re-run — the server
+            // already replicated the battle results.
+
+            // Mark finalized first so clearing a side's last party (which re-enters FinalizeEvent via
+            // RemovePartyInternal) no-ops on IsFinalized instead of depending on the State sync arriving first.
+            obj.State = MapEventState.WaitingRemoval;
+
+            foreach (var side in obj._sides)
             {
-                return;
-            }
+                if (side == null) continue;
 
-            // Captured before FinishBattle clears it; used as a last-resort client close when the server close
-            // message fails to unwind the native encounter menu before the event disappears underneath it.
-            bool localPartyWasInvolved = IsLocalPartyInMapEvent(obj);
-
-            using (new AllowedThread())
-            {
-                // Clear each involved party's battle state directly: the event's own FinalizeEventAux
-                // short-circuits on IsFinalized, and PartyBase.MapEventSide isn't synced. Nulling MapEventSide
-                // makes MobileParty.MapEvent null and SetVisualAsDirty re-marks the figure, dropping it out of
-                // the fighting animation. The full vanilla finalize is deliberately not re-run — the server
-                // already replicated the battle results.
-
-                // Mark finalized first so clearing a side's last party (which re-enters FinalizeEvent via
-                // RemovePartyInternal) no-ops on IsFinalized instead of depending on the State sync arriving first.
-                obj.State = MapEventState.WaitingRemoval;
-
-                foreach (var side in obj._sides)
+                // Nulling MapEventSide removes the party from the side, so snapshot before iterating. Only
+                // detach the edge when it still belongs to this exact graph; a newer aggregate wins.
+                foreach (var mapEventParty in new List<MapEventParty>(side.Parties))
                 {
-                    if (side == null) continue;
+                    var party = mapEventParty?.Party;
+                    if (party == null || !ReferenceEquals(party.MapEventSide, side)) continue;
 
-                    // Nulling MapEventSide removes the party from the side, so snapshot before iterating.
-                    foreach (var mapEventParty in new List<MapEventParty>(side.Parties))
-                    {
-                        var party = mapEventParty?.Party;
-                        if (party == null) continue;
-
-                        party.MapEventSide = null;
-                        party.SetVisualAsDirty();
-                    }
+                    party.MapEventSide = null;
+                    party.SetVisualAsDirty();
                 }
-
-                // Stop the battle icon and sound. The visual is also torn down through its own registry, and
-                // OnMapEventEnd is idempotent, so this is just a belt-and-suspenders stop on this client.
-                obj.MapEventVisual?.OnMapEventEnd();
-
-                // Drop the finalized event from the manager's tick list.
-                Campaign.Current.MapEventManager.Tick();
             }
 
-            CloseDestroyedMapEventEncounterIfNeeded(id, localPartyWasInvolved);
-        }, context: nameof(OnClientDestroyed));
+            // Stop the battle icon and sound. The shared lifecycle marker prevents this root fallback
+            // and the visual's own destroy packet from notifying UI handlers twice in either order.
+            var visual = obj.MapEventVisual;
+            GauntletMapEventVisualLifecycle.TryEnd(visual);
+            if (visual is SandBox.GauntletUI.Map.GauntletMapEventVisual gauntletVisual)
+                mapEventBattleSizeCorrection.Clear(gauntletVisual);
+
+            // Drop only this finalized root. Calling MapEventManager.Tick here would also Update every
+            // unrelated raid/non-player event and accidentally run a client simulation step.
+            if (MapEventsField.GetValue(Campaign.Current.MapEventManager) is MBList<MapEvent> mapEvents)
+                mapEvents.Remove(obj);
+        }
+
+        CloseDestroyedMapEventEncounterIfNeeded(id, localPartyWasInvolved);
     }
 
     private bool IsLocalPartyInMapEvent(MapEvent mapEvent)
@@ -283,5 +302,6 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 
     public override void OnServerDestroyed(MapEvent obj, string id)
     {
+        initializationTracker.DestroyGraph(obj);
     }
 }

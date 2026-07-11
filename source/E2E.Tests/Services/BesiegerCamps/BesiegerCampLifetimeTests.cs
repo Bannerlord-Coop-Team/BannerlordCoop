@@ -60,29 +60,12 @@ public class BesiegerCampLifetimeTests : IDisposable
     public void ClientCreate_BesiegerCamp_DoesNothing()
     {
         // Arrange
-        string? mapEventId = null;
-        string? mobilePartyId = null;
-        Server.Call(() =>
-        {
-            var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
-            var mobileParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
-
-            Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
-            Assert.True(Server.ObjectManager.TryGetId(mobileParty, out mobilePartyId));
-        });
-
-        Assert.NotNull(mapEventId);
-        Assert.NotNull(mobilePartyId);
-
         // Act
         string? clientBeseigerCampId = null;
 
         var firstClient = TestEnvironment.Clients.First();
         firstClient.Call(() =>
         {
-            Assert.True(firstClient.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
-            Assert.True(firstClient.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty));
-
             var BesiegerCamp = new BesiegerCamp(null, null);
 
             Assert.False(firstClient.ObjectManager.TryGetId(BesiegerCamp, out clientBeseigerCampId));

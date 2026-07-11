@@ -1,4 +1,4 @@
-using Common.Network;
+﻿using Common.Network;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
@@ -50,6 +50,11 @@ public abstract class MapEventTestBase : IDisposable
             // MockMapEventVisual) is constructor-skipped and NREs inside this method, so suppress it: this
             // is the "UI functionality is mocked" boundary for map events.
             AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)),
+
+            // Direct test helpers tick the manager once so its prefix can publish the aggregate fallback.
+            // Suppress the subsequent simulation update: it is unrelated to graph construction and would
+            // immediately mutate the just-captured initial state in the headless campaign.
+            AccessTools.Method(typeof(MapEvent), "Update"),
         };
     }
 
@@ -59,30 +64,67 @@ public abstract class MapEventTestBase : IDisposable
     /// Creates and registers a <see cref="MapEvent"/> on the server with two <see cref="MobileParty"/>
     /// participants, returning the IDs of the map event, attacker party, and defender party.
     /// </summary>
-    protected MapEventContext CreateServerMapEvent()
+    protected MapEventContext CreateServerMapEvent(bool isolateInitializationMessages = false)
     {
         string? mapEventId = null;
         string? attackerPartyId = null;
         string? defenderPartyId = null;
+        var attackerTroopId = isolateInitializationMessages
+            ? TestEnvironment.CreateRegisteredObject<CharacterObject>()
+            : null;
+        var defenderTroopId = isolateInitializationMessages
+            ? TestEnvironment.CreateRegisteredObject<CharacterObject>()
+            : null;
 
         Server.Call(() =>
         {
-            var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
             var attackerParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
             var defenderParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
+
+            if (isolateInitializationMessages)
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(attackerTroopId!, out var attackerTroop));
+                Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(defenderTroopId!, out var defenderTroop));
+                attackerParty.MemberRoster.AddToCounts(attackerTroop, 3);
+                defenderParty.MemberRoster.AddToCounts(defenderTroop, 5);
+
+                // The parties are external references of the aggregate and retain their ordinary lifetime
+                // and roster replication. Clearing after they exist isolates the MapEvent transaction itself.
+                Server.NetworkSentMessages.Clear();
+            }
+
+            Assert.True(Server.ObjectManager.TryGetId(attackerParty, out attackerPartyId));
+            Assert.True(Server.ObjectManager.TryGetId(defenderParty, out defenderPartyId));
+        }, MapEventDisabledMethods);
+
+        // External-object replication visits each in-process client synchronously. Re-entering Server.Call
+        // restores the server's Campaign statics before the MapEvent transaction starts.
+        Server.Call(() =>
+        {
+            if (isolateInitializationMessages)
+                Server.NetworkSentMessages.Clear();
+
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(attackerPartyId!, out var attackerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(defenderPartyId!, out var defenderParty));
+
+            var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
 
             // The visual must exist before Initialize is called; skip its constructor so
             // we do not need a render context.
             mapEvent.MapEventVisual = MockMapEventVisual();
 
-            // Construction has already replicated the MapEvent to the clients, where the real
-            // MapEventRegistry.OnClientCreated runs and allocates their _sides array. The synchronous
-            // MapEventSideAssigned replication produced by Initialize therefore lands on a non-null array.
-            mapEvent.Initialize(attackerParty.Party, defenderParty.Party);
+            mapEvent.Initialize(
+                attackerParty.Party,
+                defenderParty.Party,
+                new FieldBattleEventComponent(mapEvent),
+                MapEvent.BattleTypes.FieldBattle);
+
+            // This is the live commit boundary: clients must not see the MapEvent until its complete graph
+            // has been initialized and the manager is ready to make it observable.
+            Campaign.Current.MapEventManager.OnMapEventCreated(mapEvent);
+            Campaign.Current.MapEventManager.Tick();
 
             Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
-            Assert.True(Server.ObjectManager.TryGetId(attackerParty, out attackerPartyId));
-            Assert.True(Server.ObjectManager.TryGetId(defenderParty, out defenderPartyId));
         }, MapEventDisabledMethods);
 
         Assert.NotNull(mapEventId);
@@ -359,6 +401,8 @@ public abstract class MapEventTestBase : IDisposable
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
             mapEvent.MapEventVisual = MockMapEventVisual();
             mapEvent.Initialize(captorParty.Party, playerParty.Party);
+            Campaign.Current.MapEventManager.OnMapEventCreated(mapEvent);
+            Campaign.Current.MapEventManager.Tick();
 
             mapEvent.CaptureDefeatedPartyMembers(mapEvent.AttackerSide.Parties, mapEvent.DefenderSide.Parties);
         }, disabledMethods);
@@ -399,6 +443,8 @@ public abstract class MapEventTestBase : IDisposable
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
             mapEvent.MapEventVisual = MockMapEventVisual();
             mapEvent.Initialize(captorParty.Party, playerParty.Party);
+            Campaign.Current.MapEventManager.OnMapEventCreated(mapEvent);
+            Campaign.Current.MapEventManager.Tick();
 
             Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
         }, MapEventDisabledMethods);
@@ -467,6 +513,9 @@ public abstract class MapEventTestBase : IDisposable
             var losingSide = playersAreAttackers ? mapEvent.AttackerSide : mapEvent.DefenderSide;
             for (int i = 1; i < loserParties.Length; i++)
                 loserParties[i].Party.MapEventSide = losingSide;
+
+            Campaign.Current.MapEventManager.OnMapEventCreated(mapEvent);
+            Campaign.Current.MapEventManager.Tick();
 
             Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
         }, MapEventDisabledMethods);

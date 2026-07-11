@@ -10,6 +10,7 @@ using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.MapEventParties;
 using GameInterface.Services.MapEventParties.Messages;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
@@ -47,6 +48,7 @@ internal class BattleHandler : IHandler
     private readonly IMapEventLogger mapEventLogger;
     private readonly IPlayerManager playerRegistry;
     private readonly ITimeControlInterface timeControlInterface;
+    private readonly IMapEventInitializationTracker mapEventInitializationTracker;
 
     // Server-side: number of players in a map event at the last broadcast, used to
     // detect when fast-forward becomes (un)available and to keep clients informed.
@@ -58,7 +60,8 @@ internal class BattleHandler : IHandler
         INetwork network,
         IMapEventLogger mapEventLogger,
         IPlayerManager playerRegistry,
-        ITimeControlInterface timeControlInterface)
+        ITimeControlInterface timeControlInterface,
+        IMapEventInitializationTracker mapEventInitializationTracker)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -66,6 +69,7 @@ internal class BattleHandler : IHandler
         this.mapEventLogger = mapEventLogger;
         this.playerRegistry = playerRegistry;
         this.timeControlInterface = timeControlInterface;
+        this.mapEventInitializationTracker = mapEventInitializationTracker;
         messageBroker.Subscribe<PlayerJoinedBattle>(Handle_PlayerJoinedBattle);
 
         messageBroker.Subscribe<MapEventInvolvedPartiesAdded>(Handle_MapEventInvolvedPartiesAdded);
@@ -144,41 +148,44 @@ internal class BattleHandler : IHandler
         RefreshFastForwardState();
 
         var message = payload.What;
-        if (!objectManager.TryGetIdWithLogging(message.MapEvent, out var mapEventSideId))
-            return;
-
         mapEventLogger.DebugMapEvent(message.MapEvent, "Map event involved parties added. Added party count: {AddedPartyCount}", message.AddedParties.Count());
 
-        var partyIds = new List<string>();
-        var partyPositions = new List<CampaignVec2>();
-
-        foreach (var addedParty in message.AddedParties)
+        // The aggregate initialization message owns the initial membership, positions, and flattened rosters.
+        // Keep the ordinary delta path for reinforcements that join after the graph has been committed.
+        var mapEvent = message.MapEvent;
+        var initializationPending = mapEventInitializationTracker.IsPending(mapEvent)
+            || mapEventInitializationTracker.IsBuilding(mapEvent);
+        if (!initializationPending && objectManager.TryGetIdWithLogging(mapEvent, out var mapEventId))
         {
-            if (!objectManager.TryGetIdWithLogging(addedParty, out var mapEventPartyId))
-                continue;
+            var partyIds = new List<string>();
+            var partyPositions = new List<CampaignVec2>();
 
-            partyIds.Add(mapEventPartyId);
-            // Capture the party's authoritative map position, in lockstep with the id and
-            // before the roster check below so the two arrays stay index-aligned. Settlement
-            // parties have no MobileParty; their slot is a default the client never applies.
-            partyPositions.Add(addedParty.Party.MobileParty?.Position ?? default);
+            foreach (var addedParty in message.AddedParties)
+            {
+                if (!objectManager.TryGetIdWithLogging(addedParty, out var mapEventPartyId))
+                    continue;
 
-            // A player just created or joined this map event, so push every involved party's
-            // flattened roster to clients (AI-only battles never reach here). Clients need these to
-            // spawn troops in the mission; in-progress AI parties already have a roster built from
-            // server simulation. Per-troop changes after this are kept in sync incrementally.
-            if (addedParty._roster == null)
-                continue;
+                partyIds.Add(mapEventPartyId);
+                // Capture the party's authoritative map position, in lockstep with the id and
+                // before the roster check below so the two arrays stay index-aligned. Settlement
+                // parties have no MobileParty; their slot is a default the client never applies.
+                partyPositions.Add(addedParty.Party.MobileParty?.Position ?? default);
 
-            var flattenedTroops = FlattenedTroopSerializer.Serialize(addedParty._roster, objectManager);
-            network.SendAll(new NetworkUpdateMapEventParty(mapEventPartyId, flattenedTroops));
+                // A player joining an already-running map event needs every newly involved party's
+                // flattened roster. Per-troop changes after this are kept in sync incrementally.
+                if (addedParty._roster == null)
+                    continue;
+
+                var flattenedTroops = FlattenedTroopSerializer.Serialize(addedParty._roster, objectManager);
+                network.SendAll(new NetworkUpdateMapEventParty(mapEventPartyId, flattenedTroops));
+            }
+
+            network.SendAll(new NetworkAddInvolvedParties(
+                mapEventId,
+                partyIds.ToArray(),
+                partyPositions.ToArray()
+            ));
         }
-
-        network.SendAll(new NetworkAddInvolvedParties(
-            mapEventSideId,
-            partyIds.ToArray(),
-            partyPositions.ToArray()
-        ));
 
         // Tell any player parties just added to the battle to drop their "hold on" PvP popup — the battle menu
         // blocks them now. Server-driven because the client-side MapEventInvolvedPartiesAdded never fires for a

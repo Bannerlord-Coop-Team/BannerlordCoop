@@ -30,9 +30,8 @@ internal class MapEventVisibilityClientPatch
 
         foreach (var mapEvent in mapEventManager.MapEvents)
         {
-            // Skip events whose sides are not both assigned yet. On the client a map event is created
-            // first and its sides are wired up afterwards via separate messages, so during that window
-            // enumerating InvolvedParties would dereference an unassigned side.
+            // Loaded/legacy state may still be malformed, even though live MapEvents are now published only
+            // after their complete graph has been wired atomically.
             if (mapEvent?.AttackerSide == null || mapEvent.DefenderSide == null) continue;
 
             bool shouldBeVisible = AnyInvolvedPartyVisible(mapEvent);

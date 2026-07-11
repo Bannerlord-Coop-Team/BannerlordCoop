@@ -34,7 +34,6 @@ internal class GameObjectCreator
         { typeof(BanditPartyComponent), new BanditPartyComponentBuilder() },
         { typeof(CustomPartyComponent), new CustomPartyComponentBuilder() },
         { typeof(MapEvent), new MapEventBuilder() },
-        { typeof(MapEventSide), new MapEventSideBuilder() },
         { typeof(MapEventParty), new MapEventPartyBuilder() },
         { typeof(BesiegerCamp), new BesiegerCampBuilder() },
         { typeof(SiegeEvent), new SiegeEventBuilder() },

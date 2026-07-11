@@ -1,13 +1,19 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Logging;
+using Common.Messaging;
 using Common.Network;
 using Common.Serialization;
+using Common.Util;
 using GameInterface.AutoSync;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Registry.Auto;
 public interface IAutoRegistryFactory : IDisposable
@@ -30,10 +36,22 @@ public interface IAutoRegistryFactory : IDisposable
     void SetJoinIdRemap(IDictionary<string, string> map);
 
     bool IsManaged(Type type);
+
+    /// <summary>
+    /// Creates an uninitialized client instance of a managed type and runs its registry's
+    /// <c>OnClientCreated</c> callback. The object is deliberately not registered, allowing an aggregate
+    /// receive path to construct and wire a complete graph before registering it atomically.
+    /// </summary>
+    /// <param name="type">The concrete runtime type to create.</param>
+    /// <param name="fullId">The full ObjectManager id, including its type prefix.</param>
+    /// <param name="obj">The created object, or null when the type is not managed or creation fails.</param>
+    bool TryCreateClientObject(Type type, string fullId, out object obj);
 }
 
 internal class AutoRegistryFactory : IAutoRegistryFactory
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<AutoRegistryFactory>();
+
     const string HarmonyID = "CoopAutoRegistryFactory";
     private readonly Harmony harmony = new Harmony(HarmonyID);
 
@@ -43,6 +61,7 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
     IAutoSyncPatchCollector PatchCollector { get; }
     IObjectManager ObjectManager { get; }
     ISerializableTypeMapper TypeMapper { get; }
+    IMapEventInitializationTracker MapEventInitializationTracker { get; }
     List<IDisposable> Disposables { get; } = new List<IDisposable>();
 
     List<Action<IDictionary<string, string>>> RegisterAllCallbacks = new List<Action<IDictionary<string, string>>>();
@@ -53,13 +72,17 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
 
     private readonly HashSet<Type> managedTypes = new HashSet<Type>();
 
+    private readonly Dictionary<Type, Action<object, string>> clientCreatedCallbacks =
+        new Dictionary<Type, Action<object, string>>();
+
     public AutoRegistryFactory(
         IRegistryCollection collection,
         IMessageBroker messageBroker,
         INetwork network,
         IAutoSyncPatchCollector syncPatchCollector,
         IObjectManager objectManager,
-        ISerializableTypeMapper typeMapper)
+        ISerializableTypeMapper typeMapper,
+        IMapEventInitializationTracker mapEventInitializationTracker)
     {
         Collection = collection;
         MessageBroker = messageBroker;
@@ -67,6 +90,7 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
         PatchCollector = syncPatchCollector;
         ObjectManager = objectManager;
         TypeMapper = typeMapper;
+        MapEventInitializationTracker = mapEventInitializationTracker;
     }
 
     public void Dispose()
@@ -83,9 +107,58 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
         return false;
     }
 
+    public bool TryCreateClientObject(Type type, string fullId, out object obj)
+    {
+        obj = null;
+        if (type == null || type.IsAbstract || type.IsInterface || string.IsNullOrEmpty(fullId))
+            return false;
+
+        Action<object, string> onClientCreated = null;
+        for (var current = type; current != null; current = current.BaseType)
+        {
+            if (clientCreatedCallbacks.TryGetValue(current, out onClientCreated))
+                break;
+        }
+
+        if (onClientCreated == null) return false;
+
+        try
+        {
+            obj = ObjectHelper.SkipConstructor(type);
+
+            var prefix = type.Name + "_";
+            var callbackId = fullId.StartsWith(prefix, StringComparison.Ordinal)
+                ? fullId.Substring(prefix.Length)
+                : fullId;
+
+            if (obj is MBObjectBase mbObject)
+            {
+                using (new AllowedThread())
+                {
+                    mbObject.StringId = callbackId;
+                }
+            }
+
+            onClientCreated(obj, callbackId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex,
+                "Failed to create unregistered client object of type {ObjectType} with id {ObjectId}",
+                type,
+                fullId);
+            obj = null;
+            return false;
+        }
+    }
+
     public void AddRegistry<T>(AutoRegistryBase<T> autoRegistry) where T : class
     {
         managedTypes.Add(typeof(T));
+        clientCreatedCallbacks.Add(
+            typeof(T),
+            (obj, id) => autoRegistry.OnClientCreated((T)obj, id));
 
         ValidateConstructorTypes(autoRegistry.Constructors, typeof(T));
 
@@ -98,7 +171,8 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
             autoRegistry,
             MessageBroker,
             Network,
-            ObjectManager
+            ObjectManager,
+            MapEventInitializationTracker
         );
 
         foreach (var ctor in autoRegistry.Constructors)

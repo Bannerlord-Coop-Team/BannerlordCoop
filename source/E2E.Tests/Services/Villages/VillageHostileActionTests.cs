@@ -1030,6 +1030,8 @@ public class VillageHostileActionTests : MapEventTestBase
                 settlement.Party,
                 new RaidEventComponent(mapEvent),
                 MapEvent.BattleTypes.Raid);
+            Campaign.Current.MapEventManager.OnMapEventCreated(mapEvent);
+            Campaign.Current.MapEventManager.Tick();
 
             Assert.True(mapEvent.IsActiveSlowVillageRaid());
             Assert.True(InvokeMapEventUpdatePrefix(mapEvent));
@@ -1296,6 +1298,8 @@ public class VillageHostileActionTests : MapEventTestBase
                 settlement.Party,
                 new RaidEventComponent(mapEvent),
                 MapEvent.BattleTypes.Raid);
+            Campaign.Current.MapEventManager.OnMapEventCreated(mapEvent);
+            Campaign.Current.MapEventManager.Tick();
 
             Assert.True(mapEvent.IsUnopposedVillageRaid());
             Assert.Equal(TimeControlEnum.Play_2x, Server.Resolve<ITimeControlInterface>().GetTimeControl());
@@ -2643,6 +2647,8 @@ public class VillageHostileActionTests : MapEventTestBase
         mapEvent.State = MapEventState.Wait;
 
         SetVillageStateForHostileAction(defender.Settlement, action);
+        Campaign.Current.MapEventManager.OnMapEventCreated(mapEvent);
+        Campaign.Current.MapEventManager.Tick();
         return mapEvent;
     }
 

@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.GuantletMapEventVisuals.Messages;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.ObjectManager;
 using SandBox.GauntletUI.Map;
 using Serilog;
@@ -19,17 +20,20 @@ internal class GauntletMapEventVisaulHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IMapEventBattleSizeCorrection mapEventBattleSizeCorrection;
+    private readonly IMapEventInitializationTracker mapEventInitializationTracker;
 
     public GauntletMapEventVisaulHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        IMapEventBattleSizeCorrection mapEventBattleSizeCorrection)
+        IMapEventBattleSizeCorrection mapEventBattleSizeCorrection,
+        IMapEventInitializationTracker mapEventInitializationTracker)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.mapEventBattleSizeCorrection = mapEventBattleSizeCorrection;
+        this.mapEventInitializationTracker = mapEventInitializationTracker;
         messageBroker.Subscribe<GauntletMapEventVisualInitialized>(Handle_GauntletMapEventVisualInitialized);
         messageBroker.Subscribe<NetworkGauntletMapEventVisualInitialized>(Handle_NetworkGauntletMapEventVisualInitialized);
     }
@@ -45,6 +49,13 @@ internal class GauntletMapEventVisaulHandler : IHandler
     private void Handle_GauntletMapEventVisualInitialized(MessagePayload<GauntletMapEventVisualInitialized> payload)
     {
         var obj = payload.What;
+        var mapEvent = obj.Instance?.MapEvent;
+        if (mapEventInitializationTracker.IsPending(obj.Instance)
+            || mapEventInitializationTracker.IsPending(mapEvent)
+            || mapEventInitializationTracker.IsBuilding(mapEvent))
+        {
+            return;
+        }
 
         if (!objectManager.TryGetIdWithLogging(obj.Instance, out var id))
             return;
@@ -59,16 +70,15 @@ internal class GauntletMapEventVisaulHandler : IHandler
         var position = payload.What.Position;
 
         // Initializing the visual touches Gauntlet map UI, which is only safe on the main
-        // thread. The visual is re-resolved on the main thread so that a matching destroy
-        // which arrived first (and ran synchronously on the network thread) is observed here
-        // and the now stale init is skipped.
+        // thread. Re-resolve this post-commit delta on the main thread so a matching destroy
+        // is observed and a stale init is skipped.
         GameThread.Run(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<GauntletMapEventVisual>(instanceId, out var visual))
                 return;
 
-            // The visual's MapEvent syncs in separately; if it never resolved here it stays null and vanilla
-            // Initialize throws on it. An un-synced visual has no battle to show, so skip the init.
+            // A committed visual must already reference its MapEvent. Treat a missing edge as a stale or
+            // malformed delta instead of letting vanilla Initialize throw.
             if (visual.MapEvent == null)
             {
                 Logger.Warning("Skipping init of GauntletMapEventVisual {InstanceId}: its MapEvent did not resolve on this client", instanceId);
@@ -86,11 +96,8 @@ internal class GauntletMapEventVisaulHandler : IHandler
                     // and battle sound consistent here instead of starting in the server-visible state.
                     visual.Initialize(position, visual.MapEvent.IsVisible);
 
-                    // If the visual initialized before its sides/parties finished syncing, the ambient
-                    // battle-size Initialize just applied may be too small. Track every field
-                    // battle / sally-out (the only events that read the battle-size) so the real size is
-                    // re-applied as the parties stream in. We can't gate on BattleSizeComputable here: it's
-                    // already true for a half-populated battle, so the partial-roster case would be missed.
+                    // Reinforcements can change the ambient battle size after initialization. Track field
+                    // battles and sally-outs, the event types whose visuals read that value.
                     var mapEvent = visual.MapEvent;
                     if (mapEvent.IsFieldBattle || mapEvent.IsSallyOut)
                     {
