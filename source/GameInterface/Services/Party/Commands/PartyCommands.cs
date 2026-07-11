@@ -13,6 +13,8 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Party.Commands;
@@ -183,9 +185,9 @@ internal class PartyCommands
 
     // coop.debug.mobileparty.siege_buff
     /// <summary>
-    /// Fills a party to 2000 troops, maxes its morale, and forces a high map speed so it can march to
-    /// and win a siege for testing. Server only; the troop add replicates via the roster sync. Get the
-    /// party id from coop.debug.mobileparty.whoami on the client that owns the party.
+    /// Fills a party to 2000 troops, maxes its morale, forces a high map speed, and stocks it with food so it
+    /// can march to and win a siege for testing without starving. Server only; the troop and item adds replicate
+    /// via the roster sync. Get the party id from coop.debug.mobileparty.whoami on the client that owns the party.
     /// </summary>
     [CommandLineArgumentFunction("siege_buff", "coop.debug.mobileparty")]
     public static string SiegeBuffCommand(List<string> strings)
@@ -204,7 +206,17 @@ internal class PartyCommands
         party.RecentEventsMorale = 100f;
         PartyDebugBuffPatches.Boost(party);
 
-        return $"Buffed {party.Name} ({party.StringId}): {party.MemberRoster.TotalManCount} troops, max morale, boosted speed and party-size limit";
+        // Stock every food type so a 2000-troop army doesn't starve on the march to the siege. AddToCounts routes
+        // through the synced EquipmentElement overload, so the food replicates to the owning client.
+        int foodTypes = 0;
+        foreach (var item in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+        {
+            if (item?.IsFood != true) continue;
+            party.ItemRoster.AddToCounts(item, 500);
+            foodTypes++;
+        }
+
+        return $"Buffed {party.Name} ({party.StringId}): {party.MemberRoster.TotalManCount} troops, max morale, boosted speed and party-size limit, {foodTypes} food type(s) x500";
     }
 
     // coop.debug.mobileparty.declare_war
