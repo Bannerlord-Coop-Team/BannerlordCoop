@@ -10,6 +10,8 @@ using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MobileParties.Messages;
+using GameInterface.Services.PartyComponents.Messages;
 using GameInterface.Services.Stances.Messages;
 using GameInterface.Services.Villages.Interfaces;
 using GameInterface.Services.TroopRosters.Data;
@@ -1142,6 +1144,10 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         AssertPartyManCount(Server, responderMobilePartyId, 0);
         AssertHostileEncounterTornDown(Server, initiatorPartyId);
         AssertCapturedPlayerPartyParked(Server, responderPartyId);
+        var leaderChanged = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkChangePartyLeader>());
+        Assert.Equal(responderMobilePartyId, leaderChanged.MobilePartyId);
+        Assert.Null(leaderChanged.LeaderHeroId);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPartyComponentLeaderChanged>());
         foreach (var syncedClient in Clients)
         {
             Assert.Contains(syncedClient.InternalMessages.GetMessages<DeclareWarChanged>(), message =>
@@ -1327,6 +1333,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             {
                 party.MobileParty.MemberRoster.AddToCounts(hero.CharacterObject, 1);
                 hero.PartyBelongedTo = party.MobileParty;
+                party.MobileParty.ChangePartyLeader(hero);
             }
         });
     }
