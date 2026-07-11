@@ -136,11 +136,24 @@ public class AutoSyncBuilder
         var topLevelBinderFlagsProperty = typeof(CSharpCompilationOptions).GetProperty("TopLevelBinderFlags", BindingFlags.Instance | BindingFlags.NonPublic);
         topLevelBinderFlagsProperty.SetValue(compilationOptions, (uint)1 << 22);
 
+        // Under a .NET Core host (the dedicated server) the net472-generated sync code references
+        // the net472 BCL façades ([mscorlib 4.0.0.0]System.*, [System 4.0.0.0]...), which are not
+        // among the loaded `assemblies` with those identities (Exception etc. live in
+        // System.Private.CoreLib here, not mscorlib). Add the runtime's façade + impl assemblies so
+        // the BCL resolves. Skipped on the net472 client, where the real BCL is already loaded.
+        IEnumerable<string> runtimeFacades = Enumerable.Empty<string>();
+        if (typeof(object).Assembly.GetName().Name != "mscorlib")
+        {
+            runtimeFacades = Directory.EnumerateFiles(
+                Path.GetDirectoryName(typeof(object).Assembly.Location), "*.dll");
+        }
+
         var dynamicAssembly = CSharpCompilation.Create(
             "AutoSync",
             syntaxTrees: syntaxTrees,
-            references:
-            assemblies.Select(a => a.Location).Distinct().Select(a => MetadataReference.CreateFromFile(a)),
+            references: assemblies.Select(a => a.Location).Concat(runtimeFacades)
+                .Where(path => !string.IsNullOrEmpty(path) && File.Exists(path))
+                .Distinct().Select(a => MetadataReference.CreateFromFile(a)),
             options: compilationOptions
         );
 

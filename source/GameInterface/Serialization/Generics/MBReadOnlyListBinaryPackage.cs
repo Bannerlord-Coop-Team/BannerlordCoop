@@ -1,5 +1,7 @@
 ﻿using Common.Extensions;
+using Common.Logging;
 using GameInterface.Serialization.Native;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,6 +13,8 @@ namespace GameInterface.Serialization.Generics
     [Serializable]
     public class MBReadOnlyListBinaryPackage : IEnumerableBinaryPackage
     {
+        private static readonly ILogger Logger = LogManager.GetLogger<MBReadOnlyListBinaryPackage>();
+
         [NonSerialized]
         private bool IsUnpacked = false;
 
@@ -62,12 +66,14 @@ namespace GameInterface.Serialization.Generics
             {
                 var field = fields.FirstOrDefault(f => f.Name.Equals(fieldName));
 
-                // Cross-runtime field skew: a net472 client packs BCL fields (e.g. List<T>._syncRoot)
-                // that do not exist on the CoreCLR (Linux container) build of the same type — and
-                // vice versa. Skipping them is the contract; dereferencing kills the whole hero
-                // unpack and every new-character join. INERT when both sides run the same runtime
-                // (graphical host + Windows client): the field always resolves there.
-                if (field == null) continue;
+                // Cross-runtime field skew (see BinaryPackageBase.UnpackFields): a net472 sender
+                // packs List<T>._syncRoot, which does not exist on the net6 dedicated server —
+                // the null SetValue here was the join-time hero-transfer fatal. Skip unknowns.
+                if (field == null)
+                {
+                    Logger.Warning("[FieldSkew] {Type} has no field '{Field}' on this runtime; skipping packed value", type.Name, fieldName);
+                    continue;
+                }
 
                 if (type.IsValueType)
                 {
