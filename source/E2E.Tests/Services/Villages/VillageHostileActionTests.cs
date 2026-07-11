@@ -2107,6 +2107,8 @@ public class VillageHostileActionTests : MapEventTestBase
         string mobilePartyId,
         string settlementId)
     {
+        // Lord gold is coalesced; drain the buffer before reading it on a client.
+        TestEnvironment.FlushCoalescer();
         instance.Call(() =>
         {
             Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty));
