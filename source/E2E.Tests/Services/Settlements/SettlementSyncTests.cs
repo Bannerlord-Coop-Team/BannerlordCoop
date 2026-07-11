@@ -57,7 +57,6 @@ namespace E2E.Tests.Services.Settlements
             //TestEnvironment.AssertReferenceField<Settlement, MBList<Hero>>(nameof(Settlement._notablesCache));
             //TestEnvironment.AssertReferenceField<Settlement, MBList<MobileParty>>(nameof(Settlement._partiesCache));
             //TestEnvironment.AssertReferenceField<Settlement, MBList<float>>(nameof(Settlement._settlementWallSectionHitPointsRatioList));
-            //TestEnvironment.AssertReferenceField<Settlement, MBList<SiegeEvent.SiegeEngineMissile>>(nameof(Settlement._siegeEngineMissiles));
             //TestEnvironment.AssertReferenceField<Settlement, List<Alley>>(nameof(Settlement.Alleys));
 
             //TestEnvironment.AssertReferenceField<Settlement, ItemRoster>(nameof(Settlement.Stash)); // readonly

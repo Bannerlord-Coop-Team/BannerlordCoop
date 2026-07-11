@@ -29,7 +29,8 @@ public class CoopBattleDeploymentMissionController : BattleDeploymentMissionCont
     {
         // Hold SetupTeams until the sides are sized. Gate on the handler's game-thread IsSized, not the suppliers'
         // network-thread IsPopulated (which could read true mid-frame before Init has sized). The handler bounds the
-        // wait with its own deadline, so IsSized always latches and this never defers SetupTeams indefinitely.
+        // wait with its own deadline: a usable partial reserve latches IsSized, while an unusable 0/0 reserve ends
+        // the mission through its normal lifecycle instead of allowing SetupTeams to commit an empty deployment.
         if (_spawnHandler != null && !_spawnHandler.IsSized) return;
 
         base.OnMissionTick(dt);

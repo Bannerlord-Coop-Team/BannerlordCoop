@@ -1,4 +1,5 @@
 using Common.Logging;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using TaleWorlds.CampaignSystem.MapEvents;

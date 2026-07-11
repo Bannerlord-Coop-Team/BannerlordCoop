@@ -5,6 +5,7 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;

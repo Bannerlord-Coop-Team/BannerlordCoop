@@ -1,5 +1,7 @@
 using Common;
 using Common.Logging;
+using Common.Network;
+using Common.Network.Coalescing;
 using Common.Tests.Utils;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
@@ -298,6 +300,15 @@ public class E2ETestEnvironment : IDisposable
     {
         Assert.True(GenericPatchHelpers.DictionaryClearInterceptCache.TryGetValue(member, out var intercept));
         return intercept;
+    }
+
+    /// <summary>
+    /// Drains the server's per-tick send coalescer the way <c>CoopServer.Update</c> does, delivering any
+    /// coalesced sends (e.g. Hero.Gold) to clients. A no-op when nothing is buffered.
+    /// </summary>
+    public void FlushCoalescer()
+    {
+        Server.Call(() => Server.Resolve<ISendCoalescer>().Flush(Server.Resolve<INetwork>()));
     }
 
     /// <summary>
@@ -980,6 +991,10 @@ public class E2ETestEnvironment : IDisposable
                 Assert.True(JsonConvert.SerializeObject(serverVal).Equals(JsonConvert.SerializeObject(defaultVal)), $"Expected: {JsonConvert.SerializeObject(serverValue)} Actual: {JsonConvert.SerializeObject(defaultVal)}");
             propertyInfo.SetValue(serverInstance, serverValue);
         });
+
+        // A coalesced member (e.g. Hero.Gold) buffers its send until the tick flush, so drain it before
+        // reading client state. Inert for non-coalesced members: nothing is buffered.
+        FlushCoalescer();
 
         // Assert
         foreach (var client in Clients)
