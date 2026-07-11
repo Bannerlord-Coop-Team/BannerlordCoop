@@ -54,9 +54,14 @@ public class PuppetRoutApplier : IPuppetRoutApplier
             Agent agent = info.Agent;
             if (Mission.Current == null) return;
 
-            if (agent != null && agent.Health > 0)
+            // IsActive() guards the native FadeOut: a puppet already removed (duplicate rout, disconnect
+            // adoption, or teardown) keeps a non-null registry entry with stale Health > 0, and FadeOut's
+            // GetPtr() then access-violates. Only fade the mount when it too is still active (its own
+            // FadeOut AVEs on a torn-down horse); a leftover riderless horse is handled by the mount sync.
+            if (agent != null && agent.IsActive() && agent.Health > 0)
             {
-                agent.FadeOut(true, true);
+                bool hideMount = agent.HasMount && agent.MountAgent != null && agent.MountAgent.IsActive();
+                agent.FadeOut(true, hideMount);
             }
 
             // Deregister AFTER the despawn, inside this game-thread action — same ordering rationale as
