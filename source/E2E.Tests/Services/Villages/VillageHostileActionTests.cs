@@ -48,8 +48,6 @@ using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
 
-using BannerlordMobileParty = TaleWorlds.CampaignSystem.Party.MobileParty;
-
 namespace E2E.Tests.Services.Villages;
 
 public class VillageHostileActionTests : MapEventTestBase
@@ -1410,8 +1408,8 @@ public class VillageHostileActionTests : MapEventTestBase
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(raiderHeroId, out var raiderHero));
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(joinerHeroId, out var joinerHero));
-            Assert.True(Server.ObjectManager.TryGetObject<BannerlordMobileParty>(raiderMobilePartyId, out var raiderParty));
-            Assert.True(Server.ObjectManager.TryGetObject<BannerlordMobileParty>(joinerMobilePartyId, out var joinerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(raiderMobilePartyId, out var raiderParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(joinerMobilePartyId, out var joinerParty));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
             Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(defenderTroopId, out var defenderTroop));
 
