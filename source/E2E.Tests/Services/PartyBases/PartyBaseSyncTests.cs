@@ -38,7 +38,6 @@ public class PartyBaseSyncTests : SyncTestBase
         // Not synced - cached/derived values (commented out in PartyBaseSync). Kept for future reference.
         //TestEnvironment.AssertProperty<PartyBase, bool>(nameof(PartyBase.IsVisualDirty), true);
         //TestEnvironment.AssertProperty<PartyBase, bool>(nameof(PartyBase.LevelMaskIsDirty), true);
-        // MapEventSide is committed by the MapEvent initialization barrier, not generic PartyBase sync.
     }
 
     [Fact]

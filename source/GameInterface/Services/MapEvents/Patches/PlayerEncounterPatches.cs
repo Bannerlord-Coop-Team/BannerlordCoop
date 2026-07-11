@@ -31,6 +31,10 @@ internal class PlayerEncounterPatches
     [HarmonyPrefix]
     public static bool RestartPlayerEncounterPrefix(PartyBase defenderParty, PartyBase attackerParty, bool forcePlayerOutFromSettlement)
     {
+        if (EncounterManagerPatches.IsPendingParty(attackerParty) ||
+            EncounterManagerPatches.IsPendingParty(defenderParty))
+            return false;
+
         // Our own server-approved re-run (AllowedThread) runs the real RestartPlayerEncounter.
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 

@@ -6,6 +6,7 @@ using E2E.Tests.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
@@ -80,6 +81,8 @@ public class MissionTestEnvironment : E2ETestEnvironment
             // Any additional players reinforce the attacker side (coop allies).
             for (int i = 2; i < parties.Length; i++)
                 parties[i].Party.MapEventSide = mapEvent.AttackerSide;
+
+            Server.Resolve<IMapEventInitializationBarrier>().CommitServer(mapEvent);
 
             Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
             for (int i = 0; i < parties.Length; i++)

@@ -30,6 +30,16 @@ internal sealed class MapEventBattleFactory
     /// <returns>The created <see cref="MapEvent"/>, or null if no proper type could be determined.</returns>
     public static MapEvent CreateMapEvent(PartyBase attacker, PartyBase defender, BattleCreationFlags flags)
     {
+        if (!CanCreateMapEvent(attacker, defender, flags, out var rejectionReason))
+        {
+            Logger.Warning(
+                "Rejecting map event creation before construction. Attacker={Attacker}, Defender={Defender}, Reason={Reason}",
+                DescribeParty(attacker),
+                DescribeParty(defender),
+                rejectionReason);
+            return null;
+        }
+
         var mapEventManager = Campaign.Current.MapEventManager;
 
         if (TryCreateForcedMapEvent(attacker, defender, flags, mapEventManager, out var mapEvent))
@@ -45,6 +55,80 @@ internal sealed class MapEventBattleFactory
             return mapEvent;
 
         return CreateFieldBattleEvent(attacker, defender, mapEventManager);
+    }
+
+    internal static bool CanCreateMapEvent(
+        PartyBase attacker,
+        PartyBase defender,
+        BattleCreationFlags flags,
+        out string rejectionReason)
+    {
+        if (attacker == null || defender == null)
+        {
+            rejectionReason = "a party did not resolve";
+            return false;
+        }
+
+        if (ReferenceEquals(attacker, defender))
+        {
+            rejectionReason = "attacker and defender are the same party";
+            return false;
+        }
+
+        if (attacker.MapEventSide != null || defender.MapEventSide != null)
+        {
+            rejectionReason = "a party is already in a map event";
+            return false;
+        }
+
+        if (!WillCreateFieldBattle(attacker, defender, flags))
+        {
+            rejectionReason = null;
+            return true;
+        }
+
+        var attackerMobileParty = attacker.MobileParty;
+        var defenderMobileParty = defender.MobileParty;
+        if (attackerMobileParty == null || defenderMobileParty == null)
+        {
+            rejectionReason = "a field battle requires two mobile parties";
+            return false;
+        }
+
+        if (!attackerMobileParty.IsActive || !defenderMobileParty.IsActive)
+        {
+            rejectionReason = "a field-battle party is inactive";
+            return false;
+        }
+
+        if (attackerMobileParty.CurrentSettlement != null || defenderMobileParty.CurrentSettlement != null)
+        {
+            rejectionReason = "a field-battle party is inside a settlement";
+            return false;
+        }
+
+        rejectionReason = null;
+        return true;
+    }
+
+    private static string DescribeParty(PartyBase party) =>
+        party?.MobileParty?.StringId ?? party?.Settlement?.StringId ?? "<null>";
+
+    private static bool WillCreateFieldBattle(PartyBase attacker, PartyBase defender, BattleCreationFlags flags)
+    {
+        if (flags.ForceRaid || flags.ForceSallyOut || flags.ForceVolunteers || flags.ForceSupplies)
+            return false;
+
+        if (defender.IsSettlement)
+            return false;
+
+        if (flags.IsSallyOutAmbush || flags.ForceBlockadeAttack || flags.ForceBlockadeSallyOutAttack)
+            return false;
+
+        if (attacker.IsMobile && attacker.MobileParty.CurrentSettlement?.SiegeEvent != null)
+            return false;
+
+        return !defender.IsMobile || defender.MobileParty.BesiegedSettlement == null;
     }
 
     private static bool TryCreateForcedMapEvent(

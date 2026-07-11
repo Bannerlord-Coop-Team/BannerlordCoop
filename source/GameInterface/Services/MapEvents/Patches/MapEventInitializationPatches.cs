@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
@@ -26,6 +27,67 @@ internal static class MapEventInitializationPatches
             barrier.AbortServer(__instance);
 
         return __exception;
+    }
+
+    [HarmonyPatch(typeof(PartyBase), "set_MapEventSide")]
+    [HarmonyPrefix]
+    [HarmonyPriority(Priority.First)]
+    private static void Prefix_PartyBaseMapEventSide(
+        PartyBase __instance,
+        MapEventSide value,
+        out bool __state)
+    {
+        __state = false;
+        if (!ReferenceEquals(__instance?.MapEventSide, value) &&
+            value?.MapEvent != null &&
+            TryResolveServerBarrier(out var barrier))
+        {
+            barrier.AnnounceServerParty(value.MapEvent, __instance);
+            __state = true;
+        }
+    }
+
+    [HarmonyPatch(typeof(PartyBase), "set_MapEventSide")]
+    [HarmonyFinalizer]
+    [HarmonyPriority(Priority.First)]
+    private static Exception Finalizer_PartyBaseMapEventSide(
+        PartyBase __instance,
+        MapEventSide value,
+        bool __state,
+        Exception __exception)
+    {
+        if (__state && __exception != null && value?.MapEvent != null &&
+            TryResolveServerBarrier(out var barrier))
+            barrier.CancelServerParty(value.MapEvent, __instance);
+
+        return __exception;
+    }
+
+    [HarmonyPatch(typeof(PartyBase), "set_MapEventSide")]
+    [HarmonyPostfix]
+    [HarmonyPriority(Priority.First)]
+    private static void Postfix_PartyBaseMapEventSide(
+        PartyBase __instance,
+        MapEventSide value,
+        bool __state)
+    {
+        if (__state && !ReferenceEquals(__instance?.MapEventSide, value) && value?.MapEvent != null &&
+            TryResolveServerBarrier(out var barrier))
+            barrier.CancelServerParty(value.MapEvent, __instance);
+    }
+
+    [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.Initialize))]
+    [HarmonyPrefix]
+    [HarmonyPriority(Priority.First)]
+    private static void Prefix_MapEventInitialize(
+        MapEvent __instance,
+        PartyBase attackerParty,
+        PartyBase defenderParty)
+    {
+        if (!TryResolveServerBarrier(out var barrier)) return;
+
+        barrier.AnnounceServerParty(__instance, attackerParty);
+        barrier.AnnounceServerParty(__instance, defenderParty);
     }
 
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.Initialize))]

@@ -10,6 +10,7 @@ using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Kingdoms;
@@ -103,6 +104,7 @@ internal abstract class TestComponentBase
         RegisterMock<IAttachmentIdMapper>(builder);
         RegisterMock<IAutoRegistryFactory>(builder);
         RegisterMock<IBattleTroopReserveBuilder>(builder);
+        RegisterMock<IMapEventInitializationBarrier>(builder);
         // BattleHostHandler (MissionModule, auto-activated) needs the registry, which the real
         // containers get from GameInterfaceModule — not loaded here.
         RegisterMock<IBattleHostRegistry>(builder);

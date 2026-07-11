@@ -16,6 +16,7 @@ namespace GameInterface.Services.MobileParties.Patches
         [HarmonyPatch(nameof(EnterSettlementAction.ApplyForParty))]
         private static bool ApplyForPartyPrefix(ref MobileParty mobileParty, ref Settlement settlement)
         {
+            if (mobileParty?.Party?.MapEventSide != null) return false;
             if (mobileParty.CurrentSettlement == settlement) return false;
 
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;

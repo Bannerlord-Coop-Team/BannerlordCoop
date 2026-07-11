@@ -68,6 +68,19 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Fact]
+    public void OppositeDirectionInteractionRequest_ForReservedPair_IsIdempotent()
+    {
+        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+        RequestInteraction(client2, responderPartyId, initiatorPartyId);
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkConversationDenied>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionDenied>());
+    }
+
+    [Fact]
     public void TradeProposal_AcceptedByResponder_EntersTradeActiveForBothParties()
     {
         var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();

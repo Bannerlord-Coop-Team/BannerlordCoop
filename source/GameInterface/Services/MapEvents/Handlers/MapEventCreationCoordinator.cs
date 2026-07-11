@@ -7,6 +7,7 @@ using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using GameInterface.Services.Villages.Interfaces;
 using LiteNetLib;
 using Serilog;
@@ -16,6 +17,7 @@ using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.MapEvents.Handlers;
 
@@ -35,6 +37,7 @@ internal class MapEventCreationCoordinator : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
+    private readonly IPlayerManager playerManager;
     private readonly INetworkConfig configuration;
     private readonly IVillageHostileActionInterface villageHostileActionInterface;
     private readonly IMapEventInitializationBarrier initializationBarrier;
@@ -44,6 +47,7 @@ internal class MapEventCreationCoordinator : IHandler
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
+        IPlayerManager playerManager,
         INetworkConfig configuration,
         IVillageHostileActionInterface villageHostileActionInterface,
         IMapEventInitializationBarrier initializationBarrier)
@@ -51,6 +55,7 @@ internal class MapEventCreationCoordinator : IHandler
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
+        this.playerManager = playerManager;
         this.configuration = configuration;
         this.villageHostileActionInterface = villageHostileActionInterface;
         this.initializationBarrier = initializationBarrier;
@@ -117,7 +122,9 @@ internal class MapEventCreationCoordinator : IHandler
             MapEvent mapEvent = null;
             if (!GameThread.WaitWhilePumping(
                     () => objectManager.TryGetObject(pending.MapEventId, out mapEvent) && mapEvent != null
-                        && Campaign.Current.MapEventManager.MapEvents.Contains(mapEvent),
+                        && Campaign.Current.MapEventManager.MapEvents.Contains(mapEvent)
+                        && ReferenceEquals(attacker.MapEvent, mapEvent)
+                        && ReferenceEquals(defender.MapEvent, mapEvent),
                     deadline))
             {
                 Logger.Error(
@@ -155,6 +162,16 @@ internal class MapEventCreationCoordinator : IHandler
         if (!TryResolveRequestParties(request, out var attacker, out var defender))
             return;
 
+        if (!TryGetRequestingPlayerParty(requestingPeer, request, attacker, defender, out var requestingParty))
+            return;
+
+        if (TryHandleExistingMapEventRequest(request, attacker, defender, requestingParty, out var existingMapEventId))
+        {
+            if (!string.IsNullOrEmpty(existingMapEventId))
+                SendCreatedReply(requestingPeer, request, existingMapEventId);
+            return;
+        }
+
         if (!TryConsumeApprovedMapEventStart(request, attacker, defender))
             return;
 
@@ -166,8 +183,12 @@ internal class MapEventCreationCoordinator : IHandler
             return;
         }
 
-        Logger.Debug("Server created map event {MapEventId} for RequestId={RequestId}. Responding to client.", mapEventId, request.RequestId);
+        SendCreatedReply(requestingPeer, request, mapEventId);
+    }
 
+    private void SendCreatedReply(NetPeer requestingPeer, NetworkRequestCreateMapEvent request, string mapEventId)
+    {
+        Logger.Debug("Server resolved map event {MapEventId} for RequestId={RequestId}. Responding to client.", mapEventId, request.RequestId);
         network.Send(requestingPeer, new NetworkMapEventCreated(request.RequestId, mapEventId));
     }
 
@@ -212,6 +233,154 @@ internal class MapEventCreationCoordinator : IHandler
             request.AttackerId,
             request.DefenderId,
             reason);
+        return false;
+    }
+
+    private bool TryHandleExistingMapEventRequest(
+        NetworkRequestCreateMapEvent request,
+        PartyBase attacker,
+        PartyBase defender,
+        MobileParty requestingParty,
+        out string mapEventId)
+    {
+        mapEventId = null;
+        var attackerSide = attacker.MapEventSide;
+        var defenderSide = defender.MapEventSide;
+        if (attackerSide == null && defenderSide == null)
+            return false;
+
+        if (ReferenceEquals(attacker, defender))
+        {
+            LogIncompatibleExistingRequest(request, "attacker and defender are the same party");
+            return true;
+        }
+
+        if (HasForcedCreationFlags(request))
+        {
+            LogIncompatibleExistingRequest(request, "forced battle requests cannot reuse or join an existing map event");
+            return true;
+        }
+
+        if (attackerSide != null && defenderSide != null)
+        {
+            var attackerEvent = attackerSide.MapEvent;
+            if (attackerEvent == null ||
+                !ReferenceEquals(attackerEvent, defenderSide.MapEvent) ||
+                !ReferenceEquals(attackerSide.OtherSide, defenderSide) ||
+                !attackerEvent.IsFieldBattle ||
+                attackerEvent.BattleState != BattleState.None ||
+                attackerEvent.IsFinalized)
+            {
+                LogIncompatibleExistingRequest(request, "parties are not on opposing sides of the same active map event");
+                return true;
+            }
+
+            if (!objectManager.TryGetIdWithLogging(attackerEvent, out mapEventId))
+                mapEventId = null;
+            return true;
+        }
+
+        var occupiedSide = attackerSide ?? defenderSide;
+        var joiningParty = attackerSide == null ? attacker : defender;
+        if (!ReferenceEquals(joiningParty.MobileParty, requestingParty))
+        {
+            LogIncompatibleExistingRequest(request, "the requester does not control the joining party");
+            return true;
+        }
+
+        var mapEvent = occupiedSide?.MapEvent;
+        var joiningSide = occupiedSide?.OtherSide;
+        if (mapEvent == null || !mapEvent.IsFieldBattle || mapEvent.BattleState != BattleState.None ||
+            mapEvent.IsFinalized || joiningSide == null)
+        {
+            LogIncompatibleExistingRequest(request, "the existing map event cannot accept another party");
+            return true;
+        }
+
+        var joiningMobileParty = joiningParty.MobileParty;
+        if (joiningMobileParty == null || !joiningMobileParty.IsActive || joiningMobileParty.CurrentSettlement != null)
+        {
+            LogIncompatibleExistingRequest(request, "the joining party is not an active mobile party on the map");
+            return true;
+        }
+
+        if (!CanJoinFieldBattle(joiningParty, joiningSide))
+        {
+            LogIncompatibleExistingRequest(request, "the joining party is not faction-compatible with the battle sides");
+            return true;
+        }
+
+        joiningParty.MapEventSide = joiningSide;
+
+        if (!objectManager.TryGetIdWithLogging(mapEvent, out mapEventId))
+            mapEventId = null;
+        return true;
+    }
+
+    private static bool CanJoinFieldBattle(PartyBase party, MapEventSide side)
+    {
+        if (party?.MapFaction == null || side?.OtherSide == null)
+            return false;
+
+        return IsFactionCompatible(side, party.MapFaction, shouldBeAtWar: false) &&
+            IsFactionCompatible(side.OtherSide, party.MapFaction, shouldBeAtWar: true);
+    }
+
+    private static bool IsFactionCompatible(MapEventSide side, IFaction joiningFaction, bool shouldBeAtWar)
+    {
+        foreach (var mapEventParty in side.Parties)
+        {
+            var involvedParty = mapEventParty?.Party;
+            if (involvedParty?.MapFaction == null || !involvedParty.IsActive ||
+                VillageHostileFactionStanceHelper.HasWarStance(involvedParty.MapFaction, joiningFaction) != shouldBeAtWar)
+                return false;
+        }
+
+        return true;
+    }
+
+    private static bool HasForcedCreationFlags(NetworkRequestCreateMapEvent request) =>
+        request.ForceRaid ||
+        request.ForceSallyOut ||
+        request.ForceVolunteers ||
+        request.ForceSupplies ||
+        request.IsSallyOutAmbush ||
+        request.ForceBlockadeAttack ||
+        request.ForceBlockadeSallyOutAttack ||
+        request.ForceHideoutSendTroops;
+
+    private static void LogIncompatibleExistingRequest(NetworkRequestCreateMapEvent request, string reason)
+    {
+        Logger.Warning(
+            "Rejecting overlapping map event creation. RequestId={RequestId}, AttackerId={AttackerId}, DefenderId={DefenderId}, Reason={Reason}",
+            request.RequestId,
+            request.AttackerId,
+            request.DefenderId,
+            reason);
+    }
+
+    private bool TryGetRequestingPlayerParty(
+        NetPeer requestingPeer,
+        NetworkRequestCreateMapEvent request,
+        PartyBase attacker,
+        PartyBase defender,
+        out MobileParty requestingParty)
+    {
+        requestingParty = null;
+        if (playerManager.TryGetPlayer(requestingPeer, out var player) &&
+            objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out requestingParty) &&
+            (ReferenceEquals(attacker.MobileParty, requestingParty) ||
+             ReferenceEquals(defender.MobileParty, requestingParty)))
+        {
+            return true;
+        }
+
+        Logger.Warning(
+            "Rejecting unauthorized map event creation. RequestId={RequestId}, AttackerId={AttackerId}, DefenderId={DefenderId}, Peer={Peer}",
+            request.RequestId,
+            request.AttackerId,
+            request.DefenderId,
+            requestingPeer.Id);
         return false;
     }
 

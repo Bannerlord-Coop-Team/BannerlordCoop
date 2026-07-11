@@ -9,6 +9,7 @@ using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Villages.Interfaces;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -29,9 +30,8 @@ namespace GameInterface.Services.MapEvents.Handlers;
 /// both parties are players or either party is already in a <see cref="TaleWorlds.CampaignSystem.MapEvents.MapEvent"/>.
 /// Client (on approval): re-runs <c>PlayerEncounter.RestartPlayerEncounter</c> with the same parameters under an
 /// <see cref="AllowedThread"/> so the now-approved original executes.
-/// Server (additionally): while a player's conversation is open, the AI party is held in place and marked engaged
-/// in <see cref="ConversationPartyTracker"/> (requests against it from other players are rejected); the hold is
-/// released when the client reports the encounter finished, fails to start it, or disconnects.
+/// Server (additionally): while a conversation is open, the AI party is held in place. Hostile players may share
+/// that hold so simultaneous attack attempts can converge on one MapEvent.
 /// </remarks>
 internal class ConversationRequestHandler : IHandler
 {
@@ -231,15 +231,6 @@ internal class ConversationRequestHandler : IHandler
 
         aiParty = aiSide.MobileParty;
 
-        if (aiParty != null && conversationPartyTracker.IsEngagedByOther(aiPartyId, requestingPeer))
-        {
-            Logger.Debug(
-                "Rejecting conversation request: the party is in a conversation with another player. PartyId={PartyId}",
-                aiPartyId);
-            network.Send(requestingPeer, new NetworkConversationDenied());
-            return false;
-        }
-
         Logger.Debug(
             "Allowing conversation. AttackerId={AttackerId}, DefenderId={DefenderId}",
             request.AttackerId, request.DefenderId);
@@ -248,9 +239,7 @@ internal class ConversationRequestHandler : IHandler
     }
 
     /// <summary>
-    /// [Server, game thread] Re-validate (state can change while the approval is queued), hold the AI party, and
-    /// reply to allow. Stays silent (rejecting) when a party no longer resolves or entered a battle meanwhile, and
-    /// tells the requester when the party or the requester became engaged in the interim (first approval wins).
+    /// [Server, game thread] Re-validates the queued approval, holds the AI party, and replies to allow.
     /// </summary>
     private void HoldAndApprove(NetPeer requestingPeer, NetworkRequestConversation request, string aiPartyId, string playerPartyId)
     {
@@ -280,8 +269,17 @@ internal class ConversationRequestHandler : IHandler
             return;
         }
 
-        // Re-check the engagement: another player may have engaged the party meanwhile, or the requester may
-        // still hold an unfinished engagement with a different party (first approval wins).
+        if (conversationPartyTracker.IsEngagedByOther(aiPartyId, requestingPeer) &&
+            !AreHostile(playerPartyBase, aiPartyBase))
+        {
+            Logger.Debug(
+                "Rejecting shared conversation for a non-hostile party. PartyId={PartyId}",
+                aiPartyId);
+            network.Send(requestingPeer, new NetworkConversationDenied());
+            return;
+        }
+
+        // A requester may share this hostile target but cannot replace its own live engagement with another target.
         if (!ConversationPartyHold.TryEngage(conversationPartyTracker, requestingPeer, playerPartyId, aiPartyBase.MobileParty, aiPartyId))
         {
             Logger.Debug(
@@ -292,6 +290,13 @@ internal class ConversationRequestHandler : IHandler
         }
 
         SendAllowConversation(requestingPeer, request);
+    }
+
+    private static bool AreHostile(PartyBase playerParty, PartyBase aiParty)
+    {
+        var playerFaction = playerParty?.MapFaction;
+        var aiFaction = aiParty?.MapFaction;
+        return VillageHostileFactionStanceHelper.HasWarStance(playerFaction, aiFaction);
     }
 
     /// <summary>[Server] Replies to the requester that the conversation may (re)open.</summary>

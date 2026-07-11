@@ -23,15 +23,17 @@ public class ConversationPartyTrackerTests
     }
 
     [Fact]
-    public void TryBeginEngagement_WhenPartyEngagedByOtherPlayer_Fails()
+    public void TryBeginEngagement_WhenPartyEngagedByOtherPlayer_SharesHold()
     {
         tracker.TryBeginEngagement(firstPlayer, "player1", "lord1", wasAiDisabled: false);
 
-        var began = tracker.TryBeginEngagement(secondPlayer, "player2", "lord1", wasAiDisabled: false);
+        var began = tracker.TryBeginEngagement(secondPlayer, "player2", "lord1", wasAiDisabled: true);
 
-        Assert.False(began);
-        Assert.True(tracker.TryGetEngagement("lord1", out var engagement));
-        Assert.Equal(firstPlayer, engagement.EngagerKey);
+        Assert.True(began);
+        Assert.False(tracker.IsEngagedByOther("lord1", firstPlayer));
+        Assert.False(tracker.IsEngagedByOther("lord1", secondPlayer));
+        Assert.True(tracker.IsEngagerParty("lord1", "player1"));
+        Assert.True(tracker.IsEngagerParty("lord1", "player2"));
     }
 
     [Fact]
@@ -107,6 +109,31 @@ public class ConversationPartyTrackerTests
     }
 
     [Fact]
+    public void TryEndEngagement_SharedParty_ReleasesOnlyAfterLastPlayer()
+    {
+        tracker.TryBeginEngagement(firstPlayer, "player1", "lord1", wasAiDisabled: false);
+        tracker.TryBeginEngagement(secondPlayer, "player2", "lord1", wasAiDisabled: true);
+
+        var firstEnded = tracker.TryEndEngagement(firstPlayer, out var firstPartyId, out _, out var releaseAfterFirst);
+
+        Assert.True(firstEnded);
+        Assert.Equal("lord1", firstPartyId);
+        Assert.False(releaseAfterFirst);
+        Assert.True(tracker.TryGetEngagement("lord1", out var remaining));
+        Assert.Equal(secondPlayer, remaining.EngagerKey);
+        Assert.False(tracker.IsEmpty);
+
+        var secondEnded = tracker.TryEndEngagement(secondPlayer, out var secondPartyId, out var finalEngagement, out var releaseAfterSecond);
+
+        Assert.True(secondEnded);
+        Assert.Equal("lord1", secondPartyId);
+        Assert.False(finalEngagement.WasAiDisabled);
+        Assert.True(releaseAfterSecond);
+        Assert.False(tracker.TryGetEngagement("lord1", out _));
+        Assert.True(tracker.IsEmpty);
+    }
+
+    [Fact]
     public void IsEngagedByOther_TrueOnlyForDifferentEngager()
     {
         tracker.TryBeginEngagement(firstPlayer, "player1", "lord1", wasAiDisabled: false);
@@ -146,5 +173,6 @@ public class ConversationPartyTrackerTests
 
         Assert.True(tracker.IsEmpty);
         Assert.False(tracker.TryGetEngagement("lord1", out _));
+        Assert.False(tracker.TryBeginEngagement(secondPlayer, "player2", "lord2", wasAiDisabled: false));
     }
 }
