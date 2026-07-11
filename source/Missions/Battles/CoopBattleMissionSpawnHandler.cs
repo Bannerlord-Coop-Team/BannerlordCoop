@@ -87,41 +87,59 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
 
         _heldSeconds += dt;
         var sizing = ReadSizing();
-        if (_heldSeconds < ReserveHoldDeadlineSeconds && (!sizing.Ready || !sizing.HasAnyOwnedTroops)) return;
+        if (ShouldContinueHolding(sizing)) return;
 
-        // A zero-troop mission has no safe sizing or deployment path. Reserves had the full hold window to
-        // arrive/recover; terminate through Mission.EndMission so the attached coop lifecycle releases the
-        // spawn gate and returns to campaign instead of leaving the loading screen gated forever.
         if (!sizing.HasAnyOwnedTroops)
         {
-            _emptyBattleAbortRequested = true;
-            Logger.Error("[BattleSync] No battle troops arrived within {Sec}s (Def populated={DefP}, Atk populated={AtkP}); ending invalid mission",
-                ReserveHoldDeadlineSeconds, sizing.DefenderPopulated, sizing.AttackerPopulated);
-            base.Mission.EndMission();
+            AbortEmptyBattle(sizing);
             return;
         }
 
-        if (!sizing.Ready)
-        {
-            // This is the one point where an empty side becomes intentional rather than merely late. Record
-            // exactly which reserve timed out so the controller can eventually release BattleEndLogic and the
-            // depletion patch can call only that side depleted; the populated side must still field an agent.
-            if (!sizing.DefenderPopulated)
-                BattleSpawnGate.AcceptMissingReserveSide(BattleSideEnum.Defender);
-            if (!sizing.AttackerPopulated)
-                BattleSpawnGate.AcceptMissingReserveSide(BattleSideEnum.Attacker);
-        }
+        AcceptMissingReserveSides(sizing);
 
         // Ready, or the deadline expired with a partial/missing reserve. At least one combatant exists here,
         // so the joint Init cannot hit its invalid 0/0 split.
         RunJointInit(sizing.DefenderOwned, sizing.AttackerOwned);
+        LogSizingCompleted(sizing);
+        _sized = true;
+    }
 
+    private bool ShouldContinueHolding(SideSizing sizing)
+    {
+        return _heldSeconds < ReserveHoldDeadlineSeconds
+            && (!sizing.Ready || !sizing.HasAnyOwnedTroops);
+    }
+
+    // A zero-troop mission has no safe sizing or deployment path. Reserves had the full hold window to
+    // arrive/recover; terminate through Mission.EndMission so the attached coop lifecycle releases the
+    // spawn gate and returns to campaign instead of leaving the loading screen gated forever.
+    private void AbortEmptyBattle(SideSizing sizing)
+    {
+        _emptyBattleAbortRequested = true;
+        Logger.Error("[BattleSync] No battle troops arrived within {Sec}s (Def populated={DefP}, Atk populated={AtkP}); ending invalid mission",
+            ReserveHoldDeadlineSeconds, sizing.DefenderPopulated, sizing.AttackerPopulated);
+        base.Mission.EndMission();
+    }
+
+    // This is the one point where an empty side becomes intentional rather than merely late. Record exactly
+    // which reserve timed out so the controller can eventually release BattleEndLogic and the depletion patch
+    // can call only that side depleted; the populated side must still field an agent.
+    private static void AcceptMissingReserveSides(SideSizing sizing)
+    {
+        if (sizing.Ready) return;
+        if (!sizing.DefenderPopulated)
+            BattleSpawnGate.AcceptMissingReserveSide(BattleSideEnum.Defender);
+        if (!sizing.AttackerPopulated)
+            BattleSpawnGate.AcceptMissingReserveSide(BattleSideEnum.Attacker);
+    }
+
+    private static void LogSizingCompleted(SideSizing sizing)
+    {
         if (sizing.Ready)
             Logger.Information("[BattleSync] Reserves landed after start; sized sides jointly: Defender={Def}, Attacker={Atk}", sizing.DefenderOwned, sizing.AttackerOwned);
         else
             Logger.Warning("[BattleSync] Reserves incomplete after {Sec}s hold (Def populated={DefP}, Atk populated={AtkP}) — sizing with what landed: Defender={Def}, Attacker={Atk}",
                 ReserveHoldDeadlineSeconds, sizing.DefenderPopulated, sizing.AttackerPopulated, sizing.DefenderOwned, sizing.AttackerOwned);
-        _sized = true;
     }
 
     // Snapshot both suppliers into a SideSizing. Read populated before owned so the pair can't tear: SetReserve

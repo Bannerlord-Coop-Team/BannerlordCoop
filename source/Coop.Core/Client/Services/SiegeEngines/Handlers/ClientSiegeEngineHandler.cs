@@ -104,57 +104,90 @@ internal class ClientSiegeEngineHandler : IHandler
             // concurrently arriving live delta cannot overtake this buffered batch.
             revisionEpoch = snapshot.RevisionEpoch;
             slotRevisions.Clear();
-            var replayedSlotKeys = new HashSet<string>();
-            foreach (var delta in pendingSlotDeltas)
-            {
-                if (!DeltaBelongsToEpoch(delta, revisionEpoch)) continue;
-                if (delta is NetworkChangeSiegeEngineDeployed deployed)
-                {
-                    replayedSlotKeys.Add(SlotKey(deployed.ContainerId, deployed.IsRanged, deployed.Index));
-                    if (TryAdvanceSlotRevisionLocked(deployed.RevisionEpoch, deployed.ContainerId, deployed.IsRanged,
-                            deployed.Index, deployed.SlotRevision, deployed))
-                        PublishDeployed(deployed);
-                }
-                else if (delta is NetworkChangeSiegeEngineUndeployed undeployed)
-                {
-                    replayedSlotKeys.Add(SlotKey(undeployed.ContainerId, undeployed.IsRanged, undeployed.Index));
-                    if (TryAdvanceSlotRevisionLocked(undeployed.RevisionEpoch, undeployed.ContainerId, undeployed.IsRanged,
-                            undeployed.Index, undeployed.SlotRevision, undeployed))
-                        PublishUndeployed(undeployed);
-                }
-            }
-            pendingSlotDeltas.Clear();
+            var replayedSlotKeys = ReplayPendingSlotDeltasLocked();
 
             // The snapshot is authoritative for every slot, including ones with no post-save delta. Max also
             // covers any generation whose state was already present in the transferred save.
-            foreach (var slot in snapshot.Slots ?? Array.Empty<SiegeEngineSlotRevision>())
-            {
-                var key = SlotKey(slot.ContainerId, slot.IsRanged, slot.Index);
-                if (!slotRevisions.TryGetValue(key, out var current) || slot.Revision > current)
-                    slotRevisions[key] = slot.Revision;
-            }
+            MergeSlotRevisionSnapshotLocked(snapshot.Slots);
 
             // UI orders can be raised while the transferred save is already interactive but before the
             // server's revision snapshot reaches this handler. Send them only after replaying the queued
             // post-save deltas. A click for any replay-touched slot is stale even if the occupant returned via
             // ABA, so discard it rather than retargeting unseen state; untouched slots retain observed intent.
-            foreach (var request in pendingLocalRequests)
-            {
-                var key = SlotKey(request.ContainerId, request.IsRanged, request.Index);
-                if (replayedSlotKeys.Contains(key))
-                {
-                    // There was no epoch/generation available when the click was captured, so even an ABA
-                    // replay (A -> B -> A) is indistinguishable from the original A. Never retarget stale UI
-                    // intent to the post-save generation; the user can act again on the state now displayed.
-                    Logger.Warning("Ignoring pre-snapshot siege-engine request for {Slot}: buffered deltas changed that slot before the revision snapshot",
-                        key);
-                    continue;
-                }
-
-                SendSlotRequestLocked(request);
-            }
-            pendingLocalRequests.Clear();
+            FlushPendingLocalRequestsLocked(replayedSlotKeys);
         }
+    }
+
+    private HashSet<string> ReplayPendingSlotDeltasLocked()
+    {
+        var replayedSlotKeys = new HashSet<string>();
+        foreach (var delta in pendingSlotDeltas)
+            ReplayPendingSlotDeltaLocked(delta, replayedSlotKeys);
+
+        pendingSlotDeltas.Clear();
+        return replayedSlotKeys;
+    }
+
+    private void ReplayPendingSlotDeltaLocked(IMessage delta, HashSet<string> replayedSlotKeys)
+    {
+        if (!DeltaBelongsToEpoch(delta, revisionEpoch)) return;
+
+        if (delta is NetworkChangeSiegeEngineDeployed deployed)
+        {
+            ReplayDeployedSlotDeltaLocked(deployed, replayedSlotKeys);
+            return;
+        }
+
+        if (delta is NetworkChangeSiegeEngineUndeployed undeployed)
+            ReplayUndeployedSlotDeltaLocked(undeployed, replayedSlotKeys);
+    }
+
+    private void ReplayDeployedSlotDeltaLocked(NetworkChangeSiegeEngineDeployed deployed,
+        HashSet<string> replayedSlotKeys)
+    {
+        replayedSlotKeys.Add(SlotKey(deployed.ContainerId, deployed.IsRanged, deployed.Index));
+        if (TryAdvanceSlotRevisionLocked(deployed.RevisionEpoch, deployed.ContainerId, deployed.IsRanged,
+                deployed.Index, deployed.SlotRevision, deployed))
+            PublishDeployed(deployed);
+    }
+
+    private void ReplayUndeployedSlotDeltaLocked(NetworkChangeSiegeEngineUndeployed undeployed,
+        HashSet<string> replayedSlotKeys)
+    {
+        replayedSlotKeys.Add(SlotKey(undeployed.ContainerId, undeployed.IsRanged, undeployed.Index));
+        if (TryAdvanceSlotRevisionLocked(undeployed.RevisionEpoch, undeployed.ContainerId, undeployed.IsRanged,
+                undeployed.Index, undeployed.SlotRevision, undeployed))
+            PublishUndeployed(undeployed);
+    }
+
+    private void MergeSlotRevisionSnapshotLocked(IEnumerable<SiegeEngineSlotRevision> snapshotSlots)
+    {
+        foreach (var slot in snapshotSlots ?? Array.Empty<SiegeEngineSlotRevision>())
+        {
+            var key = SlotKey(slot.ContainerId, slot.IsRanged, slot.Index);
+            if (!slotRevisions.TryGetValue(key, out var current) || slot.Revision > current)
+                slotRevisions[key] = slot.Revision;
+        }
+    }
+
+    private void FlushPendingLocalRequestsLocked(HashSet<string> replayedSlotKeys)
+    {
+        foreach (var request in pendingLocalRequests)
+        {
+            var key = SlotKey(request.ContainerId, request.IsRanged, request.Index);
+            if (replayedSlotKeys.Contains(key))
+            {
+                // There was no epoch/generation available when the click was captured, so even an ABA
+                // replay (A -> B -> A) is indistinguishable from the original A. Never retarget stale UI
+                // intent to the post-save generation; the user can act again on the state now displayed.
+                Logger.Warning("Ignoring pre-snapshot siege-engine request for {Slot}: buffered deltas changed that slot before the revision snapshot",
+                    key);
+                continue;
+            }
+
+            SendSlotRequestLocked(request);
+        }
+        pendingLocalRequests.Clear();
     }
 
     private void HandleCampaignReady(MessagePayload<CampaignReady> payload)
