@@ -413,21 +413,39 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
             return TournamentMutationStatus.InvalidPhase;
 
         bool isCompetitor = session.TryGetActiveContestant(controllerId, out _);
-        if (!isCompetitor && !session.PendingSpectators.Remove(controllerId) && !session.Spectators.Contains(controllerId))
+        if (!CanEnterMission(session, controllerId, isCompetitor))
             return TournamentMutationStatus.NotParticipant;
-
-        bool changed = !isCompetitor && session.Spectators.Add(controllerId);
-        if (!session.Entrants.Contains(controllerId))
-        {
-            session.Entrants.Add(controllerId);
-            changed = true;
-        }
-        if (!changed)
+        if (!AddMissionEntrant(session, controllerId, isCompetitor))
             return TournamentMutationStatus.NoChange;
 
         session.Revision++;
         snapshot = session.CreateSnapshot();
         return TournamentMutationStatus.Applied;
+    }
+
+    private static bool CanEnterMission(
+        TournamentSessionState session,
+        string controllerId,
+        bool isCompetitor)
+    {
+        if (isCompetitor)
+            return true;
+        if (session.PendingSpectators.Remove(controllerId))
+            return true;
+        return session.Spectators.Contains(controllerId);
+    }
+
+    private static bool AddMissionEntrant(
+        TournamentSessionState session,
+        string controllerId,
+        bool isCompetitor)
+    {
+        bool changed = !isCompetitor && session.Spectators.Add(controllerId);
+        if (session.Entrants.Contains(controllerId))
+            return changed;
+
+        session.Entrants.Add(controllerId);
+        return true;
     }
     public TournamentMutationStatus TryChoose(
         string sessionId,

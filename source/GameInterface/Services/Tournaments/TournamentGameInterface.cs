@@ -75,26 +75,72 @@ public sealed partial class TournamentGameInterface : ITournamentGameInterface
     public bool TryFreezeTournament(Town town, FightTournamentGame tournamentGame, out TournamentSessionSeed seed)
     {
         seed = null;
+        if (!TryResolveFreezeContext(town, tournamentGame, out var townId, out var sceneName))
+            return false;
+        if (!TryCreateFrozenRoster(town, tournamentGame, out var sortedCharacters))
+            return false;
+        if (!TryResolveFrozenRewards(
+                town,
+                tournamentGame,
+                sortedCharacters,
+                out var prizeId,
+                out var replacementId))
+            return false;
+
+        return TryCreateTournamentSeed(
+            townId,
+            sceneName,
+            prizeId,
+            replacementId,
+            sortedCharacters,
+            out seed);
+    }
+
+    private bool TryResolveFreezeContext(
+        Town town,
+        FightTournamentGame tournamentGame,
+        out string townId,
+        out string sceneName)
+    {
+        townId = null;
+        sceneName = null;
         if (town?.Settlement == null || tournamentGame == null || tournamentGame.Town != town)
             return false;
         if (tournamentGame.GetType() != typeof(FightTournamentGame))
             return false;
-        if (!objectManager.TryGetId(town, out var townId))
+        if (!objectManager.TryGetId(town, out townId))
             return false;
 
-        string sceneName = town.Settlement.LocationComplex?.GetScene("arena", town.GetWallLevel());
-        if (string.IsNullOrEmpty(sceneName))
-            return false;
-        if (!TryCreateFrozenRoster(town, tournamentGame, out var sortedCharacters))
-            return false;
+        sceneName = town.Settlement.LocationComplex?.GetScene("arena", town.GetWallLevel());
+        return !string.IsNullOrEmpty(sceneName);
+    }
 
+    private bool TryResolveFrozenRewards(
+        Town town,
+        FightTournamentGame tournamentGame,
+        MBList<CharacterObject> sortedCharacters,
+        out string prizeId,
+        out string replacementId)
+    {
+        prizeId = null;
+        replacementId = null;
         CharacterObject replacement = town.Culture?.BasicTroop;
-        if (replacement == null || !objectManager.TryGetId(replacement, out var replacementId))
-            return false;
-        ItemObject prize = GetPrizeForFrozenRoster(town, tournamentGame, sortedCharacters);
-        if (prize == null || !objectManager.TryGetId(prize, out var prizeId))
+        if (replacement == null || !objectManager.TryGetId(replacement, out replacementId))
             return false;
 
+        ItemObject prize = GetPrizeForFrozenRoster(town, tournamentGame, sortedCharacters);
+        return prize != null && objectManager.TryGetId(prize, out prizeId);
+    }
+
+    private bool TryCreateTournamentSeed(
+        string townId,
+        string sceneName,
+        string prizeId,
+        string replacementId,
+        IReadOnlyList<CharacterObject> sortedCharacters,
+        out TournamentSessionSeed seed)
+    {
+        seed = null;
         var identity = new TournamentSessionIdentity();
         if (!objectManager.AddNewObject(identity, out var sessionId))
             return false;
@@ -111,7 +157,6 @@ public sealed partial class TournamentGameInterface : ITournamentGameInterface
             contestants);
         return true;
     }
-
     private bool TryCreateFrozenRoster(
         Town town,
         FightTournamentGame tournamentGame,
