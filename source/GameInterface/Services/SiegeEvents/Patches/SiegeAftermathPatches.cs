@@ -1,11 +1,16 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.SiegeEvents.Messages;
 using HarmonyLib;
+using Serilog;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -24,19 +29,77 @@ namespace GameInterface.Services.SiegeEvents.Patches;
 [HarmonyPatch]
 internal class SiegeAftermathPatches
 {
+    private const string PendingAftermathSaveKey = "_coop_pending_siege_aftermaths";
+    private static readonly ILogger Logger = LogManager.GetLogger<SiegeAftermathPatches>();
+
     internal class PendingAftermath
     {
         public readonly MobileParty LeaderParty;
+        public readonly Hero LeaderHero;
         public readonly Clan PreviousOwnerClan;
         public readonly Dictionary<MobileParty, float> Contributions;
         public readonly CampaignTime ParkedAt;
+        public Clan CaptureOwnerClan { get; private set; }
+        public Clan CapturerClan { get; private set; }
 
         public PendingAftermath(MobileParty leaderParty, Clan previousOwnerClan, Dictionary<MobileParty, float> contributions)
+            : this(leaderParty, leaderParty?.LeaderHero, previousOwnerClan, contributions, CampaignTime.Now)
+        {
+        }
+
+        internal PendingAftermath(MobileParty leaderParty, Hero leaderHero, Clan previousOwnerClan,
+            Dictionary<MobileParty, float> contributions, CampaignTime parkedAt)
         {
             LeaderParty = leaderParty;
+            LeaderHero = leaderHero;
             PreviousOwnerClan = previousOwnerClan;
             Contributions = contributions;
-            ParkedAt = CampaignTime.Now;
+            ParkedAt = parkedAt;
+        }
+
+        internal bool IsCaptureBound => CaptureOwnerClan != null && CapturerClan != null;
+
+        internal bool IsOriginalCaptureTransition(Settlement settlement, Hero newOwner, Hero capturerHero,
+            ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail detail)
+        {
+            return !IsCaptureBound
+                && detail == ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail.BySiege
+                && settlement?.OwnerClan == PreviousOwnerClan
+                && newOwner?.Clan != null
+                && capturerHero?.Clan != null
+                && capturerHero == LeaderHero;
+        }
+
+        internal bool TryBindCapture(Hero newOwner, Hero capturerHero)
+        {
+            if (IsCaptureBound) return false;
+            if (newOwner?.Clan == null || capturerHero?.Clan == null) return false;
+            if (capturerHero != LeaderHero) return false;
+
+            CaptureOwnerClan = newOwner.Clan;
+            CapturerClan = capturerHero.Clan;
+            return true;
+        }
+
+        internal bool TryRestoreCaptureBinding(Clan captureOwnerClan, Clan capturerClan)
+        {
+            if (IsCaptureBound || captureOwnerClan == null || capturerClan == null) return false;
+
+            CaptureOwnerClan = captureOwnerClan;
+            CapturerClan = capturerClan;
+            return true;
+        }
+
+        internal bool MatchesCapture(Clan currentOwnerClan, Clan lastCapturedBy)
+        {
+            return IsCaptureBound
+                && currentOwnerClan == CaptureOwnerClan
+                && lastCapturedBy == CapturerClan;
+        }
+
+        internal bool MatchesCurrentCapture(Settlement settlement)
+        {
+            return settlement != null && MatchesCapture(settlement.OwnerClan, settlement.Town?.LastCapturedBy);
         }
     }
 
@@ -74,9 +137,9 @@ internal class SiegeAftermathPatches
     [HarmonyPrefix]
     private static bool OnSiegeAftermathAppliedPrefix() => ModInformation.IsServer;
 
-    // Harmony statics outlive the Campaign; RegisterEvents runs once per campaign start/load, so
-    // clearing here drops any entry left by a previous campaign before the hourly eviction could
-    // deref its disposed Settlement/MobileParty.
+    // Harmony statics outlive the Campaign. RegisterEvents runs before behavior SyncData restores this
+    // campaign's saved entries, so clear process-lifetime leftovers before an hourly tick can dereference
+    // Settlement/MobileParty instances from the prior campaign.
     [HarmonyPatch(typeof(SiegeAftermathCampaignBehavior), nameof(SiegeAftermathCampaignBehavior.RegisterEvents))]
     [HarmonyPostfix]
     private static void RegisterEventsPostfix()
@@ -84,15 +147,47 @@ internal class SiegeAftermathPatches
         PendingAftermaths.Clear();
     }
 
+    // A pending entry is created by OnMapEventEnded before vanilla transfers the settlement. Bind it to
+    // that exact owner/capturer transition. Any later transfer first resolves the old capture while the
+    // old owner is still current, so the aftermath can neither be lost nor applied to the next owner.
+    [HarmonyPatch(typeof(ChangeOwnerOfSettlementAction), "ApplyInternal")]
+    [HarmonyPrefix]
+    private static void ChangeOwnerOfSettlementPrefix(Settlement settlement, Hero newOwner, Hero capturerHero,
+        ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail detail)
+    {
+        if (ModInformation.IsClient || settlement == null) return;
+        if (!PendingAftermaths.TryGetValue(settlement, out var pending)) return;
+
+        if (pending.IsOriginalCaptureTransition(settlement, newOwner, capturerHero, detail))
+        {
+            pending.TryBindCapture(newOwner, capturerHero);
+            return;
+        }
+
+        var behavior = Campaign.Current?.GetCampaignBehavior<SiegeAftermathCampaignBehavior>();
+        if (behavior != null)
+        {
+            ResolvePending(behavior, settlement, "settlement ownership changed");
+        }
+        else
+        {
+            PendingAftermaths.TryRemove(settlement, out _);
+            Logger.Error("Discarded pending siege aftermath for {Settlement}: behavior unavailable before owner transfer",
+                settlement.Name?.ToString());
+        }
+    }
+
     // Vanilla skips the capture relation penalty when the new owner is Clan.PlayerClan, which is null
     // on the dedicated host, so every player-clan siege capture would wrongly eat the -10/-6 hit.
     // Reimplemented with the co-op player check; the whole vanilla body is just this penalty.
     [HarmonyPatch(typeof(SiegeAftermathCampaignBehavior), nameof(SiegeAftermathCampaignBehavior.OnSettlementOwnerChanged))]
     [HarmonyPrefix]
-    private static bool OnSettlementOwnerChangedPrefix(Settlement settlement, Hero oldOwner, Hero capturerHero,
+    private static bool OnSettlementOwnerChangedPrefix(Settlement settlement, Hero newOwner, Hero oldOwner, Hero capturerHero,
         ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail detail)
     {
         if (ModInformation.IsClient) return false;
+
+        ValidatePendingAfterOwnerChange(settlement, newOwner, capturerHero, detail);
 
         if (settlement.IsFortification && detail == ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail.BySiege
             && capturerHero != null && settlement.OwnerClan != null
@@ -122,6 +217,14 @@ internal class SiegeAftermathPatches
         var settlement = mapEvent.MapEventSettlement;
         var winningSide = mapEvent.GetMapEventSide(battleSide);
         var leaderParty = winningSide.LeaderParty?.MobileParty;
+
+        // OnMapEventEnded runs before vanilla changes ownership. Resolve an older capture now, against
+        // its still-current owner, before this capture can replace the entry or an AI recapture can leave
+        // it behind to fire later against the wrong owner.
+        if (!PendingAftermaths.IsEmpty)
+        {
+            ResolvePending(__instance, settlement, "a newer settlement capture began");
+        }
 
         var contributions = new Dictionary<MobileParty, float>();
         foreach (var item in __instance.GetLootPercentagesOfPartiesOnSideForSiegeAftermath(mapEvent, battleSide))
@@ -153,6 +256,10 @@ internal class SiegeAftermathPatches
                 __instance._wasPlayerArmyMember = leaderParty != MobileParty.MainParty
                     && ((leaderParty?.Army != null && leaderParty.Army.Parties.Contains(MobileParty.MainParty))
                         || (MobileParty.MainParty.Army != null && MobileParty.MainParty.Army.LeaderParty != MobileParty.MainParty));
+                if (ContainerProvider.TryResolve<ISiegeEventInterface>(out var siegeEventInterface))
+                {
+                    siegeEventInterface.SetLocalAftermathNarrationContext(settlement);
+                }
                 // Don't guess _playerEncounterAftermath locally: DetermineAISiegeAftermath is a weighted
                 // RNG draw that would diverge from the server's pick. The applied-aftermath broadcast
                 // sets it (and re-renders the menu if it's already open).
@@ -163,7 +270,13 @@ internal class SiegeAftermathPatches
 
         if (leaderParty?.LeaderHero != null && leaderParty.LeaderHero.IsPlayerHero())
         {
-            PendingAftermaths[settlement] = new PendingAftermath(leaderParty, settlement.OwnerClan, contributions);
+            if (!PendingAftermaths.TryAdd(settlement,
+                    new PendingAftermath(leaderParty, settlement.OwnerClan, contributions)))
+            {
+                Logger.Error("Could not park siege aftermath for {Settlement}: another capture is still pending",
+                    settlement.Name?.ToString());
+                return false;
+            }
             // Make sure the leading player actually gets the choice menu: their local encounter flow
             // usually opens it, but if it doesn't (encounter torn down first), the server would wait
             // on this pending entry forever.
@@ -180,14 +293,31 @@ internal class SiegeAftermathPatches
     // menu) would otherwise strand its effects forever; fall back to the AI pick after a day.
     internal static void EvictStalePending(SiegeAftermathCampaignBehavior behavior)
     {
-        foreach (var pair in PendingAftermaths)
+        foreach (var pair in PendingAftermaths.ToArray())
         {
-            if (pair.Value.ParkedAt.ElapsedHoursUntilNow < CampaignTime.HoursInDay) continue;
-            if (!PendingAftermaths.TryRemove(pair.Key, out var stale)) continue;
+            if (!pair.Value.MatchesCurrentCapture(pair.Key))
+            {
+                if (PendingAftermaths.TryRemove(pair.Key, out _))
+                {
+                    Logger.Warning("Discarded stale siege aftermath for {Settlement}: capture identity no longer matches",
+                        pair.Key?.Name?.ToString());
+                }
+                continue;
+            }
 
-            var aftermath = behavior.DetermineAISiegeAftermath(stale.LeaderParty, pair.Key);
-            SiegeAftermathAction.ApplyAftermath(stale.LeaderParty, pair.Key, aftermath, stale.PreviousOwnerClan, stale.Contributions);
+            if (pair.Value.ParkedAt.ElapsedHoursUntilNow < CampaignTime.HoursInDay) continue;
+            ResolvePending(behavior, pair.Key, "the player choice timed out");
         }
+    }
+
+    // The vanilla behavior already owns the campaign-behavior save record, so append the co-op pending
+    // generations to that same record. A save (including a join snapshot) must be observational: it may
+    // preserve an unanswered player choice, but must never silently replace it with an AI choice.
+    [HarmonyPatch(typeof(SiegeAftermathCampaignBehavior), nameof(SiegeAftermathCampaignBehavior.SyncData))]
+    [HarmonyPostfix]
+    private static void SyncDataPostfix(IDataStore dataStore)
+    {
+        SyncPendingAftermaths(dataStore, ModInformation.IsClient);
     }
 
     [HarmonyPatch(typeof(SiegeAftermathAction), nameof(SiegeAftermathAction.ApplyAftermath))]
@@ -259,5 +389,110 @@ internal class SiegeAftermathPatches
                 ChangeRelationAction.ApplyRelationChangeBetweenHeroes(attackerParty.LeaderHero, party.LeaderHero, relationChange);
             }
         }
+    }
+
+    private static void ValidatePendingAfterOwnerChange(Settlement settlement, Hero newOwner, Hero capturerHero,
+        ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail detail)
+    {
+        if (settlement == null || !PendingAftermaths.TryGetValue(settlement, out var pending)) return;
+
+        // Fallback for another Harmony prefix ordering or a direct event invocation: bind the original
+        // siege capture after the owner changed if the pre-change ApplyInternal prefix did not run first.
+        if (!pending.IsCaptureBound
+            && detail == ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail.BySiege
+            && capturerHero == pending.LeaderHero)
+        {
+            pending.TryBindCapture(newOwner, capturerHero);
+        }
+
+        if (pending.MatchesCurrentCapture(settlement)) return;
+
+        PendingAftermaths.TryRemove(settlement, out _);
+        Logger.Warning("Invalidated pending siege aftermath for {Settlement}: settlement ownership no longer matches the capture",
+            settlement.Name?.ToString());
+    }
+
+    internal static void SyncPendingAftermaths(IDataStore dataStore, bool isClient)
+    {
+        List<PendingAftermathSaveData> saveData = null;
+        if (dataStore.IsSaving)
+        {
+            saveData = isClient
+                ? new List<PendingAftermathSaveData>()
+                : PendingAftermaths.Select(pair => new PendingAftermathSaveData(
+                    pair.Key,
+                    pair.Value.LeaderParty,
+                    pair.Value.LeaderHero,
+                    pair.Value.PreviousOwnerClan,
+                    pair.Value.Contributions,
+                    pair.Value.ParkedAt,
+                    pair.Value.CaptureOwnerClan,
+                    pair.Value.CapturerClan)).ToList();
+        }
+
+        dataStore.SyncData(PendingAftermathSaveKey, ref saveData);
+        if (!dataStore.IsLoading) return;
+
+        PendingAftermaths.Clear();
+        // A transferred server save contains this record on every client. Read it so the behavior
+        // store stays schema-compatible, but keep the authoritative pending state server-only.
+        if (isClient || saveData == null) return;
+
+        foreach (var entry in saveData)
+        {
+            if (entry?.Settlement == null || entry.LeaderParty == null || entry.LeaderHero == null
+                || entry.PreviousOwnerClan == null || entry.Contributions == null)
+            {
+                Logger.Warning("Discarded incomplete saved siege aftermath entry");
+                continue;
+            }
+
+            var pending = new PendingAftermath(
+                entry.LeaderParty,
+                entry.LeaderHero,
+                entry.PreviousOwnerClan,
+                new Dictionary<MobileParty, float>(entry.Contributions),
+                entry.ParkedAt);
+            if (!pending.TryRestoreCaptureBinding(entry.CaptureOwnerClan, entry.CapturerClan)
+                || !pending.MatchesCurrentCapture(entry.Settlement))
+            {
+                Logger.Warning("Discarded stale saved siege aftermath for {Settlement}",
+                    entry.Settlement.Name?.ToString());
+                continue;
+            }
+
+            if (!PendingAftermaths.TryAdd(entry.Settlement, pending))
+            {
+                Logger.Warning("Discarded duplicate saved siege aftermath for {Settlement}",
+                    entry.Settlement.Name?.ToString());
+            }
+        }
+    }
+
+    internal static bool ResolvePending(SiegeAftermathCampaignBehavior behavior, Settlement settlement, string reason,
+        Func<SiegeAftermathCampaignBehavior, MobileParty, Settlement, SiegeAftermathAction.SiegeAftermath> determineAftermath = null,
+        Action<MobileParty, Settlement, SiegeAftermathAction.SiegeAftermath, Clan,
+            Dictionary<MobileParty, float>> applyAftermath = null)
+    {
+        if (behavior == null || settlement == null) return false;
+        if (!PendingAftermaths.TryRemove(settlement, out var pending)) return false;
+
+        if (!pending.MatchesCurrentCapture(settlement))
+        {
+            Logger.Warning("Discarded pending siege aftermath for {Settlement} ({Reason}): capture identity no longer matches",
+                settlement.Name?.ToString(), reason);
+            return false;
+        }
+
+        determineAftermath ??= static (aftermathBehavior, leaderParty, capturedSettlement) =>
+            aftermathBehavior.DetermineAISiegeAftermath(leaderParty, capturedSettlement);
+        applyAftermath ??= static (leaderParty, capturedSettlement, aftermath, previousOwner, contributions) =>
+            SiegeAftermathAction.ApplyAftermath(leaderParty, capturedSettlement, aftermath, previousOwner, contributions);
+
+        var aftermath = determineAftermath(behavior, pending.LeaderParty, settlement);
+        applyAftermath(pending.LeaderParty, settlement, aftermath, pending.PreviousOwnerClan, pending.Contributions);
+        Logger.Information("Resolved pending siege aftermath for {Settlement} because {Reason}",
+            settlement.Name?.ToString(), reason);
+        return true;
     }
 }

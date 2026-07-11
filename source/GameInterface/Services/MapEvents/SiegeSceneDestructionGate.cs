@@ -1,5 +1,7 @@
 ﻿using System;
 
+using TaleWorlds.MountAndBlade;
+
 namespace GameInterface.Services.MapEvents;
 
 /// <summary>
@@ -8,25 +10,38 @@ namespace GameInterface.Services.MapEvents;
 /// destructible wall pieces (chunks, merlons, rubble) and reveals random damage decals via
 /// <c>MBRandom</c> = <c>Game.Current.RandomGenerator</c>, whose state differs per machine and never
 /// replicates in coop (no GameNetwork session). So each client breaks different wall pieces at scene
-/// build. The launcher seeds this from the map-event id (identical on every client) around
-/// <c>MissionState.OpenNew</c>, and <c>SiegeDestructionSeedPatch</c> reseeds the campaign RNG from it
-/// for the duration of that one method so every client makes the same picks.
+/// build. The launcher binds a seed derived from the map-event id (identical on every client) to the
+/// newly-created mission. <c>SiegeDestructionSeedPatch</c> consumes it later, when asynchronous mission
+/// loading actually reaches <c>ArrangeDestructedMeshes</c>, and reseeds the campaign RNG only for that method.
 /// </summary>
 public static class SiegeSceneDestructionGate
 {
+    [ThreadStatic] private static Mission pendingMission;
     [ThreadStatic] private static uint? seed;
 
-    /// <summary>[Game thread] Seed the next siege scene build from its map-event id.</summary>
-    public static void Begin(string mapEventId) => seed = StableSeed(mapEventId);
-
-    /// <summary>[Game thread] Clear the seed once the scene has built.</summary>
-    public static void End() => seed = null;
-
-    public static bool TryGetSeed(out uint value)
+    /// <summary>[Game thread] Seed this siege mission's later scene build from its map-event id.</summary>
+    public static void Begin(Mission mission, string mapEventId)
     {
-        if (seed.HasValue)
+        if (mission == null) throw new ArgumentNullException(nameof(mission));
+        pendingMission = mission;
+        seed = StableSeed(mapEventId);
+    }
+
+    /// <summary>[Game thread] Clear any pending scene-build seed.</summary>
+    public static void End()
+    {
+        pendingMission = null;
+        seed = null;
+    }
+
+    /// <summary>[Game thread] Consume the seed only for the mission it was bound to. Consumption is one-shot,
+    /// so a second handler or a later mission cannot reuse it.</summary>
+    public static bool TryTakeSeed(Mission mission, out uint value)
+    {
+        if (mission != null && ReferenceEquals(pendingMission, mission) && seed.HasValue)
         {
             value = seed.Value;
+            End();
             return true;
         }
 

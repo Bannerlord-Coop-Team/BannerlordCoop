@@ -39,7 +39,14 @@ internal class SiegeEnginesContainerPatches
                 return false;
             }
 
-            MessageBroker.Instance.Publish(__instance, new SiegeEngineDeployRequested(siegeEvent, side, siegeEngine.SiegeEngine, index));
+            var expectedOccupant = GetSlotOccupant(__instance, index, siegeEngine.SiegeEngine?.IsRanged == true);
+            MessageBroker.Instance.Publish(__instance, new SiegeEngineDeployRequested(
+                siegeEvent,
+                __instance,
+                side,
+                siegeEngine.SiegeEngine,
+                index,
+                expectedOccupant));
             return false;
         }
 
@@ -62,7 +69,15 @@ internal class SiegeEnginesContainerPatches
                 return false;
             }
 
-            MessageBroker.Instance.Publish(__instance, new SiegeEngineRemovalRequested(siegeEvent, side, index, isRanged, moveToReserve));
+            var expectedOccupant = GetSlotOccupant(__instance, index, isRanged);
+            MessageBroker.Instance.Publish(__instance, new SiegeEngineRemovalRequested(
+                siegeEvent,
+                __instance,
+                side,
+                index,
+                isRanged,
+                moveToReserve,
+                expectedOccupant));
             return false;
         }
 
@@ -91,6 +106,12 @@ internal class SiegeEnginesContainerPatches
         }
 
         return false;
+    }
+
+    private static SiegeEngineConstructionProgress GetSlotOccupant(SiegeEnginesContainer container, int index, bool isRanged)
+    {
+        var slots = isRanged ? container.DeployedRangedSiegeEngines : container.DeployedMeleeSiegeEngines;
+        return index >= 0 && index < slots.Length ? slots[index] : null;
     }
 
     [HarmonyPatch(nameof(SiegeEnginesContainer.AddPrebuiltEngineToReserve))]

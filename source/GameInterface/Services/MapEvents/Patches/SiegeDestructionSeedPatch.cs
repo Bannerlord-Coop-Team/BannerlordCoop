@@ -21,7 +21,7 @@ internal static class SiegeDestructionSeedPatch
     {
         __state = null;
         if (Game.Current == null) return;
-        if (!SiegeSceneDestructionGate.TryGetSeed(out var seed)) return;
+        if (!SiegeSceneDestructionGate.TryTakeSeed(Mission.Current, out var seed)) return;
 
         __state = Game.Current.RandomGenerator;
         Game.Current.RandomGenerator = new MBFastRandom(seed);

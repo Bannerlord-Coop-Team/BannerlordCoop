@@ -45,14 +45,35 @@ internal class SiegeProductionClickClientGatePatch
         }
 
         var side = PlayerSiege.PlayerSide;
+        var container = siege.GetSiegeEventSide(side)?.SiegeEngines;
+        if (container == null)
+        {
+            Logger.Warning("Client siege production click could not resolve the {Side} engine container", side);
+            __instance.IsEnabled = false;
+            return false;
+        }
+
         if (machine.IsReserveOption && poi.Machine != null)
         {
             bool moveToReserve = poi.Machine.IsActive || poi.Machine.IsBeingRedeployed;
-            MessageBroker.Instance.Publish(machine, new SiegeEngineRemovalRequested(siege, side, poi.MachineIndex, poi.Machine.SiegeEngine.IsRanged, moveToReserve));
+            MessageBroker.Instance.Publish(machine, new SiegeEngineRemovalRequested(
+                siege,
+                container,
+                side,
+                poi.MachineIndex,
+                poi.Machine.SiegeEngine.IsRanged,
+                moveToReserve,
+                poi.Machine));
         }
         else
         {
-            MessageBroker.Instance.Publish(machine, new SiegeEngineDeployRequested(siege, side, machine.Engine, poi.MachineIndex));
+            MessageBroker.Instance.Publish(machine, new SiegeEngineDeployRequested(
+                siege,
+                container,
+                side,
+                machine.Engine,
+                poi.MachineIndex,
+                poi.Machine));
         }
 
         __instance.IsEnabled = false;

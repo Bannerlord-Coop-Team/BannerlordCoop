@@ -4,6 +4,7 @@ using Common.Util;
 using GameInterface.Services.SiegeEvents.Handlers;
 using GameInterface.Services.SiegeEvents.Patches;
 using Serilog;
+using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -17,6 +18,18 @@ using TaleWorlds.Core;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
 namespace GameInterface.Services.SiegeEvents.Interfaces;
+
+public readonly struct PendingSiegeAftermathPrompt
+{
+    public MobileParty LeaderParty { get; }
+    public Settlement Settlement { get; }
+
+    public PendingSiegeAftermathPrompt(MobileParty leaderParty, Settlement settlement)
+    {
+        LeaderParty = leaderParty;
+        Settlement = settlement;
+    }
+}
 
 /// <summary>
 /// Applies siege entry and exit changes to the game. Callers are responsible for marshalling onto
@@ -61,6 +74,12 @@ public interface ISiegeEventInterface : IGameAbstraction
     void ApplySiegeAftermathChoice(MobileParty party, Settlement settlement, int aftermathType);
 
     /// <summary>
+    /// Returns a stable snapshot of valid server-owned aftermath prompts. Used to re-prompt a
+    /// leader when that client enters the campaign after a reload or reconnect.
+    /// </summary>
+    PendingSiegeAftermathPrompt[] GetPendingSiegeAftermathPrompts();
+
+    /// <summary>
     /// Opens the local defender's encounter prompt for a starting siege assault, when this player's
     /// party is inside the assaulted settlement.
     /// </summary>
@@ -103,6 +122,12 @@ public interface ISiegeEventInterface : IGameAbstraction
     void SetLocalAftermathNarration(Settlement settlement, int aftermathType);
 
     /// <summary>
+    /// Marks the settlement whose applied aftermath the local winning participant's menus need.
+    /// This is separate from the leader-only choice/hold identity.
+    /// </summary>
+    void SetLocalAftermathNarrationContext(Settlement settlement);
+
+    /// <summary>
     /// Opens the settlement-taken choice menu when this client leads the parked aftermath and its
     /// own encounter flow hasn't opened it already.
     /// </summary>
@@ -120,9 +145,13 @@ public interface ISiegeEventInterface : IGameAbstraction
     void RemoveDeployedSiegeEngine(SiegeEvent siegeEvent, BattleSideEnum side, int index, bool isRanged, bool moveToReserve);
 }
 
-internal class SiegeEventInterface : ISiegeEventInterface
+internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SiegeEventInterface>();
+    private bool reloadSettlementRestorePending;
+    private bool reloadSettlementRestoreSubscribed;
+    private Settlement localAftermathChoiceSettlement;
+    private Settlement localAftermathNarrationSettlement;
 
     public void StartSiegeEvent(MobileParty besiegerParty, Settlement settlement)
     {
@@ -140,6 +169,14 @@ internal class SiegeEventInterface : ISiegeEventInterface
 
     public void JoinSiegeCamp(MobileParty party, Settlement settlement)
     {
+        // Vanilla's join-siege consequence leaves the settlement before assigning the besieger camp.
+        // The client repeats that transition under AllowedThread for its encounter/menu state, so the
+        // authoritative copy has to leave here as well or it remains both inside and besieging.
+        if (party.CurrentSettlement != null)
+        {
+            LeaveSettlementAction.ApplyForParty(party);
+        }
+
         party.BesiegerCamp = settlement.SiegeEvent?.BesiegerCamp;
     }
 
@@ -202,19 +239,44 @@ internal class SiegeEventInterface : ISiegeEventInterface
             return;
         }
 
+        if (!pending.MatchesCurrentCapture(settlement))
+        {
+            Patches.SiegeAftermathPatches.PendingAftermaths.TryRemove(settlement, out _);
+            Logger.Warning("Rejected stale siege aftermath choice for {Settlement}: the capture owner or capturer changed",
+                settlement.Name?.ToString());
+            return;
+        }
+
         Patches.SiegeAftermathPatches.PendingAftermaths.TryRemove(settlement, out _);
 
         SiegeAftermathAction.ApplyAftermath(party, settlement, (SiegeAftermathAction.SiegeAftermath)aftermathType, pending.PreviousOwnerClan, pending.Contributions);
     }
 
+    public PendingSiegeAftermathPrompt[] GetPendingSiegeAftermathPrompts()
+    {
+        return Patches.SiegeAftermathPatches.PendingAftermaths
+            .Where(pair => pair.Value.MatchesCurrentCapture(pair.Key))
+            .Select(pair => new PendingSiegeAftermathPrompt(pair.Value.LeaderParty, pair.Key))
+            .ToArray();
+    }
+
     public void RestoreReloadedPlayerInSettlement()
     {
-        // The queued restore can land a frame before the map state is active; try again next frame.
+        // The queued restore can land before the map state is active. GameThread.RunSafe executes inline
+        // when called from the game thread, so using it as a retry recurses immediately. Arm one campaign-
+        // tick listener instead; campaign ticks resume only after the map state becomes active.
         if (!(GameStateManager.Current?.ActiveState is TaleWorlds.CampaignSystem.GameState.MapState))
         {
-            GameThread.RunSafe(RestoreReloadedPlayerInSettlement);
+            reloadSettlementRestorePending = true;
+            if (!reloadSettlementRestoreSubscribed)
+            {
+                reloadSettlementRestoreSubscribed = true;
+                CampaignEvents.TickEvent.AddNonSerializedListener(this, RetryReloadedPlayerSettlementRestore);
+            }
             return;
         }
+
+        ClearReloadedPlayerSettlementRetry();
 
         var settlement = MobileParty.MainParty?.CurrentSettlement;
         if (settlement?.Party == null) return;
@@ -415,6 +477,11 @@ internal class SiegeEventInterface : ISiegeEventInterface
     {
         if (leaderParty != MobileParty.MainParty) return;
 
+        // This client is both the choice owner and a local narration participant. Keep the identities
+        // separate: non-leader participants need narration too, but only the leader owns the menu hold.
+        localAftermathChoiceSettlement = settlement;
+        localAftermathNarrationSettlement = settlement;
+
         // Hold the aftermath menu open until the player picks (see SiegeCaptureMenuHoldPatch): a co-op
         // client can't pause, so its encounter would otherwise roll the choice menu out to the town menu.
         SiegeCaptureMenuHoldPatch.HoldFor(settlement);
@@ -476,9 +543,24 @@ internal class SiegeEventInterface : ISiegeEventInterface
 
     public void SetLocalAftermathNarration(Settlement settlement, int aftermathType)
     {
+        if (localAftermathChoiceSettlement == settlement)
+        {
+            localAftermathChoiceSettlement = null;
+        }
+
+        var matchesLocalNarration = localAftermathNarrationSettlement == settlement;
+        if (matchesLocalNarration)
+        {
+            localAftermathNarrationSettlement = null;
+        }
+
         // The choice is resolved (ours, or the server auto-applied a stale one); without this release a
         // client whose pick never happened keeps bouncing its town menu back to menu_settlement_taken.
         SiegeCaptureMenuHoldPatch.Release(settlement);
+
+        // Ignore another settlement's broadcast. The participant-bound identity remains valid throughout
+        // the settlement-taken flow, including the short transition where Settlement.CurrentSettlement is null.
+        if (!matchesLocalNarration) return;
 
         var behavior = Campaign.Current?.GetCampaignBehavior<SiegeAftermathCampaignBehavior>();
         if (behavior == null) return;
@@ -495,6 +577,42 @@ internal class SiegeEventInterface : ISiegeEventInterface
                 GameMenu.SwitchToMenu("menu_settlement_taken");
             }
         }
+    }
+
+    public void SetLocalAftermathNarrationContext(Settlement settlement)
+    {
+        localAftermathNarrationSettlement = settlement;
+    }
+
+    internal bool HasLocalAftermathNarrationContext(Settlement settlement)
+    {
+        return localAftermathNarrationSettlement == settlement;
+    }
+
+    private void RetryReloadedPlayerSettlementRestore(float dt)
+    {
+        if (!reloadSettlementRestorePending) return;
+        if (!(GameStateManager.Current?.ActiveState is TaleWorlds.CampaignSystem.GameState.MapState)) return;
+
+        ClearReloadedPlayerSettlementRetry();
+        RestoreReloadedPlayerInSettlement();
+    }
+
+    private void ClearReloadedPlayerSettlementRetry()
+    {
+        reloadSettlementRestorePending = false;
+        if (!reloadSettlementRestoreSubscribed) return;
+
+        reloadSettlementRestoreSubscribed = false;
+        CampaignEvents.TickEvent.ClearListeners(this);
+    }
+
+    public void Dispose()
+    {
+        ClearReloadedPlayerSettlementRetry();
+        SiegeCaptureMenuHoldPatch.Release(localAftermathChoiceSettlement);
+        localAftermathChoiceSettlement = null;
+        localAftermathNarrationSettlement = null;
     }
 
     public void DeploySiegeEngine(SiegeEvent siegeEvent, BattleSideEnum side, SiegeEngineType engineType, int index)

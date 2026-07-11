@@ -2,10 +2,13 @@
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.SiegeEvents.Messages;
+using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.SiegeEvents.Messages;
+using LiteNetLib;
+using System;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -31,6 +34,7 @@ internal class ServerSiegeAftermathHandler : IHandler
         messageBroker.Subscribe<NetworkRequestSiegeAftermath>(HandleRequest);
         messageBroker.Subscribe<SiegeAftermathApplied>(HandleApplied);
         messageBroker.Subscribe<SiegeAftermathChoicePrompted>(HandlePrompted);
+        messageBroker.Subscribe<PlayerCampaignEntered>(HandlePlayerCampaignEntered);
     }
 
     // Runs on the game thread already — published from the aftermath-park path (OnMapEventEnded prefix); only resolves ids and broadcasts, so no GameThread.RunSafe.
@@ -68,10 +72,34 @@ internal class ServerSiegeAftermathHandler : IHandler
         });
     }
 
+    private void HandlePlayerCampaignEntered(MessagePayload<PlayerCampaignEntered> payload)
+    {
+        GameThread.RunSafe(
+            () => SendPendingAftermathPrompts(payload.What.playerId),
+            blocking: true,
+            context: nameof(HandlePlayerCampaignEntered));
+    }
+
+    internal void SendPendingAftermathPrompts(NetPeer peer)
+    {
+        var prompts = siegeEventInterface.GetPendingSiegeAftermathPrompts()
+            ?? Array.Empty<PendingSiegeAftermathPrompt>();
+        foreach (var prompt in prompts)
+        {
+            if (!objectManager.TryGetIdWithLogging(prompt.Settlement, out var settlementId)) continue;
+            if (!objectManager.TryGetIdWithLogging(prompt.LeaderParty, out var leaderPartyId)) continue;
+
+            // Send every valid prompt to the entering peer. The client-side leader check makes this
+            // a no-op for other players and lets a reconnected leader resume the saved choice.
+            network.Send(peer, new NetworkPromptSiegeAftermathChoice(settlementId, leaderPartyId));
+        }
+    }
+
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkRequestSiegeAftermath>(HandleRequest);
         messageBroker.Unsubscribe<SiegeAftermathApplied>(HandleApplied);
         messageBroker.Unsubscribe<SiegeAftermathChoicePrompted>(HandlePrompted);
+        messageBroker.Unsubscribe<PlayerCampaignEntered>(HandlePlayerCampaignEntered);
     }
 }

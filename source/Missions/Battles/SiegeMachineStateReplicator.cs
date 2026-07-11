@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.MountAndBlade.Missions;
 
 namespace Missions.Battles;
 
@@ -210,52 +211,60 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             bool simulatedLocally = SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machineId);
             if (!isHost && !simulatedLocally) continue;
 
-            ReadState(machine, out var hitPoints, out var destructionState, out var gateState, out var ladderState, out var moveDistance, out var hasArrived, out var weaponState, out var aimDirection, out var aimReleaseAngle);
-
-            if (isHost && !simulatedLocally)
-            {
-                // The claiming peer reports this machine's weapon sim, aim, movement and (for a
-                // tower) ramp; the host stays the authority for its damage (the sentinels make
-                // the appliers skip a field). Castle gates are never claimed, so their state
-                // always comes from the host.
-                weaponState = -1;
-                aimDirection = AimSentinel;
-                aimReleaseAngle = AimSentinel;
-                moveDistance = -1f;
-                hasArrived = false;
-                if (machine is SiegeTower) gateState = -1;
-            }
-            else if (!isHost)
-            {
-                hitPoints = -1f;
-                destructionState = -1;
-                ladderState = -1;
-                if (!IsMovementMachine(machine))
-                {
-                    gateState = -1;
-                    moveDistance = -1f;
-                    hasArrived = false;
-                }
-            }
+            var state = CaptureState(machine, isHost, simulatedLocally);
 
             if (lastSent.TryGetValue(machineId, out var previous)
-                && previous.HitPoints == hitPoints
-                && previous.DestructionState == destructionState
-                && previous.GateState == gateState
-                && previous.LadderState == ladderState
-                && previous.HasArrived == hasArrived
-                && previous.WeaponState == weaponState
-                && Math.Abs(previous.MoveDistance - moveDistance) < MoveDistanceThreshold
-                && Math.Abs(previous.AimDirection - aimDirection) < AimEpsilon
-                && Math.Abs(previous.AimReleaseAngle - aimReleaseAngle) < AimEpsilon)
+                && previous.HitPoints == state.HitPoints
+                && previous.DestructionState == state.DestructionState
+                && previous.GateState == state.GateState
+                && previous.LadderState == state.LadderState
+                && previous.HasArrived == state.HasArrived
+                && previous.WeaponState == state.WeaponState
+                && Math.Abs(previous.MoveDistance - state.MoveDistance) < MoveDistanceThreshold
+                && Math.Abs(previous.AimDirection - state.AimDirection) < AimEpsilon
+                && Math.Abs(previous.AimReleaseAngle - state.AimReleaseAngle) < AimEpsilon)
             {
                 continue;
             }
 
-            var state = new NetworkSiegeMachineState(machineId, hitPoints, destructionState, gateState, ladderState, moveDistance, hasArrived, weaponState, aimDirection, aimReleaseAngle);
             lastSent[machineId] = state;
             network.SendAll(state);
         }
+    }
+
+    // Capture exactly the fields this simulator owns. The same routine is used for steady-state deltas and
+    // on-demand join snapshots so a stable machine does not depend on having changed since the last join.
+    private static NetworkSiegeMachineState CaptureState(UsableMachine machine, bool isHost, bool simulatedLocally)
+    {
+        ReadState(machine, out var hitPoints, out var destructionState, out var gateState, out var ladderState,
+            out var moveDistance, out var hasArrived, out var weaponState, out var aimDirection, out var aimReleaseAngle);
+
+        if (isHost && !simulatedLocally)
+        {
+            // The claiming peer reports this machine's weapon sim, aim, movement and (for a tower) ramp;
+            // the host stays authoritative for damage. Sentinels let receivers merge both snapshots.
+            weaponState = -1;
+            aimDirection = AimSentinel;
+            aimReleaseAngle = AimSentinel;
+            moveDistance = -1f;
+            hasArrived = false;
+            if (machine is SiegeTower) gateState = -1;
+        }
+        else if (!isHost)
+        {
+            hitPoints = -1f;
+            destructionState = -1;
+            ladderState = -1;
+            if (!IsMovementMachine(machine))
+            {
+                gateState = -1;
+                moveDistance = -1f;
+                hasArrived = false;
+            }
+        }
+
+        return new NetworkSiegeMachineState(machine.Id.Id, hitPoints, destructionState, gateState, ladderState,
+            moveDistance, hasArrived, weaponState, aimDirection, aimReleaseAngle);
     }
 
     private void DeactivateNewMachines()
@@ -1063,6 +1072,7 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         {
             var destruction = machine.DestructionComponent;
             destruction.HitPoint = state.HitPoints;
+            SyncMissionSiegeWeaponHealth(destruction, state.HitPoints);
             // Forward only: destruction states never regress, and vanilla's broken-entity swap indexes
             // _destructionStates[state - 1], so applying a lower state (a local cosmetic hit ran ahead)
             // would index out of range. forcedId -1 = don't force the broken entity's MissionObjectId,
@@ -1072,6 +1082,39 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
                 destruction.SetDestructionLevel(state.DestructionState, -1, 0f, TaleWorlds.Library.Vec3.Zero, TaleWorlds.Library.Vec3.Zero);
             }
         }
+    }
+
+    // MissionSiegeWeaponsController keeps campaign health in a separate MissionSiegeWeapon record. Directly
+    // assigning DestructableComponent.HitPoint (the network apply above) does not raise vanilla's OnHitTaken,
+    // so keep that backing record synchronized for a later host promotion/final engine-state report.
+    private static void SyncMissionSiegeWeaponHealth(DestructableComponent destruction, float hitPoints)
+    {
+        var enginesLogic = Mission.Current?.GetMissionBehavior<MissionSiegeEnginesLogic>();
+        if (enginesLogic == null) return;
+
+        if (TrySyncMissionSiegeWeaponHealth(enginesLogic, BattleSideEnum.Attacker, destruction, hitPoints)) return;
+        TrySyncMissionSiegeWeaponHealth(enginesLogic, BattleSideEnum.Defender, destruction, hitPoints);
+    }
+
+    private static bool TrySyncMissionSiegeWeaponHealth(MissionSiegeEnginesLogic enginesLogic, BattleSideEnum side,
+        DestructableComponent destruction, float hitPoints)
+    {
+        var controller = enginesLogic.GetSiegeWeaponsController(side) as MissionSiegeWeaponsController;
+        return controller != null
+            && TrySyncBackingWeaponHealth(controller._deployedWeapons, destruction, hitPoints);
+    }
+
+    // Pure identity-map operation split from the mission lookup above so the host-migration invariant can be
+    // regression-tested with a managed identity key, without initializing native ScriptComponentBehavior types.
+    private static bool TrySyncBackingWeaponHealth<TKey>(
+        IDictionary<TKey, MissionSiegeWeapon> deployedWeapons,
+        TKey destruction,
+        float hitPoints)
+    {
+        if (!deployedWeapons.TryGetValue(destruction, out var backingWeapon)) return false;
+
+        backingWeapon.SetHealth(hitPoints);
+        return true;
     }
 
     // Non-simulating client: drive the wind-up/reload arm animation from the replicated WeaponState, mirroring
@@ -1113,22 +1156,71 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
 
     public void CatchUpJoiner(string controllerId)
     {
-        if (!session.IsLocalHost) return;
-
         GameThread.RunSafe(() =>
         {
-            foreach (var claim in claimedMachines)
+            if (Mission.Current == null || !Mission.Current.IsSiegeBattle) return;
+
+            RefreshMachineCache();
+            bool isHost = session.IsLocalHost;
+            if (isHost)
             {
-                network.Send(controllerId, new NetworkSiegeMachineAuthority(claim.Key, claim.Value));
+                foreach (var claim in claimedMachines)
+                {
+                    network.Send(controllerId, new NetworkSiegeMachineAuthority(claim.Key, claim.Value));
+                }
             }
 
-            foreach (var state in lastSent.Values)
+            int sent = 0;
+            var machineIds = new List<int>(machines.Count);
+            foreach (var machine in machines)
             {
-                network.Send(controllerId, state);
+                machineIds.Add(machine.Id.Id);
             }
 
-            if (lastSent.Count > 0)
-                Logger.Information("[BattleSync] Replayed {Count} siege machine state(s) to joining {Controller}", lastSent.Count, controllerId);
+            sent = SendJoinStateSnapshots(
+                isHost,
+                session.OwnControllerId,
+                machineIds,
+                claimedMachines,
+                (machineId, simulatedLocally) => CaptureState(machinesById[machineId], isHost, simulatedLocally),
+                state => network.Send(controllerId, state));
+
+            if (sent > 0)
+                Logger.Information("[BattleSync] Replayed {Count} siege machine state(s) to joining {Controller} as {Role}",
+                    sent, controllerId, isHost ? "host" : "claimant");
         });
+    }
+
+    // Every existing peer receives the join notification. The host supplies all host-owned fields; a non-host
+    // supplies only machines it actually claims, directly from the live simulator rather than lastSent. That
+    // makes a stable/arrived/idle machine available to the joiner even when no delta will ever fire again.
+    private static int SendJoinStateSnapshots(
+        bool isHost,
+        string ownControllerId,
+        IEnumerable<int> machineIds,
+        IReadOnlyDictionary<int, string> claims,
+        Func<int, bool, NetworkSiegeMachineState> capture,
+        Action<NetworkSiegeMachineState> send)
+    {
+        int sent = 0;
+        foreach (int machineId in machineIds)
+        {
+            bool simulatedLocally;
+            if (isHost)
+            {
+                simulatedLocally = !claims.ContainsKey(machineId);
+            }
+            else
+            {
+                if (!claims.TryGetValue(machineId, out var owner) || owner != ownControllerId)
+                    continue;
+                simulatedLocally = true;
+            }
+
+            send(capture(machineId, simulatedLocally));
+            sent++;
+        }
+
+        return sent;
     }
 }

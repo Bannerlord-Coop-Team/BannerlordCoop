@@ -42,13 +42,16 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
     private readonly IMessageBroker messageBroker;
     private readonly IBattleSession session;
 
-    // The current placement per point, in first-touch order so a replay applies in the original order
-    // and the receivers' HP-by-type mapping matches. Recorded on every client (not just the deployer)
-    // so a successor promoted after host migration can still catch joiners up. Game-thread only.
+    // Every placement transition, in wire order. Deployment/Disband mutates vanilla's ordered
+    // _undeployedWeapons list, so collapsing this to the latest value per point can bind a different
+    // same-type campaign weapon (and therefore different HP/index) on a late loader or joiner. The
+    // deployment phase is bounded, so retain its complete transition timeline. Recorded on every
+    // client so a successor promoted after host migration can still catch joiners up. Game-thread only.
     private readonly List<KeyValuePair<int, string>> placements = new List<KeyValuePair<int, string>>();
 
-    // Placements that arrived before their DeploymentPoint registered (catch-up during a peer's scene load);
-    // re-applied by DrainPending once the point appears. Per-point, latest wins; cleared with the replicator.
+    // Transitions that arrived before their DeploymentPoint registered (catch-up during a peer's scene load).
+    // This is also a complete FIFO: later points must not overtake an earlier blocked transition, because the
+    // global Deploy/Disband order is what preserves vanilla's _undeployedWeapons identity mapping.
     private readonly List<KeyValuePair<int, string>> pending = new List<KeyValuePair<int, string>>();
 
     // Non-deployers skip the vanilla Start Battle teardown (see SiegeDeploymentPatches) and instead
@@ -72,6 +75,7 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
         messageBroker.Subscribe<SiegeEnginePlacementChanged>(Handle_PlacementChanged);
         messageBroker.Subscribe<NetworkSiegeEnginePlacement>(Handle_NetworkPlacement);
         messageBroker.Subscribe<NetworkBattleDeploymentFinished>(Handle_NetworkDeploymentFinished);
+        messageBroker.Subscribe<BattleHostMigrated>(Handle_BattleHostMigrated);
     }
 
     public void Dispose()
@@ -79,6 +83,7 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
         messageBroker.Unsubscribe<SiegeEnginePlacementChanged>(Handle_PlacementChanged);
         messageBroker.Unsubscribe<NetworkSiegeEnginePlacement>(Handle_NetworkPlacement);
         messageBroker.Unsubscribe<NetworkBattleDeploymentFinished>(Handle_NetworkDeploymentFinished);
+        messageBroker.Unsubscribe<BattleHostMigrated>(Handle_BattleHostMigrated);
         pending.Clear();
         // SuppressCapture is toggled around this replicator's own applies, so it resets here; the
         // authority flags are owned by CoopBattleController (which sets them each tick) and reset there.
@@ -96,15 +101,6 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
 
     private void Record(int pointId, string weaponTypeName)
     {
-        for (int i = 0; i < placements.Count; i++)
-        {
-            if (placements[i].Key == pointId)
-            {
-                placements[i] = new KeyValuePair<int, string>(pointId, weaponTypeName);
-                return;
-            }
-        }
-
         placements.Add(new KeyValuePair<int, string>(pointId, weaponTypeName));
     }
 
@@ -120,18 +116,14 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
                 return;
             }
 
-            if (!TryApplyPlacement(obj.PointId, obj.WeaponTypeName))
-            {
-                // The DeploymentPoint isn't registered yet (catch-up during scene load); buffer and retry from
-                // the controller tick once it appears, instead of dropping it permanently.
-                StashPending(obj.PointId, obj.WeaponTypeName);
-            }
-            else
-            {
-                // A direct apply supersedes any stale buffered placement for the same point, which
-                // DrainPending would otherwise re-apply over it.
-                RemovePending(obj.PointId);
-            }
+            // Record at receipt, not successful apply: a client promoted while its own scene is still loading
+            // must nevertheless retain the complete authoritative history for later joiners.
+            Record(obj.PointId, obj.WeaponTypeName);
+
+            // Always enqueue first. If an older transition is still waiting for its point, applying this one
+            // directly would overtake it and change vanilla's ordered undeployed-weapon mapping.
+            StashPending(obj.PointId, obj.WeaponTypeName);
+            DrainPending(0f);
         });
     }
 
@@ -148,8 +140,6 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
             .OfType<DeploymentPoint>()
             .FirstOrDefault(candidate => candidate.Id.Id == pointId);
         if (point == null) return false;
-
-        Record(pointId, weaponTypeName);
 
         SiegeMissionAuthorityGate.SuppressCapture = true;
         try
@@ -189,24 +179,7 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
 
     private void StashPending(int pointId, string weaponTypeName)
     {
-        for (int i = 0; i < pending.Count; i++)
-        {
-            if (pending[i].Key == pointId)
-            {
-                pending[i] = new KeyValuePair<int, string>(pointId, weaponTypeName);
-                return;
-            }
-        }
-
         pending.Add(new KeyValuePair<int, string>(pointId, weaponTypeName));
-    }
-
-    private void RemovePending(int pointId)
-    {
-        for (int i = pending.Count - 1; i >= 0; i--)
-        {
-            if (pending[i].Key == pointId) pending.RemoveAt(i);
-        }
     }
 
     public void MarkLocalDeploymentFinished()
@@ -218,13 +191,10 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
     {
         if (Mission.Current == null) return;
 
-        for (int i = pending.Count - 1; i >= 0; i--)
-        {
-            if (TryApplyPlacement(pending[i].Key, pending[i].Value))
-            {
-                pending.RemoveAt(i);
-            }
-        }
+        int pendingBeforeDrain = pending.Count;
+        DrainPendingInOrder(TryApplyPlacement);
+        if (pending.Count < pendingBeforeDrain)
+            pendingStallSeconds = 0f;
 
         // A placement still buffered while the mission runs means its DeploymentPoint never registered
         // here; drop it after the deadline instead of holding the sweep off for the whole battle.
@@ -233,9 +203,8 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
             pendingStallSeconds += dt;
             if (pendingStallSeconds >= PendingStallDeadlineSeconds)
             {
-                foreach (var stalled in pending)
-                    Logger.Error("[BattleSync] Dropping siege engine placement for point {PointId} ({Type}): its deployment point never registered", stalled.Key, stalled.Value);
-                pending.Clear();
+                DropStalledHeadsAndDrain(TryApplyPlacement);
+                pendingStallSeconds = 0f;
             }
         }
         else
@@ -249,6 +218,43 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
             && Mission.Current.CurrentState == Mission.State.Continuing)
         {
             sweepDone = SweepUndeployedWeapons();
+        }
+    }
+
+    // Apply one FIFO prefix only. A blocked transition is a global ordering barrier: even if a later point is
+    // already registered, letting it pass can reorder same-type MissionSiegeWeapon identities across clients.
+    // Kept as a separate pure queue operation so the ordering invariant has focused unit coverage.
+    private void DrainPendingInOrder(Func<int, string, bool> tryApply)
+    {
+        int appliedCount = 0;
+        while (appliedCount < pending.Count)
+        {
+            var transition = pending[appliedCount];
+            if (!tryApply(transition.Key, transition.Value)) break;
+            appliedCount++;
+        }
+
+        if (appliedCount > 0)
+            pending.RemoveRange(0, appliedCount);
+    }
+
+    // Once the ordering barrier has timed out, discard only transitions that still cannot resolve. After each
+    // discarded head, immediately retry the new head: valid later transitions keep their relative order and are
+    // applied instead of being lost merely because an unrelated scene point never registered on this client.
+    private void DropStalledHeadsAndDrain(Func<int, string, bool> tryApply)
+    {
+        while (pending.Count > 0)
+        {
+            var transition = pending[0];
+            if (tryApply(transition.Key, transition.Value))
+            {
+                pending.RemoveAt(0);
+                continue;
+            }
+
+            Logger.Error("[BattleSync] Dropping siege engine placement for point {PointId} ({Type}): its deployment point never registered",
+                transition.Key, transition.Value);
+            pending.RemoveAt(0);
         }
     }
 
@@ -288,6 +294,53 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
             sweepRequested = true;
             DrainPending(0f);
         });
+    }
+
+    // A successor can finish deployment while it is still a peer. Its completion is deliberately ignored above
+    // because it was not authoritative then, and its local vanilla teardown was suppressed. If the old host leaves
+    // before finishing, replay that already-completed transition now that this client is authoritative: sweep our
+    // own undeployed machines and re-announce completion so every remaining peer does the same.
+    private void Handle_BattleHostMigrated(MessagePayload<BattleHostMigrated> payload)
+    {
+        GameThread.RunSafe(() =>
+        {
+            TryReplayFinishedDeploymentAfterMigration(
+                payload.What.MapEventId,
+                session.InstanceId,
+                localDeploymentFinished,
+                session.IsLocalHost,
+                Mission.Current?.IsSiegeBattle == true,
+                requestSweep: () =>
+                {
+                    sweepRequested = true;
+                    DrainPending(0f);
+                },
+                rebroadcastCompletion: () =>
+                    network.SendAll(new NetworkBattleDeploymentFinished(session.OwnControllerId)));
+        });
+    }
+
+    // Pure decision/effect seam: migration arrives off the game thread, while the native sweep itself needs the
+    // live mission. Keeping the gate here gives direct coverage that an already-finished promoted successor does
+    // both required actions exactly once: local teardown and authoritative completion replay.
+    private static bool TryReplayFinishedDeploymentAfterMigration(
+        string migratedMapEventId,
+        string localMapEventId,
+        bool localDeploymentFinished,
+        bool isLocalHost,
+        bool isSiegeBattle,
+        Action requestSweep,
+        Action rebroadcastCompletion)
+    {
+        if (migratedMapEventId != localMapEventId
+            || !localDeploymentFinished
+            || !isLocalHost
+            || !isSiegeBattle)
+            return false;
+
+        requestSweep();
+        rebroadcastCompletion();
+        return true;
     }
 
     // Mirrors the vanilla teardown for BOTH sides (RemoveDeploymentPoints for the player side and

@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
+using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
 namespace GameInterface.Services.SiegeEngines.Messages;
 
@@ -10,15 +11,25 @@ namespace GameInterface.Services.SiegeEngines.Messages;
 public readonly struct SiegeEngineDeployRequested : IEvent
 {
     public readonly SiegeEvent SiegeEvent;
+    public readonly SiegeEnginesContainer Container;
     public readonly BattleSideEnum Side;
     public readonly SiegeEngineType EngineType;
     public readonly int Index;
+    public readonly SiegeEngineConstructionProgress ExpectedOccupant;
 
-    public SiegeEngineDeployRequested(SiegeEvent siegeEvent, BattleSideEnum side, SiegeEngineType engineType, int index)
+    public SiegeEngineDeployRequested(
+        SiegeEvent siegeEvent,
+        SiegeEnginesContainer container,
+        BattleSideEnum side,
+        SiegeEngineType engineType,
+        int index,
+        SiegeEngineConstructionProgress expectedOccupant)
     {
         SiegeEvent = siegeEvent;
+        Container = container;
         Side = side;
         EngineType = engineType;
         Index = index;
+        ExpectedOccupant = expectedOccupant;
     }
 }

@@ -165,13 +165,15 @@ public class CoopBattleController : CoopMissionController
         // another client's puppets can be empty long after activation (own-party troops stay withheld
         // until their owner's commit), and the retreat check latches "everyone ran away" on an empty
         // side. Hold the end conditions until the battle is live AND both sides actually field a live
-        // agent here; the release is one-shot, so a later real depletion still concludes normally.
+        // agent here. The only exception is a side whose reserve crossed the spawn handler's intentional
+        // timeout fallback; that exact side is allowed to start empty so the battle can conclude instead of
+        // wedging forever. The release is one-shot, so a later real depletion still concludes normally.
         if (!endConditionHoldReleased)
         {
             var battleEndLogic = Mission?.GetMissionBehavior<BattleEndLogic>();
             if (battleEndLogic != null)
             {
-                bool battleLive = Deployment.IsActivated && BothSidesFielded();
+                bool battleLive = BattleReadyForEndChecks();
                 battleEndLogic.ChangeCanCheckForEndCondition(battleLive);
                 if (battleLive) endConditionHoldReleased = true;
             }
@@ -185,7 +187,7 @@ public class CoopBattleController : CoopMissionController
 
     // A side counts as fielded once some team of it has a live human agent (puppets qualify; they join
     // teams like any agent). Mirrors CoopBattleDepletionPatch's live-agent count.
-    private bool BothSidesFielded()
+    private bool BattleReadyForEndChecks()
     {
         bool attackerFielded = false;
         bool defenderFielded = false;
@@ -203,10 +205,32 @@ public class CoopBattleController : CoopMissionController
                 break;
             }
 
-            if (attackerFielded && defenderFielded) return true;
+            if (attackerFielded && defenderFielded) break;
         }
 
-        return attackerFielded && defenderFielded;
+        return ShouldReleaseEndConditionHold(
+            Deployment.IsActivated,
+            attackerFielded,
+            defenderFielded,
+            BattleSpawnGate.IsMissingReserveSideAccepted(BattleSideEnum.Attacker),
+            BattleSpawnGate.IsMissingReserveSideAccepted(BattleSideEnum.Defender));
+    }
+
+    /// <summary>
+    /// Pure release rule for the pre-live end-condition hold. A timeout is a substitute only for the side
+    /// whose reserve was deliberately abandoned; it cannot hide that the other side has not fielded yet.
+    /// </summary>
+    public static bool ShouldReleaseEndConditionHold(
+        bool deploymentActivated,
+        bool attackerFielded,
+        bool defenderFielded,
+        bool attackerMissingReserveAccepted,
+        bool defenderMissingReserveAccepted)
+    {
+        return deploymentActivated
+            && (attackerFielded || defenderFielded)
+            && (attackerFielded || attackerMissingReserveAccepted)
+            && (defenderFielded || defenderMissingReserveAccepted);
     }
 
     public override void OnAgentRemoved(Agent affectedAgent, Agent affectorAgent, AgentState agentState, KillingBlow killingBlow)

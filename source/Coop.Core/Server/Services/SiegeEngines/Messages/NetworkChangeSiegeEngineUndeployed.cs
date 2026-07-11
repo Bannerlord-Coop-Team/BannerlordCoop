@@ -17,12 +17,24 @@ public record NetworkChangeSiegeEngineUndeployed : IEvent
     public bool IsRanged { get; }
     [ProtoMember(4)]
     public bool MoveToReserve { get; }
+    [ProtoMember(5)]
+    public long SlotRevision { get; }
+    [ProtoMember(6)]
+    public string RevisionEpoch { get; }
 
-    public NetworkChangeSiegeEngineUndeployed(string containerId, int index, bool isRanged, bool moveToReserve)
+    public NetworkChangeSiegeEngineUndeployed(
+        string containerId,
+        int index,
+        bool isRanged,
+        bool moveToReserve,
+        long slotRevision,
+        string revisionEpoch)
     {
         ContainerId = containerId;
         Index = index;
         IsRanged = isRanged;
         MoveToReserve = moveToReserve;
+        SlotRevision = slotRevision;
+        RevisionEpoch = revisionEpoch;
     }
 }

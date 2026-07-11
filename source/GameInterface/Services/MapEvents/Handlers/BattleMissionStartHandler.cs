@@ -285,11 +285,12 @@ internal class BattleMissionStartHandler : IHandler
         GameThread.Run(() => OpenSiegeMission(message));
     }
 
-    private static void OpenSiegeMission(NetworkStartSiegeMission payload)
+    private void OpenSiegeMission(NetworkStartSiegeMission payload)
     {
+        bool spawnGateEngaged = false;
         try
         {
-            if (!TryGetValidBattle(nameof(NetworkStartSiegeMission), out var battle))
+            if (!TryGetValidBattle(nameof(NetworkStartSiegeMission), payload.MapEventId, out var battle))
                 return;
 
             var settlement = battle.MapEventSettlement;
@@ -320,6 +321,7 @@ internal class BattleMissionStartHandler : IHandler
             if (BattleSpawnConfig.Enabled)
             {
                 BattleSpawnGate.BeginBattle(payload.MapEventId);
+                spawnGateEngaged = true;
                 Logger.Information("[BattleSync] Engaged spawn gate in OpenSiegeMission: mapEvent={MapEventId}", payload.MapEventId);
             }
 
@@ -327,7 +329,11 @@ internal class BattleMissionStartHandler : IHandler
             // counts and never attach the coop behaviors, so a missing launcher is a hard error.
             if (ContainerProvider.TryResolve(out ICoopSiegeBattleLauncher siegeLauncher))
             {
-                siegeLauncher.OpenCoopSiegeBattle(rec, payload.WallHitPointRatios, attackerWeapons, defenderWeapons);
+                var mission = siegeLauncher.OpenCoopSiegeBattle(rec, payload.WallHitPointRatios, attackerWeapons, defenderWeapons);
+                if (mission != null)
+                    spawnGateEngaged = false; // the attached mission lifecycle owns EndBattle from here
+                else
+                    Logger.Error("[BattleSync] Coop siege launcher returned no mission");
             }
             else
             {
@@ -340,6 +346,10 @@ internal class BattleMissionStartHandler : IHandler
             // would escape into the game's main tick and crash it.
             Logger.Error(e, "Failed to open the siege mission for {Message}", nameof(NetworkStartSiegeMission));
         }
+        finally
+        {
+            UnwindSpawnGateAfterFailedOpen(spawnGateEngaged);
+        }
     }
 
     /// <summary>[Client] Re-validates everything a mission open depends on: the encounter can end (or
@@ -347,7 +357,7 @@ internal class BattleMissionStartHandler : IHandler
     /// finalized battle keeps PlayerEncounter.Battle set while releasing the main party. The
     /// MissionState check covers a second start queued in the same frame (it is set synchronously by
     /// the state push, unlike Mission.Current).</summary>
-    private static bool TryGetValidBattle(string messageName, out MapEvent battle)
+    private bool TryGetValidBattle(string messageName, string expectedMapEventId, out MapEvent battle)
     {
         battle = null;
         if (Campaign.Current == null)
@@ -360,6 +370,12 @@ internal class BattleMissionStartHandler : IHandler
         if (battle == null)
         {
             Logger.Warning("Received {Message} but PlayerEncounter.Battle was null, not opening the mission", messageName);
+            return false;
+        }
+
+        if (!MatchesMapEventId(objectManager, battle, expectedMapEventId))
+        {
+            Logger.Warning("Received {Message} for map event {MapEventId}, but the local player is not in that battle; not opening the mission", messageName, expectedMapEventId);
             return false;
         }
 
@@ -378,8 +394,18 @@ internal class BattleMissionStartHandler : IHandler
         return true;
     }
 
+    /// <summary>Pure routing check shared by the queued siege-open path and its regression tests.</summary>
+    internal static bool MatchesMapEventId(IObjectManager objectManager, MapEvent battle, string expectedMapEventId)
+    {
+        return objectManager != null
+            && battle != null
+            && objectManager.TryGetId(battle, out var actualMapEventId)
+            && string.Equals(actualMapEventId, expectedMapEventId, StringComparison.Ordinal);
+    }
+
     private void OpenAttackMission(string mapEventId, int randomTerrainSeed, AtmosphereInfo atmosphereOnCampaign)
     {
+        bool spawnGateEngaged = false;
         try
         {
             // The encounter can end (or another mission can open) between the server
@@ -434,20 +460,25 @@ internal class BattleMissionStartHandler : IHandler
             if (BattleSpawnConfig.Enabled)
             {
                 BattleSpawnGate.BeginBattle(battleMapEventId);
+                spawnGateEngaged = true;
                 Logger.Information("[BattleSync] Engaged spawn gate in OpenAttackMission: mapEvent={MapEventId}", battleMapEventId);
             }
 
             // Coop opens a custom battle mission (per-client troop suppliers) instead of the native one; the
-            // launcher lives in Missions and is resolved from the container. Fall back to the native mission only
-            // if it is somehow unavailable, so a misconfiguration still yields a battle.
+            // launcher lives in Missions and is resolved from the container. There is deliberately no native
+            // fallback: the same unavailable container would prevent BattleMissionEntryPatch from attaching the
+            // lifecycle that owns EndBattle, while the already-engaged spawn patches could corrupt native setup.
             if (ContainerProvider.TryResolve(out ICoopFieldBattleLauncher battleLauncher))
             {
-                battleLauncher.OpenCoopFieldBattle(rec2);
+                var mission = battleLauncher.OpenCoopFieldBattle(rec2);
+                if (mission != null)
+                    spawnGateEngaged = false; // the attached mission lifecycle owns EndBattle from here
+                else
+                    Logger.Error("[BattleSync] Coop field-battle launcher returned no mission");
             }
             else
             {
-                Logger.Warning("[BattleSync] ICoopFieldBattleLauncher unavailable; opening native battle mission");
-                CampaignMission.OpenBattleMission(rec2);
+                Logger.Error("[BattleSync] ICoopFieldBattleLauncher unavailable; cannot safely open the field battle mission");
             }
         }
         catch (Exception e)
@@ -456,5 +487,14 @@ internal class BattleMissionStartHandler : IHandler
             // would escape into the game's main tick and crash it.
             Logger.Error(e, "Failed to open the battle mission for {Message}", nameof(NetworkStartAttackMission));
         }
+        finally
+        {
+            UnwindSpawnGateAfterFailedOpen(spawnGateEngaged);
+        }
+    }
+
+    internal static void UnwindSpawnGateAfterFailedOpen(bool spawnGateEngaged)
+    {
+        if (spawnGateEngaged) BattleSpawnGate.EndBattle();
     }
 }
