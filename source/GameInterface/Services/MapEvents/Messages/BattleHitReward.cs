@@ -23,7 +23,6 @@ public readonly struct BattleHitReward : IEvent
     public readonly AgentAttackType AttackType;
     public readonly float HitpointRatio;
     public readonly float DamageAmount;
-    public readonly bool IsValidAgent;
     public readonly PartyBase AffectorParty;
     public readonly bool IsSneakAttack;
     public readonly float AffectedAgentHealth;
@@ -45,7 +44,6 @@ public readonly struct BattleHitReward : IEvent
         AgentAttackType attackType,
         float hitpointRatio,
         float damageAmount,
-        bool isValidAgent,
         PartyBase affectorParty,
         bool isSneakAttack,
         float affectedAgentHealth,
@@ -66,7 +64,6 @@ public readonly struct BattleHitReward : IEvent
         AttackType = attackType;
         HitpointRatio = hitpointRatio;
         DamageAmount = damageAmount;
-        IsValidAgent = isValidAgent;
         AffectorParty = affectorParty;
         IsSneakAttack = isSneakAttack;
         AffectedAgentHealth = affectedAgentHealth;

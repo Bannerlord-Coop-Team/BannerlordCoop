@@ -31,7 +31,7 @@ internal readonly struct NetworkBattleHitReward : ICommand
     [ProtoMember(11)]
     public readonly bool IsSiegeEngineHit;
     [ProtoMember(12)]
-    public readonly int LastAttackerWeapon; // WeaponComponentData
+    public readonly WeaponComponentData LastAttackerWeapon;
     [ProtoMember(13)]
     public readonly AgentAttackType AttackType;
     [ProtoMember(14)]
@@ -39,14 +39,12 @@ internal readonly struct NetworkBattleHitReward : ICommand
     [ProtoMember(15)]
     public readonly float DamageAmount;
     [ProtoMember(16)]
-    public readonly bool IsValidAgent;
-    [ProtoMember(17)]
     public readonly string AffectorPartyId;
-    [ProtoMember(18)]
+    [ProtoMember(17)]
     public readonly bool IsSneakAttack;
-    [ProtoMember(19)]
+    [ProtoMember(18)]
     public readonly float AffectedAgentHealth;
-    [ProtoMember(20)]
+    [ProtoMember(19)]
     public readonly bool IsAffectorUnderCommand;
 
     public NetworkBattleHitReward(
@@ -61,11 +59,10 @@ internal readonly struct NetworkBattleHitReward : ICommand
         float lastSpeedBonus,
         float lastShotDifficulty,
         bool isSiegeEngineHit,
-        int lastAttackerWeapon,
+        WeaponComponentData lastAttackerWeapon,
         AgentAttackType attackType,
         float hitpointRatio,
         float damageAmount,
-        bool isValidAgent,
         string affectorPartyId,
         bool isSneakAttack,
         float affectedAgentHealth,
@@ -86,7 +83,6 @@ internal readonly struct NetworkBattleHitReward : ICommand
         AttackType = attackType;
         HitpointRatio = hitpointRatio;
         DamageAmount = damageAmount;
-        IsValidAgent = isValidAgent;
         AffectorPartyId = affectorPartyId;
         IsSneakAttack = isSneakAttack;
         AffectedAgentHealth = affectedAgentHealth;

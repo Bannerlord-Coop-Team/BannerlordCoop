@@ -20,6 +20,9 @@ internal class BattleAgentLogicHitRewardPatch
     {
         if (ModInformation.IsServer) return true;
 
+        if (affectedAgent.Origin == null || affectorAgent == null || affectorAgent.Origin == null || affectorAgent.Team == null || !affectorAgent.Team.IsValid || affectedAgent.Team == null || !affectedAgent.Team.IsValid)
+            return false;
+
         Hero hero = (affectorAgent.Team.Leader != null && affectorAgent.Team.Leader.Character.IsHero) ? ((CharacterObject)affectorAgent.Team.Leader.Character).HeroObject : null;
         var message = new BattleHitReward(
             MapEvent.PlayerMapEvent,
@@ -37,7 +40,6 @@ internal class BattleAgentLogicHitRewardPatch
             attackType,
             hitpointRatio,
             damageAmount,
-            affectedAgent.Origin != null && affectorAgent != null && affectorAgent.Origin != null && affectorAgent.Team != null && affectorAgent.Team.IsValid && affectedAgent.Team != null && affectedAgent.Team.IsValid,
             (PartyBase)affectorAgent.Origin.BattleCombatant,
             isSneakAttack,
             affectedAgent.Health,

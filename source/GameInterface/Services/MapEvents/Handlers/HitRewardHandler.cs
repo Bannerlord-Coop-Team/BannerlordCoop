@@ -2,8 +2,8 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Coalescing;
 using GameInterface.Services.MapEvents.Messages;
-using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System.Collections.Generic;
@@ -19,20 +19,25 @@ namespace GameInterface.Services.MapEvents.Handlers;
 
 public class HitRewardHandler : IHandler
 {
+    private const string UpgradedTroopsScoreboardRefreshChannel = "UpgradedTroopsScoreboardRefreshChannel";
+
     private static readonly ILogger Logger = LogManager.GetLogger<HitRewardHandler>();
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly ISendCoalescer coalescer;
 
     public HitRewardHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        ISendCoalescer coalescer = null)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.coalescer = coalescer;
 
         messageBroker.Subscribe<TrackTroopForUpgrades>(Handle_TrackTroopForUpgrades);
         messageBroker.Subscribe<NetworkTrackTroopForUpgrades>(Handle_NetworkTrackTroopForUpgrades);
@@ -113,11 +118,10 @@ public class HitRewardHandler : IHandler
                 data.LastSpeedBonus,
                 data.LastShotDifficulty,
                 data.IsSiegeEngineHit,
-                0, // data.LastAttackerWeapon
+                data.LastAttackerWeapon,
                 data.AttackType,
                 data.HitpointRatio,
                 data.DamageAmount,
-                data.IsValidAgent,
                 affectorPartyId,
                 data.IsSneakAttack,
                 data.AffectedAgentHealth,
@@ -156,7 +160,7 @@ public class HitRewardHandler : IHandler
                 hero,
                 data.LastSpeedBonus,
                 data.LastShotDifficulty,
-                null, //data.LastAttackerWeapon,
+                data.LastAttackerWeapon,
                 data.HitpointRatio,
                 CombatXpModel.MissionTypeEnum.Battle,
                 data.IsAgentMounted,
@@ -169,14 +173,13 @@ public class HitRewardHandler : IHandler
                 data.IsSneakAttack);
 
             int upgradedCount = 0;
-            if (data.IsValidAgent)
-            {
-                // Applies changes to the TroopUpgradeTracker
-                upgradedCount = mapEvent.TroopUpgradeTracker.CheckUpgradedCount(affectorParty, affectorCharacter);
 
-                // Update scoreboard for clients
-                network.SendAll(new NetworkUpdateScoreboardAfterUpgrades(data.MapEventId, data.AffectorCharacterId, data.AffectorPartyId, data.AffectorAgentSide, upgradedCount));
-            }
+            // Applies changes to the TroopUpgradeTracker
+            upgradedCount = mapEvent.TroopUpgradeTracker.CheckUpgradedCount(affectorParty, affectorCharacter);
+
+            // Update scoreboard for clients
+            var key = new CoalesceKey(UpgradedTroopsScoreboardRefreshChannel, data.AffectorPartyId + data.AffectorCharacterId);
+            coalescer.Enqueue(key, new LatestWinsPayload(new NetworkUpdateScoreboardAfterUpgrades(data.MapEventId, data.AffectorCharacterId, data.AffectorPartyId, data.AffectorAgentSide, upgradedCount)));
         });
     }
 
@@ -214,7 +217,8 @@ public class HitRewardHandler : IHandler
             var upgradedCount = mapEvent.TroopUpgradeTracker.CheckUpgradedCount(party, character);
 
             // Update scoreboard for clients
-            network.SendAll(new NetworkUpdateScoreboardAfterUpgrades(data.MapEventId, data.CharacterObjectId, data.PartyId, data.Side, upgradedCount));
+            var key = new CoalesceKey(UpgradedTroopsScoreboardRefreshChannel, data.PartyId + data.CharacterObjectId);
+            coalescer.Enqueue(key, new LatestWinsPayload(new NetworkUpdateScoreboardAfterUpgrades(data.MapEventId, data.CharacterObjectId, data.PartyId, data.Side, upgradedCount)));
         });
     }
 
@@ -232,6 +236,8 @@ public class HitRewardHandler : IHandler
             if (MapEvent.PlayerMapEvent != mapEvent) return;
 
             BattleObserverMissionLogic battleObserverMissionLogic = Mission.Current.GetMissionBehavior<BattleObserverMissionLogic>();
+            if ((battleObserverMissionLogic?.BattleObserver) == null) return;
+
             TroopUpgradeTracker troopUpgradeTracker = MapEvent.PlayerMapEvent.TroopUpgradeTracker;
             if (affectorCharacter.IsHero)
             {
@@ -246,6 +252,7 @@ public class HitRewardHandler : IHandler
                     return;
                 }
             }
+
             if (data.UpgradedCount != 0)
             {
                 battleObserverMissionLogic.BattleObserver.TroopNumberChanged(data.AffectorAgentSide, affectorParty, affectorCharacter, 0, 0, 0, 0, 0, data.UpgradedCount);
