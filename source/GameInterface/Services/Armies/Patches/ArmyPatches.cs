@@ -184,7 +184,10 @@ public class ArmyPatches
             mobileParty._army = army;
             army._parties.Add(mobileParty);
             mobileParty.Ai.RethinkAtNextHourlyTick = true;
-            CampaignEventDispatcher.Instance.OnPartyJoinedArmy(mobileParty);
+            if (ModInformation.IsServer)
+            {
+                CampaignEventDispatcher.Instance.OnPartyJoinedArmy(mobileParty);
+            }
             CampaignEventDispatcher.Instance.OnArmyOverlaySetDirty();
             mobileParty.Party.SetVisualAsDirty();
         });
