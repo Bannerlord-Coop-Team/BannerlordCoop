@@ -1,4 +1,4 @@
-﻿using GameInterface.AutoSync;
+using GameInterface.AutoSync;
 
 namespace GameInterface.Services.SiegeEnginesConstructionProgress
 {
@@ -6,13 +6,9 @@ namespace GameInterface.Services.SiegeEnginesConstructionProgress
     {
         public SiegeEngineConstructionProgressSync(AutoSyncRegistry autoSyncBuilder)
         {
-            // Props
-            //autoSyncBuilder.AddProperty(AccessTools.Property(typeof(SiegeEngineConstructionProgress), nameof(SiegeEngineConstructionProgress.Progress)));
-            //autoSyncBuilder.AddProperty(AccessTools.Property(typeof(SiegeEngineConstructionProgress), nameof(SiegeEngineConstructionProgress.Hitpoints)));
-            //autoSyncBuilder.AddProperty(AccessTools.Property(typeof(SiegeEngineConstructionProgress), nameof(SiegeEngineConstructionProgress.MaxHitPoints)));
-
-            // Fields
-            //autoSyncBuilder.AddField(AccessTools.Field(typeof(SiegeEngineConstructionProgress), nameof(SiegeEngineConstructionProgress.SiegeEngine)));
+            // Deliberately empty: every siege engine field replicates through SiegeEngineProgressPatches
+            // and the deploy/reserve messages, because the generic property sync drops values set before
+            // the engine has a network id (initial hitpoints, damage racing its late registration).
         }
     }
 }

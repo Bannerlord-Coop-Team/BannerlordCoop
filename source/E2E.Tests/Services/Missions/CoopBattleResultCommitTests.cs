@@ -1,3 +1,4 @@
+using GameInterface.Services.MapEvents;
 using System;
 using System.Linq;
 using Common.Messaging;

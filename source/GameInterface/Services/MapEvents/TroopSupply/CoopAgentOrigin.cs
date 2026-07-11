@@ -32,18 +32,23 @@ public class CoopAgentOrigin : IAgentOriginBase
     public int Rank { get; }
     public int UniqueSeed => _descriptor.UniqueSeed;
 
+    /// <summary>The server's MapEventParty id this troop was supplied under, carried so the spawn
+    /// broadcast doesn't depend on re-deriving it from the local map-event membership.</summary>
+    public string MapEventPartyId { get; }
+
     bool IAgentOriginBase.HasThrownWeapon => _hasThrownWeapon;
     bool IAgentOriginBase.HasHeavyArmor => _hasHeavyArmor;
     bool IAgentOriginBase.HasShield => _hasShield;
     bool IAgentOriginBase.HasSpear => _hasSpear;
 
-    public CoopAgentOrigin(CharacterObject troop, PartyBase party, int rank, Banner banner, UniqueTroopDescriptor descriptor)
+    public CoopAgentOrigin(CharacterObject troop, PartyBase party, int rank, Banner banner, UniqueTroopDescriptor descriptor, string mapEventPartyId = null)
     {
         _troop = troop;
         _party = party;
         _descriptor = descriptor;
         Rank = rank == -1 ? MBRandom.RandomInt(10000) : rank;
         _banner = banner;
+        MapEventPartyId = mapEventPartyId;
         AgentOriginUtilities.GetDefaultTroopTraits(_troop, out _hasThrownWeapon, out _hasSpear, out _hasShield, out _hasHeavyArmor);
     }
 

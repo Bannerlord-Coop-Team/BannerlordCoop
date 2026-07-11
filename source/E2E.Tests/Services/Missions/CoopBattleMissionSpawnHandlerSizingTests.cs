@@ -19,6 +19,7 @@ public class CoopBattleMissionSpawnHandlerSizingTests
 
         Assert.False(sizing.Ready);
         Assert.False(sizing.SizeNow);
+        Assert.True(sizing.HasAnyOwnedTroops);
     }
 
     [Fact]
@@ -29,6 +30,7 @@ public class CoopBattleMissionSpawnHandlerSizingTests
 
         Assert.False(sizing.Ready);
         Assert.False(sizing.SizeNow);
+        Assert.False(sizing.HasAnyOwnedTroops);
     }
 
     [Fact]
@@ -40,6 +42,7 @@ public class CoopBattleMissionSpawnHandlerSizingTests
 
         Assert.True(sizing.Ready);
         Assert.True(sizing.SizeNow);
+        Assert.True(sizing.HasAnyOwnedTroops);
     }
 
     [Fact]
@@ -51,5 +54,42 @@ public class CoopBattleMissionSpawnHandlerSizingTests
 
         Assert.True(sizing.Ready);
         Assert.False(sizing.SizeNow);
+        Assert.False(sizing.HasAnyOwnedTroops);
+    }
+
+    [Fact]
+    public void EndConditionHold_OneSidedFallback_ReleasesOnlyAfterOtherSideFieldsAndDeploymentActivates()
+    {
+        Assert.False(CoopBattleController.ShouldReleaseEndConditionHold(
+            deploymentActivated: false,
+            attackerFielded: true,
+            defenderFielded: false,
+            attackerMissingReserveAccepted: false,
+            defenderMissingReserveAccepted: true));
+
+        Assert.False(CoopBattleController.ShouldReleaseEndConditionHold(
+            deploymentActivated: true,
+            attackerFielded: false,
+            defenderFielded: false,
+            attackerMissingReserveAccepted: false,
+            defenderMissingReserveAccepted: true));
+
+        Assert.True(CoopBattleController.ShouldReleaseEndConditionHold(
+            deploymentActivated: true,
+            attackerFielded: true,
+            defenderFielded: false,
+            attackerMissingReserveAccepted: false,
+            defenderMissingReserveAccepted: true));
+    }
+
+    [Fact]
+    public void EndConditionHold_BothMissingFallback_DoesNotReleaseEmptyBattle()
+    {
+        Assert.False(CoopBattleController.ShouldReleaseEndConditionHold(
+            deploymentActivated: true,
+            attackerFielded: false,
+            defenderFielded: false,
+            attackerMissingReserveAccepted: true,
+            defenderMissingReserveAccepted: true));
     }
 }
