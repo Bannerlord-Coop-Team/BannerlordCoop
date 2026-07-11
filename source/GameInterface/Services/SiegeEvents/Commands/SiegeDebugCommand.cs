@@ -3,7 +3,6 @@ using Common;
 using Common.Logging;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.SiegeEvents.Patches;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -88,12 +87,6 @@ public class SiegeDebugCommand
         besieger.Position = settlement.GatePosition;
         besieger.SetMoveBesiegeSettlement(settlement, MobileParty.NavigationType.Default);
         Campaign.Current.SiegeEventManager.StartSiegeEvent(settlement, besieger);
-
-        // AiMilitaryBehavior re-scores this lord every hour and, since nothing backs this forced siege,
-        // flips its DefaultBehavior off BesiegeSettlement so the camp ejects it. Pin the party so that
-        // hourly think is skipped and DefaultBehavior stays put; the siege still advances to an assault
-        // because that is driven by the siege/encounter system, not this think.
-        SiegeDebugPinPatch.Pin(besieger);
 
         return $"{besieger.Name} ({besieger.StringId}) is now besieging {settlement.Name}";
     }
