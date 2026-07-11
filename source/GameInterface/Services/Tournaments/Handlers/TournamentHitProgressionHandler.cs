@@ -4,6 +4,7 @@ using Common.Util;
 using GameInterface.Services.Tournaments.Data;
 using GameInterface.Services.Tournaments.Messages;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
@@ -132,6 +133,12 @@ internal sealed partial class TournamentSessionHandler
             IsFinite(data.ShotDifficulty) && data.ShotDifficulty >= 0f &&
             IsFinite(data.HitpointRatio) && data.HitpointRatio >= 0f && data.HitpointRatio <= 1f &&
             IsFinite(data.DamageAmount) && data.DamageAmount >= 0f;
+    }
+
+    internal static void RemoveAcceptedHitProgression(HashSet<string> acceptedProgression, string sessionId)
+    {
+        acceptedProgression.RemoveWhere(key =>
+            key.StartsWith($"{sessionId}\n", StringComparison.Ordinal));
     }
 
     private static bool IsFinite(float value)

@@ -47,7 +47,7 @@ public class TournamentCanonicalClientFlowTests : SyncTestBase
             var controller = clients[0].Resolve<TournamentUIController>();
             controller.BetResultReceived += result =>
             {
-                Assert.True(controller.TryGetSession(initial.SessionId, out var snapshot));
+                Assert.True(controller.TryGetTownSession(initial.TownId, out var snapshot));
                 if (!CoopTournamentVM.TryGetAcceptedBetSummary(
                         snapshot,
                         result,
@@ -83,8 +83,8 @@ public class TournamentCanonicalClientFlowTests : SyncTestBase
 
         Broadcast(new NetworkTournamentSessionRemoved(initial.SessionId, initial.TownId));
 
-        AssertRemoved(clients[0], initial.SessionId);
-        AssertRemoved(clients[1], initial.SessionId);
+        AssertRemoved(clients[0], initial.SessionId, initial.TownId);
+        AssertRemoved(clients[1], initial.SessionId, initial.TownId);
         Assert.Equal(2, Volatile.Read(ref removalCount));
     }
 
@@ -113,7 +113,7 @@ public class TournamentCanonicalClientFlowTests : SyncTestBase
             Assert.Equal("slot-a", registrySnapshot.Rounds[0].Matches[0].Teams[0].ParticipantSlotIds[0]);
 
             var controller = client.Resolve<TournamentUIController>();
-            Assert.True(controller.TryGetSession("session-a", out var uiSnapshot));
+            Assert.True(controller.TryGetTownSession("town-a", out var uiSnapshot));
             Assert.Equal(registrySnapshot.Revision, uiSnapshot.Revision);
             Assert.Equal(registrySnapshot.BracketRevision, uiSnapshot.BracketRevision);
             Assert.Equal(registrySnapshot.CurrentMatchId, uiSnapshot.CurrentMatchId);
@@ -121,12 +121,12 @@ public class TournamentCanonicalClientFlowTests : SyncTestBase
         });
     }
 
-    private static void AssertRemoved(EnvironmentInstance client, string sessionId)
+    private static void AssertRemoved(EnvironmentInstance client, string sessionId, string townId)
     {
         client.Call(() =>
         {
             Assert.False(client.Resolve<ITournamentSessionRegistry>().TryGet(sessionId, out _));
-            Assert.False(client.Resolve<TournamentUIController>().TryGetSession(sessionId, out _));
+            Assert.False(client.Resolve<TournamentUIController>().TryGetTownSession(townId, out _));
         });
     }
 

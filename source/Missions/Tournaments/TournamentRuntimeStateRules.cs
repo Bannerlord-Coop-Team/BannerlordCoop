@@ -1,8 +1,6 @@
-using GameInterface.Services.Tournaments.Data;
 using Missions.Tournaments.Messages;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using TaleWorlds.Library;
 
 namespace Missions.Tournaments;
@@ -31,14 +29,6 @@ public static class TournamentRuntimeStateRules
         return agents;
     }
 
-    public static IReadOnlyDictionary<Guid, float> GetAgentHealth(NetworkTournamentRuntimeState state)
-    {
-        var healthByAgent = new Dictionary<Guid, float>();
-        foreach (var pair in GetAgents(state))
-            healthByAgent.Add(pair.Key, pair.Value.Health);
-        return healthByAgent;
-    }
-
     public static IReadOnlyDictionary<Guid, TournamentWorldItemRuntimeData> GetWorldItems(
         NetworkTournamentRuntimeState state)
     {
@@ -59,22 +49,6 @@ public static class TournamentRuntimeStateRules
                 worldItems.Add(data.WorldItemId, data);
         }
         return worldItems;
-    }
-
-    public static Guid[] GetMissingAgentIds(
-        TournamentSpawnManifestData manifest,
-        NetworkTournamentRuntimeState state)
-    {
-        if (manifest == null) return Array.Empty<Guid>();
-        IReadOnlyDictionary<Guid, float> healthByAgent = GetAgentHealth(state);
-        return (manifest.Agents ?? Array.Empty<TournamentAgentSpawnData>())
-            .Where(data => data != null)
-            .SelectMany(data => data.MountAgentId == Guid.Empty
-                ? new[] { data.AgentId }
-                : new[] { data.AgentId, data.MountAgentId })
-            .Where(agentId => agentId != Guid.Empty && !healthByAgent.ContainsKey(agentId))
-            .Distinct()
-            .ToArray();
     }
 
     private static bool IsFinite(Mat3 value) =>

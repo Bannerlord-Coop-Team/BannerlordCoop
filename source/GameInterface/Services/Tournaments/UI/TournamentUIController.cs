@@ -54,7 +54,7 @@ internal sealed class TournamentUIController : ITournamentUIController, IHandler
         this.network = network;
         this.objectManager = objectManager;
         this.controllerIdProvider = controllerIdProvider;
-        this.relayNetworks = relayNetworks?.ToArray() ?? new IRelayNetwork[0];
+        this.relayNetworks = relayNetworks?.ToArray() ?? Array.Empty<IRelayNetwork>();
 
         messageBroker.Subscribe<TournamentSessionUpdated>(Handle_TournamentSessionUpdated);
         messageBroker.Subscribe<TournamentSessionRemoved>(Handle_TournamentSessionRemoved);
@@ -74,12 +74,6 @@ internal sealed class TournamentUIController : ITournamentUIController, IHandler
         StateChanged = null;
         SessionRemoved = null;
         BetResultReceived = null;
-    }
-
-    public bool TryGetSession(string sessionId, out TournamentSessionSnapshot snapshot)
-    {
-        snapshot = null;
-        return !string.IsNullOrEmpty(sessionId) && sessionsById.TryGetValue(sessionId, out snapshot);
     }
 
     public bool TryGetTownSession(string townId, out TournamentSessionSnapshot snapshot)
@@ -299,7 +293,7 @@ internal sealed class TournamentUIController : ITournamentUIController, IHandler
 
     private void RouteRemovedSession(string townId)
     {
-        if (!ModInformation.IsClient)
+        if (ModInformation.IsServer)
             return;
 
         var town = Settlement.CurrentSettlement?.Town;
@@ -334,7 +328,7 @@ internal sealed class TournamentUIController : ITournamentUIController, IHandler
 
     private void RouteMenu(TournamentSessionSnapshot snapshot)
     {
-        if (!ModInformation.IsClient)
+        if (ModInformation.IsServer)
             return;
 
         var town = Settlement.CurrentSettlement?.Town;

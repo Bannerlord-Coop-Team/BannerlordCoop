@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 
 namespace GameInterface.Services.Tournaments.Data;
@@ -22,11 +23,11 @@ public static class TournamentSessionSnapshotNormalizer
             snapshot.BracketRevision,
             snapshot.CurrentMatchId,
             snapshot.HostControllerId,
-            snapshot.SuccessorControllerIds ?? new string[0],
-            snapshot.Contestants ?? new TournamentContestantData[0],
-            snapshot.SpectatorControllerIds ?? new string[0],
-            snapshot.Choices ?? new TournamentPlayerChoiceData[0],
-            (snapshot.Rounds ?? new TournamentRoundData[0])
+            snapshot.SuccessorControllerIds ?? Array.Empty<string>(),
+            snapshot.Contestants ?? Array.Empty<TournamentContestantData>(),
+            snapshot.SpectatorControllerIds ?? Array.Empty<string>(),
+            snapshot.Choices ?? Array.Empty<TournamentPlayerChoiceData>(),
+            (snapshot.Rounds ?? Array.Empty<TournamentRoundData>())
                 .Where(round => round != null)
                 .Select(NormalizeRound)
                 .ToArray(),
@@ -58,7 +59,7 @@ public static class TournamentSessionSnapshotNormalizer
             round.RoundId,
             round.RoundIndex,
             round.CurrentMatchIndex,
-            (round.Matches ?? new TournamentMatchData[0])
+            (round.Matches ?? Array.Empty<TournamentMatchData>())
                 .Where(match => match != null)
                 .Select(NormalizeMatch)
                 .ToArray());
@@ -72,11 +73,11 @@ public static class TournamentSessionSnapshotNormalizer
             match.State,
             match.TeamSize,
             match.NumberOfWinnerParticipants,
-            (match.Teams ?? new TournamentTeamData[0])
+            (match.Teams ?? Array.Empty<TournamentTeamData>())
                 .Where(team => team != null)
                 .Select(NormalizeTeam)
                 .ToArray(),
-            match.WinnerSlotIds ?? new string[0],
+            match.WinnerSlotIds ?? Array.Empty<string>(),
             match.QualificationMode);
     }
 
@@ -84,7 +85,7 @@ public static class TournamentSessionSnapshotNormalizer
     {
         return new TournamentTeamData(
             team.TeamId,
-            team.ParticipantSlotIds ?? new string[0],
+            team.ParticipantSlotIds ?? Array.Empty<string>(),
             team.Score,
             team.IsWinner,
             team.TeamColor,

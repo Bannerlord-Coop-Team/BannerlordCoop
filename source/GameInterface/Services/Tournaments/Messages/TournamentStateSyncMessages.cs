@@ -1,3 +1,4 @@
+using System;
 using Common.Messaging;
 using GameInterface.Services.Tournaments.Data;
 using ProtoBuf;
@@ -24,9 +25,9 @@ public readonly struct NetworkTournamentStateSnapshot : ICommand
         TournamentLeaderboardEntryData[] leaderboard,
         TournamentSessionSnapshot[] sessions)
     {
-        NativeTournaments = nativeTournaments ?? new TournamentNativeGameData[0];
-        Leaderboard = leaderboard ?? new TournamentLeaderboardEntryData[0];
-        Sessions = sessions ?? new TournamentSessionSnapshot[0];
+        NativeTournaments = nativeTournaments ?? Array.Empty<TournamentNativeGameData>();
+        Leaderboard = leaderboard ?? Array.Empty<TournamentLeaderboardEntryData>();
+        Sessions = sessions ?? Array.Empty<TournamentSessionSnapshot>();
     }
 }
 

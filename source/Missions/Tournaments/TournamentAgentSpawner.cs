@@ -14,16 +14,7 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Tournaments;
 
-public interface ITournamentAgentSpawner
-{
-    void ApplyManifest(
-        TournamentSpawnManifestData manifest,
-        TournamentSessionSnapshot snapshot,
-        ITournamentMissionSession session);
-    void Reset();
-}
-
-public class TournamentAgentSpawner : ITournamentAgentSpawner
+public class TournamentAgentSpawner
 {
     private readonly IObjectManager objectManager;
     private readonly IControllerIdProvider controllerIdProvider;

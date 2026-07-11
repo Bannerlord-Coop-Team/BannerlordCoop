@@ -14,7 +14,7 @@ public class TournamentBettingMathTests
             currentMatchOpponentPower: 60f,
             totalRoundPower: 100f);
 
-        Assert.Equal(2.2f, odd);
+        Assert.Equal(1.2f, odd);
     }
 
     [Theory]

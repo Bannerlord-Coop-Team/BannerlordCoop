@@ -136,15 +136,6 @@ public readonly struct NetworkRequestTournamentBet : ICommand
     [ProtoMember(5)]
     public readonly long Sequence;
 
-    public NetworkRequestTournamentBet(string sessionId, long expectedRevision, string matchId, int amount)
-    {
-        SessionId = sessionId;
-        ExpectedRevision = expectedRevision;
-        MatchId = matchId;
-        Amount = amount;
-        Sequence = 0;
-    }
-
     public NetworkRequestTournamentBet(
         string sessionId,
         long expectedRevision,
@@ -254,17 +245,6 @@ public readonly struct NetworkTournamentBetResult : ICommand
         ThisRoundBettedDenars = thisRoundBettedDenars;
         ExpectedPayout = expectedPayout;
         IsSettlement = isSettlement;
-    }
-
-    public NetworkTournamentBetResult(
-        string sessionId,
-        long revision,
-        bool accepted,
-        string reason,
-        int bettedDenars,
-        int expectedPayout)
-        : this(sessionId, revision, 0, null, accepted, reason, bettedDenars, 0, expectedPayout, false)
-    {
     }
 }
 

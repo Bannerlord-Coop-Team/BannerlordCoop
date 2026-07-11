@@ -278,16 +278,6 @@ internal sealed class CoopTournamentVM : TournamentVM
         IsBetWindowEnabled = false;
     }
 
-    public new void ExecuteJoinTournament() => ExecuteJoin();
-
-    public new void ExecuteWatchRound() => ExecuteWatch();
-
-    public new void ExecuteSkipRound() => ExecuteSkip();
-
-    public new void ExecuteSkipAllRounds()
-    {
-    }
-
     public new void ExecuteLeave()
     {
         if (!CanLeave) return;
@@ -347,7 +337,7 @@ internal sealed class CoopTournamentVM : TournamentVM
                 snapshot?.CurrentMatchId,
                 string.Join(",", CurrentMatch?.GetParticipants()
                     .Where(candidate => candidate.Participant != null)
-                    .Select(candidate => candidate.Participant.Descriptor.UniqueSeed) ?? new int[0]));
+                    .Select(candidate => candidate.Participant.Descriptor.UniqueSeed) ?? Array.Empty<int>()));
             return;
         }
 

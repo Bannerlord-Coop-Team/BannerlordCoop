@@ -1,3 +1,4 @@
+using System;
 using ProtoBuf;
 
 namespace GameInterface.Services.Tournaments.Data;
@@ -36,7 +37,7 @@ public sealed class TournamentPlayerChoiceData
 }
 
 [ProtoContract(SkipConstructor = true)]
-public sealed partial class TournamentContestantData
+public sealed class TournamentContestantData
 {
     [ProtoMember(1)]
     public readonly string SlotId;
@@ -130,7 +131,7 @@ public sealed class TournamentTeamData
         string bannerCode)
     {
         TeamId = teamId;
-        ParticipantSlotIds = participantSlotIds ?? new string[0];
+        ParticipantSlotIds = participantSlotIds ?? Array.Empty<string>();
         Score = score;
         IsWinner = isWinner;
         TeamColor = teamColor;
@@ -140,7 +141,7 @@ public sealed class TournamentTeamData
 }
 
 [ProtoContract(SkipConstructor = true)]
-public sealed partial class TournamentMatchData
+public sealed class TournamentMatchData
 {
     [ProtoMember(1)]
     public readonly string MatchId;
@@ -174,8 +175,8 @@ public sealed partial class TournamentMatchData
         State = state;
         TeamSize = teamSize;
         NumberOfWinnerParticipants = numberOfWinnerParticipants;
-        Teams = teams ?? new TournamentTeamData[0];
-        WinnerSlotIds = winnerSlotIds ?? new string[0];
+        Teams = teams ?? Array.Empty<TournamentTeamData>();
+        WinnerSlotIds = winnerSlotIds ?? Array.Empty<string>();
         QualificationMode = qualificationMode;
     }
 }
@@ -197,7 +198,7 @@ public sealed class TournamentRoundData
         RoundId = roundId;
         RoundIndex = roundIndex;
         CurrentMatchIndex = currentMatchIndex;
-        Matches = matches ?? new TournamentMatchData[0];
+        Matches = matches ?? Array.Empty<TournamentMatchData>();
     }
 }
 
@@ -280,11 +281,11 @@ public sealed class TournamentSessionSnapshot
         BracketRevision = bracketRevision;
         CurrentMatchId = currentMatchId;
         HostControllerId = hostControllerId;
-        SuccessorControllerIds = successorControllerIds ?? new string[0];
-        Contestants = contestants ?? new TournamentContestantData[0];
-        SpectatorControllerIds = spectatorControllerIds ?? new string[0];
-        Choices = choices ?? new TournamentPlayerChoiceData[0];
-        Rounds = rounds ?? new TournamentRoundData[0];
+        SuccessorControllerIds = successorControllerIds ?? Array.Empty<string>();
+        Contestants = contestants ?? Array.Empty<TournamentContestantData>();
+        SpectatorControllerIds = spectatorControllerIds ?? Array.Empty<string>();
+        Choices = choices ?? Array.Empty<TournamentPlayerChoiceData>();
+        Rounds = rounds ?? Array.Empty<TournamentRoundData>();
         ReadyCount = readyCount;
         SkipCount = skipCount;
         VoterCount = voterCount;

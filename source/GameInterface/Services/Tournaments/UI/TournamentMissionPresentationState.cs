@@ -5,14 +5,10 @@ namespace GameInterface.Services.Tournaments.UI;
 internal readonly struct TournamentMissionPresentationState
 {
     public readonly bool ShouldShowUI;
-    public readonly bool UseCustomCamera;
-    public readonly bool CaptureInput;
 
     private TournamentMissionPresentationState(bool shouldShowUI)
     {
         ShouldShowUI = shouldShowUI;
-        UseCustomCamera = shouldShowUI;
-        CaptureInput = shouldShowUI;
     }
 
     public static TournamentMissionPresentationState From(TournamentSessionSnapshot snapshot)

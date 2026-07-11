@@ -14,7 +14,7 @@ public static class TournamentStateReconciliation
     {
         var result = new Dictionary<string, int>();
         changed = candidateScores == null || candidateScores.Count != (snapshot?.Contestants?.Length ?? 0);
-        foreach (TournamentContestantData contestant in snapshot?.Contestants ?? new TournamentContestantData[0])
+        foreach (TournamentContestantData contestant in snapshot?.Contestants ?? Array.Empty<TournamentContestantData>())
         {
             if (candidateScores != null &&
                 candidateScores.TryGetValue(contestant.SlotId, out int score) &&

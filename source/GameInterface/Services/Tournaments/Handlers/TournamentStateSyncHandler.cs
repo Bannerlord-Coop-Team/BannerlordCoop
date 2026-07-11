@@ -10,6 +10,7 @@ using GameInterface.Services.Tournaments.Data;
 using GameInterface.Services.Tournaments.Messages;
 using LiteNetLib;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -43,7 +44,7 @@ internal sealed class TournamentStateSyncHandler : IHandler
         this.objectManager = objectManager;
         this.playerManager = playerManager;
         this.sessionRegistry = sessionRegistry;
-        this.relayNetworks = relayNetworks?.ToArray() ?? new IRelayNetwork[0];
+        this.relayNetworks = relayNetworks?.ToArray() ?? Array.Empty<IRelayNetwork>();
 
         messageBroker.Subscribe<CampaignReady>(Handle_CampaignReady);
         messageBroker.Subscribe<NetworkRequestTournamentState>(Handle_StateRequest);
@@ -305,7 +306,7 @@ internal sealed class TournamentStateSyncHandler : IHandler
                     : null;
             })
             .Where(entry => entry != null)
-            .ToArray() ?? new TournamentLeaderboardEntryData[0];
+            .ToArray() ?? Array.Empty<TournamentLeaderboardEntryData>();
         return new NetworkTournamentStateSnapshot(
             tournaments.ToArray(),
             leaderboard,

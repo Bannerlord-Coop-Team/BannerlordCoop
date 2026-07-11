@@ -779,9 +779,8 @@ public class CoopTournamentController : CoopMissionController
         TournamentMatchResultData result;
         if (pendingResult == null)
         {
-            TournamentMatchData matchData = snapshot.Rounds
-                .SelectMany(round => round.Matches)
-                .Single(match => match.MatchId == snapshot.CurrentMatchId);
+            if (!TryGetCurrentMatchData(out TournamentMatchData matchData))
+                return;
             var nativeTeams = tournamentBehavior.CurrentMatch.Teams.ToArray();
             var winners = tournamentBehavior.CurrentMatch.GetWinners();
             string[] winnerSlots = tournamentBehavior._participants
@@ -908,14 +907,6 @@ public class CoopTournamentController : CoopMissionController
                 snapshot.CurrentMatchId);
             worldItems = Array.Empty<TournamentWorldItemRuntimeData>();
         }
-        string[] aliveSlots = latestManifest.Agents
-            .Where(data => agents.Any(agent => agent.AgentId == data.AgentId))
-            .Select(data => data.SlotId)
-            .ToArray();
-        string[] aliveTeams = match.Teams
-            .Where(team => team.ParticipantSlotIds.Any(aliveSlots.Contains))
-            .Select(team => team.TeamId)
-            .ToArray();
         var nativeTeams = tournamentBehavior.CurrentMatch.Teams.ToArray();
         TournamentTeamScoreData[] scores = match.Teams
             .Select((team, index) => new TournamentTeamScoreData(team.TeamId, nativeTeams[index].Score))
@@ -927,9 +918,6 @@ public class CoopTournamentController : CoopMissionController
             snapshot.Revision,
             session.OwnControllerId,
             sequence,
-            agents.Select(data => data.AgentId).ToArray(),
-            aliveSlots,
-            aliveTeams,
             scores,
             agents,
             worldItems);
@@ -937,11 +925,9 @@ public class CoopTournamentController : CoopMissionController
         latestRuntimeState = state;
         receivedRuntimeSequences.TryAccept(session.OwnControllerId, sequence);
         Logger.Information(
-            "[Tournament] Runtime alive state for {MatchId}: agents={AgentCount}, slots={AliveSlots}, teams={AliveTeams}",
+            "[Tournament] Runtime state for {MatchId}: agents={AgentCount}",
             snapshot.CurrentMatchId,
-            agents.Length,
-            string.Join(",", aliveSlots),
-            string.Join(",", aliveTeams));
+            agents.Length);
         network.SendAll(state);
     }
 
@@ -1477,9 +1463,8 @@ public class CoopTournamentController : CoopMissionController
 
     private System.Collections.Generic.List<TournamentTeam> ResolveAliveTeams()
     {
-        TournamentMatchData match = snapshot.Rounds
-            .SelectMany(round => round.Matches)
-            .First(data => data.MatchId == snapshot.CurrentMatchId);
+        if (!TryGetCurrentMatchData(out TournamentMatchData match))
+            return new List<TournamentTeam>();
         string[] aliveSlots = GetAliveSlotIds();
         string[] aliveTeams = match.Teams
             .Where(team => team.ParticipantSlotIds.Any(aliveSlots.Contains))
@@ -1491,6 +1476,34 @@ public class CoopTournamentController : CoopMissionController
             .Where(entry => aliveTeams.Contains(entry.team.TeamId))
             .Select(entry => nativeTeams[entry.index])
             .ToList();
+    }
+
+    private bool TryGetCurrentMatchData(out TournamentMatchData match)
+    {
+        match = null;
+        if (snapshot?.Rounds == null || string.IsNullOrEmpty(snapshot.CurrentMatchId))
+            return false;
+
+        TournamentMatchData[] matches = snapshot.Rounds
+            .Where(round => round?.Matches != null)
+            .SelectMany(round => round.Matches)
+            .Where(data => data?.MatchId == snapshot.CurrentMatchId)
+            .Take(2)
+            .ToArray();
+        if (matches.Length == 1)
+        {
+            match = matches[0];
+            return true;
+        }
+
+        Logger.Error(
+            "[Tournament] Expected one current match for {MatchId}, found {MatchCount}; session={SessionId}, revision={Revision}, bracketRevision={BracketRevision}",
+            snapshot.CurrentMatchId,
+            matches.Length,
+            snapshot.SessionId,
+            snapshot.Revision,
+            snapshot.BracketRevision);
+        return false;
     }
 
     private string[] GetAliveSlotIds()

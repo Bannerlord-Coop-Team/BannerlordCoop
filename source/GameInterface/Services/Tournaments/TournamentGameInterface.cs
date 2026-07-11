@@ -31,12 +31,12 @@ public sealed class TournamentBracketUpdate
         IReadOnlyDictionary<string, int> contestantScores,
         string[] matchWinnerSlotIds)
     {
-        Rounds = rounds ?? new TournamentRoundData[0];
+        Rounds = rounds ?? Array.Empty<TournamentRoundData>();
         CurrentMatchId = currentMatchId;
         WinnerSlotId = winnerSlotId;
         IsCompleted = isCompleted;
         ContestantScores = contestantScores ?? new Dictionary<string, int>();
-        MatchWinnerSlotIds = matchWinnerSlotIds ?? new string[0];
+        MatchWinnerSlotIds = matchWinnerSlotIds ?? Array.Empty<string>();
     }
 }
 
@@ -50,10 +50,6 @@ public interface ITournamentGameInterface : IGameAbstraction
         out TournamentBracketUpdate bracket);
     bool TryRehydrateGame(TournamentSessionSnapshot snapshot, out FightTournamentGame tournamentGame);
     bool TryApplyLockedPrize(TournamentSessionSnapshot snapshot);
-    bool TrySimulateCurrentMatch(
-        TournamentSessionSnapshot snapshot,
-        long sequence,
-        out TournamentMatchResultData result);
     bool TrySimulateCurrentMatchUnbiased(
         TournamentSessionSnapshot snapshot,
         long sequence,
@@ -241,7 +237,7 @@ public sealed partial class TournamentGameInterface : ITournamentGameInterface
             null,
             false,
             participants.ToDictionary(pair => pair.Key, pair => pair.Value.Score),
-            new string[0]);
+            Array.Empty<string>());
         return currentMatchId != null;
     }
 
@@ -369,11 +365,6 @@ public sealed partial class TournamentGameInterface : ITournamentGameInterface
         return prizeGame.GetTournamentPrize(false, -1);
     }
 
-    private static int CountLords(IEnumerable<CharacterObject> characters)
-    {
-        return characters.Count(character => character.IsHero && character.HeroObject?.IsLord == true);
-    }
-
     private bool TryCreateParticipants(
         TournamentSessionSnapshot snapshot,
         out Dictionary<string, TournamentParticipant> participants,
@@ -440,12 +431,9 @@ public sealed partial class TournamentGameInterface : ITournamentGameInterface
                     teams[teamIndex] = team;
                 }
 
-                typeof(TournamentMatch)
-                    .GetField("_teams", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
-                    .SetValue(match, teams);
-                typeof(TournamentMatch)
-                    .GetField("_participants", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
-                    .SetValue(match, matchParticipants);
+                for (int teamIndex = 0; teamIndex < teams.Length; teamIndex++)
+                    match._teams[teamIndex] = teams[teamIndex];
+                match._participants.AddRange(matchParticipants);
                 var participantMap = participants;
                 match._winners = matchData.WinnerSlotIds
                     .Where(participantMap.ContainsKey)

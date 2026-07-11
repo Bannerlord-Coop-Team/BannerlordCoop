@@ -4,7 +4,6 @@ using SandBox.Tournaments.MissionLogics;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.TournamentGames;
 using TaleWorlds.Core;
@@ -18,9 +17,6 @@ public interface ITournamentNativeBracketHydrator
 
 public class TournamentNativeBracketHydrator : ITournamentNativeBracketHydrator
 {
-    private static readonly FieldInfo MatchTeams = typeof(TournamentMatch).GetField("_teams", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-    private static readonly FieldInfo MatchParticipants = typeof(TournamentMatch).GetField("_participants", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-
     private readonly IObjectManager objectManager;
 
     public TournamentNativeBracketHydrator(IObjectManager objectManager)
@@ -107,8 +103,9 @@ public class TournamentNativeBracketHydrator : ITournamentNativeBracketHydrator
             .Select(slotId => participants[slotId])
             .ToList();
 
-        MatchTeams.SetValue(match, teams);
-        MatchParticipants.SetValue(match, matchParticipants);
+        for (int i = 0; i < teams.Length; i++)
+            match._teams[i] = teams[i];
+        match._participants.AddRange(matchParticipants);
         match._winners = winners;
         match.State = (TournamentMatch.MatchState)data.State;
         return match;

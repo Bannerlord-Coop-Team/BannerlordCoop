@@ -12,7 +12,6 @@ internal interface ITournamentUIController
 
     string LocalControllerId { get; }
 
-    bool TryGetSession(string sessionId, out TournamentSessionSnapshot snapshot);
     bool TryGetTownSession(string townId, out TournamentSessionSnapshot snapshot);
 
     string GetPreparationPrizeName(string townId);

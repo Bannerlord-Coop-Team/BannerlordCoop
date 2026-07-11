@@ -1,11 +1,8 @@
 using GameInterface.Services.Tournaments.Data;
-using SandBox.Tournaments.MissionLogics;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.TournamentGames;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.Core;
 
@@ -13,55 +10,6 @@ namespace GameInterface.Services.Tournaments;
 
 public sealed partial class TournamentGameInterface
 {
-    public bool TrySimulateCurrentMatch(
-        TournamentSessionSnapshot snapshot,
-        long sequence,
-        out TournamentMatchResultData result)
-    {
-        result = null;
-        if (snapshot == null ||
-            !TryHydrateRounds(snapshot, out var rounds, out _, out var slotIds) ||
-            !TryFindCurrentMatch(snapshot, rounds, out _, out var match) ||
-            !objectManager.TryGetObject(snapshot.TownId, out Town town))
-        {
-            return false;
-        }
-
-        TournamentMatchData matchData = snapshot.Rounds
-            .SelectMany(round => round.Matches)
-            .FirstOrDefault(candidate => candidate.MatchId == snapshot.CurrentMatchId);
-        if (matchData == null)
-            return false;
-
-        match.Start();
-        var fightController = new TournamentFightMissionController(town.Culture);
-        fightController.SkipMatch(match);
-
-        TournamentTeam[] teams = match.Teams.ToArray();
-        var scores = new TournamentTeamScoreData[teams.Length];
-        for (int i = 0; i < teams.Length; i++)
-            scores[i] = new TournamentTeamScoreData(matchData.Teams[i].TeamId, teams[i].Score);
-
-        string[] winnerSlots = match.GetWinners()
-            .Where(slotIds.ContainsKey)
-            .Select(winner => slotIds[winner])
-            .ToArray();
-        string[] winnerTeams = matchData.Teams
-            .Where(team => team.ParticipantSlotIds.Any(winnerSlots.Contains))
-            .Select(team => team.TeamId)
-            .ToArray();
-        result = new TournamentMatchResultData(
-            snapshot.SessionId,
-            snapshot.CurrentMatchId,
-            snapshot.Revision,
-            snapshot.BracketRevision,
-            sequence,
-            winnerTeams,
-            winnerSlots,
-            scores);
-        return true;
-    }
-
     public bool TrySimulateCurrentMatchUnbiased(
         TournamentSessionSnapshot snapshot,
         long sequence,
@@ -69,7 +17,7 @@ public sealed partial class TournamentGameInterface
     {
         result = null;
         TournamentMatchData match = snapshot?.Rounds?
-            .SelectMany(round => round.Matches ?? new TournamentMatchData[0])
+            .SelectMany(round => round.Matches ?? Array.Empty<TournamentMatchData>())
             .FirstOrDefault(candidate => candidate.MatchId == snapshot.CurrentMatchId);
         if (match?.Teams == null ||
             match.Teams.Length < 2 ||

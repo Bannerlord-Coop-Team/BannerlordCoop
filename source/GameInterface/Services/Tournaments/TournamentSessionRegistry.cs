@@ -50,7 +50,7 @@ public sealed class TournamentSessionSeed
         SceneName = sceneName;
         PrizeItemId = prizeItemId;
         ReplacementCharacterId = replacementCharacterId;
-        FrozenContestants = frozenContestants ?? new TournamentContestantData[0];
+        FrozenContestants = frozenContestants ?? Array.Empty<TournamentContestantData>();
     }
 }
 
@@ -62,7 +62,6 @@ public interface ITournamentSessionRegistry : IGameAbstraction
     bool TryGetByTown(string townId, out TournamentSessionSnapshot snapshot);
     bool CanEnterMission(string missionInstanceId, string controllerId);
     TournamentMutationStatus TryCreate(TournamentSessionSeed seed, out TournamentSessionSnapshot snapshot);
-    bool IsTournamentMissionInstance(string missionInstanceId);
     TournamentMutationStatus TryJoin(
         string sessionId,
         long expectedRevision,
@@ -145,14 +144,6 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
     private readonly object gate = new();
     private readonly Dictionary<string, TournamentSessionState> sessionsById = new();
     private readonly Dictionary<string, string> sessionIdsByTown = new();
-    private readonly HashSet<string> tournamentMissionInstanceIds = new();
-
-    public bool IsTournamentMissionInstance(string missionInstanceId)
-    {
-        if (string.IsNullOrEmpty(missionInstanceId)) return false;
-        lock (gate)
-            return tournamentMissionInstanceIds.Contains(missionInstanceId);
-    }
 
     public bool CanEnterMission(string missionInstanceId, string controllerId)
     {
@@ -250,7 +241,6 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
             var session = new TournamentSessionState(seed);
             sessionsById.Add(seed.SessionId, session);
             sessionIdsByTown.Add(seed.TownId, seed.SessionId);
-            tournamentMissionInstanceIds.Add(seed.MissionInstanceId);
             snapshot = session.CreateSnapshot();
             return TournamentMutationStatus.Applied;
         }
@@ -725,7 +715,6 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
                 string.IsNullOrEmpty(snapshot.TownId))
                 return false;
 
-            tournamentMissionInstanceIds.Add(snapshot.MissionInstanceId);
 
             if (sessionsById.TryGetValue(snapshot.SessionId, out var existing) && existing.Revision >= snapshot.Revision)
                 return false;
@@ -825,7 +814,7 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
             ReplacementCharacterId = seed.ReplacementCharacterId;
             Contestants = seed.FrozenContestants.Select(contestant => new TournamentContestantSlot(contestant)).ToList();
             Phase = TournamentSessionPhase.Preparation;
-            Rounds = new TournamentRoundData[0];
+            Rounds = Array.Empty<TournamentRoundData>();
         }
 
         public TournamentSessionState(TournamentSessionSnapshot snapshot)
@@ -841,15 +830,15 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
             Revision = snapshot.Revision;
             BracketRevision = snapshot.BracketRevision;
             CurrentMatchId = snapshot.CurrentMatchId;
-            Rounds = snapshot.Rounds ?? new TournamentRoundData[0];
+            Rounds = snapshot.Rounds ?? Array.Empty<TournamentRoundData>();
             WinnerSlotId = snapshot.WinnerSlotId;
-            Spectators.UnionWith(snapshot.SpectatorControllerIds ?? new string[0]);
-            Choices = (snapshot.Choices ?? new TournamentPlayerChoiceData[0])
+            Spectators.UnionWith(snapshot.SpectatorControllerIds ?? Array.Empty<string>());
+            Choices = (snapshot.Choices ?? Array.Empty<TournamentPlayerChoiceData>())
                 .ToDictionary(choice => choice.ControllerId, choice => choice.Choice);
 
             if (snapshot.HostControllerId != null)
                 Entrants.Add(snapshot.HostControllerId);
-            Entrants.AddRange(snapshot.SuccessorControllerIds ?? new string[0]);
+            Entrants.AddRange(snapshot.SuccessorControllerIds ?? Array.Empty<string>());
         }
 
         public TournamentContestantSlot GetReplacementSlot()
@@ -955,7 +944,7 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
         private HashSet<string> GetCurrentMatchSlotIds()
         {
             var match = Rounds
-                .SelectMany(round => round.Matches ?? new TournamentMatchData[0])
+                .SelectMany(round => round.Matches ?? Array.Empty<TournamentMatchData>())
                 .FirstOrDefault(candidate => candidate.MatchId == CurrentMatchId);
             if (match == null)
                 return new HashSet<string>();

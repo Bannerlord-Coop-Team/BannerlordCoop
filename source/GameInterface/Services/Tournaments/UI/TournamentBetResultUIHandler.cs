@@ -2,6 +2,7 @@ using Common;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Tournaments.Messages;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.Library;
@@ -20,7 +21,7 @@ internal sealed class TournamentBetResultUIHandler : IHandler
         IEnumerable<IRelayNetwork> relayNetworks = null)
     {
         this.messageBroker = messageBroker;
-        this.relayNetworks = relayNetworks?.ToArray() ?? new IRelayNetwork[0];
+        this.relayNetworks = relayNetworks?.ToArray() ?? Array.Empty<IRelayNetwork>();
 
         messageBroker.Subscribe<NetworkTournamentBetResult>(Handle_NetworkTournamentBetResult);
     }

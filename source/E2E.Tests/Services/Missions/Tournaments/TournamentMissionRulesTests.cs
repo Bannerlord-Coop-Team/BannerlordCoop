@@ -85,32 +85,7 @@ public class TournamentMissionRulesTests
     }
 
     [Fact]
-    public void DescriptorResolver_MapsShuffledSpawnOrderToStableSlots()
-    {
-        TournamentSessionSnapshot snapshot = Snapshot(new[]
-        {
-            Contestant("npc", "npc-character", 11),
-            Contestant("human", "human-character", 22, "fighter", true)
-        });
-        TournamentMatchData match = snapshot.Rounds[0].Matches[0];
-        var shuffled = new[]
-        {
-            (seed: 22, character: "human-character", team: 1),
-            (seed: 11, character: "npc-character", team: 0)
-        };
-
-        string[] slots = shuffled.Select(entry =>
-        {
-            Assert.True(TournamentSpawnIdentityResolver.TryResolve(
-                snapshot, match, entry.seed, entry.character, entry.team, out var contestant, out _));
-            return contestant.SlotId;
-        }).ToArray();
-
-        Assert.Equal(new[] { "human", "npc" }, slots);
-    }
-
-    [Fact]
-    public void ReplacementBeforeStart_MapsBasicTroopToStableBracketSlot()
+    public void ReplacementBeforeStart_RequiresBracketRefresh()
     {
         TournamentSessionSnapshot previous = Snapshot(
             new[]
@@ -129,16 +104,6 @@ public class TournamentMissionRulesTests
             TournamentSessionPhase.AwaitingChoices,
             5);
 
-        Assert.True(TournamentSpawnIdentityResolver.TryResolve(
-            snapshot,
-            snapshot.Rounds[0].Matches[0],
-            22,
-            "culture-basic-troop",
-            1,
-            out var contestant,
-            out _));
-        Assert.Equal("human", contestant.SlotId);
-        Assert.True(contestant.IsReplaced);
         Assert.True(TournamentMatchTransitionRules.RequiresBracketRefresh(previous, snapshot));
     }
 

@@ -3,6 +3,7 @@ using Common.Messaging;
 using GameInterface.Services.Tournaments.Messages;
 using Common.Network;
 using TaleWorlds.Library;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -18,7 +19,7 @@ internal sealed class TournamentRequestRejectedUIHandler : IHandler
         IEnumerable<IRelayNetwork> relayNetworks = null)
     {
         this.messageBroker = messageBroker;
-        this.relayNetworks = relayNetworks?.ToArray() ?? new IRelayNetwork[0];
+        this.relayNetworks = relayNetworks?.ToArray() ?? Array.Empty<IRelayNetwork>();
 
         messageBroker.Subscribe<NetworkTournamentRequestRejected>(Handle_Rejected);
     }

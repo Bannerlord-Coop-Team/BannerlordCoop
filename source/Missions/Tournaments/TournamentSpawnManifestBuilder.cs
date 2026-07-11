@@ -14,17 +14,7 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Tournaments;
 
-public interface ITournamentSpawnManifestBuilder
-{
-    TournamentSpawnManifestData Build(
-        TournamentSessionSnapshot snapshot,
-        CoopTournamentBehavior behavior,
-        TournamentFightMissionController fightController,
-        long sequence,
-        ITournamentMissionSession session);
-}
-
-public class TournamentSpawnManifestBuilder : ITournamentSpawnManifestBuilder
+public class TournamentSpawnManifestBuilder
 {
     private static readonly ILogger Logger = LogManager.GetLogger<TournamentSpawnManifestBuilder>();
     private readonly IObjectManager objectManager;

@@ -37,11 +37,6 @@ public sealed class TournamentAgentRuntimeData
     [ProtoMember(2)] public readonly float Health;
     [ProtoMember(3)] public readonly TournamentMissionWeaponData[] Equipment;
 
-    public TournamentAgentRuntimeData(Guid agentId, float health)
-        : this(agentId, health, Array.Empty<TournamentMissionWeaponData>())
-    {
-    }
-
     public TournamentAgentRuntimeData(
         Guid agentId,
         float health,
@@ -97,12 +92,9 @@ public sealed class NetworkTournamentRuntimeState : IEvent
     [ProtoMember(3)] public readonly long Revision;
     [ProtoMember(4)] public readonly string OriginControllerId;
     [ProtoMember(5)] public readonly long Sequence;
-    [ProtoMember(6)] public readonly Guid[] AliveAgentIds;
-    [ProtoMember(7)] public readonly string[] AliveSlotIds;
-    [ProtoMember(8)] public readonly string[] AliveTeamIds;
-    [ProtoMember(9)] public readonly TournamentTeamScoreData[] TeamScores;
-    [ProtoMember(10)] public readonly TournamentAgentRuntimeData[] Agents;
-    [ProtoMember(11)] public readonly TournamentWorldItemRuntimeData[] WorldItems;
+    [ProtoMember(6)] public readonly TournamentTeamScoreData[] TeamScores;
+    [ProtoMember(7)] public readonly TournamentAgentRuntimeData[] Agents;
+    [ProtoMember(8)] public readonly TournamentWorldItemRuntimeData[] WorldItems;
 
     public NetworkTournamentRuntimeState(
         string sessionId,
@@ -110,35 +102,6 @@ public sealed class NetworkTournamentRuntimeState : IEvent
         long revision,
         string originControllerId,
         long sequence,
-        Guid[] aliveAgentIds,
-        string[] aliveSlotIds,
-        string[] aliveTeamIds,
-        TournamentTeamScoreData[] teamScores,
-        TournamentAgentRuntimeData[] agents)
-        : this(
-            sessionId,
-            matchId,
-            revision,
-            originControllerId,
-            sequence,
-            aliveAgentIds,
-            aliveSlotIds,
-            aliveTeamIds,
-            teamScores,
-            agents,
-            Array.Empty<TournamentWorldItemRuntimeData>())
-    {
-    }
-
-    public NetworkTournamentRuntimeState(
-        string sessionId,
-        string matchId,
-        long revision,
-        string originControllerId,
-        long sequence,
-        Guid[] aliveAgentIds,
-        string[] aliveSlotIds,
-        string[] aliveTeamIds,
         TournamentTeamScoreData[] teamScores,
         TournamentAgentRuntimeData[] agents,
         TournamentWorldItemRuntimeData[] worldItems)
@@ -148,9 +111,6 @@ public sealed class NetworkTournamentRuntimeState : IEvent
         Revision = revision;
         OriginControllerId = originControllerId;
         Sequence = sequence;
-        AliveAgentIds = aliveAgentIds ?? Array.Empty<Guid>();
-        AliveSlotIds = aliveSlotIds ?? Array.Empty<string>();
-        AliveTeamIds = aliveTeamIds ?? Array.Empty<string>();
         TeamScores = teamScores ?? Array.Empty<TournamentTeamScoreData>();
         Agents = agents ?? Array.Empty<TournamentAgentRuntimeData>();
         WorldItems = worldItems ?? Array.Empty<TournamentWorldItemRuntimeData>();

@@ -165,7 +165,7 @@ public sealed class TournamentAgentSpawnData
         TeamColor2 = teamColor2;
         TeamBannerCode = teamBannerCode;
         ControllerId = controllerId;
-        Equipment = equipment ?? new TournamentEquipmentElementData[0];
+        Equipment = equipment ?? Array.Empty<TournamentEquipmentElementData>();
         PositionX = positionX;
         PositionY = positionY;
         PositionZ = positionZ;
@@ -175,7 +175,7 @@ public sealed class TournamentAgentSpawnData
         MountAgentId = mountAgentId;
         MountCharacterId = mountCharacterId;
         MountDescriptorSeed = mountDescriptorSeed;
-        MountEquipment = mountEquipment ?? new TournamentEquipmentElementData[0];
+        MountEquipment = mountEquipment ?? Array.Empty<TournamentEquipmentElementData>();
         MountHealth = mountHealth;
     }
 }
@@ -209,7 +209,7 @@ public sealed class TournamentSpawnManifestData
         Revision = revision;
         BracketRevision = bracketRevision;
         Sequence = sequence;
-        Agents = agents ?? new TournamentAgentSpawnData[0];
+        Agents = agents ?? Array.Empty<TournamentAgentSpawnData>();
     }
 }
 
@@ -263,8 +263,8 @@ public sealed class TournamentMatchResultData
         Revision = revision;
         BracketRevision = bracketRevision;
         Sequence = sequence;
-        WinnerTeamIds = winnerTeamIds ?? new string[0];
-        WinnerSlotIds = winnerSlotIds ?? new string[0];
-        TeamScores = teamScores ?? new TournamentTeamScoreData[0];
+        WinnerTeamIds = winnerTeamIds ?? Array.Empty<string>();
+        WinnerSlotIds = winnerSlotIds ?? Array.Empty<string>();
+        TeamScores = teamScores ?? Array.Empty<TournamentTeamScoreData>();
     }
 }

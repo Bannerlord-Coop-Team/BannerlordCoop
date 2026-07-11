@@ -97,7 +97,7 @@ public class TournamentManifestAuthorityTests
     }
 
     [Fact]
-    public void Normalize_AfterTwoHostMigrations_UsesLatestHostAndKeepsKnockoutStateSeparate()
+    public void Normalize_AfterTwoHostMigrations_UsesLatestHost()
     {
         TournamentAgentSpawnData alive = Agent("npc-alive", "host-a");
         TournamentAgentSpawnData knockedOut = Agent("npc-out", "host-a");
@@ -111,48 +111,7 @@ public class TournamentManifestAuthorityTests
 
         manifest = TournamentManifestAuthority.Normalize(manifest, Snapshot("host-b", contestants));
         manifest = TournamentManifestAuthority.Normalize(manifest, Snapshot("host-c", contestants));
-        var runtime = new NetworkTournamentRuntimeState(
-            "session",
-            "match",
-            7,
-            "host-c",
-            1,
-            new[] { alive.AgentId },
-            new[] { "npc-alive" },
-            new[] { "team" },
-            Array.Empty<TournamentTeamScoreData>(),
-            new[] { new TournamentAgentRuntimeData(alive.AgentId, 47f) });
-
         Assert.All(manifest.Agents, data => Assert.Equal("host-c", data.ControllerId));
-        Assert.Equal(new[] { knockedOut.AgentId },
-            TournamentRuntimeStateRules.GetMissingAgentIds(manifest, runtime));
-    }
-
-    [Fact]
-    public void LateCatchUp_RuntimeStateKeepsCanonicalHealthAndDoesNotResurrectMissingAgents()
-    {
-        TournamentAgentSpawnData alive = Agent("alive", "host");
-        TournamentAgentSpawnData knockedOut = Agent("out", "host");
-        var manifest = new TournamentSpawnManifestData(
-            "session", "match", 8, 4, 2, new[] { alive, knockedOut });
-        var runtime = new NetworkTournamentRuntimeState(
-            "session",
-            "match",
-            8,
-            "host",
-            3,
-            new[] { alive.AgentId },
-            new[] { "alive" },
-            new[] { "team" },
-            Array.Empty<TournamentTeamScoreData>(),
-            new[] { new TournamentAgentRuntimeData(alive.AgentId, 31.5f) });
-
-        var health = TournamentRuntimeStateRules.GetAgentHealth(runtime);
-
-        Assert.Equal(31.5f, health[alive.AgentId]);
-        Assert.False(health.ContainsKey(knockedOut.AgentId));
-        Assert.Equal(new[] { knockedOut.AgentId },
-            TournamentRuntimeStateRules.GetMissingAgentIds(manifest, runtime));
     }
 
     [Fact]
@@ -216,9 +175,6 @@ public class TournamentManifestAuthorityTests
             8,
             "host",
             4,
-            new[] { agentId },
-            new[] { "alive" },
-            new[] { "team" },
             Array.Empty<TournamentTeamScoreData>(),
             new TournamentAgentRuntimeData[]
             {
@@ -261,16 +217,10 @@ public class TournamentManifestAuthorityTests
             "host",
             1,
             null,
-            null,
-            null,
-            null,
             new[] { agent },
             null);
 
         Assert.NotNull(agent.Equipment);
-        Assert.Empty(runtime.AliveAgentIds);
-        Assert.Empty(runtime.AliveSlotIds);
-        Assert.Empty(runtime.AliveTeamIds);
         Assert.Empty(runtime.TeamScores);
         Assert.Empty(runtime.WorldItems);
     }

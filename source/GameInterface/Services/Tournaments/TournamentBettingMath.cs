@@ -1,4 +1,4 @@
-using System;
+using MathF = TaleWorlds.Library.MathF;
 
 namespace GameInterface.Services.Tournaments;
 
@@ -10,7 +10,7 @@ public static class TournamentBettingMath
     {
         if (!hasDeepPockets)
             return BaseMaximumBet;
-        return checked(BaseMaximumBet * (int)primaryBonus);
+        return BaseMaximumBet * (int)primaryBonus;
     }
 
     public static float CalculateOdd(
@@ -21,19 +21,11 @@ public static class TournamentBettingMath
     {
         float ownPower = heroPower + playerTeamPower;
         float currentMatchPower = ownPower + currentMatchOpponentPower;
-        float otherMatchPower = Math.Max(
-            0f,
-            totalRoundPower - playerTeamPower - currentMatchOpponentPower);
+        float otherMatchPower = totalRoundPower - playerTeamPower - currentMatchOpponentPower;
         float adjustedRoundPower = ownPower + (0.5f * otherMatchPower);
-        if (ownPower <= 0f || currentMatchPower <= 0f || adjustedRoundPower <= 0f)
-            return 1.1f;
-
-        float winFactor = (ownPower / currentMatchPower) / (ownPower / adjustedRoundPower);
-        if (winFactor <= 0f)
-            return 4f;
-
-        float rawOdd = (float)Math.Pow(1f / (winFactor * winFactor), 0.75f);
-        float odd = Math.Max(1.1f, Math.Min(4f, rawOdd));
+        float winFactor = (ownPower / currentMatchPower) / (heroPower / adjustedRoundPower);
+        float rawOdd = MathF.Pow(1f / (winFactor * winFactor), 0.75f);
+        float odd = MathF.Clamp(rawOdd, 1.1f, 4f);
         return (int)(odd * 10f) / 10f;
     }
 

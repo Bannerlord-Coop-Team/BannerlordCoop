@@ -6,16 +6,7 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Tournaments;
 
-public interface ITournamentMatchLifecycle : IDisposable
-{
-    string MatchId { get; }
-    long MatchRevision { get; }
-    bool IsClearing { get; }
-    bool TryBeginMatch(string matchId, long matchRevision, bool clearNativeAgents = true);
-    void ClearMatch();
-}
-
-public class TournamentMatchLifecycle : ITournamentMatchLifecycle
+public class TournamentMatchLifecycle : IDisposable
 {
     private readonly object gate = new();
     private readonly ICoopMissionComponent coopMissionComponent;
@@ -51,11 +42,6 @@ public class TournamentMatchLifecycle : ITournamentMatchLifecycle
             MatchRevision = matchRevision;
         }
         return true;
-    }
-
-    public void ClearMatch()
-    {
-        if (!disposed) ClearAgents(resetMatchIdentity: true);
     }
 
     private void ClearAgents(bool resetMatchIdentity)

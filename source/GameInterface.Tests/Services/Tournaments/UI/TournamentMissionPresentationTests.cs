@@ -14,8 +14,6 @@ public class TournamentMissionPresentationTests
             CreateSnapshot(TournamentSessionPhase.AwaitingChoices));
 
         Assert.True(state.ShouldShowUI);
-        Assert.True(state.UseCustomCamera);
-        Assert.True(state.CaptureInput);
     }
 
     [Fact]
@@ -25,8 +23,6 @@ public class TournamentMissionPresentationTests
             CreateSnapshot(TournamentSessionPhase.LiveMatch));
 
         Assert.False(state.ShouldShowUI);
-        Assert.False(state.UseCustomCamera);
-        Assert.False(state.CaptureInput);
     }
 
     [Fact]

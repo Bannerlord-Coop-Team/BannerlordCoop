@@ -44,7 +44,6 @@ internal sealed partial class TournamentSessionHandler : IHandler
     private readonly HashSet<string> completionInProgress = new();
     private readonly HashSet<string> liveCombatSessions = new();
     private readonly HashSet<string> acceptedHitProgression = new();
-    private bool orderlyShutdownInProgress;
     private readonly System.Collections.Concurrent.ConcurrentDictionary<NetPeer, string> tournamentPeerControllers = new();
 
     public TournamentSessionHandler(
@@ -83,7 +82,6 @@ internal sealed partial class TournamentSessionHandler : IHandler
         messageBroker.Subscribe<NetworkTournamentSpawnManifest>(Handle_SpawnManifestSnapshot);
         messageBroker.Subscribe<NetworkEnterTournamentMission>(Handle_EnterMission);
         messageBroker.Subscribe<PlayerDisconnected>(Handle_Disconnected);
-        messageBroker.Subscribe<TournamentOrderlyShutdownRequested>(Handle_OrderlyShutdown);
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
     }
 
@@ -104,7 +102,6 @@ internal sealed partial class TournamentSessionHandler : IHandler
         messageBroker.Unsubscribe<NetworkTournamentSpawnManifest>(Handle_SpawnManifestSnapshot);
         messageBroker.Unsubscribe<NetworkEnterTournamentMission>(Handle_EnterMission);
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_Disconnected);
-        messageBroker.Unsubscribe<TournamentOrderlyShutdownRequested>(Handle_OrderlyShutdown);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
     }
 
@@ -1024,8 +1021,7 @@ internal sealed partial class TournamentSessionHandler : IHandler
                 winnerData,
                 manager,
                 transaction);
-            if (!orderlyShutdownInProgress)
-                saveDeferral.Flush();
+            saveDeferral.Flush();
         }
         catch (Exception ex)
         {
@@ -1136,8 +1132,7 @@ internal sealed partial class TournamentSessionHandler : IHandler
             Logger.Information(
                 "[Tournament] Finalized completed tournament session={SessionId}; ejecting all mission members",
                 snapshot.SessionId);
-            if (!orderlyShutdownInProgress)
-                saveDeferral.Flush();
+            saveDeferral.Flush();
         }
         catch (Exception ex)
         {
@@ -1190,6 +1185,7 @@ internal sealed partial class TournamentSessionHandler : IHandler
                 throw new InvalidOperationException("Could not remove the completed coop tournament session.");
         });
     }
+
     private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
     {
         if (ModInformation.IsClient)

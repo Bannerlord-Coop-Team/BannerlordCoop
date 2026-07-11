@@ -39,13 +39,11 @@ public class TournamentUIControllerTests
 
         controller.RemoveSession("session-old", "town-a");
 
-        Assert.False(controller.TryGetSession("session-old", out _));
         Assert.True(controller.TryGetTownSession("town-a", out var retained));
         Assert.Same(newSnapshot, retained);
 
         controller.RemoveSession("session-new", "town-a");
 
-        Assert.False(controller.TryGetSession("session-new", out _));
         Assert.False(controller.TryGetTownSession("town-a", out _));
     }
 
