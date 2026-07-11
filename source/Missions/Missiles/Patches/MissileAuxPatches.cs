@@ -1,4 +1,6 @@
 ﻿using Common.Messaging;
+using GameInterface;
+using GameInterface.Services.Locations;
 using GameInterface.Services.MapEvents;
 using HarmonyLib;
 using Missions.Agents.Extensions;
@@ -12,7 +14,7 @@ namespace Missions.Missiles.Patches
     /// MissileAuxPatch to send shoot event and returned resulting integer
     /// </summary>
     [HarmonyPatch(typeof(Mission), "AddMissileAux")]
-    [HarmonyPatchCategory(MissilePatchInstaller.MissilePatchCategory)]
+    [HarmonyPatchCategory(MissionModule.MissilePatchCategory)]
     public class AddMissileAuxPatch
     {
         private static void Prefix(Agent shooterAgent, ref MissionWeapon __state)
@@ -36,7 +38,7 @@ namespace Missions.Missiles.Patches
             if (!BlockMissileIfNative.IsCapturingAgentShot)
                 return;
 
-            if (!BattleSpawnGate.IsCoopBattleActive)
+            if (!BlockMissileIfNative.IsCoopMissionActive)
                 return;
 
             if (!shooterAgent.IsLocallyControlled())
@@ -59,7 +61,7 @@ namespace Missions.Missiles.Patches
     /// MissileSingleUsageAuxPatch to send shoot event and returned resulting integer
     /// </summary>
     [HarmonyPatch(typeof(Mission), "AddMissileSingleUsageAux")]
-    [HarmonyPatchCategory(MissilePatchInstaller.MissilePatchCategory)]
+    [HarmonyPatchCategory(MissionModule.MissilePatchCategory)]
     public class AddMissileSingleUsageAuxPatch
     {
         private static void Prefix(Agent shooterAgent, ref MissionWeapon __state)
@@ -82,7 +84,7 @@ namespace Missions.Missiles.Patches
             if (!BlockMissileIfNative.IsCapturingAgentShot)
                 return;
 
-            if (!BattleSpawnGate.IsCoopBattleActive)
+            if (!BlockMissileIfNative.IsCoopMissionActive)
                 return;
 
             if (!shooterAgent.IsLocallyControlled())
@@ -105,25 +107,28 @@ namespace Missions.Missiles.Patches
     /// Block the locally created missile
     /// </summary>
     [HarmonyPatch(typeof(Mission), "OnAgentShootMissile")]
-    [HarmonyPatchCategory(MissilePatchInstaller.MissilePatchCategory)]
+    [HarmonyPatchCategory(MissionModule.MissilePatchCategory)]
     public static class BlockMissileIfNative
     {
         [System.ThreadStatic]
         private static bool capturingAgentShot;
 
         internal static bool IsCapturingAgentShot => capturingAgentShot;
+        internal static bool IsCoopMissionActive =>
+            BattleSpawnGate.IsCoopBattleActive || LocationMissionTracker.IsLocationMission(Mission.Current);
 
         [HarmonyPrefix]
         public static bool OnAgentShootMissile(
             ref Agent shooterAgent,
             ref int forcedMissileIndex)
         {
-            // Outside a coop battle (tournaments, arenas, locations, vanilla missions) let the engine make its
-            // own missile; we only replace native creation with the networked one for peer-owned battle agents.
-            if (!BattleSpawnGate.IsCoopBattleActive)
+            if (!IsCoopMissionActive)
                 return true;
 
-            if (!shooterAgent.IsLocallyControlled() && forcedMissileIndex == -1)
+            if (forcedMissileIndex == -1 &&
+                ContainerProvider.TryResolve<INetworkAgentRegistry>(out var agentRegistry) &&
+                agentRegistry.TryGetAgentInfo(shooterAgent, out _) &&
+                !agentRegistry.IsLocallyControlled(shooterAgent))
             {
                 return false;
             }

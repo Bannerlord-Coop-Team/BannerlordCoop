@@ -11,7 +11,7 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Missiles.Handlers;
 
 /// <summary>
-/// Handler for missiles within a battle
+/// Handler for missiles within a co-op mission
 /// </summary>
 public interface IMissileHandler : IHandler
 {
@@ -99,9 +99,6 @@ public class MissileHandler : IMissileHandler
     {
         NetworkAgentShoot shot = payload.What;
 
-        // Rebuild the missile on the game thread: the shooter may be registered by a handler that defers to the
-        // game thread, and the reconstruction mutates Mission missile state that the game loop iterates each
-        // frame. RunSafe (non-blocking) so a failure logs on the game thread instead of stranding the poll thread.
         GameThread.RunSafe(() =>
         {
             // The mission can tear down between the network receive and this deferred run.

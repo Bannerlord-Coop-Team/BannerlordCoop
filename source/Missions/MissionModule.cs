@@ -1,10 +1,12 @@
 using Autofac;
+using GameInterface;
 using GameInterface.Services.Locations;
 using GameInterface.Services.MapEvents;
+using HarmonyLib;
 using Missions.Agents.Handlers;
 using Missions.Battles;
-using Missions.Missiles;
 using Missions.Missiles.Handlers;
+using Missions.Missiles.Patches;
 using Missions.Services.Network;
 using Missions.Taverns;
 
@@ -18,9 +20,17 @@ namespace Missions;
 /// </summary>
 public class MissionModule : Module
 {
+    internal const string MissilePatchCategory = "CoopMissilePatches";
+
+    private static readonly Harmony MissileHarmony = new Harmony(GameInterfaceModule.HarmonyId + ".Missiles");
+    private static readonly object MissilePatchLock = new object();
+    private static bool missilePatchesApplied;
+
     protected override void Load(ContainerBuilder builder)
     {
         base.Load(builder);
+
+        ApplyMissilePatches();
 
         builder.RegisterType<LiteNetP2PClient>().As<IBattleNetwork>().InstancePerLifetimeScope();
 
@@ -101,10 +111,6 @@ public class MissionModule : Module
         builder.RegisterType<NetworkAgentRegistry>().As<INetworkAgentRegistry>().InstancePerLifetimeScope();
         //builder.RegisterType<NetworkMissileRegistry>().As<INetworkMissileRegistry>().InstancePerDependency();
         builder.RegisterType<MissileHandler>().As<IMissileHandler>().InstancePerDependency();
-
-        // Installs the missile-sync Harmony patches on campaign ready: they live in this assembly, which the
-        // client never PatchAll's, so they must be applied explicitly. AutoActivate so it subscribes up front.
-        builder.RegisterType<MissilePatchInstaller>().AsSelf().InstancePerLifetimeScope().AutoActivate();
         builder.RegisterType<AgentMovementHandler>().As<IAgentMovementHandler>().InstancePerDependency();
         builder.RegisterType<AgentActionHandler>().As<IAgentActionHandler>().InstancePerDependency();
         builder.RegisterType<WeaponDropHandler>().As<IWeaponDropHandler>().InstancePerDependency();
@@ -112,5 +118,17 @@ public class MissionModule : Module
         builder.RegisterType<ShieldDamageHandler>().As<IShieldDamageHandler>().InstancePerDependency();
         //builder.RegisterType<AgentDamageHandler>().As<IAgentDamageHandler>().InstancePerDependency();
         builder.RegisterType<AgentDeathHandler>().As<IAgentDeathHandler>().InstancePerDependency();
+    }
+
+    private static void ApplyMissilePatches()
+    {
+        lock (MissilePatchLock)
+        {
+            if (missilePatchesApplied)
+                return;
+
+            MissileHarmony.PatchCategory(typeof(AddMissileAuxPatch).Assembly, MissilePatchCategory);
+            missilePatchesApplied = true;
+        }
     }
 }
