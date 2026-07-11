@@ -1,16 +1,14 @@
-using Common;
+﻿using Common;
 using System.Collections.Generic;
+using System.Threading;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.GameDebug.Commands;
 
 /// <summary>
-/// Console commands for the <see cref="GameThread"/> drain instrumentation. The instrumentation times
-/// how long the game thread spends applying marshaled network actions each frame and logs a per-second
-/// summary (drain time, worst single-frame hitch, backlog depth, and the handlers that dominate the
-/// cost), which attributes game-thread/render lag to the handlers that cause it. It is off by default
-/// and purely local — run the command on the process you want to profile (the client, to diagnose
-/// client-side lag).
+/// Console commands for <see cref="GameThread"/> diagnostics. The optional instrumentation attributes
+/// game-thread lag to marshaled handlers, while the server-only stall reproduces an authoritative
+/// simulation hitch for synchronization testing.
 /// </summary>
 public class GameThreadDebugCommand
 {
@@ -47,5 +45,25 @@ public class GameThreadDebugCommand
 
         return $"GameThread drain instrumentation is {(GameThread.Instrument ? "ON" : "OFF")}. " +
                "When ON, a per-second [GameThread] summary (drain ms, worst frame, backlog, top handlers) is written to the log.";
+    }
+
+    [CommandLineArgumentFunction("stall", "coop.debug.gamethread")]
+    public static string Stall(List<string> args)
+    {
+        if (ModInformation.IsClient)
+        {
+            return "gamethread.stall must be run on the server";
+        }
+
+        if (args.Count != 1 ||
+            int.TryParse(args[0], out int milliseconds) == false ||
+            milliseconds < 1 ||
+            milliseconds > 5000)
+        {
+            return "Usage: coop.debug.gamethread.stall <milliseconds from 1 to 5000>";
+        }
+
+        Thread.Sleep(milliseconds);
+        return $"Stalled the server game thread for {milliseconds} ms";
     }
 }

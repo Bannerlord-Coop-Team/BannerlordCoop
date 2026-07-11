@@ -1,4 +1,5 @@
 using Common.Logging;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -15,13 +16,14 @@ namespace Missions.Battles;
 public interface IBattleResultCommitter
 {
     /// <summary>
-    /// [Host] Commit this concluded battle's result. Setting <c>MapEvent.BattleState</c> runs the native
-    /// setter, which the coop intercept (<c>MapEventPatches</c>) syncs to the server — there it runs
+    /// Commit this concluded battle's result. Setting <c>MapEvent.BattleState</c> runs the native
+    /// setter, which the coop intercept (<c>MapEventPatches</c>) syncs to the server; there it runs
     /// <c>OnBattleWon</c> (capturing the defeated players) and the auto-finalize (closing every player's
-    /// encounter). Only the host commits; a retreat (unresolved result) commits nothing; an already-resolved
-    /// state (e.g. a simulated battle) is left untouched.
+    /// encounter). A retreat (unresolved result) commits nothing; an already-resolved state is left untouched.
+    /// This is intentionally not host-gated: the first client to finish the battle and click Done must
+    /// resolve the shared campaign battle for everyone.
     /// </summary>
-    void CommitIfHost();
+    void CommitResolvedResult();
 }
 
 /// <inheritdoc cref="IBattleResultCommitter"/>
@@ -40,30 +42,47 @@ public class BattleResultCommitter : IBattleResultCommitter
         this.hostRegistry = hostRegistry;
     }
 
-    public void CommitIfHost()
+    public void CommitResolvedResult()
     {
-        if (!session.IsLocalHost) return;
-
-        // Other players are still fighting this battle: leaving now is a RETREAT/handoff, not the battle's
-        // conclusion — a successor is promoted and the battle continues under it. Committing here would end
-        // the battle for everyone: a host retreating after losing its own troops carries a RESOLVED defeat
-        // MissionResult, and committing that made the server run the full conclusion (OnBattleWon captured the
-        // still-fighting players, the auto-finalize closed their encounters and destroyed the map event under
-        // their live mission). The LAST player out — then the host, with an empty successor line — commits.
-        if (hostRegistry.TryGet(session.InstanceId, out var assignment) && assignment.SuccessorControllerIds.Count > 0)
+        // The Done button can produce the first resolved result on any client.
+        // Retreat stays ignored by the BattleResolved guard below because it does not end the shared encounter.
+        var result = Mission.Current?.MissionResult;
+        if (result == null)
         {
-            Logger.Information("[BattleSync] Not committing battle result for {Instance}: {Count} successor(s) still in the battle",
-                session.InstanceId, assignment.SuccessorControllerIds.Count);
             return;
         }
 
-        var result = Mission.Current?.MissionResult;
-        if (result == null || !result.BattleResolved) return;
+        if (!result.BattleResolved)
+        {
+            return;
+        }
 
-        if (!objectManager.TryGetObject<MapEvent>(session.InstanceId, out var mapEvent)) return;
-        if (mapEvent.BattleState != BattleState.None) return;
+        if (!objectManager.TryGetObject<MapEvent>(session.InstanceId, out var mapEvent))
+        {
+            return;
+        }
 
-        Logger.Information("[BattleSync] Committing concluded battle result {State} for instance {Instance}", result.BattleState, session.InstanceId);
+        if (mapEvent.BattleState != BattleState.None)
+        {
+            return;
+        }
+
+        // If the current host is leaving while successors are still assigned, this mission end is a retreat or
+        // host handoff, not the shared battle's Done result. A successor will commit once the battle truly ends.
+        if (session.IsLocalHost &&
+            hostRegistry.TryGet(session.InstanceId, out var assignment) &&
+            assignment.SuccessorControllerIds.Count > 0)
+        {
+            Logger.Information("[BattleSync] Not committing battle result for {Instance}: {Count} successor(s) still in the battle",
+                session.InstanceId,
+                assignment.SuccessorControllerIds.Count);
+            return;
+        }
+
+        Logger.Information("[BattleSync] Committing concluded battle result {State} for instance {Instance}; localHost={LocalHost}",
+            result.BattleState,
+            session.InstanceId,
+            session.IsLocalHost);
         mapEvent.BattleState = result.BattleState;
     }
 }

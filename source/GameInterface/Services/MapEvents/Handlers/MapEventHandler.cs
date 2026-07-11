@@ -2,9 +2,12 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using LiteNetLib;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -20,13 +23,18 @@ internal class MapEventHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly IMapEventLogger mapEventLogger;
+    private readonly IBattleHostRegistry hostRegistry;
+    private readonly IPlayerManager playerManager;
 
-    public MapEventHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager, IMapEventLogger mapEventLogger)
+    public MapEventHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager,
+        IMapEventLogger mapEventLogger, IBattleHostRegistry hostRegistry, IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.mapEventLogger = mapEventLogger;
+        this.hostRegistry = hostRegistry;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<MapEventBattleStateChangeAttempted>(Handle_MapEventBattleStateChangeAttempted);
         messageBroker.Subscribe<NetworkChangeBattleState>(Handle_NetworkChangeBattleState);
@@ -70,6 +78,7 @@ internal class MapEventHandler : IHandler
         // server), so no AllowedThread is needed to prevent an echo.
         var mapEventId = payload.What.MapEventId;
         var battleState = payload.What.BattleState;
+        var sender = payload.Who as NetPeer;
         GameThread.Run(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<MapEvent>(mapEventId, out var mapEvent))
@@ -78,6 +87,30 @@ internal class MapEventHandler : IHandler
             mapEventLogger.DebugMapEvent(mapEvent,
                 "Applying network battle state change. BattleState={BattleState}",
                 battleState);
+
+            if (mapEvent.BattleState != BattleState.None)
+            {
+                mapEventLogger.DebugMapEvent(mapEvent,
+                    "Ignoring network battle state change because battle is already concluded. CurrentBattleState={CurrentBattleState}, IncomingBattleState={IncomingBattleState}",
+                    mapEvent.BattleState,
+                    battleState);
+                return;
+            }
+
+            // Only the elected battle host's conclusion is authoritative: a non-host's local mission can
+            // conclude a victory the shared battle never reached (its enemies arrive as another client's
+            // puppets). Applying it would run the full capture/finalize on a battle still being fought.
+            if ((battleState == BattleState.AttackerVictory || battleState == BattleState.DefenderVictory)
+                && sender != null && hostRegistry.TryGet(mapEventId, out var hostAssignment)
+                && playerManager.TryGetPlayer(sender, out var sendingPlayer)
+                && sendingPlayer.ControllerId != hostAssignment.HostControllerId)
+            {
+                Logger.Information("Refused battle state {BattleState} for {MapEventId} from non-host {ControllerId}",
+                    battleState, mapEventId, sendingPlayer.ControllerId);
+                return;
+            }
+
+            var playerPartyIds = MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, objectManager);
 
             try
             {
@@ -92,7 +125,7 @@ internal class MapEventHandler : IHandler
             // native setter runs above, so the player no longer has to leave the post-battle menu. Hand off to
             // BattleHandler for the server-authoritative teardown + the close instruction to every player.
             if (battleState == BattleState.AttackerVictory || battleState == BattleState.DefenderVictory)
-                messageBroker.Publish(this, new MapEventConcluded(mapEventId));
+                messageBroker.Publish(this, new MapEventConcluded(mapEventId, playerPartyIds));
         });
     }
 

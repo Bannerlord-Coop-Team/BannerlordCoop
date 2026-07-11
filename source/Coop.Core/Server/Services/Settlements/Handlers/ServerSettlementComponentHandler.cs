@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Coalescing;
 using Coop.Core.Server.Services.Settlements.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Messages;
@@ -14,17 +15,22 @@ namespace Coop.Core.Server.Services.Settlements.Handlers
     /// </summary>
     public class ServerSettlementComponentHandler : IHandler
     {
+        // Coalescer channel for per-component gold updates; only the latest gold per component is sent each tick.
+        private const string SettlementComponentGoldChannel = "SettlementComponentGold";
+
         private readonly ILogger logger = LogManager.GetLogger<ServerSettlementComponentHandler>();
 
         private IMessageBroker messageBroker;
         private INetwork network;
         private readonly IObjectManager objectManager;
+        private readonly ISendCoalescer coalescer;
 
-        public ServerSettlementComponentHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
+        public ServerSettlementComponentHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager, ISendCoalescer coalescer)
         {
             this.messageBroker = messageBroker;
             this.network = network;
             this.objectManager = objectManager;
+            this.coalescer = coalescer;
             messageBroker.Subscribe<SettlementComponentGoldChanged>(ChangedGold);
             messageBroker.Subscribe<SettlementComponentIsOwnerUnassignedChanged>(ChangedIsOwnerUnassigned);
             messageBroker.Subscribe<SettlementComponentOwnerChanged>(ChangedOwner);
@@ -72,7 +78,9 @@ namespace Coop.Core.Server.Services.Settlements.Handlers
                 return;
             }
 
-            network.SendAll(new NetworkChangeSettlementComponentGold(settlementComponentId, obj.Gold));
+            // Coalesce per component: repeated gold changes to one component collapse into a single latest-wins send per tick.
+            var key = new CoalesceKey(SettlementComponentGoldChannel, settlementComponentId);
+            coalescer.Enqueue(key, new LatestWinsPayload(new NetworkChangeSettlementComponentGold(settlementComponentId, obj.Gold)));
         }
 
     }

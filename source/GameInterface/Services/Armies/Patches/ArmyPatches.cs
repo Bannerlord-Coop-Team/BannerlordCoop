@@ -59,19 +59,19 @@ public class ArmyPatches
     [HarmonyPostfix]
     static void ArmyOwnerSetPostfix(Army __instance)
     {
-        if (!ModInformation.IsClient) return;
-
-        // Save loading fills ArmyOwner through this setter (PropertyLoadData invokes
-        // it reflectively) while Campaign.Current is still null — MobileParty.MainParty
-        // would NRE, and the UI catch-up below is meaningless mid-load anyway.
-        if (Campaign.Current == null || Game.Current?.GameStateManager == null) return;
+        if (ModInformation.IsServer || __instance == null) return;
 
         __instance.UpdateName();
+
+        if (__instance.LeaderParty == null) return;
+        if (MobileParty.MainParty == null) return;
+
         if (__instance.LeaderParty == MobileParty.MainParty)
         {
-            var mapState = Game.Current.GameStateManager.GameStates
-                .OfType<MapState>()
-                .SingleOrDefault();
+            var game = Game.Current;
+            if (game?.GameStateManager == null) return;
+
+            var mapState = game.GameStateManager.GameStates?.OfType<MapState>().SingleOrDefault();
             mapState?.OnArmyCreated(MobileParty.MainParty);
         }
     }

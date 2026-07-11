@@ -1,3 +1,4 @@
+using GameInterface.Services.MapEvents;
 using System;
 using System.Linq;
 using Common.Messaging;
@@ -51,7 +52,7 @@ public class CoopBattleResultCommitTests : MissionTestEnvironment
             host.Resolve<IMessageBroker>().Subscribe<MapEventBattleStateChangeAttempted>(p => committed = p.What.BattleState);
 
             // The coop battle concluded on the host -> it commits the result to the campaign map event.
-            controller.ResultCommitter.CommitIfHost();
+            controller.ResultCommitter.CommitResolvedResult();
 
             GC.KeepAlive(controller);
         });
@@ -91,7 +92,7 @@ public class CoopBattleResultCommitTests : MissionTestEnvironment
 
             host.Resolve<IMessageBroker>().Subscribe<MapEventBattleStateChangeAttempted>(p => committed = p.What.BattleState);
 
-            controller.ResultCommitter.CommitIfHost();
+            controller.ResultCommitter.CommitResolvedResult();
 
             GC.KeepAlive(controller);
         });

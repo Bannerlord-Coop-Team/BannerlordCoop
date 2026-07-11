@@ -66,6 +66,11 @@ public class BattleDeploymentCoordinator : IBattleDeploymentCoordinator
     // whole reveal gate. After commit nothing is withheld: own-party reinforcements replicate at once.
     private bool committed;
 
+    // Whether the engine deployer (the mission host) has announced its deployment finished — the moment its
+    // engine placements are final on this client. Our siege tactic re-latches once both this and the local
+    // commit have happened.
+    private bool deployerFinished;
+
     public BattleDeploymentCoordinator(IBattleNetwork network, IMessageBroker messageBroker, IBattleSession session)
     {
         this.network = network;
@@ -114,6 +119,9 @@ public class BattleDeploymentCoordinator : IBattleDeploymentCoordinator
         // First commit → the caller reveals the withheld own-party troops; idempotent afterwards.
         if (committed) return false;
         committed = true;
+
+        if (deployerFinished) RelatchSiegeTactic();
+
         return true;
     }
 
@@ -147,6 +155,42 @@ public class BattleDeploymentCoordinator : IBattleDeploymentCoordinator
             network.SendAll(new NetworkBattleActivated(session.InstanceId));
             ActivateNpcAi();
         }
+
+        // The engine deployer finished: its placements are final here (same ReliableOrdered channel).
+        // This handler runs on the poll thread while the commit path runs on the game thread; marshal
+        // the flag work there so the deployerFinished/committed pair is read and written on one thread.
+        if (session.IsHostController(payload.What.ControllerId) && !session.IsLocalHost)
+        {
+            GameThread.RunSafe(() =>
+            {
+                deployerFinished = true;
+                if (committed) RelatchSiegeTactic();
+            });
+        }
+    }
+
+    // [Non-deployer, game thread] Our siege tactic latched its assault lanes at our own commit, possibly
+    // against a not-yet-complete engine set — formations then charge the gate on foot instead of escorting
+    // the ram — and a same-side lane reassignment never re-fires the behaviors' machine scan. Reset the
+    // latched sides and the tactic so they rescan the final machine set.
+    private static void RelatchSiegeTactic()
+    {
+        GameThread.RunSafe(() =>
+        {
+            var mission = Mission.Current;
+            if (mission?.PlayerTeam == null || !mission.IsSiegeBattle) return;
+
+            foreach (var formation in mission.PlayerTeam.FormationsIncludingSpecialAndEmpty)
+            {
+                if (formation.CountOfUnits <= 0) continue;
+                formation.AI.Side = FormationAI.BehaviorSide.BehaviorSideNotSet;
+            }
+
+            mission.PlayerTeam.QuerySystem.Expire();
+            mission.PlayerTeam.ResetTactic();
+
+            Logger.Information("[BattleSync] Re-latched the siege tactic against the deployer's final engine set");
+        });
     }
 
     // The host announced the battle is live (NPCs released). Record it so a later promotion to host (migration)

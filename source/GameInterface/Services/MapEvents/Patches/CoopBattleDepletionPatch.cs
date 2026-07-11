@@ -53,8 +53,11 @@ internal class CoopBattleDepletionPatch
         else
         {
             // No live agents: depleted only if this side had agents at some point (otherwise it just hasn't
-            // spawned/arrived yet — e.g. the enemy puppets on a non-host before the catch-up burst lands).
-            __result = had[(int)side];
+            // spawned/arrived yet — e.g. the enemy puppets on a non-host before the catch-up burst lands),
+            // or if the spawn handler deliberately crossed its reserve timeout for this exact side. The latter
+            // is latched only after the full hold deadline; BattleEndLogic itself remains disabled until the
+            // other side fields and deployment activates.
+            __result = had[(int)side] || BattleSpawnGate.IsMissingReserveSideAccepted(side);
         }
         return false; // skip the native count-based check
     }

@@ -1,5 +1,7 @@
 using Common;
 using Common.Logging;
+using Common.Network;
+using Common.Network.Coalescing;
 using Common.Tests.Utils;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
@@ -250,6 +252,63 @@ public class E2ETestEnvironment : IDisposable
 
         Assert.True(GenericPatchHelpers.ArrayChangeInterceptCache.TryGetValue(member, out var intercept));
         return intercept;
+    }
+
+    /// <summary>
+    /// Gets the dictionary add intercept from the given <paramref name="member"/>.
+    /// Dictionary intercepts take (instance, dictionary, ...) argument order.
+    /// </summary>
+    /// <param name="member">Member to get intercept from</param>
+    /// <returns>Dictionary add intercept as <see cref="MethodInfo"/></returns>
+    public MethodInfo GetDictionaryAddIntercept(MemberInfo member)
+    {
+        Assert.True(GenericPatchHelpers.DictionaryAddInterceptCache.TryGetValue(member, out var intercept));
+        return intercept;
+    }
+
+    /// <summary>
+    /// Gets the dictionary indexer set intercept from the given <paramref name="member"/>.
+    /// Dictionary intercepts take (instance, dictionary, ...) argument order.
+    /// </summary>
+    /// <param name="member">Member to get intercept from</param>
+    /// <returns>Dictionary indexer set intercept as <see cref="MethodInfo"/></returns>
+    public MethodInfo GetDictionarySetItemIntercept(MemberInfo member)
+    {
+        Assert.True(GenericPatchHelpers.DictionarySetItemInterceptCache.TryGetValue(member, out var intercept));
+        return intercept;
+    }
+
+    /// <summary>
+    /// Gets the dictionary remove intercept from the given <paramref name="member"/>.
+    /// Dictionary intercepts take (instance, dictionary, ...) argument order.
+    /// </summary>
+    /// <param name="member">Member to get intercept from</param>
+    /// <returns>Dictionary remove intercept as <see cref="MethodInfo"/></returns>
+    public MethodInfo GetDictionaryRemoveIntercept(MemberInfo member)
+    {
+        Assert.True(GenericPatchHelpers.DictionaryRemoveInterceptCache.TryGetValue(member, out var intercept));
+        return intercept;
+    }
+
+    /// <summary>
+    /// Gets the dictionary clear intercept from the given <paramref name="member"/>.
+    /// Dictionary intercepts take (instance, dictionary) argument order.
+    /// </summary>
+    /// <param name="member">Member to get intercept from</param>
+    /// <returns>Dictionary clear intercept as <see cref="MethodInfo"/></returns>
+    public MethodInfo GetDictionaryClearIntercept(MemberInfo member)
+    {
+        Assert.True(GenericPatchHelpers.DictionaryClearInterceptCache.TryGetValue(member, out var intercept));
+        return intercept;
+    }
+
+    /// <summary>
+    /// Drains the server's per-tick send coalescer the way <c>CoopServer.Update</c> does, delivering any
+    /// coalesced sends (e.g. Hero.Gold) to clients. A no-op when nothing is buffered.
+    /// </summary>
+    public void FlushCoalescer()
+    {
+        Server.Call(() => Server.Resolve<ISendCoalescer>().Flush(Server.Resolve<INetwork>()));
     }
 
     /// <summary>
@@ -932,6 +991,10 @@ public class E2ETestEnvironment : IDisposable
                 Assert.True(JsonConvert.SerializeObject(serverVal).Equals(JsonConvert.SerializeObject(defaultVal)), $"Expected: {JsonConvert.SerializeObject(serverValue)} Actual: {JsonConvert.SerializeObject(defaultVal)}");
             propertyInfo.SetValue(serverInstance, serverValue);
         });
+
+        // A coalesced member (e.g. Hero.Gold) buffers its send until the tick flush, so drain it before
+        // reading client state. Inert for non-coalesced members: nothing is buffered.
+        FlushCoalescer();
 
         // Assert
         foreach (var client in Clients)

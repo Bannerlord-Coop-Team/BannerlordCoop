@@ -5,10 +5,12 @@ using Common.Serialization;
 using Common.Util;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.SiegeEvents.Interfaces;
 using SandBox.View.Map.Managers;
 using SandBox.View.Map.Visuals;
 using Serilog;
@@ -118,7 +120,31 @@ internal class HeroInterface : IHeroInterface
 
         Logger.Information("Switching to new hero: {heroName}", playerHero.Name.ToString());
 
-        ChangePlayerCharacterAction.Apply(playerHero);
+        // Vanilla's character change ejects a main hero from its settlement, which would pop the
+        // reloaded party outside on this client only (the server's save keeps it inside); keep it
+        // inside and rebuild the local in-settlement state afterwards.
+        LeaveSettlementActionPatches.SuppressForPlayerSwitch = true;
+        try
+        {
+            ChangePlayerCharacterAction.Apply(playerHero);
+        }
+        finally
+        {
+            LeaveSettlementActionPatches.SuppressForPlayerSwitch = false;
+        }
+
+        if (playerParty.CurrentSettlement != null)
+        {
+            // Queued so it runs after the campaign state is entered; the headless server's save
+            // carries no player encounter or menu state for this hero.
+            GameThread.RunSafe(() =>
+            {
+                if (ContainerProvider.TryResolve<ISiegeEventInterface>(out var siegeEventInterface))
+                {
+                    siegeEventInterface.RestoreReloadedPlayerInSettlement();
+                }
+            });
+        }
 
         // Recapture if previously captured
         if (playerHero.PartyBelongedToAsPrisoner != null)

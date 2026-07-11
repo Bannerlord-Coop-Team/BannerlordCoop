@@ -168,8 +168,8 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
     // The local player's own deployable heroes (its party leader + any companion heroes in the party), highest
     // sergeant-score first — the coop-scoped replacement for HeroHelper.OrderHeroesOnPlayerSideByPriority, which
     // spans the whole side. Carried as CharacterObject string ids, matching the native list that
-    // AssignPlayerRoleInTeamMissionController consumes.
-    private static List<string> OwnPartyHeroesByPriority()
+    // AssignPlayerRoleInTeamMissionController consumes. Shared with the siege launcher.
+    internal static List<string> OwnPartyHeroesByPriority()
     {
         var heroes = new List<Hero>();
         foreach (var member in MobileParty.MainParty.MemberRoster.GetTroopRoster())

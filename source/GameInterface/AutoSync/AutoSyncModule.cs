@@ -25,11 +25,13 @@ internal class AutoSyncModule : Module
         builder.RegisterType<AutoSyncFieldMBListBuilder>().InstancePerLifetimeScope();
         builder.RegisterType<AutoSyncFieldListBuilder>().InstancePerLifetimeScope();
         builder.RegisterType<AutoSyncFieldQueueBuilder>().InstancePerLifetimeScope();
+        builder.RegisterType<AutoSyncFieldDictionaryBuilder>().InstancePerLifetimeScope();
         builder.RegisterType<AutoSyncPropertyBuilder>().InstancePerLifetimeScope();
         builder.RegisterType<AutoSyncPropertyArrayBuilder>().InstancePerLifetimeScope();
         builder.RegisterType<AutoSyncPropertyMBListBuilder>().InstancePerLifetimeScope();
         builder.RegisterType<AutoSyncPropertyListBuilder>().InstancePerLifetimeScope();
         builder.RegisterType<AutoSyncPropertyQueueBuilder>().InstancePerLifetimeScope();
+        builder.RegisterType<AutoSyncPropertyDictionaryBuilder>().InstancePerLifetimeScope();
         builder.RegisterType<AutoSyncConstantsBuilder>().InstancePerLifetimeScope();
         builder.RegisterType<AutoSyncFieldPropertyOwnerBuilder>().InstancePerLifetimeScope();
         builder.RegisterType<AutoSyncHandler>().InstancePerLifetimeScope();

@@ -1,6 +1,7 @@
 using Common;
 using Common.Logging;
 using GameInterface.Services.Inventory.Data;
+using GameInterface.Services.Kingdoms;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Data;
 using Serilog;
@@ -31,6 +32,8 @@ internal readonly struct PlayerPartyInteractionOutcome
     public readonly TroopRosterElementData[] ResponderOfferedPrisoners;
     public readonly TroopRosterElementData[] InitiatorOfferedTroops;
     public readonly TroopRosterElementData[] ResponderOfferedTroops;
+    public readonly bool InitiatorOfferedPeace;
+    public readonly bool ResponderOfferedPeace;
 
     public PlayerPartyInteractionOutcome(PlayerPartyInteractionSession session, PlayerPartyInteractionOutcomeType outcomeType)
     {
@@ -48,6 +51,8 @@ internal readonly struct PlayerPartyInteractionOutcome
         ResponderOfferedPrisoners = session.ResponderOfferedPrisoners ?? new TroopRosterElementData[0];
         InitiatorOfferedTroops = session.InitiatorOfferedTroops ?? new TroopRosterElementData[0];
         ResponderOfferedTroops = session.ResponderOfferedTroops ?? new TroopRosterElementData[0];
+        InitiatorOfferedPeace = session.InitiatorOfferedPeace;
+        ResponderOfferedPeace = session.ResponderOfferedPeace;
     }
 }
 
@@ -56,10 +61,14 @@ internal class PlayerPartyInteractionOutcomeHandler
     private static readonly ILogger Logger = LogManager.GetLogger<PlayerPartyInteractionOutcomeHandler>();
 
     private readonly IObjectManager objectManager;
+    private readonly IKingdomMembershipState kingdomMembershipState;
 
-    public PlayerPartyInteractionOutcomeHandler(IObjectManager objectManager)
+    public PlayerPartyInteractionOutcomeHandler(
+        IObjectManager objectManager,
+        IKingdomMembershipState kingdomMembershipState)
     {
         this.objectManager = objectManager;
+        this.kingdomMembershipState = kingdomMembershipState;
     }
 
     public void Handle(PlayerPartyInteractionOutcome outcome)
@@ -73,7 +82,7 @@ internal class PlayerPartyInteractionOutcomeHandler
                 HandleClanJoinAccepted(outcome);
                 break;
             case PlayerPartyInteractionOutcomeType.VassalAccepted:
-                //TODO : Hook up joining kingdom logic after [Bannerlord-Coop-Team/BannerlordCoop#1481](https://github.com/Bannerlord-Coop-Team/BannerlordCoop/pull/1481) is merged
+                HandleVassalAccepted(outcome);
                 break;
             case PlayerPartyInteractionOutcomeType.ClanJoinDeclined:
             case PlayerPartyInteractionOutcomeType.TradeDeclined:
@@ -81,10 +90,65 @@ internal class PlayerPartyInteractionOutcomeHandler
             case PlayerPartyInteractionOutcomeType.Left:
             case PlayerPartyInteractionOutcomeType.Rejected:
             case PlayerPartyInteractionOutcomeType.Disconnected:
+            case PlayerPartyInteractionOutcomeType.HostileDemandAccepted:
+            case PlayerPartyInteractionOutcomeType.HostileDemandYielded:
                 // All the above lead to ending the interaction, however we may intend to have them lead to different
                 // logic in the future.
                 break;
         }
+    }
+
+    private void HandleVassalAccepted(PlayerPartyInteractionOutcome outcome)
+    {
+        try
+        {
+            RunOnGameThread(() => ApplyVassalage(outcome), "Apply player-party vassalage");
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e,
+                "Failed to apply player-party vassalage. SessionId={SessionId}, InitiatorPartyId={InitiatorPartyId}, ResponderPartyId={ResponderPartyId}",
+                outcome.SessionId,
+                outcome.InitiatorPartyId,
+                outcome.ResponderPartyId);
+        }
+    }
+
+    private void ApplyVassalage(PlayerPartyInteractionOutcome outcome)
+    {
+        if (!objectManager.TryGetObject(outcome.InitiatorPartyId, out PartyBase initiatorParty))
+        {
+            Logger.Warning("Unable to apply player-party vassalage: initiator party not found. PartyId={PartyId}", outcome.InitiatorPartyId);
+            return;
+        }
+
+        if (!objectManager.TryGetObject(outcome.ResponderPartyId, out PartyBase responderParty))
+        {
+            Logger.Warning("Unable to apply player-party vassalage: responder party not found. PartyId={PartyId}", outcome.ResponderPartyId);
+            return;
+        }
+
+        var initiatorClan = initiatorParty.LeaderHero?.Clan ?? initiatorParty.MobileParty?.ActualClan;
+        var responderHero = responderParty.LeaderHero;
+        var targetKingdom = responderHero?.Clan?.Kingdom;
+        if (initiatorClan == null ||
+            initiatorClan.Kingdom != null ||
+            initiatorClan.Tier < 2 ||
+            responderHero?.IsKingdomLeader != true ||
+            targetKingdom?.RulingClan != responderHero.Clan)
+        {
+            Logger.Warning(
+                "Unable to apply player-party vassalage: eligibility changed before acceptance. InitiatorPartyId={InitiatorPartyId}, ResponderPartyId={ResponderPartyId}",
+                outcome.InitiatorPartyId,
+                outcome.ResponderPartyId);
+            return;
+        }
+
+        kingdomMembershipState.MoveClanToKingdom(
+            null,
+            targetKingdom,
+            initiatorClan,
+            publishCollectionChanges: true);
     }
 
     private void HandleClanJoinAccepted(PlayerPartyInteractionOutcome outcome)
@@ -180,6 +244,20 @@ internal class PlayerPartyInteractionOutcomeHandler
 
         ApplyOffer(initiatorParty, responderParty, initiatorOffer);
         ApplyOffer(responderParty, initiatorParty, responderOffer);
+
+        if (outcome.InitiatorOfferedPeace && outcome.ResponderOfferedPeace)
+            ApplyPeace(initiatorParty, responderParty);
+    }
+
+    private static void ApplyPeace(PartyBase initiatorParty, PartyBase responderParty)
+    {
+        if (!PlayerPartyPeaceBarterable.CanOfferPeace(initiatorParty, responderParty)) return;
+
+        var initiatorFaction = PlayerPartyPeaceBarterable.GetMapFaction(initiatorParty);
+        var responderFaction = PlayerPartyPeaceBarterable.GetMapFaction(responderParty);
+        if (initiatorFaction == null || responderFaction == null || initiatorFaction == responderFaction) return;
+
+        MakePeaceAction.Apply(initiatorFaction, responderFaction);
     }
 
     private AcceptedTradeOffer BuildAcceptedOffer(

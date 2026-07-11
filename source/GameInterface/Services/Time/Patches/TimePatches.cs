@@ -1,10 +1,12 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Time;
+using GameInterface.Services.Time.Interfaces;
 using HarmonyLib;
 using SandBox.View.Map;
 using System.Collections.Generic;
@@ -70,6 +72,20 @@ internal class TimePatches
     internal static void PublishBlockedTimeControlAttempt(object source, TimeControlEnum controlMode)
     {
         MessageBroker.Instance.Publish(source, new TimeSpeedChangedAttempted(controlMode));
+    }
+}
+
+[HarmonyPatch(typeof(Campaign), "TickMapTime")]
+internal class CampaignTimePacingPatches
+{
+    [HarmonyPostfix]
+    private static void TickMapTimePostfix(Campaign __instance, float realDt)
+    {
+        if (ModInformation.IsClient &&
+            ContainerProvider.TryResolve<IMapTimeTrackerInterface>(out var mapTimeTrackerInterface))
+        {
+            mapTimeTrackerInterface.ApplyClientSimulationTime(__instance, realDt);
+        }
     }
 }
 

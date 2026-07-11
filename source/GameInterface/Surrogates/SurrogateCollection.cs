@@ -1,6 +1,7 @@
 ﻿using ProtoBuf.Meta;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
@@ -31,6 +32,7 @@ public class SurrogateCollection : ISurrogateCollection
             AddSurrogate<EquipmentElement, EquipmentElementSurrogate>();
             AddSurrogate<PropertyOwner<TraitObject>, PropertyOwnerSurrogate>();
             AddSurrogate<ItemRosterElement, ItemRosterElementSurrogate>();
+            AddSurrogate<ItemData, ItemDataSurrogate>();
 
             AddSurrogate<ExplainedNumber, ExplainedNumberSurrogate>();
             AddSurrogate<ExplainedNumber.StatExplainer, StatExplainerSurrogate>();
@@ -38,6 +40,7 @@ public class SurrogateCollection : ISurrogateCollection
 
             AddSurrogate<Vec3, Vec3Surrogate>();
             AddSurrogate<Mat3, Mat3Surrogate>();
+            AddSurrogate<MatrixFrame, MatrixFrameSurrogate>();
             AddSurrogate<Blow, BlowSurrogate>();
             AddSurrogate<AttackCollisionData, AttackCollisionDataSurrogate>();
             AddSurrogate<SunInformation, SunInformationSurrogate>();
@@ -52,6 +55,7 @@ public class SurrogateCollection : ISurrogateCollection
             AddSurrogate<PostProcessInformation, PostProcessInformationSurrogate>();
             AddSurrogate<AtmosphereInfo, AtmosphereInfoSurrogate>();
             AddSurrogate<MissionInitializerRecord, MissionInitializerRecordSurrogate>();
+            AddSurrogate<WeaponComponentData, WeaponComponentDataSurrogate>();
         }
     }
 

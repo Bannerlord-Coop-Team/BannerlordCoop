@@ -1,7 +1,6 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
 using Common.Network;
-using Common.Network.Coalescing;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using System.Collections.Generic;
 using Coop.Core.Server.Services.ItemRosters.Messages;
@@ -25,6 +24,7 @@ using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Villages.Commands;
 using GameInterface.Services.Villages.Data;
 using GameInterface.Services.Villages.Interfaces;
@@ -180,9 +180,10 @@ public class VillageHostileActionTests : MapEventTestBase
             message => Assert.Equal(otherMobilePartyId, message.PartyId));
         var endEncounter = Assert.Single(otherClient.InternalMessages.GetMessages<NetworkEndSettlementEncounter>());
         Assert.Equal(otherMobilePartyId, endEncounter.PartyId);
+        var compactOtherMobilePartyId = ObjectManager.Compact(otherMobilePartyId, typeof(MobileParty));
         Assert.All(
             Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>(),
-            message => Assert.Equal(otherMobilePartyId, message.PartyId));
+            message => Assert.Equal(compactOtherMobilePartyId, message.PartyId));
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>());
 
         Server.Call(() =>
@@ -910,8 +911,6 @@ public class VillageHostileActionTests : MapEventTestBase
             .ToList();
 
         client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkMapEventFinalizeAttempted(mapEventId!)), disabledMethods);
-        Server.Call(() => Server.Resolve<ISendCoalescer>().Flush(Server.Resolve<INetwork>()));
-
         AssertRaidPartyMovedToVillageGate(Server, mobilePartyId, target.SettlementId);
         foreach (var syncedClient in Clients)
         {
@@ -2106,6 +2105,8 @@ public class VillageHostileActionTests : MapEventTestBase
         string mobilePartyId,
         string settlementId)
     {
+        // Lord gold is coalesced; drain the buffer before reading it on a client.
+        TestEnvironment.FlushCoalescer();
         instance.Call(() =>
         {
             Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty));
