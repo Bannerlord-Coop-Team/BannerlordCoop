@@ -3,6 +3,7 @@ using GameInterface.Services.Locations;
 using GameInterface.Services.MapEvents;
 using Missions.Agents.Handlers;
 using Missions.Battles;
+using Missions.Missiles;
 using Missions.Missiles.Handlers;
 using Missions.Services.Network;
 using Missions.Taverns;
@@ -100,6 +101,10 @@ public class MissionModule : Module
         builder.RegisterType<NetworkAgentRegistry>().As<INetworkAgentRegistry>().InstancePerLifetimeScope();
         //builder.RegisterType<NetworkMissileRegistry>().As<INetworkMissileRegistry>().InstancePerDependency();
         builder.RegisterType<MissileHandler>().As<IMissileHandler>().InstancePerDependency();
+
+        // Installs the missile-sync Harmony patches on campaign ready: they live in this assembly, which the
+        // client never PatchAll's, so they must be applied explicitly. AutoActivate so it subscribes up front.
+        builder.RegisterType<MissilePatchInstaller>().AsSelf().InstancePerLifetimeScope().AutoActivate();
         builder.RegisterType<AgentMovementHandler>().As<IAgentMovementHandler>().InstancePerDependency();
         builder.RegisterType<AgentActionHandler>().As<IAgentActionHandler>().InstancePerDependency();
         builder.RegisterType<WeaponDropHandler>().As<IWeaponDropHandler>().InstancePerDependency();

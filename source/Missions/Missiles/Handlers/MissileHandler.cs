@@ -3,9 +3,9 @@ using Common.Logging;
 using Common.Messaging;
 using Missions.Missiles.Message;
 using Serilog;
-using System.Linq;
-using System.Reflection;
+using TaleWorlds.Core;
 using TaleWorlds.Engine;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Missiles.Handlers;
@@ -49,9 +49,6 @@ public class MissileHandler : IMissileHandler
         messageBroker.Unsubscribe<AgentShoot>(AgentShootSend);
         messageBroker.Unsubscribe<NetworkAgentShoot>(AgentShootRecieve);
     }
-
-    private readonly static MethodInfo AddMissileSingleUsageAux = typeof(Mission).GetMethod("AddMissileSingleUsageAux", BindingFlags.NonPublic | BindingFlags.Instance);
-    private readonly static MethodInfo AddMissileAux = typeof(Mission).GetMethod("AddMissileAux", BindingFlags.NonPublic | BindingFlags.Instance);
 
     private void AgentShootSend(MessagePayload<AgentShoot> payload)
     {
@@ -100,92 +97,60 @@ public class MissileHandler : IMissileHandler
 
     private void AgentShootRecieve(MessagePayload<NetworkAgentShoot> payload)
     {
-        if (!networkAgentRegistry.TryGetAgentInfo(payload.What.AgentId, out var agentInfo))
-            return;
-
         NetworkAgentShoot shot = payload.What;
-        var agent = agentInfo.Agent;
 
-        Logger.Debug("Firing missile with id {id}", shot.MissileIndex);
-
-        MissionWeapon missileWeapon = new MissionWeapon(
-            shot.ItemObject,
-            shot.ItemModifier,
-            shot.Banner);
-
-        WeaponData weaponData = missileWeapon.GetWeaponData(true);
-
-        GameEntity missileEntity = null;
-
-        int num = 0;
-
-        if (shot.SingleUse)
+        // Rebuild the missile on the game thread: the shooter may be registered by a handler that defers to the
+        // game thread, and the reconstruction mutates Mission missile state that the game loop iterates each
+        // frame. RunSafe (non-blocking) so a failure logs on the game thread instead of stranding the poll thread.
+        GameThread.RunSafe(() =>
         {
-            WeaponStatsData weaponStatsData = missileWeapon.GetWeaponStatsDataForUsage(0);
-            var parameters = new object[]
+            // The mission can tear down between the network receive and this deferred run.
+            if (Mission.Current == null)
+                return;
+
+            if (!networkAgentRegistry.TryGetAgentInfo(shot.AgentId, out var agentInfo))
+                return;
+
+            Agent agent = agentInfo.Agent;
+
+            Logger.Debug("Firing missile with id {id}", shot.MissileIndex);
+
+            MissionWeapon missileWeapon = new MissionWeapon(shot.ItemObject, shot.ItemModifier, shot.Banner);
+            WeaponData weaponData = missileWeapon.GetWeaponData(true);
+
+            Vec3 position = shot.Position;
+            Vec3 direction = shot.Velocity;
+            Mat3 orientation = shot.Orientation;
+
+            int index;
+            GameEntity missileEntity;
+            if (shot.SingleUse)
             {
-                -1,
-                false,
-                agent,
-                weaponData,
-                weaponStatsData,
-                0.0f,
-                shot.Position,
-                shot.Velocity,
-                shot.Orientation,
-                shot.BaseSpeed,
-                shot.Speed,
-                shot.HasRigidBody,
-                null,
-                false,
-                null,
-            };
-
-            GameThread.Run(() =>
+                WeaponStatsData weaponStatsData = missileWeapon.GetWeaponStatsDataForUsage(0);
+                index = Mission.Current.AddMissileSingleUsageAux(-1, false, agent, in weaponData, in weaponStatsData, 0f,
+                    ref position, ref direction, ref orientation, shot.BaseSpeed, shot.Speed, shot.HasRigidBody,
+                    WeakGameEntity.Invalid, false, out missileEntity);
+            }
+            else
             {
-                num = (int)AddMissileSingleUsageAux.Invoke(Mission.Current, parameters);
-            }, true);
+                WeaponStatsData[] weaponStatsData = missileWeapon.GetWeaponStatsData();
+                index = Mission.Current.AddMissileAux(-1, false, agent, in weaponData, weaponStatsData, 0f,
+                    ref position, ref direction, ref orientation, shot.BaseSpeed, shot.Speed, shot.HasRigidBody,
+                    WeakGameEntity.Invalid, false, out missileEntity);
+            }
 
-            missileEntity = (GameEntity)parameters.Last();
-        }
-        else
-        {
-            WeaponStatsData[] weaponStatsData = missileWeapon.GetWeaponStatsData();
+            weaponData.DeinitializeManagedPointers();
 
-            var parameters = new object[]
-            {
-                -1,
-                false,
-                agent,
-                weaponData,
-                weaponStatsData,
-                0.0f,
-                shot.Position,
-                shot.Velocity,
-                shot.Orientation,
-                shot.BaseSpeed,
-                shot.Speed,
-                shot.HasRigidBody,
-                null,
-                false,
-                null,
-            };
+            // A blocked or failed native add yields no entity, so there is nothing to render or track.
+            if (missileEntity == null)
+                return;
 
-            GameThread.RunSafe(() =>
-            {
-                num = (int)AddMissileAux.Invoke(Mission.Current, parameters);
-            }, true);
-
-            missileEntity = (GameEntity)parameters.Last();
-        }
-
-        weaponData.DeinitializeManagedPointers();
-        Mission.Missile missile = new Mission.Missile(Mission.Current, num, missileEntity, agent, missileWeapon, null); // Probably need to change this to not be null
-
-        missileEntity.ManualInvalidate();
-
-        var missiles = Mission.Current._missilesList;
-
-        missiles.Add(missile);
+            // Track the missile in BOTH collections like vanilla OnAgentShootMissile: the engine hard-indexes
+            // _missilesDictionary by the missile index on every collision, so a list-only add crashes on the first hit.
+            // Indexer, not Add, so a reused engine index overwrites rather than throwing back out of the dictionary.
+            Mission.Missile missile = new Mission.Missile(Mission.Current, index, missileEntity, agent, missileWeapon, null);
+            Mission.Current._missilesList.Add(missile);
+            Mission.Current._missilesDictionary[index] = missile;
+        });
     }
 }
