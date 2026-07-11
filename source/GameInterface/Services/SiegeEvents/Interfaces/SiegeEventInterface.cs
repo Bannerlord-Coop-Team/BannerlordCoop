@@ -134,6 +134,12 @@ public interface ISiegeEventInterface : IGameAbstraction
     void PromptLocalAftermathChoice(MobileParty leaderParty, Settlement settlement);
 
     /// <summary>
+    /// Backstop that routes a stale post-capture siege-assault encounter (a host attacker whose gated aftermath
+    /// transition missed) into the settlement-taken menu. Driven off the encounter menu, not the prompt.
+    /// </summary>
+    void RouteCapturedSettlementToAftermathMenu(Settlement settlement);
+
+    /// <summary>
     /// Builds/deploys a siege engine at a slot for one side, mirroring the map production popup.
     /// Server side; rejected while the siege is fighting an assault, matching the vanilla tick freeze.
     /// </summary>
@@ -475,7 +481,9 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
 
     public void PromptLocalAftermathChoice(MobileParty leaderParty, Settlement settlement)
     {
-        if (leaderParty != MobileParty.MainParty) return;
+        // Identity-stable check: the network-resolved leaderParty can be a divergent instance after a host's
+        // post-mission party resync, so a reference compare would silently drop the real local leader.
+        if (leaderParty?.LeaderHero != Hero.MainHero) return;
 
         // This client is both the choice owner and a local narration participant. Keep the identities
         // separate: non-leader participants need narration too, but only the leader owns the menu hold.
@@ -498,24 +506,29 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
         var currentMenu = Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId;
         if (currentMenu != null && (currentMenu.StartsWith("menu_settlement_taken") || currentMenu == "siege_aftermath_contextual_summary")) return;
 
-        // menu_settlement_taken_on_init routes on _besiegerParty == MainParty to reach the leader submenu
-        // that carries Devastate/Pillage/Mercy. The client's OnMapEventEnded prefix sets those fields, but
-        // it doesn't run for a battle the server auto-resolved, so set them here or the router falls
-        // through to the Continue-only participant submenu. The apply itself stays server-owned.
+        SwitchLocalPartyToSettlementTaken(settlement);
+    }
+
+    // Client-local capture-aftermath transition: finish the stale pre-mission siege encounter and open the
+    // settlement-taken menu. Shared by the aftermath-choice prompt and the encounter-menu backstop that catches
+    // a host attacker whose gated retry missed. The local player is the capturing leader (its clan now owns the
+    // settlement), so besiegerParty is MainParty.
+    private void SwitchLocalPartyToSettlementTaken(Settlement settlement)
+    {
+        // menu_settlement_taken_on_init routes on _besiegerParty == MainParty to reach the leader submenu that
+        // carries Devastate/Pillage/Mercy; set the fields the client's OnMapEventEnded prefix would have set.
         var aftermathBehavior = Campaign.Current?.GetCampaignBehavior<SiegeAftermathCampaignBehavior>();
         if (aftermathBehavior != null)
         {
-            aftermathBehavior._besiegerParty = leaderParty;
+            aftermathBehavior._besiegerParty = MobileParty.MainParty;
             aftermathBehavior._prevSettlementOwnerClan = settlement.OwnerClan;
             aftermathBehavior._wasPlayerArmyMember = false;
         }
 
         using (new AllowedThread())
         {
-            // A live PlayerEncounter here is never the settlement-taken one (that menu returned above). On the
-            // real-time path it is the STALE pre-mission siege encounter the mission popped back to, whose map
-            // event the server already destroyed, so its dead "encounter" menu NREs on the null MapEvent. Finish
-            // it first. The auto-resolve path reaches here with no encounter, so only the rebuild below runs.
+            // The live encounter is the STALE pre-mission siege encounter the mission popped back to, whose map
+            // event the server already destroyed; its dead "encounter" menu NREs on the null MapEvent. Finish it.
             if (PlayerEncounter.Current != null)
             {
                 if (MobileParty.MainParty.Party._mapEventSide != null)
@@ -539,6 +552,18 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
                 GameMenu.ActivateGameMenu("menu_settlement_taken");
             }
         }
+    }
+
+    public void RouteCapturedSettlementToAftermathMenu(Settlement settlement)
+    {
+        if (settlement == null) return;
+
+        // Backstop for a HOST attacker: the aftermath-prompt transition parks in the gated retry (the host is
+        // still in its own mission when the prompt arrives) and can miss. This runs off the observable stuck
+        // encounter menu instead, so it lands regardless of why the prompt path failed.
+        localAftermathChoiceSettlement = settlement;
+        SiegeCaptureMenuHoldPatch.HoldFor(settlement);
+        SwitchLocalPartyToSettlementTaken(settlement);
     }
 
     public void SetLocalAftermathNarration(Settlement settlement, int aftermathType)
