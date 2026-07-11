@@ -4,11 +4,9 @@ namespace GameInterface.Registry.Auto;
 readonly struct InstanceCreated<T> : IEvent
 {
     public readonly T Instance;
-    public readonly object[] ConstructorArguments;
 
-    public InstanceCreated(T instance, object[] constructorArguments = null)
+    public InstanceCreated(T instance)
     {
         Instance = instance;
-        ConstructorArguments = constructorArguments;
     }
 }

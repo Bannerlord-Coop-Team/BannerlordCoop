@@ -1,4 +1,4 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
@@ -41,8 +41,6 @@ public class MissionTestEnvironment : E2ETestEnvironment
         {
             // The real map-event visual needs a live render context; the mocked visual NREs in Initialize.
             AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)),
-            // Manager.Tick commits the aggregate, then would immediately simulate the headless battle.
-            AccessTools.Method(typeof(MapEvent), "Update"),
         };
     }
 
@@ -81,9 +79,6 @@ public class MissionTestEnvironment : E2ETestEnvironment
             // Any additional players reinforce the attacker side (coop allies).
             for (int i = 2; i < parties.Length; i++)
                 parties[i].Party.MapEventSide = mapEvent.AttackerSide;
-
-            Campaign.Current.MapEventManager.OnMapEventCreated(mapEvent);
-            Campaign.Current.MapEventManager.Tick();
 
             Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
             for (int i = 0; i < parties.Length; i++)

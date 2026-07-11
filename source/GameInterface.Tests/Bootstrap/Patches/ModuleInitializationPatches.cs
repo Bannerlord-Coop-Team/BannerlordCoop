@@ -1,5 +1,4 @@
 ﻿using HarmonyLib;
-using System;
 using System.Reflection;
 using TaleWorlds.Library;
 using TaleWorlds.ModuleManager;
@@ -37,18 +36,17 @@ internal static class TestModuleInitializationPatch
 }
 
 /// <summary>
-/// The testhost has no native sound manager. Skip the visual's static sound-event lookup so aggregate
-/// hydration tests can exercise Gauntlet publication and callback ordering in-process.
+/// The testhost has no native sound manager. Skip the visual's static sound-event lookup so MapEvent
+/// tests can exercise Gauntlet publication and callback ordering in-process.
 /// </summary>
 [HarmonyPatch]
 internal static class TestGauntletMapEventVisualInitializationPatch
 {
     private static MethodBase TargetMethod()
     {
-        var visualType = AccessTools.TypeByName("SandBox.GauntletUI.Map.GauntletMapEventVisual") ??
-            throw new InvalidOperationException("Could not resolve GauntletMapEventVisual");
-        return visualType.TypeInitializer ??
-            throw new InvalidOperationException("GauntletMapEventVisual had no type initializer");
+        return Assembly.Load("SandBox.GauntletUI")
+            .GetType("SandBox.GauntletUI.Map.GauntletMapEventVisual", throwOnError: true)
+            .TypeInitializer;
     }
 
     [HarmonyPrefix]

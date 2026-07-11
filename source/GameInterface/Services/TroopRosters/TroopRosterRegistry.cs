@@ -67,55 +67,23 @@ internal class TroopRosterRegistry : AutoRegistryBase<TroopRoster>
             RegisterExistingObject($"{nameof(Settlement.Party.PrisonRoster)}_{settlement.StringId}", settlement.Party.PrisonRoster);
         }
 
-        RegisterMapEventCasualtyRosters(Campaign.Current?.MapEventManager?.MapEvents);
-    }
-
-    /// <summary>
-    /// Registers the three casualty rosters owned by every active map-event party. These rosters are created
-    /// during map-event initialization rather than through a reliable constructor hook, so late-joining clients
-    /// must rediscover them from the saved map-event graph just like party member and prisoner rosters above.
-    /// </summary>
-    internal void RegisterMapEventCasualtyRosters(IEnumerable<MapEvent> mapEvents)
-    {
-        if (mapEvents == null)
+        var mapEvents = Campaign.Current?.MapEventManager?.MapEvents;
+        if (mapEvents == null) return;
+        foreach (var mapEvent in mapEvents)
         {
-            Logger.Error("Unable to register map-event casualty rosters when Campaign.MapEventManager.MapEvents is null");
-            return;
-        }
-
-        foreach (MapEvent mapEvent in mapEvents)
-        {
-            if (mapEvent?.StringId == null || mapEvent._sides == null) continue;
-
-            // Match MapEventPartyRegistry's side/party traversal and one-based counter. Prefixing the owner key
-            // with MapEventParty makes the roster id unambiguous while keeping it deterministic on both peers.
-            int partyCounter = 1;
-            foreach (MapEventSide side in mapEvent._sides)
+            int partyIndex = 1;
+            foreach (var side in mapEvent?._sides ?? Array.Empty<MapEventSide>())
             {
                 if (side?.Parties == null) continue;
-
-                foreach (MapEventParty party in side.Parties)
+                foreach (var party in side.Parties)
                 {
-                    if (party == null) continue;
-
-                    string ownerId = $"{nameof(MapEventParty)}_{mapEvent.StringId}_{partyCounter++}";
-                    RegisterMapEventCasualtyRoster(ownerId, nameof(MapEventParty.WoundedInBattle), party._woundedInBattle);
-                    RegisterMapEventCasualtyRoster(ownerId, nameof(MapEventParty.DiedInBattle), party._diedInBattle);
-                    RegisterMapEventCasualtyRoster(ownerId, nameof(MapEventParty.RoutedInBattle), party._routedInBattle);
+                    string owner = $"{nameof(MapEventParty)}_{mapEvent.StringId}_{partyIndex++}";
+                    RegisterExistingObject($"{owner}_{nameof(MapEventParty.WoundedInBattle)}", party?._woundedInBattle);
+                    RegisterExistingObject($"{owner}_{nameof(MapEventParty.DiedInBattle)}", party?._diedInBattle);
+                    RegisterExistingObject($"{owner}_{nameof(MapEventParty.RoutedInBattle)}", party?._routedInBattle);
                 }
             }
         }
-    }
-
-    private void RegisterMapEventCasualtyRoster(string ownerId, string rosterName, TroopRoster roster)
-    {
-        if (roster == null)
-        {
-            Logger.Error("Unable to register {RosterName} for {OwnerId}: roster is null", rosterName, ownerId);
-            return;
-        }
-
-        RegisterExistingObject($"{ownerId}_{rosterName}", roster);
     }
 
     public override void OnClientCreated(TroopRoster obj, string id)

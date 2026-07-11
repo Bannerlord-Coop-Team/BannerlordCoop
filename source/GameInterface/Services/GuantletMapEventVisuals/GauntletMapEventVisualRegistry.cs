@@ -1,5 +1,6 @@
 ﻿using Common.Util;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using SandBox.GauntletUI.Map;
@@ -14,16 +15,19 @@ namespace GameInterface.Services.GuantletMapEventVisuals;
 internal class GauntletMapEventVisualRegistry : AutoRegistryBase<GauntletMapEventVisual>
 {
     private readonly IMapEventBattleSizeCorrection mapEventBattleSizeCorrection;
+    private readonly IMapEventInitializationBarrier initializationBarrier;
 
     public override bool Debug => true;
     public GauntletMapEventVisualRegistry(
         ILogger logger,
         IAutoRegistryFactory autoRegistryFactory,
         IObjectManager objectManager,
-        IMapEventBattleSizeCorrection mapEventBattleSizeCorrection)
+        IMapEventBattleSizeCorrection mapEventBattleSizeCorrection,
+        IMapEventInitializationBarrier initializationBarrier)
         : base(logger, autoRegistryFactory, objectManager)
     {
         this.mapEventBattleSizeCorrection = mapEventBattleSizeCorrection;
+        this.initializationBarrier = initializationBarrier;
     }
 
     public override IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(GauntletMapEventVisual));
@@ -56,26 +60,32 @@ internal class GauntletMapEventVisualRegistry : AutoRegistryBase<GauntletMapEven
 
     public override void OnClientCreated(GauntletMapEventVisual visual, string id)
     {
-        var visualCreator = Campaign.Current.VisualCreator.MapEventVisualCreator as GauntletMapEventVisualCreator;
+        var visualCreator = Campaign.Current?.VisualCreator?.MapEventVisualCreator as GauntletMapEventVisualCreator;
 
         OnInitializedField.SetValue(
             visual,
-            new Action<GauntletMapEventVisual>(visualCreator.OnMapEventInitialized));
+            new Action<GauntletMapEventVisual>(value =>
+                visualCreator?.Handlers?.ForEach(handler => handler.OnInitialized(value))));
 
         OnVisibilityChangedField.SetValue(
             visual,
-            new Action<GauntletMapEventVisual>(visualCreator.OnMapEventVisibilityChanged));
+            new Action<GauntletMapEventVisual>(value =>
+                visualCreator?.Handlers?.ForEach(handler => handler.OnEventVisibilityChanged(value))));
 
         OnDeactivateField.SetValue(
             visual,
-            new Action<GauntletMapEventVisual>(visualCreator.OnMapEventOver));
+            new Action<GauntletMapEventVisual>(value =>
+            {
+                visualCreator?._listOfEvents.Remove(value);
+                visualCreator?.Handlers?.ForEach(handler => handler.OnEventEnded(value));
+            }));
     }
 
     public override void OnClientDestroyed(GauntletMapEventVisual obj, string id)
     {
         using (new AllowedThread())
         {
-            GauntletMapEventVisualLifecycle.TryEnd(obj);
+            initializationBarrier.EndVisual(obj);
         }
 
         // Drop any pending ambient battle-size correction for this ended battle.

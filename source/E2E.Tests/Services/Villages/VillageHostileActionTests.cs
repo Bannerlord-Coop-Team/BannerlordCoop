@@ -18,6 +18,7 @@ using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.MapEventComponents.Messages;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
@@ -1030,8 +1031,6 @@ public class VillageHostileActionTests : MapEventTestBase
                 settlement.Party,
                 new RaidEventComponent(mapEvent),
                 MapEvent.BattleTypes.Raid);
-            Campaign.Current.MapEventManager.OnMapEventCreated(mapEvent);
-            Campaign.Current.MapEventManager.Tick();
 
             Assert.True(mapEvent.IsActiveSlowVillageRaid());
             Assert.True(InvokeMapEventUpdatePrefix(mapEvent));
@@ -1298,8 +1297,6 @@ public class VillageHostileActionTests : MapEventTestBase
                 settlement.Party,
                 new RaidEventComponent(mapEvent),
                 MapEvent.BattleTypes.Raid);
-            Campaign.Current.MapEventManager.OnMapEventCreated(mapEvent);
-            Campaign.Current.MapEventManager.Tick();
 
             Assert.True(mapEvent.IsUnopposedVillageRaid());
             Assert.Equal(TimeControlEnum.Play_2x, Server.Resolve<ITimeControlInterface>().GetTimeControl());
@@ -2616,7 +2613,7 @@ public class VillageHostileActionTests : MapEventTestBase
         });
     }
 
-    private static MapEvent CreateHostileActionMapEvent(PartyBase attacker, PartyBase defender, VillageHostileAction action)
+    private MapEvent CreateHostileActionMapEvent(PartyBase attacker, PartyBase defender, VillageHostileAction action)
     {
         var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
         mapEvent.MapEventVisual = MockMapEventVisual();
@@ -2648,7 +2645,7 @@ public class VillageHostileActionTests : MapEventTestBase
 
         SetVillageStateForHostileAction(defender.Settlement, action);
         Campaign.Current.MapEventManager.OnMapEventCreated(mapEvent);
-        Campaign.Current.MapEventManager.Tick();
+        Server.Resolve<IMapEventInitializationBarrier>().CommitServer(mapEvent);
         return mapEvent;
     }
 
@@ -2675,7 +2672,7 @@ public class VillageHostileActionTests : MapEventTestBase
         party._mapEventSide = side;
         var mapEventParty = new MapEventParty(party);
         side._battleParties.Add(mapEventParty);
-        MessageBroker.Instance.Publish(side, new MapEventPartyAdded(side, mapEventParty));
+        MessageBroker.Instance.Publish(side, new MapEventPartyBattlePartyAdded(side, mapEventParty));
     }
 
     private RaidMapEventContext CreateHostileActionWithOnePlayerParty(VillageHostileAction action)

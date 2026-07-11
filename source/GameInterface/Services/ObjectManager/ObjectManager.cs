@@ -1,7 +1,6 @@
 ﻿using Serilog;
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using TaleWorlds.ObjectSystem;
 
@@ -49,19 +48,6 @@ public interface IObjectManager
     /// <param name="obj">Object to assosiate with id</param>
     /// <returns>True if successful, false if failed</returns>
     bool AddExisting(string id, object obj);
-
-    /// <summary>
-    /// Atomically registers a batch of existing objects. Returns false without changing either lookup map
-    /// when the input is null, contains an empty id or null object, repeats an id or object reference, collides
-    /// with an existing registration, cannot be enumerated, or cannot be fully committed.
-    /// </summary>
-    bool AddExistingBatch(IEnumerable<KeyValuePair<string, object>> objects);
-
-    /// <summary>
-    /// Removes every currently registered object in one registry critical section. Objects which are
-    /// already absent are ignored, allowing aggregate teardown to coexist with ordinary child destroy hooks.
-    /// </summary>
-    bool RemoveExistingBatch(IEnumerable<object> objects);
 
     /// <summary>
     /// Adds an object without a registered StringId
@@ -146,118 +132,6 @@ public class ObjectManager : IObjectManager
         }
     }
 
-    public bool AddExistingBatch(IEnumerable<KeyValuePair<string, object>> objects)
-    {
-        if (objects == null) return false;
-
-        List<KeyValuePair<string, object>> batch;
-        try
-        {
-            batch = new List<KeyValuePair<string, object>>(objects);
-        }
-        catch (Exception ex)
-        {
-            logger.Error(ex, "Unable to enumerate object registration batch");
-            return false;
-        }
-
-        lock (_gate)
-        {
-            var batchIds = new HashSet<string>(StringComparer.Ordinal);
-            var batchObjects = new HashSet<object>(ReferenceObjectComparer.Instance);
-
-            foreach (var pair in batch)
-            {
-                if (string.IsNullOrEmpty(pair.Key))
-                {
-                    logger.Error("Unable to register object batch because an id was null or empty");
-                    return false;
-                }
-
-                if (pair.Value == null)
-                {
-                    logger.Error("Unable to register object batch because object {Id} was null", pair.Key);
-                    return false;
-                }
-
-                if (!batchIds.Add(pair.Key))
-                {
-                    logger.Error("Unable to register object batch because id {Id} was repeated", pair.Key);
-                    return false;
-                }
-
-                if (!batchObjects.Add(pair.Value))
-                {
-                    logger.Error(
-                        "Unable to register object batch because object {ObjectType} was repeated",
-                        pair.Value.GetType());
-                    return false;
-                }
-
-                if (idObjs.ContainsKey(pair.Key))
-                {
-                    logger.Error("Unable to register object batch because id {Id} already exists", pair.Key);
-                    return false;
-                }
-
-                if (objsIds.TryGetValue(pair.Value, out var existingId))
-                {
-                    logger.Error(
-                        "Unable to register object batch because object {ObjectType} is already registered as {Id}",
-                        pair.Value.GetType(),
-                        existingId);
-                    return false;
-                }
-            }
-
-            var committed = new List<KeyValuePair<string, object>>(batch.Count);
-            try
-            {
-                foreach (var pair in batch)
-                {
-                    if (!idObjs.TryAdd(pair.Key, pair.Value))
-                    {
-                        throw new InvalidOperationException($"Duplicate id encountered while committing batch: {pair.Key}");
-                    }
-
-                    try
-                    {
-                        objsIds.Add(pair.Value, pair.Key);
-                    }
-                    catch
-                    {
-                        idObjs.TryRemove(pair.Key, out _);
-                        throw;
-                    }
-
-                    committed.Add(pair);
-                }
-            }
-            catch (Exception ex)
-            {
-                for (int i = committed.Count - 1; i >= 0; i--)
-                {
-                    var pair = committed[i];
-                    idObjs.TryRemove(pair.Key, out _);
-                    objsIds.Remove(pair.Value);
-                }
-
-                logger.Error(ex, "Unable to atomically commit object registration batch");
-                return false;
-            }
-
-            // Match AddExisting's counter advancement only after every mapping has committed. Counter state is
-            // intentionally not part of the registration transaction; it cannot make a committed id/object map
-            // partially visible.
-            foreach (var pair in batch)
-            {
-                GetUniqueTypeId(pair.Value);
-            }
-
-            return true;
-        }
-    }
-
     public bool AddNewObject(object obj, out string newId)
     {
         newId = null;
@@ -284,37 +158,6 @@ public class ObjectManager : IObjectManager
             }
 
             objsIds.Add(obj, newId);
-
-            return true;
-        }
-    }
-
-    public bool RemoveExistingBatch(IEnumerable<object> objects)
-    {
-        if (objects == null) return false;
-
-        List<object> batch;
-        try
-        {
-            batch = new List<object>(objects);
-        }
-        catch (Exception ex)
-        {
-            logger.Error(ex, "Unable to enumerate object removal batch");
-            return false;
-        }
-
-        lock (_gate)
-        {
-            var uniqueObjects = new HashSet<object>(ReferenceObjectComparer.Instance);
-            foreach (var obj in batch)
-            {
-                if (obj == null || !uniqueObjects.Add(obj)) continue;
-                if (!objsIds.TryGetValue(obj, out var id)) continue;
-
-                idObjs.TryRemove(id, out _);
-                objsIds.Remove(obj);
-            }
 
             return true;
         }
@@ -369,10 +212,7 @@ public class ObjectManager : IObjectManager
     {
         if (string.IsNullOrEmpty(id)) return false;
 
-        lock (_gate)
-        {
-            return idObjs.ContainsKey(id);
-        }
+        return idObjs.ContainsKey(id);
     }
 
     public bool TryGetId(object obj, out string id)
@@ -391,26 +231,23 @@ public class ObjectManager : IObjectManager
 
         if (string.IsNullOrEmpty(id)) return false;
 
-        lock (_gate)
+        // Compacted ids arrive without their "{TypeName}_" prefix, so try the prefixed key first;
+        // a bare id could otherwise collide with an un-prefixed key registered for another object.
+        if (!idObjs.TryGetValue($"{typeof(T).Name}_{id}", out var storedObj)
+            && !idObjs.TryGetValue(id, out storedObj))
         {
-            // Compacted ids arrive without their "{TypeName}_" prefix, so try the prefixed key first;
-            // a bare id could otherwise collide with an un-prefixed key registered for another object.
-            if (!idObjs.TryGetValue($"{typeof(T).Name}_{id}", out var storedObj)
-                && !idObjs.TryGetValue(id, out storedObj))
-            {
-                return false;
-            }
-
-            if (storedObj is not T castedObject)
-            {
-                logger.Error("Could not cast ({ActualType}) object to type {ObjectType}", storedObj.GetType(), typeof(T));
-                return false;
-            }
-
-            obj = castedObject;
-
-            return true;
+            return false;
         }
+
+        if (storedObj is not T castedObject)
+        {
+            logger.Error("Could not cast ({ActualType}) object to type {ObjectType}", storedObj.GetType(), typeof(T));
+            return false;
+        }
+
+        obj = castedObject;
+
+        return true;
     }
 
     /// <summary>
@@ -516,17 +353,4 @@ public class ObjectManager : IObjectManager
         }
     }
     #endregion
-
-    private sealed class ReferenceObjectComparer : IEqualityComparer<object>
-    {
-        public static readonly ReferenceObjectComparer Instance = new ReferenceObjectComparer();
-
-        private ReferenceObjectComparer()
-        {
-        }
-
-        public new bool Equals(object x, object y) => ReferenceEquals(x, y);
-
-        public int GetHashCode(object obj) => RuntimeHelpers.GetHashCode(obj);
-    }
 }

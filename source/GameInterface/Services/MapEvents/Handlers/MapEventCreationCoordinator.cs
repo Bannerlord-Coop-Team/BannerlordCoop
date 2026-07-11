@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
@@ -11,7 +12,9 @@ using LiteNetLib;
 using Serilog;
 using System;
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Threading;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -25,8 +28,8 @@ namespace GameInterface.Services.MapEvents.Handlers;
 /// On the client, <see cref="RequestBlocking"/> sends a <see cref="NetworkRequestCreateMapEvent"/> and blocks the
 /// calling (game main) thread until the server replies with a <see cref="NetworkMapEventCreated"/> (or it times out).
 /// Blocking the main thread is safe here: the network is polled on a dedicated thread (see
-/// <c>CoopNetworkBase.UpdateThread</c>), so the response and the aggregate initialization message that materializes
-/// the complete MapEvent graph on this client are still received and dispatched while the main thread waits.
+/// <c>CoopNetworkBase.UpdateThread</c>), so the response — and the AutoRegistry create broadcast that actually
+/// materializes the MapEvent on this client — are still received and dispatched while the main thread waits.
 /// </para>
 /// <para>
 /// On the server, it handles <see cref="NetworkRequestCreateMapEvent"/> by creating the MapEvent authoritatively
@@ -49,6 +52,7 @@ internal class MapEventCreationCoordinator : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetworkConfig configuration;
     private readonly IVillageHostileActionInterface villageHostileActionInterface;
+    private readonly IMapEventInitializationBarrier initializationBarrier;
     private readonly ConcurrentDictionary<string, PendingRequest> pendingRequests = new ConcurrentDictionary<string, PendingRequest>();
 
     public MapEventCreationCoordinator(
@@ -56,13 +60,15 @@ internal class MapEventCreationCoordinator : IHandler
         INetwork network,
         IObjectManager objectManager,
         INetworkConfig configuration,
-        IVillageHostileActionInterface villageHostileActionInterface)
+        IVillageHostileActionInterface villageHostileActionInterface,
+        IMapEventInitializationBarrier initializationBarrier)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.configuration = configuration;
         this.villageHostileActionInterface = villageHostileActionInterface;
+        this.initializationBarrier = initializationBarrier;
 
         Instance = this;
 
@@ -113,8 +119,8 @@ internal class MapEventCreationCoordinator : IHandler
             // bare blocking wait here stops the thread from pumping GameThread.Update, which the network
             // thread relies on: it processes messages in order, and a message ahead of the reply (e.g. a
             // NetworkMapEventFinalizeAttempted, applied through a blocking GameThread.Run) waits for that
-            // pump. The reply — and the aggregate initialization that materializes the MapEvent — then sits
-            // behind a handler that can never complete, so the wait always times out under battle load.
+            // pump. The reply — and the AutoRegistry create broadcast that materializes the MapEvent — then
+            // sits behind a handler that can never complete, so the wait always times out under battle load.
             // GameThread.WaitWhilePumping keeps draining the queue while we wait so the network thread makes
             // progress (it falls back to a plain poll when not on the game-loop thread).
             if (!GameThread.WaitWhilePumping(() => pending.Completed.IsSet, deadline))
@@ -129,16 +135,26 @@ internal class MapEventCreationCoordinator : IHandler
                 return null;
             }
 
-            // The aggregate initialization is sent before the reply, but its atomic game-thread apply may still
-            // be queued when the network thread signals completion. Registration is the commit point: once the
-            // MapEvent resolves, its sides, parties, rosters, component, tracker, and visual are already attached.
+            // The MapEvent object is materialized on this client by the AutoRegistry create broadcast, which is
+            // sent just before the reply; keep pumping in case the reply is processed first. Resolving the bare
+            // MapEvent isn't enough: the parties' side attachment lands via separate, GameThread-deferred
+            // messages sent right after, so wait for those on the same deadline too.
             MapEvent mapEvent = null;
+            bool BothSidesAttached() =>
+                attacker.MapEventSide != null && defender.MapEventSide != null
+                && attacker.MapEventSide.Parties.Any(p => p.Party == attacker)
+                && defender.MapEventSide.Parties.Any(p => p.Party == defender)
+                && (mapEvent.AttackerSide == attacker.MapEventSide || mapEvent.DefenderSide == attacker.MapEventSide)
+                && (mapEvent.AttackerSide == defender.MapEventSide || mapEvent.DefenderSide == defender.MapEventSide);
+
             if (!GameThread.WaitWhilePumping(
-                    () => objectManager.TryGetObject(pending.MapEventId, out mapEvent) && mapEvent != null,
+                    () => objectManager.TryGetObject(pending.MapEventId, out mapEvent) && mapEvent != null
+                        && BothSidesAttached()
+                        && Campaign.Current.MapEventManager.MapEvents.Contains(mapEvent),
                     deadline))
             {
                 Logger.Error(
-                    "Server created map event {MapEventId} but its initialized graph was not resolvable on this client before timeout. RequestId={RequestId}",
+                    "Server created map event {MapEventId} but it (or the attacker/defender side attachment) was not resolvable on this client before timeout. RequestId={RequestId}",
                     pending.MapEventId, requestId);
                 return null;
             }
@@ -245,6 +261,8 @@ internal class MapEventCreationCoordinator : IHandler
 
         if (mapEvent.IsVillageHostileAction())
             MapEventHostileActionConsequences.Apply(mapEvent, parties.Attacker, "village hostile action start");
+
+        initializationBarrier.CommitServer(mapEvent);
 
         if (!objectManager.TryGetIdWithLogging(mapEvent, out mapEventId))
         {

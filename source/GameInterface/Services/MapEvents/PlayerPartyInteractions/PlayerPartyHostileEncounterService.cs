@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -6,6 +6,7 @@ using Common.Util;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Villages.Interfaces;
@@ -28,13 +29,20 @@ internal class PlayerPartyHostileEncounterService : IPlayerPartyHostileEncounter
     private readonly INetwork network;
     private readonly IMessageBroker messageBroker;
     private readonly IPlayerManager playerManager;
+    private readonly IMapEventInitializationBarrier initializationBarrier;
 
-    public PlayerPartyHostileEncounterService(IObjectManager objectManager, INetwork network, IMessageBroker messageBroker, IPlayerManager playerManager)
+    public PlayerPartyHostileEncounterService(
+        IObjectManager objectManager,
+        INetwork network,
+        IMessageBroker messageBroker,
+        IPlayerManager playerManager,
+        IMapEventInitializationBarrier initializationBarrier)
     {
         this.objectManager = objectManager;
         this.network = network;
         this.messageBroker = messageBroker;
         this.playerManager = playerManager;
+        this.initializationBarrier = initializationBarrier;
     }
 
     public bool CanStartHostileEncounter(PartyBase initiatorParty, PartyBase responderParty)
@@ -107,6 +115,8 @@ internal class PlayerPartyHostileEncounterService : IPlayerPartyHostileEncounter
 
         if (!objectManager.TryGetIdWithLogging(mapEvent, out var mapEventId))
             return false;
+
+        initializationBarrier.CommitServer(mapEvent);
 
         network.SendAll(new NetworkPlayerPartyHostileEncounterStarted(
             sessionId,

@@ -1,7 +1,9 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using GameInterface.Registry.Auto;
 using GameInterface.Policies;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
@@ -15,6 +17,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 
@@ -25,9 +28,31 @@ internal class MapEventPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MapEventPatches>();
 
-    [HarmonyPatch(nameof(MapEvent.AddInvolvedPartyInternal))]
+    [HarmonyPatch(nameof(MapEvent.TroopUpgradeTracker), MethodType.Setter)]
     [HarmonyPrefix]
-    private static void Prefix_AddInvolvedPartyInternal(MapEvent __instance, MapEventParty mapEventParty)
+    private static void Prefix_TroopUpgradeTracker(MapEvent __instance, out TroopUpgradeTracker __state)
+    {
+        __state = MapEventGraph.GetTracker(__instance);
+    }
+
+    [HarmonyPatch(nameof(MapEvent.TroopUpgradeTracker), MethodType.Setter)]
+    [HarmonyPostfix]
+    private static void Postfix_TroopUpgradeTracker(MapEvent __instance, TroopUpgradeTracker __state)
+    {
+        if (ModInformation.IsClient || CallOriginalPolicy.IsOriginalAllowed() || __state == null ||
+            ReferenceEquals(__state, MapEventGraph.GetTracker(__instance)))
+        {
+            return;
+        }
+
+        // The replacement's create and property packets are already queued. Retiring the prior tracker
+        // now prevents constructor-created trackers from becoming unowned client registrations.
+        MessageBroker.Instance.Publish(__instance, new InstanceDestroyed<TroopUpgradeTracker>(__state));
+    }
+
+    [HarmonyPatch(nameof(MapEvent.AddInvolvedPartyInternal))]
+    [HarmonyPostfix]
+    private static void Postfix_AddInvolvedPartyInternal(MapEvent __instance, MapEventParty mapEventParty)
     {
         // Broadcast the involved parties to clients when a player joins, OR when an AI party joins as a
         // reinforcement while the join window is still open (InteractionPatches.IsWithinAiJoinWindow). Parties
@@ -37,18 +62,15 @@ internal class MapEventPatches
         if (!isPlayerJoin && !InteractionPatches.IsWithinAiJoinWindow(__instance))
             return;
 
-        var partiesAdded = new List<MapEventParty>();
-
-        MapEventSide[] sides = __instance._sides;
-        for (int i = 0; i < sides.Length; i++)
+        var parties = __instance._sides.SelectMany(side => side.Parties).ToList();
+        if (MapEventGraph.GetTracker(__instance) == null)
         {
-            foreach (var existingParty in sides[i].Parties)
-            {
-                partiesAdded.Add(existingParty);
-            }
+            var tracker = new TroopUpgradeTracker();
+            __instance.TroopUpgradeTracker = tracker;
+            parties.ForEach(tracker.AddParty);
         }
 
-        var message = new MapEventInvolvedPartiesAdded(__instance, partiesAdded);
+        var message = new MapEventInvolvedPartiesAdded(__instance, parties);
         MessageBroker.Instance.Publish(__instance, message);
     }
 

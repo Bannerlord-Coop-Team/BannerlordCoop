@@ -9,7 +9,7 @@ internal class LifetimePatches<T>
 {
     private static readonly ILogger Logger = LogManager.GetLogger<LifetimePatches<T>>();
 
-    internal static void CreatePrefix(ref T __instance, object[] __args = null)
+    internal static void CreatePrefix(ref T __instance)
     {
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
@@ -20,7 +20,7 @@ internal class LifetimePatches<T>
             return;
         }
 
-        MessageBroker.Instance.Publish(__instance, new InstanceCreated<T>(__instance, __args));
+        MessageBroker.Instance.Publish(__instance, new InstanceCreated<T>(__instance));
     }
 
     internal static void DestroyPostfix(ref T __instance, bool __runOriginal)

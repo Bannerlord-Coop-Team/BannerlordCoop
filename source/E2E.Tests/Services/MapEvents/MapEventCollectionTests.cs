@@ -1,9 +1,8 @@
 ﻿using Coop.Core.Server.Services.Time.Messages;
 using E2E.Tests.Environment.Instance;
-using GameInterface.Services.MapEvents.Messages.Start;
 using E2E.Tests.Util;
-using Moq;
-using SandBox.GauntletUI.Map;
+using GameInterface.Services.MapEvents.Initialization;
+using GameInterface.Services.MapEvents.Messages.Start;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -16,105 +15,105 @@ public class MapEventCollectionTests : MapEventTestBase
 {
     public MapEventCollectionTests(ITestOutputHelper output) : base(output) { }
 
-    [Fact(Skip = "MapEvent._sides is a fixed-size MapEventSide[2] array, not a dynamic collection; AssertCollectionReferenceField does not apply")]
+    [Fact(Skip = "MapEvent._sides is a fixed-size MapEventSide[2] array")]
     public void Server_MapEvent_Sides_IsFixedArray() { }
 
     [Fact]
-    public void Server_MapEvent_Initialize_SyncsCompleteAggregateToClients()
+    public void Server_MapEvent_Barrier_PublishesOnlyCompleteGraph()
     {
-        // The helper clears messages after the two external MobileParties exist, isolating the
-        // MapEvent construction/Initialize/manager-registration transaction.
-        var context = CreateServerMapEvent(isolateInitializationMessages: true);
+        var staged = StageMapEvent();
 
-        // One aggregate is the entire initial wire protocol. Any lifetime, assignment, membership,
-        // roster, visual, or AutoSync message here would recreate an observable partial state.
-        var initializationTraffic = Server.NetworkSentMessages.Messages
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkMapEventInitialized>());
+        ForClients(client => AssertNotPublished(client, staged.MapEventId));
+
+        Commit(staged.MapEventId);
+
+        var barrier = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkMapEventInitialized>());
+        Assert.Equal(staged.MapEventId, barrier.MapEventId);
+        Assert.False(barrier.IsTerminal);
+        var last = Server.NetworkSentMessages.Messages
             .Where(message => message is not CampaignTimeUpdated)
-            .ToArray();
-        var initialization = Assert.IsType<NetworkInitializeMapEvent>(
-            Assert.Single(initializationTraffic));
-        AssertSelfContainedSnapshot(context, initialization);
+            .Last();
+        Assert.Equal(barrier, Assert.IsType<NetworkMapEventInitialized>(last));
 
-        // The snapshot IDs must describe the authoritative graph and the identically wired graph
-        // published on every client.
-        AssertCompleteGraph(Server, context, initialization);
-        foreach (var client in Clients)
-        {
-            AssertCompleteGraph(client, context, initialization);
-        }
+        ForAll(instance => AssertCompleteGraph(instance, staged));
     }
 
     [Fact]
-    public void Server_MapEvent_Destroy_RemovesEntireAggregateGraph()
+    public void Server_MapEvent_FinalizedBeforeCommit_IsNeverPublished()
     {
-        var context = CreateServerMapEvent(isolateInitializationMessages: true);
-        var initialization = Assert.Single(
-            Server.NetworkSentMessages.GetMessages<NetworkInitializeMapEvent>());
-        var graphIds = EnumerateGraphIds(initialization).ToArray();
+        var staged = StageMapEvent();
+        var ownedIds = CaptureOwnedIds(staged.MapEventId);
 
-        DestroyServerMapEvent(context.MapEventId);
-
-        AssertGraphIsUnregistered(Server, graphIds);
-        foreach (var client in Clients)
-            AssertGraphIsUnregistered(client, graphIds);
-    }
-
-    [Fact]
-    public void Server_MapEvent_Destroy_RemovesPostCommitReinforcementGraph()
-    {
-        var context = CreateServerMapEvent(isolateInitializationMessages: true);
-        var initialization = Assert.Single(
-            Server.NetworkSentMessages.GetMessages<NetworkInitializeMapEvent>());
-        var mapEventPartyId = JoinPartyToSide(initialization.AttackerSide.MapEventSideId);
-
-        string[] reinforcementGraphIds = Array.Empty<string>();
         Server.Call(() =>
         {
-            Assert.True(Server.ObjectManager.TryGetObject<MapEventParty>(mapEventPartyId, out var party));
-            var graph = new object[]
-            {
-                party,
-                party._woundedInBattle,
-                party._diedInBattle,
-                party._routedInBattle,
-            };
-            reinforcementGraphIds = graph.Select(instance =>
-            {
-                Assert.True(Server.ObjectManager.TryGetId(instance, out var id));
-                return id;
-            }).ToArray();
+            var mapEvent = Get<MapEvent>(Server, staged.MapEventId);
+            Server.Resolve<IMapEventInitializationBarrier>().CommitTerminalServer(mapEvent);
+            mapEvent.FinalizeEvent();
         }, MapEventDisabledMethods);
 
-        AssertGraphIsRegistered(Server, reinforcementGraphIds);
-        foreach (var client in Clients)
-            AssertGraphIsRegistered(client, reinforcementGraphIds);
-
-        DestroyServerMapEvent(context.MapEventId);
-
-        AssertGraphIsUnregistered(Server, reinforcementGraphIds);
-        foreach (var client in Clients)
-            AssertGraphIsUnregistered(client, reinforcementGraphIds);
+        var terminal = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkMapEventInitialized>());
+        Assert.Equal(staged.MapEventId, terminal.MapEventId);
+        Assert.True(terminal.IsTerminal);
+        ForAll(instance =>
+        {
+            AssertNotPublished(instance, staged.MapEventId);
+            AssertRegistration(instance, ownedIds, expected: false);
+        });
+        AssertExternalPartiesRemain(staged.AttackerPartyId, staged.DefenderPartyId);
     }
 
     [Fact]
-    public void Server_MapEvent_FinalizedBeforeFirstTick_PublishesTerminalGraphBeforeDestroy()
+    public void Server_MapEvent_Destroy_RemovesInitialAndReinforcementGraph()
     {
-        string? attackerId = null;
-        string? defenderId = null;
+        var staged = StageMapEvent();
+        Commit(staged.MapEventId);
         Server.Call(() =>
         {
-            var attacker = GameObjectCreator.CreateInitializedObject<MobileParty>();
-            var defender = GameObjectCreator.CreateInitializedObject<MobileParty>();
-            Assert.True(Server.ObjectManager.TryGetId(attacker, out attackerId));
-            Assert.True(Server.ObjectManager.TryGetId(defender, out defenderId));
+            var mapEvent = Get<MapEvent>(Server, staged.MapEventId);
+            mapEvent.TroopUpgradeTracker = null!;
+            Assert.NotNull(mapEvent.TroopUpgradeTracker);
         }, MapEventDisabledMethods);
+        var initialIds = CaptureOwnedIds(staged.MapEventId);
+        var reinforcementId = JoinPartyToSide(staged.AttackerSide.Id);
 
+        string? reinforcementPartyId = null;
+        string? currentTrackerId = null;
+        Server.Call(() =>
+        {
+            var reinforcement = Get<MapEventParty>(Server, reinforcementId);
+            Assert.True(Server.ObjectManager.TryGetId(reinforcement.Party.MobileParty, out reinforcementPartyId));
+            var mapEvent = Get<MapEvent>(Server, staged.MapEventId);
+            Assert.True(Server.ObjectManager.TryGetId(mapEvent.TroopUpgradeTracker, out currentTrackerId));
+        }, MapEventDisabledMethods);
+        Assert.NotNull(reinforcementPartyId);
+        Assert.NotNull(currentTrackerId);
+
+        var ownedIds = initialIds.Concat(CaptureOwnedIds(staged.MapEventId)).Distinct().ToArray();
+        ForAll(instance => AssertRegistration(instance, ownedIds, expected: true));
+        ForAll(instance => AssertCompleteGraph(instance, staged, 2, currentTrackerId));
+
+        DestroyServerMapEvent(staged.MapEventId);
+
+        ForAll(instance => AssertRegistration(instance, ownedIds, expected: false));
+        AssertExternalPartiesRemain(
+            staged.AttackerPartyId,
+            staged.DefenderPartyId,
+            reinforcementPartyId!);
+    }
+
+    private StagedMapEvent StageMapEvent()
+    {
+        var attackerId = TestEnvironment.CreateRegisteredObject<MobileParty>(MapEventDisabledMethods);
+        var defenderId = TestEnvironment.CreateRegisteredObject<MobileParty>(MapEventDisabledMethods);
         Server.NetworkSentMessages.Clear();
+
+        StagedMapEvent? staged = null;
         Server.Call(() =>
         {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(attackerId!, out var attacker));
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(defenderId!, out var defender));
-
+            Server.NetworkSentMessages.Clear();
+            var attacker = Get<MobileParty>(Server, attackerId);
+            var defender = Get<MobileParty>(Server, defenderId);
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
             mapEvent.MapEventVisual = MockMapEventVisual();
             mapEvent.Initialize(
@@ -122,229 +121,186 @@ public class MapEventCollectionTests : MapEventTestBase
                 defender.Party,
                 new FieldBattleEventComponent(mapEvent),
                 MapEvent.BattleTypes.FieldBattle);
-            Campaign.Current.MapEventManager.OnMapEventCreated(mapEvent);
 
-            // Removing the only defender finalizes the event before its first manager Tick. Vanilla has
-            // already emptied that side when FinalizeEventAux runs, so this exercises the terminal aggregate.
-            defender.Party.MapEventSide = null;
-            Campaign.Current.MapEventManager.Tick();
+            var retiredTrackerId = Id(mapEvent.TroopUpgradeTracker);
+            mapEvent.TroopUpgradeTracker = null!;
+            mapEvent.TroopUpgradeTracker = new TroopUpgradeTracker();
+
+            staged = new StagedMapEvent(
+                Id(mapEvent),
+                attackerId,
+                defenderId,
+                Id(mapEvent.Component),
+                Id(mapEvent.TroopUpgradeTracker),
+                retiredTrackerId,
+                Side(mapEvent.AttackerSide),
+                Side(mapEvent.DefenderSide));
+            Assert.DoesNotContain(mapEvent, Campaign.Current.MapEventManager.MapEvents);
+
+            SideIds Side(MapEventSide side) =>
+                new(Id(side), Party(Assert.Single(side.Parties)));
+
+            PartyIds Party(MapEventParty party) => new(
+                Id(party),
+                Id(party._woundedInBattle),
+                Id(party._diedInBattle),
+                Id(party._routedInBattle));
+
+            string Id(object instance)
+            {
+                Assert.True(Server.ObjectManager.TryGetId(instance, out var id));
+                return id;
+            }
         }, MapEventDisabledMethods);
 
-        var terminal = Assert.Single(
-            Server.NetworkSentMessages.GetMessages<NetworkInitializeMapEvent>());
-        Assert.True(terminal.IsTerminalInitialization);
-        Assert.Empty(terminal.DefenderSide.Parties);
-
-        var graphIds = EnumerateGraphIds(terminal).ToArray();
-        AssertGraphIsUnregistered(Server, graphIds);
-        foreach (var client in Clients)
-            AssertGraphIsUnregistered(client, graphIds);
+        Assert.NotNull(staged);
+        ForAll(instance => AssertRegistration(instance, new[] { staged!.RetiredTrackerId }, expected: false));
+        return staged!;
     }
 
-    [Fact]
-    public void Client_MapEventVisualObserver_SeesOnlyFullyWiredGraph()
+    private void Commit(string mapEventId)
     {
-        var client = Clients.First();
-        bool callbackObserved = false;
-        bool graphWasComplete = false;
-        int endedCount = 0;
-
-        client.Call(() =>
+        Server.Call(() =>
         {
-            var creator = new GauntletMapEventVisualCreator();
-            Campaign.Current.VisualCreator.MapEventVisualCreator = creator;
-            var observer = new Mock<IGauntletMapEventVisualHandler>();
-            observer
-                .Setup(handler => handler.OnNewEventStarted(It.IsAny<GauntletMapEventVisual>()))
-                .Callback<GauntletMapEventVisual>(visual =>
-                {
-                    callbackObserved = true;
-                    var mapEvent = visual.MapEvent;
-                    graphWasComplete = mapEvent != null
-                        && ReferenceEquals(mapEvent.MapEventVisual, visual)
-                        && mapEvent.Component != null
-                        && mapEvent.AttackerSide?.Parties.Count > 0
-                        && mapEvent.DefenderSide?.Parties.Count > 0
-                        && mapEvent.AttackerSide.Parties.All(party =>
-                            party.Party != null &&
-                            ReferenceEquals(party.Party.MapEventSide, mapEvent.AttackerSide))
-                        && mapEvent.DefenderSide.Parties.All(party =>
-                            party.Party != null &&
-                            ReferenceEquals(party.Party.MapEventSide, mapEvent.DefenderSide));
-                });
-            observer
-                .Setup(handler => handler.OnEventEnded(It.IsAny<GauntletMapEventVisual>()))
-                .Callback(() => endedCount++);
-            creator.Handlers.Add(observer.Object);
-        });
-
-        var context = CreateServerMapEvent();
-
-        Assert.True(callbackObserved);
-        Assert.True(graphWasComplete);
-
-        DestroyServerMapEvent(context.MapEventId);
-        Assert.Equal(1, endedCount);
+            var mapEvent = Get<MapEvent>(Server, mapEventId);
+            var manager = Campaign.Current.MapEventManager;
+            if (!manager.MapEvents.Contains(mapEvent)) manager.OnMapEventCreated(mapEvent);
+            Server.Resolve<IMapEventInitializationBarrier>().CommitServer(mapEvent);
+        }, MapEventDisabledMethods);
     }
 
-    private static IEnumerable<string> EnumerateGraphIds(NetworkInitializeMapEvent initialization)
+    private string[] CaptureOwnedIds(string mapEventId)
     {
-        yield return initialization.MapEventId;
-        yield return initialization.TroopUpgradeTrackerId;
-        if (initialization.Component != null)
-            yield return initialization.Component.ComponentId;
-        if (initialization.GauntletMapEventVisualId != null)
-            yield return initialization.GauntletMapEventVisualId;
-
-        foreach (var side in new[] { initialization.DefenderSide, initialization.AttackerSide })
+        var ids = new List<string>();
+        Server.Call(() =>
         {
-            yield return side.MapEventSideId;
-            foreach (var party in side.Parties)
+            var mapEvent = Get<MapEvent>(Server, mapEventId);
+            Add(mapEvent);
+            Add(mapEvent.Component);
+            Add(mapEvent.TroopUpgradeTracker);
+            foreach (var side in mapEvent._sides.Where(side => side != null))
             {
-                yield return party.MapEventPartyId;
-                yield return party.WoundedInBattleRosterId;
-                yield return party.DiedInBattleRosterId;
-                yield return party.RoutedInBattleRosterId;
+                Add(side);
+                foreach (var party in side.Parties)
+                {
+                    Add(party);
+                    Add(party._woundedInBattle);
+                    Add(party._diedInBattle);
+                    Add(party._routedInBattle);
+                }
             }
-        }
-    }
 
-    private static void AssertGraphIsUnregistered(EnvironmentInstance instance, IEnumerable<string> graphIds)
-    {
-        instance.Call(() =>
-        {
-            foreach (var id in graphIds)
-                Assert.False(instance.ObjectManager.Contains(id), $"Aggregate object {id} remained registered");
-        });
-    }
-
-    private static void AssertGraphIsRegistered(EnvironmentInstance instance, IEnumerable<string> graphIds)
-    {
-        instance.Call(() =>
-        {
-            foreach (var id in graphIds)
-                Assert.True(instance.ObjectManager.Contains(id), $"Aggregate object {id} was never registered");
-        });
-    }
-
-    private static void AssertSelfContainedSnapshot(
-        MapEventContext context,
-        NetworkInitializeMapEvent initialization)
-    {
-        Assert.Equal(context.MapEventId, initialization.MapEventId);
-        Assert.False(string.IsNullOrEmpty(initialization.TroopUpgradeTrackerId));
-        var component = Assert.IsType<MapEventComponentInitializationData>(initialization.Component);
-        Assert.Equal(context.MapEventId, component.MapEventId);
-        Assert.False(string.IsNullOrEmpty(component.ComponentId));
-
-        Assert.Equal(context.MapEventId, initialization.AttackerSide.MapEventId);
-        Assert.Equal(context.MapEventId, initialization.DefenderSide.MapEventId);
-        Assert.False(string.IsNullOrEmpty(initialization.AttackerSide.MapEventSideId));
-        Assert.False(string.IsNullOrEmpty(initialization.DefenderSide.MapEventSideId));
-
-        var attacker = Assert.Single(initialization.AttackerSide.Parties);
-        var defender = Assert.Single(initialization.DefenderSide.Parties);
-        AssertPartySnapshot(initialization.AttackerSide.MapEventSideId, attacker);
-        AssertPartySnapshot(initialization.DefenderSide.MapEventSideId, defender);
-    }
-
-    private static void AssertPartySnapshot(
-        string sideId,
-        MapEventPartyInitializationData party)
-    {
-        Assert.Equal(sideId, party.MapEventSideId);
-        Assert.False(string.IsNullOrEmpty(party.MapEventPartyId));
-        Assert.False(string.IsNullOrEmpty(party.PartyBaseId));
-        Assert.False(string.IsNullOrEmpty(party.WoundedInBattleRosterId));
-        Assert.False(string.IsNullOrEmpty(party.DiedInBattleRosterId));
-        Assert.False(string.IsNullOrEmpty(party.RoutedInBattleRosterId));
-        Assert.NotEmpty(party.FlattenedTroops);
-        Assert.All(party.FlattenedTroops, troop => Assert.False(string.IsNullOrEmpty(troop.ObjectId)));
+            void Add(object instance)
+            {
+                Assert.True(Server.ObjectManager.TryGetId(instance, out var id));
+                ids.Add(id);
+            }
+        }, MapEventDisabledMethods);
+        return ids.Distinct().ToArray();
     }
 
     private static void AssertCompleteGraph(
         EnvironmentInstance instance,
-        MapEventContext context,
-        NetworkInitializeMapEvent initialization)
+        StagedMapEvent staged,
+        int attackerCount = 1,
+        string? trackerId = null)
     {
         instance.Call(() =>
         {
-            Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(initialization.MapEventId, out var mapEvent));
-            Assert.Contains(mapEvent, Campaign.Current.MapEventManager.MapEvents);
+            var mapEvent = Get<MapEvent>(instance, staged.MapEventId);
+            Assert.Single(Campaign.Current.MapEventManager.MapEvents, item => ReferenceEquals(item, mapEvent));
 
-            Assert.True(instance.ObjectManager.TryGetObject<MapEventSide>(
-                initialization.AttackerSide.MapEventSideId,
-                out var attackerSide));
-            Assert.True(instance.ObjectManager.TryGetObject<MapEventSide>(
-                initialization.DefenderSide.MapEventSideId,
-                out var defenderSide));
-            Assert.Same(attackerSide, mapEvent.AttackerSide);
-            Assert.Same(defenderSide, mapEvent.DefenderSide);
-            Assert.Same(mapEvent, attackerSide.MapEvent);
-            Assert.Same(mapEvent, defenderSide.MapEvent);
+            var component = Get<MapEventComponent>(instance, staged.ComponentId);
+            Assert.Same(component, mapEvent.Component);
+            Assert.Same(mapEvent, component.MapEvent);
+            Assert.Same(Get<TroopUpgradeTracker>(instance, trackerId ?? staged.TrackerId), mapEvent.TroopUpgradeTracker);
 
-            Assert.True(instance.ObjectManager.TryGetObject<TroopUpgradeTracker>(
-                initialization.TroopUpgradeTrackerId,
-                out var tracker));
-            Assert.Same(tracker, mapEvent.TroopUpgradeTracker);
+            var attacker = Get<MapEventSide>(instance, staged.AttackerSide.Id);
+            var defender = Get<MapEventSide>(instance, staged.DefenderSide.Id);
+            Assert.Same(attacker, mapEvent.AttackerSide);
+            Assert.Same(defender, mapEvent.DefenderSide);
+            Assert.Same(mapEvent, attacker.MapEvent);
+            Assert.Same(mapEvent, defender.MapEvent);
+            Assert.Equal(attackerCount, attacker.Parties.Count);
+            Assert.Single(defender.Parties);
+            AssertParty(staged.AttackerPartyId, attacker, attacker.Parties[0], staged.AttackerSide.InitialParty);
+            AssertParty(staged.DefenderPartyId, defender, defender.Parties[0], staged.DefenderSide.InitialParty);
 
-            if (initialization.Component == null)
+            foreach (var party in attacker.Parties.Concat(defender.Parties))
             {
-                Assert.Null(mapEvent.Component);
-            }
-            else
-            {
-                Assert.True(instance.ObjectManager.TryGetObject<MapEventComponent>(
-                    initialization.Component.ComponentId,
-                    out var component));
-                Assert.Same(component, mapEvent.Component);
-                Assert.Same(mapEvent, component.MapEvent);
+                Assert.True(instance.ObjectManager.Contains(party));
+                Assert.True(instance.ObjectManager.Contains(party._woundedInBattle));
+                Assert.True(instance.ObjectManager.Contains(party._diedInBattle));
+                Assert.True(instance.ObjectManager.Contains(party._routedInBattle));
+                Assert.NotNull(party._roster);
             }
 
-            AssertPartyGraph(
-                instance,
-                attackerSide,
-                context.AttackerPartyId,
-                Assert.Single(initialization.AttackerSide.Parties));
-            AssertPartyGraph(
-                instance,
-                defenderSide,
-                context.DefenderPartyId,
-                Assert.Single(initialization.DefenderSide.Parties));
+            void AssertParty(string mobileId, MapEventSide side, MapEventParty party, PartyIds expected)
+            {
+                Assert.Same(Get<MapEventParty>(instance, expected.Id), party);
+                var mobile = Get<MobileParty>(instance, mobileId);
+                Assert.Same(mobile.Party, party.Party);
+                Assert.Same(side, party.Party.MapEventSide);
+                Assert.Same(mapEvent, mobile.MapEvent);
+                Assert.Same(Get<TroopRoster>(instance, expected.WoundedId), party._woundedInBattle);
+                Assert.Same(Get<TroopRoster>(instance, expected.DiedId), party._diedInBattle);
+                Assert.Same(Get<TroopRoster>(instance, expected.RoutedId), party._routedInBattle);
+            }
         });
     }
 
-    private static void AssertPartyGraph(
-        EnvironmentInstance instance,
-        MapEventSide side,
-        string mobilePartyId,
-        MapEventPartyInitializationData expected)
+    private static T Get<T>(EnvironmentInstance instance, string id) where T : class
     {
-        Assert.True(instance.ObjectManager.TryGetObject<MapEventParty>(expected.MapEventPartyId, out var mapEventParty));
-        Assert.Same(mapEventParty, Assert.Single(side.Parties));
-
-        Assert.True(instance.ObjectManager.TryGetObject<PartyBase>(expected.PartyBaseId, out var partyBase));
-        Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty));
-        Assert.Same(partyBase, mapEventParty.Party);
-        Assert.Same(mobileParty.Party, mapEventParty.Party);
-        Assert.Same(side, partyBase.MapEventSide);
-        Assert.Same(side.MapEvent, mobileParty.MapEvent);
-        Assert.Equal(expected.MobilePartyPosition, mobileParty.Position);
-        Assert.Equal(expected.EventPositionAdderX, mobileParty.EventPositionAdder.X);
-        Assert.Equal(expected.EventPositionAdderY, mobileParty.EventPositionAdder.Y);
-
-        AssertRegisteredRoster(instance, expected.WoundedInBattleRosterId, mapEventParty._woundedInBattle);
-        AssertRegisteredRoster(instance, expected.DiedInBattleRosterId, mapEventParty._diedInBattle);
-        AssertRegisteredRoster(instance, expected.RoutedInBattleRosterId, mapEventParty._routedInBattle);
-        Assert.Equal(expected.FlattenedTroops.Length, mapEventParty._roster.Count());
+        Assert.True(instance.ObjectManager.TryGetObject<T>(id, out var value));
+        return value;
     }
 
-    private static void AssertRegisteredRoster(
-        EnvironmentInstance instance,
-        string rosterId,
-        TroopRoster expected)
+    private static void AssertNotPublished(EnvironmentInstance instance, string id)
     {
-        Assert.True(instance.ObjectManager.TryGetObject<TroopRoster>(rosterId, out var registered));
-        Assert.Same(expected, registered);
+        instance.Call(() =>
+        {
+            if (instance.ObjectManager.TryGetObject<MapEvent>(id, out var mapEvent))
+                Assert.DoesNotContain(mapEvent, Campaign.Current.MapEventManager.MapEvents);
+            Assert.DoesNotContain(
+                Campaign.Current.MapEventManager.MapEvents,
+                item => item.StringId != null && (item.StringId == id || id.EndsWith("_" + item.StringId)));
+        });
     }
+
+    private static void AssertRegistration(EnvironmentInstance instance, IEnumerable<string> ids, bool expected)
+    {
+        instance.Call(() =>
+        {
+            foreach (var id in ids) Assert.Equal(expected, instance.ObjectManager.Contains(id));
+        });
+    }
+
+    private void AssertExternalPartiesRemain(params string[] ids) => ForAll(instance => instance.Call(() =>
+    {
+        foreach (var id in ids) Assert.Null(Get<MobileParty>(instance, id).Party.MapEventSide);
+    }));
+
+    private void ForClients(Action<EnvironmentInstance> action)
+    {
+        foreach (var client in Clients) action(client);
+    }
+
+    private void ForAll(Action<EnvironmentInstance> action)
+    {
+        action(Server);
+        ForClients(action);
+    }
+
+    private sealed record StagedMapEvent(
+        string MapEventId,
+        string AttackerPartyId,
+        string DefenderPartyId,
+        string ComponentId,
+        string TrackerId,
+        string RetiredTrackerId,
+        SideIds AttackerSide,
+        SideIds DefenderSide);
+
+    private sealed record SideIds(string Id, PartyIds InitialParty);
+    private sealed record PartyIds(string Id, string WoundedId, string DiedId, string RoutedId);
 }

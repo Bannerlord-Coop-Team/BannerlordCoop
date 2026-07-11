@@ -4,7 +4,6 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.MapEventParties.Messages;
-using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
@@ -22,18 +21,12 @@ internal class MapEventPartyHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
-    private readonly IMapEventInitializationTracker mapEventInitializationTracker;
 
-    public MapEventPartyHandler(
-        IMessageBroker messageBroker,
-        INetwork network,
-        IObjectManager objectManager,
-        IMapEventInitializationTracker mapEventInitializationTracker)
+    public MapEventPartyHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
-        this.mapEventInitializationTracker = mapEventInitializationTracker;
 
         messageBroker.Subscribe<OnTroopKilledAttempted>(Handle_OnTroopKilledAttempted);
         messageBroker.Subscribe<NetworkTroopKilled>(Handle_NetworkTroopKilled);
@@ -71,7 +64,6 @@ internal class MapEventPartyHandler : IHandler
 
         messageBroker.Unsubscribe<OnTroopScoreHitAttempted>(Handle_OnTroopScoreHitAttempted);
         messageBroker.Unsubscribe<NetworkTroopScoreHit>(Handle_NetworkTroopScoreHit);
-
         messageBroker.Unsubscribe<RequestMapEventPartyUpdate>(Handle_RequestMapEventPartyUpdate);
         messageBroker.Unsubscribe<NetworkRequestMapEventPartyUpdate>(Handle_NetworkRequestMapEventPartyUpdate);
         messageBroker.Unsubscribe<MapEventPartyUpdated>(Handle_MapEventPartyUpdated);
@@ -109,7 +101,6 @@ internal class MapEventPartyHandler : IHandler
     private void Handle_MapEventPartyUpdated(MessagePayload<MapEventPartyUpdated> payload)
     {
         var obj = payload.What;
-        if (mapEventInitializationTracker.IsPending(obj.MapEventParty)) return;
 
         if (!objectManager.TryGetIdWithLogging(obj.MapEventParty, out var mapEventPartyId))
             return;
@@ -131,10 +122,8 @@ internal class MapEventPartyHandler : IHandler
                 if (!objectManager.TryGetObjectWithLogging<MapEventParty>(obj.MapEventPartyId, out var mapEventParty))
                     return;
 
-                // Deserialization resolves CharacterObject IDs through the shared registry, so both
-                // lookup and mutation belong to the game-thread transaction.
-                var roster = FlattenedTroopSerializer.Deserialize(obj.FlattenedTroops, objectManager);
-                mapEventParty._roster = roster;
+                // Troop ids are themselves created through the same ordered game-thread queue.
+                mapEventParty._roster = FlattenedTroopSerializer.Deserialize(obj.FlattenedTroops, objectManager);
 
                 messageBroker.Publish(this, new MapEventTroopsUpdated(mapEventParty));
             }

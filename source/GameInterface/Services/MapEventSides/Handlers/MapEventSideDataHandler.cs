@@ -3,7 +3,6 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
-using GameInterface.Services.GuantletMapEventVisuals;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Initialization;
@@ -22,8 +21,7 @@ internal class MapEventSideDataHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
-    private readonly IMapEventBattleSizeCorrection mapEventBattleSizeCorrection;
-    private readonly IMapEventInitializationTracker mapEventInitializationTracker;
+    private readonly IMapEventInitializationBarrier initializationBarrier;
 
     private static readonly ILogger Logger = LogManager.GetLogger<MapEventSideDataHandler>();
 
@@ -31,20 +29,18 @@ internal class MapEventSideDataHandler : IHandler
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
-        IMapEventBattleSizeCorrection mapEventBattleSizeCorrection,
-        IMapEventInitializationTracker mapEventInitializationTracker)
+        IMapEventInitializationBarrier initializationBarrier)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
-        this.mapEventBattleSizeCorrection = mapEventBattleSizeCorrection;
-        this.mapEventInitializationTracker = mapEventInitializationTracker;
+        this.initializationBarrier = initializationBarrier;
 
-        messageBroker.Subscribe<MapEventSideIFactionChanged>(Handle);
-        messageBroker.Subscribe<NetworkChangeMapEventSideIFaction>(Handle);
-        messageBroker.Subscribe<MapEventPartyAdded>(Handle);
         messageBroker.Subscribe<MapEventPartyRemoved>(Handle);
         messageBroker.Subscribe<NetworkRemoveMapEventParty>(Handle);
+
+        messageBroker.Subscribe<MapEventSideAssigned>(Handle_MapEventSideAssigned);
+        messageBroker.Subscribe<NetworkAssignMapEventSide>(Handle_NetworkAssignMapEventSide);
 
         messageBroker.Subscribe<MapEventPartyBattlePartyAdded>(Handle_MapEventPartyBattlePartyAdded);
         messageBroker.Subscribe<NetworkAddBattleParty>(Handle_NetworkAddBattleParty);
@@ -53,86 +49,22 @@ internal class MapEventSideDataHandler : IHandler
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<MapEventSideIFactionChanged>(Handle);
-        messageBroker.Unsubscribe<NetworkChangeMapEventSideIFaction>(Handle);
-        messageBroker.Unsubscribe<MapEventPartyAdded>(Handle);
         messageBroker.Unsubscribe<MapEventPartyRemoved>(Handle);
         messageBroker.Unsubscribe<NetworkRemoveMapEventParty>(Handle);
+        messageBroker.Unsubscribe<MapEventSideAssigned>(Handle_MapEventSideAssigned);
+        messageBroker.Unsubscribe<NetworkAssignMapEventSide>(Handle_NetworkAssignMapEventSide);
         messageBroker.Unsubscribe<MapEventPartyBattlePartyAdded>(Handle_MapEventPartyBattlePartyAdded);
         messageBroker.Unsubscribe<NetworkAddBattleParty>(Handle_NetworkAddBattleParty);
-    }
-
-    private void Handle(MessagePayload<MapEventSideIFactionChanged> payload)
-    {
-        var payloadData = payload.What;
-        if (IsPendingInitialization(payloadData.Side)) return;
-
-        bool isKingdom = false;
-
-        string factionId;
-
-        if (objectManager.TryGetId(payloadData.Side, out var mapEventSideId) == false) return;
-        if (objectManager.TryGetId(payloadData.Faction as Kingdom, out factionId) == false &&
-            objectManager.TryGetId(payloadData.Faction as Clan, out factionId) == false) return;
-
-        if(payloadData.Faction.GetType().Equals(typeof(Kingdom)))
-        {
-            isKingdom = true;
-        }
-
-        var message = new NetworkChangeMapEventSideIFaction(mapEventSideId, factionId, isKingdom);
-
-        network.SendAll(message);
-    }
-
-    private void Handle(MessagePayload<NetworkChangeMapEventSideIFaction> payload)
-    {
-        var payloadData = payload.What;
-
-        GameThread.RunSafe(() =>
-        {
-            try
-            {
-                if (objectManager.TryGetObject<MapEventSide>(payloadData.SideId, out var mapEventSide) == false) return;
-
-                IFaction faction;
-                if (payloadData.IsKingdom)
-                {
-                    if (objectManager.TryGetObject(payloadData.FactionId, out Kingdom kingdom) == false) return;
-                    faction = kingdom;
-                }
-                else
-                {
-                    if (objectManager.TryGetObject(payloadData.FactionId, out Clan clan) == false) return;
-                    faction = clan;
-                }
-
-                using (new AllowedThread())
-                {
-                    mapEventSide._mapFaction = faction;
-                }
-            }
-            catch (Exception e)
-            {
-                Logger.Error(e, "Failed to apply NetworkChangeMapEventSideIFaction");
-            }
-        });
     }
 
     private void Handle(MessagePayload<MapEventPartyRemoved> payload)
     {
         var data = payload.What;
-        if (IsPendingInitialization(data.MapEventSide, data.MapEventParty)) return;
 
         if (objectManager.TryGetId(data.MapEventSide, out string sideId) == false) return;
         if (objectManager.TryGetId(data.MapEventParty, out string partyId) == false) return;
 
         network.SendAll(new NetworkRemoveMapEventParty(sideId, partyId));
-    }
-
-    private void Handle(MessagePayload<MapEventPartyAdded> payload)
-    {
-        SendBattlePartyAdded(payload.What.MapEventSide, payload.What.MapEventParty);
     }
 
     private void Handle(MessagePayload<NetworkRemoveMapEventParty> payload)
@@ -154,12 +86,7 @@ internal class MapEventSideDataHandler : IHandler
                     return;
                 }
 
-                using (new AllowedThread())
-                {
-                    side._battleParties.Remove(party);
-                    if (party.Party?.MapEventSide == side)
-                        party.Party._mapEventSide = null;
-                }
+                initializationBarrier.DetachClient(side, party);
             }
             catch (Exception e)
             {
@@ -168,19 +95,46 @@ internal class MapEventSideDataHandler : IHandler
         });
     }
 
-    private void Handle_MapEventPartyBattlePartyAdded(MessagePayload<MapEventPartyBattlePartyAdded> payload)
+    private void Handle_MapEventSideAssigned(MessagePayload<MapEventSideAssigned> payload)
     {
-        SendBattlePartyAdded(payload.What.MapEventSide, payload.What.MapEventParty);
+        if (!objectManager.TryGetIdWithLogging(payload.What.MapEvent, out var mapEventId)) return;
+        if (!objectManager.TryGetIdWithLogging(payload.What.MapEventSide, out var mapEventSideId)) return;
+
+        var message = new NetworkAssignMapEventSide(mapEventId, mapEventSideId, payload.What.Side);
+        network.SendAll(message);
     }
 
-    private void SendBattlePartyAdded(MapEventSide mapEventSide, MapEventParty mapEventParty)
+    private void Handle_NetworkAssignMapEventSide(MessagePayload<NetworkAssignMapEventSide> payload)
     {
-        if (IsPendingInitialization(mapEventSide, mapEventParty))
-            return;
+        var data = payload.What;
 
-        if (!objectManager.TryGetIdWithLogging(mapEventParty, out var mapEventPartyId))
+        var side = (int)data.Side;
+
+        GameThread.RunSafe(() =>
+        {
+            try
+            {
+                if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.MapEventId, out var mapEvent)) return;
+                if (!objectManager.TryGetObjectWithLogging<MapEventSide>(data.MapEventSideId, out var mapEventSide)) return;
+
+                using (new AllowedThread())
+                {
+                    mapEvent._sides[side] = mapEventSide;
+                }
+
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to apply NetworkAssignMapEventSide");
+            }
+        });
+    }
+
+    private void Handle_MapEventPartyBattlePartyAdded(MessagePayload<MapEventPartyBattlePartyAdded> payload)
+    {
+        if (!objectManager.TryGetIdWithLogging(payload.What.MapEventParty, out var mapEventPartyId))
             return;
-        if (!objectManager.TryGetIdWithLogging(mapEventSide, out var mapEventSideId))
+        if (!objectManager.TryGetIdWithLogging(payload.What.MapEventSide, out var mapEventSideId))
             return;
 
         var message = new NetworkAddBattleParty(mapEventSideId, mapEventPartyId);
@@ -200,35 +154,16 @@ internal class MapEventSideDataHandler : IHandler
                 if (!objectManager.TryGetObjectWithLogging<MapEventParty>(data.MapEventPartyId, out var mapEventParty))
                     return;
 
-                using (new AllowedThread())
-                {
-                    mapEventParty.Party._mapEventSide = mapEventSide;
-                    mapEventSide._battleParties.Add(mapEventParty);
-                }
-
-                // Network-created reinforcement objects bypass constructor ownership tracking. Adopt
-                // the complete party subgraph as soon as it becomes reachable from the committed root.
-                mapEventInitializationTracker.ExtendCommittedGraph(
-                    mapEventSide.MapEvent,
-                    MapEventGraph.EnumerateParty(mapEventParty));
-
-                mapEventBattleSizeCorrection.TryCorrect(mapEventSide.MapEvent);
-                SwitchRaiderToEncounterIfNeeded(mapEventSide.MapEvent);
+                initializationBarrier.AttachClient(
+                    mapEventSide,
+                    mapEventParty,
+                    () => SwitchRaiderToEncounterIfNeeded(mapEventSide.MapEvent));
             }
             catch (Exception e)
             {
                 Logger.Error(e, "Failed to apply NetworkAddBattleParty");
             }
         });
-    }
-
-    private bool IsPendingInitialization(MapEventSide mapEventSide, MapEventParty mapEventParty = null)
-    {
-        var mapEvent = mapEventSide?.MapEvent;
-        return mapEventInitializationTracker.IsPending(mapEventSide)
-            || mapEventInitializationTracker.IsPending(mapEventParty)
-            || mapEventInitializationTracker.IsPending(mapEvent)
-            || mapEventInitializationTracker.IsBuilding(mapEvent);
     }
 
     private static void SwitchRaiderToEncounterIfNeeded(MapEvent mapEvent)

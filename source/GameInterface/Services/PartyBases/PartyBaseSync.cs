@@ -28,7 +28,7 @@ internal class PartyBaseSync : IAutoSync
         autoSyncBuilder.AddField(AccessTools.Field(typeof(PartyBase), nameof(PartyBase._index)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(PartyBase), nameof(PartyBase._lastEatingTime)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(PartyBase), nameof(PartyBase._remainingFoodPercentage)));
-        // MapEvent initialization and side membership own both ends of this relationship atomically.
+        // MapEventSide is published by NetworkAddBattleParty at the MapEvent initialization barrier.
 
         // Cached values, does not need sync
         //autoSyncBuilder.AddField(AccessTools.Field(typeof(PartyBase), nameof(PartyBase._numberOfMenWithHorse)));

@@ -1,6 +1,5 @@
 ﻿using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -39,8 +38,7 @@ public class PartyBaseSyncTests : SyncTestBase
         // Not synced - cached/derived values (commented out in PartyBaseSync). Kept for future reference.
         //TestEnvironment.AssertProperty<PartyBase, bool>(nameof(PartyBase.IsVisualDirty), true);
         //TestEnvironment.AssertProperty<PartyBase, bool>(nameof(PartyBase.LevelMaskIsDirty), true);
-        // MapEventSide is owned by atomic MapEvent initialization and reinforcement membership messages.
-        //TestEnvironment.AssertReferenceProperty<PartyBase, MapEventSide>(nameof(PartyBase.MapEventSide));
+        // MapEventSide is committed by the MapEvent initialization barrier, not generic PartyBase sync.
     }
 
     [Fact]

@@ -3,7 +3,6 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
-using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Utils.LocalEvents;
 using GameInterface.Utils.NetworkEvents;
@@ -11,10 +10,6 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.MapEvents;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Utils
 {
@@ -55,10 +50,6 @@ namespace GameInterface.Utils
             {
                 var data = payload.What;
 
-                // Initial MapEvent state is sent once as an aggregate graph. Suppress the ordinary setter /
-                // collection delta stream until that graph has been fully captured and queued.
-                if (IsPendingMapEventInitialization<TMessage>(data.Instance)) return;
-
                 if (!objectManager.TryGetIdWithLogging(data.Instance, out string instanceId)) return;
 
                 messageHandler(instanceId, data);
@@ -76,8 +67,6 @@ namespace GameInterface.Utils
             Action<MessagePayload<TMessage>> payloadHandler = (payload) =>
             {
                 var data = payload.What;
-                if (IsPendingMapEventInitialization<TMessage>(data.Instance)) return;
-
                 if (!objectManager.TryGetIdWithLogging(data.Instance, out string instanceId)) return;
 
                 string valueId = null;
@@ -87,20 +76,6 @@ namespace GameInterface.Utils
             };
             messageBroker.Subscribe(payloadHandler);
             disposeFunctions.Add(() => messageBroker.Unsubscribe(payloadHandler));
-        }
-
-        private static bool IsPendingMapEventInitialization<TMessage>(object instance)
-        {
-            if (!ContainerProvider.TryResolve<IMapEventInitializationTracker>(out var tracker)) return false;
-            if (tracker.IsPending(instance)) return true;
-
-            // External MobileParties already exist before the aggregate graph. Suppress only the battle
-            // displacement owned by that graph; other mutations (for example SetMoveModeHold on the main
-            // party) remain ordinary deltas and must not be swallowed by the aggregate boundary.
-            if (typeof(TMessage).Name != "MobileParty_EventPositionAdder_SetLocalMessage") return false;
-
-            var mapEvent = (instance as MobileParty)?.Party?.MapEventSide?.MapEvent;
-            return mapEvent != null && tracker.IsBuilding(mapEvent);
         }
 
         protected void SubscribeNetwork<TValue, TMessage>(Action<TInstance, TMessage> messageHandler)
@@ -135,35 +110,10 @@ namespace GameInterface.Utils
                     if (data.ValueId != null && !objectManager.TryGetObjectWithLogging(data.ValueId, out value)) return;
 
                     messageHandler(instance, value, data);
-                    ExtendCommittedMapEventOwnership(instance, value);
                 });
             };
             messageBroker.Subscribe(payloadHandler);
             disposeFunctions.Add(() => messageBroker.Unsubscribe(payloadHandler));
-        }
-
-        private static void ExtendCommittedMapEventOwnership(object instance, object value)
-        {
-            if (value == null ||
-                !ContainerProvider.TryResolve<IMapEventInitializationTracker>(out var tracker))
-            {
-                return;
-            }
-
-            if (instance is MapEvent mapEvent && value is TroopUpgradeTracker)
-            {
-                // A client can observe several tracker replacements as MainParty joins/leaves/rejoins.
-                // Record every assignment before a later null/replacement makes the old tracker unreachable.
-                tracker.ExtendCommittedGraph(mapEvent, new[] { value });
-                return;
-            }
-
-            if (instance is MapEventParty mapEventParty && value is TroopRoster)
-            {
-                var root = mapEventParty.Party?.MapEventSide?.MapEvent;
-                if (root != null)
-                    tracker.ExtendCommittedGraph(root, new[] { value });
-            }
         }
 
         /// <summary>

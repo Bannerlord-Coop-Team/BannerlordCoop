@@ -1,10 +1,5 @@
-﻿using Common.Logging;
-using Common.Util;
-using GameInterface.Policies;
-using GameInterface.Services.MapEvents.Handlers;
-using GameInterface.Services.MapEvents.Initialization;
+using Common.Logging;
 using Serilog;
-using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -30,53 +25,26 @@ internal sealed class MapEventBattleFactory
 
     /// <summary>
     /// Creates the <see cref="MapEvent"/> the supplied parties would produce in <c>StartBattleInternal</c>.
-    /// Must be called on the game thread with replication patches live. Do not wrap this server game
-    /// logic in <see cref="AllowedThread"/>; that scope is reserved for applying received state.
+    /// Must be called on the main thread inside an <see cref="Common.Util.AllowedThread"/> scope.
     /// </summary>
     /// <returns>The created <see cref="MapEvent"/>, or null if no proper type could be determined.</returns>
     public static MapEvent CreateMapEvent(PartyBase attacker, PartyBase defender, BattleCreationFlags flags)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed())
-        {
-            throw new InvalidOperationException(
-                "Authoritative MapEvent creation cannot run inside an AllowedThread receive scope");
-        }
-
         var mapEventManager = Campaign.Current.MapEventManager;
 
         if (TryCreateForcedMapEvent(attacker, defender, flags, mapEventManager, out var mapEvent))
-            return CommitInitialization(mapEvent);
+            return mapEvent;
 
         if (defender.IsSettlement)
-            return CommitInitialization(CreateSettlementMapEvent(attacker, defender, flags, mapEventManager));
+            return CreateSettlementMapEvent(attacker, defender, flags, mapEventManager);
 
         if (TryCreateAmbushOrBlockadeMapEvent(attacker, defender, flags, out mapEvent))
-            return CommitInitialization(mapEvent);
+            return mapEvent;
 
         if (TryCreateMobileSettlementMapEvent(attacker, defender, mapEventManager, out mapEvent))
-            return CommitInitialization(mapEvent);
-
-        return CommitInitialization(CreateFieldBattleEvent(attacker, defender, mapEventManager));
-    }
-
-    private static MapEvent CommitInitialization(MapEvent mapEvent)
-    {
-        if (mapEvent == null) return null;
-
-        if (!ContainerProvider.TryResolve<IMapEventInitializationTracker>(out var tracker) ||
-            !tracker.IsBuilding(mapEvent))
-        {
             return mapEvent;
-        }
 
-        if (!ContainerProvider.TryResolve<MapEventInitializationHandler>(out var handler))
-        {
-            tracker.AbortBuild(mapEvent);
-            throw new InvalidOperationException("MapEvent initialization handler is unavailable");
-        }
-
-        handler.Publish(mapEvent);
-        return mapEvent;
+        return CreateFieldBattleEvent(attacker, defender, mapEventManager);
     }
 
     private static bool TryCreateForcedMapEvent(
