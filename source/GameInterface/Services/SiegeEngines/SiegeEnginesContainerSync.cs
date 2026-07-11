@@ -1,4 +1,6 @@
 ﻿using GameInterface.AutoSync;
+using HarmonyLib;
+using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
 namespace GameInterface.Services.SiegeEngines
 {
@@ -7,7 +9,9 @@ namespace GameInterface.Services.SiegeEngines
         public SiegeEnginesContainerSync(AutoSyncRegistry autoSyncBuilder)
         {
             // Fields
-            //autoSyncBuilder.AddField(AccessTools.Field(typeof(SiegeEnginesContainer), nameof(SiegeEnginesContainer.SiegePreparations)));
+            // The deployed/reserved collections are hand-synced through SiegeEnginesContainerPatches
+            // because their writes are per-index array stores AutoSync cannot intercept.
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(SiegeEnginesContainer), nameof(SiegeEnginesContainer.SiegePreparations)));
         }
     }
 }

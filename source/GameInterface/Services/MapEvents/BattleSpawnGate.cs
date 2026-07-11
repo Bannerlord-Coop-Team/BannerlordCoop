@@ -19,6 +19,8 @@ public static class BattleSpawnGate
 {
     private static readonly object Gate = new object();
     private static string _activeMapEventId;
+    private static bool _defenderReserveTimedOut;
+    private static bool _attackerReserveTimedOut;
 
     [System.ThreadStatic]
     private static bool _suppressCapture;
@@ -133,12 +135,39 @@ public static class BattleSpawnGate
         get { lock (Gate) { return _activeMapEventId; } }
     }
 
+    /// <summary>
+    /// Marks a side whose reserve never arrived before the spawn handler's explicit fallback deadline.
+    /// Battle-end checks may treat that side as intentionally absent once deployment is active; an ordinary
+    /// not-yet-spawned side is never marked and remains protected from premature depletion.
+    /// </summary>
+    public static void AcceptMissingReserveSide(BattleSideEnum side)
+    {
+        lock (Gate)
+        {
+            if (side == BattleSideEnum.Defender) _defenderReserveTimedOut = true;
+            else if (side == BattleSideEnum.Attacker) _attackerReserveTimedOut = true;
+        }
+    }
+
+    /// <summary>Whether the spawn handler deliberately proceeded without this side's reserve.</summary>
+    public static bool IsMissingReserveSideAccepted(BattleSideEnum side)
+    {
+        lock (Gate)
+        {
+            if (side == BattleSideEnum.Defender) return _defenderReserveTimedOut;
+            if (side == BattleSideEnum.Attacker) return _attackerReserveTimedOut;
+            return false;
+        }
+    }
+
     /// <summary>[Controller] Mark a coop battle active.</summary>
     public static void BeginBattle(string mapEventId)
     {
         lock (Gate)
         {
             _activeMapEventId = mapEventId;
+            _defenderReserveTimedOut = false;
+            _attackerReserveTimedOut = false;
         }
     }
 
@@ -148,6 +177,8 @@ public static class BattleSpawnGate
         lock (Gate)
         {
             _activeMapEventId = null;
+            _defenderReserveTimedOut = false;
+            _attackerReserveTimedOut = false;
         }
     }
 }

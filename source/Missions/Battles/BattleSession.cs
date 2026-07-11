@@ -1,4 +1,5 @@
 using GameInterface.Services.Entity;
+using GameInterface.Services.MapEvents;
 
 namespace Missions.Battles;
 

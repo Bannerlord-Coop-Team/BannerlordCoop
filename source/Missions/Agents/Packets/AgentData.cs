@@ -15,6 +15,7 @@ namespace Missions.Agents.Packets
             MovementDirection = agent.GetMovementDirection();
             LookDirection = agent.LookDirection;
             InputVector = agent.MovementInputVector;
+            Speed = agent.GetRealGlobalVelocity().AsVec2.Length;
 
             AgentEquipment = new AgentEquipmentData(agent);
 
@@ -49,7 +50,24 @@ namespace Missions.Agents.Packets
 
             // apply the agent's look direction
             agent.LookDirection = LookDirection;
-            agent.MovementInputVector = InputVector;
+
+            // The raw owner input is local-frame and unrepresentative for AI movement modes (native retreat
+            // drives the owner with no input), so an on-foot puppet fed it walks while its position target
+            // sprints — the walk-lag-snap desync. Human locomotion is procedural from the input, so derive
+            // the throttle from the owner's real ground speed; keep the owner's strafe direction when it has
+            // one. Mounted riders keep the raw input — the mount's pace rides its synced channel-0 gait.
+            if (agent.HasMount)
+            {
+                agent.MovementInputVector = InputVector;
+            }
+            else
+            {
+                float maxSpeed = agent.GetMaximumForwardUnlimitedSpeed();
+                float throttle = maxSpeed > 0f ? MBMath.ClampFloat(Speed / maxSpeed, 0f, 1f) : 0f;
+                agent.MovementInputVector = InputVector.LengthSquared > 0.0001f
+                    ? InputVector.Normalized() * throttle
+                    : new Vec2(0f, throttle);
+            }
 
             // Update equipment
             AgentEquipment.Apply(agent);
@@ -78,5 +96,8 @@ namespace Missions.Agents.Packets
         // 6 was ActionData — actions moved to the event-driven AgentActionHandler; tag left unused for wire stability.
         [ProtoMember(7)]
         public AgentMountData MountData { get; }
+        /// <summary>The owner's real ground speed, m/s — drives the on-foot puppet's locomotion throttle.</summary>
+        [ProtoMember(8)]
+        public float Speed { get; }
     }
 }
