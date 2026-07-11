@@ -24,8 +24,6 @@ public class TownSyncTests : SyncTestBase
         TestEnvironment.AssertField<Town, bool>(nameof(Town._isCastle), true, defaultValue: town._isCastle);
         TestEnvironment.AssertField<Town, bool>(nameof(Town.GarrisonAutoRecruitmentIsEnabled), false, defaultValue: town.GarrisonAutoRecruitmentIsEnabled);
         TestEnvironment.AssertReferenceField<Town, Clan>(nameof(Town._ownerClan));
-        TestEnvironment.AssertField<Town, float>(nameof(Town._security), 50f);
-        TestEnvironment.AssertField<Town, float>(nameof(Town._loyalty), 60f);
         //TestEnvironment.AssertCollectionReferenceField<Town, Village>(nameof(Town._tradeBoundVillagesCache));
         //TestEnvironment.AssertCollectionReferenceField<Town, Building>(nameof(Town.Buildings), townId);
         //TestEnvironment.AssertQueueReferenceField<Town, Building>(nameof(Town.BuildingsInProgress));

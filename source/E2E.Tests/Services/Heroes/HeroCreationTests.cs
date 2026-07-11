@@ -61,6 +61,21 @@ public class HeroCreationTests : IDisposable
     }
 
     [Fact]
+    public void ServerCreateBareHero_PreservesDefaultHealthOnClients()
+    {
+        Hero? serverHero = null;
+
+        TestEnvironment.Server.Call(() => serverHero = new Hero());
+        Assert.True(TestEnvironment.Server.ObjectManager.TryGetId(serverHero!, out var heroId));
+
+        foreach (var client in TestEnvironment.Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(heroId, out var clientHero));
+            Assert.Equal(1, clientHero._health);
+        }
+    }
+
+    [Fact]
     public void ClientCreateHero_DoesNothing()
     {
         // Arrange
