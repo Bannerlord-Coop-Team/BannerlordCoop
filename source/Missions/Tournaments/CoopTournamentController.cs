@@ -758,6 +758,16 @@ public class CoopTournamentController : CoopMissionController
     {
         if (startedMatchId != snapshot.CurrentMatchId) return;
         if (submittedResultMatchId == snapshot.CurrentMatchId) return;
+        if (!IsMatchReadyForResult(dt)) return;
+        if (!TryCreateMatchResult(out TournamentMatchResultData result)) return;
+
+        submittedResultMatchId = snapshot.CurrentMatchId;
+        pendingResult = result;
+        relayNetwork.SendAll(new NetworkSubmitTournamentMatchResult(result));
+    }
+
+    private bool IsMatchReadyForResult(float dt)
+    {
         bool resultsWereReady = fightController._cheerStarted;
         bool matchEnded = fightController.IsMatchEnded();
         if (!resultsWereReady && fightController._cheerStarted)
@@ -774,46 +784,12 @@ public class CoopTournamentController : CoopMissionController
                 matchEnded = fightController.IsMatchEnded();
             }
         }
-        if (!matchEnded) return;
+        return matchEnded;
+    }
 
-        TournamentMatchResultData result;
-        if (pendingResult == null)
-        {
-            if (!TryGetCurrentMatchData(out TournamentMatchData matchData))
-                return;
-            var nativeTeams = tournamentBehavior.CurrentMatch.Teams.ToArray();
-            var winners = tournamentBehavior.CurrentMatch.GetWinners();
-            string[] winnerSlots = tournamentBehavior._participants
-                .Select((participant, index) => new { participant, index })
-                .Where(entry => winners.Contains(entry.participant))
-                .Select(entry => snapshot.Contestants[entry.index].SlotId)
-                .ToArray();
-
-            string[] winnerTeams = matchData.Teams
-                .Where((team, index) => nativeTeams[index].Participants.Any(winners.Contains))
-                .Select(team => team.TeamId)
-                .ToArray();
-            TournamentTeamScoreData[] scores = matchData.Teams
-                .Select((team, index) => new TournamentTeamScoreData(team.TeamId, nativeTeams[index].Score))
-                .ToArray();
-            Logger.Information(
-                "[Tournament] Match ended for {MatchId}: aliveParticipants={AliveParticipantCount}, aliveTeams={AliveTeamCount}, winnerTeams={WinnerTeams}, winnerSlots={WinnerSlots}",
-                snapshot.CurrentMatchId,
-                fightController._aliveParticipants?.Count ?? 0,
-                fightController._aliveTeams?.Count ?? 0,
-                string.Join(",", winnerTeams),
-                string.Join(",", winnerSlots));
-            result = new TournamentMatchResultData(
-                snapshot.SessionId,
-                snapshot.CurrentMatchId,
-                snapshot.Revision,
-                snapshot.BracketRevision,
-                ++resultSequence,
-                winnerTeams,
-                winnerSlots,
-                scores);
-        }
-        else
+    private bool TryCreateMatchResult(out TournamentMatchResultData result)
+    {
+        if (pendingResult != null)
         {
             result = new TournamentMatchResultData(
                 pendingResult.SessionId,
@@ -824,11 +800,46 @@ public class CoopTournamentController : CoopMissionController
                 pendingResult.WinnerTeamIds,
                 pendingResult.WinnerSlotIds,
                 pendingResult.TeamScores);
+            return true;
         }
 
-        submittedResultMatchId = snapshot.CurrentMatchId;
-        pendingResult = result;
-        relayNetwork.SendAll(new NetworkSubmitTournamentMatchResult(result));
+        if (!TryGetCurrentMatchData(out TournamentMatchData matchData))
+        {
+            result = null;
+            return false;
+        }
+
+        var nativeTeams = tournamentBehavior.CurrentMatch.Teams.ToArray();
+        var winners = tournamentBehavior.CurrentMatch.GetWinners();
+        string[] winnerSlots = tournamentBehavior._participants
+            .Select((participant, index) => new { participant, index })
+            .Where(entry => winners.Contains(entry.participant))
+            .Select(entry => snapshot.Contestants[entry.index].SlotId)
+            .ToArray();
+        string[] winnerTeams = matchData.Teams
+            .Where((team, index) => nativeTeams[index].Participants.Any(winners.Contains))
+            .Select(team => team.TeamId)
+            .ToArray();
+        TournamentTeamScoreData[] scores = matchData.Teams
+            .Select((team, index) => new TournamentTeamScoreData(team.TeamId, nativeTeams[index].Score))
+            .ToArray();
+        Logger.Information(
+            "[Tournament] Match ended for {MatchId}: aliveParticipants={AliveParticipantCount}, aliveTeams={AliveTeamCount}, winnerTeams={WinnerTeams}, winnerSlots={WinnerSlots}",
+            snapshot.CurrentMatchId,
+            fightController._aliveParticipants?.Count ?? 0,
+            fightController._aliveTeams?.Count ?? 0,
+            string.Join(",", winnerTeams),
+            string.Join(",", winnerSlots));
+        result = new TournamentMatchResultData(
+            snapshot.SessionId,
+            snapshot.CurrentMatchId,
+            snapshot.Revision,
+            snapshot.BracketRevision,
+            ++resultSequence,
+            winnerTeams,
+            winnerSlots,
+            scores);
+        return true;
     }
 
     private void PublishRoundResult()

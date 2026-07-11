@@ -715,7 +715,6 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
                 string.IsNullOrEmpty(snapshot.TownId))
                 return false;
 
-
             if (sessionsById.TryGetValue(snapshot.SessionId, out var existing) && existing.Revision >= snapshot.Revision)
                 return false;
 
