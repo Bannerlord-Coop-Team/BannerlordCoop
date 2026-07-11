@@ -104,7 +104,7 @@ internal class ConversationRequestHandler : IHandler
         Logger.Debug("Requesting conversation from server. AttackerId={AttackerId}, DefenderId={DefenderId}", attackerId, defenderId);
 
         // On a client, SendAll targets the server (its only connected peer).
-        network.SendAll(new NetworkRequestConversation(defenderId, attackerId, request.ForcePlayerOutFromSettlement, request.Source));
+        network.SendAll(new NetworkRequestConversation(defenderId, attackerId, request.ForcePlayerOutFromSettlement, request.Source, request.ArmyTalkEncounter));
     }
 
     /// <summary>[Server] Validate the request; reply to allow, or stay silent to reject.</summary>
@@ -181,11 +181,24 @@ internal class ConversationRequestHandler : IHandler
                 request.AttackerId, request.DefenderId);
             return true;
         }
-
+        
         // PvP: two human players are allowed to open the encounter so they can fight each other. Neither side is AI,
         // so there is nothing to hold; the defending player is shown a "hold on" popup instead.
         if (attackerIsPlayer && defenderIsPlayer)
         {
+            // Checks if there is a request to open army menu and executes if true
+            if (attacker.MobileParty?.ActualClan?.Kingdom != null
+                && attacker.MobileParty?.ActualClan?.Kingdom == defender.MobileParty?.ActualClan?.Kingdom
+                && defender.MobileParty?.Army != null
+                && defender.MobileParty?.Army?.LeaderParty == defender.MobileParty
+                && defender.MobileParty.Army.LeaderParty.AttachedParties.Contains(attacker.MobileParty) == false
+                && !request.ArmyTalkEncounter)
+            {
+                Logger.Debug(
+                "Allowing army join. AttackerId={AttackerId}, DefenderId={DefenderId}",
+                request.AttackerId, request.DefenderId);
+                return true;
+            }
             // Reject if either player is already conversing with someone else (first interaction wins) — otherwise a
             // third player could open an encounter with a defender already locked in a conversation.
             if (IsConversingWithOther(request.DefenderId, request.AttackerId) ||
@@ -241,8 +254,8 @@ internal class ConversationRequestHandler : IHandler
         }
 
         Logger.Debug(
-            "Allowing conversation. AttackerId={AttackerId}, DefenderId={DefenderId}",
-            request.AttackerId, request.DefenderId);
+        "Allowing conversation. AttackerId={AttackerId}, DefenderId={DefenderId}",
+        request.AttackerId, request.DefenderId);
 
         return true;
     }

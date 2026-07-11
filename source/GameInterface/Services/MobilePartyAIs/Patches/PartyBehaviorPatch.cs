@@ -51,7 +51,8 @@ public static class PartyBehaviorPatch
         if (BehaviorIsSame(ref __instance, ref newAiBehavior, ref interactablePoint, ref bestTargetPoint)) return false;
 
         if (__instance._mobileParty.IsControlledByThisInstance() == false) return false;
-
+        if (__instance._mobileParty?.AttachedTo == null && __instance._mobileParty?.Army != null)
+            Logger.Debug($"setaibehavior {newAiBehavior} {Environment.StackTrace}");
         var message = new PartyBehaviorChangeAttempted(__instance, newAiBehavior, interactablePoint, bestTargetPoint);
         MessageBroker.Instance.Publish(__instance, message);
 

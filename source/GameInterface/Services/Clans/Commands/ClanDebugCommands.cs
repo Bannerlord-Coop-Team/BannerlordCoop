@@ -372,5 +372,5 @@ namespace GameInterface.Services.GameDebug.Commands
     }
 }
 //coop.debug.clan.add_renown Player 1000
-// coop.debug.clan.join_kingdom Player empire
+// coop.debug.clan.join_kingdom Player empire_s
 //coop.debug.clan.give_influence Player 500

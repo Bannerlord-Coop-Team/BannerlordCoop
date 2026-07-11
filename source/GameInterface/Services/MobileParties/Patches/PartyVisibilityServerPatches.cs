@@ -1,5 +1,9 @@
 ﻿using Common;
+using Common.Logging;
+using GameInterface.Services.MapEvents.Patches;
 using HarmonyLib;
+using Serilog;
+using System;
 using System.Diagnostics;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -26,6 +30,7 @@ internal class PartyIsSpottedServerPatch
 [HarmonyPatch(typeof(MobileParty))]
 internal class PartyVisibilityOnServerPatch
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<TakePrisonerActionPatches>();
     [HarmonyPatch(nameof(MobileParty.IsVisible), MethodType.Setter)]
     [HarmonyPrefix]
     private static void PrefixIsVisible(MobileParty __instance, ref bool value)
@@ -43,5 +48,19 @@ internal class PartyVisibilityOnServerPatch
         {
             value = true;
         }
+    }
+    [HarmonyPatch(nameof(MobileParty.GetBehaviorText))]
+    [HarmonyPostfix]
+    private static void Prefix(MobileParty __instance)
+    {
+        if (__instance.Army != null && __instance.AttachedTo == null)
+            Logger.Debug($"getbehavior party {__instance}, {__instance.ShortTermBehavior}, {__instance.DefaultBehavior}, {__instance.ShortTermTargetParty}");
+    }
+    [HarmonyPatch(nameof(MobileParty.DefaultBehavior), MethodType.Setter)]
+    [HarmonyPrefix]
+    private static void Prefix1(MobileParty __instance, ref AiBehavior value)
+    {
+        if (__instance.Army != null && __instance.AttachedTo == null)
+            Logger.Debug($" {__instance}, defaultbehavior {value} {Environment.StackTrace}");
     }
 }

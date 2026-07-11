@@ -1408,7 +1408,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
                 responderPartyId,
                 initiatorPartyId,
                 forcePlayerOutFromSettlement: false,
-                ConversationRestartSource.PlayerEncounter)),
+                ConversationRestartSource.PlayerEncounter,
+                false)),
             disabledMethods);
     }
 

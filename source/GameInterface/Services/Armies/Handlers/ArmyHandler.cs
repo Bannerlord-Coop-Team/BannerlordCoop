@@ -74,7 +74,7 @@ public class ArmyHandler : IHandler
 
         if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
 
-        var message = new NetworkAddMobilePartyInArmy(armyId, mobilePartyId);
+        var message = new NetworkAddMobilePartyInArmy(armyId, mobilePartyId, obj.What.AddPartyToMergedPartiesBool);
 
         // Broadcast to all the clients that the state was changed   
         network.SendAll(message);
@@ -87,10 +87,19 @@ public class ArmyHandler : IHandler
         {
             if (objectManager.TryGetObjectWithLogging(obj.MobilePartyId, out MobileParty mobileParty) == false) return;
             if (objectManager.TryGetObjectWithLogging<Army>(obj.ArmyId, out var army) == false) return;
+
             ArmyPatches.AddMobilePartyInArmy(mobileParty, army);
+
+            if (obj.AddPartyToMergedPartiesBool && mobileParty.AttachedTo != army.LeaderParty) 
+            {
+                using (new AllowedThread())
+                {
+                    army.AddPartyToMergedParties(mobileParty);
+                }
+            }
             if (ModInformation.IsServer)
             {
-                network.SendAll(new NetworkAddMobilePartyInArmy(obj.ArmyId, obj.MobilePartyId));
+                network.SendAll(new NetworkAddMobilePartyInArmy(obj.ArmyId, obj.MobilePartyId, obj.AddPartyToMergedPartiesBool));
             }
         });
     }
