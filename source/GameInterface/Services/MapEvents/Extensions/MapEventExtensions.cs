@@ -17,7 +17,7 @@ public static class MapEventExtensions
 
             foreach (var mapEventParty in side.Parties)
             {
-                if (mapEventParty.Party == party)
+                if (mapEventParty?.Party == party)
                     return mapEventParty;
             }
         }

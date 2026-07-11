@@ -98,16 +98,24 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
                 // the fighting animation. The full vanilla finalize is deliberately not re-run — the server
                 // already replicated the battle results.
 
-                // Snapshot MainParty's reward figures before nulling any side removes it from obj's party lists —
-                // GetBattleRewardsPrefix falls back to this if this client's scoreboard reads them after teardown.
+                // Snapshot MainParty's reward figures before nulling any side removes it from obj's party lists;
+                // GetBattleRewardsPrefix falls back to this after teardown. Best-effort — GetPlayerBattleContributionRate
+                // reads PartiesOnSide(PlayerSide), which throws once the side is torn down, and that must not abort the teardown.
                 if (localPartyWasInvolved)
                 {
-                    var mainPartyEventParty = obj.FindMapEventParty(PartyBase.MainParty);
-
-                    if (mainPartyEventParty != null
-                        && ContainerProvider.TryResolve<IMainPartyBattleRewardsCache>(out var rewardsCache))
+                    try
                     {
-                        rewardsCache.Capture(obj, mainPartyEventParty, obj.GetPlayerBattleContributionRate());
+                        var mainPartyEventParty = obj.FindMapEventParty(PartyBase.MainParty);
+
+                        if (mainPartyEventParty != null
+                            && ContainerProvider.TryResolve<IMainPartyBattleRewardsCache>(out var rewardsCache))
+                        {
+                            rewardsCache.Capture(obj, mainPartyEventParty, obj.GetPlayerBattleContributionRate());
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Debug(ex, "Skipped MainParty reward snapshot during map event teardown");
                     }
                 }
 
