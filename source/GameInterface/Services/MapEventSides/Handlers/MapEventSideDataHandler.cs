@@ -121,7 +121,6 @@ internal class MapEventSideDataHandler : IHandler
                 {
                     mapEvent._sides[side] = mapEventSide;
                 }
-
             }
             catch (Exception e)
             {

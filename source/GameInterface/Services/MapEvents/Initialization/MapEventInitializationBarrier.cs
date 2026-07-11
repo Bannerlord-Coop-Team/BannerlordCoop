@@ -135,6 +135,11 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             return;
         }
 
+        PublishClientGraph(mapEvent, state);
+    }
+
+    private void PublishClientGraph(MapEvent mapEvent, State state)
+    {
         try
         {
             using (new AllowedThread())
@@ -182,25 +187,45 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         if (root == null) return;
         if (states.TryGetValue(root, out var existing) && existing.Terminal) return;
 
+        AddPartyToSide(side, party);
+        if (TryDeferAttachment(root, side, party, afterCommit)) return;
+
+        PublishPartyAttachment(root, side, party, afterCommit);
+    }
+
+    private static void AddPartyToSide(MapEventSide side, MapEventParty party)
+    {
         using (new AllowedThread())
         {
             if (!side._battleParties.Contains(party))
                 side._battleParties.Add(party);
         }
+    }
 
-        if (states.TryGetValue(root, out var state))
-        {
-            AddOwned(state, MapEventGraph.EnumerateParty(party));
-            AddOwned(state, new object[] { MapEventGraph.GetTracker(root) });
-            if (!state.Committed && !state.Terminal)
-            {
-                if (!state.DeferredEdges.Any(edge => ReferenceEquals(edge.Party, party)))
-                    state.DeferredEdges.Add((side, party));
-                if (afterCommit != null) state.AfterCommit.Add(afterCommit);
-                return;
-            }
-        }
+    private bool TryDeferAttachment(
+        MapEvent root,
+        MapEventSide side,
+        MapEventParty party,
+        Action afterCommit)
+    {
+        if (!states.TryGetValue(root, out var state)) return false;
 
+        AddOwned(state, MapEventGraph.EnumerateParty(party));
+        AddOwned(state, new object[] { MapEventGraph.GetTracker(root) });
+        if (state.Committed || state.Terminal) return false;
+
+        if (!state.DeferredEdges.Any(edge => ReferenceEquals(edge.Party, party)))
+            state.DeferredEdges.Add((side, party));
+        if (afterCommit != null) state.AfterCommit.Add(afterCommit);
+        return true;
+    }
+
+    private void PublishPartyAttachment(
+        MapEvent root,
+        MapEventSide side,
+        MapEventParty party,
+        Action afterCommit)
+    {
         using (new AllowedThread())
         {
             if (party.Party != null)
@@ -380,30 +405,36 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             battleSizeCorrection.Register(visual);
     }
 
-    private static bool IsComplete(MapEvent mapEvent, State state)
-    {
-        if (mapEvent._sides == null || mapEvent._sides.Length < 2) return false;
-        if (mapEvent.Component != null && !ReferenceEquals(mapEvent.Component.MapEvent, mapEvent)) return false;
+    private static bool IsComplete(MapEvent mapEvent, State state) =>
+        HasCompleteSides(mapEvent) &&
+        HasCompleteComponent(mapEvent) &&
+        mapEvent._sides.All(side => IsCompleteSide(mapEvent, side)) &&
+        MapEventGraph.GetTracker(mapEvent) != null &&
+        HasCompleteVisual(mapEvent, state);
 
-        foreach (var side in mapEvent._sides)
-        {
-            if (side == null || !ReferenceEquals(side.MapEvent, mapEvent) ||
-                side.Parties == null || side.Parties.Count == 0)
-                return false;
+    private static bool HasCompleteSides(MapEvent mapEvent) =>
+        mapEvent._sides != null && mapEvent._sides.Length >= 2;
 
-            foreach (var party in side.Parties)
-            {
-                if (party?.Party == null || party._roster == null ||
-                    party._woundedInBattle == null || party._diedInBattle == null || party._routedInBattle == null)
-                    return false;
-            }
-        }
+    private static bool HasCompleteComponent(MapEvent mapEvent) =>
+        mapEvent.Component == null || ReferenceEquals(mapEvent.Component.MapEvent, mapEvent);
 
-        if (MapEventGraph.GetTracker(mapEvent) == null) return false;
+    private static bool IsCompleteSide(MapEvent mapEvent, MapEventSide side) =>
+        side != null &&
+        ReferenceEquals(side.MapEvent, mapEvent) &&
+        side.Parties != null &&
+        side.Parties.Count > 0 &&
+        side.Parties.All(IsCompleteParty);
 
-        return mapEvent.MapEventVisual is not GauntletMapEventVisual visual ||
-               ReferenceEquals(visual.MapEvent, mapEvent) && ReferenceEquals(state.Visual, visual);
-    }
+    private static bool IsCompleteParty(MapEventParty party) =>
+        party?.Party != null &&
+        party._roster != null &&
+        party._woundedInBattle != null &&
+        party._diedInBattle != null &&
+        party._routedInBattle != null;
+
+    private static bool HasCompleteVisual(MapEvent mapEvent, State state) =>
+        mapEvent.MapEventVisual is not GauntletMapEventVisual visual ||
+        (ReferenceEquals(visual.MapEvent, mapEvent) && ReferenceEquals(state.Visual, visual));
 
     private static void RemoveFromManager(MapEvent mapEvent)
     {
@@ -452,7 +483,6 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
 
         public State(IEnumerable<object> objects) => AddOwned(this, objects);
     }
-
 }
 
 internal static class MapEventGraph

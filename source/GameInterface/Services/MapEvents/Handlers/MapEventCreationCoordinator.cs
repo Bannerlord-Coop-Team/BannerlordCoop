@@ -140,16 +140,9 @@ internal class MapEventCreationCoordinator : IHandler
             // MapEvent isn't enough: the parties' side attachment lands via separate, GameThread-deferred
             // messages sent right after, so wait for those on the same deadline too.
             MapEvent mapEvent = null;
-            bool BothSidesAttached() =>
-                attacker.MapEventSide != null && defender.MapEventSide != null
-                && attacker.MapEventSide.Parties.Any(p => p.Party == attacker)
-                && defender.MapEventSide.Parties.Any(p => p.Party == defender)
-                && (mapEvent.AttackerSide == attacker.MapEventSide || mapEvent.DefenderSide == attacker.MapEventSide)
-                && (mapEvent.AttackerSide == defender.MapEventSide || mapEvent.DefenderSide == defender.MapEventSide);
-
             if (!GameThread.WaitWhilePumping(
                     () => objectManager.TryGetObject(pending.MapEventId, out mapEvent) && mapEvent != null
-                        && BothSidesAttached()
+                        && BothSidesAttached(mapEvent, attacker, defender)
                         && Campaign.Current.MapEventManager.MapEvents.Contains(mapEvent),
                     deadline))
             {
@@ -167,6 +160,13 @@ internal class MapEventCreationCoordinator : IHandler
             pendingRequests.TryRemove(requestId, out _);
         }
     }
+
+    private static bool BothSidesAttached(MapEvent mapEvent, PartyBase attacker, PartyBase defender) =>
+        attacker.MapEventSide != null && defender.MapEventSide != null
+        && attacker.MapEventSide.Parties.Any(p => p.Party == attacker)
+        && defender.MapEventSide.Parties.Any(p => p.Party == defender)
+        && (mapEvent.AttackerSide == attacker.MapEventSide || mapEvent.DefenderSide == attacker.MapEventSide)
+        && (mapEvent.AttackerSide == defender.MapEventSide || mapEvent.DefenderSide == defender.MapEventSide);
 
     /// <summary>[Server] Create the MapEvent authoritatively and reply to the requesting client with its id.</summary>
     private void Handle_NetworkRequestCreateMapEvent(MessagePayload<NetworkRequestCreateMapEvent> payload)
