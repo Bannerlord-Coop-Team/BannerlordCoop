@@ -252,27 +252,37 @@ public class TournamentAgentSpawner : ITournamentAgentSpawner
     {
         if (agent == null || elements == null) return;
         foreach (TournamentEquipmentElementData data in elements)
-        {
-            if (data == null || !data.HasDataValue ||
-                data.SlotIndex < 0 ||
-                data.SlotIndex >= (int)EquipmentIndex.NumAllWeaponSlots ||
-                !objectManager.TryGetObject(data.ItemId, out ItemObject item)) continue;
-            ItemModifier modifier = null;
-            if (!string.IsNullOrEmpty(data.ItemModifierId) &&
-                !objectManager.TryGetObject(data.ItemModifierId, out modifier)) continue;
-            Banner banner = string.IsNullOrEmpty(data.BannerCode)
-                ? null
-                : new Banner(data.BannerCode);
-            var weapon = new MissionWeapon(item, modifier, banner, data.DataValue);
-            EquipmentIndex slot = (EquipmentIndex)data.SlotIndex;
-            MissionWeapon current = agent.Equipment[slot];
-            if (current.Item == weapon.Item &&
-                current.ItemModifier == weapon.ItemModifier &&
-                current.RawDataForNetwork == weapon.RawDataForNetwork &&
-                current.Banner?.Serialize() == weapon.Banner?.Serialize()) continue;
-            if (!current.IsEmpty)
-                agent.RemoveEquippedWeapon(slot);
-            agent.EquipWeaponWithNewEntity(slot, ref weapon);
-        }
+            ApplyMissionWeaponSlot(agent, data);
+    }
+
+    private void ApplyMissionWeaponSlot(Agent agent, TournamentEquipmentElementData data)
+    {
+        if (data == null || !data.HasDataValue ||
+            data.SlotIndex < 0 ||
+            data.SlotIndex >= (int)EquipmentIndex.NumAllWeaponSlots ||
+            !objectManager.TryGetObject(data.ItemId, out ItemObject item)) return;
+
+        ItemModifier modifier = null;
+        if (!string.IsNullOrEmpty(data.ItemModifierId) &&
+            !objectManager.TryGetObject(data.ItemModifierId, out modifier)) return;
+
+        Banner banner = string.IsNullOrEmpty(data.BannerCode)
+            ? null
+            : new Banner(data.BannerCode);
+        var weapon = new MissionWeapon(item, modifier, banner, data.DataValue);
+        EquipmentIndex slot = (EquipmentIndex)data.SlotIndex;
+        MissionWeapon current = agent.Equipment[slot];
+        if (MissionWeaponsMatch(current, weapon)) return;
+        if (!current.IsEmpty)
+            agent.RemoveEquippedWeapon(slot);
+        agent.EquipWeaponWithNewEntity(slot, ref weapon);
+    }
+
+    private static bool MissionWeaponsMatch(MissionWeapon current, MissionWeapon weapon)
+    {
+        return current.Item == weapon.Item &&
+            current.ItemModifier == weapon.ItemModifier &&
+            current.RawDataForNetwork == weapon.RawDataForNetwork &&
+            current.Banner?.Serialize() == weapon.Banner?.Serialize();
     }
 }

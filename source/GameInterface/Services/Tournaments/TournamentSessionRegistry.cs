@@ -397,37 +397,38 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
         out TournamentSessionSnapshot snapshot)
     {
         lock (gate)
-        {
-            if (!TryResolveForMutation(sessionId, expectedRevision, out var session, out snapshot, out var status) &&
-                status != TournamentMutationStatus.StaleRevision)
-                return status;
-
-            if (!session.IsActive)
-                return TournamentMutationStatus.InvalidPhase;
-
-            bool isCompetitor = session.TryGetActiveContestant(controllerId, out _);
-            if (!isCompetitor && !session.PendingSpectators.Remove(controllerId) && !session.Spectators.Contains(controllerId))
-                return TournamentMutationStatus.NotParticipant;
-
-            bool changed = false;
-            if (!isCompetitor)
-                changed |= session.Spectators.Add(controllerId);
-
-            if (!session.Entrants.Contains(controllerId))
-            {
-                session.Entrants.Add(controllerId);
-                changed = true;
-            }
-
-            if (!changed)
-                return TournamentMutationStatus.NoChange;
-
-            session.Revision++;
-            snapshot = session.CreateSnapshot();
-            return TournamentMutationStatus.Applied;
-        }
+            return EnterMission(sessionId, expectedRevision, controllerId, out snapshot);
     }
 
+    private TournamentMutationStatus EnterMission(
+        string sessionId,
+        long expectedRevision,
+        string controllerId,
+        out TournamentSessionSnapshot snapshot)
+    {
+        if (!TryResolveForMutation(sessionId, expectedRevision, out var session, out snapshot, out var status) &&
+            status != TournamentMutationStatus.StaleRevision)
+            return status;
+        if (!session.IsActive)
+            return TournamentMutationStatus.InvalidPhase;
+
+        bool isCompetitor = session.TryGetActiveContestant(controllerId, out _);
+        if (!isCompetitor && !session.PendingSpectators.Remove(controllerId) && !session.Spectators.Contains(controllerId))
+            return TournamentMutationStatus.NotParticipant;
+
+        bool changed = !isCompetitor && session.Spectators.Add(controllerId);
+        if (!session.Entrants.Contains(controllerId))
+        {
+            session.Entrants.Add(controllerId);
+            changed = true;
+        }
+        if (!changed)
+            return TournamentMutationStatus.NoChange;
+
+        session.Revision++;
+        snapshot = session.CreateSnapshot();
+        return TournamentMutationStatus.Applied;
+    }
     public TournamentMutationStatus TryChoose(
         string sessionId,
         long expectedRevision,
@@ -438,45 +439,53 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
         out TournamentBallotOutcome outcome)
     {
         lock (gate)
-        {
-            outcome = TournamentBallotOutcome.Open;
-            if (!TryResolveForMutation(sessionId, expectedRevision, out var session, out snapshot, out var status) &&
-                status != TournamentMutationStatus.StaleRevision)
-                return status;
-
-            if (session.Phase != TournamentSessionPhase.AwaitingChoices || session.CurrentMatchId != matchId)
-                return TournamentMutationStatus.InvalidPhase;
-
-            if (!session.IsVoter(controllerId))
-                return TournamentMutationStatus.NotParticipant;
-
-            bool isCurrentCompetitor = session.IsControllerInCurrentMatch(controllerId);
-            bool skipAllowed = session.IsSkipAllowed();
-            if (choice == TournamentPlayerChoice.Join && !isCurrentCompetitor)
-                return TournamentMutationStatus.InvalidChoice;
-            if (choice == TournamentPlayerChoice.Watch && isCurrentCompetitor)
-                return TournamentMutationStatus.InvalidChoice;
-            if (choice == TournamentPlayerChoice.Skip && !skipAllowed)
-                return TournamentMutationStatus.InvalidChoice;
-            if (choice != TournamentPlayerChoice.Join &&
-                choice != TournamentPlayerChoice.Watch &&
-                choice != TournamentPlayerChoice.Skip)
-            {
-                return TournamentMutationStatus.InvalidChoice;
-            }
-
-            if (session.Choices.TryGetValue(controllerId, out var existing) && existing == choice)
-                return TournamentMutationStatus.NoChange;
-
-            session.Choices[controllerId] = choice;
-            outcome = session.GetBallotOutcome();
-            session.ApplyBallotOutcome(outcome);
-            session.Revision++;
-            snapshot = session.CreateSnapshot();
-            return TournamentMutationStatus.Applied;
-        }
+            return Choose(sessionId, expectedRevision, matchId, controllerId, choice, out snapshot, out outcome);
     }
 
+    private TournamentMutationStatus Choose(
+        string sessionId,
+        long expectedRevision,
+        string matchId,
+        string controllerId,
+        TournamentPlayerChoice choice,
+        out TournamentSessionSnapshot snapshot,
+        out TournamentBallotOutcome outcome)
+    {
+        outcome = TournamentBallotOutcome.Open;
+        if (!TryResolveForMutation(sessionId, expectedRevision, out var session, out snapshot, out var status) &&
+            status != TournamentMutationStatus.StaleRevision)
+            return status;
+        if (session.Phase != TournamentSessionPhase.AwaitingChoices || session.CurrentMatchId != matchId)
+            return TournamentMutationStatus.InvalidPhase;
+        if (!session.IsVoter(controllerId))
+            return TournamentMutationStatus.NotParticipant;
+        if (!IsValidChoice(session, controllerId, choice))
+            return TournamentMutationStatus.InvalidChoice;
+        if (session.Choices.TryGetValue(controllerId, out var existing) && existing == choice)
+            return TournamentMutationStatus.NoChange;
+
+        session.Choices[controllerId] = choice;
+        outcome = session.GetBallotOutcome();
+        session.ApplyBallotOutcome(outcome);
+        session.Revision++;
+        snapshot = session.CreateSnapshot();
+        return TournamentMutationStatus.Applied;
+    }
+
+    private static bool IsValidChoice(
+        TournamentSessionState session,
+        string controllerId,
+        TournamentPlayerChoice choice)
+    {
+        bool isCurrentCompetitor = session.IsControllerInCurrentMatch(controllerId);
+        if (choice == TournamentPlayerChoice.Join)
+            return isCurrentCompetitor;
+        if (choice == TournamentPlayerChoice.Watch)
+            return !isCurrentCompetitor;
+        if (choice == TournamentPlayerChoice.Skip)
+            return session.IsSkipAllowed();
+        return false;
+    }
     public TournamentMutationStatus TryLeaveActive(
         string sessionId,
         long expectedRevision,
@@ -588,61 +597,91 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
                 return TournamentMutationStatus.NotFound;
 
             snapshot = session.CreateSnapshot();
-            if (result.Revision != session.Revision || result.BracketRevision != session.BracketRevision)
-                return result.Revision < session.Revision || result.BracketRevision < session.BracketRevision
-                    ? TournamentMutationStatus.StaleRevision
-                    : TournamentMutationStatus.Rejected;
-            if ((session.Phase != TournamentSessionPhase.LiveMatch &&
-                 session.Phase != TournamentSessionPhase.SimulatingMatch) ||
-                result.MatchId != session.CurrentMatchId)
-            {
-                return TournamentMutationStatus.InvalidPhase;
-            }
+            TournamentMutationStatus status = ValidateMatchResult(
+                result,
+                controllerId,
+                contestantScores,
+                session);
+            if (status != TournamentMutationStatus.Applied)
+                return status;
 
-            if (session.Phase == TournamentSessionPhase.LiveMatch && session.HostControllerId != controllerId)
-                return TournamentMutationStatus.Rejected;
-            if (result.Sequence <= session.LastResultSequence)
-                return TournamentMutationStatus.NoChange;
-            if (contestantScores == null || contestantScores.Count != session.Contestants.Count)
-                return TournamentMutationStatus.Rejected;
-            foreach (TournamentContestantSlot contestant in session.Contestants)
-            {
-                if (!contestantScores.TryGetValue(contestant.SlotId, out var score) || score < 0)
-                    return TournamentMutationStatus.Rejected;
-            }
-
-            foreach (TournamentContestantSlot contestant in session.Contestants)
-                contestant.Score = contestantScores[contestant.SlotId];
-
-            session.LastResultSequence = result.Sequence;
-            session.SpawnManifest = null;
-            session.LastManifestSequence = 0;
-            session.Rounds = rounds ?? session.Rounds;
-            session.BracketRevision++;
-            session.Choices.Clear();
-            session.WinnerSlotId = winnerSlotId;
-
-            if (completed)
-            {
-                session.CurrentMatchId = null;
-                session.Phase = TournamentSessionPhase.Completed;
-            }
-            else
-            {
-                session.CurrentMatchId = nextMatchId;
-                session.Phase = TournamentSessionPhase.AwaitingChoices;
-            }
-
-            // Sequence numbers are scoped to the current match and submitting authority. The next host or
-            // server simulation begins its own sequence at one; exact match/revision checks reject old results.
-            session.LastResultSequence = 0;
-
-            session.Revision++;
+            ApplyMatchResult(
+                session,
+                result,
+                rounds,
+                contestantScores,
+                nextMatchId,
+                winnerSlotId,
+                completed);
             snapshot = session.CreateSnapshot();
             return TournamentMutationStatus.Applied;
         }
     }
 
+    private static TournamentMutationStatus ValidateMatchResult(
+        TournamentMatchResultData result,
+        string controllerId,
+        IReadOnlyDictionary<string, int> contestantScores,
+        TournamentSessionState session)
+    {
+        if (result.Revision != session.Revision || result.BracketRevision != session.BracketRevision)
+        {
+            return result.Revision < session.Revision || result.BracketRevision < session.BracketRevision
+                ? TournamentMutationStatus.StaleRevision
+                : TournamentMutationStatus.Rejected;
+        }
+        if ((session.Phase != TournamentSessionPhase.LiveMatch &&
+             session.Phase != TournamentSessionPhase.SimulatingMatch) ||
+            result.MatchId != session.CurrentMatchId)
+            return TournamentMutationStatus.InvalidPhase;
+        if (session.Phase == TournamentSessionPhase.LiveMatch && session.HostControllerId != controllerId)
+            return TournamentMutationStatus.Rejected;
+        if (result.Sequence <= session.LastResultSequence)
+            return TournamentMutationStatus.NoChange;
+        return HasValidContestantScores(session, contestantScores)
+            ? TournamentMutationStatus.Applied
+            : TournamentMutationStatus.Rejected;
+    }
+
+    private static bool HasValidContestantScores(
+        TournamentSessionState session,
+        IReadOnlyDictionary<string, int> contestantScores)
+    {
+        if (contestantScores == null || contestantScores.Count != session.Contestants.Count)
+            return false;
+        return session.Contestants.All(contestant =>
+            contestantScores.TryGetValue(contestant.SlotId, out var score) && score >= 0);
+    }
+
+    private static void ApplyMatchResult(
+        TournamentSessionState session,
+        TournamentMatchResultData result,
+        TournamentRoundData[] rounds,
+        IReadOnlyDictionary<string, int> contestantScores,
+        string nextMatchId,
+        string winnerSlotId,
+        bool completed)
+    {
+        foreach (TournamentContestantSlot contestant in session.Contestants)
+            contestant.Score = contestantScores[contestant.SlotId];
+
+        session.LastResultSequence = result.Sequence;
+        session.SpawnManifest = null;
+        session.LastManifestSequence = 0;
+        session.Rounds = rounds ?? session.Rounds;
+        session.BracketRevision++;
+        session.Choices.Clear();
+        session.WinnerSlotId = winnerSlotId;
+        session.CurrentMatchId = completed ? null : nextMatchId;
+        session.Phase = completed
+            ? TournamentSessionPhase.Completed
+            : TournamentSessionPhase.AwaitingChoices;
+
+        // Sequence numbers are scoped to the current match and submitting authority. The next host or
+        // server simulation begins its own sequence at one; exact match/revision checks reject old results.
+        session.LastResultSequence = 0;
+        session.Revision++;
+    }
     public bool TryGetSpawnManifest(string sessionId, out TournamentSpawnManifestData manifest)
     {
         lock (gate)

@@ -173,7 +173,6 @@ public sealed class CoopTournamentMissionView : MissionGauntletTournamentView
         }
 
         if (gauntletLayer != null) gauntletLayer.UIContext.ContextAlpha = 0f;
-
     }
 
     public override void OnPhotoModeDeactivated()

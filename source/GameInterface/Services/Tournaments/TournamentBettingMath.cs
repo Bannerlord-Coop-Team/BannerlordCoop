@@ -24,7 +24,7 @@ public static class TournamentBettingMath
         float otherMatchPower = Math.Max(
             0f,
             totalRoundPower - playerTeamPower - currentMatchOpponentPower);
-        float adjustedRoundPower = ownPower + 0.5f * otherMatchPower;
+        float adjustedRoundPower = ownPower + (0.5f * otherMatchPower);
         if (ownPower <= 0f || currentMatchPower <= 0f || adjustedRoundPower <= 0f)
             return 1.1f;
 

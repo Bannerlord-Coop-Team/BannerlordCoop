@@ -96,11 +96,11 @@ public class TournamentSpawnManifestValidatorTests
             new TournamentTeamData("team-a", new[] { "human" }, 0, false, 1, "banner-a"),
             new TournamentTeamData("team-b", new[] { "npc" }, 0, false, 2, "banner-b")
         };
-        var match = new TournamentMatchData("match", "round", 0, 1, 1, teams, new string[0], 1);
+        var match = new TournamentMatchData("match", "round", 0, 1, 1, teams, Array.Empty<string>(), 1);
         return new TournamentSessionSnapshot(
             "session", "mission", "town", "arena", "prize",
-            TournamentSessionPhase.LiveMatch, 4, 2, "match", "host", new string[0],
-            contestants, new string[0], new TournamentPlayerChoiceData[0],
+            TournamentSessionPhase.LiveMatch, 4, 2, "match", "host", Array.Empty<string>(),
+            contestants, Array.Empty<string>(), Array.Empty<TournamentPlayerChoiceData>(),
             new[] { new TournamentRoundData("round", 0, 0, new[] { match }) },
             0, 0, 2, false, false, null);
     }
@@ -117,11 +117,11 @@ public class TournamentSpawnManifestValidatorTests
             new TournamentAgentSpawnData(
                 Guid.NewGuid(), "human", "hero", 1, teams[0].TeamId, teams[0].TeamColor,
                 teams[0].BannerCode, humanOwner, equipment, 0, 0, 0, 0, 1, 100,
-                Guid.Empty, null, 0, new TournamentEquipmentElementData[0], 0),
+                Guid.Empty, null, 0, Array.Empty<TournamentEquipmentElementData>(), 0),
             new TournamentAgentSpawnData(
                 Guid.NewGuid(), "npc", "troop", 2, teams[1].TeamId, teams[1].TeamColor,
                 teams[1].BannerCode, npcOwner, equipment, 1, 0, 0, 0, 1, 100,
-                Guid.Empty, null, 0, new TournamentEquipmentElementData[0], 0)
+                Guid.Empty, null, 0, Array.Empty<TournamentEquipmentElementData>(), 0)
         };
         return new TournamentSpawnManifestData(
             snapshot.SessionId,

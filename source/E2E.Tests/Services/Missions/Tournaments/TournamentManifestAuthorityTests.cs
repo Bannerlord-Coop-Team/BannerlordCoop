@@ -21,11 +21,11 @@ public class TournamentManifestAuthorityTests
             3,
             "match",
             hostControllerId,
-            new string[0],
+            System.Array.Empty<string>(),
             contestants,
-            new string[0],
-            new TournamentPlayerChoiceData[0],
-            new TournamentRoundData[0],
+            System.Array.Empty<string>(),
+            System.Array.Empty<TournamentPlayerChoiceData>(),
+            System.Array.Empty<TournamentRoundData>(),
             0,
             0,
             0,
@@ -43,7 +43,7 @@ public class TournamentManifestAuthorityTests
             1,
             null,
             controllerId,
-            new TournamentEquipmentElementData[0],
+            System.Array.Empty<TournamentEquipmentElementData>(),
             1,
             2,
             3,
@@ -53,7 +53,7 @@ public class TournamentManifestAuthorityTests
             Guid.Empty,
             null,
             0,
-            new TournamentEquipmentElementData[0],
+            System.Array.Empty<TournamentEquipmentElementData>(),
             0);
 
     private static TournamentContestantData Contestant(

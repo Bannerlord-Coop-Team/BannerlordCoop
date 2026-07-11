@@ -485,7 +485,6 @@ public class TournamentSessionRegistryTests
         Assert.Equal(7, snapshot.Contestants[0].Score);
     }
 
-
     [Fact]
     public void MatchResult_RejectsBracketRevisionMismatch()
     {
@@ -689,7 +688,7 @@ public class TournamentSessionRegistryTests
             1,
             1,
             teams,
-            new string[0],
+            Array.Empty<string>(),
             1);
         var rounds = new[] { new TournamentRoundData("round-1", 0, 0, new[] { match }) };
 

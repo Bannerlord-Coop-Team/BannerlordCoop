@@ -66,8 +66,8 @@ public class TournamentStateReconciliationTests
         return new TournamentSessionSnapshot(
             sessionId, sessionId, townId, "arena", "prize",
             TournamentSessionPhase.Preparation, 1, 0, null, null,
-            new string[0], contestants ?? new TournamentContestantData[0], new string[0],
-            new TournamentPlayerChoiceData[0], new TournamentRoundData[0],
+            System.Array.Empty<string>(), contestants ?? System.Array.Empty<TournamentContestantData>(), System.Array.Empty<string>(),
+            System.Array.Empty<TournamentPlayerChoiceData>(), System.Array.Empty<TournamentRoundData>(),
             0, 0, 0, true, false, null);
     }
 }

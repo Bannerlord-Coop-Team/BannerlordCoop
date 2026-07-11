@@ -246,7 +246,6 @@ internal sealed class CoopTournamentVM : TournamentVM
     [DataSourceProperty]
     public new bool IsTournamentIncomplete => false;
 
-
     [DataSourceProperty]
     public new bool IsBetButtonEnabled => canBet;
 
@@ -614,23 +613,15 @@ internal sealed class CoopTournamentVM : TournamentVM
         bool hasRemainingBet)
     {
         bool awaitingChoice = currentSnapshot?.Phase == TournamentSessionPhase.AwaitingChoices;
-        var localContestant = currentSnapshot?.Contestants.FirstOrDefault(contestant =>
-            contestant.IsHuman &&
-            !contestant.IsReplaced &&
-            contestant.ControllerId == localControllerId);
-        TournamentMatchData currentMatch = null;
-        if (currentSnapshot != null)
-        {
-            currentMatch = currentSnapshot.Rounds
-                .SelectMany(round => round.Matches)
-                .FirstOrDefault(match => match.MatchId == currentSnapshot.CurrentMatchId);
-        }
-
+        TournamentContestantData localContestant = GetLocalContestant(
+            currentSnapshot,
+            localControllerId);
+        TournamentMatchData currentMatch = GetCurrentMatch(currentSnapshot);
         bool localIsInCurrentMatch = localContestant != null && currentMatch?.Teams.Any(team =>
             team.ParticipantSlotIds.Contains(localContestant.SlotId)) == true;
         bool localIsSpectator = currentSnapshot?.SpectatorControllerIds.Contains(localControllerId) == true;
         bool localIsVoter = localContestant != null || localIsSpectator;
-        var selectedChoice = currentSnapshot?.Choices
+        TournamentPlayerChoice selectedChoice = currentSnapshot?.Choices
             .FirstOrDefault(item => item.ControllerId == localControllerId)?.Choice ??
             TournamentPlayerChoice.None;
 
@@ -647,6 +638,22 @@ internal sealed class CoopTournamentVM : TournamentVM
             selectedChoice);
     }
 
+    private static TournamentContestantData GetLocalContestant(
+        TournamentSessionSnapshot currentSnapshot,
+        string localControllerId)
+    {
+        return currentSnapshot?.Contestants.FirstOrDefault(contestant =>
+            contestant.IsHuman &&
+            !contestant.IsReplaced &&
+            contestant.ControllerId == localControllerId);
+    }
+
+    private static TournamentMatchData GetCurrentMatch(TournamentSessionSnapshot currentSnapshot)
+    {
+        return currentSnapshot?.Rounds
+            .SelectMany(round => round.Matches)
+            .FirstOrDefault(match => match.MatchId == currentSnapshot.CurrentMatchId);
+    }
     private void RefreshCoopState()
     {
         bool hasRemainingBet = snapshot != null && GetRemainingBetValue(

@@ -85,7 +85,38 @@ public sealed partial class TournamentGameInterface : ITournamentGameInterface
         string sceneName = town.Settlement.LocationComplex?.GetScene("arena", town.GetWallLevel());
         if (string.IsNullOrEmpty(sceneName))
             return false;
+        if (!TryCreateFrozenRoster(town, tournamentGame, out var sortedCharacters))
+            return false;
 
+        CharacterObject replacement = town.Culture?.BasicTroop;
+        if (replacement == null || !objectManager.TryGetId(replacement, out var replacementId))
+            return false;
+        ItemObject prize = GetPrizeForFrozenRoster(town, tournamentGame, sortedCharacters);
+        if (prize == null || !objectManager.TryGetId(prize, out var prizeId))
+            return false;
+
+        var identity = new TournamentSessionIdentity();
+        if (!objectManager.AddNewObject(identity, out var sessionId))
+            return false;
+        if (!TryCreateFrozenContestants(sortedCharacters, sessionId, out var contestants))
+            return false;
+
+        seed = new TournamentSessionSeed(
+            sessionId,
+            sessionId,
+            townId,
+            sceneName,
+            prizeId,
+            replacementId,
+            contestants);
+        return true;
+    }
+
+    private bool TryCreateFrozenRoster(
+        Town town,
+        FightTournamentGame tournamentGame,
+        out MBList<CharacterObject> sortedCharacters)
+    {
         var playerCharacters = ResolvePlayerCharacters();
         var rosterGame = ObjectHelper.SkipConstructor<PlayerFilteredFightTournamentGame>();
         rosterGame.Town = town;
@@ -95,26 +126,23 @@ public sealed partial class TournamentGameInterface : ITournamentGameInterface
             .GetParticipantCharacters(town.Settlement, false)
             .Where(character => character != null && !playerCharacters.Contains(character))
             .ToList();
-
-        CharacterObject replacement = town.Culture?.BasicTroop;
-        if (replacement == null || !objectManager.TryGetId(replacement, out var replacementId))
-            return false;
         if (frozenCharacters.Count != tournamentGame.MaximumParticipantCount)
+        {
+            sortedCharacters = null;
             return false;
+        }
 
-        var sortedCharacters = new MBList<CharacterObject>(frozenCharacters);
+        sortedCharacters = new MBList<CharacterObject>(frozenCharacters);
         tournamentGame.SortTournamentParticipants(sortedCharacters);
+        return true;
+    }
 
-        ItemObject prize = GetPrizeForFrozenRoster(town, tournamentGame, sortedCharacters);
-        if (prize == null || !objectManager.TryGetId(prize, out var prizeId))
-            return false;
-
-
-        var identity = new TournamentSessionIdentity();
-        if (!objectManager.AddNewObject(identity, out var sessionId))
-            return false;
-
-        var contestants = new TournamentContestantData[sortedCharacters.Count];
+    private bool TryCreateFrozenContestants(
+        IReadOnlyList<CharacterObject> sortedCharacters,
+        string sessionId,
+        out TournamentContestantData[] contestants)
+    {
+        contestants = new TournamentContestantData[sortedCharacters.Count];
         for (int i = 0; i < sortedCharacters.Count; i++)
         {
             CharacterObject character = sortedCharacters[i];
@@ -138,18 +166,8 @@ public sealed partial class TournamentGameInterface : ITournamentGameInterface
                 null,
                 0);
         }
-
-        seed = new TournamentSessionSeed(
-            sessionId,
-            sessionId,
-            townId,
-            sceneName,
-            prizeId,
-            replacementId,
-            contestants);
         return true;
     }
-
     public bool TryCreateBracket(TournamentSessionSnapshot snapshot, out TournamentBracketUpdate bracket)
     {
         bracket = null;
@@ -519,7 +537,6 @@ public sealed partial class TournamentGameInterface : ITournamentGameInterface
         }
         return data;
     }
-
 
     private sealed class PlayerFilteredFightTournamentGame : FightTournamentGame
     {

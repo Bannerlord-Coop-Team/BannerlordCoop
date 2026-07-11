@@ -104,7 +104,7 @@ internal sealed partial class TournamentSessionHandler
         while (snapshot != null && !snapshot.IsCompleted && simulatedMatches < MaximumSimulationMatches)
         {
             if (snapshot.Phase == TournamentSessionPhase.AwaitingChoices ||
-                forceSimulation && snapshot.Phase == TournamentSessionPhase.LiveMatch)
+                (forceSimulation && snapshot.Phase == TournamentSessionPhase.LiveMatch))
             {
                 var status = forceSimulation
                     ? sessionRegistry.TryForceSimulation(snapshot.SessionId, snapshot.Revision, out snapshot)

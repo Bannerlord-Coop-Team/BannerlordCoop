@@ -97,7 +97,7 @@ public sealed partial class TournamentGameInterface
 
                 float characterScore = Campaign.Current.Models.TournamentModel
                     .GetTournamentSimulationScore(character);
-                simulationScore += characterScore * (0.75f + 0.25f * MBRandom.RandomFloat);
+                simulationScore += characterScore * (0.75f + (0.25f * MBRandom.RandomFloat));
             }
             rankedTeams.Add(new KeyValuePair<TournamentTeamData, float>(team, simulationScore));
         }
@@ -161,59 +161,25 @@ public sealed partial class TournamentGameInterface
 
         List<KeyValuePair<Hero, int>> leaderboard = Campaign.Current?.TournamentManager?.GetLeaderboard()
             ?? new List<KeyValuePair<Hero, int>>();
-        int heroWins = GetTournamentWins(leaderboard, hero);
         int highestWins = leaderboard.Count == 0 ? 0 : leaderboard.Max(entry => entry.Value);
-        float heroPower = 30f + hero.Level + Math.Max(0, heroWins * 12 - highestWins * 2);
-        float playerTeamPower = 0f;
-        float currentMatchOpponentPower = 0f;
-        float totalRoundPower = 0f;
-        bool playerTeamFound = false;
-
-        foreach (TournamentMatchData match in currentRound.Matches)
-        {
-            foreach (TournamentTeamData team in match.Teams)
-            {
-                float teamPower = 0f;
-                foreach (string participantSlotId in team.ParticipantSlotIds)
-                {
-                    if (participantSlotId == slotId)
-                        continue;
-                    TournamentContestantData contestant = snapshot.Contestants
-                        .FirstOrDefault(candidate => candidate.SlotId == participantSlotId);
-                    if (contestant == null ||
-                        !objectManager.TryGetObject(contestant.CharacterId, out CharacterObject character))
-                    {
-                        return false;
-                    }
-
-                    int wins = character.IsHero
-                        ? GetTournamentWins(leaderboard, character.HeroObject)
-                        : 0;
-                    teamPower += character.Level + Math.Max(0, wins * 8 - highestWins * 2);
-                }
-
-                totalRoundPower += teamPower;
-                bool isPlayerTeam = team.ParticipantSlotIds.Contains(slotId);
-                if (isPlayerTeam && match.MatchId == snapshot.CurrentMatchId)
-                {
-                    playerTeamPower = teamPower;
-                    playerTeamFound = true;
-                }
-                else if (!isPlayerTeam && match.MatchId == snapshot.CurrentMatchId)
-                {
-                    currentMatchOpponentPower += teamPower;
-                }
-            }
-        }
-
-        if (!playerTeamFound)
+        if (!TryCalculateRoundPowers(
+                snapshot,
+                currentRound,
+                slotId,
+                leaderboard,
+                highestWins,
+                out float playerTeamPower,
+                out float currentMatchOpponentPower,
+                out float totalRoundPower))
             return false;
+
+        int heroWins = GetTournamentWins(leaderboard, hero);
+        float heroPower = 30f + hero.Level + Math.Max(0, (heroWins * 12) - (highestWins * 2));
         float odd = TournamentBettingMath.CalculateOdd(
             heroPower,
             playerTeamPower,
             currentMatchOpponentPower,
             totalRoundPower);
-
         int maximumBet = TournamentBettingMath.CalculateMaximumBet(
             hero.GetPerkValue(DefaultPerks.Roguery.DeepPockets),
             DefaultPerks.Roguery.DeepPockets.PrimaryBonus);
@@ -221,6 +187,70 @@ public sealed partial class TournamentGameInterface
         return true;
     }
 
+    private bool TryCalculateRoundPowers(
+        TournamentSessionSnapshot snapshot,
+        TournamentRoundData currentRound,
+        string slotId,
+        List<KeyValuePair<Hero, int>> leaderboard,
+        int highestWins,
+        out float playerTeamPower,
+        out float currentMatchOpponentPower,
+        out float totalRoundPower)
+    {
+        playerTeamPower = 0f;
+        currentMatchOpponentPower = 0f;
+        totalRoundPower = 0f;
+        bool playerTeamFound = false;
+        foreach (TournamentMatchData match in currentRound.Matches)
+        {
+            foreach (TournamentTeamData team in match.Teams)
+            {
+                if (!TryCalculateTeamPower(snapshot, team, slotId, leaderboard, highestWins, out float teamPower))
+                    return false;
+
+                totalRoundPower += teamPower;
+                bool isCurrentMatch = match.MatchId == snapshot.CurrentMatchId;
+                bool isPlayerTeam = team.ParticipantSlotIds.Contains(slotId);
+                if (isCurrentMatch && isPlayerTeam)
+                {
+                    playerTeamPower = teamPower;
+                    playerTeamFound = true;
+                }
+                else if (isCurrentMatch)
+                {
+                    currentMatchOpponentPower += teamPower;
+                }
+            }
+        }
+        return playerTeamFound;
+    }
+
+    private bool TryCalculateTeamPower(
+        TournamentSessionSnapshot snapshot,
+        TournamentTeamData team,
+        string playerSlotId,
+        List<KeyValuePair<Hero, int>> leaderboard,
+        int highestWins,
+        out float teamPower)
+    {
+        teamPower = 0f;
+        foreach (string participantSlotId in team.ParticipantSlotIds)
+        {
+            if (participantSlotId == playerSlotId)
+                continue;
+            TournamentContestantData contestant = snapshot.Contestants
+                .FirstOrDefault(candidate => candidate.SlotId == participantSlotId);
+            if (contestant == null ||
+                !objectManager.TryGetObject(contestant.CharacterId, out CharacterObject character))
+                return false;
+
+            int wins = character.IsHero
+                ? GetTournamentWins(leaderboard, character.HeroObject)
+                : 0;
+            teamPower += character.Level + Math.Max(0, (wins * 8) - (highestWins * 2));
+        }
+        return true;
+    }
     private static int GetTournamentWins(List<KeyValuePair<Hero, int>> leaderboard, Hero hero)
     {
         if (hero == null)

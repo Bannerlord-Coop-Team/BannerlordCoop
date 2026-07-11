@@ -54,58 +54,10 @@ public class TournamentSpawnManifestBuilder : ITournamentSpawnManifestBuilder
             .Where(agent => agent != null && !agent.IsMount)
             .ToList();
         int expectedAgentCount = match.Teams.Sum(team => team.ParticipantSlotIds.Length);
-        if (agents.Count != expectedAgentCount)
-        {
-            if (agentCountMismatchMatchId != snapshot.CurrentMatchId)
-            {
-                Logger.Warning(
-                    "[Tournament] Native fight controller has wrong agent count for {MatchId}: agents={AgentCount}, expected={ExpectedCount}",
-                    snapshot.CurrentMatchId,
-                    agents.Count,
-                    expectedAgentCount);
-            }
-            agentCountMismatchMatchId = snapshot.CurrentMatchId;
+        if (!HasExpectedAgentCount(snapshot.CurrentMatchId, agents.Count, expectedAgentCount))
             return null;
-        }
-        agentCountMismatchMatchId = null;
-
-        TournamentTeam[] nativeTeams = behavior.CurrentMatch.Teams.ToArray();
-        var assignedParticipants = new HashSet<TournamentParticipant>();
-        var assignedSlots = new HashSet<string>();
-        var records = new TournamentAgentSpawnData[agents.Count];
-        for (int i = 0; i < agents.Count; i++)
-        {
-            Agent agent = agents[i];
-            if (agent.Origin == null || agent.Character is not CharacterObject character ||
-                !objectManager.TryGetId(character, out string characterId)) return null;
-
-            TournamentParticipant participant = ResolveParticipant(
-                agent,
-                character,
-                behavior,
-                match,
-                nativeTeams,
-                assignedParticipants);
-            if (participant == null)
-            {
-                Logger.Warning("[Tournament] Could not map spawned agent {CharacterId} seed {Seed} into match {MatchId}",
-                    characterId, agent.Origin.UniqueSeed, match.MatchId);
-                return null;
-            }
-            assignedParticipants.Add(participant);
-            int nativeTeamIndex = Array.IndexOf(nativeTeams, participant.Team);
-            int participantIndex = Array.IndexOf(behavior._participants, participant);
-            if (nativeTeamIndex < 0 || nativeTeamIndex >= match.Teams.Length ||
-                participantIndex < 0 || participantIndex >= snapshot.Contestants.Length) return null;
-            TournamentContestantData contestant = snapshot.Contestants[participantIndex];
-            TournamentTeamData team = match.Teams[nativeTeamIndex];
-            if (!team.ParticipantSlotIds.Contains(contestant.SlotId)) return null;
-            if (!assignedSlots.Add(contestant.SlotId)) return null;
-            if (agent.Team == null || agent.Team.Color != team.TeamColor) return null;
-
-            records[i] = BuildAgent(agent, contestant, team, session);
-            if (records[i] == null) return null;
-        }
+        if (!TryBuildAgentRecords(snapshot, behavior, match, agents, session, out var records))
+            return null;
 
         var manifest = new TournamentSpawnManifestData(
             snapshot.SessionId,
@@ -114,29 +66,140 @@ public class TournamentSpawnManifestBuilder : ITournamentSpawnManifestBuilder
             snapshot.BracketRevision,
             sequence,
             records);
-        if (!TournamentSpawnManifestValidator.IsValid(manifest, snapshot))
-        {
-            if (rejectedManifestMatchId != snapshot.CurrentMatchId)
-                Logger.Warning(
-                    "[Tournament] Locally rejected spawn manifest for {MatchId}: agents={AgentCount}, expected={ExpectedCount}",
-                    snapshot.CurrentMatchId,
-                    records.Length,
-                    expectedAgentCount);
-            rejectedManifestMatchId = snapshot.CurrentMatchId;
+        if (!AcceptManifest(snapshot, manifest, expectedAgentCount))
             return null;
-        }
-        rejectedManifestMatchId = null;
+
         Logger.Information(
             "[Tournament] Built spawn manifest for {MatchId}: agents={AgentCount}, sequence={Sequence}",
             snapshot.CurrentMatchId,
             records.Length,
             sequence);
-
         for (int i = 0; i < agents.Count; i++)
             RegisterAgent(agents[i], records[i], session);
         return manifest;
     }
 
+    private bool HasExpectedAgentCount(string matchId, int agentCount, int expectedAgentCount)
+    {
+        if (agentCount == expectedAgentCount)
+        {
+            agentCountMismatchMatchId = null;
+            return true;
+        }
+
+        if (agentCountMismatchMatchId != matchId)
+        {
+            Logger.Warning(
+                "[Tournament] Native fight controller has wrong agent count for {MatchId}: agents={AgentCount}, expected={ExpectedCount}",
+                matchId,
+                agentCount,
+                expectedAgentCount);
+        }
+        agentCountMismatchMatchId = matchId;
+        return false;
+    }
+
+    private bool TryBuildAgentRecords(
+        TournamentSessionSnapshot snapshot,
+        CoopTournamentBehavior behavior,
+        TournamentMatchData match,
+        IReadOnlyList<Agent> agents,
+        ITournamentMissionSession session,
+        out TournamentAgentSpawnData[] records)
+    {
+        TournamentTeam[] nativeTeams = behavior.CurrentMatch.Teams.ToArray();
+        var assignedParticipants = new HashSet<TournamentParticipant>();
+        var assignedSlots = new HashSet<string>();
+        records = new TournamentAgentSpawnData[agents.Count];
+        for (int i = 0; i < agents.Count; i++)
+        {
+            if (!TryBuildAgentRecord(
+                    snapshot,
+                    behavior,
+                    match,
+                    nativeTeams,
+                    agents[i],
+                    assignedParticipants,
+                    assignedSlots,
+                    session,
+                    out records[i]))
+            {
+                records = null;
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private bool TryBuildAgentRecord(
+        TournamentSessionSnapshot snapshot,
+        CoopTournamentBehavior behavior,
+        TournamentMatchData match,
+        TournamentTeam[] nativeTeams,
+        Agent agent,
+        HashSet<TournamentParticipant> assignedParticipants,
+        HashSet<string> assignedSlots,
+        ITournamentMissionSession session,
+        out TournamentAgentSpawnData record)
+    {
+        record = null;
+        if (agent.Origin == null || agent.Character is not CharacterObject character ||
+            !objectManager.TryGetId(character, out string characterId)) return false;
+
+        TournamentParticipant participant = ResolveParticipant(
+            agent,
+            character,
+            behavior,
+            match,
+            nativeTeams,
+            assignedParticipants);
+        if (participant == null)
+        {
+            Logger.Warning("[Tournament] Could not map spawned agent {CharacterId} seed {Seed} into match {MatchId}",
+                characterId, agent.Origin.UniqueSeed, match.MatchId);
+            return false;
+        }
+
+        int nativeTeamIndex = Array.IndexOf(nativeTeams, participant.Team);
+        int participantIndex = Array.IndexOf(behavior._participants, participant);
+        if (nativeTeamIndex < 0 || nativeTeamIndex >= match.Teams.Length ||
+            participantIndex < 0 || participantIndex >= snapshot.Contestants.Length) return false;
+
+        TournamentContestantData contestant = snapshot.Contestants[participantIndex];
+        TournamentTeamData team = match.Teams[nativeTeamIndex];
+        if (!team.ParticipantSlotIds.Contains(contestant.SlotId) ||
+            !assignedSlots.Add(contestant.SlotId) ||
+            agent.Team == null ||
+            agent.Team.Color != team.TeamColor)
+            return false;
+
+        assignedParticipants.Add(participant);
+        record = BuildAgent(agent, contestant, team, session);
+        return record != null;
+    }
+
+    private bool AcceptManifest(
+        TournamentSessionSnapshot snapshot,
+        TournamentSpawnManifestData manifest,
+        int expectedAgentCount)
+    {
+        if (TournamentSpawnManifestValidator.IsValid(manifest, snapshot))
+        {
+            rejectedManifestMatchId = null;
+            return true;
+        }
+
+        if (rejectedManifestMatchId != snapshot.CurrentMatchId)
+        {
+            Logger.Warning(
+                "[Tournament] Locally rejected spawn manifest for {MatchId}: agents={AgentCount}, expected={ExpectedCount}",
+                snapshot.CurrentMatchId,
+                manifest.Agents.Length,
+                expectedAgentCount);
+        }
+        rejectedManifestMatchId = snapshot.CurrentMatchId;
+        return false;
+    }
     private static TournamentParticipant ResolveParticipant(
         Agent agent,
         CharacterObject character,
@@ -178,7 +241,6 @@ public class TournamentSpawnManifestBuilder : ITournamentSpawnManifestBuilder
             : session.HostControllerId;
         Guid agentId = Guid.NewGuid();
         Guid mountId = agent.MountAgent == null ? Guid.Empty : Guid.NewGuid();
-
 
         string mountCharacterId = null;
         if (agent.MountAgent?.Character is BasicCharacterObject mountCharacter)
@@ -247,44 +309,49 @@ public class TournamentSpawnManifestBuilder : ITournamentSpawnManifestBuilder
         var records = new List<TournamentEquipmentElementData>();
         for (int i = 0; i < (int)EquipmentIndex.NumEquipmentSetSlots; i++)
         {
-            EquipmentIndex index = (EquipmentIndex)i;
-            if (missionEquipment != null && i < (int)EquipmentIndex.NumAllWeaponSlots)
-            {
-                MissionWeapon weapon = missionEquipment[index];
-                if (!weapon.IsEmpty)
-                {
-                    if (!TrySerializeMissionWeapon(i, weapon, out var data))
-                    {
-                        serialized = null;
-                        return false;
-                    }
-                    records.Add(data);
-                    continue;
-                }
-            }
-
-            if (spawnEquipment == null) continue;
-            EquipmentElement element = spawnEquipment[index];
-            if (element.IsEmpty) continue;
-            if (!objectManager.TryGetId(element.Item, out string itemId))
+            if (!TrySerializeEquipmentSlot(missionEquipment, spawnEquipment, i, out var data))
             {
                 serialized = null;
                 return false;
             }
-
-            string modifierId = null;
-            if (element.ItemModifier != null &&
-                !objectManager.TryGetId(element.ItemModifier, out modifierId))
-            {
-                serialized = null;
-                return false;
-            }
-            records.Add(new TournamentEquipmentElementData(i, itemId, modifierId));
+            if (data != null)
+                records.Add(data);
         }
         serialized = records.ToArray();
         return true;
     }
 
+    private bool TrySerializeEquipmentSlot(
+        MissionEquipment missionEquipment,
+        Equipment spawnEquipment,
+        int slotIndex,
+        out TournamentEquipmentElementData data)
+    {
+        data = null;
+        EquipmentIndex index = (EquipmentIndex)slotIndex;
+        if (missionEquipment != null && slotIndex < (int)EquipmentIndex.NumAllWeaponSlots)
+        {
+            MissionWeapon weapon = missionEquipment[index];
+            if (!weapon.IsEmpty)
+                return TrySerializeMissionWeapon(slotIndex, weapon, out data);
+        }
+
+        if (spawnEquipment == null)
+            return true;
+        EquipmentElement element = spawnEquipment[index];
+        if (element.IsEmpty)
+            return true;
+        if (!objectManager.TryGetId(element.Item, out string itemId))
+            return false;
+
+        string modifierId = null;
+        if (element.ItemModifier != null &&
+            !objectManager.TryGetId(element.ItemModifier, out modifierId))
+            return false;
+
+        data = new TournamentEquipmentElementData(slotIndex, itemId, modifierId);
+        return true;
+    }
     private bool TrySerializeMissionWeapon(
         int slotIndex,
         MissionWeapon weapon,

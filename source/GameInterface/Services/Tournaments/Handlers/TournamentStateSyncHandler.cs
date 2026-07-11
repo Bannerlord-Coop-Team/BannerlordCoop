@@ -104,103 +104,155 @@ internal sealed class TournamentStateSyncHandler : IHandler
             !TournamentServerMessageGuard.IsTrusted(payload.Who, relayNetworks))
             return;
 
-        GameThread.RunSafe(() =>
-        {
-            if (Campaign.Current?.TournamentManager is not TournamentManager manager)
-                return;
-
-            TournamentNativeGameData[] nativeTournaments = payload.What.NativeTournaments ??
-                new TournamentNativeGameData[0];
-            TournamentLeaderboardEntryData[] leaderboard = payload.What.Leaderboard ??
-                new TournamentLeaderboardEntryData[0];
-            TournamentSessionSnapshot[] sessions = payload.What.Sessions ??
-                new TournamentSessionSnapshot[0];
-            Logger.Information(
-                "[Tournament] Received native tournament state: authoritative={AuthoritativeCount}, authoritativeTowns={AuthoritativeTowns}, localBefore={LocalCount}, localTownsBefore={LocalTowns}",
-                nativeTournaments.Length,
-                string.Join(",", nativeTournaments
-                    .Where(tournament => tournament != null)
-                    .Select(tournament => tournament.TownId)),
-                manager._activeTournaments.Count,
-                string.Join(",", manager._activeTournaments
-                    .Where(tournament => tournament?.Town != null)
-                    .Select(tournament => tournament.Town.Name.ToString())));
-
-            foreach (TournamentSessionSnapshot stale in TournamentStateReconciliation.GetStaleSessions(
-                         sessionRegistry.GetAll(), sessions))
-            {
-                if (!sessionRegistry.Remove(stale.SessionId))
-                    continue;
-                messageBroker.Publish(this, new TournamentSessionRemoved(stale.SessionId, stale.TownId));
-            }
-
-            var authoritativeTournaments = new Dictionary<Town, FightTournamentGame>();
-            foreach (TournamentNativeGameData data in nativeTournaments)
-            {
-                if (data == null || !TryRehydrateNativeGame(data, out var game))
-                    continue;
-                authoritativeTournaments[game.Town] = game;
-            }
-
-            foreach (TournamentGame tournament in manager._activeTournaments.ToArray())
-            {
-                if (tournament?.Town != null && authoritativeTournaments.ContainsKey(tournament.Town))
-                    continue;
-
-                Town removedTown = tournament?.Town;
-                manager.RemoveTournament(tournament);
-                bool removed = !manager._activeTournaments.Contains(tournament);
-                if (removed && removedTown != null)
-                {
-                    CampaignEventDispatcher.Instance.OnTournamentCancelled(removedTown);
-                    Logger.Information(
-                        "[Tournament] Raised native tournament cancellation event after authoritative removal from {Town}",
-                        removedTown.Name);
-                }
-                Logger.Information(
-                    "[Tournament] Removed native tournament from {Town}; removed={Removed}",
-                    removedTown?.Name,
-                    removed);
-            }
-            foreach (var pair in authoritativeTournaments)
-            {
-                TournamentGame existing = manager._activeTournaments
-                    .FirstOrDefault(tournament => tournament?.Town == pair.Key);
-                if (existing != null)
-                {
-                    existing.CreationTime = pair.Value.CreationTime;
-                    existing.Mode = pair.Value.Mode;
-                    existing.Prize = pair.Value.Prize;
-                    continue;
-                }
-
-                manager.AddTournament(pair.Value);
-                Logger.Information("[Tournament] Added native tournament to {Town}", pair.Key.Name);
-            }
-            Logger.Information(
-                "[Tournament] Reconciled native tournament state: authoritative={AuthoritativeCount}, localAfter={LocalCount}, localTownsAfter={LocalTowns}",
-                authoritativeTournaments.Count,
-                manager._activeTournaments.Count,
-                string.Join(",", manager._activeTournaments
-                    .Where(tournament => tournament?.Town != null)
-                    .Select(tournament => tournament.Town.Name.ToString())));
-
-            manager._worldWideTournamentLeaderboard.Clear();
-            foreach (TournamentLeaderboardEntryData data in leaderboard)
-            {
-                if (data != null && objectManager.TryGetObject(data.HeroId, out Hero hero))
-                    manager.InitializeLeaderboardEntry(hero, data.Wins);
-            }
-
-            foreach (TournamentSessionSnapshot snapshot in sessions)
-            {
-                TournamentSessionSnapshot normalized = TournamentSessionSnapshotNormalizer.Normalize(snapshot);
-                if (normalized != null && sessionRegistry.ApplySnapshot(normalized))
-                    messageBroker.Publish(this, new TournamentSessionUpdated(normalized));
-            }
-        }, context: nameof(Handle_StateSnapshot));
+        GameThread.RunSafe(
+            () => ApplyStateSnapshot(payload.What),
+            context: nameof(Handle_StateSnapshot));
     }
 
+    private void ApplyStateSnapshot(NetworkTournamentStateSnapshot state)
+    {
+        if (Campaign.Current?.TournamentManager is not TournamentManager manager)
+            return;
+
+        TournamentNativeGameData[] nativeTournaments = state.NativeTournaments ??
+            System.Array.Empty<TournamentNativeGameData>();
+        TournamentLeaderboardEntryData[] leaderboard = state.Leaderboard ??
+            System.Array.Empty<TournamentLeaderboardEntryData>();
+        TournamentSessionSnapshot[] sessions = state.Sessions ??
+            System.Array.Empty<TournamentSessionSnapshot>();
+        LogReceivedState(manager, nativeTournaments);
+        RemoveStaleSessions(sessions);
+
+        Dictionary<Town, FightTournamentGame> authoritativeTournaments =
+            RehydrateAuthoritativeTournaments(nativeTournaments);
+        ReconcileNativeTournaments(manager, authoritativeTournaments);
+        ReconcileLeaderboard(manager, leaderboard);
+        ApplySessions(sessions);
+    }
+
+    private static void LogReceivedState(
+        TournamentManager manager,
+        TournamentNativeGameData[] nativeTournaments)
+    {
+        Logger.Information(
+            "[Tournament] Received native tournament state: authoritative={AuthoritativeCount}, authoritativeTowns={AuthoritativeTowns}, localBefore={LocalCount}, localTownsBefore={LocalTowns}",
+            nativeTournaments.Length,
+            string.Join(",", nativeTournaments
+                .Where(tournament => tournament != null)
+                .Select(tournament => tournament.TownId)),
+            manager._activeTournaments.Count,
+            string.Join(",", manager._activeTournaments
+                .Where(tournament => tournament?.Town != null)
+                .Select(tournament => tournament.Town.Name.ToString())));
+    }
+
+    private void RemoveStaleSessions(TournamentSessionSnapshot[] sessions)
+    {
+        foreach (TournamentSessionSnapshot stale in TournamentStateReconciliation.GetStaleSessions(
+                     sessionRegistry.GetAll(), sessions))
+        {
+            if (!sessionRegistry.Remove(stale.SessionId))
+                continue;
+            messageBroker.Publish(this, new TournamentSessionRemoved(stale.SessionId, stale.TownId));
+        }
+    }
+
+    private Dictionary<Town, FightTournamentGame> RehydrateAuthoritativeTournaments(
+        TournamentNativeGameData[] nativeTournaments)
+    {
+        var authoritativeTournaments = new Dictionary<Town, FightTournamentGame>();
+        foreach (TournamentNativeGameData data in nativeTournaments)
+        {
+            if (data == null || !TryRehydrateNativeGame(data, out var game))
+                continue;
+            authoritativeTournaments[game.Town] = game;
+        }
+        return authoritativeTournaments;
+    }
+
+    private static void ReconcileNativeTournaments(
+        TournamentManager manager,
+        IReadOnlyDictionary<Town, FightTournamentGame> authoritativeTournaments)
+    {
+        RemoveStaleNativeTournaments(manager, authoritativeTournaments);
+        AddOrUpdateNativeTournaments(manager, authoritativeTournaments);
+        Logger.Information(
+            "[Tournament] Reconciled native tournament state: authoritative={AuthoritativeCount}, localAfter={LocalCount}, localTownsAfter={LocalTowns}",
+            authoritativeTournaments.Count,
+            manager._activeTournaments.Count,
+            string.Join(",", manager._activeTournaments
+                .Where(tournament => tournament?.Town != null)
+                .Select(tournament => tournament.Town.Name.ToString())));
+    }
+
+    private static void RemoveStaleNativeTournaments(
+        TournamentManager manager,
+        IReadOnlyDictionary<Town, FightTournamentGame> authoritativeTournaments)
+    {
+        foreach (TournamentGame tournament in manager._activeTournaments.ToArray())
+        {
+            if (tournament?.Town != null && authoritativeTournaments.ContainsKey(tournament.Town))
+                continue;
+
+            Town removedTown = tournament?.Town;
+            manager.RemoveTournament(tournament);
+            bool removed = !manager._activeTournaments.Contains(tournament);
+            if (removed && removedTown != null)
+            {
+                CampaignEventDispatcher.Instance.OnTournamentCancelled(removedTown);
+                Logger.Information(
+                    "[Tournament] Raised native tournament cancellation event after authoritative removal from {Town}",
+                    removedTown.Name);
+            }
+            Logger.Information(
+                "[Tournament] Removed native tournament from {Town}; removed={Removed}",
+                removedTown?.Name,
+                removed);
+        }
+    }
+
+    private static void AddOrUpdateNativeTournaments(
+        TournamentManager manager,
+        IReadOnlyDictionary<Town, FightTournamentGame> authoritativeTournaments)
+    {
+        foreach (var pair in authoritativeTournaments)
+        {
+            TournamentGame existing = manager._activeTournaments
+                .FirstOrDefault(tournament => tournament?.Town == pair.Key);
+            if (existing != null)
+            {
+                existing.CreationTime = pair.Value.CreationTime;
+                existing.Mode = pair.Value.Mode;
+                existing.Prize = pair.Value.Prize;
+                continue;
+            }
+
+            manager.AddTournament(pair.Value);
+            Logger.Information("[Tournament] Added native tournament to {Town}", pair.Key.Name);
+        }
+    }
+
+    private void ReconcileLeaderboard(
+        TournamentManager manager,
+        TournamentLeaderboardEntryData[] leaderboard)
+    {
+        manager._worldWideTournamentLeaderboard.Clear();
+        foreach (TournamentLeaderboardEntryData data in leaderboard)
+        {
+            if (data != null && objectManager.TryGetObject(data.HeroId, out Hero hero))
+                manager.InitializeLeaderboardEntry(hero, data.Wins);
+        }
+    }
+
+    private void ApplySessions(TournamentSessionSnapshot[] sessions)
+    {
+        foreach (TournamentSessionSnapshot snapshot in sessions)
+        {
+            TournamentSessionSnapshot normalized = TournamentSessionSnapshotNormalizer.Normalize(snapshot);
+            if (normalized != null && sessionRegistry.ApplySnapshot(normalized))
+                messageBroker.Publish(this, new TournamentSessionUpdated(normalized));
+        }
+    }
     private void Handle_SessionRemoved(MessagePayload<NetworkTournamentSessionRemoved> payload)
     {
         if (ModInformation.IsServer ||
@@ -278,7 +330,6 @@ internal sealed class TournamentStateSyncHandler : IHandler
         game.Mode = (TournamentGame.QualificationMode)data.QualificationMode;
         game.Prize = prize;
         return true;
-
     }
     private sealed class UnsupportedFightTournamentGame : FightTournamentGame
     {

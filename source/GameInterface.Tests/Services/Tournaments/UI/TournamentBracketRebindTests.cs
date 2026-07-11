@@ -156,7 +156,7 @@ public class TournamentBracketRebindTests
             {
                 new TournamentTeamData("team", new[] { "slot" }, 5, false, 0, 0, null)
             },
-            new string[0]);
+            System.Array.Empty<string>());
 
         bool applied = TournamentGameInterface.TryApplyScores(
             match,
@@ -268,5 +268,4 @@ public class TournamentBracketRebindTests
         match.State = state;
         return match;
     }
-
 }

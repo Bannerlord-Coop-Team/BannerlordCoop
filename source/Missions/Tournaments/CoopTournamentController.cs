@@ -124,70 +124,87 @@ public class CoopTournamentController : CoopMissionController
         if (updated == null || snapshot == null || updated.SessionId != snapshot.SessionId) return;
         if (updated.Revision <= snapshot.Revision) return;
 
-        GameThread.RunSafe(() =>
-        {
-            bool wasLocalMember = HasLocalMissionMember(snapshot);
-            string previousMatchId = snapshot.CurrentMatchId;
-            string previousHost = snapshot.HostControllerId;
-            TournamentSessionSnapshot previous = snapshot;
-            if (updated.CurrentMatchId == previousMatchId && pendingManifest != null &&
-                updated.Revision > pendingManifest.Revision)
-                submittedManifestMatchId = null;
-            if (updated.CurrentMatchId == previousMatchId && pendingResult != null &&
-                updated.Revision > pendingResult.Revision)
-                submittedResultMatchId = null;
-            snapshot = updated;
-            ApplySessionState(updated);
-            this.Mission.AllowAiTicking = session.IsLocalHost;
-            tournamentBehavior.ApplySnapshot(updated);
-            KnockOutDepartingContestants(previous, updated);
-            if (wasLocalMember && !HasLocalMissionMember(updated))
-            {
-                Mission.Current?.EndMission();
-                return;
-            }
-            if (leaveRequested)
-                SendAuthoritativeLeaveRequest();
-            if (updated.HostControllerId != previousHost)
-                TransferHostAuthority(previousHost);
-
-            if (!string.IsNullOrEmpty(updated.CurrentMatchId) &&
-                !TournamentMatchTransitionRules.PreservesRunningMatch(previous, updated))
-                matchLifecycle.TryBeginMatch(
-                    updated.CurrentMatchId,
-                    updated.BracketRevision,
-                    TournamentMatchTransitionRules.RequiresArenaCleanup(previous, updated));
-
-            if (updated.CurrentMatchId != previousMatchId)
-            {
-                startedMatchId = null;
-                submittedManifestMatchId = null;
-                submittedResultMatchId = null;
-                publishedRoundResultMatchId = null;
-                presentedRoundResultMatchId = null;
-                appliedManifestSequence = 0;
-                latestManifest = null;
-                pendingManifest = null;
-                pendingApplyManifest = null;
-                pendingResult = null;
-                receivedDamageSequences.Clear();
-                receivedKnockoutSequences.Clear();
-                receivedRuntimeSequences.Clear();
-                damageSequence = 0;
-                knockoutSequence = 0;
-                runtimeSequence = 0;
-                latestRuntimeState = null;
-                resultReadyElapsed = 0f;
-                manifestAgentData.Clear();
-                manifestAgentInstances.Clear();
-                ResetNativeFightState();
-                agentSpawner.Reset();
-            }
-
-            TryStartHostMatch();
-        });
+        GameThread.RunSafe(() => ApplySessionUpdate(updated));
     }
 
+    private void ApplySessionUpdate(TournamentSessionSnapshot updated)
+    {
+        bool wasLocalMember = HasLocalMissionMember(snapshot);
+        string previousMatchId = snapshot.CurrentMatchId;
+        string previousHost = snapshot.HostControllerId;
+        TournamentSessionSnapshot previous = snapshot;
+        ResetSubmittedState(updated, previousMatchId);
+        snapshot = updated;
+        ApplySessionState(updated);
+        Mission.AllowAiTicking = session.IsLocalHost;
+        tournamentBehavior.ApplySnapshot(updated);
+        KnockOutDepartingContestants(previous, updated);
+        if (wasLocalMember && !HasLocalMissionMember(updated))
+        {
+            Mission.Current?.EndMission();
+            return;
+        }
+
+        if (leaveRequested)
+            SendAuthoritativeLeaveRequest();
+        if (updated.HostControllerId != previousHost)
+            TransferHostAuthority(previousHost);
+
+        BeginUpdatedMatch(previous, updated);
+        if (updated.CurrentMatchId != previousMatchId)
+            ResetMatchRuntimeState();
+        TryStartHostMatch();
+    }
+
+    private void ResetSubmittedState(TournamentSessionSnapshot updated, string previousMatchId)
+    {
+        if (updated.CurrentMatchId == previousMatchId && pendingManifest != null &&
+            updated.Revision > pendingManifest.Revision)
+            submittedManifestMatchId = null;
+        if (updated.CurrentMatchId == previousMatchId && pendingResult != null &&
+            updated.Revision > pendingResult.Revision)
+            submittedResultMatchId = null;
+    }
+
+    private void BeginUpdatedMatch(
+        TournamentSessionSnapshot previous,
+        TournamentSessionSnapshot updated)
+    {
+        if (string.IsNullOrEmpty(updated.CurrentMatchId) ||
+            TournamentMatchTransitionRules.PreservesRunningMatch(previous, updated))
+            return;
+
+        matchLifecycle.TryBeginMatch(
+            updated.CurrentMatchId,
+            updated.BracketRevision,
+            TournamentMatchTransitionRules.RequiresArenaCleanup(previous, updated));
+    }
+
+    private void ResetMatchRuntimeState()
+    {
+        startedMatchId = null;
+        submittedManifestMatchId = null;
+        submittedResultMatchId = null;
+        publishedRoundResultMatchId = null;
+        presentedRoundResultMatchId = null;
+        appliedManifestSequence = 0;
+        latestManifest = null;
+        pendingManifest = null;
+        pendingApplyManifest = null;
+        pendingResult = null;
+        receivedDamageSequences.Clear();
+        receivedKnockoutSequences.Clear();
+        receivedRuntimeSequences.Clear();
+        damageSequence = 0;
+        knockoutSequence = 0;
+        runtimeSequence = 0;
+        latestRuntimeState = null;
+        resultReadyElapsed = 0f;
+        manifestAgentData.Clear();
+        manifestAgentInstances.Clear();
+        ResetNativeFightState();
+        agentSpawner.Reset();
+    }
     private bool HasLocalMissionMember(TournamentSessionSnapshot state)
     {
         if (state.SpectatorControllerIds.Contains(session.OwnControllerId)) return true;
@@ -211,42 +228,62 @@ public class CoopTournamentController : CoopMissionController
 
         foreach (TournamentContestantData oldContestant in previous.Contestants)
         {
-            if (!oldContestant.IsHuman || oldContestant.IsReplaced) continue;
-            TournamentContestantData replacement = updated.Contestants
-                .FirstOrDefault(contestant => contestant.SlotId == oldContestant.SlotId);
-            if (replacement == null || !replacement.IsReplaced) continue;
-            if (!current.Teams.Any(team => team.ParticipantSlotIds.Contains(oldContestant.SlotId))) continue;
-
-            TournamentAgentSpawnData data = latestManifest.Agents
-                .FirstOrDefault(agent => agent.SlotId == oldContestant.SlotId);
-            if (data == null) continue;
-            if (!coopMissionComponent.AgentRegistry.TryGetAgentInfo(data.AgentId, out var info)) continue;
-
-            Agent agent = info.Agent;
-            Agent mount = agent?.MountAgent;
-            if (data.MountAgentId != Guid.Empty &&
-                coopMissionComponent.AgentRegistry.TryGetAgentInfo(data.MountAgentId, out var mountInfo))
-                mount = mountInfo.Agent;
-            if (mount != null && mount.IsActive())
-            {
-                coopMissionComponent.AgentMovementHandler.Interpolator.Forget(mount);
-                mount.Controller = AgentControllerType.None;
-                mount.FadeOut(false, true);
-            }
-            if (agent != null && agent.IsActive())
-            {
-                coopMissionComponent.AgentMovementHandler.Interpolator.Forget(agent);
-                agent.Controller = AgentControllerType.None;
-                agent.FadeOut(false, true);
-            }
-            if (Mission.Current?.MainAgent == agent)
-                Mission.Current.MainAgent = null;
-            coopMissionComponent.AgentRegistry.RemoveAgent(data.AgentId);
-            if (data.MountAgentId != Guid.Empty)
-                coopMissionComponent.AgentRegistry.RemoveAgent(data.MountAgentId);
+            if (!TryResolveDepartingAgent(oldContestant, updated, current, out var data, out var agent))
+                continue;
+            RemoveDepartingAgent(data, agent);
         }
     }
 
+    private bool TryResolveDepartingAgent(
+        TournamentContestantData oldContestant,
+        TournamentSessionSnapshot updated,
+        TournamentMatchData current,
+        out TournamentAgentSpawnData data,
+        out Agent agent)
+    {
+        data = null;
+        agent = null;
+        if (!oldContestant.IsHuman || oldContestant.IsReplaced) return false;
+
+        TournamentContestantData replacement = updated.Contestants
+            .FirstOrDefault(contestant => contestant.SlotId == oldContestant.SlotId);
+        if (replacement == null || !replacement.IsReplaced) return false;
+        if (!current.Teams.Any(team => team.ParticipantSlotIds.Contains(oldContestant.SlotId))) return false;
+
+        data = latestManifest.Agents
+            .FirstOrDefault(candidate => candidate.SlotId == oldContestant.SlotId);
+        if (data == null ||
+            !coopMissionComponent.AgentRegistry.TryGetAgentInfo(data.AgentId, out var info))
+            return false;
+
+        agent = info.Agent;
+        return true;
+    }
+
+    private void RemoveDepartingAgent(TournamentAgentSpawnData data, Agent agent)
+    {
+        Agent mount = agent?.MountAgent;
+        if (data.MountAgentId != Guid.Empty &&
+            coopMissionComponent.AgentRegistry.TryGetAgentInfo(data.MountAgentId, out var mountInfo))
+            mount = mountInfo.Agent;
+        RemoveDepartingAgentInstance(mount);
+        RemoveDepartingAgentInstance(agent);
+
+        if (Mission.Current?.MainAgent == agent)
+            Mission.Current.MainAgent = null;
+        coopMissionComponent.AgentRegistry.RemoveAgent(data.AgentId);
+        if (data.MountAgentId != Guid.Empty)
+            coopMissionComponent.AgentRegistry.RemoveAgent(data.MountAgentId);
+    }
+
+    private void RemoveDepartingAgentInstance(Agent agent)
+    {
+        if (agent == null || !agent.IsActive()) return;
+
+        coopMissionComponent.AgentMovementHandler.Interpolator.Forget(agent);
+        agent.Controller = AgentControllerType.None;
+        agent.FadeOut(false, true);
+    }
     private void ApplySessionState(TournamentSessionSnapshot state)
     {
         session.TryApplyState(
@@ -319,7 +356,6 @@ public class CoopTournamentController : CoopMissionController
         latestRuntimeState = state;
         GameThread.RunSafe(() => ApplyRuntimeState(state));
     }
-
 
     public bool InterceptBlow(Agent victim, Blow blow, AttackCollisionData collisionData)
     {
@@ -1094,38 +1130,58 @@ public class CoopTournamentController : CoopMissionController
         if (agent?.Equipment == null) return;
         if (runtimeEquipment != null &&
             runtimeEquipment.Length > (int)EquipmentIndex.NumAllWeaponSlots) return;
+
+        Dictionary<int, TournamentMissionWeaponData> canonical =
+            BuildCanonicalRuntimeEquipment(runtimeEquipment);
+        for (int i = 0; i < (int)EquipmentIndex.NumAllWeaponSlots; i++)
+            ReconcileRuntimeEquipmentSlot(agent, i, canonical);
+    }
+
+    private static Dictionary<int, TournamentMissionWeaponData> BuildCanonicalRuntimeEquipment(
+        TournamentMissionWeaponData[] runtimeEquipment)
+    {
         var canonical = new Dictionary<int, TournamentMissionWeaponData>();
         foreach (TournamentMissionWeaponData data in
                  runtimeEquipment ?? Array.Empty<TournamentMissionWeaponData>())
         {
-            if (data == null || data.SlotIndex < 0 ||
-                data.SlotIndex >= (int)EquipmentIndex.NumAllWeaponSlots ||
-                string.IsNullOrEmpty(data.ItemId) || data.ItemId.Length > 256 ||
-                (data.ItemModifierId?.Length ?? 0) > 256 ||
-                (data.BannerCode?.Length ?? 0) > 4096 ||
-                canonical.ContainsKey(data.SlotIndex)) continue;
+            if (!IsValidRuntimeEquipment(data) || canonical.ContainsKey(data.SlotIndex))
+                continue;
             canonical.Add(data.SlotIndex, data);
         }
-
-        for (int i = 0; i < (int)EquipmentIndex.NumAllWeaponSlots; i++)
-        {
-            EquipmentIndex slot = (EquipmentIndex)i;
-            MissionWeapon current = agent.Equipment[slot];
-            if (!canonical.TryGetValue(i, out var data))
-            {
-                if (!current.IsEmpty)
-                    agent.RemoveEquippedWeapon(slot);
-                continue;
-            }
-            if (!TryBuildRuntimeWeapon(data, out MissionWeapon weapon)) continue;
-            if (RuntimeWeaponMatches(current, weapon)) continue;
-
-            if (!current.IsEmpty)
-                agent.RemoveEquippedWeapon(slot);
-            agent.EquipWeaponWithNewEntity(slot, ref weapon);
-        }
+        return canonical;
     }
 
+    private static bool IsValidRuntimeEquipment(TournamentMissionWeaponData data)
+    {
+        return data != null &&
+            data.SlotIndex >= 0 &&
+            data.SlotIndex < (int)EquipmentIndex.NumAllWeaponSlots &&
+            !string.IsNullOrEmpty(data.ItemId) &&
+            data.ItemId.Length <= 256 &&
+            (data.ItemModifierId?.Length ?? 0) <= 256 &&
+            (data.BannerCode?.Length ?? 0) <= 4096;
+    }
+
+    private void ReconcileRuntimeEquipmentSlot(
+        Agent agent,
+        int slotIndex,
+        IReadOnlyDictionary<int, TournamentMissionWeaponData> canonical)
+    {
+        EquipmentIndex slot = (EquipmentIndex)slotIndex;
+        MissionWeapon current = agent.Equipment[slot];
+        if (!canonical.TryGetValue(slotIndex, out var data))
+        {
+            if (!current.IsEmpty)
+                agent.RemoveEquippedWeapon(slot);
+            return;
+        }
+        if (!TryBuildRuntimeWeapon(data, out MissionWeapon weapon)) return;
+        if (RuntimeWeaponMatches(current, weapon)) return;
+
+        if (!current.IsEmpty)
+            agent.RemoveEquippedWeapon(slot);
+        agent.EquipWeaponWithNewEntity(slot, ref weapon);
+    }
     private void ReconcileRuntimeWorldItems(
         IReadOnlyDictionary<Guid, TournamentWorldItemRuntimeData> canonical)
     {
@@ -1258,56 +1314,61 @@ public class CoopTournamentController : CoopMissionController
         }
     }
 
-
-
-
-
     private void TransferHostAuthority(string previousHost)
     {
         if (string.IsNullOrEmpty(previousHost) ||
             !TournamentManifestAuthority.CanResume(latestManifest, snapshot)) return;
 
+        TransferPreviousHostAgents(previousHost);
+        // Carry the elected owner into the canonical local manifest. Without this rewrite a second
+        // promotion would still look for the first host and strand every NPC under stale authority.
+        latestManifest = TournamentManifestAuthority.Normalize(latestManifest, snapshot);
+        if (session.IsLocalHost)
+            ResumeHostFight();
+    }
+
+    private void TransferPreviousHostAgents(string previousHost)
+    {
         var contestants = snapshot.Contestants.ToDictionary(contestant => contestant.SlotId);
         foreach (TournamentAgentSpawnData data in latestManifest.Agents)
         {
-            if (data.ControllerId != previousHost) continue;
-            if (contestants.TryGetValue(data.SlotId, out var contestant) &&
-                contestant.IsHuman && !contestant.IsReplaced)
-                continue;
+            if (!ShouldTransferAgent(data, previousHost, contestants)) continue;
             if (!coopMissionComponent.AgentRegistry.TryGetAgentInfo(data.AgentId, out var info)) continue;
             if (!coopMissionComponent.AgentRegistry.TryTransferAuthority(snapshot.HostControllerId, data.AgentId)) continue;
             if (data.MountAgentId != Guid.Empty)
                 coopMissionComponent.AgentRegistry.TryTransferAuthority(snapshot.HostControllerId, data.MountAgentId);
-
-            Agent agent = info.Agent;
-            if (agent == null || agent.IsMount || !agent.IsActive()) continue;
-            if (!session.IsLocalHost) continue;
-            coopMissionComponent.AgentMovementHandler.Interpolator.Forget(agent);
-            if (agent.MountAgent != null)
-                coopMissionComponent.AgentMovementHandler.Interpolator.Forget(agent.MountAgent);
-            agent.Controller = AgentControllerType.AI;
-            AgentAiWaker.Wake(agent);
+            WakeTransferredAgent(info.Agent);
         }
+    }
 
-        // Carry the elected owner into the canonical local manifest. Without this rewrite a second
-        // promotion would still look for the first host and strand every NPC under stale authority.
-        latestManifest = TournamentManifestAuthority.Normalize(latestManifest, snapshot);
+    private static bool ShouldTransferAgent(
+        TournamentAgentSpawnData data,
+        string previousHost,
+        IReadOnlyDictionary<string, TournamentContestantData> contestants)
+    {
+        if (data.ControllerId != previousHost) return false;
+        return !contestants.TryGetValue(data.SlotId, out var contestant) ||
+            !contestant.IsHuman ||
+            contestant.IsReplaced;
+    }
 
-        if (!session.IsLocalHost) return;
+    private void WakeTransferredAgent(Agent agent)
+    {
+        if (agent == null || agent.IsMount || !agent.IsActive() || !session.IsLocalHost) return;
+
+        coopMissionComponent.AgentMovementHandler.Interpolator.Forget(agent);
+        if (agent.MountAgent != null)
+            coopMissionComponent.AgentMovementHandler.Interpolator.Forget(agent.MountAgent);
+        agent.Controller = AgentControllerType.AI;
+        AgentAiWaker.Wake(agent);
+    }
+
+    private void ResumeHostFight()
+    {
         if (latestRuntimeState?.MatchId == snapshot.CurrentMatchId)
             ApplyRuntimeTeamScores(latestRuntimeState);
-        bool hasRuntimeState = latestRuntimeState?.MatchId == snapshot.CurrentMatchId;
-        Guid[] aliveAgentIds = TournamentRuntimeStateRules.GetAgents(latestRuntimeState)
-            .Keys
-            .ToArray();
-        var liveAgents = latestManifest.Agents
-            .Select(data => coopMissionComponent.AgentRegistry.TryGetAgentInfo(data.AgentId, out var info)
-                ? info.Agent
-                : null)
-            .Where(agent => agent != null && agent.IsActive() &&
-                (!hasRuntimeState ||
-                 coopMissionComponent.AgentRegistry.TryGetAgentInfo(agent, out var info) && aliveAgentIds.Contains(info.AgentId)))
-            .ToList();
+
+        List<Agent> liveAgents = ResolveLiveManifestAgents();
         tournamentBehavior.CurrentMatch.State = TournamentMatch.MatchState.Started;
         Mission.Current.SetMissionMode(MissionMode.Tournament, true);
         fightController._match = tournamentBehavior.CurrentMatch;
@@ -1322,6 +1383,26 @@ public class CoopTournamentController : CoopMissionController
         PublishRuntimeState();
     }
 
+    private List<Agent> ResolveLiveManifestAgents()
+    {
+        bool hasRuntimeState = latestRuntimeState?.MatchId == snapshot.CurrentMatchId;
+        var aliveAgentIds = new HashSet<Guid>(
+            TournamentRuntimeStateRules.GetAgents(latestRuntimeState).Keys);
+        return latestManifest.Agents
+            .Select(data => coopMissionComponent.AgentRegistry.TryGetAgentInfo(data.AgentId, out var info)
+                ? info.Agent
+                : null)
+            .Where(agent => IsLiveManifestAgent(agent, hasRuntimeState, aliveAgentIds))
+            .ToList();
+    }
+
+    private bool IsLiveManifestAgent(Agent agent, bool hasRuntimeState, HashSet<Guid> aliveAgentIds)
+    {
+        if (agent == null || !agent.IsActive()) return false;
+        if (!hasRuntimeState) return true;
+        return coopMissionComponent.AgentRegistry.TryGetAgentInfo(agent, out var info) &&
+            aliveAgentIds.Contains(info.AgentId);
+    }
     private void ResetNativeFightState()
     {
         if (fightController == null) return;
@@ -1444,7 +1525,6 @@ public class CoopTournamentController : CoopMissionController
         leaveRequestRevision = snapshot.Revision;
         relayNetwork.SendAll(new NetworkRequestLeaveActiveTournament(snapshot.SessionId, snapshot.Revision));
     }
-
 
     protected override void OnLeaving()
     {

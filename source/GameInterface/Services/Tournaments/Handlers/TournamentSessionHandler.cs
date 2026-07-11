@@ -113,94 +113,129 @@ internal sealed partial class TournamentSessionHandler : IHandler
         if (ModInformation.IsClient || !TryAuthenticate(payload.Who, out var peer, out var player))
             return;
 
-        GameThread.RunSafe(() =>
-        {
-            if (sessionRegistry.GetAll().Any(session =>
-                    session.TownId != payload.What.TownId &&
-                    session.Contestants.Any(contestant =>
-                        contestant.IsHuman && contestant.ControllerId == player.ControllerId)))
-            {
-                SendRejection(peer, payload.What.TownId, "You are already enrolled in a tournament in another town.");
-                return;
-            }
-            if (!TryResolvePlayerAtTown(player, payload.What.TownId, out var town, out var hero, out _))
-            {
-                SendRejection(peer, payload.What.TownId, "Your registered party must be in this town to enter its tournament.");
-                return;
-            }
-
-            TournamentSessionSnapshot current;
-            bool hasSession = sessionRegistry.TryGetByTown(payload.What.TownId, out current);
-            if (!hasSession || current.Phase == TournamentSessionPhase.Preparation)
-            {
-                TournamentGame nativeGame = Campaign.Current?.TournamentManager?.GetTournamentGame(town);
-                if (nativeGame == null)
-                {
-                    SendRejection(peer, payload.What.TownId, "There is no active tournament in this town.");
-                    return;
-                }
-                if (nativeGame.GetType() != typeof(FightTournamentGame))
-                {
-                    SendRejection(peer, payload.What.TownId,
-                        "Cooperative tournaments support only the standard Fight Tournament in Bannerlord v1.4.7.");
-                    return;
-                }
-
-                var game = (FightTournamentGame)nativeGame;
-
-                if (!hasSession &&
-                    (!tournamentGameInterface.TryFreezeTournament(town, game, out var seed) ||
-                     sessionRegistry.TryCreate(seed, out current) == TournamentMutationStatus.Rejected))
-                {
-                    SendRejection(peer, payload.What.TownId, "The tournament could not be prepared for cooperative play.");
-                    return;
-                }
-            }
-
-            if (!string.IsNullOrEmpty(payload.What.SessionId) && payload.What.SessionId != current.SessionId)
-            {
-                SendCanonical(peer, current);
-                return;
-            }
-
-            if (current.Phase != TournamentSessionPhase.Preparation)
-            {
-                var spectateStatus = sessionRegistry.TryRequestSpectate(
-                    current.SessionId,
-                    current.Revision,
-                    player.ControllerId,
-                    out current);
-                LogSpectatorRequest(player.ControllerId, spectateStatus, current);
-                if (spectateStatus == TournamentMutationStatus.Applied)
-                {
-                    BroadcastSnapshot(current);
-                    network.Send(peer, new NetworkEnterTournamentMission(current, true));
-                }
-                return;
-            }
-
-            long expectedRevision = string.IsNullOrEmpty(payload.What.SessionId)
-                ? current.Revision
-                : payload.What.ExpectedRevision;
-            var status = sessionRegistry.TryJoin(
-                current.SessionId,
-                expectedRevision,
-                player.ControllerId,
-                player.CharacterObjectId,
-                hero.Name?.ToString() ?? player.ControllerId,
-                MBRandom.RandomInt(int.MaxValue),
-                hero.IsLord,
-                out var snapshot);
-            if (status == TournamentMutationStatus.Full)
-            {
-                SendRejection(peer, payload.What.TownId, "This tournament already has 16 human competitors.");
-                SendCanonical(peer, snapshot);
-                return;
-            }
-            PublishMutation(status, peer, snapshot);
-        }, context: nameof(Handle_Join));
+        GameThread.RunSafe(
+            () => ProcessJoin(peer, player, payload.What),
+            context: nameof(Handle_Join));
     }
 
+    private void ProcessJoin(
+        NetPeer peer,
+        Player player,
+        NetworkRequestJoinTournament request)
+    {
+        if (HasEnrollmentInAnotherTown(player.ControllerId, request.TownId))
+        {
+            SendRejection(peer, request.TownId, "You are already enrolled in a tournament in another town.");
+            return;
+        }
+        if (!TryResolvePlayerAtTown(player, request.TownId, out var town, out var hero, out _))
+        {
+            SendRejection(peer, request.TownId, "Your registered party must be in this town to enter its tournament.");
+            return;
+        }
+        if (!TryResolveJoinSession(peer, request.TownId, town, out var current))
+            return;
+        if (!string.IsNullOrEmpty(request.SessionId) && request.SessionId != current.SessionId)
+        {
+            SendCanonical(peer, current);
+            return;
+        }
+        if (current.Phase != TournamentSessionPhase.Preparation)
+        {
+            RequestActiveSpectate(peer, player.ControllerId, current);
+            return;
+        }
+
+        JoinPreparation(peer, player, hero, request, current);
+    }
+
+    private bool HasEnrollmentInAnotherTown(string controllerId, string townId)
+    {
+        return sessionRegistry.GetAll().Any(session =>
+            session.TownId != townId &&
+            session.Contestants.Any(contestant =>
+                contestant.IsHuman && contestant.ControllerId == controllerId));
+    }
+
+    private bool TryResolveJoinSession(
+        NetPeer peer,
+        string townId,
+        Town town,
+        out TournamentSessionSnapshot current)
+    {
+        bool hasSession = sessionRegistry.TryGetByTown(townId, out current);
+        if (hasSession && current.Phase != TournamentSessionPhase.Preparation)
+            return true;
+
+        TournamentGame nativeGame = Campaign.Current?.TournamentManager?.GetTournamentGame(town);
+        if (nativeGame == null)
+        {
+            SendRejection(peer, townId, "There is no active tournament in this town.");
+            return false;
+        }
+        if (nativeGame.GetType() != typeof(FightTournamentGame))
+        {
+            SendRejection(peer, townId,
+                "Cooperative tournaments support only the standard Fight Tournament in Bannerlord v1.4.7.");
+            return false;
+        }
+        if (hasSession)
+            return true;
+
+        if (!tournamentGameInterface.TryFreezeTournament(town, (FightTournamentGame)nativeGame, out var seed) ||
+            sessionRegistry.TryCreate(seed, out current) == TournamentMutationStatus.Rejected)
+        {
+            SendRejection(peer, townId, "The tournament could not be prepared for cooperative play.");
+            return false;
+        }
+        return true;
+    }
+
+    private void RequestActiveSpectate(
+        NetPeer peer,
+        string controllerId,
+        TournamentSessionSnapshot current)
+    {
+        TournamentMutationStatus status = sessionRegistry.TryRequestSpectate(
+            current.SessionId,
+            current.Revision,
+            controllerId,
+            out current);
+        LogSpectatorRequest(controllerId, status, current);
+        if (status != TournamentMutationStatus.Applied)
+            return;
+
+        BroadcastSnapshot(current);
+        network.Send(peer, new NetworkEnterTournamentMission(current, true));
+    }
+
+    private void JoinPreparation(
+        NetPeer peer,
+        Player player,
+        Hero hero,
+        NetworkRequestJoinTournament request,
+        TournamentSessionSnapshot current)
+    {
+        long expectedRevision = string.IsNullOrEmpty(request.SessionId)
+            ? current.Revision
+            : request.ExpectedRevision;
+        TournamentMutationStatus status = sessionRegistry.TryJoin(
+            current.SessionId,
+            expectedRevision,
+            player.ControllerId,
+            player.CharacterObjectId,
+            hero.Name?.ToString() ?? player.ControllerId,
+            MBRandom.RandomInt(int.MaxValue),
+            hero.IsLord,
+            out var snapshot);
+        if (status == TournamentMutationStatus.Full)
+        {
+            SendRejection(peer, request.TownId, "This tournament already has 16 human competitors.");
+            SendCanonical(peer, snapshot);
+            return;
+        }
+        PublishMutation(status, peer, snapshot);
+    }
     private void Handle_LeavePreparation(MessagePayload<NetworkRequestLeaveTournamentPreparation> payload)
     {
         if (ModInformation.IsClient || !TryAuthenticate(payload.Who, out var peer, out var player))
@@ -631,51 +666,70 @@ internal sealed partial class TournamentSessionHandler : IHandler
     {
         if (ModInformation.IsClient)
             return;
-
-        string controllerId;
-        if (playerManager.TryGetPlayer(payload.What.PlayerId, out var player))
-            controllerId = player.ControllerId;
-        else if (!tournamentPeerControllers.TryGetValue(payload.What.PlayerId, out controllerId))
+        if (!TryResolveDisconnectedController(payload.What.PlayerId, out var controllerId))
             return;
-        tournamentPeerControllers.TryRemove(payload.What.PlayerId, out _);
 
-        GameThread.RunSafe(() =>
+        GameThread.RunSafe(
+            () => ProcessDisconnected(controllerId),
+            context: nameof(Handle_Disconnected));
+    }
+
+    private bool TryResolveDisconnectedController(NetPeer playerId, out string controllerId)
+    {
+        if (playerManager.TryGetPlayer(playerId, out var player))
+            controllerId = player.ControllerId;
+        else if (!tournamentPeerControllers.TryGetValue(playerId, out controllerId))
+            return false;
+
+        tournamentPeerControllers.TryRemove(playerId, out _);
+        return true;
+    }
+
+    private void ProcessDisconnected(string controllerId)
+    {
+        foreach (TournamentSessionSnapshot snapshot in sessionRegistry.GetAll())
+            ProcessDisconnectedSession(controllerId, snapshot);
+    }
+
+    private void ProcessDisconnectedSession(
+        string controllerId,
+        TournamentSessionSnapshot snapshot)
+    {
+        bool involved = snapshot.Contestants.Any(contestant => contestant.ControllerId == controllerId) ||
+            snapshot.SpectatorControllerIds.Contains(controllerId);
+        if (!involved && snapshot.Phase == TournamentSessionPhase.Preparation)
+            return;
+
+        if (snapshot.Phase == TournamentSessionPhase.Preparation)
         {
-            foreach (TournamentSessionSnapshot snapshot in sessionRegistry.GetAll())
-            {
-                bool involved = snapshot.Contestants.Any(contestant => contestant.ControllerId == controllerId) ||
-                    snapshot.SpectatorControllerIds.Contains(controllerId);
-                if (!involved && snapshot.Phase == TournamentSessionPhase.Preparation)
-                    continue;
+            LeavePreparationAfterDisconnect(controllerId, snapshot);
+            return;
+        }
+        if (!snapshot.IsCompleted && !IsConfirmedEntrant(snapshot, controllerId))
+            LeaveActive(snapshot.SessionId, snapshot.Revision, controllerId, null);
+    }
 
-                if (snapshot.Phase == TournamentSessionPhase.Preparation)
-                {
-                    var status = sessionRegistry.TryLeavePreparation(
-                        snapshot.SessionId,
-                        snapshot.Revision,
-                        controllerId,
-                        out var changed,
-                        out var removed);
-                    if (status == TournamentMutationStatus.Applied)
-                    {
-                        if (removed)
-                        {
-                            network.SendAll(new NetworkTournamentSessionRemoved(snapshot.SessionId, snapshot.TownId));
-                            messageBroker.Publish(this, new TournamentSessionRemoved(snapshot.SessionId, snapshot.TownId));
-                        }
-                        else if (changed != null)
-                        {
-                            BroadcastSnapshot(changed);
-                }
-                    }
-                }
-                else if (!snapshot.IsCompleted &&
-                         !IsConfirmedEntrant(snapshot, controllerId))
-                {
-                    LeaveActive(snapshot.SessionId, snapshot.Revision, controllerId, null);
-                }
-            }
-        }, context: nameof(Handle_Disconnected));
+    private void LeavePreparationAfterDisconnect(
+        string controllerId,
+        TournamentSessionSnapshot snapshot)
+    {
+        TournamentMutationStatus status = sessionRegistry.TryLeavePreparation(
+            snapshot.SessionId,
+            snapshot.Revision,
+            controllerId,
+            out var changed,
+            out var removed);
+        if (status != TournamentMutationStatus.Applied)
+            return;
+        if (removed)
+        {
+            network.SendAll(new NetworkTournamentSessionRemoved(snapshot.SessionId, snapshot.TownId));
+            messageBroker.Publish(this, new TournamentSessionRemoved(snapshot.SessionId, snapshot.TownId));
+        }
+        else if (changed != null)
+        {
+            BroadcastSnapshot(changed);
+        }
     }
 
     private void LeaveActive(
@@ -690,98 +744,140 @@ internal sealed partial class TournamentSessionHandler : IHandler
             return;
         }
 
-        bool isMember = current.Contestants.Any(contestant =>
-                contestant.IsHuman && contestant.ControllerId == controllerId) ||
-            current.SpectatorControllerIds.Contains(controllerId);
-        if (current.IsCompleted)
-        {
-            if (isMember)
-            {
-                Logger.Information(
-                    "[Tournament] Completed tournament leave requested session={SessionId}, controller={ControllerId}",
-                    current.SessionId,
-                    controllerId);
-                FinalizeCompletedTournament(current);
-            }
-            else
-            {
-                SendCanonical(peer, current);
-            }
+        bool isMember = IsActiveMember(current, controllerId);
+        if (TryHandleCompletedLeave(current, controllerId, isMember, peer))
             return;
-        }
-
-        if (!objectManager.TryGetObject(current.TownId, out Town town) ||
-            town.Culture?.BasicTroop == null ||
-            !objectManager.TryGetId(town.Culture.BasicTroop, out _))
+        if (!TryResolveReplacementName(current, out var replacementName))
         {
             SendCanonical(peer, current);
             return;
         }
-
-        string replacementName = town.Culture.BasicTroop.Name?.ToString() ?? "Tournament Recruit";
         if (expectedRevision != current.Revision && !isMember)
         {
             SendCanonical(peer, current);
             return;
         }
-        expectedRevision = current.Revision;
 
+        ApplyActiveLeave(current, controllerId, replacementName, peer);
+    }
+
+    private static bool IsActiveMember(
+        TournamentSessionSnapshot snapshot,
+        string controllerId)
+    {
+        return snapshot.Contestants.Any(contestant =>
+                contestant.IsHuman && contestant.ControllerId == controllerId) ||
+            snapshot.SpectatorControllerIds.Contains(controllerId);
+    }
+
+    private bool TryHandleCompletedLeave(
+        TournamentSessionSnapshot current,
+        string controllerId,
+        bool isMember,
+        NetPeer peer)
+    {
+        if (!current.IsCompleted)
+            return false;
+        if (!isMember)
+        {
+            SendCanonical(peer, current);
+            return true;
+        }
+
+        Logger.Information(
+            "[Tournament] Completed tournament leave requested session={SessionId}, controller={ControllerId}",
+            current.SessionId,
+            controllerId);
+        FinalizeCompletedTournament(current);
+        return true;
+    }
+
+    private bool TryResolveReplacementName(
+        TournamentSessionSnapshot current,
+        out string replacementName)
+    {
+        replacementName = null;
+        if (!objectManager.TryGetObject(current.TownId, out Town town) ||
+            town.Culture?.BasicTroop == null ||
+            !objectManager.TryGetId(town.Culture.BasicTroop, out _))
+            return false;
+
+        replacementName = town.Culture.BasicTroop.Name?.ToString() ?? "Tournament Recruit";
+        return true;
+    }
+
+    private void ApplyActiveLeave(
+        TournamentSessionSnapshot current,
+        string controllerId,
+        string replacementName,
+        NetPeer peer)
+    {
         TournamentSpawnManifestData migrationManifest = null;
         if (current.HostControllerId == controllerId)
-            sessionRegistry.TryGetSpawnManifest(sessionId, out migrationManifest);
+            sessionRegistry.TryGetSpawnManifest(current.SessionId, out migrationManifest);
 
-        var status = sessionRegistry.TryLeaveActive(
-            sessionId,
-            expectedRevision,
+        TournamentMutationStatus status = sessionRegistry.TryLeaveActive(
+            current.SessionId,
+            current.Revision,
             controllerId,
             MBRandom.RandomInt(int.MaxValue),
             replacementName,
             out var snapshot,
             out var outcome,
             out var noViewers);
-        if (status == TournamentMutationStatus.Applied &&
-            migrationManifest != null &&
-            snapshot.HostControllerId != current.HostControllerId)
-        {
-            network.SendAll(new NetworkTournamentSpawnManifest(migrationManifest));
-            messageBroker.Publish(this, new TournamentSpawnManifestUpdated(migrationManifest));
-        }
+        PublishHostMigration(current, snapshot, status, migrationManifest);
         if (status == TournamentMutationStatus.Applied)
-            SettleBetLedger(sessionId, controllerId, snapshot.Revision, current.CurrentMatchId, "Tournament bet forfeited", peer);
+            SettleBetLedger(current.SessionId, controllerId, snapshot.Revision, current.CurrentMatchId, "Tournament bet forfeited", peer);
         PublishMutation(status, peer, snapshot);
         if (status == TournamentMutationStatus.Applied && outcome == TournamentBallotOutcome.SimulateMatch)
             snapshot = SimulateCurrentMatchAndAdvance(snapshot, controllerId);
         if (status == TournamentMutationStatus.Applied && noViewers && snapshot != null)
-        {
-            Logger.Information(
-                "[Tournament] Last human left active tournament session={SessionId}, phase={Phase}, revision={Revision}; resolving remaining bracket immediately",
-                snapshot.SessionId,
-                snapshot.Phase,
-                snapshot.Revision);
-            if (!snapshot.IsCompleted)
-                SimulateRemainingTournament(snapshot);
-
-            if (sessionRegistry.TryGet(snapshot.SessionId, out var completed) && completed.IsCompleted)
-            {
-                Logger.Information(
-                    "[Tournament] Last-human leave completed simulation session={SessionId}, winner={WinnerSlotId}; finalizing immediately",
-                    completed.SessionId,
-                    completed.WinnerSlotId);
-                FinalizeCompletedTournament(completed);
-            }
-            else
-            {
-                Logger.Error(
-                    "[Tournament] Last-human leave failed to complete tournament session={SessionId}; canonicalPresent={CanonicalPresent}, phase={Phase}, match={MatchId}, revision={Revision}",
-                    snapshot.SessionId,
-                    completed != null,
-                    completed?.Phase,
-                    completed?.CurrentMatchId,
-                    completed?.Revision);
-            }
-        }
+            ResolveAfterLastHumanLeaves(snapshot);
     }
 
+    private void PublishHostMigration(
+        TournamentSessionSnapshot previous,
+        TournamentSessionSnapshot snapshot,
+        TournamentMutationStatus status,
+        TournamentSpawnManifestData migrationManifest)
+    {
+        if (status != TournamentMutationStatus.Applied ||
+            migrationManifest == null ||
+            snapshot.HostControllerId == previous.HostControllerId)
+            return;
+
+        network.SendAll(new NetworkTournamentSpawnManifest(migrationManifest));
+        messageBroker.Publish(this, new TournamentSpawnManifestUpdated(migrationManifest));
+    }
+
+    private void ResolveAfterLastHumanLeaves(TournamentSessionSnapshot snapshot)
+    {
+        Logger.Information(
+            "[Tournament] Last human left active tournament session={SessionId}, phase={Phase}, revision={Revision}; resolving remaining bracket immediately",
+            snapshot.SessionId,
+            snapshot.Phase,
+            snapshot.Revision);
+        if (!snapshot.IsCompleted)
+            SimulateRemainingTournament(snapshot);
+
+        if (sessionRegistry.TryGet(snapshot.SessionId, out var completed) && completed.IsCompleted)
+        {
+            Logger.Information(
+                "[Tournament] Last-human leave completed simulation session={SessionId}, winner={WinnerSlotId}; finalizing immediately",
+                completed.SessionId,
+                completed.WinnerSlotId);
+            FinalizeCompletedTournament(completed);
+            return;
+        }
+
+        Logger.Error(
+            "[Tournament] Last-human leave failed to complete tournament session={SessionId}; canonicalPresent={CanonicalPresent}, phase={Phase}, match={MatchId}, revision={Revision}",
+            snapshot.SessionId,
+            completed != null,
+            completed?.Phase,
+            completed?.CurrentMatchId,
+            completed?.Revision);
+    }
     private bool TryAuthenticate(object source, out NetPeer peer, out Player player)
     {
         peer = source as NetPeer;
@@ -900,76 +996,34 @@ internal sealed partial class TournamentSessionHandler : IHandler
 
     private void CompleteTournament(TournamentSessionSnapshot snapshot)
     {
-        if (snapshot == null || !snapshot.IsCompleted)
-            return;
-        if (completionTransactions.TryGetValue(snapshot.SessionId, out var existing) &&
-            (existing.IsCompleted || existing.IsReadyForRemoval))
+        if (!ShouldCompleteTournament(snapshot))
             return;
         if (!completionInProgress.Add(snapshot.SessionId))
             return;
 
         try
         {
-            if (!tournamentGameInterface.TryRehydrateGame(snapshot, out var game) ||
-                !TryResolveWinner(snapshot, out var winner, out var participants) ||
-                Campaign.Current?.TournamentManager is not TournamentManager manager ||
-                game.Town == null ||
-                game.Prize == null)
+            if (!TryResolveCompletionContext(
+                    snapshot,
+                    out var game,
+                    out var winner,
+                    out var participants,
+                    out var winnerData,
+                    out var manager))
             {
                 Logger.Error("Could not rehydrate completed tournament session {SessionId}", snapshot.SessionId);
                 return;
             }
 
-            TournamentContestantData winnerData = snapshot.Contestants
-                .FirstOrDefault(contestant => contestant.SlotId == snapshot.WinnerSlotId);
-            if (winnerData == null ||
-                winnerData.ControllerId != null &&
-                (!winner.IsHero || winner.HeroObject?.PartyBelongedTo == null))
-            {
-                Logger.Error("Could not resolve the completed tournament winner reward target for {SessionId}",
-                    snapshot.SessionId);
-                return;
-            }
-
-            if (!completionTransactions.TryGetValue(snapshot.SessionId, out var transaction))
-            {
-                transaction = new TournamentCompletionTransaction();
-                completionTransactions.Add(snapshot.SessionId, transaction);
-            }
-
-            transaction.Run(TournamentCompletionStep.Leaderboard, () =>
-            {
-                if (winner.IsHero)
-                    manager.AddLeaderboardEntry(winner.HeroObject);
-            });
-            transaction.Run(TournamentCompletionStep.Influence, () =>
-            {
-                if (winnerData.ControllerId != null &&
-                    Campaign.Current.GameMode == CampaignGameMode.Campaign &&
-                    winner.HeroObject.MapFaction?.IsKingdomFaction == true &&
-                    winner.HeroObject.MapFaction.Leader != winner.HeroObject)
-                {
-                    GainKingdomInfluenceAction.ApplyForDefault(winner.HeroObject, 1f);
-                }
-            });
-            transaction.Run(TournamentCompletionStep.Prize, () =>
-            {
-                if (!winner.IsHero)
-                    return;
-                if (winnerData.ControllerId != null)
-                    winner.HeroObject.PartyBelongedTo.ItemRoster.AddToCounts(game.Prize, 1);
-                else
-                    manager.GivePrizeToWinner(game, winner.HeroObject, true);
-            });
-            transaction.Run(TournamentCompletionStep.BetPayout,
-                () => PayWinningBetAndForfeitOthers(snapshot, winner));
-            transaction.Run(TournamentCompletionStep.BetSettlement, () => { });
-            transaction.Run(TournamentCompletionStep.SimulationProgression, () =>
-            {
-                if (!liveCombatSessions.Contains(snapshot.SessionId))
-                    ApplyTournamentProgression(game.Town, participants);
-            });
-
+            TournamentCompletionTransaction transaction = GetOrCreateCompletionTransaction(snapshot.SessionId);
+            RunCompletionTransactions(
+                snapshot,
+                game,
+                winner,
+                participants,
+                winnerData,
+                manager,
+                transaction);
             if (!orderlyShutdownInProgress)
                 saveDeferral.Flush();
         }
@@ -983,44 +1037,102 @@ internal sealed partial class TournamentSessionHandler : IHandler
         }
     }
 
+    private bool ShouldCompleteTournament(TournamentSessionSnapshot snapshot)
+    {
+        if (snapshot == null || !snapshot.IsCompleted)
+            return false;
+        return !completionTransactions.TryGetValue(snapshot.SessionId, out var existing) ||
+            (!existing.IsCompleted && !existing.IsReadyForRemoval);
+    }
+
+    private bool TryResolveCompletionContext(
+        TournamentSessionSnapshot snapshot,
+        out FightTournamentGame game,
+        out CharacterObject winner,
+        out MBList<CharacterObject> participants,
+        out TournamentContestantData winnerData,
+        out TournamentManager manager)
+    {
+        game = null;
+        winner = null;
+        participants = null;
+        winnerData = snapshot.Contestants
+            .FirstOrDefault(contestant => contestant.SlotId == snapshot.WinnerSlotId);
+        manager = Campaign.Current?.TournamentManager as TournamentManager;
+        if (!tournamentGameInterface.TryRehydrateGame(snapshot, out game) ||
+            !TryResolveWinner(snapshot, out winner, out participants) ||
+            manager == null ||
+            game.Town == null ||
+            game.Prize == null ||
+            winnerData == null)
+            return false;
+
+        return winnerData.ControllerId == null ||
+            (winner.IsHero && winner.HeroObject?.PartyBelongedTo != null);
+    }
+
+    private TournamentCompletionTransaction GetOrCreateCompletionTransaction(string sessionId)
+    {
+        if (completionTransactions.TryGetValue(sessionId, out var transaction))
+            return transaction;
+
+        transaction = new TournamentCompletionTransaction();
+        completionTransactions.Add(sessionId, transaction);
+        return transaction;
+    }
+
+    private void RunCompletionTransactions(
+        TournamentSessionSnapshot snapshot,
+        FightTournamentGame game,
+        CharacterObject winner,
+        MBList<CharacterObject> participants,
+        TournamentContestantData winnerData,
+        TournamentManager manager,
+        TournamentCompletionTransaction transaction)
+    {
+        transaction.Run(TournamentCompletionStep.Leaderboard, () =>
+        {
+            if (winner.IsHero)
+                manager.AddLeaderboardEntry(winner.HeroObject);
+        });
+        transaction.Run(TournamentCompletionStep.Influence, () =>
+        {
+            if (winnerData.ControllerId != null &&
+                Campaign.Current.GameMode == CampaignGameMode.Campaign &&
+                winner.HeroObject.MapFaction?.IsKingdomFaction == true &&
+                winner.HeroObject.MapFaction.Leader != winner.HeroObject)
+            {
+                GainKingdomInfluenceAction.ApplyForDefault(winner.HeroObject, 1f);
+            }
+        });
+        transaction.Run(TournamentCompletionStep.Prize, () =>
+        {
+            if (!winner.IsHero)
+                return;
+            if (winnerData.ControllerId != null)
+                winner.HeroObject.PartyBelongedTo.ItemRoster.AddToCounts(game.Prize, 1);
+            else
+                manager.GivePrizeToWinner(game, winner.HeroObject, true);
+        });
+        transaction.Run(TournamentCompletionStep.BetPayout,
+            () => PayWinningBetAndForfeitOthers(snapshot, winner));
+        transaction.Run(TournamentCompletionStep.BetSettlement, () => { });
+        transaction.Run(TournamentCompletionStep.SimulationProgression, () =>
+        {
+            if (!liveCombatSessions.Contains(snapshot.SessionId))
+                ApplyTournamentProgression(game.Town, participants);
+        });
+    }
+
     private void FinalizeCompletedTournament(TournamentSessionSnapshot snapshot)
     {
         CompleteTournament(snapshot);
-        if (snapshot == null ||
-            !completionTransactions.TryGetValue(snapshot.SessionId, out var transaction) ||
-            !transaction.IsReadyForRemoval ||
-            transaction.IsCompleted ||
-            !completionInProgress.Add(snapshot.SessionId))
-        {
+        if (!TryBeginFinalization(snapshot, out var transaction))
             return;
-        }
 
         try
         {
-            if (!tournamentGameInterface.TryRehydrateGame(snapshot, out var game) ||
-                !TryResolveWinner(snapshot, out var winner, out var participants) ||
-                game.Town == null ||
-                game.Prize == null)
-            {
-                throw new InvalidOperationException("Could not rehydrate the tournament before final removal.");
-            }
-
-            transaction.Run(TournamentCompletionStep.FinishedEvent, () =>
-                CampaignEventDispatcher.Instance.OnTournamentFinished(
-                    winner,
-                    new MBReadOnlyList<CharacterObject>(participants),
-                    game.Town,
-                    game.Prize));
-            transaction.Run(TournamentCompletionStep.NativeRemoval, () =>
-            {
-                if (!RemoveNativeTournament(snapshot))
-                    throw new InvalidOperationException("Could not remove the completed native tournament.");
-            });
-            transaction.Run(TournamentCompletionStep.SessionRemoval, () =>
-            {
-                if (!RemoveSessionAndBroadcast(snapshot))
-                    throw new InvalidOperationException("Could not remove the completed coop tournament session.");
-            });
+            RunFinalizationTransactions(snapshot, transaction);
             Logger.Information(
                 "[Tournament] Finalized completed tournament session={SessionId}; ejecting all mission members",
                 snapshot.SessionId);
@@ -1037,6 +1149,47 @@ internal sealed partial class TournamentSessionHandler : IHandler
         }
     }
 
+    private bool TryBeginFinalization(
+        TournamentSessionSnapshot snapshot,
+        out TournamentCompletionTransaction transaction)
+    {
+        transaction = null;
+        return snapshot != null &&
+            completionTransactions.TryGetValue(snapshot.SessionId, out transaction) &&
+            transaction.IsReadyForRemoval &&
+            !transaction.IsCompleted &&
+            completionInProgress.Add(snapshot.SessionId);
+    }
+
+    private void RunFinalizationTransactions(
+        TournamentSessionSnapshot snapshot,
+        TournamentCompletionTransaction transaction)
+    {
+        if (!tournamentGameInterface.TryRehydrateGame(snapshot, out var game) ||
+            !TryResolveWinner(snapshot, out var winner, out var participants) ||
+            game.Town == null ||
+            game.Prize == null)
+        {
+            throw new InvalidOperationException("Could not rehydrate the tournament before final removal.");
+        }
+
+        transaction.Run(TournamentCompletionStep.FinishedEvent, () =>
+            CampaignEventDispatcher.Instance.OnTournamentFinished(
+                winner,
+                new MBReadOnlyList<CharacterObject>(participants),
+                game.Town,
+                game.Prize));
+        transaction.Run(TournamentCompletionStep.NativeRemoval, () =>
+        {
+            if (!RemoveNativeTournament(snapshot))
+                throw new InvalidOperationException("Could not remove the completed native tournament.");
+        });
+        transaction.Run(TournamentCompletionStep.SessionRemoval, () =>
+        {
+            if (!RemoveSessionAndBroadcast(snapshot))
+                throw new InvalidOperationException("Could not remove the completed coop tournament session.");
+        });
+    }
     private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
     {
         if (ModInformation.IsClient)
@@ -1184,8 +1337,8 @@ internal sealed partial class TournamentSessionHandler : IHandler
             }
 
             if (agent.MountAgentId != Guid.Empty &&
-                (!string.IsNullOrEmpty(agent.MountCharacterId) &&
-                 !objectManager.TryGetObject(agent.MountCharacterId, out BasicCharacterObject _) ||
+                ((!string.IsNullOrEmpty(agent.MountCharacterId) &&
+                  !objectManager.TryGetObject(agent.MountCharacterId, out BasicCharacterObject _)) ||
                  !HasValidEquipmentObjects(agent.MountEquipment)))
             {
                 return false;
@@ -1199,8 +1352,8 @@ internal sealed partial class TournamentSessionHandler : IHandler
         foreach (TournamentEquipmentElementData element in equipment)
         {
             if (!objectManager.TryGetObject(element.ItemId, out ItemObject _) ||
-                !string.IsNullOrEmpty(element.ItemModifierId) &&
-                !objectManager.TryGetObject(element.ItemModifierId, out ItemModifier _))
+                (!string.IsNullOrEmpty(element.ItemModifierId) &&
+                 !objectManager.TryGetObject(element.ItemModifierId, out ItemModifier _)))
             {
                 return false;
             }

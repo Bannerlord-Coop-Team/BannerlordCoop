@@ -55,7 +55,6 @@ public class CoopTournamentVMStateTests
         Assert.Equal(TournamentPlayerChoice.Skip, state.SelectedChoice);
     }
 
-
     [Fact]
     public void AcceptedBetSummary_UsesCurrentRoundAmountForRemainingCap()
     {

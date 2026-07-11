@@ -23,7 +23,7 @@ public class TournamentMissionSessionTests
         Assert.False(session.IsLocalHost);
 
         Assert.True(session.TryApplyState(
-            "session", "mission", 11, 3, "match", "successor", new string[0]));
+            "session", "mission", 11, 3, "match", "successor", System.Array.Empty<string>()));
 
         Assert.True(session.IsLocalHost);
         Assert.Equal("session", session.SessionId);
@@ -36,7 +36,7 @@ public class TournamentMissionSessionTests
     {
         var session = CreateSession("successor");
         Assert.True(session.TryApplyState(
-            "session", "mission", 11, 4, "match", "successor", new string[0]));
+            "session", "mission", 11, 4, "match", "successor", System.Array.Empty<string>()));
 
         Assert.False(session.TryApplyState(
             "session", "mission", 10, 3, "old-match", "host", new[] { "successor" }));
