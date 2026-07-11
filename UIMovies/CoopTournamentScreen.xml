@@ -1,0 +1,442 @@
+<Prefab>
+  <Constants>
+    <Constant Name="CoopTournament.Round.Margin" Value="10" />
+    <Constant Name="CoopTournament.BannerContainer.AnimDelay" Value="0.5" />
+    <Constant Name="CoopTournament.WinnerTextContainer.AnimDelay" Value="1.0" />
+    <Constant Name="CoopTournament.CharacterContainer.AnimDelay" Value="1.0" />
+    <Constant Name="CoopTournament.RewardsContainer.AnimDelay" Value="1.3" />
+    <Constant Name="Tournament.Flags.Cup.Width" BrushLayer="Default" BrushName="Tournament.Flags.Cup" BrushValueType="Width" />
+    <Constant Name="Tournament.Flags.Cup.Height" BrushLayer="Default" BrushName="Tournament.Flags.Cup" BrushValueType="Height" />
+  </Constants>
+  <VisualDefinitions>
+    <VisualDefinition Name="CoopTournament.BannerContainer" TransitionDuration="0.25">
+      <VisualState SuggestedHeight="0" State="Default" />
+      <VisualState SuggestedHeight="500" State="Opened" />
+    </VisualDefinition>
+    <VisualDefinition Name="CoopTournament.WinnerTextContainer" TransitionDuration="0">
+      <VisualState SuggestedWidth="0" SuggestedHeight="0" State="Default" />
+      <VisualState SuggestedWidth="750" SuggestedHeight="150" State="Opened" />
+    </VisualDefinition>
+    <VisualDefinition Name="CoopTournament.CharacterContainer" TransitionDuration="0">
+      <VisualState SuggestedWidth="0" SuggestedHeight="0" State="Default" />
+      <VisualState SuggestedWidth="350" SuggestedHeight="500" State="Opened" />
+    </VisualDefinition>
+    <VisualDefinition Name="CoopTournament.RewardsContainer" TransitionDuration="0">
+      <VisualState SuggestedWidth="0" SuggestedHeight="0" State="Default" />
+      <VisualState SuggestedWidth="750" SuggestedHeight="350" State="Opened" />
+    </VisualDefinition>
+    <VisualDefinition Name="CoopTournament.BattleRewardsList" TransitionDuration="0.6">
+      <VisualState SuggestedHeight="0" MarginBottom="0" State="Default" />
+      <VisualState SuggestedHeight="465" MarginBottom="30" State="Opened" />
+    </VisualDefinition>
+    <VisualDefinition Name="CoopTournament.BattleRewardItem" TransitionDuration="0.1">
+      <VisualState PositionXOffset="-80" State="Default" />
+      <VisualState PositionXOffset="0" State="Opened" />
+    </VisualDefinition>
+  </VisualDefinitions>
+  <Window>
+    <TournamentScreenWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                            DoNotAcceptEvents="true" IsOver="@IsOver"
+                            CharacterContainer="MainContents\ScrollablePanel\ScrollablePanel\ClipRect\InnerPanel\ListPanel\ResultBox\CharacterContainer"
+                            FlagsSuccess="MainContents\ScrollablePanel\ScrollablePanel\ClipRect\InnerPanel\ListPanel\ResultBox\FlagsSuccess"
+                            RewardsContainer="MainContents\ScrollablePanel\ScrollablePanel\ClipRect\InnerPanel\ListPanel\ResultBox\RewardsContainer"
+                            ScoreboardBattleRewardsWidget="MainContents\ScrollablePanel\ScrollablePanel\ClipRect\InnerPanel\ListPanel\ResultBox\RewardsContainer\BattleRewards"
+                            WinnerTextContainer1="MainContents\ScrollablePanel\ScrollablePanel\ClipRect\InnerPanel\ListPanel\ResultBox\WinnerTextContainer">
+      <Children>
+        <Widget Id="MainContents" WidthSizePolicy="Fixed" HeightSizePolicy="StretchToParent" SuggestedWidth="1600"
+                HorizontalAlignment="Center" VerticalAlignment="Center" Sprite="highscore_bar_9"
+                AlphaFactor="0.75" IsHidden="@IsCurrentMatchActive">
+          <Children>
+            <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="105">
+              <Children>
+                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                            Brush="Tournament.Title" Brush.TextHorizontalAlignment="Center"
+                            Text="@TournamentTitle" />
+              </Children>
+            </Widget>
+
+            <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="2"
+                    VerticalAlignment="Bottom" MarginLeft="20" MarginRight="20" MarginBottom="112"
+                    Sprite="SPGeneral\SPScoreboard\bottom_divider" AlphaFactor="0.5" />
+            <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="2"
+                    VerticalAlignment="Top" MarginLeft="20" MarginRight="20" MarginTop="105"
+                    Sprite="SPGeneral\SPScoreboard\bottom_divider" AlphaFactor="0.5" />
+
+            <Standard.ScrollablePanel Id="ScrollablePanel" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                                      MarginTop="105" MarginBottom="122" Parameter.OverlayShadowBrush=""
+                                      Parameter.ScrollbarVisible="false">
+              <Children>
+                <ListPanel Id="ListPanel" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                           HorizontalAlignment="Center" MarginTop="10" MarginRight="25"
+                           StackLayout.LayoutMethod="VerticalTopToBottom">
+                  <Children>
+                    <Widget Id="ResultBox" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren">
+                      <Children>
+                        <DelayedStateChanger Id="FlagsSuccess" VisualDefinition="CoopTournament.BannerContainer"
+                                             WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed"
+                                             PositionYOffset="-88" Delay="!CoopTournament.BannerContainer.AnimDelay"
+                                             IncludeChildren="true" State="Opened">
+                          <Children>
+                            <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" IsHidden="@IsWinnerHero">
+                              <Children>
+                                <BrushWidget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="198" SuggestedHeight="462"
+                                             HorizontalAlignment="Left" VerticalAlignment="Bottom" PositionYOffset="-25"
+                                             MarginLeft="80" Brush="Tournament.Flags.Success">
+                                  <Children>
+                                    <Widget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed"
+                                            SuggestedWidth="!Tournament.Flags.Cup.Width" SuggestedHeight="!Tournament.Flags.Cup.Height"
+                                            HorizontalAlignment="Center" VerticalAlignment="Center" PositionYOffset="10"
+                                            Sprite="SPGeneral\SPScoreboard\tournament_cup" AlphaFactor="0.7" />
+                                  </Children>
+                                </BrushWidget>
+                                <BrushWidget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="198" SuggestedHeight="462"
+                                             HorizontalAlignment="Right" VerticalAlignment="Bottom" PositionYOffset="-25"
+                                             MarginRight="80" Brush="Tournament.Flags.Success">
+                                  <Children>
+                                    <Widget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed"
+                                            SuggestedWidth="!Tournament.Flags.Cup.Width" SuggestedHeight="!Tournament.Flags.Cup.Height"
+                                            HorizontalAlignment="Center" VerticalAlignment="Center" PositionYOffset="10"
+                                            Sprite="SPGeneral\SPScoreboard\tournament_cup" AlphaFactor="0.7" />
+                                  </Children>
+                                </BrushWidget>
+                              </Children>
+                            </Widget>
+                            <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" IsVisible="@IsWinnerHero">
+                              <Children>
+                                <MaskedTextureWidget DataSource="{WinnerBanner}" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed"
+                                                     SuggestedWidth="198" SuggestedHeight="462" HorizontalAlignment="Left"
+                                                     VerticalAlignment="Bottom" Brush="Tournament.Flags.Success.Alt"
+                                                     AdditionalArgs="@AdditionalArgs" ImageId="@Id"
+                                                     TextureProviderName="@TextureProviderName" IsDisabled="true" />
+                                <MaskedTextureWidget DataSource="{WinnerBanner}" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed"
+                                                     SuggestedWidth="198" SuggestedHeight="462" HorizontalAlignment="Right"
+                                                     VerticalAlignment="Bottom" Brush="Tournament.Flags.Success.Alt"
+                                                     AdditionalArgs="@AdditionalArgs" ImageId="@Id"
+                                                     TextureProviderName="@TextureProviderName" IsDisabled="true" />
+                              </Children>
+                            </Widget>
+                          </Children>
+                        </DelayedStateChanger>
+
+                        <DelayedStateChanger Id="WinnerTextContainer" VisualDefinition="CoopTournament.WinnerTextContainer"
+                                             WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" HorizontalAlignment="Right"
+                                             VerticalAlignment="Top" MarginRight="270" ClipContents="true"
+                                             Brush="Scoreboard.TournamentResultContainer"
+                                             Delay="!CoopTournament.WinnerTextContainer.AnimDelay" RenderLate="true" State="Opened">
+                          <Children>
+                            <TextWidget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="750" SuggestedHeight="150"
+                                        HorizontalAlignment="Center" VerticalAlignment="Top"
+                                        Brush="Tournament.Winner.Info" Text="@WinnerIntro" />
+                          </Children>
+                        </DelayedStateChanger>
+
+                        <DelayedStateChanger Id="CharacterContainer" VisualDefinition="CoopTournament.CharacterContainer"
+                                             WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" HorizontalAlignment="Left"
+                                             VerticalAlignment="Top" MarginLeft="200"
+                                             Delay="!CoopTournament.CharacterContainer.AnimDelay" State="Opened" ClipContents="true">
+                          <Children>
+                            <CharacterTableauWidget DataSource="{TournamentWinner\Character}"
+                                                    WidthSizePolicy="Fixed" HeightSizePolicy="Fixed"
+                                                    SuggestedWidth="350" SuggestedHeight="500" HorizontalAlignment="Center"
+                                                    VerticalAlignment="Top" BannerCodeText="@BannerCodeText"
+                                                    CharStringId="@CharStringId" EquipmentCode="@EquipmentCode"
+                                                    BodyProperties="@BodyProperties" IsFemale="@IsFemale"
+                                                    MountCreationKey="@MountCreationKey" StanceIndex="@StanceIndex"
+                                                    ArmorColor1="@ArmorColor1" ArmorColor2="@ArmorColor2" Race="@Race" />
+                          </Children>
+                        </DelayedStateChanger>
+
+                        <DelayedStateChanger Id="RewardsContainer" VisualDefinition="CoopTournament.RewardsContainer"
+                                             WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" HorizontalAlignment="Right"
+                                             VerticalAlignment="Bottom" MarginRight="270" ClipContents="true"
+                                             Delay="!CoopTournament.RewardsContainer.AnimDelay" State="Opened">
+                          <Children>
+                            <ScoreboardBattleRewardsWidget Id="BattleRewards" WidthSizePolicy="StretchToParent"
+                                                           HeightSizePolicy="CoverChildren" HorizontalAlignment="Center"
+                                                           AnimationDelay="1.5" AnimationInterval="0.4" ItemContainer="ListPanel">
+                              <Children>
+                                <ListPanel Id="ListPanel" DataSource="{BattleRewards}"
+                                           VisualDefinition="CoopTournament.BattleRewardsList"
+                                           WidthSizePolicy="Fixed" HeightSizePolicy="Fixed"
+                                           SuggestedWidth="701" SuggestedHeight="470" HorizontalAlignment="Center"
+                                           MarginTop="35" StackLayout.LayoutMethod="VerticalTopToBottom">
+                                  <ItemTemplate>
+                                    <BrushWidget VisualDefinition="CoopTournament.BattleRewardItem"
+                                                 WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed"
+                                                 SuggestedHeight="43" MarginBottom="25"
+                                                 Brush="Scoreboard.BattleRewards.ItemBackground">
+                                      <Children>
+                                        <ListPanel WidthSizePolicy="CoverChildren" HeightSizePolicy="StretchToParent"
+                                                   HorizontalAlignment="Center"
+                                                   StackLayout.LayoutMethod="HorizontalLeftToRight">
+                                          <Children>
+                                            <RichTextWidget WidthSizePolicy="CoverChildren" HeightSizePolicy="StretchToParent"
+                                                            Brush="ScoreboardDefaultFontBrush"
+                                                            Brush.TextHorizontalAlignment="Center" Text="@Text" />
+                                            <Widget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed"
+                                                    SuggestedWidth="70" SuggestedHeight="40" VerticalAlignment="Center"
+                                                    IsVisible="@GotImageIdentifier">
+                                              <Children>
+                                                <ImageIdentifierWidget DataSource="{ImageIdentifier}"
+                                                                       WidthSizePolicy="Fixed" HeightSizePolicy="Fixed"
+                                                                       SuggestedWidth="75" SuggestedHeight="35"
+                                                                       VerticalAlignment="Center" MarginLeft="10"
+                                                                       AdditionalArgs="@AdditionalArgs" ImageId="@Id"
+                                                                       TextureProviderName="@TextureProviderName" />
+                                              </Children>
+                                            </Widget>
+                                          </Children>
+                                        </ListPanel>
+                                      </Children>
+                                    </BrushWidget>
+                                  </ItemTemplate>
+                                </ListPanel>
+                              </Children>
+                            </ScoreboardBattleRewardsWidget>
+                          </Children>
+                        </DelayedStateChanger>
+                      </Children>
+                    </Widget>
+                    <ListPanel WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
+                               HorizontalAlignment="Center" StackLayout.LayoutMethod="HorizontalLeftToRight">
+                      <Children>
+                        <Tournament.Round DataSource="{Round1}" MarginLeft="!CoopTournament.Round.Margin" MarginRight="!CoopTournament.Round.Margin" />
+                        <Tournament.Round DataSource="{Round2}" MarginLeft="!CoopTournament.Round.Margin" MarginRight="!CoopTournament.Round.Margin" />
+                        <Tournament.Round DataSource="{Round3}" MarginLeft="!CoopTournament.Round.Margin" MarginRight="!CoopTournament.Round.Margin" />
+                        <Tournament.Round DataSource="{Round4}" MarginLeft="!CoopTournament.Round.Margin" MarginRight="!CoopTournament.Round.Margin" />
+                      </Children>
+                    </ListPanel>
+                  </Children>
+                </ListPanel>
+              </Children>
+            </Standard.ScrollablePanel>
+
+            <ListPanel WidthSizePolicy="Fixed" HeightSizePolicy="CoverChildren" SuggestedWidth="280"
+                       HorizontalAlignment="Right" VerticalAlignment="Bottom" MarginRight="35" MarginBottom="125"
+                       StackLayout.LayoutMethod="VerticalTopToBottom">
+              <Children>
+                <Widget WidthSizePolicy="Fixed" HeightSizePolicy="CoverChildren" SuggestedWidth="230" MinHeight="200"
+                        HorizontalAlignment="Center" Sprite="tournament_prize_frame_9" Color="#AD823CFF"
+                        IsVisible="@HasPrizeItem" DoNotPassEventsToChildren="true">
+                  <Children>
+                    <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                               MarginTop="12" StackLayout.LayoutMethod="VerticalTopToBottom">
+                      <Children>
+                        <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                                    Brush="Tournament.Prize.Title.Text" Brush.TextHorizontalAlignment="Center"
+                                    Text="@TournamentPrizeText" />
+                        <Widget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="210" SuggestedHeight="100"
+                                HorizontalAlignment="Center">
+                          <Children>
+                            <ImageIdentifierWidget DataSource="{PrizeVisual}" WidthSizePolicy="StretchToParent"
+                                                   HeightSizePolicy="StretchToParent" AdditionalArgs="@AdditionalArgs"
+                                                   ImageId="@Id" TextureProviderName="@TextureProviderName" />
+                          </Children>
+                        </Widget>
+                        <TextWidget WidthSizePolicy="Fixed" HeightSizePolicy="CoverChildren" SuggestedWidth="200"
+                                    HorizontalAlignment="Center" MarginTop="10" Brush="Tournament.BetWindow.Text"
+                                    Text="@PrizeItemName" />
+                      </Children>
+                    </ListPanel>
+                    <HintWidget DoNotAcceptEvents="true" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                                Command.HoverBegin="ExecuteShowPrizeItemTooltip"
+                                Command.HoverEnd="ExecuteHidePrizeItemTooltip" />
+                  </Children>
+                </Widget>
+
+                <ButtonWidget DoNotPassEventsToChildren="true" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed"
+                              SuggestedWidth="180" SuggestedHeight="50" HorizontalAlignment="Center" MarginTop="8"
+                              Brush="Tournament.ControlButton" Command.Click="ExecuteOpenBetWindow"
+                              IsEnabled="@IsBetButtonEnabled" UpdateChildrenStates="true">
+                  <Children>
+                    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                                Brush="Tournament.ControlButton.Text" Text="@BetText" />
+                  </Children>
+                </ButtonWidget>
+                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                            HorizontalAlignment="Center" Brush="Tournament.BetWindow.Text"
+                            Brush.TextHorizontalAlignment="Center" Text="@BettedDenarsText" />
+                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                            HorizontalAlignment="Center" Brush="Tournament.BetWindow.Text"
+                            Brush.TextHorizontalAlignment="Center" Text="@OverallExpectedDenarsText" />
+              </Children>
+            </ListPanel>
+
+            <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="100"
+                    VerticalAlignment="Bottom">
+              <Children>
+                <ListPanel WidthSizePolicy="Fixed" HeightSizePolicy="StretchToParent" SuggestedWidth="390"
+                           HorizontalAlignment="Left" MarginLeft="24" MarginTop="8" MarginBottom="8"
+                           StackLayout.LayoutMethod="VerticalTopToBottom">
+                  <Children>
+                    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="27"
+                                Brush="Tournament.Participant.Text" Text="@ReadyCountText" />
+                    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="27"
+                                Brush="Tournament.Participant.Text" Text="@SkipCountText" />
+                    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="27"
+                                Brush="Tournament.MainHero.Participant.Text" Text="@SelectedChoiceText" />
+                  </Children>
+                </ListPanel>
+
+                <NavigationScopeTargeter ScopeID="CoopTournamentControlsScope"
+                                         ScopeParent="..\CoopTournamentControls"
+                                         ScopeMovements="Horizontal" />
+                <ListPanel Id="CoopTournamentControls" WidthSizePolicy="CoverChildren" HeightSizePolicy="StretchToParent"
+                           HorizontalAlignment="Center" StackLayout.LayoutMethod="HorizontalLeftToRight">
+                  <Children>
+                    <ButtonWidget DoNotPassEventsToChildren="true" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed"
+                                  SuggestedWidth="160" SuggestedHeight="55" VerticalAlignment="Center" MarginLeft="5" MarginRight="5"
+                                  Brush="Tournament.ControlButton" Command.Click="ExecuteJoin"
+                                  IsEnabled="@CanJoin" IsVisible="@IsJoinVisible" UpdateChildrenStates="true"
+                                  GamepadNavigationIndex="0">
+                      <Children>
+                        <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                                    Brush="Tournament.ControlButton.Text" Text="@JoinText" />
+                      </Children>
+                    </ButtonWidget>
+                    <ButtonWidget DoNotPassEventsToChildren="true" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed"
+                                  SuggestedWidth="160" SuggestedHeight="55" VerticalAlignment="Center" MarginLeft="5" MarginRight="5"
+                                  Brush="Tournament.ControlButton" Command.Click="ExecuteWatch"
+                                  IsEnabled="@CanWatch" UpdateChildrenStates="true" GamepadNavigationIndex="1">
+                      <Children>
+                        <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                                    Brush="Tournament.ControlButton.Text" Text="@WatchText" />
+                      </Children>
+                    </ButtonWidget>
+                    <ButtonWidget DoNotPassEventsToChildren="true" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed"
+                                  SuggestedWidth="160" SuggestedHeight="55" VerticalAlignment="Center" MarginLeft="5" MarginRight="5"
+                                  Brush="Tournament.ControlButton" Command.Click="ExecuteSkip"
+                                  IsEnabled="@CanSkip" UpdateChildrenStates="true" GamepadNavigationIndex="2">
+                      <Children>
+                        <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                                    Brush="Tournament.ControlButton.Text" Text="@SkipText" />
+                      </Children>
+                    </ButtonWidget>
+                    <ButtonWidget DoNotPassEventsToChildren="true" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed"
+                                  SuggestedWidth="160" SuggestedHeight="55" VerticalAlignment="Center" MarginLeft="5" MarginRight="5"
+                                  Brush="Tournament.ControlButton" Command.Click="ExecuteLeave"
+                                  IsEnabled="@CanLeave" UpdateChildrenStates="true" GamepadNavigationIndex="3">
+                      <Children>
+                        <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                                    Brush="Tournament.ControlButton.Text" Text="@CoopLeaveText" />
+                      </Children>
+                    </ButtonWidget>
+                  </Children>
+                </ListPanel>
+              </Children>
+            </Widget>
+          </Children>
+        </Widget>
+
+
+        <Widget Id="BetWindow" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                Sprite="BlankWhiteSquare_9" Color="#000000FF" AlphaFactor="0.75"
+                IsVisible="@IsBetWindowEnabled">
+          <Children>
+            <DimensionSyncWidget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="512"
+                                 HorizontalAlignment="Center" VerticalAlignment="Center" DimensionToSync="Vertical"
+                                 WidgetToCopyHeightFrom="BetWindowInnerPanel">
+              <Children>
+                <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" ClipContents="true">
+                  <Children>
+                    <Widget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="512" SuggestedHeight="645"
+                            HorizontalAlignment="Center" VerticalAlignment="Top" Sprite="StdAssets\Popup\canvas" />
+                  </Children>
+                </Widget>
+                <ListPanel Id="BetWindowInnerPanel" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                           MarginLeft="15" MarginRight="15" StackLayout.LayoutMethod="VerticalTopToBottom">
+                  <Children>
+                    <AutoHideRichTextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                                            MarginTop="10" Brush="Popup.Title.Text" MinHeight="50"
+                                            Text="@BetTitleText" />
+                    <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="23"
+                            Sprite="StdAssets\Popup\divider" />
+                    <RichTextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                                    MarginTop="10" Brush="Popup.Description.Text" Text="@BetDescriptionText" />
+                    <RichTextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                                    HorizontalAlignment="Center" MarginTop="10" Brush="Tournament.BetPopup.Text"
+                                    Text="@BetOddsText" />
+                    <TextWidget WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
+                                HorizontalAlignment="Center" MarginTop="30" Brush="Tournament.BetPopup.Text"
+                                Text="@CurrentWagerText" />
+                    <ListPanel WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
+                               HorizontalAlignment="Center" StackLayout.LayoutMethod="HorizontalLeftToRight">
+                      <Children>
+                        <TextWidget WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
+                                    Brush="Tournament.BetPopup.Text" IntText="@WageredDenars" />
+                        <Widget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="35" SuggestedHeight="35"
+                                Sprite="General\Icons\Coin@2x" />
+                        <TextWidget WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren" MarginRight="5"
+                                    Brush="Tournament.BetPopup.Text" Text="-&gt;" />
+                        <TextWidget WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
+                                    Brush="Tournament.BetPopup.Text" IntText="@ExpectedBetDenars" />
+                        <Widget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="35" SuggestedHeight="35"
+                                Sprite="General\Icons\Coin@2x" />
+                      </Children>
+                    </ListPanel>
+                    <SliderWidget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="338" SuggestedHeight="42"
+                                  HorizontalAlignment="Center" MarginTop="25" Filler="Filler" Handle="SliderHandle"
+                                  MaxValueInt="@MaximumBetValue" MinValueInt="0" ValueInt="@WageredDenars">
+                      <Children>
+                        <Widget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="362" SuggestedHeight="38"
+                                HorizontalAlignment="Center" Sprite="SPGeneral\SPOptions\standart_slider_canvas" />
+                        <Widget Id="Filler" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="345" SuggestedHeight="35"
+                                Sprite="SPGeneral\SPOptions\standart_slider_fill" ClipContents="true" />
+                        <Widget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="400" SuggestedHeight="65"
+                                HorizontalAlignment="Center" Sprite="SPGeneral\SPOptions\standart_slider_frame" />
+                        <ImageWidget Id="SliderHandle" DoNotAcceptEvents="true" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed"
+                                     SuggestedWidth="14" SuggestedHeight="38" HorizontalAlignment="Left"
+                                     Brush="SPOptions.Slider.Handle" />
+                      </Children>
+                    </SliderWidget>
+                    <ListPanel WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren" HorizontalAlignment="Center"
+                               MarginTop="20" StackLayout.LayoutMethod="HorizontalLeftToRight">
+                      <Children>
+                        <ToggleButtonWidget DoNotPassEventsToChildren="true" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed"
+                                            SuggestedWidth="220" SuggestedHeight="64" Brush="Popup.Cancel.Button"
+                                            WidgetToClose="..\..\..\..\..\BetWindow">
+                          <Children>
+                            <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                                        Brush="Popup.Button.Text" Text="@CancelText" />
+                          </Children>
+                        </ToggleButtonWidget>
+                        <ToggleButtonWidget DoNotPassEventsToChildren="true" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed"
+                                            SuggestedWidth="220" SuggestedHeight="64" Brush="Popup.Done.Button"
+                                            Command.Click="ExecuteBet" WidgetToClose="..\..\..\..\..\BetWindow">
+                          <Children>
+                            <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                                        Brush="Popup.Button.Text" Text="@AcceptText" />
+                          </Children>
+                        </ToggleButtonWidget>
+                      </Children>
+                    </ListPanel>
+                  </Children>
+                </ListPanel>
+                <BrushWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                             Brush="Popup.Frame" IsEnabled="false" />
+              </Children>
+            </DimensionSyncWidget>
+          </Children>
+        </Widget>
+        <Widget WidthSizePolicy="Fixed" HeightSizePolicy="CoverChildren" SuggestedWidth="360" IsVisible="@IsCurrentMatchActive">
+          <Children>
+            <TournamentMatchWidget DataSource="{CurrentMatch}" WidthSizePolicy="StretchToParent"
+                                   HeightSizePolicy="CoverChildren" IsVisible="@IsValid" State="@State">
+              <Children>
+                <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                           VerticalAlignment="Center" StackLayout.LayoutMethod="VerticalBottomToTop">
+                  <Children>
+                    <Tournament.Team DataSource="{Team1}" Parameter.OnMission="true" />
+                    <Tournament.Team DataSource="{Team2}" Parameter.OnMission="true" />
+                    <Tournament.Team DataSource="{Team3}" Parameter.OnMission="true" />
+                    <Tournament.Team DataSource="{Team4}" Parameter.OnMission="true" />
+                  </Children>
+                </ListPanel>
+              </Children>
+            </TournamentMatchWidget>
+          </Children>
+        </Widget>
+      </Children>
+    </TournamentScreenWidget>
+  </Window>
+</Prefab>
