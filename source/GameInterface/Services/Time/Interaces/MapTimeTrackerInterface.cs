@@ -54,21 +54,28 @@ internal class MapTimeTrackerInterface : IMapTimeTrackerInterface
 
     private static ILogger Logger => LogManager.GetLogger<MapTimeTrackerInterface>();
 
-    internal const float CorrectionWindowSeconds = 0.25f;
+    internal const float MaximumClientLeadSeconds = 0.25f;
     internal const float HeartbeatTimeoutSeconds = 0.75f;
-    private const float PacingLogDebounceSeconds = CorrectionWindowSeconds * 2f;
+    private const float ResumeClientLeadRatio = 0.5f;
+    private const float PauseClientLeadMultiplier = 2f;
+    private const float CorrectionSettleSeconds = 1f;
+    private const float MaximumSlowdownRatio = 0.25f;
+    private const float PacingLogDebounceSeconds = MaximumClientLeadSeconds * 2f;
     private const float MapSecondsPerCampaignDelta = 4320f;
 
     private bool hasServerTime;
     private bool hasPendingHardSync;
-    private bool hasPendingServerTime;
+    private bool hasEstimatedServerRate;
+    private bool isPausedForServer;
     private bool skipNextHeartbeatAgeIncrement;
     private long previousServerTicks;
     private long pendingServerTicks;
-    private double remainingCorrectionTicks;
+    private double localTicksPerSecond;
+    private double serverTicksPerSecond;
     private double correctionTicksPerSecond;
     private double correctionAccumulator;
     private float secondsSinceHeartbeat;
+    private float secondsSinceServerSample;
     private float candidatePacingStateSeconds;
     private CampaignTimePacingState loggedPacingState = CampaignTimePacingState.Normal;
     private CampaignTimePacingState candidatePacingState = CampaignTimePacingState.Normal;
@@ -115,7 +122,7 @@ internal class MapTimeTrackerInterface : IMapTimeTrackerInterface
         }
 
         long originalDeltaTicks = tracker._deltaTimeInTicks;
-        PrepareCorrection(tracker._numTicks);
+        PrepareCorrection(tracker._numTicks, originalDeltaTicks);
         long correctionTicks = GetTickCorrection(originalDeltaTicks, realDt);
         long correctedDeltaTicks = originalDeltaTicks + correctionTicks;
         UpdatePacingDiagnostics(tracker._numTicks + correctionTicks, originalDeltaTicks, correctedDeltaTicks, realDt);
@@ -139,7 +146,9 @@ internal class MapTimeTrackerInterface : IMapTimeTrackerInterface
 
     internal bool BeginCorrection(long serverTicks, long maxServerProgressTicks)
     {
+        float elapsedSincePreviousHeartbeat = secondsSinceServerSample;
         secondsSinceHeartbeat = 0f;
+        secondsSinceServerSample = 0f;
         skipNextHeartbeatAgeIncrement = true;
 
         bool isDiscontinuity = hasServerTime == false ||
@@ -147,20 +156,24 @@ internal class MapTimeTrackerInterface : IMapTimeTrackerInterface
             serverTicks - previousServerTicks > maxServerProgressTicks;
 
         hasServerTime = true;
+        if (isDiscontinuity == false && elapsedSincePreviousHeartbeat > 0f)
+        {
+            double observedServerTicksPerSecond = (serverTicks - previousServerTicks) / elapsedSincePreviousHeartbeat;
+            serverTicksPerSecond = observedServerTicksPerSecond == 0d || hasEstimatedServerRate == false
+                ? observedServerTicksPerSecond
+                : ((serverTicksPerSecond * 0.75d) + (observedServerTicksPerSecond * 0.25d));
+            hasEstimatedServerRate = true;
+        }
+
         previousServerTicks = serverTicks;
         pendingServerTicks = serverTicks;
         hasPendingHardSync = hasPendingHardSync || isDiscontinuity;
-        hasPendingServerTime = false;
-        remainingCorrectionTicks = 0d;
-        correctionTicksPerSecond = 0d;
-        correctionAccumulator = 0d;
 
         if (hasPendingHardSync)
         {
             return true;
         }
 
-        hasPendingServerTime = true;
         return false;
     }
 
@@ -171,23 +184,64 @@ internal class MapTimeTrackerInterface : IMapTimeTrackerInterface
 
         hasPendingHardSync = false;
         skipNextHeartbeatAgeIncrement = false;
+        hasEstimatedServerRate = false;
+        isPausedForServer = false;
+        localTicksPerSecond = 0d;
+        serverTicksPerSecond = 0d;
+        correctionTicksPerSecond = 0d;
+        correctionAccumulator = 0d;
         ResetPacingDiagnostics();
         return true;
     }
 
-    internal void PrepareCorrection(long localTicks)
+    internal void PrepareCorrection(long localTicks, long localDeltaTicks)
     {
-        if (hasPendingServerTime == false) return;
+        if (hasServerTime == false || localDeltaTicks <= 0L) return;
 
-        hasPendingServerTime = false;
-        remainingCorrectionTicks = pendingServerTicks - localTicks;
-        correctionTicksPerSecond = remainingCorrectionTicks / CorrectionWindowSeconds;
+        double projectedTicksPerSecond = hasEstimatedServerRate ? serverTicksPerSecond : localTicksPerSecond;
+        double projectedServerTicks = pendingServerTicks + (projectedTicksPerSecond * secondsSinceServerSample);
+        double maximumClientLeadTicks = Math.Max(localDeltaTicks, projectedTicksPerSecond * MaximumClientLeadSeconds);
+        double resumeClientLeadTicks = maximumClientLeadTicks * ResumeClientLeadRatio;
+        double clientLeadTicks = localTicks - projectedServerTicks;
+
+        if (isPausedForServer)
+        {
+            if (clientLeadTicks > resumeClientLeadTicks)
+            {
+                correctionTicksPerSecond = 0d;
+                return;
+            }
+
+            isPausedForServer = false;
+        }
+
+        if (clientLeadTicks > maximumClientLeadTicks * PauseClientLeadMultiplier)
+        {
+            isPausedForServer = true;
+            correctionTicksPerSecond = 0d;
+            return;
+        }
+
+        if (clientLeadTicks > maximumClientLeadTicks)
+        {
+            correctionTicksPerSecond = -(clientLeadTicks - maximumClientLeadTicks) / CorrectionSettleSeconds;
+            return;
+        }
+
+        if (clientLeadTicks < -maximumClientLeadTicks)
+        {
+            correctionTicksPerSecond = (-clientLeadTicks - maximumClientLeadTicks) / CorrectionSettleSeconds;
+            return;
+        }
+
+        correctionTicksPerSecond = 0d;
     }
 
     internal long GetTickCorrection(long localDeltaTicks, float realDt)
     {
         if (hasServerTime == false || realDt <= 0f) return 0L;
 
+        secondsSinceServerSample += realDt;
         if (skipNextHeartbeatAgeIncrement)
         {
             skipNextHeartbeatAgeIncrement = false;
@@ -196,6 +250,10 @@ internal class MapTimeTrackerInterface : IMapTimeTrackerInterface
         {
             secondsSinceHeartbeat += realDt;
         }
+        if (localDeltaTicks > 0L)
+        {
+            localTicksPerSecond = localDeltaTicks / realDt;
+        }
         if (localDeltaTicks <= 0L) return 0L;
 
         if (secondsSinceHeartbeat > HeartbeatTimeoutSeconds)
@@ -203,43 +261,19 @@ internal class MapTimeTrackerInterface : IMapTimeTrackerInterface
             return -localDeltaTicks;
         }
 
-        if (remainingCorrectionTicks == 0d) return 0L;
+        if (isPausedForServer) return -localDeltaTicks;
+        if (correctionTicksPerSecond == 0d) return 0L;
 
         double requestedCorrection = correctionTicksPerSecond * realDt;
-        requestedCorrection = Math.Max(-localDeltaTicks, Math.Min(localDeltaTicks, requestedCorrection));
-
-        if (remainingCorrectionTicks > 0d)
-        {
-            if (requestedCorrection <= 0d) return 0L;
-            requestedCorrection = Math.Min(remainingCorrectionTicks, requestedCorrection);
-        }
-        else
-        {
-            if (requestedCorrection >= 0d) return 0L;
-            requestedCorrection = Math.Max(remainingCorrectionTicks, requestedCorrection);
-        }
+        double maximumSlowdownTicks = localDeltaTicks * MaximumSlowdownRatio;
+        requestedCorrection = Math.Max(-maximumSlowdownTicks, Math.Min(localDeltaTicks, requestedCorrection));
 
         correctionAccumulator += requestedCorrection;
 
         long correctionTicks = (long)correctionAccumulator;
-        correctionTicks = Math.Max(-localDeltaTicks, Math.Min(localDeltaTicks, correctionTicks));
-
-        if (remainingCorrectionTicks > 0d)
-        {
-            correctionTicks = Math.Min((long)remainingCorrectionTicks, correctionTicks);
-        }
-        else
-        {
-            correctionTicks = Math.Max((long)remainingCorrectionTicks, correctionTicks);
-        }
+        correctionTicks = Math.Max(-(long)maximumSlowdownTicks, Math.Min(localDeltaTicks, correctionTicks));
 
         correctionAccumulator -= correctionTicks;
-        remainingCorrectionTicks -= correctionTicks;
-
-        if (remainingCorrectionTicks == 0d)
-        {
-            correctionAccumulator = 0d;
-        }
 
         return correctionTicks;
     }
