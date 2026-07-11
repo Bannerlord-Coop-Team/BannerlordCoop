@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -455,7 +455,12 @@ internal class BattleFinalizeHandler : IHandler
             mobileParty.Position,
             mobileParty.DefaultBehavior,
             mobileParty.TargetPosition,
-            mobileParty.DesiredAiNavigationType);
+            mobileParty.DesiredAiNavigationType)
+        {
+            ForcePosition = true,
+        };
+
+        // The gate reset must reach clients before the encounter close allows another map command.
         messageBroker.Publish(this, new PartyBehaviorUpdated(ref data));
     }
 

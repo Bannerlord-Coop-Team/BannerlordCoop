@@ -13,6 +13,8 @@ using GameInterface.Services.ObjectManager;
 using static GameInterface.Services.ObjectManager.ObjectManager;
 using Serilog;
 using System;
+using System.Collections.Generic;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Handlers;
@@ -30,11 +32,7 @@ internal class MobilePartyBehaviorHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyBehaviorHandler>();
 
-    // Owner-party position resync threshold, in campaign-map units. The per-click prediction lead is
-    // a small fraction of a unit while map features sit tens of units apart, so 1 unit stays above
-    // normal prediction drift but still catches a genuine desync.
-    private const float OwnerPositionResyncThreshold = 1f;
-
+    private readonly Dictionary<string, PartyBehaviorUpdateData> latestPredictions = new Dictionary<string, PartyBehaviorUpdateData>();
     private readonly IMessageBroker messageBroker;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IMobilePartyInterface mobilePartyInterface;
@@ -67,8 +65,6 @@ internal class MobilePartyBehaviorHandler : IHandler
         var party = obj.What.PartyAi._mobileParty;
         var interactablePoint = obj.What.InteractablePoint;
 
-        var controllerId = controllerIdProvider.ControllerId;
-
         if (!objectManager.TryGetId(partyAi._mobileParty, out var partyId))
             return;
 
@@ -94,7 +90,13 @@ internal class MobilePartyBehaviorHandler : IHandler
             party.DefaultBehavior,
             party.TargetPosition,
             party.DesiredAiNavigationType
-         );
+        );
+
+        if (ModInformation.IsClient)
+        {
+            data.OriginControllerId = controllerIdProvider.ControllerId;
+            latestPredictions[partyId] = data;
+        }
 
         messageBroker.Publish(this, new ControlledPartyBehaviorUpdated(data));
     }
@@ -107,11 +109,20 @@ internal class MobilePartyBehaviorHandler : IHandler
         {
             try
             {
-                PartyBase partyBase = null;
-                if (data.HasTarget && !objectManager.TryGetObject(data.InteractablePointId, out partyBase))
+                if (!objectManager.TryGetObjectWithLogging(data.MobilePartyId, out MobileParty party))
                     return;
 
-                if (!objectManager.TryGetObject(data.MobilePartyId, out MobileParty party))
+                bool isSelfEcho = ModInformation.IsClient &&
+                    party.IsControlledByThisInstance() &&
+                    !string.IsNullOrEmpty(data.OriginControllerId) &&
+                    string.Equals(data.OriginControllerId, controllerIdProvider.ControllerId, StringComparison.Ordinal);
+
+                // Reapply the newest local command if an authoritative update arrived before its echo.
+                if (!TrySelectBehaviorUpdate(isSelfEcho, latestPredictions, ref data))
+                    return;
+
+                PartyBase partyBase = null;
+                if (data.HasTarget && !objectManager.TryGetObjectWithLogging(data.InteractablePointId, out partyBase))
                     return;
 
                 // The apply drives the Harmony-patched SetAiBehavior path; the AutoSync
@@ -133,16 +144,14 @@ internal class MobilePartyBehaviorHandler : IHandler
 
                     if (ModInformation.IsClient)
                     {
-                        // The local player's own party is client-predicted and runs slightly ahead of the
-                        // server's relayed position; snapping it mid-move is the jitter. Snap when it's at rest,
-                        // on a nav-layer (land/sea) change, or once it's drifted far enough to be a real desync.
-                        if (!party.IsControlledByThisInstance() ||
-                            !party.IsMoving ||
-                            party.Position.IsOnLand != data.PartyPosition.IsOnLand ||
-                            party.Position.Distance(data.PartyPosition) > OwnerPositionResyncThreshold)
-                        {
+                        // Moving parties already simulate the replicated target, so an in-flight snapshot is stale.
+                        if (ShouldApplyAuthoritativePosition(
+                            isSelfEcho,
+                            data.ForcePosition,
+                            party.PartyMoveMode == MoveModeType.Hold,
+                            party.Position,
+                            data.PartyPosition))
                             party.Position = data.PartyPosition;
-                        }
                     }
                     else
                     {
@@ -156,5 +165,28 @@ internal class MobilePartyBehaviorHandler : IHandler
                 Logger.Error(e, "Failed to apply {Message}", nameof(UpdatePartyBehavior));
             }
         });
+    }
+
+    internal static bool TrySelectBehaviorUpdate(
+        bool isSelfEcho,
+        IReadOnlyDictionary<string, PartyBehaviorUpdateData> latestPredictions,
+        ref PartyBehaviorUpdateData data)
+    {
+        if (!isSelfEcho)
+            return true;
+
+        var partyId = Compact(data.MobilePartyId, typeof(MobileParty));
+        return latestPredictions.TryGetValue(partyId, out data);
+    }
+
+    internal static bool ShouldApplyAuthoritativePosition(
+        bool isSelfEcho,
+        bool forcePosition,
+        bool isHolding,
+        CampaignVec2 currentPosition,
+        CampaignVec2 authoritativePosition)
+    {
+        return !isSelfEcho &&
+            (forcePosition || isHolding || currentPosition.IsOnLand != authoritativePosition.IsOnLand);
     }
 }
