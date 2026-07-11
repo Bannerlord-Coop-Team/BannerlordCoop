@@ -5,10 +5,13 @@ using Common.Network;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.UI.Notifications.Messages;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Extensions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 
@@ -43,6 +46,9 @@ internal class OtherNotificationsHandler : IHandler
         messageBroker.Subscribe<NotifyFoundItemOnMap>(Handle_NotifyFoundItemOnMap);
         messageBroker.Subscribe<NetworkNotifyFoundItemOnMap>(Handle_NetworkNotifyFoundItemOnMap);
 
+        messageBroker.Subscribe<NotifyKingdomInfluenceChanged>(Handle_NotifyKingdomInfluenceChanged);
+        messageBroker.Subscribe<NetworkNotifyKingdomInfluenceChanged>(Handle_NetworkNotifyKingdomInfluenceChanged);
+
         messageBroker.Subscribe<NetworkNotifyRemovedSupporter>(Handle_NetworkNotifyRemovedSupporter);
     }
 
@@ -59,6 +65,9 @@ internal class OtherNotificationsHandler : IHandler
 
         messageBroker.Unsubscribe<NotifyFoundItemOnMap>(Handle_NotifyFoundItemOnMap);
         messageBroker.Unsubscribe<NetworkNotifyFoundItemOnMap>(Handle_NetworkNotifyFoundItemOnMap);
+
+        messageBroker.Unsubscribe<NotifyKingdomInfluenceChanged>(Handle_NotifyKingdomInfluenceChanged);
+        messageBroker.Unsubscribe<NetworkNotifyKingdomInfluenceChanged>(Handle_NetworkNotifyKingdomInfluenceChanged);
 
         messageBroker.Unsubscribe<NetworkNotifyRemovedSupporter>(Handle_NetworkNotifyRemovedSupporter);
     }
@@ -155,6 +164,43 @@ internal class OtherNotificationsHandler : IHandler
             textObject.SetTextVariable("COUNT", obj.What.Count);
             textObject.SetTextVariable("ANIMAL_NAME", obj.What.ItemName);
             InformationManager.DisplayMessage(new InformationMessage(textObject.ToString()));
+        });
+    }
+
+    private void Handle_NotifyKingdomInfluenceChanged(MessagePayload<NotifyKingdomInfluenceChanged> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.Hero, out var heroId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.Clan, out var clanId)) return;
+
+            network.SendAll(new NetworkNotifyKingdomInfluenceChanged(heroId, mobilePartyId, clanId, obj.What.GainedInfluence, obj.What.Detail));
+        });
+    }
+
+    private void Handle_NetworkNotifyKingdomInfluenceChanged(MessagePayload<NetworkNotifyKingdomInfluenceChanged> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
+            if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
+
+            if ((obj.What.Detail == GainKingdomInfluenceAction.InfluenceGainingReason.DonatePrisoners && mobileParty == MobileParty.MainParty) 
+            || (obj.What.Detail == GainKingdomInfluenceAction.InfluenceGainingReason.Battle && hero == Hero.MainHero))
+            {
+                TextObject textObject = GameTexts.FindText("str_influence_gain_message", null);
+                textObject.SetTextVariable("INFLUENCE", obj.What.GainedInfluence);
+                textObject.SetTextVariable("NEW_INFLUENCE", (int)clan.Influence);
+                InformationManager.DisplayMessage(new InformationMessage(textObject.ToString()));
+            }
+            if (obj.What.Detail == GainKingdomInfluenceAction.InfluenceGainingReason.SiegeSafePassage && hero == Hero.MainHero)
+            {
+                TextObject textObject2 = GameTexts.FindText("str_leave_siege_lose_influence_message", null);
+                textObject2.SetTextVariable("INFLUENCE", -obj.What.GainedInfluence);
+                InformationManager.DisplayMessage(new InformationMessage(textObject2.ToString()));
+            }
         });
     }
 
