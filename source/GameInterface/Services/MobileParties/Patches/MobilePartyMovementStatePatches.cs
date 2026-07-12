@@ -55,7 +55,7 @@ internal static class MobilePartyMovementStatePatches
     {
         movementCommandDepth = Math.Max(0, movementCommandDepth - 1);
 
-        if (__exception == null && __state)
+        if (ShouldPublishMovementState(__instance, __state, __exception))
         {
             MessageBroker.Instance.Publish(
                 __instance,
@@ -64,6 +64,12 @@ internal static class MobilePartyMovementStatePatches
 
         return __exception;
     }
+
+    internal static bool ShouldPublishMovementState(
+        MobileParty party,
+        bool isAuthoritativeMutation,
+        Exception exception) =>
+        exception == null && isAuthoritativeMutation && party?.IsActive == true;
 }
 
 /// <summary>
@@ -75,10 +81,12 @@ internal static class MobilePartyNavigationResetPatches
     [HarmonyPostfix]
     private static void Postfix(MobileParty party)
     {
-        if (!ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed())
+        if (ModInformation.IsClient ||
+            CallOriginalPolicy.IsOriginalAllowed() ||
+            party?.IsActive != true)
             return;
 
-        GameThread.Run(() => MessageBroker.Instance.Publish(
+        GameThread.RunSafe(() => MessageBroker.Instance.Publish(
             party,
             new MobilePartyMovementStateChanged(party)));
     }

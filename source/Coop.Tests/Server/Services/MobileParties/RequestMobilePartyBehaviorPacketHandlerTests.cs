@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
 using Common.PacketHandlers;
@@ -12,7 +13,6 @@ using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
-using HarmonyLib;
 using LiteNetLib;
 using Moq;
 using Serilog;
@@ -66,6 +66,7 @@ public sealed class RequestMobilePartyBehaviorPacketHandlerTests : IDisposable
             messageBroker,
             network.Object,
             objectManager,
+            new MobilePartyBehaviorSnapshot(objectManager),
             playerManager.Object);
     }
 
@@ -91,6 +92,43 @@ public sealed class RequestMobilePartyBehaviorPacketHandlerTests : IDisposable
         var update = Assert.Single(messageBroker.GetMessagesFromType<UpdatePartyBehavior>());
         Assert.Equal(CompactPartyId, update.BehaviorUpdateData.MobilePartyId);
         Assert.Equal(ControllerId, update.BehaviorUpdateData.OriginControllerId);
+    }
+
+    [Fact]
+    public void OwnerRequest_ValidationAndPublishRunOnGameThread()
+    {
+        var scheduledObjectManager = new Mock<IObjectManager>();
+        var controlledParty = ObjectHelper.SkipConstructor<MobileParty>();
+        bool lookupRanOnGameThread = false;
+        scheduledObjectManager
+            .Setup(manager => manager.TryGetObject(CompactPartyId, out controlledParty))
+            .Callback(() => lookupRanOnGameThread = GameThread.Instance.IsGameThread)
+            .Returns(true);
+        var scheduledMessageBroker = new TestMessageBroker();
+        bool publishRanOnGameThread = false;
+        scheduledMessageBroker.Subscribe<UpdatePartyBehavior>(
+            _ => publishRanOnGameThread = GameThread.Instance.IsGameThread);
+        var scheduledHandler = new RequestMobilePartyBehaviorPacketHandler(
+            packetManager.Object,
+            coalescer.Object,
+            scheduledMessageBroker,
+            network.Object,
+            scheduledObjectManager.Object,
+            Mock.Of<IMobilePartyBehaviorSnapshot>(),
+            playerManager.Object);
+
+        try
+        {
+            scheduledHandler.HandlePacket(peer, new RequestMobilePartyBehaviorPacket(CreateSnapshot()));
+
+            Assert.True(lookupRanOnGameThread);
+            Assert.True(publishRanOnGameThread);
+            Assert.Single(scheduledMessageBroker.GetMessagesFromType<UpdatePartyBehavior>());
+        }
+        finally
+        {
+            scheduledHandler.Dispose();
+        }
     }
 
     [Fact]
@@ -205,10 +243,8 @@ public sealed class RequestMobilePartyBehaviorPacketHandlerTests : IDisposable
     private void RegisterMobilePartyBase(string id, MobileParty mobileParty)
     {
         var partyBase = ObjectHelper.SkipConstructor<PartyBase>();
-        AccessTools.Property(typeof(PartyBase), nameof(PartyBase.MobileParty))
-            .SetValue(partyBase, mobileParty);
-        AccessTools.Property(typeof(MobileParty), nameof(MobileParty.Party))
-            .SetValue(mobileParty, partyBase);
+        partyBase.MobileParty = mobileParty;
+        mobileParty.Party = partyBase;
         Assert.True(objectManager.AddExisting(id, partyBase));
     }
 
@@ -216,10 +252,8 @@ public sealed class RequestMobilePartyBehaviorPacketHandlerTests : IDisposable
     {
         var settlement = ObjectHelper.SkipConstructor<Settlement>();
         var partyBase = ObjectHelper.SkipConstructor<PartyBase>();
-        AccessTools.Property(typeof(PartyBase), nameof(PartyBase.Settlement))
-            .SetValue(partyBase, settlement);
-        AccessTools.Property(typeof(Settlement), nameof(Settlement.Party))
-            .SetValue(settlement, partyBase);
+        partyBase.Settlement = settlement;
+        settlement.Party = partyBase;
         Assert.True(objectManager.AddExisting(id, partyBase));
     }
 

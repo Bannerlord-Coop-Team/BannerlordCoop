@@ -6,6 +6,7 @@ using Common.Util;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Extensions;
@@ -17,6 +18,7 @@ using HarmonyLib;
 using SandBox;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
@@ -28,10 +30,6 @@ namespace E2E.Tests.Services.MobileParties;
 
 public class MobilePartyMovementTests : SyncTestBase
 {
-    private static readonly MethodInfo SetAiBehaviorMethod =
-        AccessTools.Method(typeof(MobilePartyAi), "SetAiBehavior") ??
-        throw new MissingMethodException(typeof(MobilePartyAi).FullName, "SetAiBehavior");
-
     private readonly string MobilePartyId = "TestParty";
     private readonly string TargetPartyId = "TargetParty";
     private readonly string TargetSettlementId = "TargetSettlement";
@@ -278,6 +276,64 @@ public class MobilePartyMovementTests : SyncTestBase
         Assert.DoesNotContain(
             server.NetworkSentMessages.GetMessages<NetworkUpdatePartyBehavior>(),
             message => message.BehaviorUpdateData.MobilePartyId == compactPartyId);
+    }
+
+    [Fact]
+    public void DestroyAttachedParty_DropsQueuedBehaviorBeforeDestroy_AndSendsNoLateUpdate()
+    {
+        var server = TestEnvironment.Server;
+        var compactAttachedPartyId = ObjectManager.Compact(TargetPartyId, typeof(MobileParty));
+
+        server.Call(() =>
+        {
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(MobilePartyId, out var leaderParty));
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(TargetPartyId, out var attachedParty));
+
+            attachedParty.AttachedTo = leaderParty;
+            Assert.Same(leaderParty, attachedParty.AttachedTo);
+            FlushCoalescer(server);
+        });
+        server.NetworkSentMessages.Clear();
+
+        server.Call(() =>
+        {
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(MobilePartyId, out var leaderParty));
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(TargetPartyId, out var attachedParty));
+            Assert.Same(leaderParty, attachedParty.AttachedTo);
+
+            attachedParty.SetMoveGoToPoint(
+                new CampaignVec2(new Vec2(0.35f, 0.45f), true),
+                MobileParty.NavigationType.Default);
+            Assert.True(server.Resolve<ISendCoalescer>().HasPending);
+
+            DestroyPartyAction.Apply(null, attachedParty);
+
+            Assert.False(server.ObjectManager.TryGetObject<MobileParty>(TargetPartyId, out _));
+            int destroyIndex = server.NetworkSentMessages.Messages.FindIndex(
+                message => message is NetworkDestroyInstance<MobileParty> destroy &&
+                    destroy.InstanceId == TargetPartyId);
+            Assert.True(destroyIndex >= 0, "The MobileParty destroy must be sent during teardown.");
+
+            FlushCoalescer(server);
+
+            Assert.DoesNotContain(
+                server.NetworkSentMessages.GetMessages<NetworkUpdatePartyBehavior>(),
+                message => message.BehaviorUpdateData.MobilePartyId == compactAttachedPartyId);
+            Assert.DoesNotContain(
+                server.NetworkSentMessages.Messages
+                    .Skip(destroyIndex + 1)
+                    .OfType<NetworkUpdatePartyBehavior>(),
+                message => message.BehaviorUpdateData.MobilePartyId == compactAttachedPartyId);
+
+            int messageCountAfterFlush = server.NetworkSentMessages.Count;
+            FlushCoalescer(server);
+            Assert.Equal(messageCountAfterFlush, server.NetworkSentMessages.Count);
+        });
+
+        foreach (var client in TestEnvironment.Clients)
+        {
+            Assert.False(client.ObjectManager.TryGetObject<MobileParty>(TargetPartyId, out _));
+        }
     }
 
     [Fact]
@@ -899,9 +955,7 @@ public class MobilePartyMovementTests : SyncTestBase
         CampaignVec2 behaviorTarget,
         IInteractablePoint interactablePoint = null)
     {
-        SetAiBehaviorMethod.Invoke(
-            party.Ai,
-            new object[] { behavior, interactablePoint, behaviorTarget });
+        party.Ai.SetAiBehavior(behavior, interactablePoint, behaviorTarget);
     }
 
     private static void AssertBehaviorState(BehaviorState expected, MobileParty actual)

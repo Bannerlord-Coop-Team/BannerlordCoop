@@ -1,6 +1,6 @@
-
-using Common;
+﻿using Common;
 using Common.Logging;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MobileParties.Audit;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -373,7 +373,7 @@ internal class MobilePartyDebugCommand
         }
 
         var candidates = Hero.AllAliveHeroes
-            .Where(h => h != Hero.MainHero && h.Clan != null && !h.IsPrisoner && !h.IsChild
+            .Where(h => !h.IsPlayerHero() && h.Clan != null && !h.IsPrisoner && !h.IsChild
                         && h.IsLord && h.PartyBelongedTo == null)
             .Take(count)
             .ToList();

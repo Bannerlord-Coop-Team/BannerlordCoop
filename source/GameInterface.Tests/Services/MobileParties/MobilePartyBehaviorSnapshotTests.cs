@@ -1,5 +1,6 @@
 ﻿using Common.Util;
 using GameInterface.Services.MobileParties.Data;
+using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using Moq;
 using ProtoBuf;
@@ -18,6 +19,14 @@ namespace GameInterface.Tests.Services.MobileParties;
 /// </summary>
 public class MobilePartyBehaviorSnapshotTests
 {
+    [Theory]
+    [InlineData("GameInterface.Services.MobilePartyAIs.Messages.AiBehaviorInteractablePointUpdated")]
+    [InlineData("GameInterface.Services.MobilePartyAIs.Messages.UpdateAiBehaviorInteractablePoint")]
+    public void ObsoleteInteractableProtocolTypes_AreNotInAssembly(string fullName)
+    {
+        Assert.Null(typeof(MobilePartyBehaviorSnapshot).Assembly.GetType(fullName));
+    }
+
     [Fact]
     public void PartyBehaviorUpdateData_UsesOneCurrentSequentialWireContract()
     {
@@ -43,12 +52,12 @@ public class MobilePartyBehaviorSnapshotTests
         objectManager
             .Setup(manager => manager.TryGetId(owner, out resolvedOwnerId))
             .Returns(true);
+        var snapshot = new MobilePartyBehaviorSnapshot(objectManager.Object);
 
         var behaviorTarget = new CampaignVec2(new Vec2(0.25f, 0.5f), true);
         var moveTarget = new CampaignVec2(new Vec2(0.75f, 0.5f), true);
 
-        Assert.True(MobilePartyBehaviorSnapshot.TryCreate(
-            objectManager.Object,
+        Assert.True(snapshot.TryCreate(
             owner,
             AiBehavior.GoToPoint,
             anchor,
@@ -63,5 +72,19 @@ public class MobilePartyBehaviorSnapshotTests
             data.InteractablePointId);
         Assert.Equal(behaviorTarget, data.BestTargetPoint);
         Assert.Equal(moveTarget, data.MoveTargetPoint);
+    }
+
+    [Fact]
+    public void ShouldPublishMovementState_InactiveAttachedParty_ReturnsFalse()
+    {
+        var leader = ObjectHelper.SkipConstructor<MobileParty>();
+        var attachedParty = ObjectHelper.SkipConstructor<MobileParty>();
+        attachedParty._attachedTo = leader;
+        attachedParty.IsActive = false;
+
+        Assert.False(MobilePartyMovementStatePatches.ShouldPublishMovementState(
+            attachedParty,
+            isAuthoritativeMutation: true,
+            exception: null));
     }
 }

@@ -1,4 +1,5 @@
-﻿using Common.Network;
+﻿using Common;
+using Common.Network;
 using Common.Network.Coalescing;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Packets;
@@ -17,6 +18,7 @@ using TaleWorlds.Library;
 
 namespace Coop.IntegrationTests.MobileParties;
 
+[Collection(PartyBehaviorGameThreadCollection.Name)]
 public class PartyBehaviorTest
 {
     internal TestEnvironment TestEnvironment { get; }
@@ -58,7 +60,7 @@ public class PartyBehaviorTest
         });
 
         // Act
-        client1.SimulateMessage(this, message);
+        RunOnGameThread(() => client1.SimulateMessage(this, message));
 
         // Assert
         var update = Assert.Single(server.InternalMessages.GetMessages<UpdatePartyBehavior>());
@@ -312,10 +314,46 @@ public class PartyBehaviorTest
         server.Call(() => server.Resolve<ISendCoalescer>().Flush(server.Resolve<INetwork>()));
     }
 
+    /// <summary>
+    /// Runs a simulation on a dedicated thread marked as the game thread so blocking production
+    /// marshals execute inline without leaving the reusable xUnit thread marked as the game thread.
+    /// </summary>
+    private static void RunOnGameThread(Action act)
+    {
+        Exception? captured = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                GameThread.Instance.MarkGameThread();
+                act();
+            }
+            catch (Exception e)
+            {
+                captured = e;
+            }
+        });
+
+        thread.Start();
+        thread.Join();
+
+        if (captured != null)
+            throw captured;
+    }
+
     private static void AssertCampaignVec2Equal(CampaignVec2 expected, CampaignVec2 actual)
     {
         Assert.Equal(expected.X, actual.X);
         Assert.Equal(expected.Y, actual.Y);
         Assert.Equal(expected.IsOnLand, actual.IsOnLand);
     }
+}
+
+/// <summary>
+/// Prevents tests that temporarily mark a dedicated game thread from racing other integration tests.
+/// </summary>
+[CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class PartyBehaviorGameThreadCollection
+{
+    public const string Name = "Party behavior game thread";
 }

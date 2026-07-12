@@ -39,17 +39,20 @@ internal class MobilePartyBehaviorHandler : IHandler
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IMobilePartyInterface mobilePartyInterface;
     private readonly IObjectManager objectManager;
+    private readonly IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot;
 
     public MobilePartyBehaviorHandler(
         IMessageBroker messageBroker,
         IControllerIdProvider controllerIdProvider,
         IMobilePartyInterface mobilePartyInterface,
-        IObjectManager objectManager)
+        IObjectManager objectManager,
+        IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot)
     {
         this.messageBroker = messageBroker;
         this.controllerIdProvider = controllerIdProvider;
         this.mobilePartyInterface = mobilePartyInterface;
         this.objectManager = objectManager;
+        this.mobilePartyBehaviorSnapshot = mobilePartyBehaviorSnapshot;
 
         messageBroker.Subscribe<PartyBehaviorChangeAttempted>(Handle_PartyBehaviorChanged);
         messageBroker.Subscribe<MobilePartyMovementStateChanged>(Handle_MobilePartyMovementStateChanged);
@@ -70,8 +73,7 @@ internal class MobilePartyBehaviorHandler : IHandler
         if (!party.IsControlledByThisInstance())
             return;
 
-        if (!MobilePartyBehaviorSnapshot.TryCreateCurrent(
-                objectManager,
+        if (!mobilePartyBehaviorSnapshot.TryCreateCurrent(
                 party,
                 out PartyBehaviorUpdateData data))
             return;
@@ -90,8 +92,7 @@ internal class MobilePartyBehaviorHandler : IHandler
     private void Handle_MobilePartyMovementStateChanged(MessagePayload<MobilePartyMovementStateChanged> obj)
     {
         var party = obj.What.Party;
-        if (!MobilePartyBehaviorSnapshot.TryCreateCurrent(
-                objectManager,
+        if (!mobilePartyBehaviorSnapshot.TryCreateCurrent(
                 party,
                 out PartyBehaviorUpdateData data))
             return;
@@ -211,8 +212,7 @@ internal class MobilePartyBehaviorHandler : IHandler
 
     private void PublishAuthoritativeBehavior(MobileParty party, PartyBehaviorUpdateData request)
     {
-        if (!MobilePartyBehaviorSnapshot.TryCreateCurrent(
-                objectManager,
+        if (!mobilePartyBehaviorSnapshot.TryCreateCurrent(
                 party,
                 out PartyBehaviorUpdateData authoritativeData))
             return;

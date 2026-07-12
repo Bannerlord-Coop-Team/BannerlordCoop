@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
+using Common.Network.Coalescing;
 using Common.Util;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.Entity;
@@ -26,17 +27,20 @@ internal class MobilePartyRegistry : AutoRegistryBase<MobileParty>
 
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IMessageBroker messageBroker;
+    private readonly ISendCoalescer coalescer;
 
     public MobilePartyRegistry(
         IControllerIdProvider controllerIdProvider,
         IMessageBroker messageBroker,
         ILogger logger,
         IAutoRegistryFactory autoRegistryFactory,
-        IObjectManager objectManager)
+        IObjectManager objectManager,
+        ISendCoalescer coalescer = null)
         : base(logger, autoRegistryFactory, objectManager)
     {
         this.controllerIdProvider = controllerIdProvider;
         this.messageBroker = messageBroker;
+        this.coalescer = coalescer;
     }
 
     public override IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(MobileParty));
@@ -105,14 +109,24 @@ internal class MobilePartyRegistry : AutoRegistryBase<MobileParty>
 
     public override void OnServerDestroyed(MobileParty obj, string id)
     {
-        obj.MemberRoster.Clear();
-        obj.PrisonRoster.Clear();
-        obj.Party.SetVisualAsDirty();
+        try
+        {
+            obj.MemberRoster.Clear();
+            obj.PrisonRoster.Clear();
+            obj.Party.SetVisualAsDirty();
 
-        messageBroker.Publish(this, new MobilePartyDestroyed(obj));
+            messageBroker.Publish(this, new MobilePartyDestroyed(obj));
 
-        // Sole publisher of the PartyBase teardown: PartyBaseRegistry.DestroyMethods is empty, so
-        // a PartyBase's lifetime ends with its party's, while everything is still registered.
-        messageBroker.Publish(this, new InstanceDestroyed<PartyBase>(obj.Party));
+            // Sole publisher of the PartyBase teardown: PartyBaseRegistry.DestroyMethods is empty, so
+            // a PartyBase's lifetime ends with its party's, while everything is still registered.
+            messageBroker.Publish(this, new InstanceDestroyed<PartyBase>(obj.Party));
+        }
+        finally
+        {
+            // AutoRegistryHandler sends the MobileParty destroy after this callback. Drop any state
+            // queued before or during teardown so no behavior update can follow that destroy.
+            coalescer?.DropInstance(
+                global::GameInterface.Services.ObjectManager.ObjectManager.Compact(id, typeof(MobileParty)));
+        }
     }
 }

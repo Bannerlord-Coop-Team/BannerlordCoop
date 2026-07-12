@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
@@ -36,6 +37,7 @@ internal class RequestMobilePartyBehaviorPacketHandler : IPacketHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
+    private readonly IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot;
     private readonly IPlayerManager playerManager;
 
     public RequestMobilePartyBehaviorPacketHandler(
@@ -44,6 +46,7 @@ internal class RequestMobilePartyBehaviorPacketHandler : IPacketHandler
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
+        IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot,
         IPlayerManager playerManager)
     {
         this.packetManager = packetManager;
@@ -51,6 +54,7 @@ internal class RequestMobilePartyBehaviorPacketHandler : IPacketHandler
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
+        this.mobilePartyBehaviorSnapshot = mobilePartyBehaviorSnapshot;
         this.playerManager = playerManager;
         packetManager.RegisterPacketHandler(this);
 
@@ -80,8 +84,22 @@ internal class RequestMobilePartyBehaviorPacketHandler : IPacketHandler
             return;
         }
 
+        var controlledPartyId = player.MobilePartyId;
+        var controllerId = player.ControllerId;
         var data = convertedPacket.BehaviorUpdateData;
-        if (!TryValidateClientSnapshot(player.MobilePartyId, data, out string reason))
+        GameThread.RunSafe(
+            () => ValidateAndPublishRequest(peer, controlledPartyId, controllerId, data),
+            blocking: true,
+            context: nameof(HandlePacket));
+    }
+
+    private void ValidateAndPublishRequest(
+        NetPeer peer,
+        string controlledPartyId,
+        string controllerId,
+        PartyBehaviorUpdateData data)
+    {
+        if (!TryValidateClientSnapshot(controlledPartyId, data, out string reason))
         {
             Reject(peer, reason);
             return;
@@ -89,7 +107,7 @@ internal class RequestMobilePartyBehaviorPacketHandler : IPacketHandler
 
         // Both fields are server-authoritative. A client may predict its own movement, but it may
         // neither spoof whose prediction this is nor force an immediate position/queue flush.
-        data.OriginControllerId = player.ControllerId;
+        data.OriginControllerId = controllerId;
         data.ForcePosition = false;
 
         messageBroker.Publish(this, new UpdatePartyBehavior(ref data));
@@ -274,8 +292,7 @@ internal class RequestMobilePartyBehaviorPacketHandler : IPacketHandler
         // request, a forced battle-finalization update, and a SetMove* capture all broadcast the
         // same complete state instead of echoing a partial or stale request payload.
         if (objectManager.TryGetObject(data.MobilePartyId, out MobileParty party) &&
-            MobilePartyBehaviorSnapshot.TryCreateCurrent(
-                objectManager,
+            mobilePartyBehaviorSnapshot.TryCreateCurrent(
                 party,
                 out var authoritativeData))
         {

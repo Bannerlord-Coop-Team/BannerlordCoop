@@ -9,12 +9,39 @@ using TaleWorlds.CampaignSystem.Settlements;
 namespace GameInterface.Services.MobileParties.Data;
 
 /// <summary>
+/// Creates complete movement and AI behavior snapshots for mobile parties.
+/// </summary>
+public interface IMobilePartyBehaviorSnapshot
+{
+    bool TryCreateCurrent(
+        MobileParty party,
+        out PartyBehaviorUpdateData data);
+
+    bool TryCreate(
+        MobileParty party,
+        AiBehavior shortTermBehavior,
+        IInteractablePoint interactablePoint,
+        CampaignVec2 behaviorTarget,
+        CampaignVec2 moveTargetPoint,
+        out PartyBehaviorUpdateData data);
+}
+
+/// <summary>
 /// Builds the complete movement and AI behavior snapshot replicated for one mobile party.
 /// </summary>
-public static class MobilePartyBehaviorSnapshot
+public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
 {
-    public static bool TryCreateCurrent(
-        IObjectManager objectManager,
+    private readonly IObjectManager objectManager;
+
+    public MobilePartyBehaviorSnapshot(IObjectManager objectManager)
+    {
+        if (objectManager == null)
+            throw new ArgumentNullException(nameof(objectManager));
+
+        this.objectManager = objectManager;
+    }
+
+    public bool TryCreateCurrent(
         MobileParty party,
         out PartyBehaviorUpdateData data)
     {
@@ -22,7 +49,6 @@ public static class MobilePartyBehaviorSnapshot
 
         return party?.Ai != null &&
             TryCreate(
-                objectManager,
                 party,
                 party.ShortTermBehavior,
                 party.Ai.AiBehaviorInteractable,
@@ -31,8 +57,7 @@ public static class MobilePartyBehaviorSnapshot
                 out data);
     }
 
-    public static bool TryCreate(
-        IObjectManager objectManager,
+    public bool TryCreate(
         MobileParty party,
         AiBehavior shortTermBehavior,
         IInteractablePoint interactablePoint,
@@ -42,10 +67,10 @@ public static class MobilePartyBehaviorSnapshot
     {
         data = default;
 
-        if (objectManager == null || party == null)
+        if (party == null)
             return false;
 
-        if (!TryGetCompactId(objectManager, party, out string partyId))
+        if (!TryGetCompactId(party, out string partyId))
             return false;
 
         string interactablePointId = null;
@@ -54,12 +79,12 @@ public static class MobilePartyBehaviorSnapshot
         switch (interactablePoint)
         {
             case PartyBase partyBase:
-                if (!TryGetCompactId(objectManager, partyBase, out interactablePointId))
+                if (!TryGetCompactId(partyBase, out interactablePointId))
                     return false;
                 hasTarget = true;
                 break;
             case AnchorPoint anchorPoint when anchorPoint.Owner != null:
-                if (!TryGetCompactId(objectManager, anchorPoint.Owner, out interactablePointId))
+                if (!TryGetCompactId(anchorPoint.Owner, out interactablePointId))
                     return false;
                 interactableKind = BehaviorInteractableKind.AnchorPoint;
                 hasTarget = true;
@@ -75,9 +100,9 @@ public static class MobilePartyBehaviorSnapshot
         if (hasTarget && string.IsNullOrEmpty(interactablePointId))
             return false;
 
-        if (!TryGetCompactId(objectManager, party.TargetParty, out string targetPartyId) ||
-            !TryGetCompactId(objectManager, party.TargetSettlement, out string targetSettlementId) ||
-            !TryGetCompactId(objectManager, party.MoveTargetParty, out string moveTargetPartyId))
+        if (!TryGetCompactId(party.TargetParty, out string targetPartyId) ||
+            !TryGetCompactId(party.TargetSettlement, out string targetSettlementId) ||
+            !TryGetCompactId(party.MoveTargetParty, out string moveTargetPartyId))
             return false;
 
         data = new PartyBehaviorUpdateData(
@@ -104,7 +129,7 @@ public static class MobilePartyBehaviorSnapshot
         return true;
     }
 
-    private static bool TryGetCompactId<T>(IObjectManager objectManager, T instance, out string id)
+    private bool TryGetCompactId<T>(T instance, out string id)
         where T : class
     {
         id = null;
