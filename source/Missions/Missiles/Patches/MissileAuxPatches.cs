@@ -5,6 +5,7 @@ using GameInterface.Services.MapEvents;
 using HarmonyLib;
 using Missions.Agents.Extensions;
 using Missions.Missiles.Message;
+using System;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
@@ -74,7 +75,7 @@ namespace Missions.Missiles.Patches
     [HarmonyPatchCategory(MissionModule.MissilePatchCategory)]
     public static class BlockMissileIfNative
     {
-        [System.ThreadStatic]
+        [ThreadStatic]
         private static bool capturingAgentShot;
 
         internal static bool IsCapturingAgentShot => capturingAgentShot;
