@@ -2,6 +2,8 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.MapEvents.Patches;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
@@ -140,6 +142,71 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
         AssertClientsConvergedOn(partyId, serverContribution);
     }
 
+    [Fact]
+    public void RepeatedScoreHitsInOneTick_SendLatestContributionOnce()
+    {
+        var (partyId, troopSeed, _) = SetupScoredBattleOnServer();
+
+        Server.NetworkSentMessages.Clear();
+
+        int serverContribution = 0;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEventParty>(partyId, out var party));
+            var victim = Server.GetRegisteredObject<CharacterObject>("e2e_victim");
+
+            party.OnTroopScoreHit(new UniqueTroopDescriptor(troopSeed), victim, 10, isFatal: false, isTeamKill: false, null, isSimulatedHit: true);
+            party.OnTroopScoreHit(new UniqueTroopDescriptor(troopSeed), victim, 20, isFatal: false, isTeamKill: false, null, isSimulatedHit: true);
+            party.OnTroopScoreHit(new UniqueTroopDescriptor(troopSeed), victim, 30, isFatal: true, isTeamKill: false, null, isSimulatedHit: true);
+
+            serverContribution = party.ContributionToBattle;
+        });
+
+        Assert.DoesNotContain(Server.NetworkSentMessages, message => IsContributionMessageFor(message, partyId));
+
+        FlushCoalescer();
+
+        Assert.Single(Server.NetworkSentMessages, message => IsContributionMessageFor(message, partyId));
+        AssertClientsConvergedOn(partyId, serverContribution);
+    }
+
+    [Fact]
+    public void VictoryAndFinalizeBoundaries_FlushPendingContributionBeforeReturning()
+    {
+        var (partyId, troopSeed, _) = SetupScoredBattleOnServer();
+
+        Server.NetworkSentMessages.Clear();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEventParty>(partyId, out var party));
+            var victim = Server.GetRegisteredObject<CharacterObject>("e2e_victim");
+            var mapEvent = party.Party.MapEventSide.MapEvent;
+
+            party.OnTroopScoreHit(new UniqueTroopDescriptor(troopSeed), victim, 10, isFatal: false, isTeamKill: false, null, isSimulatedHit: true);
+            Assert.DoesNotContain(Server.NetworkSentMessages, message => IsContributionMessageFor(message, partyId));
+
+            var battleStatePrefix = AccessTools.Method(typeof(MapEventPatches), "Prefix_BattleState");
+            Assert.True((bool)battleStatePrefix.Invoke(null, new object[] { mapEvent, BattleState.AttackerVictory })!);
+            Assert.Single(Server.NetworkSentMessages, message => IsContributionMessageFor(message, partyId));
+
+            party.OnTroopScoreHit(new UniqueTroopDescriptor(troopSeed), victim, 20, isFatal: false, isTeamKill: false, null, isSimulatedHit: true);
+            Assert.Single(Server.NetworkSentMessages, message => IsContributionMessageFor(message, partyId));
+
+            var finalizePrefix = AccessTools.Method(typeof(MapEventPatches), "Prefix_FinalizeEventAux");
+            Assert.True((bool)finalizePrefix.Invoke(null, new object[] { mapEvent })!);
+            Assert.Equal(2, Server.NetworkSentMessages.Count(message => IsContributionMessageFor(message, partyId)));
+        });
+    }
+
+    private static bool IsContributionMessageFor(IMessage message, string partyId)
+    {
+        if (message.GetType().Name != "MapEventParty__contributionToBattle_SetNetworkMessage") return false;
+
+        var instanceId = AccessTools.Property(message.GetType(), "InstanceId").GetValue(message) as string;
+        return instanceId == ObjectManager.Compact(partyId, typeof(MapEventParty));
+    }
+
     /// <summary>
     /// Stands up a coop battle whose attacker-side party holds one flattened troop, ready to be scored
     /// against: returns the party's id, the troop's roster descriptor seed and the victim character's id
@@ -194,6 +261,8 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
     /// <summary>The _contributionToBattle autosync broadcast the server value to every client's copy.</summary>
     private void AssertClientsConvergedOn(string partyId, int serverContribution)
     {
+        FlushCoalescer();
+
         foreach (var client in Clients)
         {
             client.Call(() =>
