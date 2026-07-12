@@ -266,6 +266,8 @@ namespace GameInterface.Services.Smithing.Handlers
                         itemRoster.AddToCounts(craftingMaterialItem4, formula.Output2Count);
                     }
 
+                    craftingHero.AddSkillXp(DefaultSkills.Crafting, (float)Campaign.Current.Models.SmithingModel.GetSkillXpForRefining(ref formula));
+
                     int energyCostForRefining = Campaign.Current.Models.SmithingModel.GetEnergyCostForRefining(ref formula, craftingHero);
                     int newHeroCraftingStamina = craftingCampaignBehavior.GetHeroCraftingStamina(craftingHero) - energyCostForRefining;
                     craftingCampaignBehavior.SetHeroCraftingStamina(craftingHero, newHeroCraftingStamina); // Run on server

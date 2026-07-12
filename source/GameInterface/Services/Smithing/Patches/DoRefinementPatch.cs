@@ -26,9 +26,6 @@ namespace GameInterface.Services.Smithing.Patches
             var message = new RefinementDone(__instance, hero, refineFormula);
             MessageBroker.Instance.Publish(__instance, message);
 
-            // AddSkillXp already synced, run on client
-            hero.AddSkillXp(DefaultSkills.Crafting, (float)Campaign.Current.Models.SmithingModel.GetSkillXpForRefining(ref refineFormula));
-
             // Skip original to override original client saving
             return false;
         }

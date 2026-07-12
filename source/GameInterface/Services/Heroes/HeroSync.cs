@@ -28,7 +28,7 @@ namespace GameInterface.Services.Heroes
             foreach (var method in ExternalMethods)
             {
                 //ISSUES WITH THIS
-                autoSyncBuilder.AddTargetMethod(typeof(Hero), method);
+                //autoSyncBuilder.AddTargetMethod(typeof(Hero), method);
             }
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.StaticBodyProperties)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Weight)));
