@@ -54,8 +54,6 @@ internal class HeroDataHandler : IHandler
 
                 HeroDataPatches.SetNameOverride(hero, fullName, firstName);
 
-                InformationManager.DisplayMessage(new InformationMessage($"Changed hero name to {fullName}"));
-
                 if (ScreenManager.TopScreen is GauntletClanScreen clanScreen)
                 {
                     clanScreen._dataSource?.RefreshValues();

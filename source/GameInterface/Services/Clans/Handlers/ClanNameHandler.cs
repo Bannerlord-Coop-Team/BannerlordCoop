@@ -72,8 +72,6 @@ namespace GameInterface.Services.Clans.Handlers
                     {
                         clanScreen._dataSource?.RefreshValues();
                     }
-
-                    InformationManager.DisplayMessage(new InformationMessage($"Clan {payload.ClanId} changed name to {payload.Name}"));
                 }
                 catch (Exception e)
                 {
