@@ -75,6 +75,6 @@ public static class LobbyDataCodec
 
     private static bool IsTrue(string value)
     {
-        return value == "1" || bool.TryParse(value, out var parsed) && parsed;
+        return value == "1" || (bool.TryParse(value, out var parsed) && parsed);
     }
 }

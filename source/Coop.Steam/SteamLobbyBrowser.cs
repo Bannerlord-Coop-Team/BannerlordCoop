@@ -83,6 +83,6 @@ public class SteamLobbyBrowser : ISteamLobbyBrowser
 
     private static bool ParseBoolean(string value)
     {
-        return value == "1" || bool.TryParse(value, out var parsed) && parsed;
+        return value == "1" || (bool.TryParse(value, out var parsed) && parsed);
     }
 }

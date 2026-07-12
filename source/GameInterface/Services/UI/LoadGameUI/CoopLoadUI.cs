@@ -69,7 +69,6 @@ namespace Coop.UI.LoadGameUI
 
         private void StartHosting(string password)
         {
-
             if (Game.Current != null)
             {
                 ScreenManager.PopScreen();
