@@ -65,6 +65,10 @@ internal class MapTimeTrackerInterface : IMapTimeTrackerInterface
     private bool skipNextHeartbeatAgeIncrement;
     private long previousServerTicks;
     private long pendingServerTicks;
+    // How far the server clock advanced between the last two heartbeats — diagnostic only (shows the
+    // server's effective speed in the pacing log; a paused server shows 0). Not used for correction:
+    // see PrepareCorrection for why extrapolating the target would overshoot.
+    private long lastServerProgressTicks;
     private double remainingCorrectionTicks;
     private double correctionTicksPerSecond;
     private double correctionAccumulator;
@@ -146,6 +150,9 @@ internal class MapTimeTrackerInterface : IMapTimeTrackerInterface
             serverTicks < previousServerTicks ||
             serverTicks - previousServerTicks > maxServerProgressTicks;
 
+        // Remember the server's progress over the last heartbeat interval for the pacing log.
+        lastServerProgressTicks = isDiscontinuity ? 0L : serverTicks - previousServerTicks;
+
         hasServerTime = true;
         previousServerTicks = serverTicks;
         pendingServerTicks = serverTicks;
@@ -180,6 +187,11 @@ internal class MapTimeTrackerInterface : IMapTimeTrackerInterface
         if (hasPendingServerTime == false) return;
 
         hasPendingServerTime = false;
+
+        // Deliberately NOT extrapolated by the server's rate: over the correction window the client's
+        // vanilla ticking already advances at (approximately) the server's rate, so the gap measured
+        // at heartbeat arrival is the whole correction. Aiming past the heartbeat value would count
+        // that vanilla progress twice and overshoot by one interval's worth.
         remainingCorrectionTicks = pendingServerTicks - localTicks;
         correctionTicksPerSecond = remainingCorrectionTicks / CorrectionWindowSeconds;
     }
@@ -290,7 +302,8 @@ internal class MapTimeTrackerInterface : IMapTimeTrackerInterface
         Logger.Information(
             "[CampaignPacing] {PreviousPacingState} -> {PacingState}; " +
             "ServerTicks={ServerTicks}, ClientTicks={ClientTicks}, ServerMinusClientTicks={ServerMinusClientTicks}, " +
-            "HeartbeatAgeSeconds={HeartbeatAgeSeconds:0.000}, VanillaDeltaTicks={VanillaDeltaTicks}, " +
+            "HeartbeatAgeSeconds={HeartbeatAgeSeconds:0.000}, ServerProgressTicks={ServerProgressTicks}, " +
+            "VanillaDeltaTicks={VanillaDeltaTicks}, " +
             "AppliedDeltaTicks={AppliedDeltaTicks}, SpeedMultiplier={SpeedMultiplier:0.00}x",
             loggedPacingState,
             pacingState,
@@ -298,6 +311,7 @@ internal class MapTimeTrackerInterface : IMapTimeTrackerInterface
             clientTicks,
             pendingServerTicks - clientTicks,
             secondsSinceHeartbeat,
+            lastServerProgressTicks,
             originalDeltaTicks,
             correctedDeltaTicks,
             speedMultiplier);

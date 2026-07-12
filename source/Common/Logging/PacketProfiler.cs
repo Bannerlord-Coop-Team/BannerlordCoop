@@ -30,6 +30,13 @@ public sealed class PacketProfiler : IDisposable
     private readonly ConcurrentDictionary<string, Stats> stats = new ConcurrentDictionary<string, Stats>();
 
     /// <summary>
+    /// Optional provider of a one-line live-state summary (e.g. per-peer reliable-queue depth and ping)
+    /// appended to each dump. Owned by the network layer, which is the only one that can see peers;
+    /// the profiler itself stays free of any networking dependency.
+    /// </summary>
+    public Func<string> ExtraStatsProvider { get; set; }
+
+    /// <summary>
     /// Constructs a PacketProfiler.
     /// </summary>
     /// <param name="dumpInterval">How often to dump the accumulated stats to the log.</param>
@@ -80,8 +87,22 @@ public sealed class PacketProfiler : IDisposable
         var bytesPerSecond = seconds > 0 ? totalBytes / seconds : 0;
 
         Logger.Information(
-            "Packet profile over {Seconds:0.#} seconds ({BytesPerSecond:N0} bytes/sec avg): {@PacketProfile}",
-            seconds, bytesPerSecond, ordered);
+            "Packet profile over {Seconds:0.#} seconds ({BytesPerSecond:N0} bytes/sec avg): {@PacketProfile}{ExtraStats}",
+            seconds, bytesPerSecond, ordered, GetExtraStats());
+    }
+
+    // Never let a faulty provider kill the dump; the profile itself is the primary payload.
+    private string GetExtraStats()
+    {
+        try
+        {
+            var extra = ExtraStatsProvider?.Invoke();
+            return string.IsNullOrEmpty(extra) ? string.Empty : $" | {extra}";
+        }
+        catch (Exception ex)
+        {
+            return $" | peer stats unavailable: {ex.GetType().Name}";
+        }
     }
 
     private static string GetPacketName(IPacket packet)
