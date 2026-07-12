@@ -4,9 +4,8 @@ using ProtoBuf;
 namespace GameInterface.Services.TroopRosters.Messages;
 
 /// <summary>
-/// Sets the absolute xp of an element in a roster, keyed by element identity. The client sets the xp on
-/// the element if it has it; an absent element is skipped (its create is its own earlier delta), since a
-/// placeholder would corrupt the roster's cached totals.
+/// Legacy single-operation form for setting one identity-keyed roster element's XP. Normal authority
+/// traffic carries this operation inside <see cref="NetworkTroopRosterElementBatch"/>.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 internal readonly struct NetworkTroopRosterSetXp : ICommand

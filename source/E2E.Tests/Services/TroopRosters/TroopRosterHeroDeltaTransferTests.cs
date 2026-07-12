@@ -1,3 +1,4 @@
+using Common.Network.Coalescing;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
@@ -7,6 +8,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using Xunit.Abstractions;
+using static GameInterface.Services.ObjectManager.ObjectManager;
 
 namespace E2E.Tests.Services.TroopRosters;
 
@@ -55,6 +57,8 @@ public class TroopRosterHeroDeltaTransferTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetId(companion, out companionId));
             Assert.True(Server.ObjectManager.TryGetId(companion.CharacterObject, out companionCharacterId));
         });
+        TestEnvironment.FlushCoalescer();
+        CreateFreedCoalescerSlots();
 
         // Act: transfer the companion right -> left via the batched delta apply. The destination (+1) is
         // listed before the source (-1) to prove the two-pass apply is order-independent.
@@ -70,6 +74,7 @@ public class TroopRosterHeroDeltaTransferTests : IDisposable
                 (rightParty.MemberRoster, Delta(companionCharacterId, -1)),
             });
         });
+        TestEnvironment.FlushCoalescer();
 
         // Assert: the companion moved on every client and its PartyBelongedTo points at the left party.
         foreach (var client in Clients)
@@ -106,6 +111,8 @@ public class TroopRosterHeroDeltaTransferTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetId(prisoner, out prisonerId));
             Assert.True(Server.ObjectManager.TryGetId(prisoner.CharacterObject, out prisonerCharacterId));
         });
+        TestEnvironment.FlushCoalescer();
+        CreateFreedCoalescerSlots();
 
         // Act: transfer the prisoner right -> left via the batched delta apply (destination listed first).
         Server.Call(() =>
@@ -120,6 +127,7 @@ public class TroopRosterHeroDeltaTransferTests : IDisposable
                 (rightParty.Party.PrisonRoster, Delta(prisonerCharacterId, -1)),
             });
         });
+        TestEnvironment.FlushCoalescer();
 
         // Assert: the prisoner moved on every client and its PartyBelongedToAsPrisoner points at the left party.
         foreach (var client in Clients)
@@ -132,6 +140,31 @@ public class TroopRosterHeroDeltaTransferTests : IDisposable
             Assert.Equal(1, leftParty.Party.PrisonRoster.GetTroopCount(prisoner.CharacterObject));
             Assert.Same(leftParty.Party, prisoner.PartyBelongedToAsPrisoner);
         }
+    }
+
+    private void CreateFreedCoalescerSlots()
+    {
+        Server.Call(() =>
+        {
+            var fillerRoster = GameObjectCreator.CreateInitializedObject<TroopRoster>();
+            var firstFiller = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+            var secondFiller = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+
+            fillerRoster.AddToCounts(firstFiller, 1);
+            fillerRoster.AddToCounts(secondFiller, 1);
+
+            Assert.True(Server.ObjectManager.TryGetId(fillerRoster, out var fillerRosterId));
+            fillerRosterId = Compact(fillerRosterId, typeof(TroopRoster));
+
+            var coalescer = Server.Resolve<ISendCoalescer>();
+            Assert.True(coalescer.HasPending);
+
+            // Removing both keys leaves reusable Dictionary entry slots. Before hero AddCounts became
+            // immediate, the next source/destination transfer reused those slots in reverse enumeration
+            // order and replayed the destination add before the source removal.
+            coalescer.DropInstance(fillerRosterId);
+            Assert.False(coalescer.HasPending);
+        });
     }
 
     public void Dispose() => TestEnvironment.Dispose();

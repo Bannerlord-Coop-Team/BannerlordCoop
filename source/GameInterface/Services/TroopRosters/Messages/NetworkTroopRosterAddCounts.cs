@@ -4,11 +4,8 @@ using ProtoBuf;
 namespace GameInterface.Services.TroopRosters.Messages;
 
 /// <summary>
-/// Sent from the authority to every client to add (or subtract) counts for a single element in a
-/// roster, keyed by the element's identity rather than its array index. The client applies it via
-/// vanilla <c>AddToCounts</c>, which finds-or-creates the element by character and keeps the cached
-/// totals correct, so a positive add creates the element if the client is missing it. A subtract for an
-/// element the client does not have is skipped, since vanilla cannot create one from a non-positive add.
+/// Legacy single-operation form for adding or subtracting counts on one identity-keyed roster element.
+/// Normal authority traffic carries this operation inside <see cref="NetworkTroopRosterElementBatch"/>.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 internal readonly struct NetworkTroopRosterAddCounts : ICommand

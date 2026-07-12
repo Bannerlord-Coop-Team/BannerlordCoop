@@ -2,9 +2,11 @@ using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Coalescing;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
 using static GameInterface.Services.ObjectManager.ObjectManager;
+using GameInterface.Services.TroopRosters.Coalescing;
 using GameInterface.Services.TroopRosters.Messages;
 using Serilog;
 using System;
@@ -14,35 +16,35 @@ using TaleWorlds.CampaignSystem.Roster;
 namespace GameInterface.Services.TroopRosters.Handlers;
 
 /// <summary>
-/// Replicates TroopRoster changes as identity-keyed per-operation deltas (the ItemRoster pattern). On the
-/// authority each roster mutation publishes a local event carrying the SERVER index; this handler resolves
-/// the element's identity from the server's (always-aligned) roster and sends a message keyed by that
-/// identity, never by array index. The client applies it through the same vanilla mutators, found by
-/// identity, so it stays correct regardless of the client roster's layout. A positive AddCounts creates the
-/// element if it is missing (vanilla AddToCounts find-or-creates and keeps the cached totals correct); the
-/// absolute Set deltas require the element to already exist (its create is its own earlier, reliably-ordered
-/// delta) and are skipped otherwise, since minting a placeholder here would corrupt the roster's cached
-/// totals and be wiped by RemoveZeroCounts.
+/// Replicates TroopRoster changes as identity-keyed operations. AddCounts and XP mutations for one regular
+/// troop share an ordered per-tick batch; roster-wide and other absolute mutations flush that batch before
+/// sending. Hero AddCounts operations send immediately because their party-linkage side effects must preserve
+/// source/destination order across different rosters. The client resolves each element by identity and replays
+/// the same vanilla mutators in order.
 /// </summary>
 /// <remarks>
 /// No array index crosses the wire, so it cannot land out of range on an under-populated client roster.
-/// Messages send immediately on the authority's own patches, so it replicates on a headless host.
+/// The authority's own patches enqueue directly, so replication works on a headless host.
 /// Positional reorders (ShiftTroopToIndex/SwapTroopsAtIndices) are display ordering and are intentionally
 /// not synced.
 /// </remarks>
 internal class TroopRosterDeltaHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<TroopRosterDeltaHandler>();
+    private const string ElementBatchChannel = "TroopRosterElementBatch";
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly ISendCoalescer coalescer;
 
-    public TroopRosterDeltaHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
+    public TroopRosterDeltaHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network,
+        ISendCoalescer coalescer = null)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.coalescer = coalescer;
 
         // Authority send path: the roster patches publish these local events (server-only) with the server index.
         messageBroker.Subscribe<CountsAtIndexAdded>(Handle_CountsAtIndexAdded);
@@ -57,6 +59,7 @@ internal class TroopRosterDeltaHandler : IHandler
         messageBroker.Subscribe<NetworkTroopRosterSetWoundedNumber>(Handle_NetworkSetWoundedNumber);
         messageBroker.Subscribe<NetworkTroopRosterSetXp>(Handle_NetworkSetXp);
         messageBroker.Subscribe<NetworkTroopRosterRemoveZeroCounts>(Handle_NetworkRemoveZeroCounts);
+        messageBroker.Subscribe<NetworkTroopRosterElementBatch>(Handle_NetworkElementBatch);
     }
 
     public void Dispose()
@@ -72,19 +75,37 @@ internal class TroopRosterDeltaHandler : IHandler
         messageBroker.Unsubscribe<NetworkTroopRosterSetWoundedNumber>(Handle_NetworkSetWoundedNumber);
         messageBroker.Unsubscribe<NetworkTroopRosterSetXp>(Handle_NetworkSetXp);
         messageBroker.Unsubscribe<NetworkTroopRosterRemoveZeroCounts>(Handle_NetworkRemoveZeroCounts);
+        messageBroker.Unsubscribe<NetworkTroopRosterElementBatch>(Handle_NetworkElementBatch);
     }
 
     private void Handle_CountsAtIndexAdded(MessagePayload<CountsAtIndexAdded> payload)
     {
         var e = payload.What;
         if (!TryResolve(e.TroopRoster, e.Character, out var rosterId, out var characterId)) return;
-        network.SendAll(new NetworkTroopRosterAddCounts(rosterId, characterId, e.CountChange, e.WoundedCountChange, e.XpChange, e.RemoveDepleted));
+
+        var operation = TroopRosterElementOperation.AddCounts(
+            e.CountChange, e.WoundedCountChange, e.XpChange, e.RemoveDepleted);
+
+        if (e.Character.IsHero)
+        {
+            // AddToCounts mutates Hero.PartyBelongedTo / PartyBelongedToAsPrisoner. Keeping hero deltas in
+            // separate (roster, character) coalescer keys lets Dictionary slot reuse reorder a transfer's
+            // destination add ahead of its source remove. Flush earlier work for this roster, then send this
+            // hero operation immediately so the reliable stream retains the authority's cross-roster order.
+            coalescer?.FlushInstance(rosterId, network);
+            network.SendAll(new NetworkTroopRosterElementBatch(rosterId, characterId,
+                new[] { operation }));
+            return;
+        }
+
+        Enqueue(rosterId, characterId, operation);
     }
 
     private void Handle_ElementNumberSet(MessagePayload<ElementNumberSet> payload)
     {
         var e = payload.What;
         if (!TryResolve(e.TroopRoster, e.Character, out var rosterId, out var characterId)) return;
+        coalescer?.FlushInstance(rosterId, network);
         network.SendAll(new NetworkTroopRosterSetNumber(rosterId, characterId, e.Number));
     }
 
@@ -92,6 +113,7 @@ internal class TroopRosterDeltaHandler : IHandler
     {
         var e = payload.What;
         if (!TryResolve(e.TroopRoster, e.Character, out var rosterId, out var characterId)) return;
+        coalescer?.FlushInstance(rosterId, network);
         network.SendAll(new NetworkTroopRosterSetWoundedNumber(rosterId, characterId, e.Number));
     }
 
@@ -99,7 +121,7 @@ internal class TroopRosterDeltaHandler : IHandler
     {
         var e = payload.What;
         if (!TryResolve(e.TroopRoster, e.Character, out var rosterId, out var characterId)) return;
-        network.SendAll(new NetworkTroopRosterSetXp(rosterId, characterId, e.Number));
+        Enqueue(rosterId, characterId, TroopRosterElementOperation.SetXp(e.Number));
     }
 
     private void Handle_ZeroCountsRemoved(MessagePayload<ZeroCountsRemoved> payload)
@@ -108,7 +130,21 @@ internal class TroopRosterDeltaHandler : IHandler
         // to replicate, not an error.
         if (!objectManager.TryGetId(payload.What.TroopRoster, out var rosterId)) return;
         rosterId = Compact(rosterId, typeof(TroopRoster));
+        coalescer?.FlushInstance(rosterId, network);
         network.SendAll(new NetworkTroopRosterRemoveZeroCounts(rosterId));
+    }
+
+    private void Enqueue(string rosterId, string characterId, TroopRosterElementOperation operation)
+    {
+        if (coalescer == null)
+        {
+            network.SendAll(new NetworkTroopRosterElementBatch(rosterId, characterId,
+                new[] { operation }));
+            return;
+        }
+
+        var key = new CoalesceKey(ElementBatchChannel, rosterId, characterId);
+        coalescer.Enqueue(key, new TroopRosterElementBatchPayload(rosterId, characterId, operation));
     }
 
     /// <summary>
@@ -135,43 +171,43 @@ internal class TroopRosterDeltaHandler : IHandler
     private void Handle_NetworkAddCounts(MessagePayload<NetworkTroopRosterAddCounts> payload)
     {
         var m = payload.What;
-        Apply(m.RosterId, m.CharacterId, nameof(NetworkTroopRosterAddCounts), (roster, character) =>
+        Apply(m.RosterId, m.CharacterId, nameof(NetworkTroopRosterAddCounts),
+            (roster, character) => ApplyAddCounts(roster, character, m.RosterId, m.CharacterId,
+                m.Count, m.WoundedCount, m.XpChange, m.RemoveDepleted));
+    }
+
+    private void ApplyAddCounts(TroopRoster roster, CharacterObject character, string rosterId,
+        string characterId, int count, int woundedCount, int xpChange, bool removeDepleted)
+    {
+        int index = roster.FindIndexOfTroop(character);
+
+        // A subtract for a troop this client doesn't have yet can't apply: vanilla AddToCounts asserts and
+        // does nothing when the element is absent and the net change is <= 0. The add that creates the
+        // element is its own earlier delta, so skip rather than trip the assert.
+        if (count + woundedCount <= 0 && index < 0)
         {
-            int index = roster.FindIndexOfTroop(character);
+            Logger.Debug("Skipped {Message}: {Character} is not in roster {Roster} yet",
+                nameof(NetworkTroopRosterAddCounts), characterId, rosterId);
+            return;
+        }
 
-            // A subtract for a troop this client doesn't have yet can't apply: vanilla AddToCounts asserts and
-            // does nothing when the element is absent and the net change is <= 0. The add that creates the
-            // element is its own earlier delta, so skip rather than trip the assert.
-            if (m.Count + m.WoundedCount <= 0 && index < 0)
+        // Clamp a duplicate or replayed removal so client counts cannot go negative. The authority should
+        // never produce this case, so keep the detailed error that identifies the offending element.
+        if (index >= 0)
+        {
+            var current = roster.GetElementCopyAtIndex(index);
+            if (current.Number + count < 0 || current.WoundedNumber + woundedCount < 0)
             {
-                Logger.Debug("Skipped {Message}: {Character} is not in roster {Roster} yet", nameof(NetworkTroopRosterAddCounts), m.CharacterId, m.RosterId);
-                return;
+                Logger.Error("Over-subtract {Message} for {Character} in roster {Roster}: have (number={Number}, wounded={Wounded}), requested delta (number={Count}, wounded={WoundedCount}). Clamping to zero - the authority sent a duplicate remove (double-call upstream).",
+                    nameof(NetworkTroopRosterAddCounts), characterId, rosterId, current.Number,
+                    current.WoundedNumber, count, woundedCount);
+
+                if (current.Number + count < 0) count = -current.Number;
+                if (current.WoundedNumber + woundedCount < 0) woundedCount = -current.WoundedNumber;
             }
+        }
 
-            int count = m.Count;
-            int woundedCount = m.WoundedCount;
-
-            // Safety net (NOT the root fix): a subtract must never drive an element's count below zero. If it
-            // would, this client received a DUPLICATE / over-subtract remove for a troop already at that count -
-            // apply only what is actually there (clamp to zero) so the roster can never go negative, and log it
-            // loudly. The authority is expected to send each remove exactly once; a hit here means a double-call
-            // upstream (battle casualty/capture sending the same remove twice, a host-migration replay, etc.).
-            // The error names the roster, troop and the over-subtract so that upstream double-send can be traced.
-            if (index >= 0)
-            {
-                var current = roster.GetElementCopyAtIndex(index);
-                if (current.Number + count < 0 || current.WoundedNumber + woundedCount < 0)
-                {
-                    Logger.Error("Over-subtract {Message} for {Character} in roster {Roster}: have (number={Number}, wounded={Wounded}), requested delta (number={Count}, wounded={WoundedCount}). Clamping to zero - the authority sent a duplicate remove (double-call upstream).",
-                        nameof(NetworkTroopRosterAddCounts), m.CharacterId, m.RosterId, current.Number, current.WoundedNumber, count, woundedCount);
-
-                    if (current.Number + count < 0) count = -current.Number;
-                    if (current.WoundedNumber + woundedCount < 0) woundedCount = -current.WoundedNumber;
-                }
-            }
-
-            roster.AddToCounts(character, count, false, woundedCount, m.XpChange, m.RemoveDepleted);
-        });
+        roster.AddToCounts(character, count, false, woundedCount, xpChange, removeDepleted);
     }
 
     private void Handle_NetworkSetNumber(MessagePayload<NetworkTroopRosterSetNumber> payload)
@@ -193,6 +229,35 @@ internal class TroopRosterDeltaHandler : IHandler
         var m = payload.What;
         ApplyToExisting(m.RosterId, m.CharacterId, nameof(NetworkTroopRosterSetXp),
             (roster, index) => roster.SetElementXp(index, m.Xp));
+    }
+
+    private void Handle_NetworkElementBatch(MessagePayload<NetworkTroopRosterElementBatch> payload)
+    {
+        var m = payload.What;
+        if (m.Operations == null || m.Operations.Length == 0) return;
+
+        Apply(m.RosterId, m.CharacterId, nameof(NetworkTroopRosterElementBatch), (roster, character) =>
+        {
+            foreach (var operation in m.Operations)
+            {
+                switch (operation.Kind)
+                {
+                    case TroopRosterElementOperationKind.AddCounts:
+                        ApplyAddCounts(roster, character, m.RosterId, m.CharacterId, operation.Count,
+                            operation.WoundedCount, operation.Xp, operation.RemoveDepleted);
+                        break;
+                    case TroopRosterElementOperationKind.SetXp:
+                        ApplyToExisting(roster, character, m.RosterId, m.CharacterId,
+                            nameof(NetworkTroopRosterSetXp),
+                            (existingRoster, index) => existingRoster.SetElementXp(index, operation.Xp));
+                        break;
+                    default:
+                        Logger.Error("Unknown troop-roster batch operation {OperationKind} for {Character} in roster {Roster}",
+                            operation.Kind, m.CharacterId, m.RosterId);
+                        break;
+                }
+            }
+        });
     }
 
     private void Handle_NetworkRemoveZeroCounts(MessagePayload<NetworkTroopRosterRemoveZeroCounts> payload)
@@ -238,15 +303,22 @@ internal class TroopRosterDeltaHandler : IHandler
     /// </summary>
     private void ApplyToExisting(string rosterId, string characterId, string messageName, Action<TroopRoster, int> apply)
     {
-        Apply(rosterId, characterId, messageName, (roster, character) =>
+        Apply(rosterId, characterId, messageName,
+            (roster, character) => ApplyToExisting(roster, character, rosterId, characterId,
+                messageName, apply));
+    }
+
+    private void ApplyToExisting(TroopRoster roster, CharacterObject character, string rosterId,
+        string characterId, string messageName, Action<TroopRoster, int> apply)
+    {
+        int index = roster.FindIndexOfTroop(character);
+        if (index < 0)
         {
-            int index = roster.FindIndexOfTroop(character);
-            if (index < 0)
-            {
-                Logger.Debug("Skipped {Message}: {Character} is not in roster {Roster} yet", messageName, characterId, rosterId);
-                return;
-            }
-            apply(roster, index);
-        });
+            Logger.Debug("Skipped {Message}: {Character} is not in roster {Roster} yet",
+                messageName, characterId, rosterId);
+            return;
+        }
+
+        apply(roster, index);
     }
 }
