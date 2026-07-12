@@ -25,7 +25,7 @@ internal sealed class MapEventBattleFactory
 
     /// <summary>
     /// Creates the <see cref="MapEvent"/> the supplied parties would produce in <c>StartBattleInternal</c>.
-    /// Must be called on the main thread inside an <see cref="Common.Util.AllowedThread"/> scope.
+    /// Must be called on the main thread with synchronization patches enabled.
     /// </summary>
     /// <returns>The created <see cref="MapEvent"/>, or null if no proper type could be determined.</returns>
     public static MapEvent CreateMapEvent(PartyBase attacker, PartyBase defender, BattleCreationFlags flags)

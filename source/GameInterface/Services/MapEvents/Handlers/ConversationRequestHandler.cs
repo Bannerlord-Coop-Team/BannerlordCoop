@@ -120,6 +120,13 @@ internal class ConversationRequestHandler : IHandler
             return;
         }
 
+        GameThread.RunSafe(
+            () => ProcessConversationRequest(requestingPeer, request),
+            context: nameof(Handle_NetworkRequestConversation));
+    }
+
+    private void ProcessConversationRequest(NetPeer requestingPeer, NetworkRequestConversation request)
+    {
         if (!objectManager.TryGetObjectWithLogging<PartyBase>(request.AttackerId, out var attacker)) return;
         if (!objectManager.TryGetObjectWithLogging<PartyBase>(request.DefenderId, out var defender)) return;
 
@@ -139,14 +146,11 @@ internal class ConversationRequestHandler : IHandler
             return;
         }
 
-        // Mark and hold on the game thread, then reply, so the party is frozen and protected before the client
-        // (re)opens the encounter. The filter above runs on the network thread; game state can change while the
-        // approval is queued, so the hold step re-validates everything it depends on.
-        GameThread.Run(() => HoldAndApprove(requestingPeer, request, aiPartyId, playerPartyId));
+        HoldAndApprove(requestingPeer, request, aiPartyId, playerPartyId);
     }
 
     /// <summary>
-    /// [Server] Network-thread filter that identifies the AI side and rejects when both parties are already in
+    /// [Server] Identifies the AI side and rejects when both parties are already in
     /// (separate) battles. Returns false (rejection logged, and the requester told when the party is engaged by
     /// another player) when the request must not proceed. On success <paramref name="aiParty"/> is the AI mobile
     /// party to hold, or null when only a settlement side is involved or both sides are players — in which case
@@ -239,11 +243,10 @@ internal class ConversationRequestHandler : IHandler
     }
 
     /// <summary>
-    /// [Server, game thread] Re-validates the queued approval, holds the AI party, and replies to allow.
+    /// [Server, game thread] Holds the AI party and replies to allow.
     /// </summary>
     private void HoldAndApprove(NetPeer requestingPeer, NetworkRequestConversation request, string aiPartyId, string playerPartyId)
     {
-        // Re-resolve on the game thread: either party may have been removed since the network-thread lookup.
         if (!objectManager.TryGetObject(aiPartyId, out PartyBase aiPartyBase) || aiPartyBase.MobileParty == null)
         {
             Logger.Debug(
@@ -260,7 +263,6 @@ internal class ConversationRequestHandler : IHandler
             return;
         }
 
-        // Re-check map events: a party may have entered a battle while the approval was queued.
         if (aiPartyBase.MapEvent != null || playerPartyBase.MapEvent != null)
         {
             Logger.Debug(
@@ -352,20 +354,20 @@ internal class ConversationRequestHandler : IHandler
     {
         var message = payload.What;
 
-        if (!objectManager.TryGetObjectWithLogging<PartyBase>(message.DefenderId, out var defender))
+        GameThread.RunSafe(() =>
         {
-            SendConversationEndedToServer();
-            return;
-        }
+            if (!objectManager.TryGetObjectWithLogging<PartyBase>(message.DefenderId, out var defender))
+            {
+                SendConversationEndedToServer();
+                return;
+            }
 
-        if (!objectManager.TryGetObjectWithLogging<PartyBase>(message.AttackerId, out var attacker))
-        {
-            SendConversationEndedToServer();
-            return;
-        }
+            if (!objectManager.TryGetObjectWithLogging<PartyBase>(message.AttackerId, out var attacker))
+            {
+                SendConversationEndedToServer();
+                return;
+            }
 
-        GameThread.Run(() =>
-        {
             try
             {
                 if (PlayerEncounter.Current != null)
@@ -404,7 +406,7 @@ internal class ConversationRequestHandler : IHandler
                 Logger.Error(e, "Failed to restart approved conversation encounter; releasing the server-side party hold");
                 SendConversationEndedToServer();
             }
-        });
+        }, context: nameof(Handle_NetworkAllowConversation));
     }
 
     /// <summary>[Client] This player's encounter finished; tell the server to release the held party.</summary>
