@@ -23,7 +23,10 @@ namespace GameInterface.Services.HeroDevelopers.Patches
 
             // Publish message with data
             var message = new SkillLevelChange(__instance, skill, changeAmount, shouldNotify);
-            MessageBroker.Instance.Publish(__instance, message);
+            if (!HeroDeveloperBatchScope.TryEnqueue(message))
+            {
+                MessageBroker.Instance.Publish(__instance, message);
+            }
 
             // Skip original to override original client saving
             return false;
