@@ -15,6 +15,8 @@ internal class PartyPlayerNameplateVisualPatch
     {
         if (ModInformation.IsClient && __instance._mainHeroVisualBind != null)
         {
+            // The nameplate can initialize before a joining client switches to its hero. Vanilla refreshes
+            // this value afterward but never rebinds it, leaving the initial gray portrait visible.
             __instance.MainHeroVisual = __instance._mainHeroVisualBind;
         }
     }
