@@ -20,8 +20,9 @@ public class MessageAggregationBuffer
     private int payloadBytes;
 
     /// <param name="budgetBytes">
-    /// Combined payload size to aim for per batch. Chosen below the post-discovery MTU (~1.4KB) so a
-    /// typical batch still fits one datagram after envelope framing.
+    /// Combined payload size to aim for per batch. Callers pick it so a batch plus its envelope
+    /// framing fits one datagram at the link's LiteNetLib-negotiated packet size — see
+    /// <c>CoopNetworkBase.AggregationBudgetBytes</c> for the concrete numbers and rationale.
     /// </param>
     public MessageAggregationBuffer(int budgetBytes)
     {

@@ -200,9 +200,16 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
     /// <summary>
     /// Combined payload budget per aggregate batch. LiteNetLib's reliable channel caps unacked
     /// packets — not bytes — in flight (a hardcoded 64-packet window in 1.3.1), so per-peer
-    /// throughput scales with packet fullness. Kept under the post-discovery MTU (~1.4KB) so a
-    /// typical batch is still one datagram after envelope framing.
+    /// throughput scales with packet fullness.
     /// </summary>
+    /// <remarks>
+    /// Why 1200: a LiteNetLib connection starts at InitialMtu (1024B) and probes upward ("MTU
+    /// discovery") to MaxPacketSize (1432B = Ethernet 1500 minus IP/UDP/LiteNetLib headers),
+    /// normally settling at 1432 within seconds. 1200B of payload plus envelope framing (~10-30B
+    /// protobuf + 4B channeled header) fits one 1432B datagram — one packet, one window slot. On a
+    /// link still at 1024 (pre-discovery, or a path that never upgrades) the envelope splits into
+    /// two reliable fragments — two window slots, still ~10x fewer than one packet per message.
+    /// </remarks>
     public const int AggregationBudgetBytes = 1200;
 
     private sealed class PeerMessageBuffer
