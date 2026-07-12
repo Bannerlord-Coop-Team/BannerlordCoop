@@ -17,6 +17,7 @@ public class ConfiguredSessionJoinInfoSourceTests
 
         var info = source.Get();
 
+        Assert.Equal(Common.ModInformation.BuildVersion, info.ModVersion);
         Assert.Equal(expected, info.PasswordRequired);
         Assert.Null(info.Password);
     }

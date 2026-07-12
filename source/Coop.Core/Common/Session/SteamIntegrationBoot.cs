@@ -40,7 +40,7 @@ public static class SteamIntegrationBoot
             catch (Exception ex)
             {
                 // Also catches type-load/JIT failures before the non-inlined helper can enter its own guard.
-                Logger.Information("Server Steam integration unavailable: {Reason}", ex.Message);
+                Logger.Warning("Server Steam integration unavailable: {Reason}", ex.Message);
                 return null;
             }
         }
@@ -76,7 +76,7 @@ public static class SteamIntegrationBoot
         }
         catch (Exception ex)
         {
-            Logger.Information("Server Steam integration unavailable: {Reason}", ex.Message);
+            Logger.Warning("Server Steam integration unavailable: {Reason}", ex.Message);
             return null;
         }
 

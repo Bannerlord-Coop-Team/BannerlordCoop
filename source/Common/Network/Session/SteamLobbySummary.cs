@@ -9,8 +9,8 @@ public class SteamLobbySummary
     public bool PasswordRequired { get; set; }
 
     /// <summary>
-    /// Whether this client understands the lobby metadata and connection protocol. The existing
-    /// module validation handshake separately rejects a different installed mod version.
+    /// Whether this client uses the same lobby protocol and exact mod build as the host.
     /// </summary>
-    public bool IsCompatible => ProtocolVersion == SessionJoinInfo.CurrentVersion;
+    public bool IsCompatible => ProtocolVersion == SessionJoinInfo.CurrentVersion &&
+        ModInformation.MatchesBuildVersion(ModVersion);
 }

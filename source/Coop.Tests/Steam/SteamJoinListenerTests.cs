@@ -37,6 +37,7 @@ namespace Coop.Tests.Steam
                 Port = port,
                 Version = version,
                 ServerSteamId = serverSteamId,
+                ModVersion = Common.ModInformation.BuildVersion,
             };
 
             foreach (var pair in LobbyDataCodec.Encode(info))
@@ -128,6 +129,19 @@ namespace Coop.Tests.Steam
 
             Assert.Empty(resolved);
             Assert.Single(failed);
+            Assert.Contains(42UL, api.LeftLobbies);
+        }
+
+        [Fact]
+        public void DifferentModVersion_PublishesFailureAndLeaves()
+        {
+            SetupLobby(42);
+            api.SetLobbyData(42, LobbyDataCodec.ModVersionKey, "different-build");
+
+            api.RaiseLobbyJoinRequested(42);
+
+            Assert.Empty(resolved);
+            Assert.Contains("mod", Assert.Single(failed).Reason);
             Assert.Contains(42UL, api.LeftLobbies);
         }
 

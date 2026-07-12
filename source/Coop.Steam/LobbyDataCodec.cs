@@ -51,6 +51,16 @@ public static class LobbyDataCodec
             return false;
         }
 
+        var modVersion = readValue(ModVersionKey);
+        if (!Common.ModInformation.MatchesBuildVersion(modVersion))
+        {
+            error = string.IsNullOrEmpty(modVersion)
+                ? "The host did not advertise a co-op mod version"
+                : $"The host is running co-op mod {modVersion}; " +
+                  $"this client is running {Common.ModInformation.BuildVersion}";
+            return false;
+        }
+
         if (!int.TryParse(readValue(PortKey), out var port) || port < 1 || port > 65535)
         {
             error = "The co-op lobby has no valid port";
@@ -67,14 +77,9 @@ public static class LobbyDataCodec
             Address = readValue(AddressKey),
             Port = port,
             ServerSteamId = serverSteamId,
-            ModVersion = readValue(ModVersionKey),
-            PasswordRequired = IsTrue(readValue(PasswordRequiredKey)),
+            ModVersion = modVersion,
+            PasswordRequired = readValue(PasswordRequiredKey) == "1",
         };
         return true;
-    }
-
-    private static bool IsTrue(string value)
-    {
-        return value == "1" || (bool.TryParse(value, out var parsed) && parsed);
     }
 }

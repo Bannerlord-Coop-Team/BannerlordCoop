@@ -66,8 +66,8 @@ public class SteamLobbyBrowser : ISteamLobbyBrowser
             }
 
             int.TryParse(lobbyApi.GetLobbyData(lobbyId, LobbyDataCodec.VersionKey), out var protocolVersion);
-            var passwordRequired = ParseBoolean(
-                lobbyApi.GetLobbyData(lobbyId, LobbyDataCodec.PasswordRequiredKey));
+            var passwordRequired = lobbyApi.GetLobbyData(
+                lobbyId, LobbyDataCodec.PasswordRequiredKey) == "1";
 
             summaries.Add(new SteamLobbySummary
             {
@@ -79,10 +79,5 @@ public class SteamLobbyBrowser : ISteamLobbyBrowser
         }
 
         onCompleted(summaries, null);
-    }
-
-    private static bool ParseBoolean(string value)
-    {
-        return value == "1" || (bool.TryParse(value, out var parsed) && parsed);
     }
 }

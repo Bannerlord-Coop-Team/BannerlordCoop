@@ -17,6 +17,7 @@ public class SteamLobbyBrowserTests
 
     private void AddLobby(ulong lobbyId, SessionJoinInfo info)
     {
+        info.ModVersion ??= Common.ModInformation.BuildVersion;
         api.ListedLobbyIds.Add(lobbyId);
         foreach (var pair in LobbyDataCodec.Encode(info))
         {
@@ -31,7 +32,7 @@ public class SteamLobbyBrowserTests
         {
             Port = 4200,
             ServerSteamId = 76561198000000042,
-            ModVersion = "1.2.3+abc123",
+            ModVersion = Common.ModInformation.BuildVersion,
             PasswordRequired = true,
         });
 
@@ -42,7 +43,7 @@ public class SteamLobbyBrowserTests
         var lobby = Assert.Single(results);
         Assert.Equal(42UL, lobby.LobbyId);
         Assert.Equal(SessionJoinInfo.CurrentVersion, lobby.ProtocolVersion);
-        Assert.Equal("1.2.3+abc123", lobby.ModVersion);
+        Assert.Equal(Common.ModInformation.BuildVersion, lobby.ModVersion);
         Assert.True(lobby.PasswordRequired);
         Assert.True(lobby.IsCompatible);
         Assert.Null(error);
@@ -75,6 +76,42 @@ public class SteamLobbyBrowserTests
         browser.RequestLobbies((lobbies, _) => results = lobbies);
 
         Assert.False(Assert.Single(results).IsCompatible);
+    }
+
+    [Fact]
+    public void RequestLobbies_PreservesDifferentModVersionButMarksItIncompatible()
+    {
+        const string otherVersion = "different-build";
+        AddLobby(42, new SessionJoinInfo
+        {
+            Port = 4200,
+            ServerSteamId = 76561198000000042,
+            ModVersion = otherVersion,
+        });
+
+        IReadOnlyList<SteamLobbySummary> results = null;
+        browser.RequestLobbies((lobbies, _) => results = lobbies);
+
+        var lobby = Assert.Single(results);
+        Assert.Equal(otherVersion, lobby.ModVersion);
+        Assert.False(lobby.IsCompatible);
+    }
+
+    [Fact]
+    public void RequestLobbies_TreatsTextualPasswordFlagAsFalse()
+    {
+        AddLobby(42, new SessionJoinInfo
+        {
+            Port = 4200,
+            ServerSteamId = 76561198000000042,
+            PasswordRequired = true,
+        });
+        api.SetLobbyData(42, LobbyDataCodec.PasswordRequiredKey, "true");
+
+        IReadOnlyList<SteamLobbySummary> results = null;
+        browser.RequestLobbies((lobbies, _) => results = lobbies);
+
+        Assert.False(Assert.Single(results).PasswordRequired);
     }
 
     [Fact]

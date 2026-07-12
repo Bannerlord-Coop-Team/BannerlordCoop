@@ -20,17 +20,20 @@ public class SessionJoinInfo
     public string Address { get; set; }
     public int Port { get; set; }
 
-    /// <summary>Steam id of the player hosting the tunnel; 0 when the session is direct-only.</summary>
+    /// <summary>
+    /// Resolved Steam identity of the tunnel endpoint: the standalone server's
+    /// <see cref="ServerSteamId"/>, or the lobby owner's user Steam id for a client-owned lobby.
+    /// Zero for a direct-only session.
+    /// </summary>
     public ulong HostSteamId { get; set; }
 
     /// <summary>
-    /// Game-server Steam id of a standalone server that listens on Steam itself; 0 for a
-    /// player-hosted session. When set, a joiner tunnels to this identity instead of the lobby
-    /// owner, so the owner (a connected player, or none) is not the connect target.
+    /// Steam game-server id advertised by a standalone server. Zero for a client-owned lobby;
+    /// joiners then resolve <see cref="HostSteamId"/> from the lobby owner.
     /// </summary>
     public ulong ServerSteamId { get; set; }
 
-    /// <summary>The host's mod build string, shown to a joiner so they can compare versions.</summary>
+    /// <summary>The host's exact mod build, displayed and checked before a Steam join.</summary>
     public string ModVersion { get; set; }
 
     /// <summary>True when the server requires a password before admitting the connection.</summary>

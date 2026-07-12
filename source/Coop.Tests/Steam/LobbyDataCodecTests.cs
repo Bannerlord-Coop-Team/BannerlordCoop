@@ -20,7 +20,7 @@ namespace Coop.Tests.Steam
                 Address = "203.0.113.7",
                 Port = 4200,
                 ServerSteamId = 76561198000000042,
-                ModVersion = "1.2.3+abc123",
+                ModVersion = Common.ModInformation.BuildVersion,
                 PasswordRequired = true,
                 Password = "must-not-be-advertised",
             };
@@ -33,7 +33,7 @@ namespace Coop.Tests.Steam
             Assert.Equal("203.0.113.7", decoded.Address);
             Assert.Equal(4200, decoded.Port);
             Assert.Equal(76561198000000042UL, decoded.ServerSteamId);
-            Assert.Equal("1.2.3+abc123", decoded.ModVersion);
+            Assert.Equal(Common.ModInformation.BuildVersion, decoded.ModVersion);
             Assert.True(decoded.PasswordRequired);
             Assert.Null(decoded.Password);
             Assert.True(decoded.HasAddress);
@@ -45,7 +45,12 @@ namespace Coop.Tests.Steam
         [Fact]
         public void RoundTrip_PreservesEmptyAddress()
         {
-            var info = new SessionJoinInfo { Address = null, Port = 4200 };
+            var info = new SessionJoinInfo
+            {
+                Address = null,
+                Port = 4200,
+                ModVersion = Common.ModInformation.BuildVersion,
+            };
 
             var encoded = LobbyDataCodec.Encode(info);
             Assert.True(LobbyDataCodec.TryDecode(key => Read(encoded, key), out var decoded, out _));
@@ -70,6 +75,7 @@ namespace Coop.Tests.Steam
                 [LobbyDataCodec.VersionKey] = "1",
                 [LobbyDataCodec.AddressKey] = "203.0.113.7",
                 [LobbyDataCodec.PortKey] = "4200",
+                [LobbyDataCodec.ModVersionKey] = Common.ModInformation.BuildVersion,
             };
 
             Assert.True(LobbyDataCodec.TryDecode(key => Read(data, key), out var decoded, out _));
@@ -77,24 +83,77 @@ namespace Coop.Tests.Steam
             Assert.Equal(1, decoded.Version);
             Assert.True(decoded.Version < SessionJoinInfo.MinTunnelVersion);
             Assert.False(decoded.HasServerSteamId);
-            Assert.True(string.IsNullOrEmpty(decoded.ModVersion));
+            Assert.Equal(Common.ModInformation.BuildVersion, decoded.ModVersion);
             Assert.False(decoded.PasswordRequired);
         }
 
+        [Fact]
+        public void Decode_AcceptsCanonicalPasswordRequiredFlag()
+        {
+            var data = LobbyDataCodec.Encode(new SessionJoinInfo
+            {
+                Port = 4200,
+                ModVersion = Common.ModInformation.BuildVersion,
+            });
+            var mutable = new Dictionary<string, string>(data)
+            {
+                [LobbyDataCodec.PasswordRequiredKey] = "1",
+            };
+
+            Assert.True(LobbyDataCodec.TryDecode(key => Read(mutable, key), out var decoded, out _));
+            Assert.True(decoded.PasswordRequired);
+        }
+
         [Theory]
-        [InlineData("1")]
+        [InlineData("")]
+        [InlineData("0")]
         [InlineData("true")]
         [InlineData("True")]
-        public void Decode_AcceptsPasswordRequiredFlag(string value)
+        [InlineData("not-a-flag")]
+        public void Decode_TreatsNonCanonicalPasswordFlagAsFalse(string value)
         {
-            var data = LobbyDataCodec.Encode(new SessionJoinInfo { Port = 4200 });
+            var data = LobbyDataCodec.Encode(new SessionJoinInfo
+            {
+                Port = 4200,
+                ModVersion = Common.ModInformation.BuildVersion,
+            });
             var mutable = new Dictionary<string, string>(data)
             {
                 [LobbyDataCodec.PasswordRequiredKey] = value,
             };
 
             Assert.True(LobbyDataCodec.TryDecode(key => Read(mutable, key), out var decoded, out _));
-            Assert.True(decoded.PasswordRequired);
+            Assert.False(decoded.PasswordRequired);
+        }
+
+        [Fact]
+        public void Decode_RejectsDifferentModVersion()
+        {
+            var data = LobbyDataCodec.Encode(new SessionJoinInfo
+            {
+                Port = 4200,
+                ModVersion = Common.ModInformation.BuildVersion + ".different",
+            });
+
+            Assert.False(LobbyDataCodec.TryDecode(key => Read(data, key), out _, out var error));
+
+            Assert.Contains("mod", error);
+            Assert.Contains(Common.ModInformation.BuildVersion, error);
+        }
+
+        [Fact]
+        public void Decode_RejectsMissingModVersion()
+        {
+            var data = new Dictionary<string, string>(LobbyDataCodec.Encode(new SessionJoinInfo
+            {
+                Port = 4200,
+                ModVersion = Common.ModInformation.BuildVersion,
+            }));
+            data.Remove(LobbyDataCodec.ModVersionKey);
+
+            Assert.False(LobbyDataCodec.TryDecode(key => Read(data, key), out _, out var error));
+
+            Assert.Contains("did not advertise", error);
         }
 
         [Fact]
@@ -123,6 +182,7 @@ namespace Coop.Tests.Steam
             {
                 [LobbyDataCodec.VersionKey] = SessionJoinInfo.CurrentVersion.ToString(),
                 [LobbyDataCodec.PortKey] = port,
+                [LobbyDataCodec.ModVersionKey] = Common.ModInformation.BuildVersion,
             };
 
             Assert.False(LobbyDataCodec.TryDecode(key => Read(data, key), out _, out var error));

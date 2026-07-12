@@ -207,7 +207,8 @@
                                                         Brush.TextVerticalAlignment="Center" Text="@LobbyText"/>
                                             <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="290" HeightSizePolicy="StretchToParent"
                                                         Brush="Clan.TabControl.Text" Brush.FontSize="21" ClipContents="true"
-                                                        Brush.TextVerticalAlignment="Center" Text="@VersionText"/>
+                                                        Brush.FontColor="@VersionColor" Brush.TextVerticalAlignment="Center"
+                                                        Text="@VersionText"/>
                                             <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="160" HeightSizePolicy="StretchToParent"
                                                         Brush="Clan.TabControl.Text" Brush.FontSize="21"
                                                         Brush.TextVerticalAlignment="Center" Text="@PasswordText"/>

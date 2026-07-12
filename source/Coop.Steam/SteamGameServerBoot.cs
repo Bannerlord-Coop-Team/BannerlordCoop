@@ -82,7 +82,7 @@ public static class SteamGameServerBoot
         started = true;
 
         SteamGameServer.SetProduct(AppId);
-        SteamGameServer.SetGameDescription("BannerlordCoop");
+        SteamGameServer.SetGameDescription("Bannerlord Coop");
         SteamGameServer.SetModDir(ModDir);
         SteamGameServer.SetDedicatedServer(true);
 

@@ -25,6 +25,7 @@ public class ConfiguredSessionJoinInfoSource : ISessionJoinInfoSource
         {
             Address = advertisementConfig.PublicAddress,
             Port = networkConfig.Port,
+            ModVersion = global::Common.ModInformation.BuildVersion,
             PasswordRequired = !string.IsNullOrEmpty(networkConfig.Token),
         };
     }

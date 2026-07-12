@@ -8,6 +8,9 @@ namespace GameInterface.Services.UI;
 /// </summary>
 public sealed class SteamLobbyListItemVM : ViewModel
 {
+    private const string CompatibleVersionColor = "#F4E1C4FF";
+    private const string IncompatibleVersionColor = "#FF5555FF";
+
     private readonly Action<ulong> onJoin;
 
     public SteamLobbyListItemVM(
@@ -39,6 +42,9 @@ public sealed class SteamLobbyListItemVM : ViewModel
     public string VersionText => string.IsNullOrWhiteSpace(ModVersion)
         ? $"Protocol {ProtocolVersion}"
         : $"{ModVersion} (protocol {ProtocolVersion})";
+
+    [DataSourceProperty]
+    public string VersionColor => IsCompatible ? CompatibleVersionColor : IncompatibleVersionColor;
 
     [DataSourceProperty]
     public string PasswordText => PasswordRequired ? "Password required" : "No password";
