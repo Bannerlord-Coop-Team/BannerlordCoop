@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.HeroDevelopers.Messages;
@@ -15,7 +16,7 @@ namespace GameInterface.Services.HeroDevelopers.Patches
 
         [HarmonyPatch("GainRawXp")]
         [HarmonyPrefix]
-        public static bool GainRawXp(ref HeroDeveloper __instance, float rawXp, bool shouldNotify)
+        public static bool GainRawXp(ref HeroDeveloper __instance, float rawXp, ref bool shouldNotify)
         {
             // Call original if we call this function
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
@@ -27,8 +28,11 @@ namespace GameInterface.Services.HeroDevelopers.Patches
                 MessageBroker.Instance.Publish(__instance, message);
             }
 
-            // Skip original to override original client saving
-            return false;
+            if (ModInformation.IsClient) return false;
+
+            // Dedicated servers preserve the requested flag in the batch but do not render local UI.
+            shouldNotify = false;
+            return true;
         }
     }
 }

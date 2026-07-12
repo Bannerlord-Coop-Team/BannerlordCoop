@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.HeroDevelopers.Messages;
+using GameInterface.Services.HeroDevelopers.Patches;
 using GameInterface.Services.ObjectManager;
 using static GameInterface.Services.ObjectManager.ObjectManager;
 using Serilog;
@@ -84,6 +85,8 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
 
         private void Handle(MessagePayload<NetworkHeroDeveloperBatchServer> obj)
         {
+            if (ModInformation.IsClient) return;
+
             var data = obj.What;
 
             GameThread.RunSafe(() =>
@@ -94,6 +97,7 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
                     return;
                 }
 
+                using (HeroDeveloperBatchScope.SuppressNotificationForwarding())
                 using (new AllowedThread())
                 {
                     NetworkHeroDeveloperBatchClients changes = new(data);
@@ -105,6 +109,8 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
 
         private void Handle(MessagePayload<NetworkHeroDeveloperBatchClients> obj)
         {
+            if (ModInformation.IsServer) return;
+
             var data = obj.What;
 
             GameThread.RunSafe(() =>
@@ -152,7 +158,16 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
                 int count = Math.Min(
                     NetworkHeroDeveloperBatchServer.MaxOperationsPerMessage,
                     networkOperations.Count - offset);
-                network.SendAll(new NetworkHeroDeveloperBatchServer(heroId, networkOperations.GetRange(offset, count)));
+                List<NetworkHeroDeveloperOperation> operations = networkOperations.GetRange(offset, count);
+
+                if (ModInformation.IsServer)
+                {
+                    network.SendAll(new NetworkHeroDeveloperBatchClients(heroId, operations));
+                }
+                else if (ModInformation.IsClient)
+                {
+                    network.SendAll(new NetworkHeroDeveloperBatchServer(heroId, operations));
+                }
             }
         }
 
@@ -332,17 +347,8 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
 
         private void SetSkillXp(string heroId, string skillObjectId, float value)
         {
-            // Get objects from objectManager
-            if (!objectManager.TryGetObject(heroId, out Hero hero))
-            {
-                Logger.Error("Unable to get object for hero id {id}", heroId);
-                return;
-            }
-            if (!objectManager.TryGetObject(skillObjectId, out SkillObject skillObject))
-            {
-                Logger.Error("Unable to get object for skill object id {id}", skillObjectId);
-                return;
-            }
+            if (!objectManager.TryGetObjectWithLogging(heroId, out Hero hero)) return;
+            if (!objectManager.TryGetObjectWithLogging(skillObjectId, out SkillObject skillObject)) return;
 
             // Replace original TaleWorlds implementation
             if (!value.ApproximatelyEqualsTo(0f, 1E-05f))
@@ -362,30 +368,22 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
             int changeAmount,
             bool notifyRequested)
         {
-            // Get objects from objectManager
-            if (!objectManager.TryGetObject(heroId, out Hero hero))
-            {
-                Logger.Error("Unable to get object for hero id {id}", heroId);
-                return;
-            }
-            if (!objectManager.TryGetObject(skillObjectId, out SkillObject skillObject))
-            {
-                Logger.Error("Unable to get object for skill object id {id}", skillObjectId);
-                return;
-            }
+            if (!objectManager.TryGetObjectWithLogging(heroId, out Hero hero)) return;
+            if (!objectManager.TryGetObjectWithLogging(skillObjectId, out SkillObject skillObject)) return;
 
             // Replace original TaleWorlds implementation
             if (changeAmount != 0)
             {
-                // Hero.SetSkillValue is patched and only runs the original on a client when the
-                // thread is allowed, so the vanilla skill write must be marked as allowed here.
+                // Mark the authoritative replay as allowed so the vanilla write is not
+                // intercepted and announced again.
                 using (new AllowedThread())
                 {
                     int value = hero.GetSkillValue(skillObject) + changeAmount;
                     hero.SetSkillValue(skillObject, value);
 
-                    // Only notify if running on client where the updated hero is their main hero
-                    bool shouldNotify = (hero == Hero.MainHero) && notifyRequested;
+                    // Every client replays the requested flag; vanilla filters notifications to
+                    // that client's main hero, clan, companions, and main party.
+                    bool shouldNotify = ModInformation.IsClient && notifyRequested;
 
                     CampaignEventDispatcher.Instance.OnHeroGainedSkill(hero, skillObject, changeAmount, shouldNotify);
                 }
@@ -406,16 +404,17 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
             int maxSkillPoint = campaign.Models.CharacterDevelopmentModel.GetMaxSkillPoint();
 
             // Replace original TaleWorlds implementation
-            // HeroDeveloper.CheckLevel is patched and only runs the original on a client when the
-            // thread is allowed, so the vanilla level-up must be marked as allowed here.
+            // Mark the authoritative replay as allowed so level-up writes are not intercepted
+            // and announced again.
             using (new AllowedThread())
             {
                 if ((long)heroDeveloper._totalXp + (long)MathF.Round(rawXp) < (long)maxSkillPoint)
                 {
                     heroDeveloper._totalXp += MathF.Round(rawXp);
 
-                    // Only notify if running on client where the updated hero is their main hero
-                    bool shouldNotify = (hero == Hero.MainHero) && notifyRequested;
+                    // Every client replays the requested flag; vanilla filters notifications to
+                    // that client's main hero, clan, companions, and main party.
+                    bool shouldNotify = ModInformation.IsClient && notifyRequested;
 
                     heroDeveloper.CheckLevel(shouldNotify);
                     return;

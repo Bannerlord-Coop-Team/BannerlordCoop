@@ -13,6 +13,9 @@ internal sealed class HeroDeveloperBatchScope
     [ThreadStatic]
     private static HeroDeveloperBatchScope current;
 
+    [ThreadStatic]
+    private static int notificationForwardingSuppressionCount;
+
     private readonly HeroDeveloperBatchScope parent;
     private readonly HeroDeveloper heroDeveloper;
     private readonly List<HeroDeveloperOperation> operations = new();
@@ -26,6 +29,17 @@ internal sealed class HeroDeveloperBatchScope
     }
 
     public static HeroDeveloperBatchScope Begin(HeroDeveloper heroDeveloper) => new(heroDeveloper);
+
+    /// <summary>
+    /// True while hero-developer notifications are already represented by an authoritative batch.
+    /// </summary>
+    public static bool IsNotificationForwardingSuppressed =>
+        current != null || notificationForwardingSuppressionCount > 0;
+
+    /// <summary>
+    /// Prevents server notification postfixes from sending a second notification for batch replay.
+    /// </summary>
+    public static IDisposable SuppressNotificationForwarding() => new NotificationSuppressionScope();
 
     public static bool TryEnqueue(RawXpGain message) =>
         TryEnqueue(message.HeroDeveloper, HeroDeveloperOperation.RawXpGain(message.RawXp, message.ShouldNotify));
@@ -72,5 +86,21 @@ internal sealed class HeroDeveloperBatchScope
         active = false;
         if (ReferenceEquals(current, this)) current = parent;
         return true;
+    }
+
+    private sealed class NotificationSuppressionScope : IDisposable
+    {
+        public NotificationSuppressionScope()
+        {
+            notificationForwardingSuppressionCount++;
+        }
+
+        public void Dispose()
+        {
+            if (notificationForwardingSuppressionCount > 0)
+            {
+                notificationForwardingSuppressionCount--;
+            }
+        }
     }
 }

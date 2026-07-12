@@ -19,11 +19,19 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.HeroDevelopers;
 
+[CollectionDefinition(nameof(HeroDeveloperRoleCollection), DisableParallelization = true)]
+public class HeroDeveloperRoleCollection
+{
+}
+
 /// <summary>
 /// Verifies hero-developer batch chunking and isolated ordered replay.
 /// </summary>
-public class HeroDeveloperBatchHandlerTests
+[Collection(nameof(HeroDeveloperRoleCollection))]
+public class HeroDeveloperBatchHandlerTests : IDisposable
 {
+    private readonly bool originalIsServer = ModInformation.IsServer;
+
     static HeroDeveloperBatchHandlerTests()
     {
         // Ensure the shared game-loop pump is running when this class is tested in isolation.
@@ -33,6 +41,8 @@ public class HeroDeveloperBatchHandlerTests
     [Fact]
     public void LocalNestedBatch_AboveWireBound_IsSplitWithoutDroppingOperations()
     {
+        ModInformation.IsServer = false;
+
         var broker = new TestMessageBroker();
         var objectManager = new Mock<IObjectManager>();
         var network = new Mock<INetwork>();
@@ -89,6 +99,8 @@ public class HeroDeveloperBatchHandlerTests
     [InlineData(false)]
     public void NetworkBatch_WhenMiddleOperationThrows_AppliesLaterOperation(bool applyOnServer)
     {
+        ModInformation.IsServer = applyOnServer;
+
         var broker = new TestMessageBroker();
         var objectManager = new Mock<IObjectManager>();
         var network = new Mock<INetwork>();
@@ -104,9 +116,9 @@ public class HeroDeveloperBatchHandlerTests
         Hero resolvedHero = hero;
         SkillObject resolvedSkill = skill;
         SkillObject failedSkill = null!;
-        objectManager.Setup(manager => manager.TryGetObject("hero-test", out resolvedHero)).Returns(true);
-        objectManager.Setup(manager => manager.TryGetObject("skill-test", out resolvedSkill)).Returns(true);
-        objectManager.Setup(manager => manager.TryGetObject("skill-failure", out failedSkill))
+        objectManager.Setup(manager => manager.TryGetObjectWithLogging("hero-test", out resolvedHero)).Returns(true);
+        objectManager.Setup(manager => manager.TryGetObjectWithLogging("skill-test", out resolvedSkill)).Returns(true);
+        objectManager.Setup(manager => manager.TryGetObjectWithLogging("skill-failure", out failedSkill))
             .Throws(new InvalidOperationException("expected test failure"));
         network.Setup(instance => instance.SendAll(It.IsAny<IMessage>()))
             .Callback<IMessage>(message => sent.Add(message));
@@ -153,6 +165,8 @@ public class HeroDeveloperBatchHandlerTests
     [Fact]
     public void StandaloneOperations_UseSingleOperationBatches()
     {
+        ModInformation.IsServer = false;
+
         var broker = new TestMessageBroker();
         var objectManager = new Mock<IObjectManager>();
         var network = new Mock<INetwork>();
@@ -197,6 +211,47 @@ public class HeroDeveloperBatchHandlerTests
         }
     }
 
+    [Fact]
+    public void ServerLocalBatch_BroadcastsAuthoritativeClientMessageWithoutRequestRoundTrip()
+    {
+        ModInformation.IsServer = true;
+
+        var broker = new TestMessageBroker();
+        var objectManager = new Mock<IObjectManager>();
+        var network = new Mock<INetwork>();
+        var sent = new List<IMessage>();
+        var handler = new HeroDeveloperHandler(broker, objectManager.Object, network.Object);
+        Hero hero = Uninitialized<Hero>();
+        HeroDeveloper developer = Uninitialized<HeroDeveloper>();
+        developer.Hero = hero;
+        string heroId = "hero-test";
+        objectManager.Setup(manager => manager.TryGetId(hero, out heroId)).Returns(true);
+        network.Setup(instance => instance.SendAll(It.IsAny<IMessage>()))
+            .Callback<IMessage>(message => sent.Add(message));
+
+        try
+        {
+            broker.Publish(
+                developer,
+                new HeroDeveloperBatch(
+                    developer,
+                    new[] { HeroDeveloperOperation.RawXpGain(1f, false) }));
+
+            NetworkHeroDeveloperBatchClients update = Assert.Single(
+                sent.OfType<NetworkHeroDeveloperBatchClients>());
+            Assert.Empty(sent.OfType<NetworkHeroDeveloperBatchServer>());
+            Assert.Equal("hero-test", update.HeroId);
+            Assert.Equal(
+                NetworkHeroDeveloperOperationType.RawXpGain,
+                Assert.Single(update.Operations).Type);
+            Assert.Single(sent);
+        }
+        finally
+        {
+            handler.Dispose();
+        }
+    }
+
     [Theory]
     [InlineData("GameInterface.Services.HeroDevelopers.Messages.NetworkRawXpGainServer")]
     [InlineData("GameInterface.Services.HeroDevelopers.Messages.NetworkRawXpGainClients")]
@@ -207,6 +262,11 @@ public class HeroDeveloperBatchHandlerTests
     public void LegacySingleOperationMessages_AreNotInAssembly(string typeName)
     {
         Assert.Null(typeof(NetworkHeroDeveloperBatchServer).Assembly.GetType(typeName));
+    }
+
+    public void Dispose()
+    {
+        ModInformation.IsServer = originalIsServer;
     }
 
     private static T Uninitialized<T>() where T : class =>

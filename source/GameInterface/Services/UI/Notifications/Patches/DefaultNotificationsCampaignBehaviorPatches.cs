@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using GameInterface.Services.Clans.Extensions;
+using GameInterface.Services.HeroDevelopers.Patches;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.UI.Notifications.Messages;
@@ -208,7 +209,7 @@ internal class DefaultNotificationsCampaignBehaviorPatches
     [HarmonyPostfix]
     public static void OnHeroLevelledUpPostfix(ref DefaultNotificationsCampaignBehavior __instance, Hero hero, bool shouldNotify)
     {
-        if (ModInformation.IsClient 
+        if (ModInformation.IsClient || HeroDeveloperBatchScope.IsNotificationForwardingSuppressed
             || (!IsValidPlayerHero(hero) && !IsValidPlayerClan(hero.Clan))) return;
 
         var message = new NotifyHeroLevelledUp(hero, shouldNotify);
@@ -219,7 +220,7 @@ internal class DefaultNotificationsCampaignBehaviorPatches
     [HarmonyPostfix]
     public static void OnHeroGainedSkillPostfix(ref DefaultNotificationsCampaignBehavior __instance, Hero hero, SkillObject skill, int change = 1, bool shouldNotify = true)
     {
-        if (ModInformation.IsClient 
+        if (ModInformation.IsClient || HeroDeveloperBatchScope.IsNotificationForwardingSuppressed
             || (!IsValidPlayerHero(hero) && !IsValidPlayerClan(hero.Clan) && !IsValidPlayerParty(hero.PartyBelongedTo))) return;
 
         var message = new NotifyHeroGainedSkill(hero, skill, change, shouldNotify);

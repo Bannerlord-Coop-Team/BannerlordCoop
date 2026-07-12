@@ -91,11 +91,18 @@ public sealed class NetworkHeroDeveloperBatchClients : ICommand
     [ProtoMember(2)]
     public List<NetworkHeroDeveloperOperation> Operations;
 
-    public NetworkHeroDeveloperBatchClients(NetworkHeroDeveloperBatchServer cloneObject)
+    public NetworkHeroDeveloperBatchClients(
+        string heroId,
+        List<NetworkHeroDeveloperOperation> operations)
     {
-        HeroId = cloneObject.HeroId;
-        Operations = cloneObject.Operations == null
+        HeroId = heroId;
+        Operations = operations == null
             ? new List<NetworkHeroDeveloperOperation>()
-            : new List<NetworkHeroDeveloperOperation>(cloneObject.Operations);
+            : new List<NetworkHeroDeveloperOperation>(operations);
+    }
+
+    public NetworkHeroDeveloperBatchClients(NetworkHeroDeveloperBatchServer cloneObject)
+        : this(cloneObject.HeroId, cloneObject.Operations)
+    {
     }
 }

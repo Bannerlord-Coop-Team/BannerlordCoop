@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.HeroDevelopers.Messages;
@@ -30,8 +31,8 @@ namespace GameInterface.Services.HeroDevelopers.Patches
                 MessageBroker.Instance.Publish(__instance, message);
             }
 
-            // Skip original to override original client saving
-            return false;
+            // Server-owned campaign logic remains live; clients wait for the authoritative replay.
+            return ModInformation.IsServer;
         }
     }
 }

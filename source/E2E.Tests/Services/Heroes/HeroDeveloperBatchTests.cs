@@ -1,7 +1,6 @@
 ﻿using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.HeroDevelopers.Messages;
-using HarmonyLib;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
@@ -42,6 +41,8 @@ public class HeroDeveloperBatchTests : SyncTestBase
         EnvironmentInstance sender = Clients.First();
         Dictionary<EnvironmentInstance, int> initialTotalXp = AllInstances()
             .ToDictionary(instance => instance, GetTotalXp);
+        Dictionary<EnvironmentInstance, int> initialSkillLevels = AllInstances()
+            .ToDictionary(instance => instance, GetSkillLevel);
 
         ClearNetworkMessages();
 
@@ -50,9 +51,9 @@ public class HeroDeveloperBatchTests : SyncTestBase
             Assert.True(sender.ObjectManager.TryGetObject(heroId, out Hero hero));
             hero.HeroDeveloper.AddSkillXp(
                 DefaultSkills.OneHanded,
-                1f,
+                1000f,
                 isAffectedByFocusFactor: true,
-                shouldNotify: false);
+                shouldNotify: true);
         });
 
         NetworkHeroDeveloperBatchServer captured = Assert.Single(
@@ -62,13 +63,11 @@ public class HeroDeveloperBatchTests : SyncTestBase
         NetworkHeroDeveloperOperationType[] capturedTypes = captured.Operations
             .Select(operation => operation.Type)
             .ToArray();
-        Assert.InRange(capturedTypes.Length, 2, 3);
+        Assert.Equal(3, capturedTypes.Length);
         Assert.Equal(NetworkHeroDeveloperOperationType.RawXpGain, capturedTypes[0]);
         Assert.Equal(NetworkHeroDeveloperOperationType.SkillXpSet, capturedTypes[1]);
-        if (capturedTypes.Length == 3)
-        {
-            Assert.Equal(NetworkHeroDeveloperOperationType.SkillLevelChange, capturedTypes[2]);
-        }
+        Assert.Equal(NetworkHeroDeveloperOperationType.SkillLevelChange, capturedTypes[2]);
+        Assert.True(captured.Operations[2].ShouldNotify);
 
         NetworkHeroDeveloperBatchServer roundTripped = sender.EnsureSerializable(captured);
         NetworkHeroDeveloperOperation rawXp = Assert.Single(
@@ -77,9 +76,9 @@ public class HeroDeveloperBatchTests : SyncTestBase
         NetworkHeroDeveloperOperation skillXp = Assert.Single(
             roundTripped.Operations,
             operation => operation.Type == NetworkHeroDeveloperOperationType.SkillXpSet);
-
-        ClearNetworkMessages();
-        Server.SimulateMessage(sender.NetPeer, roundTripped);
+        NetworkHeroDeveloperOperation skillLevel = Assert.Single(
+            roundTripped.Operations,
+            operation => operation.Type == NetworkHeroDeveloperOperationType.SkillLevelChange);
 
         NetworkHeroDeveloperBatchClients response = Assert.Single(
             Server.NetworkSentMessages.GetMessages<NetworkHeroDeveloperBatchClients>());
@@ -92,8 +91,60 @@ public class HeroDeveloperBatchTests : SyncTestBase
         {
             AssertDeveloperState(
                 peer,
-                initialTotalXp[peer] + (2 * MathF.Round(rawXp.Value)),
+                initialTotalXp[peer] + MathF.Round(rawXp.Value),
                 skillXp.Value);
+            Assert.Equal(
+                initialSkillLevels[peer] + skillLevel.ChangeAmount,
+                GetSkillLevel(peer));
+        }
+    }
+
+    [Fact]
+    public void ServerAddSkillXp_HarmonyCapture_BroadcastsOnceWithoutRequestRoundTrip()
+    {
+        Dictionary<EnvironmentInstance, int> initialTotalXp = AllInstances()
+            .ToDictionary(instance => instance, GetTotalXp);
+        Dictionary<EnvironmentInstance, int> initialSkillLevels = AllInstances()
+            .ToDictionary(instance => instance, GetSkillLevel);
+
+        ClearNetworkMessages();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject(heroId, out Hero hero));
+            hero.HeroDeveloper.AddSkillXp(
+                DefaultSkills.OneHanded,
+                1000f,
+                isAffectedByFocusFactor: true,
+                shouldNotify: true);
+        });
+
+        NetworkHeroDeveloperBatchClients captured = Assert.Single(
+            Server.NetworkSentMessages.GetMessages<NetworkHeroDeveloperBatchClients>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkHeroDeveloperBatchServer>());
+        Assert.Single(Server.NetworkSentMessages);
+        Assert.All(Clients, client => Assert.Empty(client.NetworkSentMessages));
+
+        NetworkHeroDeveloperOperation rawXp = Assert.Single(
+            captured.Operations,
+            operation => operation.Type == NetworkHeroDeveloperOperationType.RawXpGain);
+        NetworkHeroDeveloperOperation skillXp = Assert.Single(
+            captured.Operations,
+            operation => operation.Type == NetworkHeroDeveloperOperationType.SkillXpSet);
+        NetworkHeroDeveloperOperation skillLevel = Assert.Single(
+            captured.Operations,
+            operation => operation.Type == NetworkHeroDeveloperOperationType.SkillLevelChange);
+        Assert.True(skillLevel.ShouldNotify);
+
+        foreach (EnvironmentInstance peer in AllInstances())
+        {
+            AssertDeveloperState(
+                peer,
+                initialTotalXp[peer] + MathF.Round(rawXp.Value),
+                skillXp.Value);
+            Assert.Equal(
+                initialSkillLevels[peer] + skillLevel.ChangeAmount,
+                GetSkillLevel(peer));
         }
     }
 
@@ -261,6 +312,17 @@ public class HeroDeveloperBatchTests : SyncTestBase
         return totalXp;
     }
 
+    private int GetSkillLevel(EnvironmentInstance instance)
+    {
+        int skillLevel = 0;
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject(heroId, out Hero hero));
+            skillLevel = hero.GetSkillValue(DefaultSkills.OneHanded);
+        });
+        return skillLevel;
+    }
+
     private void AssertTotalXpUnchanged(Dictionary<EnvironmentInstance, int> expected)
     {
         foreach (EnvironmentInstance instance in AllInstances())
@@ -292,7 +354,7 @@ public class HeroDeveloperBatchTests : SyncTestBase
             }
 
             var gameModels = new GameModels(models);
-            AccessTools.Field(typeof(Campaign), "_gameModels").SetValue(Campaign.Current, gameModels);
+            Campaign.Current._gameModels = gameModels;
         });
     }
 
@@ -304,6 +366,11 @@ public class HeroDeveloperBatchTests : SyncTestBase
             if (hero.CharacterAttributes == null)
             {
                 hero._characterAttributes = new PropertyOwner<CharacterAttribute>();
+            }
+
+            if (hero._heroSkills == null)
+            {
+                hero._heroSkills = new PropertyOwner<SkillObject>();
             }
         });
     }
