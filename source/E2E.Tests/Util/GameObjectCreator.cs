@@ -24,6 +24,7 @@ internal class GameObjectCreator
         { typeof(Kingdom), new KingdomBuilder() },
         { typeof(Clan), new ClanBuilder() },
         { typeof(Hero), new HeroBuilder() },
+        { typeof(HeroDeveloper), new HeroDeveloperBuilder() },
         { typeof(LordPartyComponent), new LordPartyComponentBuilder() },
         { typeof(Hideout), new HideoutBuilder() },
         { typeof(CultureObject), new CultureBuilder() },

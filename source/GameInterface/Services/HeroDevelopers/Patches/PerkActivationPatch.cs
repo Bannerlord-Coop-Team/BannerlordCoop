@@ -8,7 +8,6 @@ using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
-using TaleWorlds.CampaignSystem.Inventory;
 
 namespace GameInterface.Services.HeroDevelopers.Patches
 {
@@ -19,14 +18,14 @@ namespace GameInterface.Services.HeroDevelopers.Patches
 
         [HarmonyPatch(nameof(PerkActivationHandlerCampaignBehavior.OnPerkOpened))]
         [HarmonyPrefix]
-        static bool OnPerkOpenedPrefix(ref InventoryLogic __instance, Hero hero, PerkObject perk)
+        static bool OnPerkOpenedPrefix(ref PerkActivationHandlerCampaignBehavior __instance, Hero hero, PerkObject perk)
         {
             // Call original if we call this function
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient) return false;
 
-            var message = new PerkOpened(hero, perk);
+            var message = new OpenPerk(hero, perk);
             MessageBroker.Instance.Publish(__instance, message);
 
             return false;

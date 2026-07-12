@@ -6,14 +6,18 @@ using TaleWorlds.Library;
 
 namespace GameInterface.Services.CharacterDevelopers.Messages;
 
-public record ApplyChangesPressed : IEvent
+public readonly struct ApplyChanges : IEvent
 {
-    public HeroDeveloper HeroDeveloper;
-    public PerkSelectionVM Perks;
-    public MBBindingList<CharacterAttributeItemVM> Attributes;
-    public MBBindingList<SkillVM> Skills;
+    public readonly HeroDeveloper HeroDeveloper;
+    public readonly PerkSelectionVM Perks;
+    public readonly MBBindingList<CharacterAttributeItemVM> Attributes;
+    public readonly MBBindingList<SkillVM> Skills;
 
-    public ApplyChangesPressed(HeroDeveloper heroDeveloper, PerkSelectionVM perks, MBBindingList<CharacterAttributeItemVM> attributes, MBBindingList<SkillVM> skills)
+    public ApplyChanges(
+        HeroDeveloper heroDeveloper,
+        PerkSelectionVM perks,
+        MBBindingList<CharacterAttributeItemVM> attributes,
+        MBBindingList<SkillVM> skills)
     {
         HeroDeveloper = heroDeveloper;
         Perks = perks;

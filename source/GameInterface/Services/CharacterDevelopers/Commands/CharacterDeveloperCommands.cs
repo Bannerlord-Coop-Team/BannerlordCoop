@@ -17,7 +17,7 @@ internal class CharacterDeveloperCommands
     /// <summary>
     /// Output attributes, focuses, skills and perks of a specific hero
     /// </summary>
-    [CommandLineArgumentFunction("herostats", "coop.debug.hero")]
+    [CommandLineArgumentFunction("stats", "coop.debug.herodeveloper")]
     public static string HeroStatsCommand(List<string> strings)
     {
         if (strings.Count == 0)

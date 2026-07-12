@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.HeroDevelopers.Messages;
@@ -14,21 +15,17 @@ namespace GameInterface.Services.HeroDevelopers.Patches
     {
         private static readonly ILogger Logger = LogManager.GetLogger<HeroDeveloper>();
 
-        [HarmonyPatch("SetSkillXp")]
+        [HarmonyPatch(nameof(HeroDeveloper.SetSkillXp))]
         [HarmonyPrefix]
-        public static bool SetSkillXp(ref HeroDeveloper __instance, PropertyObject skill, float value)
+        public static bool SetSkillXpPrefix(ref HeroDeveloper __instance, PropertyObject skill, float value)
         {
             // Call original if we call this function
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-            SkillObject skillObject = (SkillObject) skill;
+            // Don't allow clients to change skill xp
+            if (ModInformation.IsClient) return false;
 
-            // Publish message with data
-            var message = new SkillXpSet(__instance, skillObject, value);
-            MessageBroker.Instance.Publish(__instance, message);
-
-            // Skip original to override original client saving
-            return false;
+            return true;
         }
     }
 }

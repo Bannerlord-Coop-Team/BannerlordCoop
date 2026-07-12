@@ -6,10 +6,9 @@ using Common.Util;
 using GameInterface.Services.HeroDevelopers.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
 using Serilog;
-using System;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.Core;
 
@@ -21,79 +20,54 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
         private readonly INetwork network;
-        private readonly IPlayerManager playerRegistry;
 
         public PerkActivationHandler(
             IMessageBroker messageBroker,
             IObjectManager objectManager,
-            INetwork network,
-            IPlayerManager playerRegistry)
+            INetwork network)
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
             this.network = network;
-            this.playerRegistry = playerRegistry;
-            messageBroker.Subscribe<PerkOpened>(Handle_PerkOpened);
+
             messageBroker.Subscribe<OpenPerk>(Handle_OpenPerk);
+            messageBroker.Subscribe<NetworkOpenPerk>(Handle_NetworkOpenPerk);
         }
 
         public void Dispose()
         {
-            messageBroker.Unsubscribe<PerkOpened>(Handle_PerkOpened);
             messageBroker.Unsubscribe<OpenPerk>(Handle_OpenPerk);
-        }
-
-        private void Handle_PerkOpened(MessagePayload<PerkOpened> obj)
-        {
-            if (!objectManager.TryGetIdWithLogging(obj.What.Hero, out var heroId)) return;
-            if (!objectManager.TryGetIdWithLogging(obj.What.Perk, out var perkId)) return;
-
-            var message = new OpenPerk(heroId, perkId);
-
-            var hero = obj.What.Hero;
-            var perk = obj.What.Perk;
-
-            // OnOpenedPerkInternal mutates campaign hero state (HitPoints, attributes/focus,
-            // roster version, power modifier), which is main-thread-only; defer it off the
-            // poller thread that delivered this message.
-            GameThread.Run(() =>
-            {
-                try
-                {
-                    OnOpenedPerkInternal(hero, perk);
-
-                    network.SendAll(message);
-                }
-                catch (Exception e)
-                {
-                    Logger.Error(e, "Failed to apply PerkOpened");
-                }
-            });
+            messageBroker.Unsubscribe<NetworkOpenPerk>(Handle_NetworkOpenPerk);
         }
 
         private void Handle_OpenPerk(MessagePayload<OpenPerk> obj)
         {
-            var heroId = obj.What.HeroId;
-            var perkId = obj.What.PerkId;
+            var data = obj.What;
 
-            // OnOpenedPerkInternal mutates campaign hero state (HitPoints, attributes/focus,
-            // roster version, power modifier), which is main-thread-only; defer it off the
-            // network receive thread that delivered this message.
-            GameThread.Run(() =>
+            GameThread.RunSafe(() =>
             {
-                try
-                {
-                    if (!objectManager.TryGetObjectWithLogging<Hero>(heroId, out var hero)) return;
-                    if (!objectManager.TryGetObjectWithLogging<PerkObject>(perkId, out var perk)) return;
+                if (!TryGetPerkActivationBehavior(out var perkActivationBehavior)) return;
+                if (!objectManager.TryGetIdWithLogging(obj.What.Hero, out var heroId)) return;
+                if (!objectManager.TryGetIdWithLogging(obj.What.Perk, out var perkId)) return;
 
-                    using (new AllowedThread())
-                    {
-                        OnOpenedPerkInternal(hero, perk);
-                    }
-                }
-                catch (Exception e)
+                OnOpenedPerkInternal(data.Hero, data.Perk);
+
+                network.SendAll(new NetworkOpenPerk(heroId, perkId));
+            });
+        }
+
+        private void Handle_NetworkOpenPerk(MessagePayload<NetworkOpenPerk> obj)
+        {
+            var data = obj.What;
+
+            GameThread.RunSafe(() =>
+            {
+                if (!objectManager.TryGetObjectWithLogging<Hero>(data.HeroId, out var hero)) return;
+                if (!objectManager.TryGetObjectWithLogging<PerkObject>(data.PerkId, out var perk)) return;
+
+                using (new AllowedThread())
                 {
-                    Logger.Error(e, "Failed to apply OpenPerk");
+                    OnOpenedPerkInternal(hero, perk);
                 }
             });
         }
@@ -145,6 +119,15 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
             {
                 hero.UpdatePowerModifier();
             }
+        }
+
+        private bool TryGetPerkActivationBehavior(out PerkActivationHandlerCampaignBehavior perkActivationBehavior)
+        {
+            perkActivationBehavior = Campaign.Current?.GetCampaignBehavior<PerkActivationHandlerCampaignBehavior>();
+            if (perkActivationBehavior != null) return true;
+
+            Logger.Debug("Skipping perk activation because the campaign behavior is unavailable");
+            return false;
         }
     }
 }

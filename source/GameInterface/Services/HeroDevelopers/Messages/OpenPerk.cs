@@ -1,20 +1,17 @@
 ﻿using Common.Messaging;
-using ProtoBuf;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 
 namespace GameInterface.Services.HeroDevelopers.Messages;
 
-[ProtoContract(SkipConstructor = true)]
-internal readonly struct OpenPerk : ICommand
+public readonly struct OpenPerk : IEvent
 {
-    [ProtoMember(1)]
-    public readonly string HeroId;
+    public readonly Hero Hero;
+    public readonly PerkObject Perk;
 
-    [ProtoMember(2)]
-    public readonly string PerkId;
-
-    public OpenPerk(string heroId, string perkId)
+    public OpenPerk(Hero hero, PerkObject perk)
     {
-        HeroId = heroId;
-        PerkId = perkId;
+        Hero = hero;
+        Perk = perk;
     }
 }
