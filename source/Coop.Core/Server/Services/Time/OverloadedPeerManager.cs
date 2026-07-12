@@ -32,6 +32,12 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
     private TimeControlEnum? originalSpeed;
     private volatile IEnumerable<NetPeer> cachedOverloadedPeers = Array.Empty<NetPeer>();
 
+    // Diagnostics for the catch-up pause: when it started and when depths were last logged, so a
+    // long pause leaves periodic evidence in the log instead of only an in-game message.
+    private DateTime pauseStartedUtc;
+    private DateTime lastPauseDepthLogUtc;
+    private static readonly TimeSpan PauseDepthLogInterval = TimeSpan.FromSeconds(5);
+
     public OverloadedPeerManager(
         INetworkConfig config,
         IMessageBroker messageBroker,
@@ -56,19 +62,30 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
         timeControlInterface.RemoveUnpausePolicy(PlayersOverloadedPolicy);
     }
 
+    private static int GetQueueDepth(NetPeer peer)
+    {
+        return peer.GetPacketsCountInReliableQueue(0, true) +
+               peer.GetPacketsCountInReliableQueue(0, false);
+    }
+
     private List<NetPeer> GetPeersAboveThreshold(int threshold)
     {
+        // Loading peers are excluded: the multi-MB transfer save legitimately floods their queue,
+        // and time is already locked for them by TimeHandler's loading-players pause. Counting them
+        // here would guarantee a redundant "catching up" pause on every join.
         return connectionCollection
+            .Where(logic => logic.IsLoading == false)
             .Select(logic => logic.Peer)
-            .Where(peer =>
-            {
-                var numPacketsInQueue =
-                    peer.GetPacketsCountInReliableQueue(0, true) +
-                    peer.GetPacketsCountInReliableQueue(0, false);
-
-                return numPacketsInQueue > threshold;
-            })
+            .Where(peer => GetQueueDepth(peer) > threshold)
             .ToList();
+    }
+
+    // One line per peer, e.g. "2@127.0.0.1 queue=12345 ping=87ms" — enough to tell from the log
+    // alone which peer tripped the pause and how far it has drained since.
+    private string DescribePeerQueues(IEnumerable<NetPeer> peers)
+    {
+        return string.Join(", ", peers.Select(peer =>
+            $"{peer.Id}@{peer.Address} queue={GetQueueDepth(peer)} ping={peer.Ping}ms"));
     }
 
     public void CheckForOverloadedPeers()
@@ -78,8 +95,20 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
         // hysteresis: it stops a chronically slow peer from flapping pause/resume around one limit.
         if (originalSpeed.HasValue)
         {
-            if (GetPeersAboveThreshold(config.ResumePacketsInQueue).Any())
+            var stillDraining = GetPeersAboveThreshold(config.ResumePacketsInQueue);
+            if (stillDraining.Any())
+            {
+                if (DateTime.UtcNow - lastPauseDepthLogUtc >= PauseDepthLogInterval)
+                {
+                    lastPauseDepthLogUtc = DateTime.UtcNow;
+                    Logger.Information(
+                        "Catch-up pause ongoing for {Seconds:0}s; peers above resume threshold ({ResumeThreshold}): {PeerQueues}",
+                        (DateTime.UtcNow - pauseStartedUtc).TotalSeconds,
+                        config.ResumePacketsInQueue,
+                        DescribePeerQueues(stillDraining));
+                }
                 return;
+            }
 
             ResumeTime();
             return;
@@ -91,6 +120,14 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
 
         originalSpeed = timeControlInterface.GetTimeControl();
         cachedOverloadedPeers = overloadedPeers;
+        pauseStartedUtc = DateTime.UtcNow;
+        lastPauseDepthLogUtc = DateTime.UtcNow;
+
+        Logger.Information(
+            "Pausing campaign time: {PeerCount} peer(s) above {PauseThreshold} queued reliable packets: {PeerQueues}",
+            overloadedPeers.Count,
+            config.MaxPacketsInQueue,
+            DescribePeerQueues(overloadedPeers));
 
         timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
         NotifyAll($"{overloadedPeers.Count} clients are catching up. Pausing...");
@@ -103,6 +140,11 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
         var resumeSpeed = originalSpeed.Value;
         originalSpeed = null;
         cachedOverloadedPeers = Array.Empty<NetPeer>();   // clear first so the policy allows it
+
+        Logger.Information(
+            "Resuming campaign time after {Seconds:0.0}s catch-up pause; all peers below {ResumeThreshold} queued reliable packets",
+            (DateTime.UtcNow - pauseStartedUtc).TotalSeconds,
+            config.ResumePacketsInQueue);
 
         timeControlInterface.ServerSetTimeControl(resumeSpeed);
         NotifyAll("All clients synchronized. Resuming...");
