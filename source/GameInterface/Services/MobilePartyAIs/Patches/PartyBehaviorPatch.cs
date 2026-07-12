@@ -55,17 +55,10 @@ public static class PartyBehaviorPatch
 
         if (BehaviorIsSame(ref __instance, ref newAiBehavior, ref interactablePoint, ref bestTargetPoint)) return false;
 
-        if (__instance._mobileParty.IsControlledByThisInstance() == false) return false;
+        if (!__instance._mobileParty.IsControlledByThisInstance()) return false;
 
-        // The authority keeps the original suppression contract: route the request through the handler,
-        // which invokes vanilla once under AllowedThread and snapshots the resulting state. A controlling
-        // client runs vanilla locally first and publishes from the postfix so prediction captures the real
-        // DesiredAiNavigationType and MoveTargetPoint rather than their pre-call values.
         if (ModInformation.IsServer)
         {
-            PublishBehaviorAttempt(__instance, newAiBehavior, interactablePoint, bestTargetPoint,
-                stateAlreadyApplied: false);
-
             if (MobilePartyAiConfig.DEBUG)
             {
                 if (interactablePoint is null)
@@ -80,7 +73,9 @@ public static class PartyBehaviorPatch
                 }
             }
 
-            return false;
+            // Server behavior is authoritative and runs with every replication patch live.
+            __state = true;
+            return true;
         }
 
         __state = true;
@@ -91,30 +86,16 @@ public static class PartyBehaviorPatch
     [HarmonyPatch("SetAiBehavior")]
     private static void SetAiBehaviorPostfix(
         MobilePartyAi __instance,
-        AiBehavior newAiBehavior,
-        IInteractablePoint interactablePoint,
-        CampaignVec2 bestTargetPoint,
         bool __state)
     {
         if (!__state) return;
 
-        PublishBehaviorAttempt(__instance, newAiBehavior, interactablePoint, bestTargetPoint,
-            stateAlreadyApplied: true);
+        PublishBehaviorAttempt(__instance);
     }
 
-    private static void PublishBehaviorAttempt(
-        MobilePartyAi partyAi,
-        AiBehavior newAiBehavior,
-        IInteractablePoint interactablePoint,
-        CampaignVec2 bestTargetPoint,
-        bool stateAlreadyApplied)
+    private static void PublishBehaviorAttempt(MobilePartyAi partyAi)
     {
-        var message = new PartyBehaviorChangeAttempted(
-            partyAi,
-            newAiBehavior,
-            interactablePoint,
-            bestTargetPoint,
-            stateAlreadyApplied);
+        var message = new PartyBehaviorChangeAttempted(partyAi);
         MessageBroker.Instance.Publish(partyAi, message);
     }
 

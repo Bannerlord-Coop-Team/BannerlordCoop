@@ -66,33 +66,25 @@ internal class MobilePartyBehaviorHandler : IHandler
     public void Handle_PartyBehaviorChanged(MessagePayload<PartyBehaviorChangeAttempted> obj)
     {
         var party = obj.What.PartyAi._mobileParty;
-        var interactablePoint = obj.What.InteractablePoint;
 
         if (!party.IsControlledByThisInstance())
             return;
 
-        PartyBehaviorUpdateData data;
-        bool snapshotCreated = obj.What.StateAlreadyApplied
-            ? MobilePartyBehaviorSnapshot.TryCreateCurrent(objectManager, party, out data)
-            : MobilePartyBehaviorSnapshot.TryCreate(
+        if (!MobilePartyBehaviorSnapshot.TryCreateCurrent(
                 objectManager,
                 party,
-                obj.What.NewAiBehavior,
-                interactablePoint,
-                obj.What.BestTargetPoint,
-                obj.What.BestTargetPoint,
-                out data);
-
-        if (!snapshotCreated)
+                out PartyBehaviorUpdateData data))
             return;
 
         if (ModInformation.IsClient)
         {
             data.OriginControllerId = controllerIdProvider.ControllerId;
             latestPredictions[data.MobilePartyId] = data;
+            messageBroker.Publish(this, new ControlledPartyBehaviorUpdated(data));
+            return;
         }
 
-        messageBroker.Publish(this, new ControlledPartyBehaviorUpdated(data));
+        messageBroker.Publish(this, new PartyBehaviorUpdated(ref data));
     }
 
     private void Handle_MobilePartyMovementStateChanged(MessagePayload<MobilePartyMovementStateChanged> obj)
@@ -129,23 +121,6 @@ internal class MobilePartyBehaviorHandler : IHandler
 
                 if (!TryResolveInteractablePoint(data, out IInteractablePoint interactablePoint))
                     return;
-
-                bool isClientRequest = ModInformation.IsServer &&
-                    !string.IsNullOrEmpty(data.OriginControllerId);
-
-                if (ModInformation.IsServer && !isClientRequest)
-                {
-                    // The first server-side call was intentionally suppressed by PartyBehaviorPatch. Run the
-                    // real vanilla method exactly once under AllowedThread, then publish what it actually did.
-                    // This also keeps the manual PartyBehaviorChangeAttempted producers on the same path.
-                    using (new AllowedThread())
-                    {
-                        party.Ai.SetAiBehavior(data.NewAiBehavior, interactablePoint, data.BestTargetPoint);
-                    }
-
-                    PublishAuthoritativeBehavior(party, data);
-                    return;
-                }
 
                 MobileParty targetParty = null;
                 if (data.TargetPartyId != null &&

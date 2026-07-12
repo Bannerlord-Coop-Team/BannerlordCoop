@@ -160,7 +160,7 @@ internal class PlayerEncounterPatches
         // So also publish the hold through the gated AI-behavior channel — the one client-initiated path the
         // server applies and re-broadcasts (with its position snapshot) to every client, including this one.
         // That makes the hold authoritative everywhere and clears the stale engage order at its source.
-        MessageBroker.Instance.Publish(mainParty.Ai, new PartyBehaviorChangeAttempted(mainParty.Ai, AiBehavior.Hold, null, mainParty.Position));
+        MessageBroker.Instance.Publish(mainParty.Ai, new PartyBehaviorChangeAttempted(mainParty.Ai));
     }
 
     // Native blocks defender-side parties from leaving; allow a joiner (a non-leader of its side) to leave,
@@ -211,8 +211,8 @@ internal class PlayerEncounterPatches
             return false;
         }
 
-        // Side leader: route every instance, including the host, through the synced finalize path so the
-        // local encounter menu is explicitly closed after server-authoritative teardown.
+        // Side leader: route every participating client through the synced finalize path so its local
+        // encounter menu is explicitly closed after server-authoritative teardown.
         MessageBroker.Instance.Publish(mapEvent, new MapEventFinalizeAttempted(mapEvent));
         ClearEngageOrder(mainParty);
         CloseLocalEncounterMenu(mainParty);
@@ -290,7 +290,7 @@ internal class PlayerEncounterPatches
     private static void ClearEngageOrder(MobileParty party)
     {
         party.SetMoveModeHold();
-        MessageBroker.Instance.Publish(party.Ai, new PartyBehaviorChangeAttempted(party.Ai, AiBehavior.Hold, null, party.Position));
+        MessageBroker.Instance.Publish(party.Ai, new PartyBehaviorChangeAttempted(party.Ai));
     }
 
     [HarmonyPatch(nameof(PlayerEncounter.Update))]

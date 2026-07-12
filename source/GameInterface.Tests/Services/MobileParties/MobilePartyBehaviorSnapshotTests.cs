@@ -2,6 +2,9 @@
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.ObjectManager;
 using Moq;
+using ProtoBuf;
+using System.Linq;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
@@ -15,6 +18,20 @@ namespace GameInterface.Tests.Services.MobileParties;
 /// </summary>
 public class MobilePartyBehaviorSnapshotTests
 {
+    [Fact]
+    public void PartyBehaviorUpdateData_UsesOneCurrentSequentialWireContract()
+    {
+        var tags = typeof(PartyBehaviorUpdateData)
+            .GetMembers(BindingFlags.Instance | BindingFlags.Public)
+            .Select(member => member.GetCustomAttribute<ProtoMemberAttribute>())
+            .Where(attribute => attribute != null)
+            .Select(attribute => attribute.Tag)
+            .OrderBy(tag => tag)
+            .ToArray();
+
+        Assert.Equal(Enumerable.Range(1, 19).ToArray(), tags);
+    }
+
     [Fact]
     public void TryCreate_AnchorPoint_UsesOwnerPartyReference()
     {

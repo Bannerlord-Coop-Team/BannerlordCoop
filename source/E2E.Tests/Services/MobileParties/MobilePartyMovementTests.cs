@@ -8,6 +8,7 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MobileParties.Data;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -31,26 +32,15 @@ public class MobilePartyMovementTests : SyncTestBase
         AccessTools.Method(typeof(MobilePartyAi), "SetAiBehavior") ??
         throw new MissingMethodException(typeof(MobilePartyAi).FullName, "SetAiBehavior");
 
-    private readonly string ServerId = "TestServer";
-
-    private readonly string HeroId = "TestHero";
     private readonly string MobilePartyId = "TestParty";
     private readonly string TargetPartyId = "TargetParty";
     private readonly string TargetSettlementId = "TargetSettlement";
 
     public MobilePartyMovementTests(ITestOutputHelper output) : base(output)
     {
-        TestEnvironment.Server.Container.Resolve<IControllerIdProvider>().SetControllerId(ServerId);
-
-
-
         MobilePartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         TargetPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         TargetSettlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
-
-        var playerManager = TestEnvironment.Server.Container.Resolve<IPlayerManager>();
-
-        playerManager.AddPlayer(new Player(ServerId, HeroId, MobilePartyId, "MyClan", "MyCharacterObject"));
 
         var clientNum = 1;
 
@@ -69,7 +59,7 @@ public class MobilePartyMovementTests : SyncTestBase
         var startingBehaviorTarget = new CampaignVec2(new Vec2(0.25f, 0.35f), true);
         var requestedBehaviorTarget = new CampaignVec2(new Vec2(0.85f, 0.95f), true);
         var server = TestEnvironment.Server;
-        BehaviorState expected = default;
+        BehaviorState authoritative = default;
 
         server.Call(() =>
         {
@@ -77,25 +67,19 @@ public class MobilePartyMovementTests : SyncTestBase
             Assert.False(serverParty.IsMainParty);
 
             PrepareSetAiBehaviorState(serverParty, startingMoveTarget, startingBehaviorTarget);
-            using (new AllowedThread())
-            {
-                InvokeSetAiBehavior(serverParty, behavior, requestedBehaviorTarget);
-            }
-
-            expected = new BehaviorState(serverParty);
-            Assert.Equal(MobileParty.NavigationType.Default, expected.DesiredAiNavigationType);
-            Assert.Equal(
-                behavior == AiBehavior.Hold ? startingMoveTarget : requestedBehaviorTarget,
-                expected.MoveTargetPoint);
-            Assert.Equal(
-                behavior == AiBehavior.Hold ? MoveModeType.Hold : MoveModeType.Point,
-                expected.PartyMoveMode);
-
-            PrepareSetAiBehaviorState(serverParty, startingMoveTarget, startingBehaviorTarget);
             InvokeSetAiBehavior(serverParty, behavior, requestedBehaviorTarget);
             FlushCoalescer(server);
 
-            AssertBehaviorState(expected, serverParty);
+            authoritative = new BehaviorState(serverParty);
+            Assert.Equal(behavior, authoritative.ShortTermBehavior);
+            Assert.Equal(MobileParty.NavigationType.Default, authoritative.DesiredAiNavigationType);
+            Assert.Equal(
+                behavior == AiBehavior.Hold ? startingMoveTarget : requestedBehaviorTarget,
+                authoritative.MoveTargetPoint);
+            Assert.Equal(
+                behavior == AiBehavior.Hold ? MoveModeType.Hold : MoveModeType.Point,
+                authoritative.PartyMoveMode);
+            Assert.Equal(requestedBehaviorTarget, authoritative.BehaviorTarget);
         });
 
         var compactPartyId = ObjectManager.Compact(TargetPartyId, typeof(MobileParty));
@@ -103,16 +87,64 @@ public class MobilePartyMovementTests : SyncTestBase
             server.NetworkSentMessages.GetMessages<NetworkUpdatePartyBehavior>(),
             message => message.BehaviorUpdateData.MobilePartyId == compactPartyId);
         var emitted = sent.BehaviorUpdateData;
-        Assert.Equal(expected.ShortTermBehavior, emitted.NewAiBehavior);
-        Assert.Equal(expected.DesiredAiNavigationType, emitted.DesiredAiNavigationType);
-        Assert.Equal(expected.MoveTargetPoint, emitted.MoveTargetPoint);
-        Assert.Equal(expected.BehaviorTarget, emitted.BestTargetPoint);
+        Assert.Equal(authoritative.ShortTermBehavior, emitted.NewAiBehavior);
+        Assert.Equal(authoritative.DesiredAiNavigationType, emitted.DesiredAiNavigationType);
+        Assert.Equal(authoritative.MoveTargetPoint, emitted.MoveTargetPoint);
+        Assert.Equal(authoritative.BehaviorTarget, emitted.BestTargetPoint);
 
         foreach (var client in TestEnvironment.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(TargetPartyId, out var clientParty));
-            AssertBehaviorState(expected, clientParty);
+            AssertBehaviorState(authoritative, clientParty);
         }
+    }
+
+    [Fact]
+    public void ServerSetAiBehavior_ClientOwnedParty_DoesNotMutateOrBroadcast()
+    {
+        var server = TestEnvironment.Server;
+        var startingMoveTarget = new CampaignVec2(new Vec2(0.2f, 0.3f), true);
+        var startingBehaviorTarget = new CampaignVec2(new Vec2(0.4f, 0.5f), true);
+        var requestedBehaviorTarget = new CampaignVec2(new Vec2(0.8f, 0.9f), true);
+        var compactPartyId = ObjectManager.Compact(MobilePartyId, typeof(MobileParty));
+        BehaviorState expected = default;
+
+        server.Call(() =>
+        {
+            var playerManager = server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player(
+                "TestClient1",
+                string.Empty,
+                MobilePartyId,
+                string.Empty,
+                string.Empty)));
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(MobilePartyId, out var party));
+
+            PrepareSetAiBehaviorState(party, startingMoveTarget, startingBehaviorTarget);
+            expected = new BehaviorState(party);
+
+            Assert.False(party.IsControlledByThisInstance());
+            Assert.Equal(AiBehavior.Hold, expected.ShortTermBehavior);
+            Assert.Equal(MoveModeType.Hold, expected.PartyMoveMode);
+            FlushCoalescer(server);
+        });
+
+        server.NetworkSentMessages.Clear();
+
+        server.Call(() =>
+        {
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(MobilePartyId, out var party));
+            Assert.False(party.IsControlledByThisInstance());
+
+            InvokeSetAiBehavior(party, AiBehavior.GoToPoint, requestedBehaviorTarget);
+
+            AssertBehaviorState(expected, party);
+            FlushCoalescer(server);
+        });
+
+        Assert.DoesNotContain(
+            server.NetworkSentMessages.GetMessages<NetworkUpdatePartyBehavior>(),
+            message => message.BehaviorUpdateData.MobilePartyId == compactPartyId);
     }
 
     [Fact]

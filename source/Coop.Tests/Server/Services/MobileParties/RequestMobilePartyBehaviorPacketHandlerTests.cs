@@ -71,6 +71,16 @@ public sealed class RequestMobilePartyBehaviorPacketHandlerTests : IDisposable
 
     public void Dispose() => handler.Dispose();
 
+    [Theory]
+    [InlineData("Coop.Core.Server.Services.MobileParties.Messages.NetworkUpdatePartyMovement")]
+    [InlineData("Coop.Core.Server.Services.MobileParties.Messages.NetworkPartyMovementRequested")]
+    [InlineData("Coop.Core.Common.Services.MobileParties.Data.MobilePartyMovementData")]
+    [InlineData("Coop.Core.Common.Services.MobileParties.Data.MovementType")]
+    public void ObsoleteMovementProtocolTypes_AreNotInAssembly(string fullName)
+    {
+        Assert.Null(typeof(RequestMobilePartyBehaviorPacketHandler).Assembly.GetType(fullName));
+    }
+
     [Fact]
     public void OwnerRequest_WithCompactPartyId_IsPublished()
     {

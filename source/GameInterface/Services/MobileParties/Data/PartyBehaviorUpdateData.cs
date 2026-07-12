@@ -36,48 +36,47 @@ public struct PartyBehaviorUpdateData
     [ProtoMember(5)]
     public readonly bool HasTarget;
 
-    [ProtoMember(8)]
+    [ProtoMember(6)]
     public CampaignVec2 PartyPosition { get; set; }
 
-    [ProtoMember(9)]
+    [ProtoMember(7)]
     public readonly AiBehavior DefaultBehavior;
 
-    [ProtoMember(10)]
+    [ProtoMember(8)]
     public readonly CampaignVec2 TargetPosition;
 
-    [ProtoMember(11)]
+    [ProtoMember(9)]
     public readonly MobileParty.NavigationType DesiredAiNavigationType;
 
     // Server-authored updates leave the origin null.
-    [ProtoMember(12)]
+    [ProtoMember(10)]
     public string OriginControllerId { get; set; }
 
-    // Field 13 was OriginRequestSequence in an earlier development build.
-    [ProtoMember(14)]
+    [ProtoMember(11)]
     public bool ForcePosition { get; set; }
 
-    [ProtoMember(15)]
+    [ProtoMember(12)]
     public string TargetPartyId { get; set; }
 
-    [ProtoMember(16)]
+    [ProtoMember(13)]
     public string TargetSettlementId { get; set; }
 
-    [ProtoMember(17)]
+    [ProtoMember(14)]
     public CampaignVec2 MoveTargetPoint { get; set; }
 
-    [ProtoMember(18)]
+    [ProtoMember(15)]
     public bool IsTargetingPort { get; set; }
 
-    [ProtoMember(19)]
+    [ProtoMember(16)]
     public MoveModeType PartyMoveMode { get; set; }
 
-    [ProtoMember(20)]
+    [ProtoMember(17)]
     public string MoveTargetPartyId { get; set; }
 
-    [ProtoMember(21)]
+    [ProtoMember(18)]
     public CampaignVec2 NextTargetPosition { get; set; }
 
-    [ProtoMember(22)]
+    [ProtoMember(19)]
     public BehaviorInteractableKind InteractableKind { get; set; }
 
     public PartyBehaviorUpdateData(
