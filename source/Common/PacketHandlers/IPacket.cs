@@ -18,7 +18,9 @@ namespace Common.PacketHandlers
         SaveData,
         Relay,
         AgentAction,
-        MountMovement
+        MountMovement,
+        AggregateMessage,
+        CampaignTime
     }
 
     public interface IPacket
