@@ -57,27 +57,18 @@ namespace GameInterface.Services.Clans.Handlers
             }
 
             // The refresh touches the clan screen UI, which is main-thread only.
-            GameThread.Run(() =>
+            GameThread.RunSafe(() =>
             {
-                try
+                ClanNameChangePatch.RunOriginalChangeClanName(clan, new TextObject(payload.Name), new TextObject(payload.InformalName));
+
+                if (ModInformation.IsServer)
                 {
-                    ClanNameChangePatch.RunOriginalChangeClanName(clan, new TextObject(payload.Name), new TextObject(payload.InformalName));
-
-                    if (ModInformation.IsServer)
-                    {
-                        network.SendAll(new NetworkChangeClanName(payload.ClanId, payload.Name, payload.InformalName));
-                    }
-
-                    if (ScreenManager.TopScreen is GauntletClanScreen clanScreen)
-                    {
-                        clanScreen._dataSource?.RefreshValues();
-                    }
-
-                    InformationManager.DisplayMessage(new InformationMessage($"Clan {payload.ClanId} changed name to {payload.Name}"));
+                    network.SendAll(new NetworkChangeClanName(payload.ClanId, payload.Name, payload.InformalName));
                 }
-                catch (Exception e)
+
+                if (ScreenManager.TopScreen is GauntletClanScreen clanScreen)
                 {
-                    Logger.Error(e, "Failed to apply clan name change for clan ({clanId})", payload.ClanId);
+                    clanScreen._dataSource?.RefreshValues();
                 }
             });
         }
