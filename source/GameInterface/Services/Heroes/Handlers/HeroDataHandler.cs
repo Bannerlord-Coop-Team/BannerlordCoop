@@ -45,25 +45,16 @@ internal class HeroDataHandler : IHandler
         }
 
         // The refresh touches the clan screen UI, which must run on the main thread.
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
-            try
+            var fullName = new TextObject(data.FullName);
+            var firstName = new TextObject(data.FirstName);
+
+            HeroDataPatches.SetNameOverride(hero, fullName, firstName);
+
+            if (ScreenManager.TopScreen is GauntletClanScreen clanScreen)
             {
-                var fullName = new TextObject(data.FullName);
-                var firstName = new TextObject(data.FirstName);
-
-                HeroDataPatches.SetNameOverride(hero, fullName, firstName);
-
-                InformationManager.DisplayMessage(new InformationMessage($"Changed hero name to {fullName}"));
-
-                if (ScreenManager.TopScreen is GauntletClanScreen clanScreen)
-                {
-                    clanScreen._dataSource?.RefreshValues();
-                }
-            }
-            catch (Exception e)
-            {
-                Logger.Error(e, "Failed to apply hero name change for {stringId}", data.HeroStringId);
+                clanScreen._dataSource?.RefreshValues();
             }
         });
     }
