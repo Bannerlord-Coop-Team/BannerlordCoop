@@ -1,5 +1,8 @@
-﻿using E2E.Tests.Environment.Instance;
+﻿using Common.Network.Messages;
+using Coop.Core.Server.Connections.Messages;
+using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Services.Players;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Messages.Start;
@@ -61,6 +64,47 @@ public class MapEventCollectionTests : MapEventTestBase
             Assert.False(instance.ObjectManager.Contains(staged.MapEventId));
             Assert.Null(Get<MobileParty>(instance, staged.AttackerPartyId).MapEvent);
             Assert.Null(Get<MobileParty>(instance, staged.DefenderPartyId).MapEvent);
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PlayerDisconnect_MapEventParkingFollowsReconnectState(bool reconnectBeforeMapEventEnds)
+    {
+        var mapEvent = CreateServerMapEvent();
+        var client = Clients.First();
+        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        RegisterAsPlayerParty("PlayerOne", heroId, mapEvent.AttackerPartyId);
+
+        Server.Call(() =>
+        {
+            Get<MobileParty>(Server, mapEvent.AttackerPartyId).IsActive = true;
+            Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        });
+
+        Server.SimulateMessage(this, new PlayerDisconnected(client.NetPeer, default));
+
+        Server.Call(() =>
+        {
+            var party = Get<MobileParty>(Server, mapEvent.AttackerPartyId);
+            Assert.True(party.IsActive);
+            Assert.NotNull(party.MapEvent);
+        });
+
+        if (reconnectBeforeMapEventEnds)
+        {
+            Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer));
+            Server.SimulateMessage(this, new PlayerCampaignEntered(client.NetPeer));
+        }
+
+        DestroyServerMapEvent(mapEvent.MapEventId);
+
+        Server.Call(() =>
+        {
+            var party = Get<MobileParty>(Server, mapEvent.AttackerPartyId);
+            Assert.Equal(reconnectBeforeMapEventEnds, party.IsActive);
+            Assert.Null(party.MapEvent);
         });
     }
 
