@@ -1,4 +1,4 @@
-using Common.Network;
+﻿using Common.Network;
 using Common.Network.Coalescing;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using E2E.Tests.Environment.Instance;
