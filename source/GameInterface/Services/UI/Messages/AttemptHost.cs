@@ -8,9 +8,16 @@ namespace GameInterface.Services.UI.Messages;
 public record AttemptHost : ICommand
 {
     public AttemptHost(string saveName)
+        : this(saveName, null)
+    {
+    }
+
+    public AttemptHost(string saveName, string password)
     {
         SaveName = saveName;
+        Password = password;
     }
 
     public string SaveName { get; }
+    public string Password { get; }
 }

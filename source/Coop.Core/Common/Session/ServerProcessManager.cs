@@ -39,7 +39,9 @@ public class ServerProcessManager : IDisposable
         }
     }
 
-    public void Start(string saveName)
+    public void Start(string saveName) => Start(saveName, null);
+
+    public void Start(string saveName, string password)
     {
         lock (stateLock)
         {
@@ -51,9 +53,10 @@ public class ServerProcessManager : IDisposable
             var currentProcess = Process.GetCurrentProcess();
             var exePath = ManagedServerLauncher.GetEngineExecutablePath();
             var arguments = ServerLaunchArguments.BuildManagedServerArguments(
-                ManagedServerLauncher.GetActiveModuleIds(), saveName, currentProcess.Id);
+                ManagedServerLauncher.GetActiveModuleIds(), saveName, currentProcess.Id, password);
 
-            Logger.Information("Spawning co-op server for save '{SaveName}': {Exe} {Arguments}", saveName, exePath, arguments);
+            // The arguments may contain the hosted-server password, so never write them to a log.
+            Logger.Information("Spawning co-op server for save '{SaveName}': {Exe}", saveName, exePath);
 
             var process = new Process
             {

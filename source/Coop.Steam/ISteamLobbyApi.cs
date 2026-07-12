@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace Coop.Steam;
 
@@ -27,4 +28,12 @@ public interface ISteamLobbyApi : IDisposable
 
     /// <summary>Fires with a connect string from a rich-presence join or new launch parameters.</summary>
     event Action<string> ConnectStringReceived;
+}
+
+/// <summary>Public discovery operations layered on the existing invite-lobby API.</summary>
+public interface ISteamPublicLobbyApi : ISteamLobbyApi
+{
+    /// <summary>Creates a browsable public lobby for a standalone server.</summary>
+    void CreatePublicLobby(int maxMembers, Action<ulong, bool> onCompleted);
+    void RequestLobbyList(Action<IReadOnlyList<ulong>, bool> onCompleted);
 }

@@ -37,9 +37,13 @@ public class CoopConnectionUI : ScreenBase
 
     protected override void OnFinalize()
     {
+        // A Steam lobby search can complete after this screen is popped. Dispose first so the
+        // view model rejects that late callback before any bound collections are torn down.
+        _dataSource?.Dispose();
         base.OnFinalize();
         RemoveLayer(_gauntletLayer);
         _dataSource = null;
+        _gauntletMovie = null;
         _gauntletLayer = null;
     }
 }

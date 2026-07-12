@@ -79,11 +79,13 @@ namespace Coop
 
             // GetFullCommandLineString splits on spaces, which would cut a quoted save
             // name apart; the managed-server arguments need real Windows arg parsing.
-            if (ServerLaunchArguments.TryParse(Environment.GetCommandLineArgs(), out var managedSaveName, out var ownerProcessId))
+            if (ServerLaunchArguments.TryParse(Environment.GetCommandLineArgs(), out var managedSaveName,
+                out var ownerProcessId, out var serverPassword))
             {
                 ManagedServerConfig.SaveName = managedSaveName;
                 ManagedServerConfig.OwnerProcessId = ownerProcessId;
             }
+            ManagedServerConfig.Password = serverPassword;
 
             SetupLogging();
 
@@ -95,7 +97,8 @@ namespace Coop
 
             if (isAutoConnect)
             {
-                Logger.Information("[AutoConnect] Full command line: {CommandLine}", fullCommandLine);
+                // Launch arguments can include the hosted-server password; never write them to logs.
+                Logger.Information("[AutoConnect] Launch arguments detected");
                 Logger.Information("[AutoConnect] isServer={IsServer} isAutoConnect={IsAutoConnect}", isServer, isAutoConnect);
                 EnsureSafeExitConfig();
             }
@@ -285,7 +288,7 @@ namespace Coop
 
                         if (isServer)
                         {
-                            Coop.StartAsServer();
+                            Coop.StartAsServer(null, ManagedServerConfig.Password);
                         }
                         else
                         {
@@ -373,7 +376,10 @@ namespace Coop
             if (!steamBootAttempted && GameStateManager.Current?.ActiveState is InitialState)
             {
                 steamBootAttempted = true;
-                SteamIntegrationBoot.TryStart(isServer, Utilities.GetFullCommandLineString());
+                var steamPump = SteamIntegrationBoot.TryStartWithCallbackPump(
+                    isServer, Utilities.GetFullCommandLineString());
+                // The standalone server has no game frame of its own to dispatch its game-server callbacks.
+                if (steamPump != null) Updateables.Add(steamPump);
             }
 
             TimeSpan frameTime = TimeSpan.FromSeconds(dt);
@@ -399,7 +405,7 @@ namespace Coop
 
             try
             {
-                Coop.StartAsServer(ManagedServerConfig.SaveName);
+                Coop.StartAsServer(ManagedServerConfig.SaveName, ManagedServerConfig.Password);
             }
             catch (Exception ex)
             {
@@ -420,7 +426,7 @@ namespace Coop
                     if (isServer)
                     {
                         Logger.Information("[AutoConnect] InitialState active — auto-starting as server...");
-                        Coop.StartAsServer();
+                        Coop.StartAsServer(null, ManagedServerConfig.Password);
                         Logger.Information("[AutoConnect] StartAsServer() completed");
                     }
                     else

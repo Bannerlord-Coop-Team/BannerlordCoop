@@ -20,8 +20,11 @@ public class NetworkConfig : INetworkConfig
 
     public int Port { get; set; } = 4200;
 
-    // TODO find better token
-    public string Token { get; set; } = "TempToken";
+    /// <summary>
+    /// Optional server password sent in LiteNetLib's connection request data. Empty means the
+    /// server accepts every connection.
+    /// </summary>
+    public string Token { get; set; } = string.Empty;
 
     public bool IsTunneled { get; set; }
 

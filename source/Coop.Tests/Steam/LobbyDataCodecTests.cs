@@ -15,7 +15,15 @@ namespace Coop.Tests.Steam
         [Fact]
         public void RoundTrip_PreservesJoinInfo()
         {
-            var info = new SessionJoinInfo { Address = "203.0.113.7", Port = 4200 };
+            var info = new SessionJoinInfo
+            {
+                Address = "203.0.113.7",
+                Port = 4200,
+                ServerSteamId = 76561198000000042,
+                ModVersion = "1.2.3+abc123",
+                PasswordRequired = true,
+                Password = "must-not-be-advertised",
+            };
 
             var encoded = LobbyDataCodec.Encode(info);
             Assert.True(LobbyDataCodec.TryDecode(key => Read(encoded, key), out var decoded, out var error));
@@ -24,7 +32,14 @@ namespace Coop.Tests.Steam
             Assert.Equal(SessionJoinInfo.CurrentVersion, decoded.Version);
             Assert.Equal("203.0.113.7", decoded.Address);
             Assert.Equal(4200, decoded.Port);
+            Assert.Equal(76561198000000042UL, decoded.ServerSteamId);
+            Assert.Equal("1.2.3+abc123", decoded.ModVersion);
+            Assert.True(decoded.PasswordRequired);
+            Assert.Null(decoded.Password);
             Assert.True(decoded.HasAddress);
+            Assert.True(decoded.HasServerSteamId);
+            Assert.DoesNotContain(encoded.Values, value => value.Contains("must-not-be-advertised"));
+            Assert.Equal(LobbyDataCodec.StandaloneLobbyType, encoded[LobbyDataCodec.LobbyTypeKey]);
         }
 
         [Fact]
@@ -61,6 +76,25 @@ namespace Coop.Tests.Steam
 
             Assert.Equal(1, decoded.Version);
             Assert.True(decoded.Version < SessionJoinInfo.MinTunnelVersion);
+            Assert.False(decoded.HasServerSteamId);
+            Assert.True(string.IsNullOrEmpty(decoded.ModVersion));
+            Assert.False(decoded.PasswordRequired);
+        }
+
+        [Theory]
+        [InlineData("1")]
+        [InlineData("true")]
+        [InlineData("True")]
+        public void Decode_AcceptsPasswordRequiredFlag(string value)
+        {
+            var data = LobbyDataCodec.Encode(new SessionJoinInfo { Port = 4200 });
+            var mutable = new Dictionary<string, string>(data)
+            {
+                [LobbyDataCodec.PasswordRequiredKey] = value,
+            };
+
+            Assert.True(LobbyDataCodec.TryDecode(key => Read(mutable, key), out var decoded, out _));
+            Assert.True(decoded.PasswordRequired);
         }
 
         [Fact]

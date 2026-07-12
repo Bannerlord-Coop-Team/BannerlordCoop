@@ -12,6 +12,12 @@ public static class LobbyDataCodec
     public const string VersionKey = "coop_version";
     public const string AddressKey = "coop_address";
     public const string PortKey = "coop_port";
+    public const string ServerSteamIdKey = "coop_server_steamid";
+    public const string ModVersionKey = "coop_mod_version";
+    public const string PasswordRequiredKey = "coop_password_required";
+    public const string LobbyTypeKey = "coop_lobby_type";
+    public const string StandaloneLobbyType = "standalone";
+    public const string PlayerLobbyType = "player";
 
     public static IReadOnlyDictionary<string, string> Encode(SessionJoinInfo info)
     {
@@ -20,6 +26,10 @@ public static class LobbyDataCodec
             [VersionKey] = info.Version.ToString(),
             [AddressKey] = info.Address ?? string.Empty,
             [PortKey] = info.Port.ToString(),
+            [ServerSteamIdKey] = info.ServerSteamId.ToString(),
+            [ModVersionKey] = info.ModVersion ?? string.Empty,
+            [PasswordRequiredKey] = info.PasswordRequired ? "1" : "0",
+            [LobbyTypeKey] = info.HasServerSteamId ? StandaloneLobbyType : PlayerLobbyType,
         };
     }
 
@@ -47,12 +57,24 @@ public static class LobbyDataCodec
             return false;
         }
 
+        // Absent (older lobby) or unparsable server id decodes to 0, which HasServerSteamId
+        // reads as "player-hosted", so the joiner falls back to the lobby owner.
+        ulong.TryParse(readValue(ServerSteamIdKey), out var serverSteamId);
+
         info = new SessionJoinInfo
         {
             Version = version,
             Address = readValue(AddressKey),
             Port = port,
+            ServerSteamId = serverSteamId,
+            ModVersion = readValue(ModVersionKey),
+            PasswordRequired = IsTrue(readValue(PasswordRequiredKey)),
         };
         return true;
+    }
+
+    private static bool IsTrue(string value)
+    {
+        return value == "1" || bool.TryParse(value, out var parsed) && parsed;
     }
 }

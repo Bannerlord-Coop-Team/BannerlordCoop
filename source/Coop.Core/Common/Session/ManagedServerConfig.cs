@@ -21,4 +21,7 @@ public static class ManagedServerConfig
 
     /// <summary>Process id of the hosting client that spawned this server; 0 when unmanaged.</summary>
     public static int OwnerProcessId { get; set; }
+
+    /// <summary>Optional connection password supplied on the server command line.</summary>
+    public static string Password { get; set; } = string.Empty;
 }

@@ -1,4 +1,5 @@
-﻿using Coop.Core.Common.Session;
+﻿using Common.Network;
+using Coop.Core.Common.Session;
 using Xunit;
 
 namespace Coop.Tests.Session;
@@ -45,6 +46,46 @@ public class ServerLaunchArgumentsTests
         Assert.True(ServerLaunchArguments.TryParse(args, out var saveName, out var ownerProcessId));
         Assert.Equal("My Save", saveName);
         Assert.Equal(1234, ownerProcessId);
+    }
+
+    [Fact]
+    public void TryParse_FindsPasswordWithoutChangingSaveResult()
+    {
+        var args = new[]
+        {
+            "Bannerlord.exe", "/server", "/coopsave", "My Save", "/coopowner", "1234",
+            "/cooppassword", "Secret words",
+        };
+
+        Assert.True(ServerLaunchArguments.TryParse(
+            args, out var saveName, out var ownerProcessId, out var password));
+        Assert.Equal("My Save", saveName);
+        Assert.Equal(1234, ownerProcessId);
+        Assert.Equal("Secret words", password);
+    }
+
+    [Fact]
+    public void TryParse_ReturnsPasswordEvenWithoutAutoLoadSave()
+    {
+        var args = new[] { "/server", "/cooppassword", "Secret" };
+
+        Assert.False(ServerLaunchArguments.TryParse(args, out _, out _, out var password));
+        Assert.Equal("Secret", password);
+    }
+
+    [Fact]
+    public void TryParse_RejectsAnOverlongPassword()
+    {
+        var args = new[]
+        {
+            ServerLaunchArguments.SaveArgument,
+            "Campaign",
+            ServerLaunchArguments.PasswordArgument,
+            new string('x', ConnectionPassword.MaxLength + 1),
+        };
+
+        Assert.False(ServerLaunchArguments.TryParse(args, out _, out _, out var password));
+        Assert.Equal(string.Empty, password);
     }
 
     [Fact]
@@ -97,5 +138,23 @@ public class ServerLaunchArgumentsTests
         var built = ServerLaunchArguments.BuildManagedServerArguments(new[] { "Native", "Coop" }, "My Save", 42);
 
         Assert.Equal("/singleplayer /server _MODULES_*Native*Coop*_MODULES_ /coopsave \"My Save\" /coopowner 42", built);
+    }
+
+    [Fact]
+    public void BuildManagedServerArguments_AppendsQuotedPasswordWhenProtected()
+    {
+        var built = ServerLaunchArguments.BuildManagedServerArguments(
+            new[] { "Native", "Coop" }, "My Save", 42, "Secret words");
+
+        Assert.Equal("/singleplayer /server _MODULES_*Native*Coop*_MODULES_ /coopsave \"My Save\" /coopowner 42 /cooppassword \"Secret words\"", built);
+    }
+
+    [Fact]
+    public void BuildManagedServerArguments_OmitsPasswordArgumentWhenUnprotected()
+    {
+        var built = ServerLaunchArguments.BuildManagedServerArguments(
+            new[] { "Native", "Coop" }, "My Save", 42, string.Empty);
+
+        Assert.DoesNotContain(ServerLaunchArguments.PasswordArgument, built);
     }
 }

@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Common.Network;
 using GameInterface.Services.UI.Messages;
 using SandBox.View;
 using SandBox.ViewModelCollection.SaveLoad;
@@ -45,6 +46,30 @@ namespace Coop.UI.LoadGameUI
             if (IsCorrupted || IsDisabled)
                 return;
 
+            InformationManager.ShowTextInquiry(new TextInquiryData(
+                "Server Password",
+                "Set an optional password for this server. Leave it blank to allow anyone to join.",
+                true,
+                true,
+                "Host",
+                "Cancel",
+                StartHosting,
+                () => { },
+                shouldInputBeObfuscated: true,
+                textCondition: ValidatePassword));
+        }
+
+        private static Tuple<bool, string> ValidatePassword(string password)
+        {
+            bool valid = ConnectionPassword.IsValid(password);
+            return Tuple.Create(valid, valid
+                ? string.Empty
+                : $"Password cannot exceed {ConnectionPassword.MaxLength} characters");
+        }
+
+        private void StartHosting(string password)
+        {
+
             if (Game.Current != null)
             {
                 ScreenManager.PopScreen();
@@ -53,7 +78,7 @@ namespace Coop.UI.LoadGameUI
             }
 
             // The handler decides spawn-managed (Steam) vs in-process hosting.
-            MessageBroker.Instance.Publish(this, new AttemptHost(Save.Name));
+            MessageBroker.Instance.Publish(this, new AttemptHost(Save.Name, password ?? string.Empty));
         }
 	}
 

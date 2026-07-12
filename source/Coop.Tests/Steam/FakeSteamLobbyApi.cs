@@ -8,25 +8,30 @@ namespace Coop.Tests.Steam
     /// Scriptable <see cref="ISteamLobbyApi"/>: records calls and lets tests decide when and
     /// how the asynchronous lobby operations complete.
     /// </summary>
-    public class FakeSteamLobbyApi : ISteamLobbyApi
+    public class FakeSteamLobbyApi : ISteamPublicLobbyApi
     {
         public bool OverlayEnabled = true;
         public ulong NextCreatedLobbyId = 1001;
         public ulong LobbyOwner = 76561198000000001;
         public bool CreateSucceeds = true;
         public bool JoinSucceeds = true;
+        public bool ListSucceeds = true;
         public bool SetLobbyDataSucceeds = true;
         public bool CompleteOperationsImmediately = true;
         public string LaunchCommandLine = string.Empty;
+        public bool LastCreateWasPublic;
+        public bool ThrowOnListRequest;
 
         public readonly List<ulong> LeftLobbies = new List<ulong>();
         public readonly List<ulong> InviteDialogsOpened = new List<ulong>();
         public readonly List<string> RichPresenceConnects = new List<string>();
+        public readonly List<ulong> ListedLobbyIds = new List<ulong>();
         public readonly Dictionary<ulong, Dictionary<string, string>> LobbyData = new Dictionary<ulong, Dictionary<string, string>>();
         public int ClearRichPresenceCalls;
 
         public Action PendingCreateCompletion;
         public Action PendingJoinCompletion;
+        public Action PendingListCompletion;
 
         public bool IsOverlayEnabled => OverlayEnabled;
 
@@ -37,6 +42,18 @@ namespace Coop.Tests.Steam
         public void RaiseConnectStringReceived(string connectString) => ConnectStringReceived?.Invoke(connectString);
 
         public void CreateFriendsOnlyLobby(int maxMembers, Action<ulong, bool> onCompleted)
+        {
+            LastCreateWasPublic = false;
+            BeginCreate(onCompleted);
+        }
+
+        public void CreatePublicLobby(int maxMembers, Action<ulong, bool> onCompleted)
+        {
+            LastCreateWasPublic = true;
+            BeginCreate(onCompleted);
+        }
+
+        private void BeginCreate(Action<ulong, bool> onCompleted)
         {
             PendingCreateCompletion = () => onCompleted(NextCreatedLobbyId, CreateSucceeds);
 
@@ -61,6 +78,22 @@ namespace Coop.Tests.Steam
         {
             var completion = PendingJoinCompletion;
             PendingJoinCompletion = null;
+            completion?.Invoke();
+        }
+
+        public void RequestLobbyList(Action<IReadOnlyList<ulong>, bool> onCompleted)
+        {
+            if (ThrowOnListRequest) throw new InvalidOperationException("scripted lobby-list failure");
+
+            PendingListCompletion = () => onCompleted(ListedLobbyIds, ListSucceeds);
+
+            if (CompleteOperationsImmediately) CompletePendingList();
+        }
+
+        public void CompletePendingList()
+        {
+            var completion = PendingListCompletion;
+            PendingListCompletion = null;
             completion?.Invoke();
         }
 

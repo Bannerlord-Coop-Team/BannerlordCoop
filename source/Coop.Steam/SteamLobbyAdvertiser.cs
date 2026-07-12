@@ -16,11 +16,12 @@ public class SteamLobbyAdvertiser : ISessionAdvertiser
     public const int MaxLobbyMembers = 16;
     public const string ConnectLobbyArgument = "+connect_lobby";
 
-    private readonly ISteamLobbyApi lobbyApi;
+    protected readonly ISteamLobbyApi lobbyApi;
 
     private ulong lobbyId;
     private bool createInFlight;
     private bool disposed;
+    private bool richPresenceSet;
     private SessionJoinInfo pendingInfo;
 
     public SteamLobbyAdvertiser(ISteamLobbyApi lobbyApi)
@@ -30,7 +31,7 @@ public class SteamLobbyAdvertiser : ISessionAdvertiser
 
     public bool IsAdvertising => lobbyId != 0;
 
-    public void Advertise(SessionJoinInfo info)
+    public virtual void Advertise(SessionJoinInfo info)
     {
         if (disposed) return;
 
@@ -45,8 +46,21 @@ public class SteamLobbyAdvertiser : ISessionAdvertiser
         if (createInFlight) return;
 
         createInFlight = true;
-        lobbyApi.CreateFriendsOnlyLobby(MaxLobbyMembers, OnLobbyCreated);
+        try
+        {
+            RequestLobby(MaxLobbyMembers, OnLobbyCreated);
+        }
+        catch (Exception ex)
+        {
+            createInFlight = false;
+            Logger.Error(ex, "Could not request a Steam lobby");
+            OnLobbyUnavailable(pendingInfo);
+        }
     }
+
+    // The standalone-server advertiser overrides this to create a browsable public lobby instead.
+    protected virtual void RequestLobby(int maxMembers, Action<ulong, bool> onCompleted)
+        => lobbyApi.CreateFriendsOnlyLobby(maxMembers, onCompleted);
 
     private void OnLobbyCreated(ulong createdLobbyId, bool success)
     {
@@ -55,6 +69,7 @@ public class SteamLobbyAdvertiser : ISessionAdvertiser
         if (!success)
         {
             Logger.Error("Could not create a Steam lobby; invites are unavailable this session");
+            OnLobbyUnavailable(pendingInfo);
             return;
         }
 
@@ -74,33 +89,77 @@ public class SteamLobbyAdvertiser : ISessionAdvertiser
     private void ApplyLobbyData()
     {
         bool applied = true;
-        foreach (var pair in LobbyDataCodec.Encode(pendingInfo))
+        try
         {
-            applied &= lobbyApi.SetLobbyData(lobbyId, pair.Key, pair.Value);
+            foreach (var pair in LobbyDataCodec.Encode(pendingInfo))
+            {
+                applied &= lobbyApi.SetLobbyData(lobbyId, pair.Key, pair.Value);
+            }
+        }
+        catch (Exception ex)
+        {
+            applied = false;
+            Logger.Error(ex, "Steam lobby data writes threw an exception");
         }
 
         // Advertising a lobby with partial metadata just strands invitees; withdraw instead.
         if (!applied)
         {
             Logger.Error("Steam lobby data writes failed; withdrawing the advertisement");
-            StopAdvertising();
+            var failedInfo = pendingInfo;
+            WithdrawAdvertisement();
+            OnLobbyUnavailable(failedInfo);
             return;
         }
 
-        lobbyApi.SetRichPresenceConnect($"{ConnectLobbyArgument} {lobbyId}");
+        try
+        {
+            richPresenceSet |= lobbyApi.SetRichPresenceConnect($"{ConnectLobbyArgument} {lobbyId}");
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Could not set Steam rich presence for the lobby");
+        }
     }
 
-    public void StopAdvertising()
+    protected virtual void OnLobbyUnavailable(SessionJoinInfo info)
+    {
+    }
+
+    public virtual void StopAdvertising()
+    {
+        WithdrawAdvertisement();
+    }
+
+    private void WithdrawAdvertisement()
     {
         pendingInfo = null;
 
         if (lobbyId != 0)
         {
-            lobbyApi.LeaveLobby(lobbyId);
+            try
+            {
+                lobbyApi.LeaveLobby(lobbyId);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Could not leave Steam lobby {LobbyId}", lobbyId.ToString());
+            }
             lobbyId = 0;
         }
 
-        lobbyApi.ClearRichPresenceConnect();
+        if (richPresenceSet)
+        {
+            try
+            {
+                lobbyApi.ClearRichPresenceConnect();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Could not clear Steam lobby rich presence");
+            }
+            richPresenceSet = false;
+        }
     }
 
     public bool InviteFriends()
@@ -117,7 +176,7 @@ public class SteamLobbyAdvertiser : ISessionAdvertiser
         return true;
     }
 
-    public void Dispose()
+    public virtual void Dispose()
     {
         disposed = true;
 

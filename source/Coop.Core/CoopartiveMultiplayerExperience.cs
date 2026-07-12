@@ -40,6 +40,7 @@ namespace Coop.Core
         private volatile bool coopStarting;
         private volatile bool hostedSession;
         private volatile bool clientConnectedOnce;
+        private bool passwordInquiryPending;
         // Bumped when a new host attempt starts, so a prior attempt's deferred exit handling drops out.
         private volatile int hostSessionGeneration;
 
@@ -85,6 +86,7 @@ namespace Coop.Core
             {
                 Address = connectMessage.Address.ToString(),
                 Port = connectMessage.Port,
+                Token = connectMessage.Password ?? string.Empty,
             };
 
             var advertisementConfig = new SessionAdvertisementConfig
@@ -109,13 +111,21 @@ namespace Coop.Core
             // so bail before spawning a server this instance can't wire itself to.
             if (coopStarting) return;
 
+            var password = obj.What.Password ?? string.Empty;
+            if (!ConnectionPassword.IsValid(password))
+            {
+                InformationManager.DisplayMessage(new InformationMessage(
+                    $"The server password cannot exceed {ConnectionPassword.MaxLength} characters"));
+                return;
+            }
+
             AbandonAnyStartingSession();
 
             // Off Steam, keep the in-process dedicated-server behavior: this instance becomes
             // the server, and the player launches a second instance to join it.
             if (!SessionDiscovery.SteamAvailable)
             {
-                StartAsServer(obj.What.SaveName);
+                StartAsServer(obj.What.SaveName, password);
                 return;
             }
 
@@ -133,7 +143,7 @@ namespace Coop.Core
 
             try
             {
-                serverProcessManager.Start(obj.What.SaveName);
+                serverProcessManager.Start(obj.What.SaveName, password);
             }
             catch (Exception ex)
             {
@@ -147,11 +157,14 @@ namespace Coop.Core
             configuration = new NetworkConfig()
             {
                 Address = "127.0.0.1",
+                Token = password,
             };
 
             var advertisementConfig = new SessionAdvertisementConfig
             {
-                EnableSteamInvites = SessionDiscovery.SteamAvailable,
+                // The spawned server owns the Steam listener and public lobby. This loopback
+                // client must not create a second lobby and user-flavor tunnel.
+                EnableSteamInvites = false,
                 PublicAddress = string.Empty,
             };
 
@@ -222,22 +235,52 @@ namespace Coop.Core
 
         private void Handle(MessagePayload<SessionJoinInfoResolved> obj)
         {
-            // Steam callbacks can fire at any moment, so this join must check state itself.
-            if (container != null)
+            var joinInfo = obj.What.JoinInfo;
+            if (!CanStartResolvedJoin()) return;
+
+            if (joinInfo.PasswordRequired)
             {
-                InformationManager.DisplayMessage(new InformationMessage(
-                    "Already in a co-op session; leave it before joining another"));
+                PromptForSessionPassword(joinInfo);
                 return;
             }
 
-            if (!GameStateQuery.IsAtMainMenu)
-            {
-                InformationManager.DisplayMessage(new InformationMessage(
-                    "Return to the main menu to join a co-op session"));
-                return;
-            }
+            StartResolvedJoin(joinInfo);
+        }
 
-            var prepared = joinEndpointPreparer.PrepareAsync(obj.What.JoinInfo).GetAwaiter().GetResult();
+        private void PromptForSessionPassword(SessionJoinInfo joinInfo)
+        {
+            if (passwordInquiryPending) return;
+            passwordInquiryPending = true;
+
+            InformationManager.ShowTextInquiry(new TextInquiryData(
+                "Server Password",
+                "This server requires a password.",
+                true,
+                true,
+                "Join",
+                "Cancel",
+                password =>
+                {
+                    passwordInquiryPending = false;
+                    joinInfo.Password = password ?? string.Empty;
+                    StartResolvedJoin(joinInfo);
+                },
+                () => passwordInquiryPending = false,
+                shouldInputBeObfuscated: true,
+                textCondition: password =>
+                {
+                    bool valid = ConnectionPassword.IsValid(password);
+                    return Tuple.Create(valid, valid
+                        ? string.Empty
+                        : $"Password cannot exceed {ConnectionPassword.MaxLength} characters");
+                }));
+        }
+
+        private void StartResolvedJoin(SessionJoinInfo joinInfo)
+        {
+            if (!CanStartResolvedJoin()) return;
+
+            var prepared = joinEndpointPreparer.PrepareAsync(joinInfo).GetAwaiter().GetResult();
 
             // A failed tunnel setup falls back to the advertised address, which a
             // tunnel-only lobby doesn't have; an empty address would resolve to this machine.
@@ -253,6 +296,7 @@ namespace Coop.Core
                 Address = prepared.Address,
                 Port = prepared.Port,
                 IsTunneled = prepared.Tunneled,
+                Token = joinInfo.Password ?? string.Empty,
             };
 
             try
@@ -273,6 +317,26 @@ namespace Coop.Core
             }
         }
 
+        private bool CanStartResolvedJoin()
+        {
+            // Steam callbacks can fire at any moment, so every prompt and callback rechecks state.
+            if (container != null)
+            {
+                InformationManager.DisplayMessage(new InformationMessage(
+                    "Already in a co-op session; leave it before joining another"));
+                return false;
+            }
+
+            if (!GameStateQuery.IsAtMainMenu)
+            {
+                InformationManager.DisplayMessage(new InformationMessage(
+                    "Return to the main menu to join a co-op session"));
+                return false;
+            }
+
+            return true;
+        }
+
         private void Handle(MessagePayload<SessionJoinFailed> obj)
         {
             InformationManager.DisplayMessage(new InformationMessage(obj.What.Reason));
@@ -280,7 +344,7 @@ namespace Coop.Core
 
         private void Handle(MessagePayload<HostSaveGame> obj)
         {
-            StartAsServer(obj.What.SaveName);
+            StartAsServer(obj.What.SaveName, ManagedServerConfig.Password);
         }
 
         private void Handle(MessagePayload<EndCoopMode> payload)
@@ -303,10 +367,16 @@ namespace Coop.Core
 
         public int Priority => 0;
 
-        public void StartAsServer(string saveName = null)
+        public void StartAsServer(string saveName = null) => StartAsServer(saveName, null);
+
+        public void StartAsServer(string saveName, string password)
         {
             // A second Host or Join click while patches are still applying would tear down the in-flight start
             if (coopStarting) return;
+
+            if (!ConnectionPassword.IsValid(password))
+                throw new ArgumentOutOfRangeException(nameof(password),
+                    $"The server password cannot exceed {ConnectionPassword.MaxLength} characters");
 
             DestroyContainer();
 
@@ -315,6 +385,9 @@ namespace Coop.Core
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<ServerModule>();
             builder.RegisterModule<GameInterfaceModule>();
+            builder.RegisterInstance(new NetworkConfig { Token = password ?? string.Empty })
+                .As<INetworkConfig>()
+                .SingleInstance();
             container = builder.Build();
 
             GameInterface.ContainerProvider.SetContainer(container);

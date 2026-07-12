@@ -2,17 +2,16 @@
 using Serilog;
 using Steamworks;
 using System;
+using System.Collections.Generic;
 
 namespace Coop.Steam;
 
 /// <inheritdoc cref="ISteamLobbyApi"/>
 /// <remarks>
-/// Relies on the game's own Steam runtime: TaleWorlds initializes SteamAPI and pumps
-/// SteamAPI.RunCallbacks every frame on the game thread, so callbacks registered here are
-/// dispatched without a pump of our own. The dispatcher swallows handler exceptions, so
-/// every callback body catches and logs its own failures.
+/// Uses TaleWorlds' initialized user Steam runtime and frame callback pump. Callback bodies catch
+/// their own failures because Steam's dispatcher otherwise hides them from the mod log.
 /// </remarks>
-public class SteamLobbyApi : ISteamLobbyApi
+public class SteamLobbyApi : ISteamPublicLobbyApi
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SteamLobbyApi>();
 
@@ -22,12 +21,15 @@ public class SteamLobbyApi : ISteamLobbyApi
 
     private CallResult<LobbyCreated_t> lobbyCreated;
     private CallResult<LobbyEnter_t> lobbyEntered;
+    private CallResult<LobbyMatchList_t> lobbyMatchList;
 
     private bool createInFlight;
     private bool joinInFlight;
+    private bool listInFlight;
 
     private Action<ulong, bool> onCreateCompleted;
     private Action<ulong, bool> onJoinCompleted;
+    private Action<IReadOnlyList<ulong>, bool> onListCompleted;
 
     public SteamLobbyApi()
     {
@@ -86,7 +88,7 @@ public class SteamLobbyApi : ISteamLobbyApi
         try
         {
             var commandLine = GetLaunchCommandLine();
-            Logger.Information("Steam launch parameters updated: {CommandLine}", commandLine);
+            Logger.Information("Steam launch parameters updated");
             ConnectStringReceived?.Invoke(commandLine);
         }
         catch (Exception ex)
@@ -96,13 +98,27 @@ public class SteamLobbyApi : ISteamLobbyApi
     }
 
     public void CreateFriendsOnlyLobby(int maxMembers, Action<ulong, bool> onCompleted)
+        => CreateLobby(ELobbyType.k_ELobbyTypeFriendsOnly, maxMembers, onCompleted);
+
+    public void CreatePublicLobby(int maxMembers, Action<ulong, bool> onCompleted)
+        => CreateLobby(ELobbyType.k_ELobbyTypePublic, maxMembers, onCompleted);
+
+    private void CreateLobby(ELobbyType lobbyType, int maxMembers, Action<ulong, bool> onCompleted)
     {
         onCreateCompleted = onCompleted;
         createInFlight = true;
         lobbyCreated ??= CallResult<LobbyCreated_t>.Create();
 
-        var call = SteamMatchmaking.CreateLobby(ELobbyType.k_ELobbyTypeFriendsOnly, maxMembers);
-        lobbyCreated.Set(call, OnLobbyCreated);
+        try
+        {
+            var call = SteamMatchmaking.CreateLobby(lobbyType, maxMembers);
+            lobbyCreated.Set(call, OnLobbyCreated);
+        }
+        catch
+        {
+            createInFlight = false;
+            throw;
+        }
     }
 
     private void OnLobbyCreated(LobbyCreated_t result, bool ioFailure)
@@ -131,8 +147,16 @@ public class SteamLobbyApi : ISteamLobbyApi
         joinInFlight = true;
         lobbyEntered ??= CallResult<LobbyEnter_t>.Create();
 
-        var call = SteamMatchmaking.JoinLobby(new CSteamID(lobbyId));
-        lobbyEntered.Set(call, OnLobbyEntered);
+        try
+        {
+            var call = SteamMatchmaking.JoinLobby(new CSteamID(lobbyId));
+            lobbyEntered.Set(call, OnLobbyEntered);
+        }
+        catch
+        {
+            joinInFlight = false;
+            throw;
+        }
     }
 
     private void OnLobbyEntered(LobbyEnter_t result, bool ioFailure)
@@ -153,6 +177,63 @@ public class SteamLobbyApi : ISteamLobbyApi
         catch (Exception ex)
         {
             Logger.Error(ex, "LobbyEnter handler failed");
+        }
+    }
+
+    public void RequestLobbyList(Action<IReadOnlyList<ulong>, bool> onCompleted)
+    {
+        if (listInFlight)
+        {
+            onCompleted(Array.Empty<ulong>(), false);
+            return;
+        }
+
+        onListCompleted = onCompleted;
+        listInFlight = true;
+        lobbyMatchList ??= CallResult<LobbyMatchList_t>.Create();
+
+        try
+        {
+            SteamMatchmaking.AddRequestLobbyListDistanceFilter(ELobbyDistanceFilter.k_ELobbyDistanceFilterWorldwide);
+            SteamMatchmaking.AddRequestLobbyListStringFilter(
+                LobbyDataCodec.LobbyTypeKey,
+                LobbyDataCodec.StandaloneLobbyType,
+                ELobbyComparison.k_ELobbyComparisonEqual);
+
+            lobbyMatchList.Set(SteamMatchmaking.RequestLobbyList(), OnLobbyMatchList);
+        }
+        catch
+        {
+            listInFlight = false;
+            throw;
+        }
+    }
+
+    private void OnLobbyMatchList(LobbyMatchList_t result, bool ioFailure)
+    {
+        listInFlight = false;
+
+        try
+        {
+            if (ioFailure)
+            {
+                Logger.Error("Steam lobby search failed");
+                onListCompleted?.Invoke(Array.Empty<ulong>(), false);
+                return;
+            }
+
+            var lobbyIds = new List<ulong>((int)result.m_nLobbiesMatching);
+            for (uint i = 0; i < result.m_nLobbiesMatching; i++)
+            {
+                lobbyIds.Add(SteamMatchmaking.GetLobbyByIndex((int)i).m_SteamID);
+            }
+
+            onListCompleted?.Invoke(lobbyIds, true);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "LobbyMatchList handler failed");
+            onListCompleted?.Invoke(Array.Empty<ulong>(), false);
         }
     }
 
@@ -209,5 +290,6 @@ public class SteamLobbyApi : ISteamLobbyApi
         // from the dispatcher once it fires.
         if (!createInFlight) lobbyCreated?.Dispose();
         if (!joinInFlight) lobbyEntered?.Dispose();
+        if (!listInFlight) lobbyMatchList?.Dispose();
     }
 }

@@ -25,6 +25,7 @@ public class ConfiguredSessionJoinInfoSource : ISessionJoinInfoSource
         {
             Address = advertisementConfig.PublicAddress,
             Port = networkConfig.Port,
+            PasswordRequired = !string.IsNullOrEmpty(networkConfig.Token),
         };
     }
 }

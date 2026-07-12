@@ -23,9 +23,21 @@ namespace Coop.Tests.Steam
             advertiser.Advertise(Info());
 
             Assert.True(advertiser.IsAdvertising);
+            Assert.False(api.LastCreateWasPublic);
             Assert.Equal("203.0.113.7", api.GetLobbyData(api.NextCreatedLobbyId, LobbyDataCodec.AddressKey));
             Assert.Equal("4200", api.GetLobbyData(api.NextCreatedLobbyId, LobbyDataCodec.PortKey));
             Assert.Contains($"{SteamLobbyAdvertiser.ConnectLobbyArgument} {api.NextCreatedLobbyId}", api.RichPresenceConnects);
+        }
+
+        [Fact]
+        public void PublicAdvertiser_CreatesBrowsableLobby()
+        {
+            var publicAdvertiser = new SteamPublicLobbyAdvertiser(api);
+
+            publicAdvertiser.Advertise(Info());
+
+            Assert.True(publicAdvertiser.IsAdvertising);
+            Assert.True(api.LastCreateWasPublic);
         }
 
         [Fact]
@@ -122,6 +134,7 @@ namespace Coop.Tests.Steam
             Assert.False(advertiser.IsAdvertising);
             Assert.Null(api.PendingCreateCompletion);
             Assert.Empty(api.LobbyData);
+            Assert.Equal(0, api.ClearRichPresenceCalls);
         }
 
         [Fact]

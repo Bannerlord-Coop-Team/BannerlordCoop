@@ -29,9 +29,17 @@ namespace Coop.Tests.Steam
         private void Handle_Failed(MessagePayload<SessionJoinFailed> payload) => failed.Add(payload.What);
 
         private void SetupLobby(ulong lobbyId, string address = "203.0.113.7", int port = 4200,
-            int version = SessionJoinInfo.CurrentVersion)
+            int version = SessionJoinInfo.CurrentVersion, ulong serverSteamId = 0)
         {
-            foreach (var pair in LobbyDataCodec.Encode(new SessionJoinInfo { Address = address, Port = port, Version = version }))
+            var info = new SessionJoinInfo
+            {
+                Address = address,
+                Port = port,
+                Version = version,
+                ServerSteamId = serverSteamId,
+            };
+
+            foreach (var pair in LobbyDataCodec.Encode(info))
             {
                 api.SetLobbyData(lobbyId, pair.Key, pair.Value);
             }
@@ -148,6 +156,19 @@ namespace Coop.Tests.Steam
             Assert.Empty(failed);
             // The owner is only readable while a member, so the leave must come after the read.
             Assert.Contains(42UL, api.LeftLobbies);
+        }
+
+        [Fact]
+        public void StandaloneServerLobby_PrefersServerSteamIdOverLobbyOwner()
+        {
+            SetupLobby(42, address: null, serverSteamId: 76561198000000042);
+
+            api.RaiseLobbyJoinRequested(42);
+
+            var info = Assert.Single(resolved).JoinInfo;
+            Assert.Equal(76561198000000042UL, info.HostSteamId);
+            Assert.NotEqual(api.LobbyOwner, info.HostSteamId);
+            Assert.Empty(failed);
         }
 
         [Fact]

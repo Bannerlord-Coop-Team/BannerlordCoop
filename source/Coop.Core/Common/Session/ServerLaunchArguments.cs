@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Common.Network;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -14,14 +15,18 @@ public static class ServerLaunchArguments
 {
     public const string SaveArgument = "/coopsave";
     public const string OwnerArgument = "/coopowner";
+    public const string PasswordArgument = "/cooppassword";
 
     /// <summary>
-    /// Builds the spawned server's command line from scratch, mirroring deploy/start-server.bat:
-    /// /singleplayer /server, the active module list, then the save + owner pid. Built fresh
-    /// (not carried from this process's arguments) because a Steam launch hosts the engine inside
-    /// the launcher, so the running process's command line has neither the module list nor the mode.
+    /// Builds a fresh server command line with mode, active modules, save, owner PID, and optional
+    /// password because a Steam-launched client command line lacks the engine module token.
     /// </summary>
-    public static string BuildManagedServerArguments(IReadOnlyList<string> moduleIds, string saveName, int ownerProcessId)
+    public static string BuildManagedServerArguments(IReadOnlyList<string> moduleIds, string saveName,
+        int ownerProcessId)
+        => BuildManagedServerArguments(moduleIds, saveName, ownerProcessId, null);
+
+    public static string BuildManagedServerArguments(IReadOnlyList<string> moduleIds, string saveName,
+        int ownerProcessId, string password)
     {
         if (saveName == null) throw new ArgumentNullException(nameof(saveName));
         if (moduleIds == null) throw new ArgumentNullException(nameof(moduleIds));
@@ -37,6 +42,12 @@ public static class ServerLaunchArguments
             ownerProcessId.ToString(CultureInfo.InvariantCulture),
         };
 
+        if (!string.IsNullOrEmpty(password))
+        {
+            tokens.Add(PasswordArgument);
+            tokens.Add(password);
+        }
+
         return string.Join(" ", tokens.Select(QuoteArgument));
     }
 
@@ -48,8 +59,15 @@ public static class ServerLaunchArguments
 
     public static bool TryParse(IReadOnlyList<string> args, out string saveName, out int ownerProcessId)
     {
+        return TryParse(args, out saveName, out ownerProcessId, out _);
+    }
+
+    public static bool TryParse(IReadOnlyList<string> args, out string saveName, out int ownerProcessId,
+        out string password)
+    {
         saveName = null;
         ownerProcessId = 0;
+        password = string.Empty;
 
         for (int i = 0; i < args.Count; i++)
         {
@@ -61,6 +79,16 @@ public static class ServerLaunchArguments
             {
                 int.TryParse(args[++i], NumberStyles.Integer, CultureInfo.InvariantCulture, out ownerProcessId);
             }
+            else if (IsToken(args[i], PasswordArgument) && i + 1 < args.Count)
+            {
+                password = args[++i];
+            }
+        }
+
+        if (!ConnectionPassword.IsValid(password))
+        {
+            password = string.Empty;
+            return false;
         }
 
         return saveName != null;
