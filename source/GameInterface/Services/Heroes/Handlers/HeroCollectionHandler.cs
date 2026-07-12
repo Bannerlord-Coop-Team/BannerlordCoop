@@ -31,7 +31,6 @@ namespace GameInterface.Services.Heroes.Handlers
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
             this.network = network;
-            messageBroker.Subscribe<VolunteerTypesArrayUpdated>(Handle);
             messageBroker.Subscribe<NetworkUpdateArray>(Handle);
 
             messageBroker.Subscribe<ChildrenListUpdated>(Handle);
@@ -50,7 +49,6 @@ namespace GameInterface.Services.Heroes.Handlers
 
         public void Dispose()
         {
-            messageBroker.Unsubscribe<VolunteerTypesArrayUpdated>(Handle);
             messageBroker.Unsubscribe<NetworkUpdateArray>(Handle);
 
             messageBroker.Unsubscribe<ChildrenListUpdated>(Handle);
@@ -65,18 +63,6 @@ namespace GameInterface.Services.Heroes.Handlers
             messageBroker.Unsubscribe<NetworkUpdateWorkshopList>(Handle);
             messageBroker.Unsubscribe<WorkshopListRemoved>(Handle);
             messageBroker.Unsubscribe<NetworkRemoveWorkshopList>(Handle);
-        }
-
-        private void Handle(MessagePayload<VolunteerTypesArrayUpdated> payload)
-        {
-            var data = payload.What;
-
-            if (!TryGetId(data.Instance, out string HeroId)) return;
-            if (!TryGetId(data.Value, out string CharacterObjectId) && data.Value != null) return;
-
-            HeroId = Compact(HeroId, typeof(Hero));
-            CharacterObjectId = Compact(CharacterObjectId, typeof(CharacterObject));
-            network.SendAll(new NetworkUpdateArray(HeroId, CharacterObjectId, data.Index));
         }
 
         private void Handle(MessagePayload<NetworkUpdateArray> payload)
