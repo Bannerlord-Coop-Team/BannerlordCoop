@@ -81,6 +81,9 @@ public class MissionTestEnvironment : E2ETestEnvironment
             for (int i = 2; i < parties.Length; i++)
                 parties[i].Party.MapEventSide = mapEvent.AttackerSide;
 
+            mapEvent.MapEventVisual = null;
+            Campaign.Current.MapEventManager.OnMapEventCreated(mapEvent);
+
             Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
             for (int i = 0; i < parties.Length; i++)
                 Assert.True(Server.ObjectManager.TryGetId(parties[i], out partyIds[i]));

@@ -2706,6 +2706,7 @@ public class VillageHostileActionTests : MapEventTestBase
         mapEvent.State = MapEventState.Wait;
 
         SetVillageStateForHostileAction(defender.Settlement, action);
+        mapEvent.MapEventVisual = null;
         Campaign.Current.MapEventManager.OnMapEventCreated(mapEvent);
         return mapEvent;
     }
