@@ -29,5 +29,10 @@ public interface INetworkConfig
     TimeSpan PingInterval { get; }
     TimeSpan ReconnectDelay { get; }
     TimeSpan DisconnectTimeout { get; }
+    /// <summary>
+    /// LiteNetLib's internal logic-thread cycle (NetManager.UpdateTime): resends, packet merging and
+    /// reliable-window advances happen at this cadence.
+    /// </summary>
+    TimeSpan UpdateTime { get; }
     NatAddressType NATType { get; }
 }
