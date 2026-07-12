@@ -1,6 +1,5 @@
 ﻿using Common.Network;
 using Common.Network.Coalescing;
-using Common.Util;
 using GameInterface.Services.ObjectManager;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -10,38 +9,39 @@ namespace GameInterface.Services.MapEventParties;
 /// <summary>
 /// Flushes pending absolute contribution values before dependent battle-result or teardown traffic.
 /// </summary>
-internal static class MapEventContributionBarrier
+internal interface IMapEventContributionBarrier
 {
-    public static void Flush(MapEvent mapEvent)
-    {
-        if (mapEvent == null ||
-            !ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
-            !ContainerProvider.TryResolve<ISendCoalescer>(out var coalescer) ||
-            !ContainerProvider.TryResolve<INetwork>(out var network))
-            return;
+    void Flush(MapEvent mapEvent);
+}
 
-        Flush(mapEvent, objectManager, coalescer, network);
+/// <inheritdoc cref="IMapEventContributionBarrier"/>
+internal sealed class MapEventContributionBarrier : IMapEventContributionBarrier
+{
+    private readonly IObjectManager objectManager;
+    private readonly INetwork network;
+    private readonly ISendCoalescer coalescer;
+
+    public MapEventContributionBarrier(
+        IObjectManager objectManager,
+        INetwork network,
+        ISendCoalescer coalescer = null)
+    {
+        this.objectManager = objectManager;
+        this.network = network;
+        this.coalescer = coalescer;
     }
 
-    internal static void Flush(
-        MapEvent mapEvent,
-        IObjectManager objectManager,
-        ISendCoalescer coalescer,
-        INetwork network)
+    public void Flush(MapEvent mapEvent)
     {
-        if (mapEvent == null || objectManager == null || coalescer == null || network == null)
-            return;
+        if (mapEvent == null || coalescer == null) return;
 
         var flushedIds = new HashSet<string>();
-        FlushSide(mapEvent.AttackerSide, objectManager, coalescer, network, flushedIds);
-        FlushSide(mapEvent.DefenderSide, objectManager, coalescer, network, flushedIds);
+        FlushSide(mapEvent.AttackerSide, flushedIds);
+        FlushSide(mapEvent.DefenderSide, flushedIds);
     }
 
-    private static void FlushSide(
+    private void FlushSide(
         MapEventSide side,
-        IObjectManager objectManager,
-        ISendCoalescer coalescer,
-        INetwork network,
         HashSet<string> flushedIds)
     {
         if (side == null) return;

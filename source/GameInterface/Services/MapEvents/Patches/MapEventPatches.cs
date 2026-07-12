@@ -2,7 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
-using GameInterface.Services.MapEventParties;
+using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
@@ -62,7 +62,7 @@ internal class MapEventPatches
     private static bool Prefix_FinalizeEventAux(MapEvent __instance)
     {
         if (ModInformation.IsServer)
-            MapEventContributionBarrier.Flush(__instance);
+            MessageBroker.Instance.Publish(__instance, new MapEventContributionFlushRequested(__instance));
 
         if (CallOriginalPolicy.IsOriginalAllowed())
             return true;
@@ -95,7 +95,7 @@ internal class MapEventPatches
     {
         if (ModInformation.IsServer &&
             (value == BattleState.AttackerVictory || value == BattleState.DefenderVictory))
-            MapEventContributionBarrier.Flush(__instance);
+            MessageBroker.Instance.Publish(__instance, new MapEventContributionFlushRequested(__instance));
 
         if (CallOriginalPolicy.IsOriginalAllowed())
         {
