@@ -95,6 +95,9 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
 
     public bool TryHandleBroadcast(NetPeer peer, IPacket packet)
     {
+        // Time is latest-wins state, so replaying a loading backlog would move a client to stale time.
+        if (packet.PacketType == PacketType.CampaignTime) return false;
+
         // No channel means a fully-joined (or unknown) peer: send live.
         if (channels.TryGetValue(peer, out var channel) == false) return false;
 

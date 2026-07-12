@@ -16,60 +16,104 @@ public class MapTimeTrackerInterfaceTests
     }
 
     [Fact]
-    public void BeginCorrection_OrdinaryHeartbeatStartsBoundedCorrection()
+    public void PrepareCorrection_ClientWithinLeadBandKeepsVanillaFastForwardRate()
     {
-        var tracker = CreateSynchronizedTracker();
+        var tracker = CreateTrackerWithServerRate();
 
-        Assert.False(tracker.BeginCorrection(150L, 1000L));
-        tracker.PrepareCorrection(200L);
-        Assert.Equal(-5L, tracker.GetTickCorrection(10L, 0.025f));
+        tracker.PrepareCorrection(190L, 40L);
+
+        Assert.Equal(0L, tracker.GetTickCorrection(40L, 0.05f));
     }
 
     [Fact]
-    public void GetTickCorrection_AheadClientNeverRunsBackward()
+    public void PrepareCorrection_SlowerServerDoesNotShrinkClientLeadBand()
     {
         var tracker = CreateSynchronizedTracker();
-        tracker.BeginCorrection(100L, 1000L);
-        tracker.PrepareCorrection(10000L);
 
-        Assert.Equal(-10L, tracker.GetTickCorrection(10L, 0.25f));
+        for (int frame = 0; frame < 5; frame++)
+        {
+            tracker.GetTickCorrection(10L, 0.05f);
+        }
+
+        tracker.BeginCorrection(125L, 1000L);
+        tracker.PrepareCorrection(170L, 10L);
+
+        Assert.Equal(0L, tracker.GetTickCorrection(10L, 0.05f));
     }
 
     [Fact]
-    public void GetTickCorrection_BehindClientNeverExceedsDoubleSpeed()
+    public void PrepareCorrection_HealthyFourHertzHeartbeatsDoNotPaceClient()
     {
         var tracker = CreateSynchronizedTracker();
-        tracker.BeginCorrection(10000L, 10000L);
-        tracker.PrepareCorrection(100L);
+        long localTicks = 100L;
 
-        Assert.Equal(10L, tracker.GetTickCorrection(10L, 0.25f));
+        for (int heartbeat = 0; heartbeat < 8; heartbeat++)
+        {
+            for (int frame = 0; frame < 5; frame++)
+            {
+                const long vanillaDeltaTicks = 10L;
+                localTicks += vanillaDeltaTicks;
+                tracker.PrepareCorrection(localTicks, vanillaDeltaTicks);
+                localTicks += tracker.GetTickCorrection(vanillaDeltaTicks, 0.05f);
+            }
+
+            Assert.False(tracker.BeginCorrection(localTicks, 1000L));
+        }
     }
 
     [Fact]
-    public void GetTickCorrection_AccumulatesFractionalTicks()
+    public void PrepareCorrection_ClientAheadOfLeadBandSlowsWithoutPausing()
     {
-        var tracker = CreateSynchronizedTracker();
-        tracker.BeginCorrection(101L, 1000L);
-        tracker.PrepareCorrection(100L);
+        var tracker = CreateTrackerWithServerRate();
 
-        Assert.Equal(0L, tracker.GetTickCorrection(10L, 0.1f));
-        Assert.Equal(0L, tracker.GetTickCorrection(10L, 0.1f));
-        Assert.Equal(1L, tracker.GetTickCorrection(10L, 0.1f));
+        tracker.PrepareCorrection(220L, 10L);
+
+        Assert.Equal(-1L, tracker.GetTickCorrection(10L, 0.05f));
+    }
+
+    [Fact]
+    public void PrepareCorrection_ClientFarAheadPausesUntilItReentersResumeBand()
+    {
+        var tracker = CreateTrackerWithServerRate();
+
+        tracker.PrepareCorrection(420L, 10L);
+        Assert.Equal(-10L, tracker.GetTickCorrection(10L, 0.05f));
+
+        Assert.Equal(-50L, tracker.GetTickCorrection(50L, 0.25f));
+        tracker.BeginCorrection(220L, 1000L);
+        tracker.PrepareCorrection(250L, 10L);
+
+        Assert.Equal(0L, tracker.GetTickCorrection(10L, 0.05f));
+    }
+
+    [Fact]
+    public void PrepareCorrection_OneWayLatencyProjectsServerTimeForward()
+    {
+        var tracker = CreateTrackerWithServerRate();
+
+        tracker.BeginCorrection(150L, 1000L, 0.075f);
+        tracker.PrepareCorrection(230L, 10L);
+
+        Assert.Equal(0L, tracker.GetTickCorrection(10L, 0.05f));
+    }
+
+    [Fact]
+    public void PrepareCorrection_BehindClientNeverExceedsDoubleSpeed()
+    {
+        var tracker = CreateTrackerWithServerRate();
+
+        tracker.PrepareCorrection(0L, 10L);
+
+        Assert.Equal(5L, tracker.GetTickCorrection(10L, 0.05f));
     }
 
     [Fact]
     public void GetTickCorrection_StaleHeartbeatStopsSimulation()
     {
-        var tracker = CreateSynchronizedTracker();
-        tracker.BeginCorrection(100L, 1000L);
-        tracker.PrepareCorrection(100L);
+        var tracker = CreateTrackerWithServerRate();
 
         Assert.Equal(0L, tracker.GetTickCorrection(10L, 0.8f));
         Assert.Equal(-10L, tracker.GetTickCorrection(10L, 0.8f));
-
-        tracker.BeginCorrection(110L, 1000L);
-        tracker.PrepareCorrection(110L);
-        Assert.Equal(0L, tracker.GetTickCorrection(10L, 0.01f));
     }
 
     [Fact]
@@ -111,39 +155,11 @@ public class MapTimeTrackerInterfaceTests
     }
 
     [Fact]
-    public void GetTickCorrection_RepeatedUnchangedHeartbeatsDoNotAccumulateDrift()
-    {
-        var tracker = CreateSynchronizedTracker();
-        long localTicks = 100L;
-        long firstCycleTicks = 0L;
-
-        for (int heartbeat = 0; heartbeat < 8; heartbeat++)
-        {
-            tracker.BeginCorrection(100L, 1000L);
-
-            for (int frame = 0; frame < 5; frame++)
-            {
-                const long vanillaDeltaTicks = 10L;
-                localTicks += vanillaDeltaTicks;
-                tracker.PrepareCorrection(localTicks);
-                localTicks += tracker.GetTickCorrection(vanillaDeltaTicks, 0.05f);
-            }
-
-            if (heartbeat == 0)
-            {
-                firstCycleTicks = localTicks;
-            }
-        }
-
-        Assert.Equal(firstCycleTicks, localTicks);
-    }
-
-    [Fact]
     public void GetTickCorrection_PausedClientDoesNotCatchUpOrRunBackward()
     {
-        var tracker = CreateSynchronizedTracker();
-        tracker.BeginCorrection(200L, 1000L);
-        tracker.PrepareCorrection(100L);
+        var tracker = CreateTrackerWithServerRate();
+
+        tracker.PrepareCorrection(100L, 0L);
 
         Assert.Equal(0L, tracker.GetTickCorrection(0L, 1f));
         Assert.Equal(0L, tracker.GetTickCorrection(0L, 1f));
@@ -152,23 +168,11 @@ public class MapTimeTrackerInterfaceTests
     [Fact]
     public void PrepareCorrection_PostHitchVanillaProgressIsNotAppliedTwice()
     {
-        var tracker = CreateSynchronizedTracker();
-        tracker.BeginCorrection(200L, 1000L);
+        var tracker = CreateTrackerWithServerRate();
 
-        tracker.PrepareCorrection(200L);
+        tracker.PrepareCorrection(150L, 100L);
 
         Assert.Equal(0L, tracker.GetTickCorrection(100L, 1f));
-    }
-
-    [Fact]
-    public void PrepareCorrection_PostHitchCorrectsOnlyUnconsumedProgress()
-    {
-        var tracker = CreateSynchronizedTracker();
-        tracker.BeginCorrection(200L, 1000L);
-
-        tracker.PrepareCorrection(150L);
-
-        Assert.Equal(50L, tracker.GetTickCorrection(50L, 1f));
     }
 
     private static MapTimeTrackerInterface CreateSynchronizedTracker()
@@ -176,6 +180,19 @@ public class MapTimeTrackerInterfaceTests
         var tracker = new MapTimeTrackerInterface();
         tracker.BeginCorrection(100L, 1000L);
         tracker.TryConsumeHardSync(out _);
+        return tracker;
+    }
+
+    private static MapTimeTrackerInterface CreateTrackerWithServerRate()
+    {
+        var tracker = CreateSynchronizedTracker();
+
+        for (int frame = 0; frame < 5; frame++)
+        {
+            tracker.GetTickCorrection(10L, 0.05f);
+        }
+
+        tracker.BeginCorrection(150L, 1000L);
         return tracker;
     }
 }
