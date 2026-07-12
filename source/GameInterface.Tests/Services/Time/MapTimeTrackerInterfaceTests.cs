@@ -66,7 +66,7 @@ public class MapTimeTrackerInterfaceTests
     {
         var tracker = CreateTrackerWithServerRate();
 
-        tracker.PrepareCorrection(220L, 10L);
+        tracker.PrepareCorrection(250L, 10L);
 
         Assert.Equal(-1L, tracker.GetTickCorrection(10L, 0.05f));
     }
@@ -104,7 +104,7 @@ public class MapTimeTrackerInterfaceTests
 
         tracker.PrepareCorrection(0L, 10L);
 
-        Assert.Equal(5L, tracker.GetTickCorrection(10L, 0.05f));
+        Assert.Equal(2L, tracker.GetTickCorrection(10L, 0.05f));
     }
 
     [Fact]
@@ -112,6 +112,7 @@ public class MapTimeTrackerInterfaceTests
     {
         var tracker = CreateTrackerWithServerRate();
 
+        Assert.Equal(0L, tracker.GetTickCorrection(10L, 0.8f));
         Assert.Equal(0L, tracker.GetTickCorrection(10L, 0.8f));
         Assert.Equal(-10L, tracker.GetTickCorrection(10L, 0.8f));
     }
