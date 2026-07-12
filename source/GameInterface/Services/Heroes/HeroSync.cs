@@ -77,6 +77,7 @@ namespace GameInterface.Services.Heroes
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._heroPerks)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._heroSkills)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._characterAttributes)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero.Level)));
         }
     }
 }

@@ -40,6 +40,7 @@ internal class HeroDeveloperRegistry : AutoRegistryBase<HeroDeveloper>
     {
         using (new AllowedThread())
         {
+            AccessTools.Field(typeof(HeroDeveloper), nameof(HeroDeveloper._skillXps)).SetValue(obj, new Dictionary<PropertyObject, float>());
             AccessTools.Field(typeof(HeroDeveloper), nameof(HeroDeveloper._newFocuses)).SetValue(obj, new PropertyOwner<SkillObject>());
         }
     }
