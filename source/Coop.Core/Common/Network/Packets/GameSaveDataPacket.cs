@@ -18,8 +18,10 @@ namespace Coop.Core.Common.Network.Packets;
 /// separate from the world-change message stream. World deltas are withheld from a joining client on
 /// the server side (the connection message queue) until it has loaded and entered the campaign, so the
 /// save's arrival no longer drives any client-side buffering. Uses <see cref="DeliveryMethod.ReliableOrdered"/>
-/// — the same channel as <see cref="MessagePacket"/> — so it stays correctly ordered relative to the
-/// deltas that follow once the client is live.
+/// on the dedicated bulk channel (see <c>CoopNetworkBase.BulkChannel</c>), so its tens of thousands of
+/// fragments neither head-of-line block the world-sync channel nor count toward the queue depth that
+/// pauses campaign time; the held-back deltas make cross-channel ordering unobservable.
+/// <see cref="GameSaveData"/> is deflate-compressed (see <see cref="SaveDataCompression"/>).
 /// </remarks>
 [ProtoContract(SkipConstructor = true)]
 public readonly struct GameSaveDataPacket : IPacket
