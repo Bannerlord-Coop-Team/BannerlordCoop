@@ -75,9 +75,7 @@ public class HeroDeveloperBatchHandlerTests
             Assert.All(
                 requests.SelectMany(request => request.Operations),
                 operation => Assert.Equal(NetworkHeroDeveloperOperationType.RawXpGain, operation.Type));
-            Assert.DoesNotContain(sent, message => message is NetworkRawXpGainServer);
-            Assert.DoesNotContain(sent, message => message is NetworkSetSkillXpServer);
-            Assert.DoesNotContain(sent, message => message is NetworkSkillLevelChangeServer);
+            Assert.Equal(2, sent.Count);
         }
         finally
         {
@@ -150,6 +148,65 @@ public class HeroDeveloperBatchHandlerTests
         {
             handler.Dispose();
         }
+    }
+
+    [Fact]
+    public void StandaloneOperations_UseSingleOperationBatches()
+    {
+        var broker = new TestMessageBroker();
+        var objectManager = new Mock<IObjectManager>();
+        var network = new Mock<INetwork>();
+        var sent = new List<IMessage>();
+        var handler = new HeroDeveloperHandler(broker, objectManager.Object, network.Object);
+        Hero hero = Uninitialized<Hero>();
+        HeroDeveloper developer = Uninitialized<HeroDeveloper>();
+        SkillObject skill = Uninitialized<SkillObject>();
+        developer.Hero = hero;
+        string heroId = "hero-test";
+        string skillId = "skill-test";
+        objectManager.Setup(manager => manager.TryGetId(hero, out heroId)).Returns(true);
+        objectManager.Setup(manager => manager.TryGetId(skill, out skillId)).Returns(true);
+        network.Setup(instance => instance.SendAll(It.IsAny<IMessage>()))
+            .Callback<IMessage>(message => sent.Add(message));
+
+        try
+        {
+            broker.Publish(developer, new RawXpGain(developer, 1f, false));
+            broker.Publish(developer, new SkillXpSet(developer, skill, 5f));
+            broker.Publish(developer, new SkillLevelChange(developer, skill, 1, true));
+
+            NetworkHeroDeveloperBatchServer[] requests = sent
+                .OfType<NetworkHeroDeveloperBatchServer>()
+                .ToArray();
+            Assert.Equal(3, sent.Count);
+            Assert.Collection(
+                requests,
+                request => Assert.Equal(
+                    NetworkHeroDeveloperOperationType.RawXpGain,
+                    Assert.Single(request.Operations).Type),
+                request => Assert.Equal(
+                    NetworkHeroDeveloperOperationType.SkillXpSet,
+                    Assert.Single(request.Operations).Type),
+                request => Assert.Equal(
+                    NetworkHeroDeveloperOperationType.SkillLevelChange,
+                    Assert.Single(request.Operations).Type));
+        }
+        finally
+        {
+            handler.Dispose();
+        }
+    }
+
+    [Theory]
+    [InlineData("GameInterface.Services.HeroDevelopers.Messages.NetworkRawXpGainServer")]
+    [InlineData("GameInterface.Services.HeroDevelopers.Messages.NetworkRawXpGainClients")]
+    [InlineData("GameInterface.Services.HeroDevelopers.Messages.NetworkSetSkillXpServer")]
+    [InlineData("GameInterface.Services.HeroDevelopers.Messages.NetworkSetSkillXpClients")]
+    [InlineData("GameInterface.Services.HeroDevelopers.Messages.NetworkSkillLevelChangeServer")]
+    [InlineData("GameInterface.Services.HeroDevelopers.Messages.NetworkSkillLevelChangeClients")]
+    public void LegacySingleOperationMessages_AreNotInAssembly(string typeName)
+    {
+        Assert.Null(typeof(NetworkHeroDeveloperBatchServer).Assembly.GetType(typeName));
     }
 
     private static T Uninitialized<T>() where T : class =>

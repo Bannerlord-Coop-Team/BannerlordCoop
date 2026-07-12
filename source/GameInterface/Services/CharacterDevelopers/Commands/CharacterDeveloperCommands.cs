@@ -15,22 +15,23 @@ internal class CharacterDeveloperCommands
     private static readonly ILogger Logger = LogManager.GetLogger<CharacterDeveloperHandler>();
 
     /// <summary>
-    /// Output attributes, focuses, skills and perks of a specific hero
+    /// Output attributes, focuses, skills and perks of a specific hero by StringId or display name.
     /// </summary>
     [CommandLineArgumentFunction("herostats", "coop.debug.hero")]
     public static string HeroStatsCommand(List<string> strings)
     {
         if (strings.Count == 0)
         {
-            return "Hero name argument required.";
+            return "Hero id or name argument required.";
         }
 
+        string heroIdOrName = string.Join(" ", strings);
         StringBuilder stringBuilder = new StringBuilder();
         foreach (var hero in Hero.AllAliveHeroes)
         {
-            if (hero.Name.ToString() == strings[0])
+            if (hero.StringId == heroIdOrName || hero.Name.ToString() == heroIdOrName)
             {
-                string heroData = hero.Name + ":\n";
+                string heroData = hero.Name + " (hero id: " + hero.StringId + "):\n";
 
                 heroData += "Level: " + hero.Level + "\n";
 
@@ -68,6 +69,8 @@ internal class CharacterDeveloperCommands
                 heroData += "}";
 
                 stringBuilder.AppendLine(heroData);
+
+                if (hero.StringId == heroIdOrName) break;
             }
         }
 

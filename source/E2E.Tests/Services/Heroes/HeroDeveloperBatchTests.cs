@@ -37,7 +37,7 @@ public class HeroDeveloperBatchTests : SyncTestBase
     }
 
     [Fact]
-    public void AddSkillXp_HarmonyCapture_UsesRoundTrippedBatchWithoutLegacyPackets()
+    public void AddSkillXp_HarmonyCapture_UsesOneRoundTrippedBatch()
     {
         EnvironmentInstance sender = Clients.First();
         Dictionary<EnvironmentInstance, int> initialTotalXp = AllInstances()
@@ -57,6 +57,8 @@ public class HeroDeveloperBatchTests : SyncTestBase
 
         NetworkHeroDeveloperBatchServer captured = Assert.Single(
             sender.NetworkSentMessages.GetMessages<NetworkHeroDeveloperBatchServer>());
+        Assert.Single(sender.NetworkSentMessages);
+        Assert.Single(Server.NetworkSentMessages);
         NetworkHeroDeveloperOperationType[] capturedTypes = captured.Operations
             .Select(operation => operation.Type)
             .ToArray();
@@ -67,13 +69,6 @@ public class HeroDeveloperBatchTests : SyncTestBase
         {
             Assert.Equal(NetworkHeroDeveloperOperationType.SkillLevelChange, capturedTypes[2]);
         }
-
-        Assert.Empty(sender.NetworkSentMessages.GetMessages<NetworkRawXpGainServer>());
-        Assert.Empty(sender.NetworkSentMessages.GetMessages<NetworkSetSkillXpServer>());
-        Assert.Empty(sender.NetworkSentMessages.GetMessages<NetworkSkillLevelChangeServer>());
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkRawXpGainClients>());
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkSetSkillXpClients>());
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkSkillLevelChangeClients>());
 
         NetworkHeroDeveloperBatchServer roundTripped = sender.EnsureSerializable(captured);
         NetworkHeroDeveloperOperation rawXp = Assert.Single(
@@ -88,12 +83,10 @@ public class HeroDeveloperBatchTests : SyncTestBase
 
         NetworkHeroDeveloperBatchClients response = Assert.Single(
             Server.NetworkSentMessages.GetMessages<NetworkHeroDeveloperBatchClients>());
+        Assert.Single(Server.NetworkSentMessages);
         Assert.Equal(
             roundTripped.Operations.Select(operation => operation.Type),
             response.Operations.Select(operation => operation.Type));
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkRawXpGainClients>());
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkSetSkillXpClients>());
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkSkillLevelChangeClients>());
 
         foreach (EnvironmentInstance peer in AllInstances())
         {
@@ -127,12 +120,9 @@ public class HeroDeveloperBatchTests : SyncTestBase
 
         NetworkHeroDeveloperBatchClients response = Assert.Single(
             Server.NetworkSentMessages.GetMessages<NetworkHeroDeveloperBatchClients>());
+        Assert.Single(Server.NetworkSentMessages);
         Assert.Equal(request.Operations.Select(operation => operation.Type),
             response.Operations.Select(operation => operation.Type));
-
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkRawXpGainClients>());
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkSetSkillXpClients>());
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkSkillLevelChangeClients>());
 
         foreach (EnvironmentInstance peer in AllInstances())
         {
