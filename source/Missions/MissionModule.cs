@@ -22,15 +22,15 @@ public class MissionModule : Module
 {
     internal const string MissilePatchCategory = "CoopMissilePatches";
 
-    private static readonly Harmony MissileHarmony = new Harmony(GameInterfaceModule.HarmonyId + ".Missiles");
-    private static readonly object MissilePatchLock = new object();
-    private static bool missilePatchesApplied;
+    static MissionModule()
+    {
+        new Harmony(GameInterfaceModule.HarmonyId + ".Missiles")
+            .PatchCategory(typeof(AddMissileAuxPatch).Assembly, MissilePatchCategory);
+    }
 
     protected override void Load(ContainerBuilder builder)
     {
         base.Load(builder);
-
-        ApplyMissilePatches();
 
         builder.RegisterType<LiteNetP2PClient>().As<IBattleNetwork>().InstancePerLifetimeScope();
 
@@ -118,17 +118,5 @@ public class MissionModule : Module
         builder.RegisterType<ShieldDamageHandler>().As<IShieldDamageHandler>().InstancePerDependency();
         //builder.RegisterType<AgentDamageHandler>().As<IAgentDamageHandler>().InstancePerDependency();
         builder.RegisterType<AgentDeathHandler>().As<IAgentDeathHandler>().InstancePerDependency();
-    }
-
-    private static void ApplyMissilePatches()
-    {
-        lock (MissilePatchLock)
-        {
-            if (missilePatchesApplied)
-                return;
-
-            MissileHarmony.PatchCategory(typeof(AddMissileAuxPatch).Assembly, MissilePatchCategory);
-            missilePatchesApplied = true;
-        }
     }
 }

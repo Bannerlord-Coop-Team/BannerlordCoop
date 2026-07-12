@@ -35,26 +35,8 @@ namespace Missions.Missiles.Patches
             bool addRigidBody,
             ref MissionWeapon __state)
         {
-            if (!BlockMissileIfNative.IsCapturingAgentShot)
-                return;
-
-            if (!BlockMissileIfNative.IsCoopMissionActive)
-                return;
-
-            if (!shooterAgent.IsLocallyControlled())
-                return;
-
-            AgentShoot message = new AgentShoot(
-                shooterAgent,
-                __state,
-                position,
-                direction,
-                orientation,
-                baseSpeed,
-                speed,
-                addRigidBody,
-                __result);
-            MessageBroker.Instance.Publish(shooterAgent, message);
+            BlockMissileIfNative.PublishAgentShot(__result, shooterAgent, direction, position,
+                orientation, baseSpeed, speed, addRigidBody, __state);
         }
     }
     /// <summary>
@@ -81,26 +63,8 @@ namespace Missions.Missiles.Patches
             bool addRigidBody,
             ref MissionWeapon __state)
         {
-            if (!BlockMissileIfNative.IsCapturingAgentShot)
-                return;
-
-            if (!BlockMissileIfNative.IsCoopMissionActive)
-                return;
-
-            if (!shooterAgent.IsLocallyControlled())
-                return;
-
-            AgentShoot message = new AgentShoot(
-                shooterAgent,
-                __state,
-                position,
-                direction,
-                orientation,
-                baseSpeed,
-                speed,
-                addRigidBody,
-                __result);
-            MessageBroker.Instance.Publish(shooterAgent, message);
+            BlockMissileIfNative.PublishAgentShot(__result, shooterAgent, direction, position,
+                orientation, baseSpeed, speed, addRigidBody, __state);
         }
     }
     /// <summary>
@@ -116,6 +80,16 @@ namespace Missions.Missiles.Patches
         internal static bool IsCapturingAgentShot => capturingAgentShot;
         internal static bool IsCoopMissionActive =>
             BattleSpawnGate.IsCoopBattleActive || LocationMissionTracker.IsLocationMission(Mission.Current);
+
+        internal static void PublishAgentShot(int missileIndex, Agent shooter, Vec3 direction, Vec3 position,
+            Mat3 orientation, float baseSpeed, float speed, bool hasRigidBody, MissionWeapon weapon)
+        {
+            if (!capturingAgentShot || !IsCoopMissionActive || !shooter.IsLocallyControlled())
+                return;
+
+            MessageBroker.Instance.Publish(shooter, new AgentShoot(shooter, weapon, position, direction,
+                orientation, baseSpeed, speed, hasRigidBody, missileIndex));
+        }
 
         [HarmonyPrefix]
         public static bool OnAgentShootMissile(

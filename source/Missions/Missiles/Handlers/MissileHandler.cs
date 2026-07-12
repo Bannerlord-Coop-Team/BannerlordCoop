@@ -1,12 +1,13 @@
-﻿using Common;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MapEvents;
 using Missions.Missiles.Message;
 using Serilog;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics;
+using System.Threading;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
@@ -15,113 +16,57 @@ using TaleWorlds.ObjectSystem;
 
 namespace Missions.Missiles.Handlers;
 
-/// <summary>
-/// Handler for missiles within a co-op mission
-/// </summary>
+/// <summary>Synchronizes missiles fired by registered mission agents.</summary>
 public interface IMissileHandler : IHandler
 {
     void DrainPendingShots();
-    bool IsReconstructionPending(Guid agentId, long shotSequence, int sourceMissileIndex);
-    bool TryGetLocalShot(int sourceMissileIndex, out Guid agentId, out long shotSequence);
-    void RecordImpactHint(Guid attackerAgentId, long shotSequence, Guid victimAgentId, bool isMountFallback,
-        Vec3 historicalImpactPosition, Vec3 impactVelocity);
+    bool IsReconstructionPending(Guid agentId, long shotSequence);
+    bool TryTakeLocalShot(int missileIndex, out Guid agentId, out long shotSequence);
+    void RecordImpactHint(Guid attackerAgentId, long shotSequence, Guid victimAgentId,
+        bool isMountFallback, Vec3 impactVelocity);
 }
 
 /// <inheritdoc/>
 public class MissileHandler : IMissileHandler
 {
-    readonly static ILogger Logger = LogManager.GetLogger<MissileHandler>();
+    private static readonly ILogger Logger = LogManager.GetLogger<MissileHandler>();
 
     private readonly IBattleNetwork network;
     private readonly IMessageBroker messageBroker;
     private readonly INetworkAgentRegistry networkAgentRegistry;
-    private readonly Queue<PendingShot> pendingShots = new();
-    private readonly object outstandingGate = new();
-    private readonly Dictionary<(Guid AgentId, long ShotSequence, int MissileIndex), int> outstandingReconstructions = new();
-    private readonly Dictionary<(Guid AgentId, long ShotSequence), ImpactHint> impactHints = new();
-    private readonly Queue<(Guid AgentId, long ShotSequence)> impactHintHistory = new();
-    private readonly HashSet<(Guid AgentId, long ShotSequence)> completedShotSequences = new();
-    private readonly Queue<(Guid AgentId, long ShotSequence)> completedShotHistory = new();
-    private readonly Dictionary<int, LocalShot> localShots = new();
-    private readonly Queue<(int MissileIndex, long ShotSequence)> localShotHistory = new();
-    // A random positive seed keeps sequences distinct if authority for the same network agent moves to a
-    // different client or the mission handler is recreated. The upper bound leaves effectively unlimited
-    // room for Interlocked.Increment during one process lifetime.
+    private readonly ConcurrentQueue<(NetworkAgentShoot Shot, int Attempts)> pendingShots = new();
+    private readonly ConcurrentDictionary<(Guid AgentId, long ShotSequence), byte> pendingReconstructions = new();
+    private readonly ConcurrentDictionary<(Guid AgentId, long ShotSequence), ImpactHint> impactHints = new();
+    private readonly Dictionary<int, (Guid AgentId, long ShotSequence)> localShots = new();
     private long nextShotSequence = CreateShotSequenceSeed();
     private volatile bool disposed;
-
-    private const int MaxPendingShots = 512;
-    private const int MaxLocalShotMappings = 8192;
-    private const int MaxImpactHints = 4096;
-    private const int MaxCompletedShotSequences = 8192;
-    private const double PendingShotLifetimeSeconds = 0.5;
-
-    private enum ReconstructionResult
-    {
-        Reconstructed,
-        Retry,
-        Dropped,
-    }
-
-    private readonly struct PendingShot
-    {
-        public NetworkAgentShoot Shot { get; }
-        public long FirstSeenTimestamp { get; }
-        public string LastReason { get; }
-
-        public PendingShot(NetworkAgentShoot shot, long firstSeenTimestamp, string lastReason)
-        {
-            Shot = shot;
-            FirstSeenTimestamp = firstSeenTimestamp;
-            LastReason = lastReason;
-        }
-    }
-
-    private readonly struct LocalShot
-    {
-        public Guid AgentId { get; }
-        public long ShotSequence { get; }
-
-        public LocalShot(Guid agentId, long shotSequence)
-        {
-            AgentId = agentId;
-            ShotSequence = shotSequence;
-        }
-    }
+    private const int MaxReconstructionAttempts = 30;
 
     private readonly struct ImpactHint
     {
         public Guid VictimAgentId { get; }
         public bool IsMountFallback { get; }
-        public Vec3 HistoricalImpactPosition { get; }
         public Vec3 ImpactVelocity { get; }
 
-        public ImpactHint(Guid victimAgentId, bool isMountFallback, Vec3 historicalImpactPosition,
-            Vec3 impactVelocity)
+        public ImpactHint(Guid victimAgentId, bool isMountFallback, Vec3 impactVelocity)
         {
             VictimAgentId = victimAgentId;
             IsMountFallback = isMountFallback;
-            HistoricalImpactPosition = historicalImpactPosition;
             ImpactVelocity = impactVelocity;
         }
     }
 
-    public MissileHandler(
-        IBattleNetwork network,
-        IMessageBroker messageBroker,
+    public MissileHandler(IBattleNetwork network, IMessageBroker messageBroker,
         INetworkAgentRegistry networkAgentRegistry)
     {
         this.network = network;
         this.messageBroker = messageBroker;
         this.networkAgentRegistry = networkAgentRegistry;
         messageBroker.Subscribe<AgentShoot>(AgentShootSend);
-        messageBroker.Subscribe<NetworkAgentShoot>(AgentShootRecieve);
+        messageBroker.Subscribe<NetworkAgentShoot>(AgentShootReceive);
     }
 
-    ~MissileHandler()
-    {
-        Dispose();
-    }
+    ~MissileHandler() => Dispose();
 
     public void Dispose()
     {
@@ -130,17 +75,10 @@ public class MissileHandler : IMissileHandler
 
         disposed = true;
         messageBroker.Unsubscribe<AgentShoot>(AgentShootSend);
-        messageBroker.Unsubscribe<NetworkAgentShoot>(AgentShootRecieve);
-        lock (outstandingGate)
-        {
-            outstandingReconstructions.Clear();
-            impactHints.Clear();
-            impactHintHistory.Clear();
-            completedShotSequences.Clear();
-            completedShotHistory.Clear();
-        }
+        messageBroker.Unsubscribe<NetworkAgentShoot>(AgentShootReceive);
+        pendingReconstructions.Clear();
+        impactHints.Clear();
         localShots.Clear();
-        localShotHistory.Clear();
     }
 
     private void AgentShootSend(MessagePayload<AgentShoot> payload)
@@ -154,151 +92,88 @@ public class MissileHandler : IMissileHandler
             return;
         }
 
-        MissionWeapon missionWeapon;
-
-        if (payload.What.MissionWeapon.CurrentUsageItem.IsRangedWeapon &&
-            payload.What.MissionWeapon.CurrentUsageItem.IsConsumable)
-        {
-            missionWeapon = payload.What.MissionWeapon;
-        }
-        else
-        {
-            missionWeapon = payload.What.MissionWeapon.AmmoWeapon;
-        }
-
-        ItemObject missileItem = missionWeapon.Item;
+        MissionWeapon missileWeapon = payload.What.MissionWeapon.CurrentUsageItem.IsRangedWeapon
+            && payload.What.MissionWeapon.CurrentUsageItem.IsConsumable
+                ? payload.What.MissionWeapon
+                : payload.What.MissionWeapon.AmmoWeapon;
+        ItemObject missileItem = missileWeapon.Item;
         if (missileItem == null || string.IsNullOrEmpty(missileItem.StringId))
         {
             Logger.Warning("Cannot send missile {idx}: its item has no StringId", payload.What.MissileIndex);
             return;
         }
 
-        if (missionWeapon.IsEmpty || missionWeapon.CurrentUsageIndex < 0 ||
-            missionWeapon.CurrentUsageIndex >= missionWeapon.WeaponsCount)
+        if (missileWeapon.IsEmpty || missileWeapon.CurrentUsageIndex < 0
+            || missileWeapon.CurrentUsageIndex >= missileWeapon.WeaponsCount)
         {
             Logger.Warning("Cannot send missile {idx}: item {itemId} has invalid usage {usageIndex}/{usageCount}",
-                payload.What.MissileIndex, missileItem.StringId, missionWeapon.CurrentUsageIndex, missionWeapon.WeaponsCount);
+                payload.What.MissileIndex, missileItem.StringId, missileWeapon.CurrentUsageIndex,
+                missileWeapon.WeaponsCount);
             return;
         }
 
-        string itemModifierId = missionWeapon.ItemModifier?.StringId;
-        if (missionWeapon.ItemModifier != null && string.IsNullOrEmpty(itemModifierId))
-        {
-            Logger.Warning("Missile {idx} item modifier has no StringId; sending the shot without it", payload.What.MissileIndex);
-        }
+        string modifierId = missileWeapon.ItemModifier?.StringId;
+        long sequence = Interlocked.Increment(ref nextShotSequence);
+        localShots[payload.What.MissileIndex] = (agentInfo.AgentId, sequence);
 
-        long shotSequence = System.Threading.Interlocked.Increment(ref nextShotSequence);
-        RememberLocalShot(payload.What.MissileIndex, agentInfo.AgentId, shotSequence);
-
-        Logger.Debug("Sending Agent Shoot sequence {sequence} with index {idx}, item {itemId}, modifier {modifierId}, usage {usageIndex}/{usageCount}",
-            shotSequence, payload.What.MissileIndex, missileItem.StringId, itemModifierId,
-            missionWeapon.CurrentUsageIndex, missionWeapon.WeaponsCount);
-
-        NetworkAgentShoot message = new NetworkAgentShoot(
-            agentInfo.AgentId,
-            payload.What.Position,
-            payload.What.Direction,
-            payload.What.Orientation,
-            payload.What.HasRigidBody,
-            missileItem.StringId,
-            itemModifierId,
-            missionWeapon.Banner,
-            payload.What.MissileIndex,
-            payload.What.BaseSpeed,
-            payload.What.Speed,
-            missionWeapon.CurrentUsageIndex,
-            shotSequence);
-
-        network.SendAll(message);
+        Logger.Debug("Sending missile sequence {sequence}, source {index}, item {itemId}, usage {usageIndex}/{usageCount}",
+            sequence, payload.What.MissileIndex, missileItem.StringId, missileWeapon.CurrentUsageIndex,
+            missileWeapon.WeaponsCount);
+        network.SendAll(new NetworkAgentShoot(agentInfo.AgentId, payload.What.Position, payload.What.Direction,
+            payload.What.Orientation, payload.What.HasRigidBody, missileItem.StringId, modifierId,
+            missileWeapon.Banner, payload.What.MissileIndex, payload.What.BaseSpeed, payload.What.Speed,
+            missileWeapon.CurrentUsageIndex, sequence));
     }
 
-    private void AgentShootRecieve(MessagePayload<NetworkAgentShoot> payload)
+    private void AgentShootReceive(MessagePayload<NetworkAgentShoot> payload)
     {
         NetworkAgentShoot shot = payload.What;
-        long firstSeenTimestamp = Stopwatch.GetTimestamp();
-        MarkReconstructionOutstanding(shot);
+        var key = (shot.AgentId, shot.ShotSequence);
+        if (disposed || shot.ShotSequence == 0 || !pendingReconstructions.TryAdd(key, 0))
+            return;
 
-        GameThread.RunSafe(() =>
-        {
-            if (disposed)
-            {
-                CompleteReconstruction(shot);
-                return;
-            }
-
-            try
-            {
-                ReconstructionResult result = TryReconstruct(shot, out string retryReason);
-                if (result == ReconstructionResult.Retry)
-                {
-                    if (!EnqueuePending(shot, firstSeenTimestamp, retryReason))
-                        CompleteReconstruction(shot);
-                }
-                else
-                {
-                    CompleteReconstruction(shot);
-                }
-            }
-            catch
-            {
-                CompleteReconstruction(shot);
-                throw;
-            }
-        });
+        pendingShots.Enqueue((shot, 0));
     }
 
     public void DrainPendingShots()
     {
-        if (disposed)
-        {
-            pendingShots.Clear();
-            return;
-        }
-
         int count = pendingShots.Count;
-        for (int i = 0; i < count; i++)
+        for (int i = 0; i < count && pendingShots.TryDequeue(out var pending); i++)
         {
-            PendingShot pending = pendingShots.Dequeue();
-            double ageSeconds = ElapsedSeconds(pending.FirstSeenTimestamp);
-            if (ageSeconds > PendingShotLifetimeSeconds)
-            {
-                Logger.Warning("Dropping pending missile {idx} for agent {agentId} after {ageMs:0}ms: {reason}",
-                    pending.Shot.MissileIndex, pending.Shot.AgentId, ageSeconds * 1000d, pending.LastReason);
-                CompleteReconstruction(pending.Shot);
-                continue;
-            }
-
+            bool retry = false;
             try
             {
-                ReconstructionResult result = TryReconstruct(pending.Shot, out string retryReason);
-                if (result == ReconstructionResult.Retry)
-                    pendingShots.Enqueue(new PendingShot(pending.Shot, pending.FirstSeenTimestamp, retryReason));
-                else
-                    CompleteReconstruction(pending.Shot);
+                if (!disposed)
+                    retry = !Reconstruct(pending.Shot);
             }
             catch (Exception ex)
             {
-                CompleteReconstruction(pending.Shot);
-                Logger.Error(ex, "Failed to retry missile {MissileIndex} reconstruction", pending.Shot.MissileIndex);
+                Logger.Error(ex, "Failed to reconstruct missile {MissileIndex}", pending.Shot.MissileIndex);
             }
+
+            if (retry && pending.Attempts < MaxReconstructionAttempts)
+            {
+                pendingShots.Enqueue((pending.Shot, pending.Attempts + 1));
+                continue;
+            }
+
+            if (retry)
+            {
+                Logger.Warning("Dropping missile {MissileIndex}: no cosmetic shooter became available",
+                    pending.Shot.MissileIndex);
+            }
+            CompleteReconstruction(pending.Shot);
         }
     }
 
-    public bool IsReconstructionPending(Guid agentId, long shotSequence, int sourceMissileIndex)
-    {
-        if (disposed)
-            return false;
+    public bool IsReconstructionPending(Guid agentId, long shotSequence) =>
+        !disposed && shotSequence != 0 && pendingReconstructions.ContainsKey((agentId, shotSequence));
 
-        lock (outstandingGate)
-        {
-            return outstandingReconstructions.ContainsKey(ReconstructionKey(agentId, shotSequence, sourceMissileIndex));
-        }
-    }
-
-    public bool TryGetLocalShot(int sourceMissileIndex, out Guid agentId, out long shotSequence)
+    public bool TryTakeLocalShot(int missileIndex, out Guid agentId, out long shotSequence)
     {
-        if (!disposed && localShots.TryGetValue(sourceMissileIndex, out LocalShot shot))
+        if (!disposed && localShots.TryGetValue(missileIndex, out var shot))
         {
+            localShots.Remove(missileIndex);
             agentId = shot.AgentId;
             shotSequence = shot.ShotSequence;
             return true;
@@ -310,152 +185,42 @@ public class MissileHandler : IMissileHandler
     }
 
     public void RecordImpactHint(Guid attackerAgentId, long shotSequence, Guid victimAgentId,
-        bool isMountFallback, Vec3 historicalImpactPosition, Vec3 impactVelocity)
+        bool isMountFallback, Vec3 impactVelocity)
     {
-        if (disposed || attackerAgentId == Guid.Empty || shotSequence == 0)
-            return;
-
         var key = (attackerAgentId, shotSequence);
-        lock (outstandingGate)
+        if (disposed || attackerAgentId == Guid.Empty || shotSequence == 0
+            || !pendingReconstructions.ContainsKey(key))
         {
-            if (disposed || completedShotSequences.Contains(key) || impactHints.ContainsKey(key))
-                return;
-
-            impactHints[key] = new ImpactHint(victimAgentId, isMountFallback, historicalImpactPosition,
-                impactVelocity);
-            impactHintHistory.Enqueue(key);
-
-            while (impactHintHistory.Count > MaxImpactHints)
-                impactHints.Remove(impactHintHistory.Dequeue());
-        }
-    }
-
-    private void RememberLocalShot(int sourceMissileIndex, Guid agentId, long shotSequence)
-    {
-        localShots[sourceMissileIndex] = new LocalShot(agentId, shotSequence);
-        localShotHistory.Enqueue((sourceMissileIndex, shotSequence));
-
-        while (localShotHistory.Count > MaxLocalShotMappings)
-        {
-            var expired = localShotHistory.Dequeue();
-            if (localShots.TryGetValue(expired.MissileIndex, out LocalShot current)
-                && current.ShotSequence == expired.ShotSequence)
-            {
-                localShots.Remove(expired.MissileIndex);
-            }
-        }
-    }
-
-    private bool EnqueuePending(NetworkAgentShoot shot, long firstSeenTimestamp, string reason)
-    {
-        double ageSeconds = ElapsedSeconds(firstSeenTimestamp);
-        if (ageSeconds > PendingShotLifetimeSeconds)
-        {
-            Logger.Warning("Dropping missile {idx} for agent {agentId} after {ageMs:0}ms: {reason}",
-                shot.MissileIndex, shot.AgentId, ageSeconds * 1000d, reason);
-            return false;
+            return;
         }
 
-        if (pendingShots.Count >= MaxPendingShots)
-        {
-            PendingShot oldest = pendingShots.Dequeue();
-            Logger.Warning("Dropping pending missile {idx} for agent {agentId}: reconstruction queue reached {capacity}",
-                oldest.Shot.MissileIndex, oldest.Shot.AgentId, MaxPendingShots);
-            CompleteReconstruction(oldest.Shot);
-        }
-
-        pendingShots.Enqueue(new PendingShot(shot, firstSeenTimestamp, reason));
-        return true;
-    }
-
-    private void MarkReconstructionOutstanding(NetworkAgentShoot shot)
-    {
-        lock (outstandingGate)
-        {
-            var key = ReconstructionKey(shot.AgentId, shot.ShotSequence, shot.MissileIndex);
-            outstandingReconstructions.TryGetValue(key, out int count);
-            outstandingReconstructions[key] = count + 1;
-        }
+        impactHints.TryAdd(key, new ImpactHint(victimAgentId, isMountFallback, impactVelocity));
+        if (!pendingReconstructions.ContainsKey(key))
+            impactHints.TryRemove(key, out _);
     }
 
     private void CompleteReconstruction(NetworkAgentShoot shot)
     {
-        lock (outstandingGate)
-        {
-            var key = ReconstructionKey(shot.AgentId, shot.ShotSequence, shot.MissileIndex);
-            var sequenceKey = (shot.AgentId, shot.ShotSequence);
-            if (shot.ShotSequence != 0)
-                impactHints.Remove(sequenceKey);
-
-            if (!outstandingReconstructions.TryGetValue(key, out int count))
-                return;
-
-            if (count <= 1)
-            {
-                outstandingReconstructions.Remove(key);
-                RememberCompletedShot(sequenceKey);
-            }
-            else
-                outstandingReconstructions[key] = count - 1;
-        }
+        var key = (shot.AgentId, shot.ShotSequence);
+        pendingReconstructions.TryRemove(key, out _);
+        impactHints.TryRemove(key, out _);
     }
 
-    private bool TryTakeImpactHint(NetworkAgentShoot shot, out ImpactHint hint)
+    private bool TryTakeImpactHint(NetworkAgentShoot shot, out ImpactHint hint) =>
+        impactHints.TryRemove((shot.AgentId, shot.ShotSequence), out hint);
+
+    private bool Reconstruct(NetworkAgentShoot shot)
     {
-        hint = default;
-        if (shot.ShotSequence == 0)
-            return false;
-
-        lock (outstandingGate)
-        {
-            var key = (shot.AgentId, shot.ShotSequence);
-            if (!impactHints.TryGetValue(key, out hint))
-                return false;
-
-            impactHints.Remove(key);
-            return true;
-        }
-    }
-
-    private void RememberCompletedShot((Guid AgentId, long ShotSequence) key)
-    {
-        if (key.ShotSequence == 0 || !completedShotSequences.Add(key))
-            return;
-
-        completedShotHistory.Enqueue(key);
-        while (completedShotHistory.Count > MaxCompletedShotSequences)
-            completedShotSequences.Remove(completedShotHistory.Dequeue());
-    }
-
-    private static (Guid AgentId, long ShotSequence, int MissileIndex) ReconstructionKey(
-        Guid agentId, long shotSequence, int sourceMissileIndex) =>
-        (agentId, shotSequence, shotSequence == 0 ? sourceMissileIndex : 0);
-
-    private static double ElapsedSeconds(long firstSeenTimestamp) =>
-        (Stopwatch.GetTimestamp() - firstSeenTimestamp) / (double)Stopwatch.Frequency;
-
-    private static long CreateShotSequenceSeed() =>
-        BitConverter.ToInt64(Guid.NewGuid().ToByteArray(), 0) & 0x3FFFFFFFFFFFFFFF;
-
-    private ReconstructionResult TryReconstruct(NetworkAgentShoot shot, out string retryReason)
-    {
-        retryReason = null;
-
         Mission mission = Mission.Current;
         if (mission == null)
-        {
-            retryReason = "the mission is not ready";
-            return ReconstructionResult.Retry;
-        }
+            return false;
 
         Agent agent = null;
-        if (networkAgentRegistry.TryGetAgentInfo(shot.AgentId, out var agentInfo)
-            && agentInfo.Agent != null
-            && agentInfo.Agent.Mission == mission
-            && agentInfo.Agent.IsActive()
-            && !networkAgentRegistry.IsLocallyControlled(agentInfo.Agent))
+        if (networkAgentRegistry.TryGetAgentInfo(shot.AgentId, out var info)
+            && info.Agent != null && info.Agent.Mission == mission && info.Agent.IsActive()
+            && !networkAgentRegistry.IsLocallyControlled(info.Agent))
         {
-            agent = agentInfo.Agent;
+            agent = info.Agent;
         }
         else if (BattleSpawnGate.IsCoopBattleActive)
         {
@@ -463,73 +228,49 @@ public class MissileHandler : IMissileHandler
         }
 
         if (agent == null)
-        {
-            retryReason = "no safe cosmetic shooter is active in the current mission";
-            return ReconstructionResult.Retry;
-        }
+            return false;
 
-        if (string.IsNullOrEmpty(shot.MissileItemId))
-        {
-            Logger.Warning("Cannot reconstruct missile {idx}: its item id is empty", shot.MissileIndex);
-            return ReconstructionResult.Dropped;
-        }
-
-        ItemObject missileItem = MBObjectManager.Instance.GetObject<ItemObject>(shot.MissileItemId);
+        ItemObject missileItem = string.IsNullOrEmpty(shot.MissileItemId)
+            ? null
+            : MBObjectManager.Instance.GetObject<ItemObject>(shot.MissileItemId);
         if (missileItem == null)
         {
-            Logger.Warning("Cannot reconstruct missile {idx}: item {itemId} was not found", shot.MissileIndex, shot.MissileItemId);
-            return ReconstructionResult.Dropped;
+            Logger.Warning("Cannot reconstruct missile {index}: item {itemId} was not found",
+                shot.MissileIndex, shot.MissileItemId);
+            return true;
         }
 
-        ItemModifier itemModifier = null;
-        if (!string.IsNullOrEmpty(shot.ItemModifierId))
+        ItemModifier modifier = string.IsNullOrEmpty(shot.ItemModifierId)
+            ? null
+            : MBObjectManager.Instance.GetObject<ItemModifier>(shot.ItemModifierId);
+        MissionWeapon missileWeapon = new MissionWeapon(missileItem, modifier, shot.Banner);
+        if (missileWeapon.IsEmpty || shot.CurrentUsageIndex < 0
+            || shot.CurrentUsageIndex >= missileWeapon.WeaponsCount)
         {
-            itemModifier = MBObjectManager.Instance.GetObject<ItemModifier>(shot.ItemModifierId);
-            if (itemModifier == null)
-            {
-                Logger.Warning("Missile {idx} item modifier {modifierId} was not found; reconstructing without it",
-                    shot.MissileIndex, shot.ItemModifierId);
-            }
-        }
-
-        MissionWeapon missileWeapon = new MissionWeapon(missileItem, itemModifier, shot.Banner);
-        if (missileWeapon.IsEmpty || shot.CurrentUsageIndex < 0 ||
-            shot.CurrentUsageIndex >= missileWeapon.WeaponsCount)
-        {
-            Logger.Warning("Cannot reconstruct missile {idx}: item {itemId} has invalid usage {usageIndex}/{usageCount}",
+            Logger.Warning("Cannot reconstruct missile {index}: item {itemId} has invalid usage {usageIndex}/{usageCount}",
                 shot.MissileIndex, shot.MissileItemId, shot.CurrentUsageIndex, missileWeapon.WeaponsCount);
-            return ReconstructionResult.Dropped;
+            return true;
         }
 
         missileWeapon.CurrentUsageIndex = shot.CurrentUsageIndex;
         missileWeapon.Amount = 1;
 
-        Logger.Debug("Reconstructing missile sequence {sequence} with source id {id}, item {itemId}, modifier {modifierId}, usage {usageIndex}/{usageCount}",
-            shot.ShotSequence, shot.MissileIndex, shot.MissileItemId, shot.ItemModifierId,
-            shot.CurrentUsageIndex, missileWeapon.WeaponsCount);
-
-        bool hasImpactHint = TryTakeImpactHint(shot, out ImpactHint impactHint);
+        ImpactHint hint = default;
         Vec3 impactTarget = default;
-        bool usedCurrentTarget = false;
-        bool hasImpactTarget = hasImpactHint
-            && TryResolveImpactTarget(impactHint, mission, out impactTarget, out usedCurrentTarget);
+        bool fastForward = TryTakeImpactHint(shot, out hint)
+            && TryResolveImpactTarget(hint, mission, out impactTarget);
         MissileReplayPlan replay = MissileReplayPlanner.Plan(shot.Position, shot.Velocity, shot.Orientation,
-            shot.Speed, hasImpactTarget, impactTarget, impactHint.ImpactVelocity);
-
+            shot.Speed, fastForward, impactTarget, hint.ImpactVelocity);
         if (replay.IsFastForwarded)
         {
-            Logger.Debug("Fast-forwarding missile sequence {sequence} to a {durationMs:0}ms final segment aimed at the {targetKind} victim position",
-                shot.ShotSequence, replay.RemainingFlightSeconds * 1000f,
-                usedCurrentTarget ? "current" : "historical fallback");
+            Logger.Debug("Fast-forwarding missile sequence {sequence} to a {durationMs:0}ms segment aimed at the current victim position",
+                shot.ShotSequence, replay.RemainingFlightSeconds * 1000f);
         }
 
         Vec3 position = replay.Position;
         Vec3 direction = replay.Direction;
         Mat3 orientation = replay.Orientation;
-        float baseSpeed = !float.IsNaN(shot.BaseSpeed) && !float.IsInfinity(shot.BaseSpeed) && shot.BaseSpeed > 0f
-            ? shot.BaseSpeed
-            : replay.Speed;
-
+        float baseSpeed = IsUsableSpeed(shot.BaseSpeed) ? shot.BaseSpeed : replay.Speed;
         WeaponData weaponData = missileWeapon.GetWeaponData(true);
         int index;
         GameEntity missileEntity;
@@ -537,15 +278,15 @@ public class MissileHandler : IMissileHandler
         {
             if (missileWeapon.WeaponsCount == 1)
             {
-                WeaponStatsData weaponStatsData = missileWeapon.GetWeaponStatsDataForUsage(0);
-                index = mission.AddMissileSingleUsageAux(-1, false, agent, in weaponData, in weaponStatsData, 0f,
+                WeaponStatsData stats = missileWeapon.GetWeaponStatsDataForUsage(0);
+                index = mission.AddMissileSingleUsageAux(-1, false, agent, in weaponData, in stats, 0f,
                     ref position, ref direction, ref orientation, baseSpeed, replay.Speed, shot.HasRigidBody,
                     WeakGameEntity.Invalid, false, out missileEntity);
             }
             else
             {
-                WeaponStatsData[] weaponStatsData = missileWeapon.GetWeaponStatsData();
-                index = mission.AddMissileAux(-1, false, agent, in weaponData, weaponStatsData, 0f,
+                WeaponStatsData[] stats = missileWeapon.GetWeaponStatsData();
+                index = mission.AddMissileAux(-1, false, agent, in weaponData, stats, 0f,
                     ref position, ref direction, ref orientation, baseSpeed, replay.Speed, shot.HasRigidBody,
                     WeakGameEntity.Invalid, false, out missileEntity);
             }
@@ -557,46 +298,35 @@ public class MissileHandler : IMissileHandler
 
         if (index < 0 || missileEntity == null || !missileEntity.WeakEntity.IsValid)
         {
-            Logger.Warning("Cannot reconstruct missile {idx}: native add returned no entity", shot.MissileIndex);
-            return ReconstructionResult.Dropped;
+            Logger.Warning("Cannot reconstruct missile {index}: native add returned no entity", shot.MissileIndex);
+            return true;
         }
 
-        // Track the missile in BOTH collections like vanilla OnAgentShootMissile: the engine hard-indexes
-        // _missilesDictionary by the missile index on every collision, so a list-only add crashes on the first hit.
-        // Indexer, not Add, so a reused engine index overwrites rather than throwing back out of the dictionary.
-        Mission.Missile missileRecord = new Mission.Missile(mission, index, missileEntity, agent, missileWeapon, null);
-        mission._missilesList.Add(missileRecord);
-        mission._missilesDictionary[index] = missileRecord;
+        Mission.Missile missile = new Mission.Missile(mission, index, missileEntity, agent, missileWeapon, null);
+        mission._missilesList.Add(missile);
+        mission._missilesDictionary[index] = missile;
 
         Logger.Debug("Reconstructed missile sequence {sequence}, source {sourceIndex}, as local {localIndex}",
             shot.ShotSequence, shot.MissileIndex, index);
-        messageBroker.Publish(this, new MissileReconstructed(shot.AgentId, shot.MissileIndex, shot.ShotSequence,
-            position, direction, baseSpeed, replay.Speed, replay.IsFastForwarded,
-            replay.RemainingFlightSeconds));
-        return ReconstructionResult.Reconstructed;
+        messageBroker.Publish(this, new MissileReconstructed(shot.AgentId, shot.ShotSequence, position,
+            replay.Speed, replay.RemainingFlightSeconds));
+        return true;
     }
 
-    private bool TryResolveImpactTarget(ImpactHint hint, Mission mission, out Vec3 impactTarget,
-        out bool usedCurrentTarget)
+    private bool TryResolveImpactTarget(ImpactHint hint, Mission mission, out Vec3 target)
     {
-        usedCurrentTarget = false;
-        if (networkAgentRegistry.TryGetAgentInfo(hint.VictimAgentId, out var victimInfo))
+        if (networkAgentRegistry.TryGetAgentInfo(hint.VictimAgentId, out var info))
         {
-            Agent victim = hint.IsMountFallback ? victimInfo.Agent?.MountAgent : victimInfo.Agent;
+            Agent victim = hint.IsMountFallback ? info.Agent?.MountAgent : info.Agent;
             if (victim != null && victim.Mission == mission && victim.IsActive())
             {
-                Vec3 currentChest = victim.GetChestGlobalPosition();
-                if (MissileReplayPlanner.IsFinite(currentChest))
-                {
-                    impactTarget = currentChest;
-                    usedCurrentTarget = true;
-                    return true;
-                }
+                target = victim.GetChestGlobalPosition();
+                return MissileReplayPlanner.IsFinite(target);
             }
         }
 
-        impactTarget = hint.HistoricalImpactPosition;
-        return MissileReplayPlanner.IsFinite(impactTarget);
+        target = default;
+        return false;
     }
 
     private static Agent FindStandInShooter(Mission mission)
@@ -609,4 +339,10 @@ public class MissileHandler : IMissileHandler
 
         return null;
     }
+
+    private static bool IsUsableSpeed(float value) =>
+        !float.IsNaN(value) && !float.IsInfinity(value) && value > 0f;
+
+    private static long CreateShotSequenceSeed() =>
+        BitConverter.ToInt64(Guid.NewGuid().ToByteArray(), 0) & long.MaxValue;
 }

@@ -62,9 +62,6 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         // transition can't be observed reliably off-thread, so actions are event-synced from here instead of
         // polled with movement.
         coopMissionComponent.AgentActionHandler.PollActions();
-
-        // A shot can overtake the remote agent's spawn/registration during join or deployment. Retry that
-        // short readiness race here, on the mission thread, without replaying stale projectiles indefinitely.
         coopMissionComponent.MissileHandler.DrainPendingShots();
     }
 

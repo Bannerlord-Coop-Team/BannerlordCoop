@@ -36,9 +36,7 @@ public class NetworkApplyBattleDamage : IEvent
     [ProtoMember(5)]
     public bool IsMount { get; }
     /// <summary>
-    /// Identity of the exact missile launch that produced this blow. Zero means the launch could not be
-    /// resolved (or the sender predates shot sequencing), in which case the receiver uses a short fallback
-    /// presentation grace.
+    /// Identity of the exact missile launch that produced this blow. Zero means correlation was unavailable.
     /// </summary>
     [ProtoMember(6)]
     public long MissileShotSequence { get; }
@@ -48,10 +46,6 @@ public class NetworkApplyBattleDamage : IEvent
     /// </summary>
     [ProtoMember(7)]
     public bool IsMissile { get; }
-    /// <summary>The shooter's native missile index at the time of impact, or -1 for non-missile damage.</summary>
-    [ProtoMember(8)]
-    public int SourceMissileIndex { get; }
-
     public NetworkApplyBattleDamage(Guid victimAgentId, Guid attackerAgentId, Blow blow, AttackCollisionData collisionData,
         bool isMount = false, long missileShotSequence = 0)
     {
@@ -62,8 +56,5 @@ public class NetworkApplyBattleDamage : IEvent
         IsMount = isMount;
         MissileShotSequence = missileShotSequence;
         IsMissile = blow.IsMissile;
-        SourceMissileIndex = IsMissile
-            ? blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex
-            : -1;
     }
 }

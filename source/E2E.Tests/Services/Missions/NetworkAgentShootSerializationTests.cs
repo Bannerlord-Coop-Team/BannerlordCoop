@@ -87,7 +87,6 @@ public class NetworkAgentShootSerializationTests
         Assert.Equal(original.VictimAgentId, result.VictimAgentId);
         Assert.Equal(original.AttackerAgentId, result.AttackerAgentId);
         Assert.True(result.IsMissile);
-        Assert.Equal(42, result.SourceMissileIndex);
         Assert.Equal(4_500_000_123L, result.MissileShotSequence);
     }
 }

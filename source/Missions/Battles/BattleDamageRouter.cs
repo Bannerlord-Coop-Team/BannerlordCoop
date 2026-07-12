@@ -1,12 +1,14 @@
-﻿using Common;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using Missions.Messages;
+using Missions.Missiles.Handlers;
 using Missions.Missiles.Message;
 using Serilog;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using TaleWorlds.CampaignSystem;
@@ -16,13 +18,7 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Battles;
 
-/// <summary>
-/// Combat damage routing for a coop battle: a local troop hitting a puppet is suppressed locally
-/// (<c>BattleBlowInterceptPatch</c>) and routed to the puppet's owner, which applies it authoritatively — so
-/// each agent's life/death is decided on exactly one client and the battles don't diverge. Mounts are
-/// registered agents too, so a hit on another owner's horse routes by the HORSE's own id — pinned to the
-/// exact horse that was struck, immune to its rider dismounting or swapping horses in flight.
-/// </summary>
+/// <summary>Routes puppet damage to the client that owns the victim.</summary>
 public interface IBattleDamageRouter : IDisposable
 {
     void Tick(float dt);
@@ -39,86 +35,63 @@ public class BattleDamageRouter : IBattleDamageRouter
     private readonly ICoopMissionComponent coopMissionComponent;
     private readonly IBattleSession session;
     private readonly Func<Agent, bool?> mountAuthorityProbe;
-    private readonly Dictionary<(Guid AgentId, long ShotSequence), ReconstructionInfo> reconstructionsBySequence = new();
-    private readonly Dictionary<(Guid AgentId, int MissileIndex), ReconstructionInfo> reconstructionsBySource = new();
-    private readonly Queue<ReconstructionInfo> reconstructionHistory = new();
-    private readonly Queue<DeferredDamage> deferredDamage = new();
-    private readonly Dictionary<Guid, int> deferredDamageByVictim = new();
     private readonly object inboundDamageGate = new();
-    private readonly Queue<NetworkApplyBattleDamage> inboundDamage = new();
-    private System.Threading.Timer deferredFlushTimer;
-    private long deferredTimerGeneration;
+    private readonly ConcurrentQueue<NetworkApplyBattleDamage> inboundDamage = new();
+    private readonly Queue<DeferredDamage> deferredDamage = new();
+    private readonly Dictionary<(Guid AgentId, long ShotSequence), ReconstructionInfo> reconstructions = new();
+    private readonly Queue<(Guid AgentId, long ShotSequence)> reconstructionHistory = new();
     private long presentationEpoch;
-    private float presentationTimeSeconds;
-    private bool inboundDamageScheduled;
+    private float presentationTime;
     private bool disposed;
     private bool closing;
 
-    private const int MaxDeferredDamage = 4096;
-    private const int MaxReconstructionHistory = 8192;
-    private const int DeferredDamageTimeoutMs = 4000;
     private const int MinimumPresentationEpochs = 2;
+    private const int MaxReconstructionHistory = 4096;
+    private const double DamageTimeoutSeconds = 4d;
     private const float UnknownShotGraceSeconds = 0.5f;
     private const float MinimumFlightSeconds = 0.05f;
     private const float MaximumFlightSeconds = 2.5f;
-    private const float MaximumPresentationTickSeconds = 0.1f;
-    private const float LegacyCorrelationSeconds = 0.5f;
-    private const float ReconstructionRetentionSeconds = 30f;
+    private const float MaximumTickSeconds = 0.1f;
 
     private readonly struct ReconstructionInfo
     {
-        public Guid AgentId { get; }
-        public int SourceMissileIndex { get; }
-        public long ShotSequence { get; }
         public Vec3 Position { get; }
-        public Vec3 Direction { get; }
-        public float BaseSpeed { get; }
         public float Speed { get; }
-        public bool IsFastForwarded { get; }
         public float RemainingFlightSeconds { get; }
-        public long PresentationEpoch { get; }
-        public float PresentationTime { get; }
+        public long Epoch { get; }
+        public float Time { get; }
 
-        public ReconstructionInfo(MissileReconstructed reconstructed, long presentationEpoch, float presentationTime)
+        public ReconstructionInfo(MissileReconstructed missile, long epoch, float time)
         {
-            AgentId = reconstructed.AgentId;
-            SourceMissileIndex = reconstructed.SourceMissileIndex;
-            ShotSequence = reconstructed.ShotSequence;
-            Position = reconstructed.Position;
-            Direction = reconstructed.Direction;
-            BaseSpeed = reconstructed.BaseSpeed;
-            Speed = reconstructed.Speed;
-            IsFastForwarded = reconstructed.IsFastForwarded;
-            RemainingFlightSeconds = reconstructed.RemainingFlightSeconds;
-            PresentationEpoch = presentationEpoch;
-            PresentationTime = presentationTime;
+            Position = missile.Position;
+            Speed = missile.Speed;
+            RemainingFlightSeconds = missile.RemainingFlightSeconds;
+            Epoch = epoch;
+            Time = time;
         }
     }
 
     private readonly struct DeferredDamage
     {
         public NetworkApplyBattleDamage Damage { get; }
+        public bool NeedsPresentation { get; }
+        public long EarliestEpoch { get; }
+        public float FallbackDeadline { get; }
         public long EnqueuedTimestamp { get; }
-        public long EarliestPresentationEpoch { get; }
-        public float FallbackPresentationDeadline { get; }
-        public bool RequiresPresentation { get; }
 
-        public DeferredDamage(NetworkApplyBattleDamage damage, long earliestPresentationEpoch,
-            float fallbackPresentationDeadline)
+        public DeferredDamage(NetworkApplyBattleDamage damage, bool needsPresentation,
+            long earliestEpoch, float fallbackDeadline)
         {
             Damage = damage;
+            NeedsPresentation = needsPresentation;
+            EarliestEpoch = earliestEpoch;
+            FallbackDeadline = fallbackDeadline;
             EnqueuedTimestamp = Stopwatch.GetTimestamp();
-            EarliestPresentationEpoch = earliestPresentationEpoch;
-            FallbackPresentationDeadline = fallbackPresentationDeadline;
-            RequiresPresentation = IsMissileDamage(damage);
         }
     }
 
-    public BattleDamageRouter(
-        IBattleNetwork network,
-        IMessageBroker messageBroker,
-        ICoopMissionComponent coopMissionComponent,
-        IBattleSession session)
+    public BattleDamageRouter(IBattleNetwork network, IMessageBroker messageBroker,
+        ICoopMissionComponent coopMissionComponent, IBattleSession session)
     {
         this.network = network;
         this.messageBroker = messageBroker;
@@ -128,10 +101,6 @@ public class BattleDamageRouter : IBattleDamageRouter
         messageBroker.Subscribe<BattlePuppetHit>(Handle_BattlePuppetHit);
         messageBroker.Subscribe<NetworkApplyBattleDamage>(Handle_NetworkApplyBattleDamage);
         messageBroker.Subscribe<MissileReconstructed>(Handle_MissileReconstructed);
-
-        // Let the (static, DI-less) intercept patch gate mount hits by the horse's OWN registration — a
-        // registered horse under a remote authority is suppressed+routed even when masterless. Kept as a
-        // field so Dispose only clears a probe this instance installed.
         mountAuthorityProbe = ProbeMountAuthority;
         BattleSpawnGate.MountAuthorityProbe = mountAuthorityProbe;
     }
@@ -142,53 +111,42 @@ public class BattleDamageRouter : IBattleDamageRouter
         {
             if (disposed)
                 return;
-
             disposed = true;
-            inboundDamage.Clear();
-            inboundDamageScheduled = false;
+            closing = true;
         }
 
         messageBroker.Unsubscribe<BattlePuppetHit>(Handle_BattlePuppetHit);
         messageBroker.Unsubscribe<NetworkApplyBattleDamage>(Handle_NetworkApplyBattleDamage);
         messageBroker.Unsubscribe<MissileReconstructed>(Handle_MissileReconstructed);
-
-        CancelDeferredFlush();
-        reconstructionsBySequence.Clear();
-        reconstructionsBySource.Clear();
-        reconstructionHistory.Clear();
         deferredDamage.Clear();
-        deferredDamageByVictim.Clear();
+        reconstructions.Clear();
+        reconstructionHistory.Clear();
+        while (inboundDamage.TryDequeue(out _)) { }
 
         if (BattleSpawnGate.MountAuthorityProbe == mountAuthorityProbe)
             BattleSpawnGate.MountAuthorityProbe = null;
     }
 
-    private void Handle_MissileReconstructed(MessagePayload<MissileReconstructed> payload)
+    private bool? ProbeMountAuthority(Agent mount)
     {
-        if (disposed || closing)
-            return;
-
-        ReconstructionInfo reconstruction = new ReconstructionInfo(payload.What, presentationEpoch, presentationTimeSeconds);
-        if (reconstruction.AgentId != Guid.Empty)
-        {
-            if (reconstruction.ShotSequence != 0)
-                reconstructionsBySequence[(reconstruction.AgentId, reconstruction.ShotSequence)] = reconstruction;
-            else
-                // Only legacy sequence-zero shots enter the index lookup. A failed lookup from a new sender
-                // must not accidentally correlate against some other sequenced shot that reused the same slot.
-                reconstructionsBySource[(reconstruction.AgentId, reconstruction.SourceMissileIndex)] = reconstruction;
-        }
-
-        reconstructionHistory.Enqueue(reconstruction);
-        while (reconstructionHistory.Count > MaxReconstructionHistory)
-            RemoveOldestReconstruction();
+        if (!coopMissionComponent.AgentRegistry.TryGetAgentInfo(mount, out var info))
+            return null;
+        return info.CurrentAuthority != session.OwnControllerId;
     }
 
-    /// <summary>
-    /// Advances the presentation clock and applies hits once their locally replayed projectile has had time to
-    /// traverse the corresponding shot. The per-tick clamp prevents a long game-thread stall from consuming the
-    /// whole visual flight before even one recovered frame can be displayed.
-    /// </summary>
+    private void Handle_MissileReconstructed(MessagePayload<MissileReconstructed> payload)
+    {
+        MissileReconstructed missile = payload.What;
+        if (disposed || closing || missile.AgentId == Guid.Empty || missile.ShotSequence == 0)
+            return;
+
+        var key = (missile.AgentId, missile.ShotSequence);
+        reconstructions[key] = new ReconstructionInfo(missile, presentationEpoch, presentationTime);
+        reconstructionHistory.Enqueue(key);
+        while (reconstructionHistory.Count > MaxReconstructionHistory)
+            reconstructions.Remove(reconstructionHistory.Dequeue());
+    }
+
     public void Tick(float dt)
     {
         if (disposed || closing)
@@ -196,313 +154,225 @@ public class BattleDamageRouter : IBattleDamageRouter
 
         presentationEpoch++;
         if (!float.IsNaN(dt) && !float.IsInfinity(dt) && dt > 0f)
-            presentationTimeSeconds += Math.Min(dt, MaximumPresentationTickSeconds);
+            presentationTime += Math.Min(dt, MaximumTickSeconds);
 
-        int deferredCount = deferredDamage.Count;
+        DrainInboundDamage();
+        int count = deferredDamage.Count;
         var blockedVictims = new HashSet<Guid>();
-        for (int i = 0; i < deferredCount; i++)
+        for (int i = 0; i < count; i++)
         {
             DeferredDamage deferred = deferredDamage.Dequeue();
-            NetworkApplyBattleDamage damage = deferred.Damage;
-            if (blockedVictims.Contains(damage.VictimAgentId) || IsWaitingForMissilePresentation(deferred))
+            Guid victimId = deferred.Damage.VictimAgentId;
+            if (blockedVictims.Contains(victimId) || IsWaiting(deferred))
             {
                 deferredDamage.Enqueue(deferred);
-                blockedVictims.Add(damage.VictimAgentId);
+                blockedVictims.Add(victimId);
             }
             else
             {
-                ApplyDeferredDamage(damage);
+                ApplyDeferredDamage(deferred.Damage);
             }
-        }
-
-        if (deferredDamage.Count == 0)
-            CancelDeferredFlush();
-
-        while (reconstructionHistory.Count > 0
-            && reconstructionHistory.Peek().PresentationTime + ReconstructionRetentionSeconds <= presentationTimeSeconds)
-            RemoveOldestReconstruction();
-    }
-
-    private void RemoveOldestReconstruction()
-    {
-        ReconstructionInfo expired = reconstructionHistory.Dequeue();
-
-        if (expired.AgentId == Guid.Empty)
-            return;
-
-        if (expired.ShotSequence != 0
-            && reconstructionsBySequence.TryGetValue((expired.AgentId, expired.ShotSequence), out ReconstructionInfo currentSequence)
-            && currentSequence.PresentationEpoch == expired.PresentationEpoch)
-        {
-            reconstructionsBySequence.Remove((expired.AgentId, expired.ShotSequence));
-        }
-
-        if (reconstructionsBySource.TryGetValue((expired.AgentId, expired.SourceMissileIndex), out ReconstructionInfo currentSource)
-            && currentSource.ShotSequence == expired.ShotSequence
-            && currentSource.PresentationEpoch == expired.PresentationEpoch)
-        {
-            reconstructionsBySource.Remove((expired.AgentId, expired.SourceMissileIndex));
         }
     }
 
     public void FlushForMissionEnd()
     {
-        List<NetworkApplyBattleDamage> receivedDamage;
         lock (inboundDamageGate)
         {
             if (disposed || closing)
                 return;
-
             closing = true;
-            receivedDamage = new List<NetworkApplyBattleDamage>(inboundDamage);
-            inboundDamage.Clear();
-            inboundDamageScheduled = false;
         }
 
-        // Deferred entries were received first, so apply them before packets that had reached this router but
-        // whose game-thread callback had not run yet. This closes the mission-end window without letting a
-        // late callback silently disappear after the result is committed.
-        FlushAllDeferredDamage();
-        foreach (NetworkApplyBattleDamage damage in receivedDamage)
-        {
-            if (!IsLocallyAuthoritativeFor(damage.VictimAgentId))
-                continue;
-
-            try
-            {
-                ApplyNetworkDamage(damage);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to apply routed battle damage during mission-end flush");
-            }
-        }
+        while (deferredDamage.Count > 0)
+            ApplyDeferredDamage(deferredDamage.Dequeue().Damage);
+        while (inboundDamage.TryDequeue(out NetworkApplyBattleDamage damage))
+            TryApplyNetworkDamage(damage);
     }
 
-    // Whether a mount agent is registered and remotely owned: true → puppet-gated (suppress + route), false →
-    // ours (apply locally), null → unregistered (the patch falls back to rider-keyed gating).
-    private bool? ProbeMountAuthority(Agent mount)
-    {
-        if (!coopMissionComponent.AgentRegistry.TryGetAgentInfo(mount, out var info)) return null;
-        return info.CurrentAuthority != session.OwnControllerId;
-    }
-
-    // [Attacker's node] A local troop hit a puppet (suppressed locally by BattleBlowInterceptPatch). Route the
-    // WHOLE blow to the victim's owner; only the owner re-applies it. The attacker's network id rides along so
-    // the owner can re-map the (per-client) attacker index to its local agent. The victim is the agent actually
-    // struck — for a registered mount that is the HORSE itself, routed by its own id so the blow stays pinned
-    // to it even if its rider dismounts or swaps horses before the owner applies it. Only an UNregistered horse
-    // is keyed off its rider's id (IsMount), leaving the owner to resolve its current MountAgent.
     private void Handle_BattlePuppetHit(MessagePayload<BattlePuppetHit> payload)
     {
+        if (disposed || closing)
+            return;
+
         var registry = coopMissionComponent.AgentRegistry;
+        Guid attackerId = Guid.Empty;
+        if (payload.What.Attacker != null
+            && registry.TryGetAgentInfo(payload.What.Attacker, out var attackerInfo))
+        {
+            attackerId = attackerInfo.AgentId;
+        }
+
+        long shotSequence = 0;
+        if (payload.What.Blow.IsMissile)
+        {
+            int missileIndex = payload.What.Blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex;
+            if (coopMissionComponent.MissileHandler.TryTakeLocalShot(missileIndex,
+                out Guid shotAgentId, out shotSequence))
+            {
+                if (attackerId != Guid.Empty && attackerId != shotAgentId)
+                    shotSequence = 0;
+                else
+                    attackerId = shotAgentId;
+            }
+            else
+            {
+                Logger.Warning("Could not correlate local missile hit at source index {MissileIndex}",
+                    missileIndex);
+            }
+        }
 
         GameThread.RunSafe(() =>
         {
             if (disposed || closing)
                 return;
 
-            Guid attackerId = Guid.Empty;
-            if (payload.What.Attacker != null && registry.TryGetAgentInfo(payload.What.Attacker, out var attackerInfo))
-                attackerId = attackerInfo.AgentId;
-
-            long missileShotSequence = 0;
-            if (payload.What.Blow.IsMissile)
-            {
-                int sourceMissileIndex = payload.What.Blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex;
-                if (coopMissionComponent.MissileHandler.TryGetLocalShot(sourceMissileIndex,
-                    out Guid shotAgentId, out missileShotSequence))
-                {
-                    // The shooter can leave or be deregistered while its projectile is still in flight. The
-                    // launch record preserves the original network identity even when FindAgentWithIndex did not.
-                    attackerId = shotAgentId;
-                }
-                else
-                {
-                    Logger.Warning("Could not correlate local missile hit at source index {MissileIndex}; sending sequence-zero fallback",
-                        sourceMissileIndex);
-                }
-            }
-
             if (registry.TryGetAgentInfo(payload.What.Victim, out var victimInfo))
             {
-                Logger.Information("[DeathDiag] Routing puppet hit to owner {Owner}: victim={Victim}, dmg={Dmg}, mount={IsMount}, shot={ShotSequence}",
-                    victimInfo.CurrentAuthority, victimInfo.AgentId, payload.What.Blow.InflictedDamage,
-                    payload.What.IsMount, missileShotSequence);
-                network.SendAll(new NetworkApplyBattleDamage(victimInfo.AgentId, attackerId, payload.What.Blow,
-                    payload.What.CollisionData, missileShotSequence: missileShotSequence));
+                network.SendAll(new NetworkApplyBattleDamage(victimInfo.AgentId, attackerId,
+                    payload.What.Blow, payload.What.CollisionData,
+                    missileShotSequence: shotSequence));
                 return;
             }
 
-            // An unregistered horse under a registered rider: legacy rider-keyed route — the owner resolves
-            // its rider's CURRENT MountAgent at apply time.
-            if (payload.What.IsMount
-                && payload.What.Victim?.RiderAgent is Agent rider
+            if (payload.What.IsMount && payload.What.Victim?.RiderAgent is Agent rider
                 && registry.TryGetAgentInfo(rider, out var riderInfo))
             {
-                Logger.Information("[DeathDiag] Routing unregistered-mount hit via rider {Rider} to owner {Owner}: dmg={Dmg}", riderInfo.AgentId, riderInfo.CurrentAuthority, payload.What.Blow.InflictedDamage);
-                network.SendAll(new NetworkApplyBattleDamage(riderInfo.AgentId, attackerId, payload.What.Blow,
-                    payload.What.CollisionData, isMount: true, missileShotSequence: missileShotSequence));
+                network.SendAll(new NetworkApplyBattleDamage(riderInfo.AgentId, attackerId,
+                    payload.What.Blow, payload.What.CollisionData, isMount: true,
+                    missileShotSequence: shotSequence));
                 return;
             }
 
-            Logger.Information("[DeathDiag] Local hit on a puppet that is not in our registry — cannot route it");
+            Logger.Warning("Local hit on an unregistered puppet could not be routed");
         });
     }
 
-    // [Owner] Another client's troop hit one of OUR agents — a troop, or a registered horse addressed by its
-    // own id. (IsMount is the fallback for an UNregistered horse, addressed via its rider's id; the rider's
-    // current MountAgent is resolved here at apply time.) Re-apply the real blow through Agent.RegisterBlow so
-    // the engine resolves damage, hit reaction, ragdoll and lethal death. AgentDeathReporter then sends
-    // the normal death/casualty sync. Non-owners ignore it. No synthetic blow.
     private void Handle_NetworkApplyBattleDamage(MessagePayload<NetworkApplyBattleDamage> payload)
     {
         NetworkApplyBattleDamage damage = payload.What;
-        if (IsMissileDamage(damage)
-            && damage.AttackerAgentId != Guid.Empty
-            && damage.MissileShotSequence != 0)
+        if (IsMissileDamage(damage) && damage.MissileShotSequence != 0)
         {
-            Vec3 impactPosition = damage.Blow.GlobalPosition;
-            if (!IsFinite(impactPosition))
-                impactPosition = damage.CollisionData.CollisionGlobalPosition;
-
             Vec3 impactVelocity = damage.Blow.WeaponRecord.Velocity;
-            if (!IsFinite(impactVelocity) || impactVelocity.LengthSquared <= 0.0001f)
+            if (!MissileReplayPlanner.IsFinite(impactVelocity) || impactVelocity.LengthSquared <= 0.0001f)
                 impactVelocity = damage.CollisionData.MissileVelocity;
 
-            // Record this before dispatching to the game thread. If the matching shot is still waiting there,
-            // reconstruction can show only its terminal segment instead of replaying an already-finished flight.
             coopMissionComponent.MissileHandler.RecordImpactHint(damage.AttackerAgentId,
-                damage.MissileShotSequence, damage.VictimAgentId, damage.IsMount, impactPosition, impactVelocity);
+                damage.MissileShotSequence, damage.VictimAgentId, damage.IsMount, impactVelocity);
         }
 
-        bool scheduleDrain;
+        bool enqueued = false;
         lock (inboundDamageGate)
         {
-            if (disposed || closing)
-                return;
-
-            inboundDamage.Enqueue(damage);
-            scheduleDrain = !inboundDamageScheduled;
-            inboundDamageScheduled = true;
+            if (!disposed && !closing)
+            {
+                inboundDamage.Enqueue(damage);
+                enqueued = true;
+            }
         }
 
-        if (scheduleDrain)
-            GameThread.RunSafe(DrainInboundDamage, context: nameof(DrainInboundDamage));
+        if (enqueued)
+            GameThread.RunSafe(DrainInboundDamage);
     }
 
     private void DrainInboundDamage()
     {
-        while (true)
+        while (inboundDamage.TryDequeue(out NetworkApplyBattleDamage damage))
         {
-            NetworkApplyBattleDamage damage;
-            lock (inboundDamageGate)
+            if (!IsLocallyAuthoritativeFor(damage.VictimAgentId))
+                continue;
+
+            bool missile = IsMissileDamage(damage);
+            if (missile || HasDeferredDamageFor(damage.VictimAgentId))
             {
-                if (disposed || closing)
-                {
-                    inboundDamage.Clear();
-                    inboundDamageScheduled = false;
-                    return;
-                }
-
-                if (inboundDamage.Count == 0)
-                {
-                    inboundDamageScheduled = false;
-                    return;
-                }
-
-                damage = inboundDamage.Dequeue();
+                deferredDamage.Enqueue(new DeferredDamage(damage, missile,
+                    presentationEpoch + (missile ? MinimumPresentationEpochs : 0),
+                    presentationTime + (missile ? UnknownShotGraceSeconds : 0f)));
             }
-
-            try
+            else
             {
-                if (!IsLocallyAuthoritativeFor(damage.VictimAgentId))
-                    continue;
-
-                if (ShouldDeferDamage(damage))
-                {
-                    DeferDamage(damage);
-                    Logger.Debug("Deferring routed damage for victim {VictimId} behind missile presentation", damage.VictimAgentId);
-                    continue;
-                }
-
-                ApplyNetworkDamage(damage);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to process routed battle damage");
+                TryApplyNetworkDamage(damage);
             }
         }
     }
 
-    private bool ShouldDeferDamage(NetworkApplyBattleDamage damage)
+    private bool HasDeferredDamageFor(Guid victimId)
     {
-        if (deferredDamageByVictim.ContainsKey(damage.VictimAgentId))
-            return true;
-
-        if (!IsMissileDamage(damage))
-            return false;
-
-        if (IsReconstructionPending(damage))
-            return true;
-
-        if (!TryGetReconstruction(damage, out ReconstructionInfo reconstruction))
-            return true;
-
-        return IsReconstructionStillPresenting(damage, reconstruction);
-    }
-
-    private bool IsReconstructionPending(NetworkApplyBattleDamage damage)
-    {
-        if (!IsMissileDamage(damage) || damage.AttackerAgentId == Guid.Empty)
-            return false;
-
-        int sourceMissileIndex = GetSourceMissileIndex(damage);
-        return coopMissionComponent.MissileHandler.IsReconstructionPending(
-            damage.AttackerAgentId, damage.MissileShotSequence, sourceMissileIndex);
-    }
-
-    private bool TryGetReconstruction(NetworkApplyBattleDamage damage, out ReconstructionInfo reconstruction)
-    {
-        reconstruction = default;
-        if (!IsMissileDamage(damage) || damage.AttackerAgentId == Guid.Empty)
-            return false;
-
-        if (damage.MissileShotSequence != 0)
-            return reconstructionsBySequence.TryGetValue(
-                (damage.AttackerAgentId, damage.MissileShotSequence), out reconstruction);
-
-        int sourceMissileIndex = GetSourceMissileIndex(damage);
-        return reconstructionsBySource.TryGetValue(
-                (damage.AttackerAgentId, sourceMissileIndex), out reconstruction)
-            && presentationTimeSeconds - reconstruction.PresentationTime <= LegacyCorrelationSeconds;
-    }
-
-    private bool IsLocallyAuthoritativeFor(Guid victimAgentId)
-    {
-        return coopMissionComponent.AgentRegistry.TryGetAgentInfo(victimAgentId, out var info)
-            && info.CurrentAuthority == session.OwnControllerId;
-    }
-
-    private void DeferDamage(NetworkApplyBattleDamage damage)
-    {
-        if (deferredDamage.Count >= MaxDeferredDamage)
+        foreach (DeferredDamage deferred in deferredDamage)
         {
-            Logger.Warning("Missile presentation queue reached {Capacity}; applying its oldest hit to make room", MaxDeferredDamage);
-            ApplyDeferredDamage(deferredDamage.Dequeue().Damage);
+            if (deferred.Damage.VictimAgentId == victimId)
+                return true;
+        }
+        return false;
+    }
+
+    private bool IsWaiting(DeferredDamage deferred)
+    {
+        if (!deferred.NeedsPresentation)
+            return false;
+        if (presentationEpoch < deferred.EarliestEpoch)
+            return true;
+        if (ElapsedSeconds(deferred.EnqueuedTimestamp) >= DamageTimeoutSeconds)
+            return false;
+
+        NetworkApplyBattleDamage damage = deferred.Damage;
+        if (damage.AttackerAgentId != Guid.Empty && damage.MissileShotSequence != 0)
+        {
+            if (coopMissionComponent.MissileHandler.IsReconstructionPending(
+                damage.AttackerAgentId, damage.MissileShotSequence))
+            {
+                return true;
+            }
+
+            if (reconstructions.TryGetValue((damage.AttackerAgentId, damage.MissileShotSequence),
+                out ReconstructionInfo reconstruction))
+            {
+                if (presentationEpoch < reconstruction.Epoch + MinimumPresentationEpochs)
+                    return true;
+                return presentationTime < reconstruction.Time + EstimateFlightSeconds(damage, reconstruction);
+            }
         }
 
-        bool hasReconstruction = TryGetReconstruction(damage, out _);
-        long earliestPresentationEpoch = presentationEpoch + (IsMissileDamage(damage) ? MinimumPresentationEpochs : 0);
-        float fallbackDeadline = presentationTimeSeconds
-            + (IsMissileDamage(damage) && !hasReconstruction ? UnknownShotGraceSeconds : 0f);
-        deferredDamage.Enqueue(new DeferredDamage(damage, earliestPresentationEpoch, fallbackDeadline));
-        deferredDamageByVictim.TryGetValue(damage.VictimAgentId, out int count);
-        deferredDamageByVictim[damage.VictimAgentId] = count + 1;
-        EnsureDeferredFlushScheduled();
+        return presentationTime < deferred.FallbackDeadline;
     }
+
+    private static float EstimateFlightSeconds(NetworkApplyBattleDamage damage, ReconstructionInfo reconstruction)
+    {
+        if (reconstruction.RemainingFlightSeconds > 0f)
+            return Math.Min(MaximumFlightSeconds, reconstruction.RemainingFlightSeconds);
+
+        Vec3 impact = MissileReplayPlanner.IsFinite(damage.Blow.GlobalPosition)
+            ? damage.Blow.GlobalPosition
+            : damage.CollisionData.CollisionGlobalPosition;
+        Vec3 displacement = impact - reconstruction.Position;
+        if (!MissileReplayPlanner.IsFinite(displacement) || reconstruction.Speed <= 1f)
+            return MinimumFlightSeconds;
+
+        Vec3 impactVelocity = damage.Blow.WeaponRecord.Velocity;
+        if (!MissileReplayPlanner.IsFinite(impactVelocity) || impactVelocity.LengthSquared <= 1f)
+            impactVelocity = damage.CollisionData.MissileVelocity;
+        double impactSpeed = MissileReplayPlanner.IsFinite(impactVelocity)
+            ? Math.Sqrt(impactVelocity.LengthSquared)
+            : 0d;
+        double averageSpeed = impactSpeed > 1d
+            ? (reconstruction.Speed + impactSpeed) * 0.5d
+            : reconstruction.Speed;
+        float flight = (float)(Math.Sqrt(displacement.LengthSquared) / averageSpeed);
+        return Math.Max(MinimumFlightSeconds, Math.Min(MaximumFlightSeconds, flight));
+    }
+
+    private bool IsLocallyAuthoritativeFor(Guid victimId) =>
+        coopMissionComponent.AgentRegistry.TryGetAgentInfo(victimId, out var info)
+        && info.CurrentAuthority == session.OwnControllerId;
 
     private void ApplyDeferredDamage(NetworkApplyBattleDamage damage)
+    {
+        TryApplyNetworkDamage(damage);
+        if (damage.AttackerAgentId != Guid.Empty && damage.MissileShotSequence != 0)
+            reconstructions.Remove((damage.AttackerAgentId, damage.MissileShotSequence));
+    }
+
+    private void TryApplyNetworkDamage(NetworkApplyBattleDamage damage)
     {
         try
         {
@@ -510,227 +380,42 @@ public class BattleDamageRouter : IBattleDamageRouter
         }
         catch (Exception ex)
         {
-            Logger.Error(ex, "Failed to apply deferred routed battle damage");
-        }
-        finally
-        {
-            ReleaseDeferredVictim(damage.VictimAgentId);
+            Logger.Error(ex, "Failed to apply routed battle damage");
         }
     }
-
-    private void FlushAllDeferredDamage()
-    {
-        while (deferredDamage.Count > 0)
-            ApplyDeferredDamage(deferredDamage.Dequeue().Damage);
-
-        CancelDeferredFlush();
-    }
-
-    private void EnsureDeferredFlushScheduled()
-    {
-        if (deferredFlushTimer != null || deferredDamage.Count == 0 || disposed || closing)
-            return;
-
-        long oldestTimestamp = long.MaxValue;
-        foreach (DeferredDamage deferred in deferredDamage)
-            oldestTimestamp = Math.Min(oldestTimestamp, deferred.EnqueuedTimestamp);
-
-        double elapsedMs = ElapsedMilliseconds(oldestTimestamp);
-        int dueMs = Math.Max(1, (int)Math.Ceiling(DeferredDamageTimeoutMs - elapsedMs));
-        long generation = ++deferredTimerGeneration;
-        deferredFlushTimer = new System.Threading.Timer(_ =>
-        {
-            GameThread.RunSafe(() => FlushExpiredDeferredDamage(generation),
-                context: nameof(FlushExpiredDeferredDamage));
-        }, null, dueMs, System.Threading.Timeout.Infinite);
-    }
-
-    private void FlushExpiredDeferredDamage(long generation)
-    {
-        if (disposed || generation != deferredTimerGeneration)
-            return;
-
-        deferredFlushTimer?.Dispose();
-        deferredFlushTimer = null;
-
-        int expiredCount = 0;
-        int count = deferredDamage.Count;
-        var blockedVictims = new HashSet<Guid>();
-        for (int i = 0; i < count; i++)
-        {
-            DeferredDamage deferred = deferredDamage.Dequeue();
-            Guid victimId = deferred.Damage.VictimAgentId;
-            bool expired = ElapsedMilliseconds(deferred.EnqueuedTimestamp) >= DeferredDamageTimeoutMs;
-            if (blockedVictims.Contains(victimId) || (deferred.RequiresPresentation && !expired))
-            {
-                deferredDamage.Enqueue(deferred);
-                blockedVictims.Add(victimId);
-                continue;
-            }
-
-            ApplyDeferredDamage(deferred.Damage);
-            expiredCount++;
-        }
-
-        if (expiredCount > 0)
-            Logger.Warning("Missile presentation wait exceeded {TimeoutMs}ms; flushed {Count} deferred hits",
-                DeferredDamageTimeoutMs, expiredCount);
-
-        EnsureDeferredFlushScheduled();
-    }
-
-    private static double ElapsedMilliseconds(long timestamp) =>
-        (Stopwatch.GetTimestamp() - timestamp) * 1000d / Stopwatch.Frequency;
-
-    private void CancelDeferredFlush()
-    {
-        deferredTimerGeneration++;
-        deferredFlushTimer?.Dispose();
-        deferredFlushTimer = null;
-    }
-
-    private void ReleaseDeferredVictim(Guid victimAgentId)
-    {
-        if (!deferredDamageByVictim.TryGetValue(victimAgentId, out int count))
-            return;
-
-        if (count <= 1)
-            deferredDamageByVictim.Remove(victimAgentId);
-        else
-            deferredDamageByVictim[victimAgentId] = count - 1;
-    }
-
-    private bool IsWaitingForMissilePresentation(DeferredDamage deferred)
-    {
-        if (presentationEpoch < deferred.EarliestPresentationEpoch)
-            return true;
-
-        NetworkApplyBattleDamage damage = deferred.Damage;
-        if (!IsMissileDamage(damage))
-            return false;
-
-        if (IsReconstructionPending(damage))
-            return true;
-
-        if (TryGetReconstruction(damage, out ReconstructionInfo reconstruction))
-            return IsReconstructionStillPresenting(damage, reconstruction);
-
-        return presentationTimeSeconds < deferred.FallbackPresentationDeadline;
-    }
-
-    private bool IsReconstructionStillPresenting(NetworkApplyBattleDamage damage, ReconstructionInfo reconstruction)
-    {
-        if (presentationEpoch < reconstruction.PresentationEpoch + MinimumPresentationEpochs)
-            return true;
-
-        float flightSeconds = EstimateFlightSeconds(damage, reconstruction);
-        return presentationTimeSeconds < reconstruction.PresentationTime + flightSeconds;
-    }
-
-    private static float EstimateFlightSeconds(NetworkApplyBattleDamage damage, ReconstructionInfo reconstruction)
-    {
-        if (reconstruction.IsFastForwarded && IsFinite(reconstruction.RemainingFlightSeconds))
-        {
-            return (float)Math.Max(0d,
-                Math.Min(MaximumFlightSeconds, reconstruction.RemainingFlightSeconds));
-        }
-
-        Vec3 impactPosition = damage.Blow.GlobalPosition;
-        if (!IsFinite(impactPosition))
-            impactPosition = damage.CollisionData.CollisionGlobalPosition;
-
-        Vec3 displacement = impactPosition - reconstruction.Position;
-        if (!IsFinite(displacement))
-            displacement = damage.CollisionData.CollisionGlobalPosition - reconstruction.Position;
-
-        double horizontalDistance = Math.Sqrt(
-            ((double)displacement.X * displacement.X) + ((double)displacement.Y * displacement.Y));
-        double distance = Math.Sqrt(
-            ((double)displacement.X * displacement.X)
-            + ((double)displacement.Y * displacement.Y)
-            + ((double)displacement.Z * displacement.Z));
-
-        double launchSpeed = IsUsableSpeed(reconstruction.Speed)
-            ? reconstruction.Speed
-            : IsUsableSpeed(reconstruction.BaseSpeed) ? reconstruction.BaseSpeed : 0d;
-        if (!IsFinite(distance) || !IsUsableSpeed(launchSpeed))
-            return MinimumFlightSeconds;
-
-        Vec3 impactVelocity = damage.Blow.WeaponRecord.Velocity;
-        if (!IsFinite(impactVelocity) || impactVelocity.LengthSquared <= 0.0001f)
-            impactVelocity = damage.CollisionData.MissileVelocity;
-        double impactSpeed = IsFinite(impactVelocity)
-            ? Math.Sqrt(((double)impactVelocity.X * impactVelocity.X)
-                + ((double)impactVelocity.Y * impactVelocity.Y)
-                + ((double)impactVelocity.Z * impactVelocity.Z))
-            : 0d;
-
-        double launchHorizontalSpeed = Math.Sqrt(
-            ((double)reconstruction.Direction.X * reconstruction.Direction.X)
-            + ((double)reconstruction.Direction.Y * reconstruction.Direction.Y)) * launchSpeed;
-        double impactHorizontalSpeed = IsFinite(impactVelocity)
-            ? Math.Sqrt(((double)impactVelocity.X * impactVelocity.X)
-                + ((double)impactVelocity.Y * impactVelocity.Y))
-            : 0d;
-
-        double estimatedSeconds;
-        if (horizontalDistance > 0.05d
-            && IsUsableSpeed(launchHorizontalSpeed)
-            && IsUsableSpeed(impactHorizontalSpeed))
-        {
-            estimatedSeconds = 2d * horizontalDistance / (launchHorizontalSpeed + impactHorizontalSpeed);
-        }
-        else if (IsUsableSpeed(impactSpeed))
-        {
-            estimatedSeconds = 2d * distance / (launchSpeed + impactSpeed);
-        }
-        else
-        {
-            estimatedSeconds = distance / launchSpeed;
-        }
-
-        if (!IsFinite(estimatedSeconds))
-            return MinimumFlightSeconds;
-
-        return (float)Math.Max(MinimumFlightSeconds, Math.Min(MaximumFlightSeconds, estimatedSeconds));
-    }
-
-    private static bool IsFinite(Vec3 value) =>
-        IsFinite(value.X) && IsFinite(value.Y) && IsFinite(value.Z);
 
     private static bool IsMissileDamage(NetworkApplyBattleDamage damage) =>
         damage.IsMissile || damage.Blow.IsMissile;
 
-    private static int GetSourceMissileIndex(NetworkApplyBattleDamage damage) =>
-        damage.IsMissile
-            ? damage.SourceMissileIndex
-            : damage.Blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex;
-
-    private static bool IsFinite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
-
-    private static bool IsUsableSpeed(double value) => IsFinite(value) && value > 1d;
+    private static double ElapsedSeconds(long timestamp) =>
+        (Stopwatch.GetTimestamp() - timestamp) / (double)Stopwatch.Frequency;
 
     private void ApplyNetworkDamage(NetworkApplyBattleDamage damage)
     {
         var registry = coopMissionComponent.AgentRegistry;
-        if (!registry.TryGetAgentInfo(damage.VictimAgentId, out var info)) return;
-        if (info.CurrentAuthority != session.OwnControllerId) return;
+        if (!registry.TryGetAgentInfo(damage.VictimAgentId, out var info)
+            || info.CurrentAuthority != session.OwnControllerId)
+        {
+            return;
+        }
 
-        var victim = damage.IsMount ? info.Agent?.MountAgent : info.Agent;
-        var blow = damage.Blow;
-        var collisionData = damage.CollisionData;
-        var attackerId = damage.AttackerAgentId;
+        Agent victim = damage.IsMount ? info.Agent?.MountAgent : info.Agent;
+        Blow blow = damage.Blow;
+        AttackCollisionData collisionData = damage.CollisionData;
+        if (Mission.Current == null || victim == null || !victim.IsActive() || victim.Health <= 0)
+            return;
 
-        if (Mission.Current == null || victim == null || !victim.IsActive() || victim.Health <= 0) return;
-
-        // Re-map the attacker index to OUR local agent (indices are per-client); -1 if not resolvable here.
-        if (attackerId != Guid.Empty && registry.TryGetAgentInfo(attackerId, out var attackerInfo) && attackerInfo.Agent != null)
+        if (damage.AttackerAgentId != Guid.Empty
+            && registry.TryGetAgentInfo(damage.AttackerAgentId, out var attackerInfo)
+            && attackerInfo.Agent != null)
+        {
             blow.OwnerId = attackerInfo.Agent.Index;
+        }
         else
+        {
             blow.OwnerId = -1;
+        }
 
-        // The visual missile has a receiver-local index, while the routed blow carries the shooter's source
-        // index. Clear the missile lookup before RegisterBlow so Mission.OnAgentHit cannot index the wrong entry.
         bool wasMissile = IsMissileDamage(damage);
         if (wasMissile)
         {
@@ -742,9 +427,10 @@ public class BattleDamageRouter : IBattleDamageRouter
             victim.Name, blow.InflictedDamage, wasMissile, victim.Health);
         victim.RegisterBlow(blow, in collisionData);
 
-        // A hero's in-mission Agent.Health only propagates to the campaign Hero.HitPoints when the agent is
-        // removed (Mission.OnAgentRemoved), so mirror surviving hero damage back to the campaign object.
-        if (victim.Health > 0 && victim.Character is CharacterObject character && character.IsHero && character.HeroObject is Hero hero)
+        if (victim.Health > 0 && victim.Character is CharacterObject character && character.IsHero
+            && character.HeroObject is Hero hero)
+        {
             hero.HitPoints = Math.Max(1, (int)victim.Health);
+        }
     }
 }
