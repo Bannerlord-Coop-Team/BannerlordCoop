@@ -33,7 +33,7 @@ public class HeroDeveloperSyncTests : SyncTestBase
         Server.ObjectManager.TryGetObject<HeroDeveloper>(HeroDeveloperId, out var heroDeveloper);
 
         //TestEnvironment.AssertDictionaryField<HeroDeveloper, (PropertyObject, float)>(nameof(HeroDeveloper._skillXps));
-        //assertHelper.AssertPropertyOwnerField<HeroDeveloper, SkillObject>(nameof(HeroDeveloper._newFocuses));
+        assertHelper.AssertPropertyOwnerField<HeroDeveloper, SkillObject>(nameof(HeroDeveloper._newFocuses));
         TestEnvironment.AssertField<HeroDeveloper, int>(nameof(HeroDeveloper._totalXp), 123, defaultValue: heroDeveloper._totalXp);
     }
 }

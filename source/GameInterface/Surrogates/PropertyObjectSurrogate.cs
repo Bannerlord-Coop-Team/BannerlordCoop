@@ -8,16 +8,18 @@ namespace GameInterface.Surrogates;
 internal struct PropertyObjectSurrogate
 {
     [ProtoMember(1)]
-    public string StringId { get; set; }
+    public string StringId { get; set; } = "";
 
     [ProtoMember(2)]
-    public TextObject Name { get; set; }
+    public TextObject Name { get; set; } = new TextObject("");
 
     [ProtoMember(3)]
-    public TextObject Description { get; set; }
+    public TextObject Description { get; set; } = new TextObject("");
 
     public PropertyObjectSurrogate(PropertyObject propertyObject)
     {
+        if (propertyObject == null) return;
+
         StringId = propertyObject.StringId;
         Name = propertyObject.Name;
         Description = propertyObject.Description;

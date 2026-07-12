@@ -38,6 +38,10 @@ internal class HeroDeveloperRegistry : AutoRegistryBase<HeroDeveloper>
 
     public override void OnClientCreated(HeroDeveloper obj, string id)
     {
+        using (new AllowedThread())
+        {
+            AccessTools.Field(typeof(HeroDeveloper), nameof(HeroDeveloper._newFocuses)).SetValue(obj, new PropertyOwner<SkillObject>());
+        }
     }
 
     public override void OnClientDestroyed(HeroDeveloper obj, string id)
