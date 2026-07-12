@@ -2,6 +2,7 @@ using Autofac;
 using Common;
 using Common.Logging;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Party.Patches;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
 using Serilog;
@@ -9,6 +10,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Party.Commands;
@@ -175,6 +181,66 @@ internal class PartyCommands
         }
 
         return stringBuilder.ToString();
+    }
+
+    // coop.debug.mobileparty.siege_buff
+    /// <summary>
+    /// Fills a party to 2000 troops, maxes its morale, forces a high map speed, and stocks it with food so it
+    /// can march to and win a siege for testing without starving. Server only; the troop and item adds replicate
+    /// via the roster sync. Get the party id from coop.debug.mobileparty.whoami on the client that owns the party.
+    /// </summary>
+    [CommandLineArgumentFunction("siege_buff", "coop.debug.mobileparty")]
+    public static string SiegeBuffCommand(List<string> strings)
+    {
+        if (ModInformation.IsClient) return "Command can only be run on the server.";
+        if (strings.Count != 1) return "Usage: coop.debug.mobileparty.siege_buff <partyId>";
+        if (TryGetObjectManager(out var objectManager) == false) return "Unable to resolve ObjectManager.";
+        if (!objectManager.TryGetObject(strings[0], out MobileParty party)) return $"Party with id {strings[0]} not found";
+
+        var troop = party.MapFaction?.Culture?.EliteBasicTroop ?? party.MapFaction?.Culture?.BasicTroop;
+        if (troop == null) return $"Could not resolve a troop for {party.Name}'s culture";
+
+        int toAdd = 2000 - party.MemberRoster.TotalManCount;
+        if (toAdd > 0) party.MemberRoster.AddToCounts(troop, toAdd);
+
+        party.RecentEventsMorale = 100f;
+        PartyDebugBuffPatches.Boost(party);
+
+        // Stock every food type so a 2000-troop army doesn't starve on the march to the siege. AddToCounts routes
+        // through the synced EquipmentElement overload, so the food replicates to the owning client.
+        int foodTypes = 0;
+        foreach (var item in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+        {
+            if (item?.IsFood != true) continue;
+            party.ItemRoster.AddToCounts(item, 500);
+            foodTypes++;
+        }
+
+        return $"Buffed {party.Name} ({party.StringId}): {party.MemberRoster.TotalManCount} troops, max morale, boosted speed and party-size limit, {foodTypes} food type(s) x500";
+    }
+
+    // coop.debug.mobileparty.declare_war
+    /// <summary>
+    /// Declares war between a party's faction and a settlement's faction, so the party can besiege that
+    /// settlement. Works for an independent clan (no kingdom needed). Server only; the war replicates.
+    /// </summary>
+    [CommandLineArgumentFunction("declare_war", "coop.debug.mobileparty")]
+    public static string DeclareWarCommand(List<string> strings)
+    {
+        if (ModInformation.IsClient) return "Command can only be run on the server.";
+        if (strings.Count != 2) return "Usage: coop.debug.mobileparty.declare_war <partyId> <settlementId>";
+        if (TryGetObjectManager(out var objectManager) == false) return "Unable to resolve ObjectManager.";
+        if (!objectManager.TryGetObject(strings[0], out MobileParty party)) return $"Party with id {strings[0]} not found";
+        if (!objectManager.TryGetObject(strings[1], out Settlement settlement)) return $"Settlement with id {strings[1]} not found";
+
+        var attacker = party.MapFaction;
+        var defender = settlement.MapFaction;
+        if (attacker == null || defender == null) return "Could not resolve both factions";
+        if (attacker == defender) return "The party and the settlement share a faction";
+        if (attacker.IsAtWarWith(defender)) return $"{attacker.Name} is already at war with {defender.Name}";
+
+        DeclareWarAction.ApplyByDefault(attacker, defender);
+        return $"{attacker.Name} is now at war with {defender.Name}";
     }
 
     /// <summary>

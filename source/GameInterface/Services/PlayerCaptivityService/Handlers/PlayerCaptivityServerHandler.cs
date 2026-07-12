@@ -128,7 +128,8 @@ internal class PlayerCaptivityServerHandler : IHandler
         EmptyRoster(playerParty.PrisonRoster);
         playerParty.IsActive = false;
         RemoveVisual(playerParty);
-        playerParty.ChangePartyLeader(null);
+        if (playerParty.LeaderHero != null)
+            playerParty.ChangePartyLeader(null);
     }
 
     /// <summary>

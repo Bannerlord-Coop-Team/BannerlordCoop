@@ -1,7 +1,7 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Coop.Core.Server.Services.Time.Messages;
+using Coop.Core.Common.Network.Packets;
 using GameInterface.Services.Time.Interfaces;
 using Serilog;
 using System;
@@ -13,14 +13,16 @@ namespace Coop.Core.Server.Services.Time.Handlers;
 /// Periodically broadcasts the authoritative campaign time to all clients.
 /// </summary>
 /// <remarks>
-/// Once per second the server reads the current <c>MapTimeTracker</c> tick value and
-/// sends a <see cref="CampaignTimeUpdated"/> message to every connected client.
+/// Four times per second the server reads the current <c>MapTimeTracker</c> tick value and sends a
+/// <see cref="CampaignTimePacket"/> to every connected client. It goes as a Sequenced packet — not a
+/// reliable message — so the clock heartbeat stays live even while the reliable world-sync stream is
+/// congested (see the packet's remarks).
 /// </remarks>
 public class CampaignTimeSyncHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<CampaignTimeSyncHandler>();
 
-    private const double PublishIntervalMs = 1000d;
+    private const double PublishIntervalMs = 250d;
 
     private readonly INetwork network;
     private readonly IMapTimeTrackerInterface mapTimeTrackerInterface;
@@ -54,11 +56,11 @@ public class CampaignTimeSyncHandler : IHandler
             // No campaign loaded yet, nothing authoritative to broadcast.
             if (mapTimeTrackerInterface.TryGetCurrentTicks(out long currentTicks) == false) return;
 
-            network.SendAll(new CampaignTimeUpdated(currentTicks));
+            network.SendAll(new CampaignTimePacket(currentTicks));
         }
         catch (Exception ex)
         {
-            Logger.Error(ex, "Failed to broadcast {message}", nameof(CampaignTimeUpdated));
+            Logger.Error(ex, "Failed to broadcast {message}", nameof(CampaignTimePacket));
         }
         finally
         {

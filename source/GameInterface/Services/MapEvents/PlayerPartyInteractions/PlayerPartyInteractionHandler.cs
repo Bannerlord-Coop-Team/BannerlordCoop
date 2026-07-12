@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Network.Messages;
 using Common.Util;
 using GameInterface.Services.Inventory.Data;
+using GameInterface.Services.Kingdoms;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MobileParties.Extensions;
@@ -63,7 +64,8 @@ internal class PlayerPartyInteractionHandler : IHandler
         IObjectManager objectManager,
         ConversationPartyTracker conversationPartyTracker,
         INetworkConfig configuration,
-        IPlayerPartyHostileEncounterService hostileEncounterService)
+        IPlayerPartyHostileEncounterService hostileEncounterService,
+        IKingdomMembershipState kingdomMembershipState)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -71,7 +73,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         this.conversationPartyTracker = conversationPartyTracker;
         this.configuration = configuration;
         this.hostileEncounterService = hostileEncounterService;
-        outcomeHandler = new PlayerPartyInteractionOutcomeHandler(objectManager);
+        outcomeHandler = new PlayerPartyInteractionOutcomeHandler(objectManager, kingdomMembershipState);
 
         messageBroker.Subscribe<NetworkPlayerPartyInteractionStarted>(Handle_NetworkPlayerPartyInteractionStarted);
         messageBroker.Subscribe<NetworkPlayerPartyInteractionState>(Handle_NetworkPlayerPartyInteractionState);
@@ -762,8 +764,12 @@ internal class PlayerPartyInteractionHandler : IHandler
     {
         var initiatorClan = initiatorParty.LeaderHero?.Clan ?? initiatorParty.MobileParty?.ActualClan;
         var responderHero = responderParty.LeaderHero;
+        var responderKingdom = responderHero?.Clan?.Kingdom;
 
-        return responderHero?.IsKingdomLeader == true && initiatorClan?.Tier == 2;
+        return responderHero?.IsKingdomLeader == true &&
+               responderKingdom?.RulingClan == responderHero.Clan &&
+               initiatorClan?.Kingdom == null &&
+               initiatorClan.Tier >= 2;
     }
 
     private static PlayerPartyInteractionProposal ToProposal(PlayerPartyInteractionOption option)

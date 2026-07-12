@@ -1,5 +1,6 @@
 using HarmonyLib;
 using Helpers;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MapEvents.Patches;
@@ -30,5 +31,26 @@ internal class CoopLeaveBattleNullMapEventPatch
 
         __result = true; // concluded coop battle (no map event) → leaving is allowed
         return false;    // skip the original, which would NRE on MainParty.MapEvent.PlayerSide
+    }
+}
+
+/// <summary>
+/// Completes <see cref="CoopLeaveBattleNullMapEventPatch"/> for the outer leave condition. Guarding only the
+/// helper lets execution reach <c>game_menu_encounter_leave_on_condition</c>'s own
+/// <c>MainParty.MapEvent.IsSallyOut</c> dereference, which NREs the same way once a coop capture destroys the map
+/// event. This is the one-frame window where the map screen refreshes the stale "encounter" menu before the
+/// deferred settlement-taken transition swaps it. With no map event the battle is over, so report the leave option.
+/// </summary>
+[HarmonyPatch(typeof(EncounterGameMenuBehavior), "game_menu_encounter_leave_on_condition")]
+internal class CoopEncounterLeaveConditionNullMapEventPatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix(ref bool __result)
+    {
+        if (MobileParty.MainParty?.MapEvent != null)
+            return true; // normal case — run the original condition
+
+        __result = true; // concluded coop battle (no map event) → the leave option is safe to show
+        return false;    // skip the original, which would NRE on MainParty.MapEvent.IsSallyOut
     }
 }

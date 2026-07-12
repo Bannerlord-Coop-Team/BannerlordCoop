@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.HeroDevelopers.Messages;
 using GameInterface.Services.ObjectManager;
+using static GameInterface.Services.ObjectManager.ObjectManager;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
@@ -167,6 +168,9 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
                 return;
             }
 
+            heroId = Compact(heroId, typeof(Hero));
+            skillObjectId = Compact(skillObjectId, typeof(SkillObject));
+
             // Send to server from client
             NetworkSetSkillXpServer message = new(
                 heroId,
@@ -268,6 +272,8 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
                 Logger.Error("Unable to get network ID for instance of type {type}", obj.HeroDeveloper.Hero?.GetType());
                 return;
             }
+
+            heroId = Compact(heroId, typeof(Hero));
 
             // Send to server from client
             NetworkRawXpGainServer message = new(

@@ -32,6 +32,7 @@ public abstract class CommonModule : Module
         #region Communication
         builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
         builder.RegisterType<MessagePacketHandler>().AsSelf().As<IMessagePacketHandler>().InstancePerLifetimeScope().AutoActivate();
+        builder.RegisterType<AggregateMessagePacketHandler>().AsSelf().InstancePerLifetimeScope().AutoActivate();
         builder.RegisterInstance(MessageBroker.Instance).As<IMessageBroker>().SingleInstance().ExternallyOwned();
         #endregion
 

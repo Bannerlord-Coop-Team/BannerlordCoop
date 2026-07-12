@@ -1,4 +1,5 @@
 using GameInterface.Services.MapEvents;
+using TaleWorlds.Core;
 
 namespace E2E.Tests.Services.Missions;
 
@@ -38,5 +39,20 @@ public class BattleSpawnGateTests : IDisposable
 
         Assert.False(BattleSpawnGate.IsCoopBattleActive);
         Assert.Null(BattleSpawnGate.ActiveMapEventId);
+    }
+
+    [Fact]
+    public void MissingReserveAcceptance_IsPerSide_AndClearedForNextBattle()
+    {
+        BattleSpawnGate.BeginBattle("mapEvent-1");
+        BattleSpawnGate.AcceptMissingReserveSide(BattleSideEnum.Defender);
+
+        Assert.True(BattleSpawnGate.IsMissingReserveSideAccepted(BattleSideEnum.Defender));
+        Assert.False(BattleSpawnGate.IsMissingReserveSideAccepted(BattleSideEnum.Attacker));
+
+        BattleSpawnGate.BeginBattle("mapEvent-2");
+
+        Assert.False(BattleSpawnGate.IsMissingReserveSideAccepted(BattleSideEnum.Defender));
+        Assert.False(BattleSpawnGate.IsMissingReserveSideAccepted(BattleSideEnum.Attacker));
     }
 }

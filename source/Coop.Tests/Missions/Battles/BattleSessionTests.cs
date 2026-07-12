@@ -1,4 +1,5 @@
 using GameInterface.Services.Entity;
+using GameInterface.Services.MapEvents;
 using Missions.Battles;
 using Moq;
 using System;

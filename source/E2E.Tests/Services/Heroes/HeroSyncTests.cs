@@ -93,8 +93,6 @@ namespace E2E.Tests.Services.Heroes
         {
             var assertHelper = TestEnvironment.CreateAssertHelper<Hero>(HeroId);
 
-            // Hero._health is initialized to 100 in the constructor
-            TestEnvironment.AssertField<Hero, int>(nameof(Hero._health), 5, defaultValue: 100);
             // Hero.Culture is initialized by HeroCreator.CreateSpecialHero(); clear it first so the pre-check passes
             Server.ObjectManager.TryGetObject<Hero>(HeroId, out var hero);
             HarmonyLib.AccessTools.Field(typeof(Hero), nameof(Hero.Culture)).SetValue(hero, null);

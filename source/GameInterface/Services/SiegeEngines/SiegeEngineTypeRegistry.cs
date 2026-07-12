@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.SiegeEngines;
 internal class SiegeEngineTypeRegistry : AutoRegistryBase<SiegeEngineType>
@@ -22,36 +23,13 @@ internal class SiegeEngineTypeRegistry : AutoRegistryBase<SiegeEngineType>
 
     public override void RegisterAllObjects()
     {
-        var siegeEvents = Campaign.Current?.SiegeEventManager?.SiegeEvents;
-        if (siegeEvents == null)
+        // The whole XML catalog, keyed by StringId (deterministic on every machine): consumers resolve
+        // any engine type by co-op id — a firing catapult in a bombardment notification just as much as
+        // the prep-slot Preparations type — so registering only the active sieges' prep slots left every
+        // other type unresolvable ("Failed to get id" on each bombardment broadcast).
+        foreach (var engineType in MBObjectManager.Instance.GetObjectTypeList<SiegeEngineType>())
         {
-            Logger.Error("Unable to register siege engine types when SiegeEvents is null");
-            return;
-        }
-
-        foreach (var siegeEvent in siegeEvents)
-        {
-            var settlement = siegeEvent?.BesiegedSettlement;
-            if (settlement == null)
-            {
-                Logger.Error("Unable to register siege engine type: BesiegedSettlement is null");
-                continue;
-            }
-
-            var siegeEngine = siegeEvent?.BesiegerCamp?.SiegeEngines?.SiegePreparations?.SiegeEngine;
-            if (siegeEngine == null)
-            {
-                Logger.Error("Unable to register siege engine type for settlement {SettlementId}: SiegeEngine is null", settlement.StringId);
-                continue;
-            }
-
-            if (string.IsNullOrEmpty(settlement.StringId))
-            {
-                Logger.Error("Unable to register siege engine type: settlement StringId is null/empty");
-                continue;
-            }
-
-            RegisterExistingObject(settlement.StringId, siegeEngine);
+            RegisterExistingObject(engineType.StringId, engineType);
         }
     }
 

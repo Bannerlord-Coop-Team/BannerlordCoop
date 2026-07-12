@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Entity;
@@ -10,6 +10,8 @@ using Missions.Data;
 using Missions.Messages;
 using Serilog;
 using System;
+using TaleWorlds.Core;
+using TaleWorlds.MountAndBlade;
 
 namespace Missions.Battles;
 
@@ -54,11 +56,21 @@ public class CoopBattleController : CoopMissionController
     private readonly IBattleInstanceLifecycle lifecycle;
     private readonly IOwnedAgentReplicator replicator;
     private readonly IAgentDeathReporter deathReporter;
+    private readonly IAgentRoutReporter routReporter;
     private readonly IPuppetSpawner puppetSpawner;
     private readonly IPuppetDeathApplier puppetDeathApplier;
+    private readonly IPuppetRoutApplier puppetRoutApplier;
     private readonly IBattleDamageRouter damageRouter;
     private readonly IBattleAuthorityMigrator authorityMigrator;
     private readonly IReinforcementFielder reinforcementFielder;
+    private readonly ISiegeEngineDeploymentReplicator siegeEngineDeployment;
+    private readonly ISiegeMachineStateReplicator siegeMachineState;
+    private readonly ISiegeWeaponFireReplicator siegeWeaponFire;
+    private readonly ISiegeEngineStateReporter siegeEngineStateReporter;
+    private readonly IBattleHostRegistry hostRegistryRef;
+
+    // Whether the pre-live hold on vanilla's battle-end checks has been lifted (see OnMissionTick).
+    private bool endConditionHoldReleased;
     private readonly ISupplyProgressReporter supplyReporter;
     private readonly BattleTeamDiagnostics diagnostics = new BattleTeamDiagnostics();
 
@@ -82,16 +94,23 @@ public class CoopBattleController : CoopMissionController
         lifecycle = new BattleInstanceLifecycle(network, relayNetwork, messageBroker, objectManager, coopMissionComponent, session);
         replicator = new OwnedAgentReplicator(network, messageBroker, objectManager, coopMissionComponent, session, casualties, deployment);
         deathReporter = new AgentDeathReporter(network, relayNetwork, messageBroker, objectManager, coopMissionComponent, session, casualties);
+        routReporter = new AgentRoutReporter(network, messageBroker, coopMissionComponent, session, casualties);
         puppetSpawner = new PuppetSpawner(messageBroker, objectManager, coopMissionComponent, session, casualties, deployment, formationAssigner);
         puppetDeathApplier = new PuppetDeathApplier(messageBroker, coopMissionComponent, casualties);
+        puppetRoutApplier = new PuppetRoutApplier(messageBroker, coopMissionComponent, casualties);
         damageRouter = new BattleDamageRouter(network, messageBroker, coopMissionComponent, session);
         authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner);
         reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, session, deployment, formationAssigner);
+        siegeEngineDeployment = new SiegeEngineDeploymentReplicator(network, messageBroker, session);
+        siegeMachineState = new SiegeMachineStateReplicator(network, messageBroker, session, coopMissionComponent.AgentRegistry);
+        siegeWeaponFire = new SiegeWeaponFireReplicator(network, messageBroker, coopMissionComponent.AgentRegistry);
         supplyReporter = new SupplyProgressReporter(relayNetwork, session);
 
+        hostRegistryRef = hostRegistry;
         Session = session;
         Deployment = deployment;
         ResultCommitter = new BattleResultCommitter(objectManager, session, hostRegistry);
+        siegeEngineStateReporter = new SiegeEngineStateReporter(objectManager, session, hostRegistry, relayNetwork);
     }
 
     public override void Dispose()
@@ -99,12 +118,25 @@ public class CoopBattleController : CoopMissionController
         lifecycle.Dispose();
         replicator.Dispose();
         deathReporter.Dispose();
+        routReporter.Dispose();
         puppetSpawner.Dispose();
         puppetDeathApplier.Dispose();
+        puppetRoutApplier.Dispose();
         damageRouter.Dispose();
         authorityMigrator.Dispose();
         reinforcementFielder.Dispose();
+        siegeEngineDeployment.Dispose();
+        siegeMachineState.Dispose();
+        siegeWeaponFire.Dispose();
         Deployment.Dispose();
+
+        // OnMissionTick sets these each frame; reset them here (their owner) so a stale authority
+        // never bleeds into the next siege before the first tick refreshes it.
+        SiegeMissionAuthorityGate.IsLocalAuthority = false;
+        SiegeMissionAuthorityGate.IsAuthorityKnown = false;
+        SiegeMissionAuthorityGate.ResetClaimedMachines();
+        BattleConclusionGate.IsInCoopBattleMission = false;
+        BattleConclusionGate.IsLocalBattleHost = false;
 
         base.Dispose();
     }
@@ -113,9 +145,99 @@ public class CoopBattleController : CoopMissionController
     {
         base.OnMissionTick(dt);
 
+        // The mission host is the single siege authority (engine deployment and machine simulation);
+        // host election can settle after the mission opens, so keep the patch-visible flags current
+        // instead of latching them once. Siege missions only, so field battles never touch the gate.
+        if (Mission?.IsSiegeBattle == true)
+        {
+            SiegeMissionAuthorityGate.IsLocalAuthority = Session.IsLocalHost;
+            SiegeMissionAuthorityGate.IsAuthorityKnown = hostRegistryRef.TryGet(Session.InstanceId, out _);
+        }
+
+        // Only the battle host's mission conclusion may relay to the server (every coop battle mission).
+        BattleConclusionGate.IsInCoopBattleMission = true;
+        BattleConclusionGate.IsLocalBattleHost = Session.IsLocalHost;
+
+        // Drain before the end-condition gate below so a release sees this tick's fresh puppets.
         puppetSpawner.DrainPendingPuppets();
+
+        // Vanilla's end checks unlock at the LOCAL deployment finish, but a side whose troops arrive as
+        // another client's puppets can be empty long after activation (own-party troops stay withheld
+        // until their owner's commit), and the retreat check latches "everyone ran away" on an empty
+        // side. Hold the end conditions until the battle is live AND both sides actually field a live
+        // agent here. The only exception is a side whose reserve crossed the spawn handler's intentional
+        // timeout fallback; that exact side is allowed to start empty so the battle can conclude instead of
+        // wedging forever. The release is one-shot, so a later real depletion still concludes normally.
+        if (!endConditionHoldReleased)
+        {
+            var battleEndLogic = Mission?.GetMissionBehavior<BattleEndLogic>();
+            if (battleEndLogic != null)
+            {
+                bool battleLive = BattleReadyForEndChecks();
+                battleEndLogic.ChangeCanCheckForEndCondition(battleLive);
+                if (battleLive) endConditionHoldReleased = true;
+            }
+        }
+
+        siegeEngineDeployment.DrainPending(dt);
+        siegeMachineState.Tick(dt);
         diagnostics.Tick(dt);
         supplyReporter.Tick(dt);
+    }
+
+    // A side counts as fielded once some team of it has a live human agent (puppets qualify; they join
+    // teams like any agent). Mirrors CoopBattleDepletionPatch's live-agent count.
+    private bool BattleReadyForEndChecks()
+    {
+        bool attackerFielded = false;
+        bool defenderFielded = false;
+        foreach (var team in Mission.Teams)
+        {
+            if (team.Side != BattleSideEnum.Attacker && team.Side != BattleSideEnum.Defender) continue;
+            if (team.Side == BattleSideEnum.Attacker && attackerFielded) continue;
+            if (team.Side == BattleSideEnum.Defender && defenderFielded) continue;
+
+            foreach (var agent in team.ActiveAgents)
+            {
+                if (!agent.IsHuman) continue;
+                if (team.Side == BattleSideEnum.Attacker) attackerFielded = true;
+                else defenderFielded = true;
+                break;
+            }
+
+            if (attackerFielded && defenderFielded) break;
+        }
+
+        return ShouldReleaseEndConditionHold(
+            Deployment.IsActivated,
+            attackerFielded,
+            defenderFielded,
+            BattleSpawnGate.IsMissingReserveSideAccepted(BattleSideEnum.Attacker),
+            BattleSpawnGate.IsMissingReserveSideAccepted(BattleSideEnum.Defender));
+    }
+
+    /// <summary>
+    /// Pure release rule for the pre-live end-condition hold. A timeout is a substitute only for the side
+    /// whose reserve was deliberately abandoned; it cannot hide that the other side has not fielded yet.
+    /// </summary>
+    public static bool ShouldReleaseEndConditionHold(
+        bool deploymentActivated,
+        bool attackerFielded,
+        bool defenderFielded,
+        bool attackerMissingReserveAccepted,
+        bool defenderMissingReserveAccepted)
+    {
+        return deploymentActivated
+            && (attackerFielded || defenderFielded)
+            && (attackerFielded || attackerMissingReserveAccepted)
+            && (defenderFielded || defenderMissingReserveAccepted);
+    }
+
+    public override void OnAgentRemoved(Agent affectedAgent, Agent affectorAgent, AgentState agentState, KillingBlow killingBlow)
+    {
+        base.OnAgentRemoved(affectedAgent, affectorAgent, agentState, killingBlow);
+
+        deathReporter.OnAgentRemoved(affectedAgent, affectorAgent, agentState, killingBlow);
     }
 
     // The local player just finished their own deployment (Start Battle): the coordinator announces it to the
@@ -125,6 +247,8 @@ public class CoopBattleController : CoopMissionController
     public override void OnDeploymentFinished()
     {
         base.OnDeploymentFinished();
+
+        siegeEngineDeployment.MarkLocalDeploymentFinished();
 
         if (Deployment.OnLocalDeploymentFinished())
             replicator.BroadcastOwnDeployedTroops();
@@ -144,8 +268,11 @@ public class CoopBattleController : CoopMissionController
         // Catch a mid-battle joiner up on the activation state (a no-op while the battle is not live)...
         Deployment.CatchUpJoiner(controllerId);
 
-        // ...and on the live battle itself: replay the agents WE own so the joiner spawns matching puppets.
+        // ...and on the live battle itself: replay the agents WE own so the joiner spawns matching puppets,
+        // plus the siege engine placement when we are the deployer (a no-op in field battles).
         replicator.ReplicateCurrentAgentsTo(controllerId);
+        siegeEngineDeployment.CatchUpJoiner(controllerId);
+        siegeMachineState.CatchUpJoiner(controllerId);
     }
 
     protected override void HandleJoinInfo(NetPeer peer, NetworkMissionJoinInfo joinInfo)
@@ -157,6 +284,9 @@ public class CoopBattleController : CoopMissionController
 
     protected override void OnLeaving()
     {
+        // Report engine states before the commit, so the server applies them while the siege still exists.
+        siegeEngineStateReporter.ReportIfHost();
+
         // Commit the concluded battle's result to the campaign BEFORE tearing the instance down, so the server
         // captures losers / awards the win and finalizes the encounter.
         ResultCommitter.CommitResolvedResult();

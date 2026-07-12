@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.MapEvents;
@@ -18,9 +19,23 @@ public static class BattleSpawnGate
 {
     private static readonly object Gate = new object();
     private static string _activeMapEventId;
+    private static bool _defenderReserveTimedOut;
+    private static bool _attackerReserveTimedOut;
 
     [System.ThreadStatic]
     private static bool _suppressCapture;
+
+    [System.ThreadStatic]
+    private static Agent _replicatedDeathAgent;
+
+    [System.ThreadStatic]
+    private static Agent _replicatedDeathAffector;
+
+    [System.ThreadStatic]
+    private static KillingBlow _replicatedKillingBlow;
+
+    [System.ThreadStatic]
+    private static AgentState _replicatedDeathState;
 
     /// <summary>
     /// Set around a puppet spawn (<c>CoopBattleController.SpawnPuppet</c>) so the spawn-capture patch does NOT
@@ -49,9 +64,100 @@ public static class BattleSpawnGate
     /// </summary>
     public static Func<Agent, bool?> MountAuthorityProbe { get; set; }
 
+    /// <summary>Runs a replicated puppet death with the owner's kill-feed metadata available to UI patches.</summary>
+    public static void RunWithReplicatedDeath(
+        Agent affectedAgent,
+        Agent affectorAgent,
+        KillingBlow killingBlow,
+        AgentState agentState,
+        Action applyDeath)
+    {
+        var previousAgent = _replicatedDeathAgent;
+        var previousAffector = _replicatedDeathAffector;
+        var previousKillingBlow = _replicatedKillingBlow;
+        var previousAgentState = _replicatedDeathState;
+
+        _replicatedDeathAgent = affectedAgent;
+        _replicatedDeathAffector = affectorAgent;
+        _replicatedKillingBlow = killingBlow;
+        _replicatedDeathState = agentState;
+        try
+        {
+            applyDeath();
+        }
+        finally
+        {
+            _replicatedDeathAgent = previousAgent;
+            _replicatedDeathAffector = previousAffector;
+            _replicatedKillingBlow = previousKillingBlow;
+            _replicatedDeathState = previousAgentState;
+        }
+    }
+
+    public static bool IsReplicatedDeath(Agent affectedAgent)
+    {
+        return ReferenceEquals(_replicatedDeathAgent, affectedAgent);
+    }
+
+    public static bool TryGetReplicatedDeath(
+        Agent affectedAgent,
+        out Agent affectorAgent,
+        out KillingBlow killingBlow)
+    {
+        if (!IsReplicatedDeath(affectedAgent))
+        {
+            affectorAgent = null;
+            killingBlow = default;
+            return false;
+        }
+
+        affectorAgent = _replicatedDeathAffector;
+        killingBlow = _replicatedKillingBlow;
+        return true;
+    }
+
+    public static bool TryGetReplicatedDeathState(
+        Agent affectedAgent,
+        out AgentState agentState)
+    {
+        if (!IsReplicatedDeath(affectedAgent))
+        {
+            agentState = AgentState.None;
+            return false;
+        }
+
+        agentState = _replicatedDeathState;
+        return true;
+    }
+
     public static string ActiveMapEventId
     {
         get { lock (Gate) { return _activeMapEventId; } }
+    }
+
+    /// <summary>
+    /// Marks a side whose reserve never arrived before the spawn handler's explicit fallback deadline.
+    /// Battle-end checks may treat that side as intentionally absent once deployment is active; an ordinary
+    /// not-yet-spawned side is never marked and remains protected from premature depletion.
+    /// </summary>
+    public static void AcceptMissingReserveSide(BattleSideEnum side)
+    {
+        lock (Gate)
+        {
+            if (side == BattleSideEnum.Defender) _defenderReserveTimedOut = true;
+            else if (side == BattleSideEnum.Attacker) _attackerReserveTimedOut = true;
+        }
+    }
+
+    /// <summary>Whether the spawn handler deliberately proceeded without this side's reserve.</summary>
+    public static bool IsMissingReserveSideAccepted(BattleSideEnum side)
+    {
+        lock (Gate)
+        {
+            if (side == BattleSideEnum.Defender) return _defenderReserveTimedOut;
+            if (side == BattleSideEnum.Attacker) return _attackerReserveTimedOut;
+            return false;
+        }
     }
 
     /// <summary>[Controller] Mark a coop battle active.</summary>
@@ -60,6 +166,8 @@ public static class BattleSpawnGate
         lock (Gate)
         {
             _activeMapEventId = mapEventId;
+            _defenderReserveTimedOut = false;
+            _attackerReserveTimedOut = false;
         }
     }
 
@@ -69,6 +177,8 @@ public static class BattleSpawnGate
         lock (Gate)
         {
             _activeMapEventId = null;
+            _defenderReserveTimedOut = false;
+            _attackerReserveTimedOut = false;
         }
     }
 }

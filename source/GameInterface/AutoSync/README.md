@@ -103,3 +103,11 @@ public class MyAutoSyncClass : IAutoSync
 ### List
 ### MBList
 ### Queue
+### Dictionary
+
+`Dictionary<TKey, TValue>` members sync every mutation available to game code: `Add`, the indexer
+setter (`dict[key] = value`), `Remove(key)`, `Clear()` and whole-member reassignment. Key and value
+are synced independently, each either by value (protobuf serializable, optionally through a
+surrogate in `SurrogateCollection`) or by reference (resolved through the object manager). A key or
+value type that is neither serializable nor registry-managed fails the assembly build with a
+`NotSupportedException` naming the member.

@@ -62,7 +62,7 @@ namespace GameInterface.Services.Heroes
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.HasMet)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.LastMeetingTimeWithPlayer)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.BornSettlement)));
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Gold)));
+            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Gold)), coalesce: true);
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.RandomValue)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.BannerItem)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Father)));
@@ -70,7 +70,6 @@ namespace GameInterface.Services.Heroes
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Spouse)));
 
             // TODO add all fields
-            autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._health)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero.Culture)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._power)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._heroTraits)));
