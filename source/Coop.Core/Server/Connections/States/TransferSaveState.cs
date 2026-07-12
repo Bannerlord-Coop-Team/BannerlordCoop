@@ -55,7 +55,7 @@ public class TransferSaveState : ConnectionStateBase
             var saveResults = saveInterface.SaveCurrentGame();
 
             var savePacket = new GameSaveDataPacket(
-                saveResults.Data,
+                SaveDataCompression.Compress(saveResults.Data),
                 saveResults.CampaignId,
                 coopSessionProvider.CoopSession?.CraftingPlayerData,
                 coopSessionProvider.CoopSession?.WorkshopPlayerData,
