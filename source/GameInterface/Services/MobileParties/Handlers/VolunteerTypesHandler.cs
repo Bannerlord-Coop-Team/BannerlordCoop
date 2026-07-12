@@ -115,14 +115,15 @@ internal class VolunteerTypesHandler : IHandler
         for (int i = 0; i < volunteerTypes.Length; i++)
         {
             CharacterObject character = i == changedIndex ? changedValue : volunteerTypes[i];
-            if (character != null && objectManager.TryGetIdWithLogging(character, out var characterId))
-            {
-                volunteerTypeIds[i] = Compact(characterId, typeof(CharacterObject));
-            }
-            else
+            if (character == null)
             {
                 volunteerTypeIds[i] = string.Empty;
+                continue;
             }
+
+            if (!objectManager.TryGetIdWithLogging(character, out var characterId)) return false;
+
+            volunteerTypeIds[i] = Compact(characterId, typeof(CharacterObject));
         }
 
         return true;

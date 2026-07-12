@@ -52,6 +52,35 @@ public class VolunteerTypesHandlerTests
     }
 
     [Fact]
+    public void ArrayUpdate_UnresolvedNonNullVolunteerIsSkippedButNullSerializesEmpty()
+    {
+        var broker = new TestMessageBroker();
+        var objectManager = new ObjectManager(new Mock<ILogger>().Object);
+        var coalescer = new SendCoalescer();
+        var sent = new List<IMessage>();
+        var network = new Mock<INetwork>();
+        network.Setup(instance => instance.SendAll(It.IsAny<IMessage>())).Callback<IMessage>(sent.Add);
+        using var handler = new VolunteerTypesHandler(broker, objectManager, network.Object, coalescer);
+
+        var hero = CreateHero(objectManager, "Hero_hero_a");
+        hero.VolunteerTypes[0] = CreateCharacter(objectManager, "CharacterObject_troop_1");
+        var unresolvedTroop = ObjectHelper.SkipConstructor<CharacterObject>();
+
+        broker.Publish(hero, new VolunteerTypesArrayUpdated(hero, unresolvedTroop, 0));
+
+        Assert.False(coalescer.HasPending);
+        Assert.Empty(sent);
+
+        broker.Publish(hero, new VolunteerTypesArrayUpdated(hero, null, 0));
+        Assert.True(coalescer.HasPending);
+
+        coalescer.Flush(network.Object);
+
+        var message = Assert.IsType<UpdateVolunteers>(Assert.Single(sent));
+        Assert.Equal(string.Empty, message.UpdatedVolunteerTypeIds["hero_a"][0]);
+    }
+
+    [Fact]
     public void PeriodicUpdateAndRemoval_MergeIntoLatestSnapshots()
     {
         var broker = new TestMessageBroker();
