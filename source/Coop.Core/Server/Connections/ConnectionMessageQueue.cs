@@ -95,8 +95,7 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
 
     public bool TryHandleBroadcast(NetPeer peer, IPacket packet)
     {
-        // Time is latest-wins state, so replaying a loading backlog would move a client to stale time.
-        if (packet.PacketType == PacketType.CampaignTime) return false;
+        if (ShouldBypassLoadingQueue(packet)) return false;
 
         // No channel means a fully-joined (or unknown) peer: send live.
         if (channels.TryGetValue(peer, out var channel) == false) return false;
@@ -118,6 +117,12 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
                     return false;
             }
         }
+    }
+
+    private static bool ShouldBypassLoadingQueue(IPacket packet)
+    {
+        // Campaign time is a periodic current-state sample, not history to replay after loading.
+        return packet.PacketType == PacketType.CampaignTime;
     }
 
     public void BeginQueueing(NetPeer peer)

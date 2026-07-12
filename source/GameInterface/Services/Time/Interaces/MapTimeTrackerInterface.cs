@@ -74,6 +74,7 @@ internal class MapTimeTrackerInterface : IMapTimeTrackerInterface
     private const float PauseClientLeadMultiplier = 3f;
     private const float CorrectionSettleSeconds = 1.5f;
     private const float MaximumSlowdownRatio = 0.25f;
+    private const double ServerRateSmoothingRatio = 0.25d;
     private const float PacingLogDebounceSeconds = MaximumClientLeadSeconds * 2f;
     private const float MapSecondsPerCampaignDelta = 4320f;
 
@@ -212,11 +213,7 @@ internal class MapTimeTrackerInterface : IMapTimeTrackerInterface
         hasServerTime = true;
         if (isDiscontinuity == false && elapsedSincePreviousHeartbeat > 0f)
         {
-            double observedServerTicksPerSecond = (serverTicks - previousServerTicks) / elapsedSincePreviousHeartbeat;
-            serverTicksPerSecond = observedServerTicksPerSecond == 0d || hasEstimatedServerRate == false
-                ? observedServerTicksPerSecond
-                : ((serverTicksPerSecond * 0.75d) + (observedServerTicksPerSecond * 0.25d));
-            hasEstimatedServerRate = true;
+            UpdateEstimatedServerRate(lastServerProgressTicks, elapsedSincePreviousHeartbeat);
         }
 
         previousServerTicks = serverTicks;
@@ -232,6 +229,22 @@ internal class MapTimeTrackerInterface : IMapTimeTrackerInterface
         }
 
         return false;
+    }
+
+    private void UpdateEstimatedServerRate(long progressTicks, float elapsedSeconds)
+    {
+        double observedTicksPerSecond = progressTicks / elapsedSeconds;
+        if (hasEstimatedServerRate && observedTicksPerSecond != 0d)
+        {
+            serverTicksPerSecond +=
+                (observedTicksPerSecond - serverTicksPerSecond) * ServerRateSmoothingRatio;
+        }
+        else
+        {
+            serverTicksPerSecond = observedTicksPerSecond;
+        }
+
+        hasEstimatedServerRate = true;
     }
 
     internal bool TryConsumeHardSync(out long serverTicks)

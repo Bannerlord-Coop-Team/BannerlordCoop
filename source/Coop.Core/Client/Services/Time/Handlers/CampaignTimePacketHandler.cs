@@ -67,10 +67,14 @@ public class CampaignTimePacketHandler : IPacketHandler
         if (peer == null || peer.Ping <= 0) return;
 
         float measuredOneWayLatencySeconds = CalculateOneWayLatencySeconds(peer.Ping);
-        oneWayLatencySeconds = hasOneWayLatencyEstimate
-            ? (oneWayLatencySeconds * (1f - LatencySmoothingRatio)) +
-                (measuredOneWayLatencySeconds * LatencySmoothingRatio)
-            : measuredOneWayLatencySeconds;
+        if (hasOneWayLatencyEstimate)
+        {
+            oneWayLatencySeconds +=
+                (measuredOneWayLatencySeconds - oneWayLatencySeconds) * LatencySmoothingRatio;
+            return;
+        }
+
+        oneWayLatencySeconds = measuredOneWayLatencySeconds;
         hasOneWayLatencyEstimate = true;
     }
 }
