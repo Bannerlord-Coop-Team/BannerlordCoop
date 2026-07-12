@@ -6,6 +6,15 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.MobileParties.Data;
 
 /// <summary>
+/// Identifies how a replicated behavior interactable reference should be resolved.
+/// </summary>
+public enum BehaviorInteractableKind
+{
+    PartyBase = 0,
+    AnchorPoint = 1,
+}
+
+/// <summary>
 /// Contains the data used for <see cref="MobilePartyAi"/> behavior synchronisation.
 /// </summary>
 /// <seealso cref="MobilePartyBehaviorHandler"/>
@@ -47,6 +56,30 @@ public struct PartyBehaviorUpdateData
     [ProtoMember(14)]
     public bool ForcePosition { get; set; }
 
+    [ProtoMember(15)]
+    public string TargetPartyId { get; set; }
+
+    [ProtoMember(16)]
+    public string TargetSettlementId { get; set; }
+
+    [ProtoMember(17)]
+    public CampaignVec2 MoveTargetPoint { get; set; }
+
+    [ProtoMember(18)]
+    public bool IsTargetingPort { get; set; }
+
+    [ProtoMember(19)]
+    public MoveModeType PartyMoveMode { get; set; }
+
+    [ProtoMember(20)]
+    public string MoveTargetPartyId { get; set; }
+
+    [ProtoMember(21)]
+    public CampaignVec2 NextTargetPosition { get; set; }
+
+    [ProtoMember(22)]
+    public BehaviorInteractableKind InteractableKind { get; set; }
+
     public PartyBehaviorUpdateData(
         string mobilePartyId,
         AiBehavior newAiBehavior,
@@ -69,5 +102,13 @@ public struct PartyBehaviorUpdateData
         DesiredAiNavigationType = desiredAiNavigationType;
         OriginControllerId = null;
         ForcePosition = false;
+        TargetPartyId = null;
+        TargetSettlementId = null;
+        MoveTargetPoint = targetPosition;
+        IsTargetingPort = false;
+        PartyMoveMode = MoveModeType.Hold;
+        MoveTargetPartyId = null;
+        NextTargetPosition = targetPosition;
+        InteractableKind = BehaviorInteractableKind.PartyBase;
     }
 }

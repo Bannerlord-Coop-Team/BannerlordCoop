@@ -8,6 +8,8 @@ using Coop.IntegrationTests.Environment.Mock;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Handlers;
 using GameInterface.Services.MobileParties.Messages.Behavior;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -42,6 +44,18 @@ public class PartyBehaviorTest
 
         var client1 = TestEnvironment.Clients.First();
         var server = TestEnvironment.Server;
+        server.CreateRegisteredObject<MobileParty>("MobileParty_Test_Party");
+        server.Call(() =>
+        {
+            var playerManager = server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player(
+                originControllerId,
+                string.Empty,
+                "MobileParty_Test_Party",
+                string.Empty,
+                string.Empty)));
+            playerManager.SetPeer(originControllerId, client1.NetPeer);
+        });
 
         // Act
         client1.SimulateMessage(this, message);
@@ -96,7 +110,26 @@ public class PartyBehaviorTest
     {
         // Arrange: two updates for the same party, distinguished by HasTarget so the latest is identifiable.
         var first = new PartyBehaviorUpdateData("Test_Party", default, default, default, false, default, default, default, default);
-        var latest = new PartyBehaviorUpdateData("Test_Party", default, default, default, true, default, default, default, default);
+        var latestMoveTarget = new CampaignVec2(new Vec2(42f, 24f), true);
+        var latestNextTarget = new CampaignVec2(new Vec2(48f, 30f), true);
+        var latest = new PartyBehaviorUpdateData(
+            "Test_Party",
+            AiBehavior.GoToSettlement,
+            "Target_Settlement_Party",
+            latestMoveTarget,
+            true,
+            default,
+            AiBehavior.GoToSettlement,
+            latestMoveTarget,
+            MobileParty.NavigationType.Default)
+        {
+            TargetSettlementId = "Target_Settlement",
+            MoveTargetPoint = latestMoveTarget,
+            IsTargetingPort = true,
+            PartyMoveMode = MoveModeType.Party,
+            MoveTargetPartyId = "Target_Party",
+            NextTargetPosition = latestNextTarget,
+        };
 
         var server = TestEnvironment.Server;
 
@@ -112,12 +145,57 @@ public class PartyBehaviorTest
         // Assert: the two updates for the same party collapse into one send carrying the latest behavior.
         var sent = Assert.Single(server.NetworkSentMessages.GetMessages<NetworkUpdatePartyBehavior>());
         Assert.True(sent.BehaviorUpdateData.HasTarget);
+        Assert.Equal(AiBehavior.GoToSettlement, sent.BehaviorUpdateData.DefaultBehavior);
+        Assert.Equal("Target_Settlement", sent.BehaviorUpdateData.TargetSettlementId);
+        AssertCampaignVec2Equal(latestMoveTarget, sent.BehaviorUpdateData.MoveTargetPoint);
+        Assert.True(sent.BehaviorUpdateData.IsTargetingPort);
+        Assert.Equal(MoveModeType.Party, sent.BehaviorUpdateData.PartyMoveMode);
+        Assert.Equal("Target_Party", sent.BehaviorUpdateData.MoveTargetPartyId);
+        AssertCampaignVec2Equal(latestNextTarget, sent.BehaviorUpdateData.NextTargetPosition);
+
+        var serialized = server.EnsureSerializable(sent);
+        Assert.Equal("Target_Settlement", serialized.BehaviorUpdateData.TargetSettlementId);
+        AssertCampaignVec2Equal(latestMoveTarget, serialized.BehaviorUpdateData.MoveTargetPoint);
+        Assert.True(serialized.BehaviorUpdateData.IsTargetingPort);
+        Assert.Equal(MoveModeType.Party, serialized.BehaviorUpdateData.PartyMoveMode);
+        Assert.Equal("Target_Party", serialized.BehaviorUpdateData.MoveTargetPartyId);
+        AssertCampaignVec2Equal(latestNextTarget, serialized.BehaviorUpdateData.NextTargetPosition);
 
         foreach (var client in TestEnvironment.Clients)
         {
             var update = Assert.Single(client.InternalMessages.GetMessages<UpdatePartyBehavior>());
             Assert.True(update.BehaviorUpdateData.HasTarget);
+            Assert.Equal(MoveModeType.Party, update.BehaviorUpdateData.PartyMoveMode);
+            Assert.Equal("Target_Party", update.BehaviorUpdateData.MoveTargetPartyId);
+            AssertCampaignVec2Equal(latestNextTarget, update.BehaviorUpdateData.NextTargetPosition);
         }
+    }
+
+    [Fact]
+    public void NetworkUpdatePartyBehavior_AnchorInteractableKind_RoundTrips()
+    {
+        var data = new PartyBehaviorUpdateData(
+            "Test_Party",
+            AiBehavior.GoToPoint,
+            "Anchor_Owner",
+            default,
+            true,
+            default,
+            AiBehavior.GoToPoint,
+            default,
+            MobileParty.NavigationType.Default)
+        {
+            InteractableKind = BehaviorInteractableKind.AnchorPoint,
+        };
+
+        var serialized = TestEnvironment.Server.EnsureSerializable(
+            new NetworkUpdatePartyBehavior(data));
+
+        Assert.True(serialized.BehaviorUpdateData.HasTarget);
+        Assert.Equal("Anchor_Owner", serialized.BehaviorUpdateData.InteractablePointId);
+        Assert.Equal(
+            BehaviorInteractableKind.AnchorPoint,
+            serialized.BehaviorUpdateData.InteractableKind);
     }
 
     /// <summary>
@@ -232,5 +310,12 @@ public class PartyBehaviorTest
     private static void FlushCoalescer(EnvironmentInstance server)
     {
         server.Call(() => server.Resolve<ISendCoalescer>().Flush(server.Resolve<INetwork>()));
+    }
+
+    private static void AssertCampaignVec2Equal(CampaignVec2 expected, CampaignVec2 actual)
+    {
+        Assert.Equal(expected.X, actual.X);
+        Assert.Equal(expected.Y, actual.Y);
+        Assert.Equal(expected.IsOnLand, actual.IsOnLand);
     }
 }

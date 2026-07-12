@@ -16,12 +16,19 @@ internal readonly struct PartyBehaviorChangeAttempted : IEvent
     public readonly AiBehavior NewAiBehavior;
     public readonly IInteractablePoint InteractablePoint;
     public readonly CampaignVec2 BestTargetPoint;
+    public readonly bool StateAlreadyApplied;
 
-    public PartyBehaviorChangeAttempted(MobilePartyAi partyAi, AiBehavior newAiBehavior, IInteractablePoint interactablePoint, CampaignVec2 bestTargetPoint)
+    public PartyBehaviorChangeAttempted(
+        MobilePartyAi partyAi,
+        AiBehavior newAiBehavior,
+        IInteractablePoint interactablePoint,
+        CampaignVec2 bestTargetPoint,
+        bool stateAlreadyApplied = false)
     {
         PartyAi = partyAi;
         NewAiBehavior = newAiBehavior;
         InteractablePoint = interactablePoint;
         BestTargetPoint = bestTargetPoint;
+        StateAlreadyApplied = stateAlreadyApplied;
     }
 }
