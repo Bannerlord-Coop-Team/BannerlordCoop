@@ -28,7 +28,7 @@ public class MissileReplayPlannerTests
             currentVictimPosition,
             new Vec3(50f, 0f, 0f));
 
-        Vec3 endpoint = plan.Position + plan.Direction * plan.Speed * plan.RemainingFlightSeconds;
+        Vec3 endpoint = plan.Position + (plan.Direction * (plan.Speed * plan.RemainingFlightSeconds));
 
         Assert.True(plan.IsFastForwarded);
         AssertVec3(currentVictimPosition, endpoint);
@@ -66,7 +66,7 @@ public class MissileReplayPlannerTests
         AssertVec3(origin, plan.Position);
         Assert.Equal(1f / 50f, plan.RemainingFlightSeconds, 4);
         AssertVec3(currentVictimPosition,
-            plan.Position + plan.Direction * plan.Speed * plan.RemainingFlightSeconds);
+            plan.Position + (plan.Direction * (plan.Speed * plan.RemainingFlightSeconds)));
     }
 
     [Fact]

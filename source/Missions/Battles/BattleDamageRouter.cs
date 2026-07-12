@@ -644,11 +644,11 @@ public class BattleDamageRouter : IBattleDamageRouter
             displacement = damage.CollisionData.CollisionGlobalPosition - reconstruction.Position;
 
         double horizontalDistance = Math.Sqrt(
-            (double)displacement.X * displacement.X + (double)displacement.Y * displacement.Y);
+            ((double)displacement.X * displacement.X) + ((double)displacement.Y * displacement.Y));
         double distance = Math.Sqrt(
-            (double)displacement.X * displacement.X
-            + (double)displacement.Y * displacement.Y
-            + (double)displacement.Z * displacement.Z);
+            ((double)displacement.X * displacement.X)
+            + ((double)displacement.Y * displacement.Y)
+            + ((double)displacement.Z * displacement.Z));
 
         double launchSpeed = IsUsableSpeed(reconstruction.Speed)
             ? reconstruction.Speed
@@ -660,17 +660,17 @@ public class BattleDamageRouter : IBattleDamageRouter
         if (!IsFinite(impactVelocity) || impactVelocity.LengthSquared <= 0.0001f)
             impactVelocity = damage.CollisionData.MissileVelocity;
         double impactSpeed = IsFinite(impactVelocity)
-            ? Math.Sqrt((double)impactVelocity.X * impactVelocity.X
-                + (double)impactVelocity.Y * impactVelocity.Y
-                + (double)impactVelocity.Z * impactVelocity.Z)
+            ? Math.Sqrt(((double)impactVelocity.X * impactVelocity.X)
+                + ((double)impactVelocity.Y * impactVelocity.Y)
+                + ((double)impactVelocity.Z * impactVelocity.Z))
             : 0d;
 
         double launchHorizontalSpeed = Math.Sqrt(
-            (double)reconstruction.Direction.X * reconstruction.Direction.X
-            + (double)reconstruction.Direction.Y * reconstruction.Direction.Y) * launchSpeed;
+            ((double)reconstruction.Direction.X * reconstruction.Direction.X)
+            + ((double)reconstruction.Direction.Y * reconstruction.Direction.Y)) * launchSpeed;
         double impactHorizontalSpeed = IsFinite(impactVelocity)
-            ? Math.Sqrt((double)impactVelocity.X * impactVelocity.X
-                + (double)impactVelocity.Y * impactVelocity.Y)
+            ? Math.Sqrt(((double)impactVelocity.X * impactVelocity.X)
+                + ((double)impactVelocity.Y * impactVelocity.Y))
             : 0d;
 
         double estimatedSeconds;

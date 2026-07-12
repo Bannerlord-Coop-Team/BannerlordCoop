@@ -72,7 +72,7 @@ internal static class MissileReplayPlanner
         if (hasOriginToTarget && originToTargetDistance <= desiredDistance)
             finalDirection = originToTarget;
 
-        Vec3 finalPosition = currentImpactTarget - finalDirection * segmentDistance;
+        Vec3 finalPosition = currentImpactTarget - (finalDirection * segmentDistance);
         if (!IsFinite(finalPosition))
             return new MissileReplayPlan(safePosition, safeDirection, safeOrientation, safeSpeed, 0f, false);
 
@@ -97,9 +97,9 @@ internal static class MissileReplayPlanner
         if (!IsFinite(value))
             return false;
 
-        double lengthSquared = (double)value.X * value.X
-            + (double)value.Y * value.Y
-            + (double)value.Z * value.Z;
+        double lengthSquared = ((double)value.X * value.X)
+            + ((double)value.Y * value.Y)
+            + ((double)value.Z * value.Z);
         if (!IsFinite(lengthSquared) || lengthSquared <= MinimumDirectionLengthSquared)
             return false;
 
@@ -121,9 +121,9 @@ internal static class MissileReplayPlanner
         TryNormalize(side, out side, out _);
 
         Vec3 up = new Vec3(
-            side.Y * forward.Z - side.Z * forward.Y,
-            side.Z * forward.X - side.X * forward.Z,
-            side.X * forward.Y - side.Y * forward.X);
+            (side.Y * forward.Z) - (side.Z * forward.Y),
+            (side.Z * forward.X) - (side.X * forward.Z),
+            (side.X * forward.Y) - (side.Y * forward.X));
         TryNormalize(up, out up, out _);
         return new Mat3(side, forward, up);
     }
