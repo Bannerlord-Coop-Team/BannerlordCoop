@@ -58,7 +58,7 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
             if (mapEvent.StringId == null) continue;
 
             RegisterExistingObject(mapEvent.StringId, mapEvent);
-            initializationBarrier.AdoptExisting(mapEvent);
+            initializationBarrier.Register(mapEvent, committed: true);
         }
     }
 
@@ -71,7 +71,7 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
             obj.WonRounds = new MBList<BattleSideEnum>();
         }
 
-        initializationBarrier.RegisterClient(obj);
+        initializationBarrier.Register(obj);
     }
 
     public override void OnClientDestroyed(MapEvent obj, string id)
@@ -236,7 +236,7 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 
     public override void OnServerCreated(MapEvent obj, string id)
     {
-        initializationBarrier.BeginServer(obj);
+        initializationBarrier.Register(obj);
     }
 
     public override void OnServerDestroyed(MapEvent obj, string id)

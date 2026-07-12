@@ -3,18 +3,13 @@ using GameInterface.Policies;
 using GameInterface.Services.MapEvents.Initialization;
 using HarmonyLib;
 using System;
-using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
-/// <summary>
-/// Brackets server MapEvent construction with one initialization barrier. The first manager tick
-/// publishes completed graphs before vanilla updates them, while exceptional and early-finalization
-/// paths publish a terminal graph before their destroy stream begins.
-/// </summary>
 [HarmonyPatch]
 internal static class MapEventInitializationPatches
 {
@@ -23,31 +18,23 @@ internal static class MapEventInitializationPatches
     [HarmonyPriority(Priority.First)]
     private static Exception Finalizer_MapEventConstructor(MapEvent __instance, Exception __exception)
     {
-        if (__exception != null && TryResolveServerBarrier(out var barrier))
-            barrier.AbortServer(__instance);
-
+        if (__exception != null && TryResolve(out var barrier)) barrier.AbortServer(__instance);
         return __exception;
     }
 
-    [HarmonyPatch(typeof(PartyBase), "set_MapEventSide")]
+    [HarmonyPatch(typeof(PartyBase), nameof(PartyBase.MapEventSide), MethodType.Setter)]
     [HarmonyPrefix]
     [HarmonyPriority(Priority.First)]
-    private static void Prefix_PartyBaseMapEventSide(
-        PartyBase __instance,
-        MapEventSide value,
-        out bool __state)
+    private static void Prefix_PartyBaseMapEventSide(PartyBase __instance, MapEventSide value, out bool __state)
     {
         __state = false;
-        if (!ReferenceEquals(__instance?.MapEventSide, value) &&
-            value?.MapEvent != null &&
-            TryResolveServerBarrier(out var barrier))
-        {
-            barrier.AnnounceServerParty(value.MapEvent, __instance);
-            __state = true;
-        }
+        if (ReferenceEquals(__instance?.MapEventSide, value) || value?.MapEvent == null ||
+            !TryResolve(out var barrier)) return;
+        barrier.SetServerPartyPending(value.MapEvent, __instance, true);
+        __state = true;
     }
 
-    [HarmonyPatch(typeof(PartyBase), "set_MapEventSide")]
+    [HarmonyPatch(typeof(PartyBase), nameof(PartyBase.MapEventSide), MethodType.Setter)]
     [HarmonyFinalizer]
     [HarmonyPriority(Priority.First)]
     private static Exception Finalizer_PartyBaseMapEventSide(
@@ -56,50 +43,28 @@ internal static class MapEventInitializationPatches
         bool __state,
         Exception __exception)
     {
-        if (__state && __exception != null && value?.MapEvent != null &&
-            TryResolveServerBarrier(out var barrier))
-            barrier.CancelServerParty(value.MapEvent, __instance);
-
+        if (__state && value?.Parties?.Any(party => ReferenceEquals(party?.Party, __instance)) != true &&
+            value?.MapEvent != null && TryResolve(out var barrier))
+            barrier.SetServerPartyPending(value.MapEvent, __instance, false);
         return __exception;
-    }
-
-    [HarmonyPatch(typeof(PartyBase), "set_MapEventSide")]
-    [HarmonyPostfix]
-    [HarmonyPriority(Priority.First)]
-    private static void Postfix_PartyBaseMapEventSide(
-        PartyBase __instance,
-        MapEventSide value,
-        bool __state)
-    {
-        if (__state && !ReferenceEquals(__instance?.MapEventSide, value) && value?.MapEvent != null &&
-            TryResolveServerBarrier(out var barrier))
-            barrier.CancelServerParty(value.MapEvent, __instance);
     }
 
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.Initialize))]
     [HarmonyPrefix]
     [HarmonyPriority(Priority.First)]
-    private static void Prefix_MapEventInitialize(
-        MapEvent __instance,
-        PartyBase attackerParty,
-        PartyBase defenderParty)
+    private static void Prefix_MapEventInitialize(MapEvent __instance, PartyBase attackerParty, PartyBase defenderParty)
     {
-        if (!TryResolveServerBarrier(out var barrier)) return;
-
-        barrier.AnnounceServerParty(__instance, attackerParty);
-        barrier.AnnounceServerParty(__instance, defenderParty);
+        if (!TryResolve(out var barrier)) return;
+        barrier.SetServerPartyPending(__instance, attackerParty, true);
+        barrier.SetServerPartyPending(__instance, defenderParty, true);
     }
 
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.Initialize))]
     [HarmonyFinalizer]
     [HarmonyPriority(Priority.First)]
-    private static Exception Finalizer_MapEventInitialize(
-        MapEvent __instance,
-        Exception __exception)
+    private static Exception Finalizer_MapEventInitialize(MapEvent __instance, Exception __exception)
     {
-        if (__exception != null && TryResolveServerBarrier(out var barrier))
-            barrier.AbortServer(__instance);
-
+        if (__exception != null && TryResolve(out var barrier)) barrier.AbortServer(__instance);
         return __exception;
     }
 
@@ -107,42 +72,22 @@ internal static class MapEventInitializationPatches
     [HarmonyPostfix]
     private static void Postfix_MapEventAddInvolvedParty(MapEvent __instance, MapEventParty mapEventParty)
     {
-        if (TryResolveServerBarrier(out var barrier))
-            barrier.TrackParty(__instance, mapEventParty);
+        if (TryResolve(out var barrier)) barrier.TrackParty(__instance, mapEventParty);
     }
 
-    [HarmonyPatch(typeof(MapEventManager), nameof(MapEventManager.Tick))]
-    [HarmonyPrefix]
-    [HarmonyPriority(Priority.First)]
-    private static void Prefix_MapEventManagerTick(MapEventManager __instance)
+    [HarmonyPatch(typeof(MapEventManager), nameof(MapEventManager.OnMapEventCreated))]
+    [HarmonyPostfix]
+    [HarmonyPriority(Priority.Last)]
+    private static void Postfix_MapEventCreated(MapEvent mapEvent)
     {
-        if (!TryResolveServerBarrier(out var barrier)) return;
-
-        var mapEvents = new List<MapEvent>(__instance.MapEvents);
-        foreach (var mapEvent in mapEvents)
-            barrier.CommitServer(mapEvent);
+        if (TryResolve(out var barrier)) barrier.CommitServer(mapEvent);
     }
 
-    [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.FinalizeEventAux))]
-    [HarmonyPrefix]
-    [HarmonyPriority(Priority.First)]
-    private static void Prefix_MapEventFinalizeEventAux(MapEvent __instance)
-    {
-        if (TryResolveServerBarrier(out var barrier))
-            barrier.CommitTerminalServer(__instance);
-    }
-
-    private static bool TryResolveServerBarrier(out IMapEventInitializationBarrier barrier)
+    private static bool TryResolve(out IMapEventInitializationBarrier barrier)
     {
         barrier = null;
-        if (!ModInformation.IsServer ||
-            !ContainerProvider.TryResolve(out barrier) ||
-            CallOriginalPolicy.IsOriginalAllowed())
-        {
-            barrier = null;
-            return false;
-        }
-
-        return true;
+        return ModInformation.IsServer &&
+            !CallOriginalPolicy.IsOriginalAllowed() &&
+            ContainerProvider.TryResolve(out barrier);
     }
 }

@@ -1,6 +1,5 @@
 ﻿using Common.Util;
 using GameInterface.Registry.Auto;
-using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using SandBox.GauntletUI.Map;
@@ -14,17 +13,13 @@ namespace GameInterface.Services.GuantletMapEventVisuals;
 
 internal class GauntletMapEventVisualRegistry : AutoRegistryBase<GauntletMapEventVisual>
 {
-    private readonly IMapEventInitializationBarrier initializationBarrier;
-
     public override bool Debug => true;
     public GauntletMapEventVisualRegistry(
         ILogger logger,
         IAutoRegistryFactory autoRegistryFactory,
-        IObjectManager objectManager,
-        IMapEventInitializationBarrier initializationBarrier)
+        IObjectManager objectManager)
         : base(logger, autoRegistryFactory, objectManager)
     {
-        this.initializationBarrier = initializationBarrier;
     }
 
     public override IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(GauntletMapEventVisual));
@@ -80,10 +75,7 @@ internal class GauntletMapEventVisualRegistry : AutoRegistryBase<GauntletMapEven
 
     public override void OnClientDestroyed(GauntletMapEventVisual obj, string id)
     {
-        using (new AllowedThread())
-        {
-            initializationBarrier.EndVisual(obj);
-        }
+        using (new AllowedThread()) obj.OnMapEventEnd();
     }
 
     public override void OnServerCreated(GauntletMapEventVisual obj, string id)

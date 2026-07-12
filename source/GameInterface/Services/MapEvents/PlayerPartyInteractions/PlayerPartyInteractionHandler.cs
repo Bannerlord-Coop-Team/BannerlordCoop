@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -119,47 +119,29 @@ internal class PlayerPartyInteractionHandler : IHandler
         if (ModInformation.IsClient) return false;
 
         PlayerPartyInteractionSession session;
-        bool denyAsBusy;
         lock (sessionGate)
         {
             var existing = FindExistingSession(request.AttackerId) ?? FindExistingSession(request.DefenderId);
             if (existing != null)
             {
-                // Reliable retries and simultaneous opposite-direction requests for the same pair are
-                // idempotent. A party already reserved by any other pairing is busy; first reservation wins.
-                denyAsBusy = !IsSamePair(existing, request.AttackerId, request.DefenderId);
-                session = null;
+                if (!IsSamePair(existing, request.AttackerId, request.DefenderId))
+                    network.Send(initiatorPeer, new NetworkPlayerPartyInteractionDenied(PlayerPartyInteractionDeniedReason.Busy));
+                return false;
             }
-            else
-            {
-                denyAsBusy = false;
-                var isHostile = AreHostile(initiatorParty, responderParty);
 
-                session = new PlayerPartyInteractionSession(
-                    Guid.NewGuid().ToString("N"),
-                    request.AttackerId,
-                    request.DefenderId,
-                    GetPartyName(initiatorParty, "Player"),
-                    GetPartyName(responderParty, "Player"),
-                    initiatorPeer,
-                    isHostile);
-
-                AddInitialOptions(session, initiatorParty, responderParty);
-
-                if (!sessionsById.TryAdd(session.SessionId, session))
-                    return false;
-
-                sessionsByPartyId[session.InitiatorPartyId] = session.SessionId;
-                sessionsByPartyId[session.ResponderPartyId] = session.SessionId;
-                conversationPartyTracker.BeginPvpConversation(session.InitiatorPartyId, session.ResponderPartyId);
-            }
-        }
-
-        if (session == null)
-        {
-            if (denyAsBusy)
-                network.Send(initiatorPeer, new NetworkPlayerPartyInteractionDenied(PlayerPartyInteractionDeniedReason.Busy));
-            return false;
+            session = new PlayerPartyInteractionSession(
+                Guid.NewGuid().ToString("N"),
+                request.AttackerId,
+                request.DefenderId,
+                GetPartyName(initiatorParty, "Player"),
+                GetPartyName(responderParty, "Player"),
+                initiatorPeer,
+                AreHostile(initiatorParty, responderParty));
+            AddInitialOptions(session, initiatorParty, responderParty);
+            if (!sessionsById.TryAdd(session.SessionId, session)) return false;
+            sessionsByPartyId[session.InitiatorPartyId] = session.SessionId;
+            sessionsByPartyId[session.ResponderPartyId] = session.SessionId;
+            conversationPartyTracker.BeginPvpConversation(session.InitiatorPartyId, session.ResponderPartyId);
         }
 
         GameThread.RunSafe(() =>
@@ -236,6 +218,11 @@ internal class PlayerPartyInteractionHandler : IHandler
         if (!(payload.Who is NetPeer peer)) return;
 
         var message = payload.What;
+        GameThread.RunSafe(() => ProcessSubmittedOption(peer, message), context: nameof(Handle_NetworkSubmitPlayerPartyInteractionOption));
+    }
+
+    private void ProcessSubmittedOption(NetPeer peer, NetworkSubmitPlayerPartyInteractionOption message)
+    {
         if (!sessionsById.TryGetValue(message.SessionId, out var session))
         {
             Logger.Warning(
@@ -737,8 +724,8 @@ internal class PlayerPartyInteractionHandler : IHandler
         {
             if (!sessionsById.TryRemove(session.SessionId, out _)) return;
 
-            RemovePartyReservation(session.InitiatorPartyId, session.SessionId);
-            RemovePartyReservation(session.ResponderPartyId, session.SessionId);
+            sessionsByPartyId.TryRemove(session.InitiatorPartyId, out _);
+            sessionsByPartyId.TryRemove(session.ResponderPartyId, out _);
             conversationPartyTracker.EndPvpConversation(session.InitiatorPartyId);
         }
 
@@ -862,14 +849,6 @@ internal class PlayerPartyInteractionHandler : IHandler
     private static bool IsSamePair(PlayerPartyInteractionSession session, string partyA, string partyB)
         => (session.InitiatorPartyId == partyA && session.ResponderPartyId == partyB) ||
            (session.InitiatorPartyId == partyB && session.ResponderPartyId == partyA);
-
-    private void RemovePartyReservation(string partyId, string sessionId)
-    {
-        if (!sessionsByPartyId.TryGetValue(partyId, out var currentSessionId) || currentSessionId != sessionId)
-            return;
-
-        sessionsByPartyId.TryRemove(partyId, out _);
-    }
 
     private static bool AreHostile(PartyBase initiatorParty, PartyBase responderParty)
     {

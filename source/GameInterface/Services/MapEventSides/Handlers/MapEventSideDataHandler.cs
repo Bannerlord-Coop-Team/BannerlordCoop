@@ -86,7 +86,11 @@ internal class MapEventSideDataHandler : IHandler
                     return;
                 }
 
-                initializationBarrier.DetachClient(side, party);
+                using (new AllowedThread())
+                {
+                    side._battleParties.Remove(party);
+                    if (party.Party?.MapEventSide == side) party.Party._mapEventSide = null;
+                }
             }
             catch (Exception e)
             {

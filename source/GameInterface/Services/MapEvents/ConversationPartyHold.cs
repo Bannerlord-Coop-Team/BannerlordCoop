@@ -1,4 +1,4 @@
-using GameInterface.Services.ObjectManager;
+﻿using GameInterface.Services.ObjectManager;
 using System;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;

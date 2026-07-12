@@ -1,7 +1,9 @@
+﻿using Common;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 
 namespace GameInterface.Services.MapEvents;
@@ -22,8 +24,8 @@ internal sealed class ConversationPartyTracker : IHandler
     internal static ConversationPartyTracker Instance { get; private set; }
 
     private readonly object stateLock = new object();
-    private readonly Dictionary<string, EngagementGroup> engagementsByPartyId = new Dictionary<string, EngagementGroup>();
-    private readonly Dictionary<object, string> partyIdsByEngager = new Dictionary<object, string>(ReferenceObjectComparer.Instance);
+    private readonly Dictionary<object, Engagement> engagements =
+        new Dictionary<object, Engagement>(ReferenceObjectComparer.Instance);
 
     // Player-vs-player conversations: both player parties' ids -> the partner's id. Unlike an AI engagement no party
     // is held/AI-disabled; this just marks the two players unattackable by anyone but each other until the battle
@@ -56,14 +58,14 @@ internal sealed class ConversationPartyTracker : IHandler
 
     public void Dispose()
     {
-        List<KeyValuePair<string, EngagementGroup>> leftovers;
+        Dictionary<string, bool> leftovers;
         lock (stateLock)
         {
             if (disposed) return;
             disposed = true;
-            leftovers = new List<KeyValuePair<string, EngagementGroup>>(engagementsByPartyId);
-            engagementsByPartyId.Clear();
-            partyIdsByEngager.Clear();
+            leftovers = engagements.Values.GroupBy(x => x.PartyId)
+                .ToDictionary(x => x.Key, x => x.First().WasAiDisabled);
+            engagements.Clear();
             pvpPartnersByPartyId.Clear();
             pvpPeerByPartyId.Clear();
             pvpPartyIdByPeer.Clear();
@@ -74,11 +76,13 @@ internal sealed class ConversationPartyTracker : IHandler
         // The campaign can outlive this co-op session (the container is disposed on leaving the mode while the
         // game stays loaded), and MobilePartyAi._isDisabled is a saveable field that vanilla never re-enables on
         // its own - so any party still held here must be released now or it stays frozen forever.
-        using (new AllowedThread())
+        GameThread.RunSafe(() =>
         {
             foreach (var leftover in leftovers)
-                ConversationPartyHold.ReleaseParty(ObjectManager, leftover.Key, leftover.Value.WasAiDisabled);
-        }
+                ConversationPartyHold.ReleaseParty(ObjectManager, leftover.Key, leftover.Value);
+        },
+            blocking: true,
+            context: nameof(ConversationPartyTracker));
 
         if (Instance == this) Instance = null;
     }
@@ -92,13 +96,16 @@ internal sealed class ConversationPartyTracker : IHandler
         /// <summary>Id of the engaging player's party; interactions from that party stay allowed.</summary>
         public readonly string EngagerPartyId;
 
+        public readonly string PartyId;
+
         /// <summary>Whether the party's AI was already disabled before the hold, so release preserves that state.</summary>
         public readonly bool WasAiDisabled;
 
-        public Engagement(object engagerKey, string engagerPartyId, bool wasAiDisabled)
+        public Engagement(object engagerKey, string engagerPartyId, string partyId, bool wasAiDisabled)
         {
             EngagerKey = engagerKey;
             EngagerPartyId = engagerPartyId;
+            PartyId = partyId;
             WasAiDisabled = wasAiDisabled;
         }
     }
@@ -114,19 +121,11 @@ internal sealed class ConversationPartyTracker : IHandler
         lock (stateLock)
         {
             if (disposed) return false;
-            if (partyIdsByEngager.TryGetValue(engagerKey, out var currentPartyId))
-            {
-                return currentPartyId == partyId;
-            }
+            if (engagements.TryGetValue(engagerKey, out var current)) return current.PartyId == partyId;
+            var existing = engagements.Values.FirstOrDefault(x => x.PartyId == partyId);
+            if (existing.PartyId != null) wasAiDisabled = existing.WasAiDisabled;
 
-            if (!engagementsByPartyId.TryGetValue(partyId, out var group))
-            {
-                group = new EngagementGroup(wasAiDisabled);
-                engagementsByPartyId[partyId] = group;
-            }
-
-            group.Engagements[engagerKey] = new Engagement(engagerKey, engagerPartyId, group.WasAiDisabled);
-            partyIdsByEngager[engagerKey] = partyId;
+            engagements.Add(engagerKey, new Engagement(engagerKey, engagerPartyId, partyId, wasAiDisabled));
             isEmpty = false;
             return true;
         }
@@ -147,23 +146,11 @@ internal sealed class ConversationPartyTracker : IHandler
 
         lock (stateLock)
         {
-            if (!partyIdsByEngager.TryGetValue(engagerKey, out partyId))
-                return false;
-
-            partyIdsByEngager.Remove(engagerKey);
-
-            if (!engagementsByPartyId.TryGetValue(partyId, out var group) ||
-                !group.Engagements.TryGetValue(engagerKey, out engagement))
-                return false;
-
-            group.Engagements.Remove(engagerKey);
-            if (group.Engagements.Count == 0)
-            {
-                engagementsByPartyId.Remove(partyId);
-                shouldReleaseParty = true;
-            }
-
-            isEmpty = engagementsByPartyId.Count == 0;
+            if (!engagements.TryGetValue(engagerKey, out engagement)) return false;
+            var endedPartyId = partyId = engagement.PartyId;
+            engagements.Remove(engagerKey);
+            shouldReleaseParty = !engagements.Values.Any(x => x.PartyId == endedPartyId);
+            isEmpty = engagements.Count == 0;
             return true;
         }
     }
@@ -180,16 +167,8 @@ internal sealed class ConversationPartyTracker : IHandler
 
         lock (stateLock)
         {
-            if (!engagementsByPartyId.TryGetValue(partyId, out var group))
-                return false;
-
-            foreach (var candidate in group.Engagements.Values)
-            {
-                engagement = candidate;
-                return true;
-            }
-
-            return false;
+            engagement = engagements.Values.FirstOrDefault(x => x.PartyId == partyId);
+            return engagement.PartyId != null;
         }
     }
 
@@ -199,16 +178,7 @@ internal sealed class ConversationPartyTracker : IHandler
 
         lock (stateLock)
         {
-            if (!engagementsByPartyId.TryGetValue(partyId, out var group))
-                return false;
-
-            foreach (var engagement in group.Engagements.Values)
-            {
-                if (engagement.EngagerPartyId == engagerPartyId)
-                    return true;
-            }
-
-            return false;
+            return engagements.Values.Any(x => x.PartyId == partyId && x.EngagerPartyId == engagerPartyId);
         }
     }
 
@@ -219,20 +189,8 @@ internal sealed class ConversationPartyTracker : IHandler
 
         lock (stateLock)
         {
-            return engagementsByPartyId.TryGetValue(partyId, out var group) &&
-                (engagerKey == null || !group.Engagements.ContainsKey(engagerKey));
-        }
-    }
-
-    private sealed class EngagementGroup
-    {
-        public readonly bool WasAiDisabled;
-        public readonly Dictionary<object, Engagement> Engagements =
-            new Dictionary<object, Engagement>(ReferenceObjectComparer.Instance);
-
-        public EngagementGroup(bool wasAiDisabled)
-        {
-            WasAiDisabled = wasAiDisabled;
+            return engagements.Values.Any(x => x.PartyId == partyId) &&
+                engagements.Values.All(x => x.PartyId != partyId || !ReferenceEquals(x.EngagerKey, engagerKey));
         }
     }
 

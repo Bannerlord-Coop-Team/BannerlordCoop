@@ -3,7 +3,6 @@ using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
-using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
@@ -60,7 +59,7 @@ public abstract class MapEventTestBase : IDisposable
     /// Creates and registers a <see cref="MapEvent"/> on the server with two <see cref="MobileParty"/>
     /// participants, returning the IDs of the map event, attacker party, and defender party.
     /// </summary>
-    protected MapEventContext CreateServerMapEvent()
+    protected MapEventContext CreateServerMapEvent(bool commit = true)
     {
         string? mapEventId = null;
         string? attackerPartyId = null;
@@ -79,11 +78,15 @@ public abstract class MapEventTestBase : IDisposable
             // Construction has already replicated the MapEvent to the clients, where the real
             // MapEventRegistry.OnClientCreated runs and allocates their _sides array. The synchronous
             // MapEventSideAssigned replication produced by Initialize therefore lands on a non-null array.
-            mapEvent.Initialize(attackerParty.Party, defenderParty.Party);
+            mapEvent.Initialize(
+                attackerParty.Party,
+                defenderParty.Party,
+                new FieldBattleEventComponent(mapEvent),
+                MapEvent.BattleTypes.FieldBattle);
+            mapEvent.MapEventVisual = null;
 
-            if (!Campaign.Current.MapEventManager.MapEvents.Contains(mapEvent))
+            if (commit && !Campaign.Current.MapEventManager.MapEvents.Contains(mapEvent))
                 Campaign.Current.MapEventManager.OnMapEventCreated(mapEvent);
-            Server.Resolve<IMapEventInitializationBarrier>().CommitServer(mapEvent);
 
             Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
             Assert.True(Server.ObjectManager.TryGetId(attackerParty, out attackerPartyId));
@@ -188,8 +191,7 @@ public abstract class MapEventTestBase : IDisposable
             // MapEventSide.AddPartyInternal internally. Calling AddPartyInternal directly skips that wiring,
             // leaving Side == None (-1) and throwing IndexOutOfRange in
             // RecalculateRenownAndInfluenceValuesOnPartyInvolved. It is NOT wrapped in AllowedThread: the
-            // collection-add must go through MapEventSidePatches.AddIntercept so the server broadcasts the new
-            // battle party to the clients.
+            // MapEventSidePatches.AddIntercept broadcasts this collection add to clients.
             party.Party.MapEventSide = side;
 
             var joined = side.Parties.LastOrDefault(p => p?.Party == party.Party);

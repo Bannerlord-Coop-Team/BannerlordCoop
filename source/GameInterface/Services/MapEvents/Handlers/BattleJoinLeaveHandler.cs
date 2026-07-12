@@ -88,26 +88,22 @@ internal class BattleJoinLeaveHandler : IHandler
 
                 var positions = message.Positions;
 
-                initializationBarrier.AfterClientCommit(mapEvent, () =>
+                var trackParties = !initializationBarrier.IsPending(mapEvent);
+                using (new AllowedThread())
                 {
-                    // Re-applying campaign-collection state replicated from the server; the
-                    // AutoSync TroopUpgradeTracker patches must stand down during the apply.
-                    using (new AllowedThread())
+                    for (int i = 0; i < message.MapEventPartyIds.Length; i++)
                     {
-                        for (int i = 0; i < message.MapEventPartyIds.Length; i++)
-                        {
-                            var mapEventPartyId = message.MapEventPartyIds[i];
-                            if (!objectManager.TryGetObjectWithLogging<MapEventParty>(mapEventPartyId, out var mapEventParty))
-                                continue;
+                        var mapEventPartyId = message.MapEventPartyIds[i];
+                        if (!objectManager.TryGetObjectWithLogging<MapEventParty>(mapEventPartyId, out var mapEventParty))
+                            continue;
 
-                            initializationBarrier.TrackParty(mapEvent, mapEventParty);
+                        if (trackParties)
                             mapEvent.TroopUpgradeTracker.AddParty(mapEventParty);
-                            var mobileParty = mapEventParty.Party.MobileParty;
-                            if (mobileParty != null && positions != null && i < positions.Length)
-                                mobileParty.Position = positions[i];
-                        }
+                        var mobileParty = mapEventParty.Party.MobileParty;
+                        if (mobileParty != null && positions != null && i < positions.Length)
+                            mobileParty.Position = positions[i];
                     }
-                });
+                }
             }
             catch (Exception e)
             {

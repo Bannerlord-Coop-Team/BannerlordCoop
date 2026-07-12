@@ -87,42 +87,46 @@ class AutoRegistryHandler<T> : IHandler where T : class
     {
         // TODO drop on loading clients
 
-        GameThread.RunSafe(() =>
+        GameThread.RunSafe(() => CreateClientInstance(payload), context: $"NetworkCreate {typeof(T).Name}");
+    }
+
+    private void CreateClientInstance(MessagePayload<NetworkCreateInstance<T>> payload)
+    {
+        var newInstance = ObjectHelper.SkipConstructor<T>();
+
+        var id = payload.What.InstanceId;
+
+        if (newInstance is MBObjectBase mBObject)
         {
-            var newInstance = ObjectHelper.SkipConstructor<T>();
-            var id = payload.What.InstanceId;
+            using (new AllowedThread())
+            {
+                mBObject.StringId = payload.What.InstanceId;
+            }
+        }
 
-            if (newInstance is MBObjectBase mBObject)
-            {
-                using (new AllowedThread())
-                {
-                    mBObject.StringId = id;
-                }
-            }
+        if (!ObjectManager.AddExisting($"{typeof(T).Name}_{id}", newInstance))
+        {
+            Logger.Error("Failed to create new id for {type} with id {id}", typeof(T).Name, payload.What.InstanceId);
+            return;
+        }
 
-            if (!ObjectManager.AddExisting($"{typeof(T).Name}_{id}", newInstance))
-            {
-                Logger.Error("Failed to create new id for {type} with id {id}", typeof(T).Name, id);
-                return;
-            }
+        if (Registry.Debug)
+        {
+            Logger.Debug("[Client][{CallingMethod}] Created new instance of {type} with id {id}.",
+                $"{nameof(AutoRegistryHandler<T>)}.{nameof(Handle_NetworkCreateInstance)}",
+                typeof(T).Name,
+                payload.What.InstanceId);
+        }
 
-            if (Registry.Debug)
-            {
-                Logger.Debug("[Client][{CallingMethod}] Created new instance of {type} with id {id}.",
-                    $"{nameof(AutoRegistryHandler<T>)}.{nameof(Handle_NetworkCreateInstance)}",
-                    typeof(T).Name,
-                    id);
-            }
-
-            try
-            {
-                Registry.OnClientCreated(newInstance, id);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to run OnClientCreated for {MessageType}", payload.What.GetType());
-            }
-        }, context: $"NetworkCreate {typeof(T).Name}");
+        try
+        {
+            // Callback after created on client
+            Registry.OnClientCreated(newInstance, payload.What.InstanceId);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to run OnClientCreated for {MessageType}", payload.What.GetType());
+        }
     }
 
     private void Handle_InstanceDestroyed(MessagePayload<InstanceDestroyed<T>> payload)

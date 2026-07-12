@@ -1,9 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
-using GameInterface.Registry.Auto;
 using GameInterface.Policies;
-using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
@@ -17,7 +15,6 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 
@@ -27,28 +24,6 @@ namespace GameInterface.Services.MapEvents.Patches;
 internal class MapEventPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MapEventPatches>();
-
-    [HarmonyPatch(nameof(MapEvent.TroopUpgradeTracker), MethodType.Setter)]
-    [HarmonyPrefix]
-    private static void Prefix_TroopUpgradeTracker(MapEvent __instance, out TroopUpgradeTracker __state)
-    {
-        __state = MapEventGraph.GetTracker(__instance);
-    }
-
-    [HarmonyPatch(nameof(MapEvent.TroopUpgradeTracker), MethodType.Setter)]
-    [HarmonyPostfix]
-    private static void Postfix_TroopUpgradeTracker(MapEvent __instance, TroopUpgradeTracker __state)
-    {
-        if (ModInformation.IsClient || CallOriginalPolicy.IsOriginalAllowed() || __state == null ||
-            ReferenceEquals(__state, MapEventGraph.GetTracker(__instance)))
-        {
-            return;
-        }
-
-        // The replacement's create and property packets are already queued. Retiring the prior tracker
-        // now prevents constructor-created trackers from becoming unowned client registrations.
-        MessageBroker.Instance.Publish(__instance, new InstanceDestroyed<TroopUpgradeTracker>(__state));
-    }
 
     [HarmonyPatch(nameof(MapEvent.AddInvolvedPartyInternal))]
     [HarmonyPostfix]
@@ -62,15 +37,9 @@ internal class MapEventPatches
         if (!isPlayerJoin && !InteractionPatches.IsWithinAiJoinWindow(__instance))
             return;
 
-        var parties = __instance._sides.SelectMany(side => side.Parties).ToList();
-        if (MapEventGraph.GetTracker(__instance) == null)
-        {
-            var tracker = new TroopUpgradeTracker();
-            __instance.TroopUpgradeTracker = tracker;
-            parties.ForEach(tracker.AddParty);
-        }
-
-        var message = new MapEventInvolvedPartiesAdded(__instance, parties);
+        var message = new MapEventInvolvedPartiesAdded(
+            __instance,
+            __instance._sides.SelectMany(side => side.Parties).ToList());
         MessageBroker.Instance.Publish(__instance, message);
     }
 

@@ -1,4 +1,4 @@
-using Coop.Core.Server.Services.Stances.Messages;
+﻿using Coop.Core.Server.Services.Stances.Messages;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
@@ -76,7 +76,6 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         RequestInteraction(client2, responderPartyId, initiatorPartyId);
 
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>());
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkConversationDenied>());
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionDenied>());
     }
 

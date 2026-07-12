@@ -97,7 +97,7 @@ internal class EncounterManagerPatches
     }
 
     internal static bool IsPendingParty(PartyBase party) =>
-        PendingMapEventPartyLock.IsLocked(party);
+        PendingMapEventPartyMovementPatch.IsPending(party);
 
     // EncounterManager.RestartPlayerEncounter is private; patch by name. It is the path that opens the encounter
     // menu/conversation (it calls PlayerEncounter.Current.Init). Parameter order here is (attacker, defender).

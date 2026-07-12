@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Util;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
@@ -115,10 +115,9 @@ namespace Coop.IntegrationTests.MobileParties
         {
             var client1 = TestEnvironment.Clients.First();
             var party = ObjectHelper.SkipConstructor<MobileParty>();
-            var partyBase = ObjectHelper.SkipConstructor<PartyBase>();
-            party.Party = partyBase;
-            partyBase.MobileParty = party;
-            partyBase._mapEventSide = ObjectHelper.SkipConstructor<MapEventSide>();
+            party.Party = ObjectHelper.SkipConstructor<PartyBase>();
+            party.Party.MobileParty = party;
+            party.Party._mapEventSide = ObjectHelper.SkipConstructor<MapEventSide>();
             var settlement = ObjectHelper.SkipConstructor<Settlement>();
             TestEnvironment.RegisterObjectInNetwork(party, "party1");
             TestEnvironment.RegisterObjectInNetwork(settlement, "settlement1");
@@ -129,8 +128,7 @@ namespace Coop.IntegrationTests.MobileParties
 
             TestEnvironment.Server.Resolve<Mock<ISettlementInterface>>()
                 .Verify(s => s.PartyEnterSettlement(It.IsAny<MobileParty>(), It.IsAny<Settlement>()), Times.Never);
-            Assert.Empty(TestEnvironment.Server.NetworkSentMessages.GetMessages<NetworkStartSettlementEncounter>());
-            Assert.Empty(TestEnvironment.Server.NetworkSentMessages.GetMessages<NetworkPartyEnterSettlement>());
+            Assert.Empty(TestEnvironment.Server.NetworkSentMessages.Messages);
         }
 
         /// <summary>
