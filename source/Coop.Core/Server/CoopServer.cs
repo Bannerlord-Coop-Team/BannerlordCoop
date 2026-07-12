@@ -156,6 +156,9 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         {
             GameThread.RunSafe(() => coalescer.Flush(this));
         }
+
+        // Send any sub-budget aggregated messages so nothing waits longer than one poll interval.
+        FlushPendingMessages();
     }
 
     public override void Start()
