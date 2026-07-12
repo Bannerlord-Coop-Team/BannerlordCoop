@@ -31,8 +31,6 @@ namespace GameInterface.Services.Heroes.Handlers
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
             this.network = network;
-            messageBroker.Subscribe<NetworkUpdateArray>(Handle);
-
             messageBroker.Subscribe<ChildrenListUpdated>(Handle);
             messageBroker.Subscribe<NetworkUpdateChildrenList>(Handle);
 
@@ -49,8 +47,6 @@ namespace GameInterface.Services.Heroes.Handlers
 
         public void Dispose()
         {
-            messageBroker.Unsubscribe<NetworkUpdateArray>(Handle);
-
             messageBroker.Unsubscribe<ChildrenListUpdated>(Handle);
             messageBroker.Unsubscribe<NetworkUpdateChildrenList>(Handle);
 
@@ -63,29 +59,6 @@ namespace GameInterface.Services.Heroes.Handlers
             messageBroker.Unsubscribe<NetworkUpdateWorkshopList>(Handle);
             messageBroker.Unsubscribe<WorkshopListRemoved>(Handle);
             messageBroker.Unsubscribe<NetworkRemoveWorkshopList>(Handle);
-        }
-
-        private void Handle(MessagePayload<NetworkUpdateArray> payload)
-        {
-            var data = payload.What;
-
-            GameThread.Run(() =>
-            {
-                try
-                {
-                    if (!objectManager.TryGetObject(data.HeroId, out Hero hero)) return;
-                    if (!objectManager.TryGetObject(data.ValueId, out CharacterObject characterObject) && data.ValueId != null) return;
-
-                    using (new AllowedThread())
-                    {
-                        hero.VolunteerTypes[data.Index] = characterObject;
-                    }
-                }
-                catch (Exception e)
-                {
-                    Logger.Error(e, "Failed to apply NetworkUpdateArray");
-                }
-            });
         }
 
         private void Handle(MessagePayload<ChildrenListUpdated> payload)

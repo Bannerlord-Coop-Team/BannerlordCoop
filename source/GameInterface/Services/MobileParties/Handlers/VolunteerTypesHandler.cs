@@ -35,7 +35,6 @@ internal class VolunteerTypesHandler : IHandler
 
         messageBroker.Subscribe<VolunteerTypesArrayUpdated>(Handle_VolunteerTypesArrayUpdated);
         messageBroker.Subscribe<VolunteerRemoved>(Handle_VolunteerRemoved);
-        messageBroker.Subscribe<RemoveVolunteer>(Handle_RemoveVolunteer);
         messageBroker.Subscribe<VolunteersUpdated>(Handle_VolunteersUpdated);
         messageBroker.Subscribe<UpdateVolunteers>(Handle_UpdateVolunteers);
     }
@@ -44,7 +43,6 @@ internal class VolunteerTypesHandler : IHandler
     {
         messageBroker.Unsubscribe<VolunteerTypesArrayUpdated>(Handle_VolunteerTypesArrayUpdated);
         messageBroker.Unsubscribe<VolunteerRemoved>(Handle_VolunteerRemoved);
-        messageBroker.Unsubscribe<RemoveVolunteer>(Handle_RemoveVolunteer);
         messageBroker.Unsubscribe<VolunteersUpdated>(Handle_VolunteersUpdated);
         messageBroker.Unsubscribe<UpdateVolunteers>(Handle_UpdateVolunteers);
     }
@@ -59,22 +57,6 @@ internal class VolunteerTypesHandler : IHandler
     private void Handle_VolunteerRemoved(MessagePayload<VolunteerRemoved> obj)
     {
         EnqueueSnapshot(obj.What.Individual);
-    }
-
-    private void Handle_RemoveVolunteer(MessagePayload<RemoveVolunteer> obj)
-    {
-        var individualId = obj.What.IndividualId;
-        var bitCode = obj.What.BitCode;
-
-        GameThread.RunSafe(() =>
-        {
-            if (!objectManager.TryGetObjectWithLogging<Hero>(individualId, out var individual)) return;
-
-            using (new AllowedThread())
-            {
-                individual.VolunteerTypes[bitCode] = null;
-            }
-        }, context: $"RemoveVolunteer for hero ({individualId})");
     }
 
     private void Handle_VolunteersUpdated(MessagePayload<VolunteersUpdated> obj)
