@@ -14,6 +14,22 @@ To unblock them:
 
 You may need to do this for DLLs inside subfolders as well.
 
+**How to Unblock Files**
+
+1. **Open PowerShell as Administrator**
+   - Click the **Start** button.
+   - Type **PowerShell**.
+   - Right-click **Windows PowerShell**.
+   - Select **Run as administrator**.
+
+2. **Run the unblock command**
+   - Copy and paste the command below.
+   - Replace the folder path inside the quotes with the actual location of your folder.
+
+```powershell
+Get-ChildItem "C:\Path\To\Your\Folder" -Recurse | Unblock-File
+```
+
 ---
 ### 2. Disable Warsails DLL if you have it
 
