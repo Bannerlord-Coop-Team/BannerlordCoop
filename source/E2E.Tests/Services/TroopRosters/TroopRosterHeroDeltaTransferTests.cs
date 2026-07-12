@@ -1,4 +1,4 @@
-using Common.Network.Coalescing;
+﻿using Common.Network.Coalescing;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
