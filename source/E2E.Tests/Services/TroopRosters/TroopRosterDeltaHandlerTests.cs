@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Common.Messaging;
 using Common.Network.Coalescing;
 using Common.Util;
@@ -148,6 +148,34 @@ namespace E2E.Tests.Services.TroopRosters
                 Resolve(client, out var roster, out _, CharacterId1);
                 Assert.Equal(250, roster.GetElementCopyAtIndex(0).Xp);
             }
+        }
+
+        [Fact]
+        public void Server_AddCountsAndSetXp_SendsOneBatch()
+        {
+            Server.NetworkSentMessages.Clear();
+
+            Server.Call(() =>
+            {
+                Resolve(Server, out var roster, out var character, CharacterId1);
+                roster.AddToCounts(character, 5);
+                roster.SetElementXp(roster.FindIndexOfTroop(character), 250);
+            });
+            FlushCoalescer();
+
+            Assert.Single(Server.NetworkSentMessages);
+            var batch = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkTroopRosterElementBatch>());
+            Assert.Collection(batch.Operations,
+                addCounts =>
+                {
+                    Assert.Equal(TroopRosterElementOperationKind.AddCounts, addCounts.Kind);
+                    Assert.Equal(5, addCounts.Count);
+                },
+                setXp =>
+                {
+                    Assert.Equal(TroopRosterElementOperationKind.SetXp, setXp.Kind);
+                    Assert.Equal(250, setXp.Xp);
+                });
         }
 
         [Fact]
@@ -354,7 +382,8 @@ namespace E2E.Tests.Services.TroopRosters
             client.Call(() =>
             {
                 var broker = client.Resolve<IMessageBroker>();
-                broker.Publish(this, new NetworkTroopRosterAddCounts(TroopRosterId, CharacterId1, -5, 0, 0, false));
+                broker.Publish(this, new NetworkTroopRosterElementBatch(TroopRosterId, CharacterId1,
+                    new[] { TroopRosterElementOperation.AddCounts(-5, 0, 0, false) }));
             });
 
             client.Call(() =>

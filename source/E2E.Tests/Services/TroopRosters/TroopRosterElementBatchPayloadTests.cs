@@ -8,6 +8,14 @@ namespace E2E.Tests.Services.TroopRosters;
 /// </summary>
 public class TroopRosterElementBatchPayloadTests
 {
+    [Theory]
+    [InlineData("GameInterface.Services.TroopRosters.Messages.NetworkTroopRosterAddCounts")]
+    [InlineData("GameInterface.Services.TroopRosters.Messages.NetworkTroopRosterSetXp")]
+    public void LegacySingleOperationMessages_AreNotInAssembly(string fullName)
+    {
+        Assert.Null(typeof(NetworkTroopRosterElementBatch).Assembly.GetType(fullName));
+    }
+
     [Fact]
     public void Merge_AdjacentXpSets_KeepsLatestOnly()
     {

@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -54,10 +54,8 @@ internal class TroopRosterDeltaHandler : IHandler
         messageBroker.Subscribe<ZeroCountsRemoved>(Handle_ZeroCountsRemoved);
 
         // Client apply path.
-        messageBroker.Subscribe<NetworkTroopRosterAddCounts>(Handle_NetworkAddCounts);
         messageBroker.Subscribe<NetworkTroopRosterSetNumber>(Handle_NetworkSetNumber);
         messageBroker.Subscribe<NetworkTroopRosterSetWoundedNumber>(Handle_NetworkSetWoundedNumber);
-        messageBroker.Subscribe<NetworkTroopRosterSetXp>(Handle_NetworkSetXp);
         messageBroker.Subscribe<NetworkTroopRosterRemoveZeroCounts>(Handle_NetworkRemoveZeroCounts);
         messageBroker.Subscribe<NetworkTroopRosterElementBatch>(Handle_NetworkElementBatch);
     }
@@ -70,10 +68,8 @@ internal class TroopRosterDeltaHandler : IHandler
         messageBroker.Unsubscribe<ElementXpSet>(Handle_ElementXpSet);
         messageBroker.Unsubscribe<ZeroCountsRemoved>(Handle_ZeroCountsRemoved);
 
-        messageBroker.Unsubscribe<NetworkTroopRosterAddCounts>(Handle_NetworkAddCounts);
         messageBroker.Unsubscribe<NetworkTroopRosterSetNumber>(Handle_NetworkSetNumber);
         messageBroker.Unsubscribe<NetworkTroopRosterSetWoundedNumber>(Handle_NetworkSetWoundedNumber);
-        messageBroker.Unsubscribe<NetworkTroopRosterSetXp>(Handle_NetworkSetXp);
         messageBroker.Unsubscribe<NetworkTroopRosterRemoveZeroCounts>(Handle_NetworkRemoveZeroCounts);
         messageBroker.Unsubscribe<NetworkTroopRosterElementBatch>(Handle_NetworkElementBatch);
     }
@@ -168,14 +164,6 @@ internal class TroopRosterDeltaHandler : IHandler
         return true;
     }
 
-    private void Handle_NetworkAddCounts(MessagePayload<NetworkTroopRosterAddCounts> payload)
-    {
-        var m = payload.What;
-        Apply(m.RosterId, m.CharacterId, nameof(NetworkTroopRosterAddCounts),
-            (roster, character) => ApplyAddCounts(roster, character, m.RosterId, m.CharacterId,
-                m.Count, m.WoundedCount, m.XpChange, m.RemoveDepleted));
-    }
-
     private void ApplyAddCounts(TroopRoster roster, CharacterObject character, string rosterId,
         string characterId, int count, int woundedCount, int xpChange, bool removeDepleted)
     {
@@ -187,7 +175,7 @@ internal class TroopRosterDeltaHandler : IHandler
         if (count + woundedCount <= 0 && index < 0)
         {
             Logger.Debug("Skipped {Message}: {Character} is not in roster {Roster} yet",
-                nameof(NetworkTroopRosterAddCounts), characterId, rosterId);
+                nameof(NetworkTroopRosterElementBatch), characterId, rosterId);
             return;
         }
 
@@ -199,7 +187,7 @@ internal class TroopRosterDeltaHandler : IHandler
             if (current.Number + count < 0 || current.WoundedNumber + woundedCount < 0)
             {
                 Logger.Error("Over-subtract {Message} for {Character} in roster {Roster}: have (number={Number}, wounded={Wounded}), requested delta (number={Count}, wounded={WoundedCount}). Clamping to zero - the authority sent a duplicate remove (double-call upstream).",
-                    nameof(NetworkTroopRosterAddCounts), characterId, rosterId, current.Number,
+                    nameof(NetworkTroopRosterElementBatch), characterId, rosterId, current.Number,
                     current.WoundedNumber, count, woundedCount);
 
                 if (current.Number + count < 0) count = -current.Number;
@@ -224,13 +212,6 @@ internal class TroopRosterDeltaHandler : IHandler
             (roster, index) => roster.SetElementWoundedNumber(index, m.Number));
     }
 
-    private void Handle_NetworkSetXp(MessagePayload<NetworkTroopRosterSetXp> payload)
-    {
-        var m = payload.What;
-        ApplyToExisting(m.RosterId, m.CharacterId, nameof(NetworkTroopRosterSetXp),
-            (roster, index) => roster.SetElementXp(index, m.Xp));
-    }
-
     private void Handle_NetworkElementBatch(MessagePayload<NetworkTroopRosterElementBatch> payload)
     {
         var m = payload.What;
@@ -248,7 +229,7 @@ internal class TroopRosterDeltaHandler : IHandler
                         break;
                     case TroopRosterElementOperationKind.SetXp:
                         ApplyToExisting(roster, character, m.RosterId, m.CharacterId,
-                            nameof(NetworkTroopRosterSetXp),
+                            nameof(NetworkTroopRosterElementBatch),
                             (existingRoster, index) => existingRoster.SetElementXp(index, operation.Xp));
                         break;
                     default:

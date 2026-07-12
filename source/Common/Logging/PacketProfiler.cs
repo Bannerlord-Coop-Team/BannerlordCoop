@@ -15,7 +15,7 @@ namespace Common.Logging;
 /// <remarks>
 /// Fed from the network send path (see <c>CoopNetworkBase.SendInternal</c>), so every recorded packet is
 /// one actually sent over the wire, counted with its serialized byte size. A <see cref="MessagePacket"/>
-/// is broken out by the message type it wraps (e.g. <c>MessagePacket:NetworkTroopRosterAddCounts</c>).
+/// is broken out by the message type it wraps (e.g. <c>MessagePacket:NetworkTroopRosterElementBatch</c>).
 /// The accumulated stats are dumped on a fixed wall-clock interval. Only the server profiles traffic
 /// (see <see cref="ModInformation.IsServer"/>).
 /// </remarks>
