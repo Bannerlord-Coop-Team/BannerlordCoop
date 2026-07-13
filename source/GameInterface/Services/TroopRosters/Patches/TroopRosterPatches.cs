@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
@@ -16,7 +16,7 @@ namespace GameInterface.Services.TroopRosters.Patches;
 /// <summary>
 /// Patches the TroopRoster mutators on the authority so each change is published as an event keyed by the
 /// element's <see cref="CharacterObject"/>, resolved while the index is still valid. TroopRosterDeltaHandler
-/// turns these into per-operation identity-keyed network messages.
+/// turns these into identity-keyed ordered batches while retaining every non-coalescible operation.
 /// </summary>
 [HarmonyPatch(typeof(TroopRoster))]
 internal class TroopRosterPatches

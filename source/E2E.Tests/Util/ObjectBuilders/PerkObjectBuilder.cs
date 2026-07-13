@@ -1,4 +1,4 @@
-using TaleWorlds.CampaignSystem.CharacterDevelopment;
+﻿using TaleWorlds.CampaignSystem.CharacterDevelopment;
 
 namespace E2E.Tests.Util.ObjectBuilders;
 
