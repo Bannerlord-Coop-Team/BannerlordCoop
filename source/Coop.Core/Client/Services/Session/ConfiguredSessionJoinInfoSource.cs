@@ -1,4 +1,5 @@
-﻿using Common.Network.Session;
+﻿using Common;
+using Common.Network.Session;
 using Common.Network;
 using Coop.Core.Common.Configuration;
 
@@ -25,7 +26,7 @@ public class ConfiguredSessionJoinInfoSource : ISessionJoinInfoSource
         {
             Address = advertisementConfig.PublicAddress,
             Port = networkConfig.Port,
-            ModVersion = global::Common.ModInformation.BuildVersion,
+            ModVersion = ModInformation.BuildVersion,
             PasswordRequired = !string.IsNullOrEmpty(networkConfig.Token),
         };
     }
