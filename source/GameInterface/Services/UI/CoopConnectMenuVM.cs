@@ -41,7 +41,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     public string BuyMeACoffeeButtonText => "Buy a Coffee";
     public string MovieTextHeader => "Join Co-op Sandbox";
     public string CommunityText => "Join the Community";
-    public string SteamLobbiesHeaderText => "Hosted Steam Servers";
+    public string SteamLobbiesHeaderText => $"Hosted Steam Servers ({SteamLobbies.Count})";
     public string HostSearchLabelText => "Hostname:";
     public string HostColumnText => "Host";
     public string PasswordColumnText => "Access";
@@ -237,6 +237,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
 
         discoveredSteamLobbies.Clear();
         SteamLobbies.Clear();
+        OnPropertyChanged(nameof(SteamLobbiesHeaderText));
 
         if (steamLobbyBrowser == null)
         {
@@ -349,6 +350,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         IsRefreshingSteamLobbies = false;
         discoveredSteamLobbies.Clear();
         SteamLobbies.Clear();
+        OnPropertyChanged(nameof(SteamLobbiesHeaderText));
     }
 
     private void SelectTab(CoopConnectionTabVM tab)
@@ -378,6 +380,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
 
         IsRefreshingSteamLobbies = false;
         SteamLobbies.Clear();
+        OnPropertyChanged(nameof(SteamLobbiesHeaderText));
 
         if (!string.IsNullOrWhiteSpace(error))
         {
@@ -417,6 +420,8 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
                 SteamLobbies.Add(lobby);
             }
         }
+
+        OnPropertyChanged(nameof(SteamLobbiesHeaderText));
 
         if (SteamLobbies.Count > 0)
         {

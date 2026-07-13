@@ -27,6 +27,7 @@ public class CoopConnectMenuVMTests
 
         var match = Assert.Single(viewModel.SteamLobbies);
         Assert.Equal("Mountain King", match.HostText);
+        Assert.Equal("Hosted Steam Servers (1)", viewModel.SteamLobbiesHeaderText);
         Assert.Equal(string.Empty, viewModel.SteamLobbyStatusText);
         Assert.Equal(1, browser.RequestCount);
     }
@@ -43,6 +44,8 @@ public class CoopConnectMenuVMTests
             CreateLobby(1, string.Empty),
             CreateLobby(2, "River Trader"));
 
+        Assert.Equal("Hosted Steam Servers (2)", viewModel.SteamLobbiesHeaderText);
+
         viewModel.SteamLobbyHostSearchText = "UNKNOWN HOST";
         viewModel.ActionSearchSteamLobbies();
 
@@ -52,13 +55,33 @@ public class CoopConnectMenuVMTests
         viewModel.ActionSearchSteamLobbies();
 
         Assert.Empty(viewModel.SteamLobbies);
+        Assert.Equal("Hosted Steam Servers (0)", viewModel.SteamLobbiesHeaderText);
         Assert.Equal("No hosts match 'missing'.", viewModel.SteamLobbyStatusText);
 
         viewModel.SteamLobbyHostSearchText = "  ";
         viewModel.ActionSearchSteamLobbies();
 
         Assert.Equal(2, viewModel.SteamLobbies.Count);
+        Assert.Equal("Hosted Steam Servers (2)", viewModel.SteamLobbiesHeaderText);
         Assert.Equal(string.Empty, viewModel.SteamLobbyStatusText);
+    }
+
+    [Fact]
+    public void SteamLobbyHeader_StartsAtZeroAndRefreshClearsTheCount()
+    {
+        var browser = new TestSteamLobbyBrowser();
+        using var messageBroker = new MessageBroker();
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker);
+
+        Assert.Equal("Hosted Steam Servers (0)", viewModel.SteamLobbiesHeaderText);
+
+        SelectSteamLobbiesTab(viewModel);
+        browser.Complete(CreateLobby(1, "Mountain King"));
+        Assert.Equal("Hosted Steam Servers (1)", viewModel.SteamLobbiesHeaderText);
+
+        viewModel.ActionRefreshSteamLobbies();
+
+        Assert.Equal("Hosted Steam Servers (0)", viewModel.SteamLobbiesHeaderText);
     }
 
     private static void SelectSteamLobbiesTab(CoopConnectMenuVM viewModel)
