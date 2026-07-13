@@ -104,8 +104,8 @@ public class CoopAgentOrigin : IAgentOriginBase
     public void SetRouted(bool isOrderRetreat) { }
     public void OnAgentRemoved(float agentHealth)
     {
-        // Vanilla transfers final agent health in this origin hook. The coop casualty path only handles killed or
-        // unconscious agents, so it cannot preserve an injured survivor's health during mission teardown.
+        // Unlike the casualty hooks above, final agent health has no other path back to Hero.HitPoints. Vanilla
+        // performs this transfer in the origin hook, which also covers injured survivors removed during teardown.
         if (!_troop.IsHero) return;
 
         var hero = _troop.HeroObject;
