@@ -107,6 +107,20 @@ public class PlayerKillFeedColorTests
     }
 
     [Fact]
+    public void CoopOptionsVM_ActionCancel_UsesHostCloseAction()
+    {
+        var closeCalled = false;
+        var viewModel = new CoopOptionsVM(
+            new CoopOptionsStore(CreateTempFilePath()),
+            new MessageBroker(),
+            () => closeCalled = true);
+
+        viewModel.ActionCancel();
+
+        Assert.True(closeCalled);
+    }
+
+    [Fact]
     public void Handler_LocalSelection_CachesAndSendsRequest()
     {
         var wasServer = ModInformation.IsServer;
