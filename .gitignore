@@ -540,7 +540,6 @@ MigrationBackup/
 
 # End of https://www.gitignore.io/api/csharp,powershell,dotnetcore,visualstudio,visualstudiocode
 DockerAssembliesTemp/**
-DockerServerTemp/**
 mb2
 mb2/**
 source/.editorconfig
@@ -554,11 +553,3 @@ source/.idea
 /source/.cr/personal
 # ServerHeadless dev scratch helper (machine-specific paths)
 source/ServerHeadless/run.ps1
-
-# TaleWorlds dedicated-server binaries + NavSpike staging (never commit)
-/Linux64_Shipping_Server/**
-/Native/**
-/DockerNavSpike/**
-
-# Operator data: saves + autosaves the server writes (test data, not source)
-/server-data/
