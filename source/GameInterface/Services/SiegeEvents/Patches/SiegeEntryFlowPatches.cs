@@ -1,9 +1,14 @@
 ﻿using Common;
 using Common.Messaging;
+using Common.Util;
 using GameInterface.Policies;
+using GameInterface.Services.Armies.Messages;
+using GameInterface.Services.Armies.Patches;
+using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.SiegeEvents.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -41,6 +46,30 @@ internal class SiegeEntryFlowPatches
 
         MessageBroker.Instance.Publish(null, new JoinSiegeCampAttempted(MobileParty.MainParty, Settlement.CurrentSettlement));
         return false;
+    }
+
+    [HarmonyPatch(typeof(SiegeEventCampaignBehavior), nameof(SiegeEventCampaignBehavior.menu_siege_leave_on_consequence))]
+    [HarmonyPrefix]
+    private static bool SettlementDefenderLeavePrefix()
+    {
+        if (ModInformation.IsServer) return true;
+
+        var mainParty = MobileParty.MainParty;
+        if (mainParty.BesiegerCamp != null || PlayerEncounter.Current == null || mainParty.CurrentSettlement == null)
+            return true;
+
+        var army = mainParty.Army;
+        if (army != null)
+        {
+            MessageBroker.Instance.Publish(army, new MobilePartyInArmyRemoved(army, mainParty, mainParty));
+            using (new AllowedThread())
+            {
+                ArmyPatches.RemoveMobilePartyInArmy(mainParty, army, mainParty);
+            }
+        }
+        PlayerSiege.FinalizePlayerSiege();
+
+        return PlayerLeaveSettlementPatch.RequestLeave();
     }
 
     // The besieger leader's "Lead an assault" (and the follower "Send troops" order) locally start an encounter
