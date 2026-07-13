@@ -298,11 +298,11 @@ public class TournamentSpectatorAgentManager : ITournamentSpectatorAgentManager
         character = null;
         data = null;
         spawn = default;
-        if (Mission.Current == null || snapshot?.Phase != TournamentSessionPhase.LiveMatch) return false;
-        if (joinInfo.ControllerId == controllerIdProvider.ControllerId) return false;
-        if (!GetEligibleControllers(snapshot).Contains(joinInfo.ControllerId)) return false;
-        if (!TournamentSpectatorSceneLayouts.TryGet(Mission.Current.SceneName, out var layout)) return false;
-        if (!TryResolveCharacter(joinInfo.ControllerId, out string characterId, out character)) return false;
+        if (!TryResolveRemoteSpectatorContext(
+                joinInfo,
+                out TournamentSpectatorSceneLayout layout,
+                out string characterId,
+                out character)) return false;
 
         CoopAgentSpawnData[] spawnData = joinInfo.AiAgentData ?? Array.Empty<CoopAgentSpawnData>();
         if (spawnData.Length != 1) return false;
@@ -310,6 +310,22 @@ public class TournamentSpectatorAgentManager : ITournamentSpectatorAgentManager
         if (data == null || data.AgentId == Guid.Empty || data.CharacterObjectId != characterId) return false;
         if (!TryResolveSpawn(layout, data.Position, out spawn)) return false;
         return !coopMissionComponent.AgentRegistry.TryGetAgentInfo(data.AgentId, out _);
+    }
+
+    private bool TryResolveRemoteSpectatorContext(
+        NetworkMissionJoinInfo joinInfo,
+        out TournamentSpectatorSceneLayout layout,
+        out string characterId,
+        out CharacterObject character)
+    {
+        layout = default;
+        characterId = null;
+        character = null;
+        if (Mission.Current == null || snapshot?.Phase != TournamentSessionPhase.LiveMatch) return false;
+        if (joinInfo.ControllerId == controllerIdProvider.ControllerId) return false;
+        if (!GetEligibleControllers(snapshot).Contains(joinInfo.ControllerId)) return false;
+        if (!TournamentSpectatorSceneLayouts.TryGet(Mission.Current.SceneName, out layout)) return false;
+        return TryResolveCharacter(joinInfo.ControllerId, out characterId, out character);
     }
 
     private bool TryResolveOrangeItem(out ItemObject item)
