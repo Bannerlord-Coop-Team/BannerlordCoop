@@ -103,32 +103,14 @@ public static class PartyBehaviorPatch
 
             var mobileParty = partyAi._mobileParty;
 
-            mobileParty.DefaultBehavior = newBehavior;
-
-
-            if (interactablePoint is null)
-            {
-                mobileParty._targetSettlement = null;
-                mobileParty._targetParty = null;
-                partyAi.AiBehaviorPartyBase = null;
-            }
-
             if (interactablePoint is PartyBase partyBase)
             {
-                if (partyBase.IsSettlement)
-                {
-                    mobileParty._targetSettlement = partyBase.Settlement;
-                    mobileParty._targetParty = null;
-                    partyAi.AiBehaviorPartyBase = partyBase;
-                }
-                else if (partyBase.IsMobile)
-                {
-                    mobileParty._targetSettlement = null;
-                    mobileParty._targetParty = partyBase.MobileParty;
-                    partyAi.AiBehaviorPartyBase = partyBase;
-                }
+                partyAi.AiBehaviorPartyBase = partyBase;
             }
-
+            else
+            {
+                partyAi.AiBehaviorPartyBase = null;
+            }
 
             try
             {
@@ -138,7 +120,6 @@ public static class PartyBehaviorPatch
                 partyAi.AiBehaviorInteractable = interactablePoint;
                 partyAi.BehaviorTarget = targetPoint;
 
-                mobileParty.RecalculateShortTermBehavior();
                 partyAi.UpdateBehavior();
             }
             catch(Exception ex)

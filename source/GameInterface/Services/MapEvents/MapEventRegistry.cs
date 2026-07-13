@@ -2,6 +2,7 @@
 using Common.Util;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.MapEvents.Initialization;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
@@ -78,11 +79,26 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
     {
         if (Campaign.Current == null) return;
 
-        // AutoRegistry already marshals this callback to the game thread. Capturing before teardown keeps
-        // the encounter fallback available while the barrier removes every external party edge atomically.
         bool localPartyWasInvolved = IsLocalPartyInMapEvent(obj);
+        if (localPartyWasInvolved) CaptureMainPartyBattleRewards(obj);
         initializationBarrier.DestroyGraph(obj);
         CloseDestroyedMapEventEncounterIfNeeded(id, localPartyWasInvolved);
+    }
+
+    private void CaptureMainPartyBattleRewards(MapEvent mapEvent)
+    {
+        try
+        {
+            var mapEventParty = mapEvent.FindMapEventParty(PartyBase.MainParty, out var side);
+            if (mapEventParty == null ||
+                !ContainerProvider.TryResolve<IMainPartyBattleRewardsCache>(out var cache)) return;
+
+            cache.Capture(mapEvent, mapEventParty, side.GetPartyContributionRate(mapEventParty));
+        }
+        catch (Exception ex)
+        {
+            Logger.Debug(ex, "Skipped MainParty reward snapshot during map event teardown");
+        }
     }
 
     private bool IsLocalPartyInMapEvent(MapEvent mapEvent)

@@ -56,6 +56,10 @@ public class SurrogateCollection : ISurrogateCollection
             AddSurrogate<AtmosphereInfo, AtmosphereInfoSurrogate>();
             AddSurrogate<MissionInitializerRecord, MissionInitializerRecordSurrogate>();
             AddSurrogate<WeaponComponentData, WeaponComponentDataSurrogate>();
+
+            AddSurrogate<BodyProperties, BodyPropertiesSurrogate>();
+            AddSurrogate<DynamicBodyProperties, DynamicBodyPropertiesSurrogate>();
+            AddSurrogate<StaticBodyProperties, StaticBodyPropertiesSurrogate>();
         }
     }
 
