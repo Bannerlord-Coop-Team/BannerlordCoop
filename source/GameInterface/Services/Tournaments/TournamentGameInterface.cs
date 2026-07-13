@@ -124,7 +124,7 @@ public sealed partial class TournamentGameInterface : ITournamentGameInterface
         if (replacement == null || !objectManager.TryGetId(replacement, out replacementId))
             return false;
 
-        ItemObject prize = GetPrizeForFrozenRoster(town, tournamentGame, sortedCharacters);
+        ItemObject prize = LockPrizeForFrozenRoster(town, tournamentGame, sortedCharacters);
         return prize != null && objectManager.TryGetId(prize, out prizeId);
     }
 
@@ -351,7 +351,7 @@ public sealed partial class TournamentGameInterface : ITournamentGameInterface
         return characters;
     }
 
-    private static ItemObject GetPrizeForFrozenRoster(
+    internal static ItemObject LockPrizeForFrozenRoster(
         Town town,
         FightTournamentGame tournamentGame,
         MBList<CharacterObject> frozenCharacters)
@@ -359,10 +359,17 @@ public sealed partial class TournamentGameInterface : ITournamentGameInterface
         var prizeGame = ObjectHelper.SkipConstructor<FrozenRosterFightTournamentGame>();
         prizeGame.Town = town;
         prizeGame.Mode = tournamentGame.Mode;
-        prizeGame.Prize = null;
-        prizeGame._lastRecordedLordCountForTournamentPrize = -1;
+        prizeGame.Prize = tournamentGame.Prize;
+        prizeGame._lastRecordedLordCountForTournamentPrize =
+            tournamentGame._lastRecordedLordCountForTournamentPrize;
         prizeGame.FrozenCharacters = frozenCharacters;
-        return prizeGame.GetTournamentPrize(false, -1);
+        ItemObject prize = prizeGame.GetTournamentPrize(
+            false,
+            tournamentGame._lastRecordedLordCountForTournamentPrize);
+        tournamentGame.Prize = prize;
+        tournamentGame._lastRecordedLordCountForTournamentPrize =
+            prizeGame._lastRecordedLordCountForTournamentPrize;
+        return prize;
     }
 
     private bool TryCreateParticipants(

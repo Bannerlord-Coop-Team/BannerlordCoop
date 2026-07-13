@@ -185,6 +185,7 @@ internal sealed partial class TournamentSessionHandler : IHandler
             SendRejection(peer, townId, "The tournament could not be prepared for cooperative play.");
             return false;
         }
+        messageBroker.Publish(this, new TournamentNativeStateChanged());
         return true;
     }
 
