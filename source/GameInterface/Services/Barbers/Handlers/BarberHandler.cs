@@ -127,6 +127,5 @@ internal class BarberHandler : IHandler
                 agent.UpdateSpawnEquipmentAndRefreshVisuals(Mission.Current.DoesMissionRequireCivilianEquipment ? updatedCharacter.FirstCivilianEquipment : updatedCharacter.FirstBattleEquipment);
             }
         }
-
     }
 }
