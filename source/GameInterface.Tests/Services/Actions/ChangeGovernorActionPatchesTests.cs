@@ -14,6 +14,7 @@ namespace GameInterface.Tests.Services.Actions
     /// <summary>
     /// Tests for the governor removal prefix in <see cref="ChangeGovernorActionPatches"/>.
     /// </summary>
+    [Collection(global::GameInterface.Tests.ModInformationRoleCollection.Name)]
     public class ChangeGovernorActionPatchesTests
     {
         private static Hero CreateHero(bool isGovernor)

@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Entity;
@@ -17,6 +17,7 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.UI;
 
+[Collection(global::GameInterface.Tests.ModInformationRoleCollection.Name)]
 public class PlayerKillFeedColorTests
 {
     [Fact]
