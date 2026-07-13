@@ -54,6 +54,7 @@ internal class PlayerPartyInteractionHandler : IHandler
 
     private readonly ConcurrentDictionary<string, PlayerPartyInteractionSession> sessionsById = new ConcurrentDictionary<string, PlayerPartyInteractionSession>();
     private readonly ConcurrentDictionary<string, string> sessionsByPartyId = new ConcurrentDictionary<string, string>();
+    private readonly object sessionGate = new object();
     private readonly HashSet<string> openedConversationSessionIds = new HashSet<string>();
     private readonly HashSet<string> hostileEncounterSessionIds = new HashSet<string>();
     private readonly HashSet<string> closedHostileEncounterPartyIds = new HashSet<string>();
@@ -117,31 +118,31 @@ internal class PlayerPartyInteractionHandler : IHandler
     {
         if (ModInformation.IsClient) return false;
 
-        if (IsPartyBusy(request.AttackerId, request.DefenderId) || IsPartyBusy(request.DefenderId, request.AttackerId))
+        PlayerPartyInteractionSession session;
+        lock (sessionGate)
         {
-            network.Send(initiatorPeer, new NetworkPlayerPartyInteractionDenied(PlayerPartyInteractionDeniedReason.Busy));
-            return false;
+            var existing = FindExistingSession(request.AttackerId) ?? FindExistingSession(request.DefenderId);
+            if (existing != null)
+            {
+                if (!IsSamePair(existing, request.AttackerId, request.DefenderId))
+                    network.Send(initiatorPeer, new NetworkPlayerPartyInteractionDenied(PlayerPartyInteractionDeniedReason.Busy));
+                return false;
+            }
+
+            session = new PlayerPartyInteractionSession(
+                Guid.NewGuid().ToString("N"),
+                request.AttackerId,
+                request.DefenderId,
+                GetPartyName(initiatorParty, "Player"),
+                GetPartyName(responderParty, "Player"),
+                initiatorPeer,
+                AreHostile(initiatorParty, responderParty));
+            AddInitialOptions(session, initiatorParty, responderParty);
+            if (!sessionsById.TryAdd(session.SessionId, session)) return false;
+            sessionsByPartyId[session.InitiatorPartyId] = session.SessionId;
+            sessionsByPartyId[session.ResponderPartyId] = session.SessionId;
+            conversationPartyTracker.BeginPvpConversation(session.InitiatorPartyId, session.ResponderPartyId);
         }
-
-        var isHostile = AreHostile(initiatorParty, responderParty);
-
-        var session = new PlayerPartyInteractionSession(
-            Guid.NewGuid().ToString("N"),
-            request.AttackerId,
-            request.DefenderId,
-            GetPartyName(initiatorParty, "Player"),
-            GetPartyName(responderParty, "Player"),
-            initiatorPeer,
-            isHostile);
-
-        AddInitialOptions(session, initiatorParty, responderParty);
-
-        if (!sessionsById.TryAdd(session.SessionId, session))
-            return false;
-
-        sessionsByPartyId[session.InitiatorPartyId] = session.SessionId;
-        sessionsByPartyId[session.ResponderPartyId] = session.SessionId;
-        conversationPartyTracker.BeginPvpConversation(session.InitiatorPartyId, session.ResponderPartyId);
 
         GameThread.RunSafe(() =>
         {
@@ -217,6 +218,11 @@ internal class PlayerPartyInteractionHandler : IHandler
         if (!(payload.Who is NetPeer peer)) return;
 
         var message = payload.What;
+        GameThread.RunSafe(() => ProcessSubmittedOption(peer, message), context: nameof(Handle_NetworkSubmitPlayerPartyInteractionOption));
+    }
+
+    private void ProcessSubmittedOption(NetPeer peer, NetworkSubmitPlayerPartyInteractionOption message)
+    {
         if (!sessionsById.TryGetValue(message.SessionId, out var session))
         {
             Logger.Warning(
@@ -714,11 +720,14 @@ internal class PlayerPartyInteractionHandler : IHandler
 
     private void EndSession(PlayerPartyInteractionSession session, PlayerPartyInteractionOutcomeType outcomeType)
     {
-        if (!sessionsById.TryRemove(session.SessionId, out _)) return;
+        lock (sessionGate)
+        {
+            if (!sessionsById.TryRemove(session.SessionId, out _)) return;
 
-        sessionsByPartyId.TryRemove(session.InitiatorPartyId, out _);
-        sessionsByPartyId.TryRemove(session.ResponderPartyId, out _);
-        conversationPartyTracker.EndPvpConversation(session.InitiatorPartyId);
+            sessionsByPartyId.TryRemove(session.InitiatorPartyId, out _);
+            sessionsByPartyId.TryRemove(session.ResponderPartyId, out _);
+            conversationPartyTracker.EndPvpConversation(session.InitiatorPartyId);
+        }
 
         var outcome = new PlayerPartyInteractionOutcome(session, outcomeType);
         outcomeHandler.Handle(outcome);
@@ -825,16 +834,21 @@ internal class PlayerPartyInteractionHandler : IHandler
         return PlayerPartyInteractionOutcomeType.Left;
     }
 
-    private bool IsPartyBusy(string partyId, string allowedPartnerId)
+    private PlayerPartyInteractionSession FindExistingSession(string partyId)
     {
-        if (!sessionsByPartyId.TryGetValue(partyId, out var existingSessionId))
-            return conversationPartyTracker.TryGetPvpPartner(partyId, out var partner) && partner != allowedPartnerId;
+        if (!sessionsByPartyId.TryGetValue(partyId, out var sessionId))
+            return null;
 
-        if (!sessionsById.TryGetValue(existingSessionId, out var existingSession))
-            return false;
+        if (sessionsById.TryGetValue(sessionId, out var session))
+            return session;
 
-        return existingSession.GetOtherPartyId(partyId) != allowedPartnerId;
+        sessionsByPartyId.TryRemove(partyId, out _);
+        return null;
     }
+
+    private static bool IsSamePair(PlayerPartyInteractionSession session, string partyA, string partyB)
+        => (session.InitiatorPartyId == partyA && session.ResponderPartyId == partyB) ||
+           (session.InitiatorPartyId == partyB && session.ResponderPartyId == partyA);
 
     private static bool AreHostile(PartyBase initiatorParty, PartyBase responderParty)
     {

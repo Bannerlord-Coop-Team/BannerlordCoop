@@ -10,6 +10,8 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
@@ -416,6 +418,26 @@ public class HeroDebugCommand
             return result;
         }
         return "Hero not found.";
+    }
+
+    /// <summary>
+    /// Runs the authoritative volunteer refresh for one settlement.
+    /// </summary>
+    [CommandLineArgumentFunction("refresh_volunteers", "coop.debug.hero")]
+    public static string RefreshVolunteersCommand(List<string> args)
+    {
+        if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.refresh_volunteers")) return error;
+        if (args.Count > 1) return "Usage: coop.debug.hero.refresh_volunteers [settlementId]";
+
+        string settlementId = args.Count == 0 ? "town_ES1" : args[0];
+        var settlement = Settlement.All.FirstOrDefault(candidate => candidate.StringId == settlementId);
+        if (settlement == null) return $"Settlement '{settlementId}' not found.";
+
+        var behavior = Campaign.Current?.GetCampaignBehavior<RecruitmentCampaignBehavior>();
+        if (behavior == null) return $"Unable to find {nameof(RecruitmentCampaignBehavior)}.";
+
+        behavior.UpdateVolunteersOfNotablesInSettlement(settlement);
+        return $"Refreshed volunteers for {settlement.Name} ({settlement.StringId}).";
     }
 
     // coop.debug.hero.set_relation

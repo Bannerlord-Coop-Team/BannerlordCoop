@@ -9,6 +9,7 @@ using GameInterface.Services.UI.CoopOptions.Providers.KillFeedTab;
 using GameInterface.Services.UI.CoopOptions.Providers.KillFeedTab.Sections;
 using GameInterface.Services.UI.Handlers;
 using GameInterface.Services.UI.Messages;
+using GameInterface.Tests;
 using Moq;
 using System;
 using System.IO;
@@ -17,7 +18,7 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.UI;
 
-[Collection(global::GameInterface.Tests.ModInformationRoleCollection.Name)]
+[Collection(ModInformationRoleCollection.Name)]
 public class PlayerKillFeedColorTests
 {
     [Fact]

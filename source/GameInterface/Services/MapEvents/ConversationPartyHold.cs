@@ -1,4 +1,4 @@
-using GameInterface.Services.ObjectManager;
+﻿using GameInterface.Services.ObjectManager;
 using System;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
@@ -37,9 +37,7 @@ internal static class ConversationPartyHold
     }
 
     /// <summary>
-    /// Marks the party as engaged by the given player and holds it in place. Fails when another player already
-    /// engages the party, or when this player still holds an engagement with a different party (first approval
-    /// wins; that hold is released when its conversation ends).
+    /// Marks the party as engaged and holds it in place. The tracker decides whether the engagement can be shared.
     /// </summary>
     public static bool TryEngage(ConversationPartyTracker tracker, object engagerKey, string engagerPartyId, MobileParty party, string partyId)
     {
@@ -68,15 +66,15 @@ internal static class ConversationPartyHold
     {
         if (tracker == null) return;
 
-        if (!tracker.TryEndEngagement(engagerKey, out var partyId, out var engagement))
+        if (!tracker.TryEndEngagement(engagerKey, out var partyId, out var engagement, out var shouldReleaseParty))
             return;
 
-        ReleaseParty(tracker.ObjectManager, partyId, engagement.WasAiDisabled);
+        if (shouldReleaseParty)
+            ReleaseParty(tracker.ObjectManager, partyId, engagement.WasAiDisabled);
     }
 
     /// <summary>
-    /// [Server] True when the target party is held in a player's conversation and the interacting party is not the
-    /// engaging player's own party, so the map interaction must be blocked.
+    /// [Server] True when the target is held and the interacting party is not one of its registered contenders.
     /// </summary>
     public static bool IsInteractionBlocked(PartyBase targetParty, MobileParty interactor)
     {
@@ -94,9 +92,9 @@ internal static class ConversationPartyHold
         if (interactor?.Party != null)
             objectManager.TryGetId(interactor.Party, out interactorId);
 
-        // AI party held in a conversation: only the engaging player's party may interact.
-        if (tracker.TryGetEngagement(targetPartyId, out var engagement))
-            return interactorId != engagement.EngagerPartyId;
+        // Every contender registered for a shared hostile encounter may interact with the target.
+        if (tracker.TryGetEngagement(targetPartyId, out _))
+            return !tracker.IsEngagerParty(targetPartyId, interactorId);
 
         // PvP conversation: only the partner (the other player in the conversation) may interact.
         if (tracker.TryGetPvpPartner(targetPartyId, out var partnerId))

@@ -1,12 +1,13 @@
 ﻿using Common;
 using GameInterface.Services.GameDebug.Commands;
+using GameInterface.Tests;
 using System;
 using System.Collections.Generic;
 using Xunit;
 
 namespace GameInterface.Tests.Services.GameDebug;
 
-[Collection(global::GameInterface.Tests.ModInformationRoleCollection.Name)]
+[Collection(ModInformationRoleCollection.Name)]
 public class GameThreadDebugCommandTests : IDisposable
 {
     private readonly bool wasServer = ModInformation.IsServer;

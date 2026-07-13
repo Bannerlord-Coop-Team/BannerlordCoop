@@ -9,6 +9,7 @@ using GameInterface.Services.GameDebug.Commands;
 using GameInterface.Services.GameDebug.Metrics;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Tests;
 using LiteNetLib;
 using Moq;
 using ProtoBuf;
@@ -24,7 +25,7 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.GameDebug.Metrics;
 
-[Collection(global::GameInterface.Tests.ModInformationRoleCollection.Name)]
+[Collection(ModInformationRoleCollection.Name)]
 public class PartySyncPerformanceLogsCommandTests : IDisposable
 {
     private readonly IContainer container;
@@ -140,7 +141,7 @@ public class PartySyncPerformanceLogsCommandTests : IDisposable
     }
 }
 
-[Collection(global::GameInterface.Tests.ModInformationRoleCollection.Name)]
+[Collection(ModInformationRoleCollection.Name)]
 public class PartySyncPerformanceSerializationTests
 {
     [Fact]
@@ -180,7 +181,7 @@ public class PartySyncPerformanceSerializationTests
         new(id, new CampaignVec2(new Vec2(x, y), true));
 }
 
-[Collection(global::GameInterface.Tests.ModInformationRoleCollection.Name)]
+[Collection(ModInformationRoleCollection.Name)]
 public class PartySyncPerformanceLoggerTests : IDisposable
 {
     private readonly TestMessageBroker messageBroker = new();
@@ -311,7 +312,7 @@ public class PartySyncPerformanceLoggerTests : IDisposable
         new(id, new CampaignVec2(new Vec2(x, y), true));
 }
 
-[Collection(global::GameInterface.Tests.ModInformationRoleCollection.Name)]
+[Collection(ModInformationRoleCollection.Name)]
 public class PartySyncPerformanceHandlerTests : IDisposable
 {
     private readonly TestMessageBroker messageBroker = new();

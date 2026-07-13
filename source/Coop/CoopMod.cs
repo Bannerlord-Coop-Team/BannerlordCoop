@@ -329,6 +329,9 @@ namespace Coop
         {
             base.OnGameStart(game, gameStarterObject);
 
+            if (ContainerProvider.TryResolve<IGameInterface>(out var gameInterface))
+                gameInterface.PatchGameStarted();
+
             if (gameStarterObject is CampaignGameStarter campaignGameStarter)
                 campaignGameStarter.AddBehavior(new PlayerPartyInteractionCampaignBehavior());
         }

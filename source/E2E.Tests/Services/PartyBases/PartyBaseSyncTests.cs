@@ -1,6 +1,5 @@
 ﻿using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -18,7 +17,6 @@ public class PartyBaseSyncTests : SyncTestBase
         TestEnvironment.CreateRegisteredObject<MobileParty>();
         TestEnvironment.CreateRegisteredObject<Settlement>();
         TestEnvironment.CreateRegisteredObject<ItemRoster>();
-        TestEnvironment.CreateRegisteredObject<MapEventSide>();
         TestEnvironment.CreateRegisteredObject<TroopRoster>();
         TestEnvironment.CreateRegisteredObject<TroopRoster>();
         TestEnvironment.CreateRegisteredObject<Hero>();
@@ -40,9 +38,6 @@ public class PartyBaseSyncTests : SyncTestBase
         // Not synced - cached/derived values (commented out in PartyBaseSync). Kept for future reference.
         //TestEnvironment.AssertProperty<PartyBase, bool>(nameof(PartyBase.IsVisualDirty), true);
         //TestEnvironment.AssertProperty<PartyBase, bool>(nameof(PartyBase.LevelMaskIsDirty), true);
-        // MapEventSide (the property) is not synced; only the _mapEventSide field is (see Server_PartyBase_Fields).
-        // Its setter calls AddPartyInternal which creates a MapEventParty requiring full game state.
-        //TestEnvironment.AssertReferenceProperty<PartyBase, MapEventSide>(nameof(PartyBase.MapEventSide));
     }
 
     [Fact]
@@ -55,7 +50,6 @@ public class PartyBaseSyncTests : SyncTestBase
         TestEnvironment.AssertReferenceField<PartyBase, Hero>(nameof(PartyBase._customOwner));
         TestEnvironment.AssertField<PartyBase, int>(nameof(PartyBase._index), 5, PartyBaseId, defaultValue: initialIndex);
         TestEnvironment.AssertField<PartyBase, CampaignTime>(nameof(PartyBase._lastEatingTime), new CampaignTime(1512));
-        TestEnvironment.AssertReferenceField<PartyBase, MapEventSide>(nameof(PartyBase._mapEventSide));
         TestEnvironment.AssertField<PartyBase, int>(nameof(PartyBase._remainingFoodPercentage), 9);
 
         // Not synced - cached/version-counter values (commented out in PartyBaseSync). Kept for future reference.

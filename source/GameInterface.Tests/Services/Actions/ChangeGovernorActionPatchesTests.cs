@@ -2,6 +2,7 @@
 using Common.Messaging;
 using GameInterface.Services.Actions.Messages;
 using GameInterface.Services.Actions.Patches;
+using GameInterface.Tests;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -14,7 +15,7 @@ namespace GameInterface.Tests.Services.Actions
     /// <summary>
     /// Tests for the governor removal prefix in <see cref="ChangeGovernorActionPatches"/>.
     /// </summary>
-    [Collection(global::GameInterface.Tests.ModInformationRoleCollection.Name)]
+    [Collection(ModInformationRoleCollection.Name)]
     public class ChangeGovernorActionPatchesTests
     {
         private static Hero CreateHero(bool isGovernor)
