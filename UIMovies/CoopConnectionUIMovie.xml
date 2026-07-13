@@ -7,7 +7,7 @@
         <Standard.TopPanel Parameter.Title="@MovieTextHeader"/>
 
         <ListPanel WidthSizePolicy="Fixed" SuggestedWidth="1160" HeightSizePolicy="Fixed" SuggestedHeight="650"
-                   HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="20"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="20" PositionXOffset="-60"
                    StackLayout.LayoutMethod="HorizontalLeftToRight">
           <Children>
             <!-- Left-side connection-mode menu. -->
@@ -166,13 +166,11 @@
                                 Text="@SteamLobbyStatusText"/>
 
                     <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="42"
-                               MarginRight="18" StackLayout.LayoutMethod="HorizontalLeftToRight">
+                               MarginLeft="12" MarginRight="18" StackLayout.LayoutMethod="HorizontalLeftToRight">
                       <Children>
-                        <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="210" HeightSizePolicy="StretchToParent"
-                                    Brush="Clan.TabControl.Text" Brush.FontSize="22" Text="@LobbyColumnText"/>
-                        <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="290" HeightSizePolicy="StretchToParent"
-                                    Brush="Clan.TabControl.Text" Brush.FontSize="22" Text="@VersionColumnText"/>
-                        <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="160" HeightSizePolicy="StretchToParent"
+                        <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="408" HeightSizePolicy="StretchToParent"
+                                    Brush="Clan.TabControl.Text" Brush.FontSize="22" Text="@HostColumnText"/>
+                        <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="180" HeightSizePolicy="StretchToParent"
                                     Brush="Clan.TabControl.Text" Brush.FontSize="22" Text="@PasswordColumnText"/>
                         <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
                                     Brush="Clan.TabControl.Text" Brush.FontSize="22" Text="@CompatibilityColumnText"/>
@@ -193,32 +191,46 @@
                                                       WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
                                                       StackLayout.LayoutMethod="VerticalTopToBottom">
                                   <ItemTemplate>
-                                    <ButtonWidget DoNotPassEventsToChildren="true" UpdateChildrenStates="true"
-                                                  WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="72"
-                                                  MarginBottom="8" Brush="Header.Tab.Center"
-                                                  Command.Click="ExecuteJoin" IsDisabled="@IsJoinDisabled">
+                                    <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="72"
+                                            MarginBottom="8">
                                       <Children>
-                                        <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
-                                                   MarginLeft="12" MarginRight="12"
-                                                   StackLayout.LayoutMethod="HorizontalLeftToRight">
+                                        <ButtonWidget DoNotPassEventsToChildren="true" UpdateChildrenStates="true"
+                                                      WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                                                      Brush="Header.Tab.Center" Command.Click="ExecuteJoin"
+                                                      IsDisabled="@IsJoinDisabled">
                                           <Children>
-                                            <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="198" HeightSizePolicy="StretchToParent"
-                                                        Brush="Clan.TabControl.Text" Brush.FontSize="21"
-                                                        Brush.TextVerticalAlignment="Center" Text="@LobbyText"/>
-                                            <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="290" HeightSizePolicy="StretchToParent"
-                                                        Brush="Clan.TabControl.Text" Brush.FontSize="21" ClipContents="true"
-                                                        Brush.FontColor="@VersionColor" Brush.TextVerticalAlignment="Center"
-                                                        Text="@VersionText"/>
-                                            <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="160" HeightSizePolicy="StretchToParent"
-                                                        Brush="Clan.TabControl.Text" Brush.FontSize="21"
-                                                        Brush.TextVerticalAlignment="Center" Text="@PasswordText"/>
-                                            <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
-                                                        Brush="Clan.TabControl.Text" Brush.FontSize="21"
-                                                        Brush.TextVerticalAlignment="Center" Text="@CompatibilityText"/>
+                                            <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                                                       MarginLeft="12" MarginRight="12"
+                                                       StackLayout.LayoutMethod="HorizontalLeftToRight">
+                                              <Children>
+                                                <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="408" HeightSizePolicy="StretchToParent"
+                                                            Brush="Clan.TabControl.Text" Brush.FontSize="21" ClipContents="true"
+                                                            Brush.TextVerticalAlignment="Center" Text="@HostText"/>
+                                                <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="180" HeightSizePolicy="StretchToParent"
+                                                            Brush="Clan.TabControl.Text" Brush.FontSize="21"
+                                                            Brush.TextVerticalAlignment="Center" Text="@PasswordText"/>
+                                                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                                                            Brush="Clan.TabControl.Text" Brush.FontSize="21"
+                                                            Brush.FontColor="@StatusColor" Brush.TextVerticalAlignment="Center"
+                                                            Text="@StatusText"/>
+                                              </Children>
+                                            </ListPanel>
                                           </Children>
-                                        </ListPanel>
+                                        </ButtonWidget>
+
+                                        <HintWidget DataSource="{StatusHint}" WidthSizePolicy="Fixed" SuggestedWidth="44"
+                                                    HeightSizePolicy="StretchToParent" HorizontalAlignment="Left"
+                                                    PositionXOffset="738" IsVisible="@IsStatusHintVisible"
+                                                    Command.HoverBegin="ExecuteBeginHint" Command.HoverEnd="ExecuteEndHint">
+                                          <Children>
+                                            <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                                                        DoNotAcceptEvents="true" Brush="Clan.TabControl.Text"
+                                                        Brush.FontColor="@StatusColor" Brush.TextVerticalAlignment="Center"
+                                                        Text="(i)"/>
+                                          </Children>
+                                        </HintWidget>
                                       </Children>
-                                    </ButtonWidget>
+                                    </Widget>
                                   </ItemTemplate>
                                 </NavigatableListPanel>
                               </Children>

@@ -23,6 +23,7 @@ public class SteamLobbyBrowserTests
         {
             api.SetLobbyData(lobbyId, pair.Key, pair.Value);
         }
+        api.SetLobbyData(lobbyId, LobbyDataCodec.OwnerNameKey, api.PersonaName);
     }
 
     [Fact]
@@ -42,11 +43,28 @@ public class SteamLobbyBrowserTests
 
         var lobby = Assert.Single(results);
         Assert.Equal(42UL, lobby.LobbyId);
+        Assert.Equal(api.PersonaName, lobby.OwnerName);
         Assert.Equal(SessionJoinInfo.CurrentVersion, lobby.ProtocolVersion);
         Assert.Equal(Common.ModInformation.BuildVersion, lobby.ModVersion);
         Assert.True(lobby.PasswordRequired);
         Assert.True(lobby.IsCompatible);
         Assert.Null(error);
+    }
+
+    [Fact]
+    public void RequestLobbies_PreservesMissingOwnerNameForUiFallback()
+    {
+        AddLobby(42, new SessionJoinInfo
+        {
+            Port = 4200,
+            ServerSteamId = 76561198000000042,
+        });
+        api.SetLobbyData(42, LobbyDataCodec.OwnerNameKey, string.Empty);
+
+        IReadOnlyList<SteamLobbySummary> results = null;
+        browser.RequestLobbies((lobbies, _) => results = lobbies);
+
+        Assert.Equal(string.Empty, Assert.Single(results).OwnerName);
     }
 
     [Fact]

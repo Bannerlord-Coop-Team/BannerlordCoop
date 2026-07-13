@@ -72,6 +72,7 @@ public class SteamLobbyBrowser : ISteamLobbyBrowser
             summaries.Add(new SteamLobbySummary
             {
                 LobbyId = lobbyId,
+                OwnerName = lobbyApi.GetLobbyData(lobbyId, LobbyDataCodec.OwnerNameKey),
                 ProtocolVersion = protocolVersion,
                 ModVersion = lobbyApi.GetLobbyData(lobbyId, LobbyDataCodec.ModVersionKey),
                 PasswordRequired = passwordRequired,

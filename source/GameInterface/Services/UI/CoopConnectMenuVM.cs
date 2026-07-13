@@ -39,8 +39,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     public string MovieTextHeader => "Join Co-op Sandbox";
     public string CommunityText => "Join the Community";
     public string SteamLobbiesHeaderText => "Hosted Steam Servers";
-    public string LobbyColumnText => "Lobby";
-    public string VersionColumnText => "Version";
+    public string HostColumnText => "Host";
     public string PasswordColumnText => "Access";
     public string CompatibilityColumnText => "Status";
     public string IpText => "Server IP Address:";
@@ -363,6 +362,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
 
             SteamLobbies.Add(new SteamLobbyListItemVM(
                 lobby.LobbyId,
+                lobby.OwnerName,
                 lobby.ProtocolVersion,
                 lobby.ModVersion,
                 lobby.PasswordRequired,

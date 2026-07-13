@@ -114,6 +114,19 @@ public class SteamLobbyAdvertiser : ISessionAdvertiser
 
         try
         {
+            if (!lobbyApi.SetLobbyData(
+                lobbyId, LobbyDataCodec.OwnerNameKey, lobbyApi.LocalPersonaName ?? string.Empty))
+            {
+                Logger.Warning("Could not advertise the Steam lobby owner's display name");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "Could not advertise the Steam lobby owner's display name");
+        }
+
+        try
+        {
             richPresenceSet |= lobbyApi.SetRichPresenceConnect($"{ConnectLobbyArgument} {lobbyId}");
         }
         catch (Exception ex)

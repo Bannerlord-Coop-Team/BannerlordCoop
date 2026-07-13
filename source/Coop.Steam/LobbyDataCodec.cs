@@ -13,6 +13,7 @@ public static class LobbyDataCodec
     public const string AddressKey = "coop_address";
     public const string PortKey = "coop_port";
     public const string ServerSteamIdKey = "coop_server_steamid";
+    public const string OwnerNameKey = "coop_owner_name";
     public const string ModVersionKey = "coop_mod_version";
     public const string PasswordRequiredKey = "coop_password_required";
     public const string LobbyTypeKey = "coop_lobby_type";

@@ -57,6 +57,8 @@ public class SteamLobbyApi : ISteamPublicLobbyApi
         }
     }
 
+    public string LocalPersonaName => SteamFriends.GetPersonaName() ?? string.Empty;
+
     private void OnGameLobbyJoinRequested(GameLobbyJoinRequested_t callback)
     {
         try

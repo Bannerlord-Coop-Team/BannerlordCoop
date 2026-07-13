@@ -11,12 +11,14 @@ namespace Coop.Tests.Steam
     public class FakeSteamLobbyApi : ISteamPublicLobbyApi
     {
         public bool OverlayEnabled = true;
+        public string PersonaName = "Test Host";
         public ulong NextCreatedLobbyId = 1001;
         public ulong LobbyOwner = 76561198000000001;
         public bool CreateSucceeds = true;
         public bool JoinSucceeds = true;
         public bool ListSucceeds = true;
         public bool SetLobbyDataSucceeds = true;
+        public string FailedLobbyDataKey;
         public bool CompleteOperationsImmediately = true;
         public string LaunchCommandLine = string.Empty;
         public bool LastCreateWasPublic;
@@ -34,6 +36,7 @@ namespace Coop.Tests.Steam
         public Action PendingListCompletion;
 
         public bool IsOverlayEnabled => OverlayEnabled;
+        public string LocalPersonaName => PersonaName;
 
         public event Action<ulong> LobbyJoinRequested;
         public event Action<string> ConnectStringReceived;
@@ -101,7 +104,7 @@ namespace Coop.Tests.Steam
 
         public bool SetLobbyData(ulong lobbyId, string key, string value)
         {
-            if (!SetLobbyDataSucceeds) return false;
+            if (!SetLobbyDataSucceeds || key == FailedLobbyDataKey) return false;
 
             if (!LobbyData.TryGetValue(lobbyId, out var data))
             {

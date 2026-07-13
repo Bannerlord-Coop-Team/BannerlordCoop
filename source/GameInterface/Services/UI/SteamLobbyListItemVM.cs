@@ -1,5 +1,8 @@
+using Common;
 using System;
+using TaleWorlds.Core.ViewModelCollection.Information;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.UI;
 
@@ -8,13 +11,14 @@ namespace GameInterface.Services.UI;
 /// </summary>
 public sealed class SteamLobbyListItemVM : ViewModel
 {
-    private const string CompatibleVersionColor = "#F4E1C4FF";
-    private const string IncompatibleVersionColor = "#FF5555FF";
+    private const string CompatibleStatusColor = "#F4E1C4FF";
+    private const string IncompatibleStatusColor = "#FF5555FF";
 
     private readonly Action<ulong> onJoin;
 
     public SteamLobbyListItemVM(
         ulong lobbyId,
+        string ownerName,
         int protocolVersion,
         string modVersion,
         bool passwordRequired,
@@ -22,35 +26,51 @@ public sealed class SteamLobbyListItemVM : ViewModel
         Action<ulong> onJoin)
     {
         LobbyId = lobbyId;
+        OwnerName = ownerName?.Trim() ?? string.Empty;
         ProtocolVersion = protocolVersion;
         ModVersion = modVersion ?? string.Empty;
         PasswordRequired = passwordRequired;
         IsCompatible = isCompatible;
         this.onJoin = onJoin ?? throw new ArgumentNullException(nameof(onJoin));
+
+        string hintText;
+        if (!ModInformation.MatchesBuildVersion(ModVersion))
+        {
+            string hostVersion = string.IsNullOrWhiteSpace(ModVersion) ? "unknown" : ModVersion;
+            hintText = $"The host's version is {hostVersion} while your version is {ModInformation.BuildVersion}.";
+        }
+        else
+        {
+            hintText = $"The host's protocol version is {ProtocolVersion} while your protocol version is " +
+                $"{Common.Network.Session.SessionJoinInfo.CurrentVersion}.";
+        }
+        StatusHint = new HintViewModel(new TextObject(hintText));
     }
 
     public ulong LobbyId { get; }
+    public string OwnerName { get; }
     public int ProtocolVersion { get; }
     public string ModVersion { get; }
     public bool PasswordRequired { get; }
     public bool IsCompatible { get; }
 
     [DataSourceProperty]
-    public string LobbyText => $"Lobby {LobbyId}";
+    public string HostText => !string.IsNullOrWhiteSpace(OwnerName) ? OwnerName : "Unknown host";
 
     [DataSourceProperty]
-    public string VersionText => string.IsNullOrWhiteSpace(ModVersion)
-        ? $"Protocol {ProtocolVersion}"
-        : $"{ModVersion} (protocol {ProtocolVersion})";
+    public string StatusText => IsCompatible ? "Compatible" : "Incompatible";
 
     [DataSourceProperty]
-    public string VersionColor => IsCompatible ? CompatibleVersionColor : IncompatibleVersionColor;
+    public string StatusColor => IsCompatible ? CompatibleStatusColor : IncompatibleStatusColor;
 
     [DataSourceProperty]
     public string PasswordText => PasswordRequired ? "Password required" : "No password";
 
     [DataSourceProperty]
-    public string CompatibilityText => IsCompatible ? "Compatible" : "Incompatible version";
+    public bool IsStatusHintVisible => !IsCompatible;
+
+    [DataSourceProperty]
+    public HintViewModel StatusHint { get; }
 
     [DataSourceProperty]
     public bool IsJoinDisabled => !IsCompatible;

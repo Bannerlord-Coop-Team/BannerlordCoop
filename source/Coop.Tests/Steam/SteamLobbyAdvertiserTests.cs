@@ -26,6 +26,8 @@ namespace Coop.Tests.Steam
             Assert.False(api.LastCreateWasPublic);
             Assert.Equal("203.0.113.7", api.GetLobbyData(api.NextCreatedLobbyId, LobbyDataCodec.AddressKey));
             Assert.Equal("4200", api.GetLobbyData(api.NextCreatedLobbyId, LobbyDataCodec.PortKey));
+            Assert.Equal(api.PersonaName,
+                api.GetLobbyData(api.NextCreatedLobbyId, LobbyDataCodec.OwnerNameKey));
             Assert.Contains($"{SteamLobbyAdvertiser.ConnectLobbyArgument} {api.NextCreatedLobbyId}", api.RichPresenceConnects);
         }
 
@@ -72,6 +74,19 @@ namespace Coop.Tests.Steam
             Assert.False(advertiser.IsAdvertising);
             Assert.Contains(api.NextCreatedLobbyId, api.LeftLobbies);
             Assert.Empty(api.RichPresenceConnects);
+        }
+
+        [Fact]
+        public void Advertise_FailedOwnerNameWriteKeepsJoinableLobby()
+        {
+            api.FailedLobbyDataKey = LobbyDataCodec.OwnerNameKey;
+
+            advertiser.Advertise(Info());
+
+            Assert.True(advertiser.IsAdvertising);
+            Assert.Empty(api.LeftLobbies);
+            Assert.Contains($"{SteamLobbyAdvertiser.ConnectLobbyArgument} {api.NextCreatedLobbyId}",
+                api.RichPresenceConnects);
         }
 
         [Fact]

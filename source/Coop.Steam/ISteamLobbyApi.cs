@@ -10,6 +10,8 @@ namespace Coop.Steam;
 public interface ISteamLobbyApi : IDisposable
 {
     bool IsOverlayEnabled { get; }
+    /// <summary>Display name for the local Steam user that creates and owns the lobby.</summary>
+    string LocalPersonaName { get; }
 
     void CreateFriendsOnlyLobby(int maxMembers, Action<ulong, bool> onCompleted);
     void JoinLobby(ulong lobbyId, Action<ulong, bool> onCompleted);

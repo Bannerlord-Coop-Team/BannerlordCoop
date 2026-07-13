@@ -4,6 +4,8 @@ namespace Common.Network.Session;
 public class SteamLobbySummary
 {
     public ulong LobbyId { get; set; }
+    /// <summary>Steam persona name advertised by the lobby creator; display metadata only.</summary>
+    public string OwnerName { get; set; }
     public int ProtocolVersion { get; set; }
     public string ModVersion { get; set; }
     public bool PasswordRequired { get; set; }
