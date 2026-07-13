@@ -1,4 +1,5 @@
 ﻿using GameInterface.Services.ObjectManager;
+using static GameInterface.Services.ObjectManager.ObjectManager;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Map;
@@ -149,7 +150,7 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
         if (!objectManager.TryGetId(instance, out id))
             return false;
 
-        id = ObjectManager.Compact(id, typeof(T));
+        id = Compact(id, typeof(T));
         return true;
     }
 }
