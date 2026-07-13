@@ -2,7 +2,6 @@ using Autofac;
 using GameInterface;
 using GameInterface.Services.Locations;
 using GameInterface.Services.MapEvents;
-using HarmonyLib;
 using Missions.Agents.Handlers;
 using Missions.Battles;
 using Missions.Missiles.Handlers;
@@ -22,15 +21,13 @@ public class MissionModule : Module
 {
     internal const string MissilePatchCategory = "CoopMissilePatches";
 
-    static MissionModule()
-    {
-        new Harmony(GameInterfaceModule.HarmonyId + ".Missiles")
-            .PatchCategory(typeof(AddMissileAuxPatch).Assembly, MissilePatchCategory);
-    }
-
     protected override void Load(ContainerBuilder builder)
     {
         base.Load(builder);
+
+        builder.RegisterInstance(new HarmonyPatchCategoryRegistration(
+            typeof(AddMissileAuxPatch).Assembly,
+            MissilePatchCategory));
 
         builder.RegisterType<LiteNetP2PClient>().As<IBattleNetwork>().InstancePerLifetimeScope();
 
