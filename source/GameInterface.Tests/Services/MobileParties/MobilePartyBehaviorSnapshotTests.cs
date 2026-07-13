@@ -61,7 +61,7 @@ public class MobilePartyBehaviorSnapshotTests
         Assert.True(data.HasTarget);
         Assert.Equal(BehaviorInteractableKind.AnchorPoint, data.InteractableKind);
         Assert.Equal(
-            global::GameInterface.Services.ObjectManager.ObjectManager.Compact(ownerId, typeof(MobileParty)),
+            ObjectManager.Compact(ownerId, typeof(MobileParty)),
             data.InteractablePointId);
         Assert.Equal(behaviorTarget, data.BestTargetPoint);
         Assert.Equal(moveTarget, data.MoveTargetPoint);

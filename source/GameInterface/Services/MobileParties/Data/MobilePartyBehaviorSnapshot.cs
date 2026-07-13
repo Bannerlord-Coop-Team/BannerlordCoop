@@ -149,7 +149,7 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
         if (!objectManager.TryGetId(instance, out id))
             return false;
 
-        id = global::GameInterface.Services.ObjectManager.ObjectManager.Compact(id, typeof(T));
+        id = ObjectManager.Compact(id, typeof(T));
         return true;
     }
 }
