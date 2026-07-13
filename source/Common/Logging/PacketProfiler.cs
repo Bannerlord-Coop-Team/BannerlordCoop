@@ -15,7 +15,7 @@ namespace Common.Logging;
 /// <remarks>
 /// Fed from the network send path (see <c>CoopNetworkBase.SendInternal</c>), so every recorded packet is
 /// one actually sent over the wire, counted with its serialized byte size. A <see cref="MessagePacket"/>
-/// is broken out by the message type it wraps (e.g. <c>MessagePacket:NetworkTroopRosterAddCounts</c>).
+/// is broken out by the message type it wraps (e.g. <c>MessagePacket:NetworkTroopRosterElementBatch</c>).
 /// The accumulated stats are dumped on a fixed wall-clock interval. Only the server profiles traffic
 /// (see <see cref="ModInformation.IsServer"/>).
 /// </remarks>
@@ -28,6 +28,13 @@ public sealed class PacketProfiler : IDisposable
     private readonly Poller poller;
 
     private readonly ConcurrentDictionary<string, Stats> stats = new ConcurrentDictionary<string, Stats>();
+
+    /// <summary>
+    /// Optional provider of a one-line live-state summary (e.g. per-peer reliable-queue depth and ping)
+    /// appended to each dump. Owned by the network layer, which is the only one that can see peers;
+    /// the profiler itself stays free of any networking dependency.
+    /// </summary>
+    public Func<string> ExtraStatsProvider { get; set; }
 
     /// <summary>
     /// Constructs a PacketProfiler.
@@ -80,8 +87,22 @@ public sealed class PacketProfiler : IDisposable
         var bytesPerSecond = seconds > 0 ? totalBytes / seconds : 0;
 
         Logger.Information(
-            "Packet profile over {Seconds:0.#} seconds ({BytesPerSecond:N0} bytes/sec avg): {@PacketProfile}",
-            seconds, bytesPerSecond, ordered);
+            "Packet profile over {Seconds:0.#} seconds ({BytesPerSecond:N0} bytes/sec avg): {@PacketProfile}{ExtraStats}",
+            seconds, bytesPerSecond, ordered, GetExtraStats());
+    }
+
+    // Never let a faulty provider kill the dump; the profile itself is the primary payload.
+    private string GetExtraStats()
+    {
+        try
+        {
+            var extra = ExtraStatsProvider?.Invoke();
+            return string.IsNullOrEmpty(extra) ? string.Empty : $" | {extra}";
+        }
+        catch (Exception ex)
+        {
+            return $" | peer stats unavailable: {ex.GetType().Name}";
+        }
     }
 
     private static string GetPacketName(IPacket packet)

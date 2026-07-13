@@ -1,0 +1,17 @@
+using Common.Messaging;
+using GameInterface.Utils.LocalEvents;
+{{~ for library in Libraries ~}}
+using {{ library }};
+{{~ end ~}}
+
+namespace AutoSync;
+
+public readonly struct Local_{{ MemberDeclaringTypeName}}_{{ MemberName }}_PropertyOwnerClear : IEvent
+{
+    public readonly {{ MemberDeclaringType }} Instance;
+
+    public Local_{{ MemberDeclaringTypeName}}_{{ MemberName }}_PropertyOwnerClear({{ MemberDeclaringType }} instance)
+    {
+        Instance = instance;
+    }
+}
