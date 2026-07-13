@@ -5,6 +5,7 @@ using Common.Util;
 using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Kingdoms.Patches;
+using GameInterface.Tests;
 using GameInterface.Tests.Bootstrap;
 using System;
 using System.Collections.Generic;
@@ -15,7 +16,7 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.Kingdoms;
 
-[Collection(global::GameInterface.Tests.ModInformationRoleCollection.Name)]
+[Collection(ModInformationRoleCollection.Name)]
 public class GovernorKingdomCreationPatchesTests
 {
     private static GovernorCampaignBehavior CreateGovernorBehavior(string kingdomName, string cultureId)

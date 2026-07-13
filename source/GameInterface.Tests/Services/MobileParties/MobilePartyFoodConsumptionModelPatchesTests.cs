@@ -3,6 +3,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.Players;
+using GameInterface.Tests;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
@@ -19,7 +20,7 @@ namespace GameInterface.Tests.Services.MobileParties;
 /// <summary>
 /// Regression coverage for co-op food-consumption eligibility and legacy starvation repair.
 /// </summary>
-[Collection(global::GameInterface.Tests.ModInformationRoleCollection.Name)]
+[Collection(ModInformationRoleCollection.Name)]
 public class MobilePartyFoodConsumptionModelPatchesTests : IDisposable
 {
     private readonly ConditionalWeakTable<object, ControlledObjectInfo> playerObjects =

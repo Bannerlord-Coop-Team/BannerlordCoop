@@ -1,12 +1,13 @@
 ﻿using Common;
 using Common.Util;
 using GameInterface.Services.UI.Patches;
+using GameInterface.Tests;
 using TaleWorlds.CampaignSystem.GameState;
 using Xunit;
 
 namespace GameInterface.Tests.Services.UI;
 
-[Collection(global::GameInterface.Tests.ModInformationRoleCollection.Name)]
+[Collection(ModInformationRoleCollection.Name)]
 public class GameUIDisableTests
 {
     [Fact]

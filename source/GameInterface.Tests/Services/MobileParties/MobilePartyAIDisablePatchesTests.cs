@@ -3,6 +3,7 @@ using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MobilePartyAIs.Patches;
 using GameInterface.Services.Players;
+using GameInterface.Tests;
 using HarmonyLib;
 using System;
 using System.Runtime.CompilerServices;
@@ -14,7 +15,7 @@ namespace GameInterface.Tests.Services.MobileParties;
 /// <summary>
 /// Tests the authority boundary for campaign-map AI decisions.
 /// </summary>
-[Collection(global::GameInterface.Tests.ModInformationRoleCollection.Name)]
+[Collection(ModInformationRoleCollection.Name)]
 public class MobilePartyAIDisablePatchesTests : IDisposable
 {
     private readonly bool wasServer = ModInformation.IsServer;

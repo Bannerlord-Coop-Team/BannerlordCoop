@@ -5,6 +5,7 @@ using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.MobileParties.Handlers;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Tests;
 using Moq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -12,7 +13,7 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.MobileParties;
 
-[Collection(global::GameInterface.Tests.ModInformationRoleCollection.Name)]
+[Collection(ModInformationRoleCollection.Name)]
 public class MercenaryStockHandlerTests
 {
     private readonly Mock<IMessageBroker> messageBroker = new();
