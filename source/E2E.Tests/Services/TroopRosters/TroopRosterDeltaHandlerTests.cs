@@ -1,5 +1,6 @@
-using System;
+﻿using System;
 using Common.Messaging;
+using Common.Network.Coalescing;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
@@ -11,13 +12,13 @@ using Xunit.Abstractions;
 namespace E2E.Tests.Services.TroopRosters
 {
     /// <summary>
-    /// End to end tests for the identity-keyed per-operation TroopRoster sync handled by
+    /// End to end tests for the identity-keyed, ordered-batch TroopRoster sync handled by
     /// <see cref="GameInterface.Services.TroopRosters.Handlers.TroopRosterDeltaHandler"/>.
     /// </summary>
     /// <remarks>
     /// Each test drives an authoritative <see cref="TroopRoster"/> mutation on the server. The server
     /// patch publishes a local event carrying the server index; the handler resolves the element's
-    /// identity from the server roster and sends an identity-keyed message, which the client applies
+    /// identity from the server roster and batches its operations, which the client applies
     /// through the same vanilla mutator, found by character. The client roster starts empty, so the
     /// AddToCounts tests also prove a positive add creates the element (with correct cached totals) on an
     /// under-populated client; the Set tests seed the element first, since an absolute Set for a troop the
@@ -44,6 +45,7 @@ namespace E2E.Tests.Services.TroopRosters
                 Resolve(Server, out var roster, out var character, CharacterId1);
                 roster.AddToCounts(character, 5);
             });
+            FlushCoalescer();
 
             foreach (var client in Clients)
             {
@@ -64,6 +66,7 @@ namespace E2E.Tests.Services.TroopRosters
                 Resolve(Server, out var roster, out var character, CharacterId1);
                 roster.AddToCounts(character, 5, woundedCount: 2, xpChange: 100);
             });
+            FlushCoalescer();
 
             foreach (var client in Clients)
             {
@@ -84,6 +87,7 @@ namespace E2E.Tests.Services.TroopRosters
                 roster.AddToCounts(character, 8);
                 roster.AddToCounts(character, -3);
             });
+            FlushCoalescer();
 
             foreach (var client in Clients)
             {
@@ -101,6 +105,7 @@ namespace E2E.Tests.Services.TroopRosters
                 roster.AddToCounts(character, 5);
                 roster.SetElementNumber(roster.FindIndexOfTroop(character), 12);
             });
+            FlushCoalescer();
 
             foreach (var client in Clients)
             {
@@ -118,6 +123,7 @@ namespace E2E.Tests.Services.TroopRosters
                 roster.AddToCounts(character, 5);
                 roster.SetElementWoundedNumber(roster.FindIndexOfTroop(character), 3);
             });
+            FlushCoalescer();
 
             foreach (var client in Clients)
             {
@@ -135,11 +141,120 @@ namespace E2E.Tests.Services.TroopRosters
                 roster.AddToCounts(character, 5);
                 roster.SetElementXp(roster.FindIndexOfTroop(character), 250);
             });
+            FlushCoalescer();
 
             foreach (var client in Clients)
             {
                 Resolve(client, out var roster, out _, CharacterId1);
                 Assert.Equal(250, roster.GetElementCopyAtIndex(0).Xp);
+            }
+        }
+
+        [Fact]
+        public void Server_AddCountsAndSetXp_SendsOneBatch()
+        {
+            Server.NetworkSentMessages.Clear();
+
+            Server.Call(() =>
+            {
+                Resolve(Server, out var roster, out var character, CharacterId1);
+                roster.AddToCounts(character, 5);
+                roster.SetElementXp(roster.FindIndexOfTroop(character), 250);
+            });
+            FlushCoalescer();
+
+            Assert.Single(Server.NetworkSentMessages);
+            var batch = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkTroopRosterElementBatch>());
+            Assert.Collection(batch.Operations,
+                addCounts =>
+                {
+                    Assert.Equal(TroopRosterElementOperationKind.AddCounts, addCounts.Kind);
+                    Assert.Equal(5, addCounts.Count);
+                },
+                setXp =>
+                {
+                    Assert.Equal(TroopRosterElementOperationKind.SetXp, setXp.Kind);
+                    Assert.Equal(250, setXp.Xp);
+                });
+        }
+
+        [Fact]
+        public void Server_AdjacentAddCounts_ReplayNonCommutativeWoundedClampInOrder()
+        {
+            Server.Call(() =>
+            {
+                Resolve(Server, out var roster, out var character, CharacterId1);
+                roster.AddToCounts(character, 5, woundedCount: 5, xpChange: 100);
+                roster.AddToCounts(character, -4, xpChange: 50);
+                roster.AddToCounts(character, 4, xpChange: 7);
+
+                Assert.True(Server.Resolve<ISendCoalescer>().HasPending);
+            });
+
+            foreach (var client in Clients)
+            {
+                Resolve(client, out var roster, out _, CharacterId1);
+                Assert.Equal(0, roster.Count);
+            }
+
+            FlushCoalescer();
+
+            foreach (var client in Clients)
+            {
+                Resolve(client, out var roster, out _, CharacterId1);
+                Assert.Equal(1, roster.Count);
+                var element = roster.GetElementCopyAtIndex(0);
+                Assert.Equal(5, element.Number);
+                Assert.Equal(1, element.WoundedNumber);
+                Assert.Equal(157, element.Xp);
+                Assert.Equal(5, roster.TotalManCount);
+            }
+        }
+
+        [Fact]
+        public void Server_RemoveAndRecreateInOneBatch_DiscardsRemovedElementsXp()
+        {
+            Server.Call(() =>
+            {
+                Resolve(Server, out var roster, out var character, CharacterId1);
+                roster.AddToCounts(character, 1, xpChange: 100);
+                roster.AddToCounts(character, -1, xpChange: 50, removeDepleted: true);
+                roster.AddToCounts(character, 1, xpChange: 7);
+            });
+            FlushCoalescer();
+
+            foreach (var client in Clients)
+            {
+                Resolve(client, out var roster, out _, CharacterId1);
+                Assert.Equal(1, roster.Count);
+                var element = roster.GetElementCopyAtIndex(0);
+                Assert.Equal(1, element.Number);
+                Assert.Equal(0, element.WoundedNumber);
+                Assert.Equal(7, element.Xp);
+            }
+        }
+
+        [Fact]
+        public void Server_RemoveToZeroWithRemoveDepletedFalse_KeepsZeroCountElement()
+        {
+            Server.Call(() =>
+            {
+                Resolve(Server, out var roster, out var character, CharacterId1);
+                roster.AddToCounts(character, 2, xpChange: 10);
+                roster.AddToCounts(character, -2, xpChange: 5, removeDepleted: false);
+            });
+            FlushCoalescer();
+
+            foreach (var client in Clients)
+            {
+                Resolve(client, out var roster, out var character, CharacterId1);
+                Assert.Equal(1, roster.Count);
+                Assert.True(roster.Contains(character));
+                var element = roster.GetElementCopyAtIndex(0);
+                Assert.Equal(0, element.Number);
+                Assert.Equal(0, element.WoundedNumber);
+                Assert.Equal(15, element.Xp);
+                Assert.Equal(0, roster.TotalManCount);
             }
         }
 
@@ -153,6 +268,7 @@ namespace E2E.Tests.Services.TroopRosters
                 roster.AddToCounts(character1, 3);
                 roster.AddToCounts(character2, 4);
             });
+            FlushCoalescer();
 
             foreach (var client in Clients)
             {
@@ -178,6 +294,7 @@ namespace E2E.Tests.Services.TroopRosters
                 roster.SetElementNumber(roster.FindIndexOfTroop(character1), 0);
                 roster.RemoveZeroCounts();
             });
+            FlushCoalescer();
 
             foreach (var client in Clients)
             {
@@ -199,6 +316,7 @@ namespace E2E.Tests.Services.TroopRosters
                 Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
                 roster.AddToCounts(hero.CharacterObject, 1);
             });
+            FlushCoalescer();
 
             foreach (var client in Clients)
             {
@@ -223,6 +341,7 @@ namespace E2E.Tests.Services.TroopRosters
                 Resolve(Server, out var roster, out var character, CharacterId1);
                 roster.AddToCounts(character, 5);
             });
+            FlushCoalescer();
 
             Server.Call(() =>
             {
@@ -232,6 +351,7 @@ namespace E2E.Tests.Services.TroopRosters
                     roster.AddToCounts(character, -5);
                 }
             });
+            FlushCoalescer();
 
             foreach (var client in Clients)
             {
@@ -249,6 +369,7 @@ namespace E2E.Tests.Services.TroopRosters
                 Resolve(Server, out var roster, out var character, CharacterId1);
                 roster.AddToCounts(character, 2);
             });
+            FlushCoalescer();
 
             var client = Clients.First();
 
@@ -261,7 +382,8 @@ namespace E2E.Tests.Services.TroopRosters
             client.Call(() =>
             {
                 var broker = client.Resolve<IMessageBroker>();
-                broker.Publish(this, new NetworkTroopRosterAddCounts(TroopRosterId, CharacterId1, -5, 0, 0, false));
+                broker.Publish(this, new NetworkTroopRosterElementBatch(TroopRosterId, CharacterId1,
+                    new[] { TroopRosterElementOperation.AddCounts(-5, 0, 0, false) }));
             });
 
             client.Call(() =>
@@ -279,5 +401,7 @@ namespace E2E.Tests.Services.TroopRosters
             Assert.True(instance.ObjectManager.TryGetObject<TroopRoster>(TroopRosterId, out roster));
             Assert.True(instance.ObjectManager.TryGetObject<CharacterObject>(characterId, out character));
         }
+
+        private void FlushCoalescer() => TestEnvironment.FlushCoalescer();
     }
 }

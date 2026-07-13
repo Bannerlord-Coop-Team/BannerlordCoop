@@ -2124,6 +2124,8 @@ public class VillageHostileActionTests : MapEventTestBase
         string villageId,
         string troopId)
     {
+        // Regular-troop roster changes are coalesced; drain the buffer before reading them on a client.
+        TestEnvironment.FlushCoalescer();
         instance.Call(() =>
         {
             Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty));
