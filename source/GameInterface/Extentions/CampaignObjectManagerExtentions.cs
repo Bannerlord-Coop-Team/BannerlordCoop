@@ -1,4 +1,5 @@
 ﻿using GameInterface.Services.Clans.Extensions;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MobileParties.Extensions;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,6 +18,11 @@ namespace GameInterface.Extentions
         public static List<Clan> GetPlayerClans(this CampaignObjectManager campaignObjectManager)
         {
             return campaignObjectManager._clans.Where(clan => clan.IsPlayerClan()).ToList();
+        }
+
+        public static List<Hero> GetPlayerHeroes(this CampaignObjectManager campaignObjectManager)
+        {
+            return campaignObjectManager._aliveHeroes.Where(hero => hero.IsPlayerHero()).ToList();
         }
     }
 }
