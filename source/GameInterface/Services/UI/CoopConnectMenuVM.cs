@@ -21,6 +21,8 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     public const string DirectTabId = "direct";
     public const string SteamLobbiesTabId = "steam_lobbies";
 
+    public event Action SteamLobbiesTabActivated;
+
     private readonly ISteamLobbyBrowser steamLobbyBrowser;
     private readonly IMessageBroker messageBroker;
     private readonly List<SteamLobbyListItemVM> discoveredSteamLobbies = new();
@@ -42,8 +44,9 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     public string MovieTextHeader => "Join Co-op Sandbox";
     public string CommunityText => "Join the Community";
     public string SteamLobbiesHeaderText => $"Hosted Steam Servers ({SteamLobbies.Count})";
-    public string HostSearchLabelText => "Hostname:";
-    public string HostColumnText => "Host";
+    public string HostSearchLabelText => "Host Name";
+    public string HostSearchPlaceholderText => "Type a host name...";
+    public string HostColumnText => "Host Name";
     public string PasswordColumnText => "Access";
     public string CompatibilityColumnText => "Status";
     public string IpText => "Server IP Address:";
@@ -367,6 +370,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
 
         if (SelectedTab.Id == SteamLobbiesTabId)
         {
+            SteamLobbiesTabActivated?.Invoke();
             ActionRefreshSteamLobbies();
         }
     }

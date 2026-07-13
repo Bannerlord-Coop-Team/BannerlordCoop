@@ -84,6 +84,33 @@ public class CoopConnectMenuVMTests
         Assert.Equal("Hosted Steam Servers (0)", viewModel.SteamLobbiesHeaderText);
     }
 
+    [Fact]
+    public void SteamLobbySearch_UsesClearHostNameLabelsAndPrompt()
+    {
+        var browser = new TestSteamLobbyBrowser();
+        using var messageBroker = new MessageBroker();
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker);
+
+        Assert.Equal("Host Name", viewModel.HostSearchLabelText);
+        Assert.Equal("Type a host name...", viewModel.HostSearchPlaceholderText);
+        Assert.Equal("Host Name", viewModel.HostColumnText);
+    }
+
+    [Fact]
+    public void SelectingSteamLobbiesTab_RequestsSearchFieldFocusOnce()
+    {
+        var browser = new TestSteamLobbyBrowser();
+        using var messageBroker = new MessageBroker();
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker);
+        int activationCount = 0;
+        viewModel.SteamLobbiesTabActivated += () => activationCount++;
+
+        SelectSteamLobbiesTab(viewModel);
+        viewModel.Tabs[1].ExecuteSelection();
+
+        Assert.Equal(1, activationCount);
+    }
+
     private static void SelectSteamLobbiesTab(CoopConnectMenuVM viewModel)
     {
         Assert.Equal(CoopConnectMenuVM.SteamLobbiesTabId, viewModel.Tabs[1].Id);

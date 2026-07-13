@@ -166,11 +166,19 @@
                                     Brush="Clan.TabControl.Text" Brush.FontSize="24"
                                     Brush.TextHorizontalAlignment="Left" Brush.TextVerticalAlignment="Center"
                                     Text="@HostSearchLabelText"/>
-                        <EditableTextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="58"
-                                            VerticalAlignment="Center" Brush="ScoreboardPanels_2" Brush.AlphaFactor="0.75"
-                                            Brush.FontSize="26" Brush.TextHorizontalAlignment="Center"
-                                            Brush.TextVerticalAlignment="Center" Text="@SteamLobbyHostSearchText"
-                                            MaxLength="128"/>
+                        <BrushWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="58"
+                                     VerticalAlignment="Center" Brush="SaveLoad.Search.Button"
+                                     UpdateChildrenStates="true">
+                          <Children>
+                            <EditableTextWidget Id="SteamLobbyHostSearchInput" UpdateChildrenStates="true"
+                                                WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                                                MarginLeft="12" MarginRight="12" MarginTop="8" MarginBottom="8"
+                                                Brush="SaveLoad.Search.InputText" Brush.FontSize="24"
+                                                Text="@SteamLobbyHostSearchText"
+                                                DefaultSearchText="@HostSearchPlaceholderText"
+                                                KeyboardInfoText="@HostSearchLabelText" MaxLength="128"/>
+                          </Children>
+                        </BrushWidget>
                         <Standard.Button WidthSizePolicy="Fixed" SuggestedWidth="150" HeightSizePolicy="Fixed" SuggestedHeight="58"
                                          VerticalAlignment="Center" MarginLeft="12"
                                          IsDisabled="@IsSearchSteamLobbiesDisabled"
