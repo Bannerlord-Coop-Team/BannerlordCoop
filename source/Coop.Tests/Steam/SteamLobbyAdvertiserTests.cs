@@ -43,6 +43,39 @@ namespace Coop.Tests.Steam
         }
 
         [Fact]
+        public void StandaloneAdvertiser_FriendsOnly_CreatesFriendsOnlyLobby()
+        {
+            var friendsOnlyAdvertiser = new SteamPublicLobbyAdvertiser(api, ServerVisibility.FriendsOnly);
+
+            friendsOnlyAdvertiser.Advertise(Info());
+
+            Assert.True(friendsOnlyAdvertiser.IsAdvertising);
+            Assert.False(api.LastCreateWasPublic);
+            Assert.Equal("203.0.113.7",
+                api.GetLobbyData(api.NextCreatedLobbyId, LobbyDataCodec.AddressKey));
+        }
+
+        [Fact]
+        public void StandaloneAdvertiser_None_DoesNotCreateLobbyOrRichPresence()
+        {
+            var hiddenAdvertiser = new SteamPublicLobbyAdvertiser(api, ServerVisibility.None);
+
+            hiddenAdvertiser.Advertise(Info());
+
+            Assert.False(hiddenAdvertiser.IsAdvertising);
+            Assert.Null(api.PendingCreateCompletion);
+            Assert.Empty(api.LobbyData);
+            Assert.Empty(api.RichPresenceConnects);
+        }
+
+        [Fact]
+        public void StandaloneAdvertiser_RejectsUnknownVisibility()
+        {
+            Assert.Throws<System.ArgumentOutOfRangeException>(() =>
+                new SteamPublicLobbyAdvertiser(api, (ServerVisibility)999));
+        }
+
+        [Fact]
         public void Advertise_Again_UpdatesDataWithoutSecondLobby()
         {
             advertiser.Advertise(Info());

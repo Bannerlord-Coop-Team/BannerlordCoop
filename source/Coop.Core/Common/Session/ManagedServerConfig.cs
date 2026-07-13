@@ -1,4 +1,6 @@
-﻿namespace Coop.Core.Common.Session;
+﻿using Common.Network.Session;
+
+namespace Coop.Core.Common.Session;
 
 /// <summary>
 /// Process-wide facts a server was launched with, parsed once at mod load. Empty in every
@@ -24,4 +26,7 @@ public static class ManagedServerConfig
 
     /// <summary>Optional connection password supplied on the server command line.</summary>
     public static string Password { get; set; } = string.Empty;
+
+    /// <summary>Who can discover this server through Steam.</summary>
+    public static ServerVisibility Visibility { get; set; } = ServerVisibility.Public;
 }

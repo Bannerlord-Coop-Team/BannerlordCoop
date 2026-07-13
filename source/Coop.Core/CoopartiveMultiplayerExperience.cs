@@ -119,13 +119,21 @@ namespace Coop.Core
                 return;
             }
 
+            var visibility = obj.What.Visibility;
+            if (!Enum.IsDefined(typeof(ServerVisibility), visibility))
+            {
+                InformationManager.DisplayMessage(new InformationMessage(
+                    "Choose a valid server visibility setting"));
+                return;
+            }
+
             AbandonAnyStartingSession();
 
             // Off Steam, keep the in-process dedicated-server behavior: this instance becomes
             // the server, and the player launches a second instance to join it.
             if (!SessionDiscovery.SteamAvailable)
             {
-                StartAsServer(obj.What.SaveName, password);
+                StartAsServer(obj.What.SaveName, password, visibility);
                 return;
             }
 
@@ -143,7 +151,7 @@ namespace Coop.Core
 
             try
             {
-                serverProcessManager.Start(obj.What.SaveName, password);
+                serverProcessManager.Start(obj.What.SaveName, password, visibility);
             }
             catch (Exception ex)
             {
@@ -166,6 +174,7 @@ namespace Coop.Core
                 // client must not create a second lobby and user-flavor tunnel.
                 EnableSteamInvites = false,
                 PublicAddress = string.Empty,
+                Visibility = visibility,
             };
 
             try
@@ -337,7 +346,7 @@ namespace Coop.Core
 
         private void Handle(MessagePayload<HostSaveGame> obj)
         {
-            StartAsServer(obj.What.SaveName, ManagedServerConfig.Password);
+            StartAsServer(obj.What.SaveName, ManagedServerConfig.Password, ManagedServerConfig.Visibility);
         }
 
         private void Handle(MessagePayload<EndCoopMode> payload)
@@ -354,9 +363,13 @@ namespace Coop.Core
 
         public int Priority => 0;
 
-        public void StartAsServer(string saveName = null) => StartAsServer(saveName, null);
+        public void StartAsServer(string saveName = null) =>
+            StartAsServer(saveName, null, ServerVisibility.Public);
 
-        public void StartAsServer(string saveName, string password)
+        public void StartAsServer(string saveName, string password) =>
+            StartAsServer(saveName, password, ServerVisibility.Public);
+
+        public void StartAsServer(string saveName, string password, ServerVisibility visibility)
         {
             // A second Host or Join click while patches are still applying would tear down the in-flight start
             if (coopStarting) return;
@@ -364,6 +377,8 @@ namespace Coop.Core
             if (!ConnectionPassword.IsValid(password))
                 throw new ArgumentOutOfRangeException(nameof(password),
                     $"The server password cannot exceed {ConnectionPassword.MaxLength} characters");
+            if (!Enum.IsDefined(typeof(ServerVisibility), visibility))
+                throw new ArgumentOutOfRangeException(nameof(visibility));
 
             DestroyContainer();
 
@@ -374,6 +389,9 @@ namespace Coop.Core
             builder.RegisterModule<GameInterfaceModule>();
             builder.RegisterInstance(new NetworkConfig { Token = password ?? string.Empty })
                 .As<INetworkConfig>()
+                .SingleInstance();
+            builder.RegisterInstance(new SessionAdvertisementConfig { Visibility = visibility })
+                .AsSelf()
                 .SingleInstance();
             container = builder.Build();
 

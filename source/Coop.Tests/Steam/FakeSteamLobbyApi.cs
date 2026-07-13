@@ -20,15 +20,22 @@ namespace Coop.Tests.Steam
         public bool SetLobbyDataSucceeds = true;
         public string FailedLobbyDataKey;
         public bool CompleteOperationsImmediately = true;
+        public bool CompleteLobbyDataRequestsImmediately = true;
         public string LaunchCommandLine = string.Empty;
         public bool LastCreateWasPublic;
         public bool ThrowOnListRequest;
+        public bool ThrowOnFriendLobbyRequest;
+        public bool ThrowOnLobbyDataRequest;
 
         public readonly List<ulong> LeftLobbies = new List<ulong>();
         public readonly List<ulong> InviteDialogsOpened = new List<ulong>();
         public readonly List<string> RichPresenceConnects = new List<string>();
         public readonly List<ulong> ListedLobbyIds = new List<ulong>();
+        public readonly List<ulong> FriendLobbyIds = new List<ulong>();
+        public readonly List<ulong> RequestedLobbyDataIds = new List<ulong>();
+        public readonly HashSet<ulong> FailedLobbyDataRequests = new HashSet<ulong>();
         public readonly Dictionary<ulong, Dictionary<string, string>> LobbyData = new Dictionary<ulong, Dictionary<string, string>>();
+        private readonly Dictionary<ulong, Action> pendingLobbyDataCompletions = new Dictionary<ulong, Action>();
         public int ClearRichPresenceCalls;
 
         public Action PendingCreateCompletion;
@@ -98,6 +105,28 @@ namespace Coop.Tests.Steam
             var completion = PendingListCompletion;
             PendingListCompletion = null;
             completion?.Invoke();
+        }
+
+        public IReadOnlyList<ulong> GetFriendLobbyIds()
+        {
+            if (ThrowOnFriendLobbyRequest) throw new InvalidOperationException("scripted friend-lobby failure");
+            return FriendLobbyIds;
+        }
+
+        public void RequestLobbyData(ulong lobbyId, Action<bool> onCompleted)
+        {
+            if (ThrowOnLobbyDataRequest) throw new InvalidOperationException("scripted lobby-data failure");
+
+            RequestedLobbyDataIds.Add(lobbyId);
+            pendingLobbyDataCompletions[lobbyId] = () => onCompleted(!FailedLobbyDataRequests.Contains(lobbyId));
+            if (CompleteLobbyDataRequestsImmediately) CompletePendingLobbyData(lobbyId);
+        }
+
+        public void CompletePendingLobbyData(ulong lobbyId)
+        {
+            if (!pendingLobbyDataCompletions.TryGetValue(lobbyId, out var completion)) return;
+            pendingLobbyDataCompletions.Remove(lobbyId);
+            completion();
         }
 
         public void LeaveLobby(ulong lobbyId) => LeftLobbies.Add(lobbyId);

@@ -32,10 +32,17 @@ public interface ISteamLobbyApi : IDisposable
     event Action<string> ConnectStringReceived;
 }
 
-/// <summary>Public discovery operations layered on the existing invite-lobby API.</summary>
+/// <summary>Standalone-server discovery operations layered on the existing invite-lobby API.</summary>
 public interface ISteamPublicLobbyApi : ISteamLobbyApi
 {
     /// <summary>Creates a browsable public lobby for a standalone server.</summary>
     void CreatePublicLobby(int maxMembers, Action<ulong, bool> onCompleted);
+
+    /// <summary>Gets lobby ids advertised by Steam friends playing this app.</summary>
+    IReadOnlyList<ulong> GetFriendLobbyIds();
+
+    /// <summary>Refreshes metadata for a lobby obtained through a friend rather than public search.</summary>
+    void RequestLobbyData(ulong lobbyId, Action<bool> onCompleted);
+
     void RequestLobbyList(Action<IReadOnlyList<ulong>, bool> onCompleted);
 }

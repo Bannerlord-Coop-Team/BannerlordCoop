@@ -76,12 +76,13 @@ namespace Coop
             // GetFullCommandLineString splits on spaces, which would cut a quoted save
             // name apart; the managed-server arguments need real Windows arg parsing.
             if (ServerLaunchArguments.TryParse(Environment.GetCommandLineArgs(), out var managedSaveName,
-                out var ownerProcessId, out var serverPassword))
+                out var ownerProcessId, out var serverPassword, out var serverVisibility))
             {
                 ManagedServerConfig.SaveName = managedSaveName;
                 ManagedServerConfig.OwnerProcessId = ownerProcessId;
             }
             ManagedServerConfig.Password = serverPassword;
+            ManagedServerConfig.Visibility = serverVisibility;
 
             SetupLogging();
 
@@ -277,7 +278,7 @@ namespace Coop
 
                         if (isServer)
                         {
-                            Coop.StartAsServer(null, ManagedServerConfig.Password);
+                            Coop.StartAsServer(null, ManagedServerConfig.Password, ManagedServerConfig.Visibility);
                         }
                         else
                         {
@@ -390,7 +391,8 @@ namespace Coop
 
             try
             {
-                Coop.StartAsServer(ManagedServerConfig.SaveName, ManagedServerConfig.Password);
+                Coop.StartAsServer(ManagedServerConfig.SaveName, ManagedServerConfig.Password,
+                    ManagedServerConfig.Visibility);
             }
             catch (Exception ex)
             {
@@ -411,7 +413,7 @@ namespace Coop
                     if (isServer)
                     {
                         Logger.Information("[AutoConnect] InitialState active — auto-starting as server...");
-                        Coop.StartAsServer(null, ManagedServerConfig.Password);
+                        Coop.StartAsServer(null, ManagedServerConfig.Password, ManagedServerConfig.Visibility);
                         Logger.Information("[AutoConnect] StartAsServer() completed");
                     }
                     else

@@ -5,12 +5,14 @@ using System.Collections.Generic;
 namespace Coop.Steam;
 
 /// <summary>
-/// Converts Steam's public lobby search results into display-safe standalone-server summaries.
+/// Unions public search results with same-app friend lobbies and converts them into
+/// display-safe standalone-server summaries.
 /// </summary>
 public class SteamLobbyBrowser : ISteamLobbyBrowser
 {
     private readonly ISteamPublicLobbyApi lobbyApi;
     private bool requestInFlight;
+    private LobbyRequest activeRequest;
 
     public SteamLobbyBrowser(ISteamPublicLobbyApi lobbyApi)
     {
@@ -26,28 +28,124 @@ public class SteamLobbyBrowser : ISteamLobbyBrowser
         }
 
         requestInFlight = true;
+        var request = new LobbyRequest(onCompleted);
+        activeRequest = request;
+
         try
         {
-            lobbyApi.RequestLobbyList((lobbyIds, success) => CompleteRequest(lobbyIds, success, onCompleted));
+            var friendLobbyIds = lobbyApi.GetFriendLobbyIds();
+            if (friendLobbyIds != null)
+            {
+                foreach (var lobbyId in friendLobbyIds)
+                {
+                    if (lobbyId != 0 && request.SeenFriendLobbyIds.Add(lobbyId))
+                    {
+                        request.FriendLobbyIds.Add(lobbyId);
+                    }
+                }
+            }
         }
         catch (Exception)
         {
-            requestInFlight = false;
-            onCompleted(Array.Empty<SteamLobbySummary>(), "Could not retrieve Steam lobbies");
+            // Public discovery remains useful when Steam friend presence is unavailable.
+        }
+
+        try
+        {
+            lobbyApi.RequestLobbyList((lobbyIds, success) => CompletePublicRequest(request, lobbyIds, success));
+        }
+        catch (Exception)
+        {
+            FinishRequest(request, Array.Empty<SteamLobbySummary>(), "Could not retrieve Steam lobbies");
         }
     }
 
-    private void CompleteRequest(IReadOnlyList<ulong> lobbyIds, bool success,
-        Action<IReadOnlyList<SteamLobbySummary>, string> onCompleted)
+    private void CompletePublicRequest(LobbyRequest request, IReadOnlyList<ulong> lobbyIds, bool success)
     {
-        requestInFlight = false;
+        if (!ReferenceEquals(activeRequest, request)) return;
 
         if (!success)
         {
-            onCompleted(Array.Empty<SteamLobbySummary>(), "Could not retrieve Steam lobbies");
+            FinishRequest(request, Array.Empty<SteamLobbySummary>(), "Could not retrieve Steam lobbies");
             return;
         }
 
+        var publicLobbyIds = new HashSet<ulong>();
+        if (lobbyIds != null)
+        {
+            foreach (var lobbyId in lobbyIds)
+            {
+                if (lobbyId != 0 && publicLobbyIds.Add(lobbyId)) request.PublicLobbyIds.Add(lobbyId);
+            }
+        }
+
+        foreach (var friendLobbyId in request.FriendLobbyIds)
+        {
+            if (!publicLobbyIds.Contains(friendLobbyId)) request.PendingFriendLobbyIds.Add(friendLobbyId);
+        }
+
+        if (request.PendingFriendLobbyIds.Count == 0)
+        {
+            FinishSuccessfulRequest(request);
+            return;
+        }
+
+        // Populate the entire pending set before making any request: test doubles and failure paths
+        // may complete synchronously, while Steam itself completes on a later callback pump.
+        foreach (var friendLobbyId in request.FriendLobbyIds)
+        {
+            if (!request.PendingFriendLobbyIds.Contains(friendLobbyId)) continue;
+
+            try
+            {
+                lobbyApi.RequestLobbyData(friendLobbyId,
+                    dataLoaded => CompleteFriendLobbyData(request, friendLobbyId, dataLoaded));
+            }
+            catch (Exception)
+            {
+                CompleteFriendLobbyData(request, friendLobbyId, false);
+            }
+        }
+    }
+
+    private void CompleteFriendLobbyData(LobbyRequest request, ulong lobbyId, bool success)
+    {
+        if (!ReferenceEquals(activeRequest, request) || !request.PendingFriendLobbyIds.Remove(lobbyId)) return;
+
+        if (success) request.LoadedFriendLobbyIds.Add(lobbyId);
+        if (request.PendingFriendLobbyIds.Count == 0) FinishSuccessfulRequest(request);
+    }
+
+    private void FinishSuccessfulRequest(LobbyRequest request)
+    {
+        var lobbyIds = new List<ulong>(request.PublicLobbyIds.Count + request.LoadedFriendLobbyIds.Count);
+        var seenLobbyIds = new HashSet<ulong>();
+        foreach (var lobbyId in request.PublicLobbyIds)
+        {
+            if (seenLobbyIds.Add(lobbyId)) lobbyIds.Add(lobbyId);
+        }
+
+        foreach (var lobbyId in request.FriendLobbyIds)
+        {
+            if (request.LoadedFriendLobbyIds.Contains(lobbyId) && seenLobbyIds.Add(lobbyId)) lobbyIds.Add(lobbyId);
+        }
+
+        IReadOnlyList<SteamLobbySummary> summaries;
+        try
+        {
+            summaries = BuildSummaries(lobbyIds);
+        }
+        catch (Exception)
+        {
+            FinishRequest(request, Array.Empty<SteamLobbySummary>(), "Could not retrieve Steam lobbies");
+            return;
+        }
+
+        FinishRequest(request, summaries, null);
+    }
+
+    private IReadOnlyList<SteamLobbySummary> BuildSummaries(IReadOnlyList<ulong> lobbyIds)
+    {
         var summaries = new List<SteamLobbySummary>();
         foreach (var lobbyId in lobbyIds)
         {
@@ -79,6 +177,30 @@ public class SteamLobbyBrowser : ISteamLobbyBrowser
             });
         }
 
-        onCompleted(summaries, null);
+        return summaries;
+    }
+
+    private void FinishRequest(LobbyRequest request, IReadOnlyList<SteamLobbySummary> summaries, string error)
+    {
+        if (!ReferenceEquals(activeRequest, request)) return;
+
+        activeRequest = null;
+        requestInFlight = false;
+        request.OnCompleted(summaries, error);
+    }
+
+    private sealed class LobbyRequest
+    {
+        public readonly Action<IReadOnlyList<SteamLobbySummary>, string> OnCompleted;
+        public readonly List<ulong> PublicLobbyIds = new List<ulong>();
+        public readonly List<ulong> FriendLobbyIds = new List<ulong>();
+        public readonly HashSet<ulong> SeenFriendLobbyIds = new HashSet<ulong>();
+        public readonly HashSet<ulong> PendingFriendLobbyIds = new HashSet<ulong>();
+        public readonly HashSet<ulong> LoadedFriendLobbyIds = new HashSet<ulong>();
+
+        public LobbyRequest(Action<IReadOnlyList<SteamLobbySummary>, string> onCompleted)
+        {
+            OnCompleted = onCompleted;
+        }
     }
 }

@@ -6,8 +6,9 @@ using System.Threading;
 namespace Coop.Steam;
 
 /// <summary>
-/// Publishes a browsable lobby from the server process's user Steam session while carrying the
-/// separate game-server identity as its connect target.
+/// Publishes a standalone-server lobby from the server process's user Steam session while carrying
+/// the separate game-server identity as its connect target. The configured Steam lobby type controls
+/// whether the session is publicly browsable, restricted to friends, or not published at all.
 /// </summary>
 public class SteamPublicLobbyAdvertiser : SteamLobbyAdvertiser
 {
@@ -15,21 +16,48 @@ public class SteamPublicLobbyAdvertiser : SteamLobbyAdvertiser
     private static readonly TimeSpan CreateRetryDelay = TimeSpan.FromSeconds(5);
 
     private readonly ISteamPublicLobbyApi publicLobbyApi;
+    private readonly ServerVisibility visibility;
     private Timer retryTimer;
     private SessionJoinInfo retryInfo;
     private int retryCount;
     private bool standaloneDisposed;
 
-    public SteamPublicLobbyAdvertiser(ISteamPublicLobbyApi lobbyApi) : base(lobbyApi)
+    public SteamPublicLobbyAdvertiser(ISteamPublicLobbyApi lobbyApi)
+        : this(lobbyApi, ServerVisibility.Public)
     {
+    }
+
+    public SteamPublicLobbyAdvertiser(ISteamPublicLobbyApi lobbyApi, ServerVisibility visibility)
+        : base(lobbyApi)
+    {
+        if (!Enum.IsDefined(typeof(ServerVisibility), visibility))
+            throw new ArgumentOutOfRangeException(nameof(visibility));
+
         publicLobbyApi = lobbyApi;
+        this.visibility = visibility;
     }
 
     protected override void RequestLobby(int maxMembers, Action<ulong, bool> onCompleted)
-        => publicLobbyApi.CreatePublicLobby(maxMembers, onCompleted);
+    {
+        switch (visibility)
+        {
+            case ServerVisibility.Public:
+                publicLobbyApi.CreatePublicLobby(maxMembers, onCompleted);
+                return;
+            case ServerVisibility.FriendsOnly:
+                publicLobbyApi.CreateFriendsOnlyLobby(maxMembers, onCompleted);
+                return;
+            case ServerVisibility.None:
+                throw new InvalidOperationException("A hidden server must not request a Steam lobby");
+            default:
+                throw new ArgumentOutOfRangeException(nameof(visibility));
+        }
+    }
 
     public override void Advertise(SessionJoinInfo info)
     {
+        if (visibility == ServerVisibility.None) return;
+
         CancelRetry();
         retryCount = 0;
         retryInfo = null;

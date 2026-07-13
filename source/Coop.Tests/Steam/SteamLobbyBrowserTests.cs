@@ -15,10 +15,10 @@ public class SteamLobbyBrowserTests
         browser = new SteamLobbyBrowser(api);
     }
 
-    private void AddLobby(ulong lobbyId, SessionJoinInfo info)
+    private void AddLobby(ulong lobbyId, SessionJoinInfo info, bool publiclyListed = true)
     {
         info.ModVersion ??= Common.ModInformation.BuildVersion;
-        api.ListedLobbyIds.Add(lobbyId);
+        if (publiclyListed) api.ListedLobbyIds.Add(lobbyId);
         foreach (var pair in LobbyDataCodec.Encode(info))
         {
             api.SetLobbyData(lobbyId, pair.Key, pair.Value);
@@ -49,6 +49,94 @@ public class SteamLobbyBrowserTests
         Assert.True(lobby.PasswordRequired);
         Assert.True(lobby.IsCompatible);
         Assert.Null(error);
+    }
+
+    [Fact]
+    public void RequestLobbies_UnionsFriendLobbiesAndDeduplicatesPublicMatches()
+    {
+        AddLobby(41, new SessionJoinInfo { Port = 4200, ServerSteamId = 76561198000000041 });
+        AddLobby(42, new SessionJoinInfo { Port = 4200, ServerSteamId = 76561198000000042 },
+            publiclyListed: false);
+        api.FriendLobbyIds.Add(41);
+        api.FriendLobbyIds.Add(42);
+        api.FriendLobbyIds.Add(42);
+
+        IReadOnlyList<SteamLobbySummary> results = null;
+        browser.RequestLobbies((lobbies, _) => results = lobbies);
+
+        Assert.Collection(results,
+            lobby => Assert.Equal(41UL, lobby.LobbyId),
+            lobby => Assert.Equal(42UL, lobby.LobbyId));
+        Assert.Equal(new[] { 42UL }, api.RequestedLobbyDataIds);
+    }
+
+    [Fact]
+    public void RequestLobbies_WaitsForFriendLobbyMetadata()
+    {
+        AddLobby(42, new SessionJoinInfo { Port = 4200, ServerSteamId = 76561198000000042 },
+            publiclyListed: false);
+        api.FriendLobbyIds.Add(42);
+        api.CompleteLobbyDataRequestsImmediately = false;
+
+        IReadOnlyList<SteamLobbySummary> results = null;
+        browser.RequestLobbies((lobbies, _) => results = lobbies);
+
+        Assert.Null(results);
+        Assert.Equal(new[] { 42UL }, api.RequestedLobbyDataIds);
+
+        api.CompletePendingLobbyData(42);
+
+        Assert.Equal(42UL, Assert.Single(results).LobbyId);
+    }
+
+    [Fact]
+    public void RequestLobbies_SkipsFriendLobbyWhoseMetadataCouldNotBeLoaded()
+    {
+        AddLobby(41, new SessionJoinInfo { Port = 4200, ServerSteamId = 76561198000000041 });
+        AddLobby(42, new SessionJoinInfo { Port = 4200, ServerSteamId = 76561198000000042 },
+            publiclyListed: false);
+        api.FriendLobbyIds.Add(42);
+        api.FailedLobbyDataRequests.Add(42);
+
+        IReadOnlyList<SteamLobbySummary> results = null;
+        string error = null;
+        browser.RequestLobbies((lobbies, failure) => (results, error) = (lobbies, failure));
+
+        Assert.Equal(41UL, Assert.Single(results).LobbyId);
+        Assert.Null(error);
+    }
+
+    [Fact]
+    public void RequestLobbies_FriendPresenceFailureStillReturnsPublicLobbies()
+    {
+        AddLobby(41, new SessionJoinInfo { Port = 4200, ServerSteamId = 76561198000000041 });
+        api.ThrowOnFriendLobbyRequest = true;
+
+        IReadOnlyList<SteamLobbySummary> results = null;
+        string error = null;
+        browser.RequestLobbies((lobbies, failure) => (results, error) = (lobbies, failure));
+
+        Assert.Equal(41UL, Assert.Single(results).LobbyId);
+        Assert.Null(error);
+    }
+
+    [Fact]
+    public void RequestLobbies_SynchronousFriendDataFailureDoesNotBlockRetry()
+    {
+        AddLobby(42, new SessionJoinInfo { Port = 4200, ServerSteamId = 76561198000000042 },
+            publiclyListed: false);
+        api.FriendLobbyIds.Add(42);
+        api.ThrowOnLobbyDataRequest = true;
+
+        IReadOnlyList<SteamLobbySummary> first = null;
+        browser.RequestLobbies((lobbies, _) => first = lobbies);
+
+        api.ThrowOnLobbyDataRequest = false;
+        IReadOnlyList<SteamLobbySummary> retry = null;
+        browser.RequestLobbies((lobbies, _) => retry = lobbies);
+
+        Assert.Empty(first);
+        Assert.Equal(42UL, Assert.Single(retry).LobbyId);
     }
 
     [Fact]

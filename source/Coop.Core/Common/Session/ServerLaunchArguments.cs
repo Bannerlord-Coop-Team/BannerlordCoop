@@ -1,4 +1,5 @@
 ﻿using Common.Network;
+using Common.Network.Session;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -16,6 +17,7 @@ public static class ServerLaunchArguments
     public const string SaveArgument = "/coopsave";
     public const string OwnerArgument = "/coopowner";
     public const string PasswordArgument = "/cooppassword";
+    public const string VisibilityArgument = "/coopvisibility";
 
     /// <summary>
     /// Builds a fresh server command line with mode, active modules, save, owner PID, and optional
@@ -23,13 +25,19 @@ public static class ServerLaunchArguments
     /// </summary>
     public static string BuildManagedServerArguments(IReadOnlyList<string> moduleIds, string saveName,
         int ownerProcessId)
-        => BuildManagedServerArguments(moduleIds, saveName, ownerProcessId, null);
+        => BuildManagedServerArguments(moduleIds, saveName, ownerProcessId, null, ServerVisibility.Public);
 
     public static string BuildManagedServerArguments(IReadOnlyList<string> moduleIds, string saveName,
         int ownerProcessId, string password)
+        => BuildManagedServerArguments(moduleIds, saveName, ownerProcessId, password, ServerVisibility.Public);
+
+    public static string BuildManagedServerArguments(IReadOnlyList<string> moduleIds, string saveName,
+        int ownerProcessId, string password, ServerVisibility visibility)
     {
         if (saveName == null) throw new ArgumentNullException(nameof(saveName));
         if (moduleIds == null) throw new ArgumentNullException(nameof(moduleIds));
+        if (!Enum.IsDefined(typeof(ServerVisibility), visibility))
+            throw new ArgumentOutOfRangeException(nameof(visibility));
 
         var tokens = new List<string>
         {
@@ -40,6 +48,8 @@ public static class ServerLaunchArguments
             saveName,
             OwnerArgument,
             ownerProcessId.ToString(CultureInfo.InvariantCulture),
+            VisibilityArgument,
+            FormatVisibility(visibility),
         };
 
         if (!string.IsNullOrEmpty(password))
@@ -64,10 +74,16 @@ public static class ServerLaunchArguments
 
     public static bool TryParse(IReadOnlyList<string> args, out string saveName, out int ownerProcessId,
         out string password)
+        => TryParse(args, out saveName, out ownerProcessId, out password, out _);
+
+    public static bool TryParse(IReadOnlyList<string> args, out string saveName, out int ownerProcessId,
+        out string password, out ServerVisibility visibility)
     {
         saveName = null;
         ownerProcessId = 0;
         password = string.Empty;
+        visibility = ServerVisibility.Public;
+        bool visibilityValid = true;
 
         for (int i = 0; i < args.Count; i++)
         {
@@ -83,6 +99,15 @@ public static class ServerLaunchArguments
             {
                 password = args[++i];
             }
+            else if (IsToken(args[i], VisibilityArgument))
+            {
+                if (i + 1 >= args.Count || !TryParseVisibility(args[++i], out visibility))
+                {
+                    // An explicit malformed value must not silently advertise the server publicly.
+                    visibility = ServerVisibility.None;
+                    visibilityValid = false;
+                }
+            }
         }
 
         if (!ConnectionPassword.IsValid(password))
@@ -91,7 +116,7 @@ public static class ServerLaunchArguments
             return false;
         }
 
-        return saveName != null;
+        return saveName != null && visibilityValid;
     }
 
     /// <summary>
@@ -133,4 +158,39 @@ public static class ServerLaunchArguments
     }
 
     private static bool IsToken(string arg, string token) => string.Equals(arg, token, StringComparison.OrdinalIgnoreCase);
+
+    private static string FormatVisibility(ServerVisibility visibility) => visibility switch
+    {
+        ServerVisibility.Public => "public",
+        ServerVisibility.FriendsOnly => "friends_only",
+        ServerVisibility.None => "none",
+        _ => throw new ArgumentOutOfRangeException(nameof(visibility)),
+    };
+
+    private static bool TryParseVisibility(string value, out ServerVisibility visibility)
+    {
+        if (string.Equals(value, "public", StringComparison.OrdinalIgnoreCase))
+        {
+            visibility = ServerVisibility.Public;
+            return true;
+        }
+
+        if (string.Equals(value, "friends_only", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(value, "friends", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(value, "friendsonly", StringComparison.OrdinalIgnoreCase))
+        {
+            visibility = ServerVisibility.FriendsOnly;
+            return true;
+        }
+
+        if (string.Equals(value, "none", StringComparison.OrdinalIgnoreCase))
+        {
+            visibility = ServerVisibility.None;
+            return true;
+        }
+
+        // Unknown explicit values fail closed instead of accidentally advertising publicly.
+        visibility = ServerVisibility.None;
+        return false;
+    }
 }

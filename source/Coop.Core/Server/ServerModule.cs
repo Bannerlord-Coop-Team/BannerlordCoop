@@ -58,9 +58,9 @@ public class ServerModule : CommonModule
         // Policies
         builder.RegisterType<ServerSyncPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();
 
-        // The standalone server logs into Steam itself and advertises a public discovery lobby, so
-        // friends join without port forwarding and the owner never plays. Same guard as ClientModule:
-        // only touch Steam types when the boot probe found Steam.
+        // The standalone server logs into Steam itself and advertises with the host-selected lobby
+        // visibility, so eligible players can join without port forwarding while the owner never
+        // plays. Same guard as ClientModule: only touch Steam types when the boot probe found Steam.
         if (SessionDiscovery.SteamAvailable)
         {
             RegisterSteamSessionServices(builder);
@@ -89,7 +89,11 @@ public class ServerModule : CommonModule
             .As<ISteamLobbyApi>()
             .As<ISteamPublicLobbyApi>()
             .InstancePerLifetimeScope();
-        builder.RegisterType<SteamPublicLobbyAdvertiser>().As<ISessionAdvertiser>().InstancePerLifetimeScope();
+        builder.Register(context => new SteamPublicLobbyAdvertiser(
+                context.Resolve<ISteamPublicLobbyApi>(),
+                context.Resolve<SessionAdvertisementConfig>().Visibility))
+            .As<ISessionAdvertiser>()
+            .InstancePerLifetimeScope();
         builder.RegisterType<SteamGameServerNetworkingTunnelTransport>().As<ISteamTunnelTransport>().InstancePerLifetimeScope();
         builder.RegisterType<SteamTunnelHost>()
             .As<ISessionTunnelHost>()

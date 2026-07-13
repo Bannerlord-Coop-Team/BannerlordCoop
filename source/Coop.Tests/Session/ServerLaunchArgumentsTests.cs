@@ -1,4 +1,5 @@
 ﻿using Common.Network;
+using Common.Network.Session;
 using Coop.Core.Common.Session;
 using Xunit;
 
@@ -62,6 +63,70 @@ public class ServerLaunchArgumentsTests
         Assert.Equal("My Save", saveName);
         Assert.Equal(1234, ownerProcessId);
         Assert.Equal("Secret words", password);
+    }
+
+    [Theory]
+    [InlineData("public", ServerVisibility.Public)]
+    [InlineData("FRIENDS_ONLY", ServerVisibility.FriendsOnly)]
+    [InlineData("friends", ServerVisibility.FriendsOnly)]
+    [InlineData("friendsonly", ServerVisibility.FriendsOnly)]
+    [InlineData("none", ServerVisibility.None)]
+    public void TryParse_FindsVisibilityCaseInsensitively(string value, ServerVisibility expected)
+    {
+        var args = new[]
+        {
+            ServerLaunchArguments.SaveArgument,
+            "Campaign",
+            ServerLaunchArguments.VisibilityArgument,
+            value,
+        };
+
+        Assert.True(ServerLaunchArguments.TryParse(
+            args, out _, out _, out _, out var visibility));
+        Assert.Equal(expected, visibility);
+    }
+
+    [Fact]
+    public void TryParse_DefaultsMissingVisibilityToPublicForLegacyLaunches()
+    {
+        var args = new[] { ServerLaunchArguments.SaveArgument, "Campaign" };
+
+        Assert.True(ServerLaunchArguments.TryParse(
+            args, out _, out _, out _, out var visibility));
+        Assert.Equal(ServerVisibility.Public, visibility);
+    }
+
+    [Theory]
+    [InlineData("invalid")]
+    [InlineData("")]
+    public void TryParse_RejectsInvalidExplicitVisibility(string value)
+    {
+        var args = new[]
+        {
+            ServerLaunchArguments.SaveArgument,
+            "Campaign",
+            ServerLaunchArguments.VisibilityArgument,
+            value,
+        };
+
+        Assert.False(ServerLaunchArguments.TryParse(
+            args, out _, out _, out _, out var visibility));
+        Assert.Equal(ServerVisibility.None, visibility);
+    }
+
+    [Fact]
+    public void TryParse_RejectsVisibilityWithoutValue()
+    {
+        var args = new[]
+        {
+            ServerLaunchArguments.SaveArgument,
+            "Campaign",
+            ServerLaunchArguments.VisibilityArgument,
+        };
+
+        Assert.False(ServerLaunchArguments.TryParse(
+            args, out _, out _, out _, out var visibility));
+        Assert.Equal(ServerVisibility.None, visibility);
     }
 
     [Fact]
@@ -129,7 +194,7 @@ public class ServerLaunchArgumentsTests
         var built = ServerLaunchArguments.BuildManagedServerArguments(
             new[] { "Native", "SandBoxCore", "SandBox", "StoryMode", "Coop" }, "MP", 1234);
 
-        Assert.Equal("/singleplayer /server _MODULES_*Native*SandBoxCore*SandBox*StoryMode*Coop*_MODULES_ /coopsave MP /coopowner 1234", built);
+        Assert.Equal("/singleplayer /server _MODULES_*Native*SandBoxCore*SandBox*StoryMode*Coop*_MODULES_ /coopsave MP /coopowner 1234 /coopvisibility public", built);
     }
 
     [Fact]
@@ -137,7 +202,7 @@ public class ServerLaunchArgumentsTests
     {
         var built = ServerLaunchArguments.BuildManagedServerArguments(new[] { "Native", "Coop" }, "My Save", 42);
 
-        Assert.Equal("/singleplayer /server _MODULES_*Native*Coop*_MODULES_ /coopsave \"My Save\" /coopowner 42", built);
+        Assert.Equal("/singleplayer /server _MODULES_*Native*Coop*_MODULES_ /coopsave \"My Save\" /coopowner 42 /coopvisibility public", built);
     }
 
     [Fact]
@@ -146,7 +211,19 @@ public class ServerLaunchArgumentsTests
         var built = ServerLaunchArguments.BuildManagedServerArguments(
             new[] { "Native", "Coop" }, "My Save", 42, "Secret words");
 
-        Assert.Equal("/singleplayer /server _MODULES_*Native*Coop*_MODULES_ /coopsave \"My Save\" /coopowner 42 /cooppassword \"Secret words\"", built);
+        Assert.Equal("/singleplayer /server _MODULES_*Native*Coop*_MODULES_ /coopsave \"My Save\" /coopowner 42 /coopvisibility public /cooppassword \"Secret words\"", built);
+    }
+
+    [Theory]
+    [InlineData(ServerVisibility.Public, "public")]
+    [InlineData(ServerVisibility.FriendsOnly, "friends_only")]
+    [InlineData(ServerVisibility.None, "none")]
+    public void BuildManagedServerArguments_AppendsVisibility(ServerVisibility visibility, string expected)
+    {
+        var built = ServerLaunchArguments.BuildManagedServerArguments(
+            new[] { "Native", "Coop" }, "My Save", 42, string.Empty, visibility);
+
+        Assert.Contains($"{ServerLaunchArguments.VisibilityArgument} {expected}", built);
     }
 
     [Fact]

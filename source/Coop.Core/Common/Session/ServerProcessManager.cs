@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using Common.Network.Session;
 using Coop.Core.Common.Session.Messages;
 using GameInterface.Services.GameState;
 using Serilog;
@@ -39,9 +40,11 @@ public class ServerProcessManager : IDisposable
         }
     }
 
-    public void Start(string saveName) => Start(saveName, null);
+    public void Start(string saveName) => Start(saveName, null, ServerVisibility.Public);
 
-    public void Start(string saveName, string password)
+    public void Start(string saveName, string password) => Start(saveName, password, ServerVisibility.Public);
+
+    public void Start(string saveName, string password, ServerVisibility visibility)
     {
         lock (stateLock)
         {
@@ -53,7 +56,7 @@ public class ServerProcessManager : IDisposable
             var currentProcess = Process.GetCurrentProcess();
             var exePath = ManagedServerLauncher.GetEngineExecutablePath();
             var arguments = ServerLaunchArguments.BuildManagedServerArguments(
-                ManagedServerLauncher.GetActiveModuleIds(), saveName, currentProcess.Id, password);
+                ManagedServerLauncher.GetActiveModuleIds(), saveName, currentProcess.Id, password, visibility);
 
             // The arguments may contain the hosted-server password, so never write them to a log.
             Logger.Information("Spawning co-op server for save '{SaveName}': {Exe}", saveName, exePath);
