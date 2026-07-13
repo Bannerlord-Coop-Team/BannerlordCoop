@@ -80,7 +80,7 @@ public class ServerSettlementExitEnterHandler : IHandler
                 Compact(payload.PartyId, typeof(MobileParty))));
 
             settlementInterface.PartyEnterSettlement(mobileParty, settlement);
-        }, blocking: true, context: nameof(NetworkRequestStartSettlementEncounter));
+        }, context: nameof(NetworkRequestStartSettlementEncounter));
     }
 
     private void Handle(MessagePayload<NetworkRequestEndSettlementEncounter> obj)

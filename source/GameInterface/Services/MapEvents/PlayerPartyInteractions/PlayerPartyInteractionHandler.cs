@@ -148,7 +148,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         {
             HoldParty(initiatorParty.MobileParty);
             HoldParty(responderParty.MobileParty);
-        }, blocking: true, context: "Hold player-party interaction parties");
+        }, context: "Hold player-party interaction parties");
 
         network.SendAll(new NetworkPlayerPartyInteractionStarted(
             session.SessionId,
