@@ -66,7 +66,6 @@ internal class GameObjectCreator
         { typeof(PerkObject), new PerkObjectBuilder() },
         { typeof(CharacterAttribute), new CharacterAttributeBuilder() },
         { typeof(SkillObject), new SkillObjectBuilder() },
-        { typeof(PerkObject), new PerkObjectBuilder() },
         { typeof(PropertyOwner<TraitObject>), new PropertyOwnerBuilder() },
         { typeof(SiegeEngineType), new SiegeEngineTypeBuilder() },
         { typeof(SiegeEngineConstructionProgress), new SiegeEngineConstructionProgressBuilder()  },
