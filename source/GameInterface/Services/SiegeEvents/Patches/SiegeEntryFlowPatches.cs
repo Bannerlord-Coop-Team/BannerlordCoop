@@ -8,7 +8,6 @@ using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.SiegeEvents.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -55,7 +54,7 @@ internal class SiegeEntryFlowPatches
         if (ModInformation.IsServer) return true;
 
         var mainParty = MobileParty.MainParty;
-        if (mainParty.BesiegerCamp != null || PlayerEncounter.Current == null || mainParty.CurrentSettlement == null)
+        if (mainParty.BesiegerCamp != null || mainParty.CurrentSettlement == null)
             return true;
 
         var army = mainParty.Army;
