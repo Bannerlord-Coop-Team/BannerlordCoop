@@ -212,7 +212,6 @@ internal class TroopRosterDeltaHandler : IHandler
             {
                 if (!objectManager.TryGetObjectWithLogging<TroopRoster>(rosterId, out var roster)) return;
                 roster.RemoveZeroCounts();
-                // RemoveZeroCounts changes the element list without updating cached totals.
                 roster.InitializeCachedData();
             }
         }, context: nameof(NetworkTroopRosterRemoveZeroCounts));

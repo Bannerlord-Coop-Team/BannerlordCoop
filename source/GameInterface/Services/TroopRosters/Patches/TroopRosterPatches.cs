@@ -103,7 +103,6 @@ internal class TroopRosterPatches
         if (ModInformation.IsClient) return;
         if (!IsRegistered(__instance)) return;
 
-        // RemoveZeroCounts changes the element list without updating cached totals.
         __instance.InitializeCachedData();
     }
 
