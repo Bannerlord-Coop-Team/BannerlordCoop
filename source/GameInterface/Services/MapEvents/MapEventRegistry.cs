@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Util;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
@@ -96,6 +97,27 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
                 // makes MobileParty.MapEvent null and SetVisualAsDirty re-marks the figure, dropping it out of
                 // the fighting animation. The full vanilla finalize is deliberately not re-run — the server
                 // already replicated the battle results.
+
+                // Snapshot MainParty's reward figures before nulling any side removes it from obj's party lists;
+                // GetBattleRewardsPrefix falls back to this after teardown. Best-effort and guarded so a snapshot
+                // failure can never abort the teardown below.
+                if (localPartyWasInvolved)
+                {
+                    try
+                    {
+                        var mainPartyEventParty = obj.FindMapEventParty(PartyBase.MainParty, out var mainPartySide);
+
+                        if (mainPartyEventParty != null
+                            && ContainerProvider.TryResolve<IMainPartyBattleRewardsCache>(out var rewardsCache))
+                        {
+                            rewardsCache.Capture(obj, mainPartyEventParty, mainPartySide.GetPartyContributionRate(mainPartyEventParty));
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Debug(ex, "Skipped MainParty reward snapshot during map event teardown");
+                    }
+                }
 
                 // Mark finalized first so clearing a side's last party (which re-enters FinalizeEvent via
                 // RemovePartyInternal) no-ops on IsFinalized instead of depending on the State sync arriving first.
