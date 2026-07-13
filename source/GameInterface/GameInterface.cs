@@ -8,6 +8,7 @@ namespace GameInterface;
 public interface IGameInterface : IDisposable
 {
     void PatchAll();
+    void PatchGameStarted();
     void UnpatchAll();
 }
 
@@ -17,6 +18,11 @@ public class GameInterface : IGameInterface
 
     // Applied at boot by CoopMod, not by PatchAll: the loading-window keepalive must already be live while a host waits on PatchAll itself
     public const string HARMONY_UI_LOADING_CATEGORY = "UILoadingPatches";
+
+    // Applied from CoopMod.OnGameStart because these patches compile types whose initializers require Game.Current
+    public const string HARMONY_GAME_STARTED_CATEGORY = "GameStartedPatches";
+
+    private static bool gameStartedPatchesApplied;
     
     private readonly Harmony harmony;
     private readonly IAutoSyncPatchCollector patchCollector;
@@ -55,6 +61,14 @@ public class GameInterface : IGameInterface
         harmony.PatchCategory(assembly, HARMONY_STATIC_FIXES_CATEGORY);
         harmony.PatchAllUncategorized(assembly);
         AutoSyncPatcher.PatchAll();
+    }
+
+    public void PatchGameStarted()
+    {
+        if (gameStartedPatchesApplied) return;
+
+        harmony.PatchCategory(typeof(GameInterface).Assembly, HARMONY_GAME_STARTED_CATEGORY);
+        gameStartedPatchesApplied = true;
     }
 
     public void UnpatchAll()
