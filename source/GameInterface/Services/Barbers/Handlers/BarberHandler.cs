@@ -8,6 +8,7 @@ using SandBox.CampaignBehaviors;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.Barbers.Handlers;
@@ -124,7 +125,7 @@ internal class BarberHandler : IHandler
             if (currentCharacter.IsHero && currentCharacter == updatedCharacter)
             {
                 agent.UpdateBodyProperties(updatedCharacter.HeroObject.BodyProperties);
-                agent.UpdateSpawnEquipmentAndRefreshVisuals(Mission.Current.DoesMissionRequireCivilianEquipment ? updatedCharacter.FirstCivilianEquipment : updatedCharacter.FirstBattleEquipment);
+                agent.EquipItemsFromSpawnEquipment(false, false, false, 0);
             }
         }
     }
