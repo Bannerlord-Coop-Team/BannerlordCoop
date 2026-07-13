@@ -7,6 +7,7 @@ namespace Common.Network.Coalescing;
 public sealed class SendCoalescer : ISendCoalescer
 {
     private readonly Dictionary<CoalesceKey, ICoalescedPayload> pending = new();
+    private readonly List<CoalesceKey> order = new();
     private readonly object gate = new();
 
     public bool HasPending
@@ -26,9 +27,14 @@ public sealed class SendCoalescer : ISendCoalescer
 
         lock (gate)
         {
-            pending[key] = pending.TryGetValue(key, out var existing)
-                ? existing.Merge(payload)
-                : payload;
+            if (pending.TryGetValue(key, out var existing))
+            {
+                pending[key] = existing.Merge(payload);
+                return;
+            }
+
+            pending.Add(key, payload);
+            order.Add(key);
         }
     }
 
@@ -42,8 +48,13 @@ public sealed class SendCoalescer : ISendCoalescer
             if (pending.Count == 0) return;
 
             toSend = new ICoalescedPayload[pending.Count];
-            pending.Values.CopyTo(toSend, 0);
+            for (int i = 0; i < order.Count; i++)
+            {
+                toSend[i] = pending[order[i]];
+            }
+
             pending.Clear();
+            order.Clear();
         }
 
         foreach (var payload in toSend)
@@ -76,22 +87,19 @@ public sealed class SendCoalescer : ISendCoalescer
     {
         lock (gate)
         {
-            List<CoalesceKey> keys = null;
-            foreach (var key in pending.Keys)
+            List<ICoalescedPayload> payloads = null;
+            for (int i = 0; i < order.Count;)
             {
+                var key = order[i];
                 if (string.Equals(key.InstanceId, instanceId, StringComparison.Ordinal))
                 {
-                    (keys ??= new List<CoalesceKey>()).Add(key);
+                    (payloads ??= new List<ICoalescedPayload>()).Add(pending[key]);
+                    pending.Remove(key);
+                    order.RemoveAt(i);
+                    continue;
                 }
-            }
 
-            if (keys == null) return null;
-
-            var payloads = new List<ICoalescedPayload>(keys.Count);
-            foreach (var key in keys)
-            {
-                payloads.Add(pending[key]);
-                pending.Remove(key);
+                i++;
             }
 
             return payloads;
