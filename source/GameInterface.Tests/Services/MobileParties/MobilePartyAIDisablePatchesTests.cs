@@ -3,6 +3,7 @@ using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MobilePartyAIs.Patches;
 using GameInterface.Services.Players;
+using GameInterface.Tests;
 using HarmonyLib;
 using System;
 using System.Runtime.CompilerServices;
@@ -12,17 +13,9 @@ using Xunit;
 namespace GameInterface.Tests.Services.MobileParties;
 
 /// <summary>
-/// Prevents tests that mutate global role and player-control state from running concurrently.
-/// </summary>
-[CollectionDefinition(nameof(MobilePartyAiAuthorityCollection), DisableParallelization = true)]
-public class MobilePartyAiAuthorityCollection
-{
-}
-
-/// <summary>
 /// Tests the authority boundary for campaign-map AI decisions.
 /// </summary>
-[Collection(nameof(MobilePartyAiAuthorityCollection))]
+[Collection(ModInformationRoleCollection.Name)]
 public class MobilePartyAIDisablePatchesTests : IDisposable
 {
     private readonly bool wasServer = ModInformation.IsServer;

@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Util;
 using GameInterface.Services.MobileParties.Patches;
+using GameInterface.Tests;
 using System;
 using TaleWorlds.CampaignSystem.Party;
 using Xunit;
@@ -12,6 +13,7 @@ namespace GameInterface.Tests.Services.MobileParties;
 /// always spotted, but a destroyed party must read as unspotted, or the map nameplate machinery
 /// keeps re-creating its banner after the destruction replicates.
 /// </summary>
+[Collection(ModInformationRoleCollection.Name)]
 public class PartyIsSpottedServerPatchTests : IDisposable
 {
     private readonly bool wasServer;
