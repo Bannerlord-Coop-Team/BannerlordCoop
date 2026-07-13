@@ -158,8 +158,11 @@ public class CoopBattleController : CoopMissionController
         BattleConclusionGate.IsInCoopBattleMission = true;
         BattleConclusionGate.IsLocalBattleHost = Session.IsLocalHost;
 
-        // Drain before the end-condition gate below so a release sees this tick's fresh puppets.
+        // Drain terminal events after the buffered puppet batch registers, then let the end-condition gate
+        // observe the resulting live-agent state on this same tick.
         puppetSpawner.DrainPendingPuppets();
+        puppetDeathApplier.DrainPendingDeaths();
+        puppetRoutApplier.DrainPendingRouts();
 
         // Vanilla's end checks unlock at the LOCAL deployment finish, but a side whose troops arrive as
         // another client's puppets can be empty long after activation (own-party troops stay withheld
