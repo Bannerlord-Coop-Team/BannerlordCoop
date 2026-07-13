@@ -1,4 +1,5 @@
 ﻿using GameInterface.Services.Clans.Interfaces;
+using GameInterface.Services.Clans.Extensions;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
@@ -6,13 +7,17 @@ using TaleWorlds.CampaignSystem.GameComponents;
 namespace GameInterface.Services.Clans.Patches;
 
 [HarmonyPatch(typeof(DefaultClanFinanceModel))]
+[HarmonyPatchCategory(DeferredCategory)]
 internal class DefaultClanFinanceModelPatches
 {
+    internal const string DeferredCategory = "CoopClanFinanceDeferred";
+
     [HarmonyPatch(nameof(DefaultClanFinanceModel.AddExpenseFromLeaderParty))]
     [HarmonyPrefix]
     private static bool AddExpenseFromLeaderPartyPrefix(DefaultClanFinanceModel __instance, Clan clan, ExplainedNumber goldChange, bool applyWithdrawals, ref int __result)
     {
-        ContainerProvider.TryResolve<IDefaultClanFinanceModelInterface>(out var financeModelInterface);
+        if (clan == null || !clan.IsPlayerClan()) return true;
+        if (!ContainerProvider.TryResolve<IDefaultClanFinanceModelInterface>(out var financeModelInterface)) return true;
 
         __result = financeModelInterface.AddExpenseFromLeaderParty(__instance, clan, goldChange, applyWithdrawals);
 
@@ -23,7 +28,8 @@ internal class DefaultClanFinanceModelPatches
     [HarmonyPrefix]
     public static bool CalculateClanIncomeInternalPrefix(DefaultClanFinanceModel __instance, Clan clan, ref ExplainedNumber goldChange, bool applyWithdrawals = false, bool includeDetails = false)
     {
-        ContainerProvider.TryResolve<IDefaultClanFinanceModelInterface>(out var financeModelInterface);
+        if (clan == null || !clan.IsPlayerClan()) return true;
+        if (!ContainerProvider.TryResolve<IDefaultClanFinanceModelInterface>(out var financeModelInterface)) return true;
 
         financeModelInterface.CalculateClanIncomeInternal(__instance, clan, ref goldChange, applyWithdrawals, includeDetails);
 
