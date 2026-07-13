@@ -9,6 +9,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.ModuleManager;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.ObjectSystem;
@@ -36,6 +37,7 @@ public class GameInstance
             {
                 Module = (Module)AccessTools.Constructor(typeof(Module)).Invoke(null);
                 var modules = ModuleHelper.GetOfficialModuleIds().Append("Coop");
+                VirtualFolders.PlatformDLCPaths.Remove("NavalDLC");
                 ModuleHelper.InitializeModules(modules.ToArray());
                 GameManager = new SandBoxGameManager(() => new Campaign(CampaignGameMode.Campaign));
                 Campaign = new Campaign(CampaignGameMode.Campaign);
