@@ -71,7 +71,7 @@ public static class RaidMapEventExtensions
 
     private static bool HasDefenderPlayerParty(MapEvent mapEvent)
     {
-        if (mapEvent.DefenderSide == null)
+        if (mapEvent.DefenderSide?.Parties == null)
             return false;
 
         foreach (var mapEventParty in mapEvent.DefenderSide.Parties)

@@ -169,11 +169,10 @@ internal class BattleSimulationRunHandler : IHandler
         GameThread.RunSafe(() =>
         {
             // v1: simulate the full participating troop count (null), not the player's selected subset.
-            // Set up before attaching the observer: setup fires +1 TroopNumberChanged calls to populate the
-            // scoreboard, which the client already does for itself and must not receive twice.
             var previousObserver = mapEvent.BattleObserver;
-            mapEvent.SimulateBattleSetup(null);
             mapEvent.BattleObserver = observer;
+            mapEvent.SimulateBattleSetup(null);
+            observer.FlushRound();
 
             lock (simLock)
             {

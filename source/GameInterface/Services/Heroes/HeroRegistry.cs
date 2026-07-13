@@ -11,6 +11,7 @@ using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
 
@@ -56,6 +57,13 @@ internal class HeroRegistry : AutoRegistryBase<Hero>
             AccessTools.Property(typeof(Hero), nameof(Hero.OwnedCaravans)).SetValue(obj, new MBList<CaravanPartyComponent>());
             AccessTools.Field(typeof(Hero), nameof(Hero.VolunteerTypes)).SetValue(obj, new CharacterObject[6]);
             obj._heroDeveloper = new HeroDeveloper(obj);
+
+            // Client heroes skip Hero.Init(); the PropertyOwner fields must exist for the
+            // AutoSync PropertyOwner apply handlers (skills/traits/perks/attributes)
+            obj._heroSkills = new PropertyOwner<SkillObject>();
+            obj._heroTraits = new PropertyOwner<TraitObject>();
+            obj._heroPerks = new PropertyOwner<PerkObject>();
+            obj._characterAttributes = new PropertyOwner<CharacterAttribute>();
         }
 
         MBObjectManager.Instance?.RegisterObjectInternalWithoutTypeId(obj, false, out _);
