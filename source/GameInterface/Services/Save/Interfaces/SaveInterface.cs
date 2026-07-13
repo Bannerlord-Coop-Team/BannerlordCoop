@@ -41,7 +41,7 @@ internal class SaveInterface : ISaveInterface
     }
 
     /// <summary>
-    /// Headless hosts (the dedicated-server engine, ServerHeadless) ship no
+    /// Headless hosts (the dedicated-server engine) ship no
     /// Parameters/Version.xml, so MBSaveLoad.CurrentVersion — and with it the
     /// "ApplicationVersion" this metadata was just stamped with — is Empty
     /// (i-1.-1.-1.-1). A client loading the transferred save then treats it as

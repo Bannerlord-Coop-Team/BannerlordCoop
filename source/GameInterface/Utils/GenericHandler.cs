@@ -88,9 +88,6 @@ namespace GameInterface.Utils
                 MarshalApply(() =>
                 {
                     if (!objectManager.TryGetObjectWithLogging(data.InstanceId, out TInstance instance)) return;
-                    // Movement members of a party THIS instance controls are locally simulated;
-                    // the server's dead-reckoning stream must not overwrite them (see gate).
-                    if (AutoSyncOwnershipGate.ShouldSkipInboundApply(instance, typeof(TMessage))) return;
                     messageHandler(instance, data);
                 });
             };
@@ -108,7 +105,6 @@ namespace GameInterface.Utils
                 MarshalApply(() =>
                 {
                     if (!objectManager.TryGetObjectWithLogging(data.InstanceId, out TInstance instance)) return;
-                    if (AutoSyncOwnershipGate.ShouldSkipInboundApply(instance, typeof(TMessage))) return;
 
                     TValue value = null;
                     if (data.ValueId != null && !objectManager.TryGetObjectWithLogging(data.ValueId, out value)) return;
