@@ -192,22 +192,29 @@
                                 Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
                                 Text="@SteamLobbyStatusText"/>
 
-                    <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="42"
-                               MarginLeft="12" MarginRight="18" StackLayout.LayoutMethod="HorizontalLeftToRight">
+                    <Widget Id="LobbyColumnHeaders" WidthSizePolicy="Fixed" SuggestedWidth="900"
+                            HeightSizePolicy="Fixed" SuggestedHeight="42">
                       <Children>
-                        <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="260" HeightSizePolicy="StretchToParent"
-                                    Brush="Clan.TabControl.Text" Brush.FontSize="22" Text="@HostColumnText"/>
-                        <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="180" HeightSizePolicy="StretchToParent"
-                                    Brush="Clan.TabControl.Text" Brush.FontSize="22" Text="@PasswordColumnText"/>
-                        <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="200" HeightSizePolicy="StretchToParent"
-                                    Brush="Clan.TabControl.Text" Brush.FontSize="22"
-                                    Brush.TextHorizontalAlignment="Center" Text="@ConnectedPlayersColumnText"/>
-                        <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
-                                    Brush="Clan.TabControl.Text" Brush.FontSize="22" Text="@CompatibilityColumnText"/>
+                        <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                                   MarginLeft="12" MarginRight="18"
+                                   StackLayout.LayoutMethod="HorizontalLeftToRight">
+                          <Children>
+                            <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="260" HeightSizePolicy="StretchToParent"
+                                        Brush="Clan.TabControl.Text" Brush.FontSize="22" Text="@HostColumnText"/>
+                            <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="180" HeightSizePolicy="StretchToParent"
+                                        Brush="Clan.TabControl.Text" Brush.FontSize="22" Text="@PasswordColumnText"/>
+                            <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="200" HeightSizePolicy="StretchToParent"
+                                        Brush="Clan.TabControl.Text" Brush.FontSize="22"
+                                        Brush.TextHorizontalAlignment="Center" Text="@ConnectedPlayersColumnText"/>
+                            <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                                        Brush="Clan.TabControl.Text" Brush.FontSize="22" Text="@CompatibilityColumnText"/>
+                          </Children>
+                        </ListPanel>
                       </Children>
-                    </ListPanel>
+                    </Widget>
 
-                    <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="408">
+                    <Widget Id="LobbyListContainer" WidthSizePolicy="Fixed" SuggestedWidth="900"
+                            HeightSizePolicy="Fixed" SuggestedHeight="408">
                       <Children>
                         <ScrollablePanel Id="LobbyScrollablePanel" WidthSizePolicy="StretchToParent"
                                          HeightSizePolicy="StretchToParent" MarginRight="18"
@@ -255,7 +262,7 @@
 
                                         <Widget WidthSizePolicy="Fixed" SuggestedWidth="178"
                                                 HeightSizePolicy="StretchToParent" HorizontalAlignment="Right"
-                                                MarginRight="28" IsVisible="@IsStatusHintVisible">
+                                                MarginRight="52" IsVisible="@IsStatusHintVisible">
                                           <Children>
                                             <HintWidget DataSource="{StatusHint}" WidthSizePolicy="StretchToParent"
                                                         HeightSizePolicy="StretchToParent"

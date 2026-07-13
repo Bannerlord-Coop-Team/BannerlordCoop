@@ -19,12 +19,20 @@ public class CoopConnectionUIMovieTests
         var container = Assert.IsType<XElement>(hint.Parent?.Parent);
         Assert.Equal("Widget", container.Name.LocalName);
         Assert.Equal("@IsStatusHintVisible", container.Attribute("IsVisible")?.Value);
-        Assert.Equal("28", container.Attribute("MarginRight")?.Value);
+        Assert.Equal("52", container.Attribute("MarginRight")?.Value);
         Assert.Null(container.Attribute("DataSource"));
 
         var label = Assert.Single(hint.Descendants("TextWidget"));
         Assert.Equal("Incompatible (i)", label.Attribute("Text")?.Value);
         Assert.Equal("#FF8080FF", label.Attribute("Brush.FontColor")?.Value);
+
+        foreach (var id in new[] { "LobbyColumnHeaders", "LobbyListContainer" })
+        {
+            var tableSection = Assert.Single(document.Descendants(),
+                element => element.Attribute("Id")?.Value == id);
+            Assert.Equal("Fixed", tableSection.Attribute("WidthSizePolicy")?.Value);
+            Assert.Equal("900", tableSection.Attribute("SuggestedWidth")?.Value);
+        }
     }
 
     private static string FindMoviePath([CallerFilePath] string sourceFile = "")
