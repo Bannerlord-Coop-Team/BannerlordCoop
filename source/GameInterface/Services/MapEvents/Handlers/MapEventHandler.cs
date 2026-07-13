@@ -62,7 +62,7 @@ internal class MapEventHandler : IHandler
             "Sending network battle state change. BattleState={BattleState}",
             payload.What.BattleState);
 
-        var message = new NetworkChangeBattleState(mapEventId, payload.What.BattleState);
+        var message = new NetworkChangeBattleState(mapEventId, payload.What.BattleState, isLeavingFallback: false);
         network.SendAll(message);
     }
 
@@ -79,7 +79,7 @@ internal class MapEventHandler : IHandler
         var mapEventId = payload.What.MapEventId;
         var battleState = payload.What.BattleState;
         var sender = payload.Who as NetPeer;
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<MapEvent>(mapEventId, out var mapEvent))
                 return;
@@ -97,17 +97,26 @@ internal class MapEventHandler : IHandler
                 return;
             }
 
-            // Only the elected battle host's conclusion is authoritative: a non-host's local mission can
-            // conclude a victory the shared battle never reached (its enemies arrive as another client's
-            // puppets). Applying it would run the full capture/finalize on a battle still being fought.
+            // A leaving non-host may replace a missing host conclusion only when the server's live rosters
+            // independently produce the same victory.
             if ((battleState == BattleState.AttackerVictory || battleState == BattleState.DefenderVictory)
                 && sender != null && hostRegistry.TryGet(mapEventId, out var hostAssignment)
                 && playerManager.TryGetPlayer(sender, out var sendingPlayer)
                 && sendingPlayer.ControllerId != hostAssignment.HostControllerId)
             {
-                Logger.Information("Refused battle state {BattleState} for {MapEventId} from non-host {ControllerId}",
-                    battleState, mapEventId, sendingPlayer.ControllerId);
-                return;
+                var authoritativeVictory = GetAuthoritativeVictory(mapEvent, out var attackerHealthy, out var defenderHealthy);
+                if (!payload.What.IsLeavingFallback || authoritativeVictory != battleState)
+                {
+                    Logger.Information(
+                        "Refused battle state {BattleState} for {MapEventId} from non-host {ControllerId}; leavingFallback={LeavingFallback} attackerHealthy={AttackerHealthy} defenderHealthy={DefenderHealthy}",
+                        battleState, mapEventId, sendingPlayer.ControllerId, payload.What.IsLeavingFallback,
+                        attackerHealthy, defenderHealthy);
+                    return;
+                }
+
+                Logger.Information(
+                    "Accepted leaving fallback {BattleState} for {MapEventId} from non-host {ControllerId}; attackerHealthy={AttackerHealthy} defenderHealthy={DefenderHealthy}",
+                    battleState, mapEventId, sendingPlayer.ControllerId, attackerHealthy, defenderHealthy);
             }
 
             var playerPartyIds = MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, objectManager);
@@ -127,6 +136,17 @@ internal class MapEventHandler : IHandler
             if (battleState == BattleState.AttackerVictory || battleState == BattleState.DefenderVictory)
                 messageBroker.Publish(this, new MapEventConcluded(mapEventId, playerPartyIds));
         });
+    }
+
+    private static BattleState GetAuthoritativeVictory(MapEvent mapEvent, out int attackerHealthy, out int defenderHealthy)
+    {
+        attackerHealthy = mapEvent.AttackerSide?.RecalculateMemberCountOfSide() ?? -1;
+        defenderHealthy = mapEvent.DefenderSide?.RecalculateMemberCountOfSide() ?? -1;
+
+        if (attackerHealthy < 0 || defenderHealthy < 0 || (attackerHealthy != 0 && defenderHealthy != 0))
+            return BattleState.None;
+
+        return attackerHealthy <= 0 ? BattleState.DefenderVictory : BattleState.AttackerVictory;
     }
 
     private void Handle_MapEventSurrenderAttempted(MessagePayload<MapEventSurrenderAttempted> payload)

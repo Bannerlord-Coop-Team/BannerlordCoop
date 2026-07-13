@@ -109,7 +109,7 @@ public class CoopBattleController : CoopMissionController
         hostRegistryRef = hostRegistry;
         Session = session;
         Deployment = deployment;
-        ResultCommitter = new BattleResultCommitter(objectManager, session, hostRegistry);
+        ResultCommitter = new BattleResultCommitter(objectManager, session, hostRegistry, relayNetwork);
         siegeEngineStateReporter = new SiegeEngineStateReporter(objectManager, session, hostRegistry, relayNetwork);
     }
 
@@ -137,6 +137,7 @@ public class CoopBattleController : CoopMissionController
         SiegeMissionAuthorityGate.ResetClaimedMachines();
         BattleConclusionGate.IsInCoopBattleMission = false;
         BattleConclusionGate.IsLocalBattleHost = false;
+        BattleConclusionGate.SuppressNextHostVictoryRelay = false;
 
         base.Dispose();
     }

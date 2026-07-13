@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Common.Messaging;
+using Common.Network;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.MapEvents;
@@ -9,6 +10,7 @@ using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.PlayerCaptivityService.Messages;
+using GameInterface.Services.Players;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -315,6 +317,81 @@ public class CoopBattleFinalizeTests : MapEventTestBase
     }
 
     [Fact]
+    public void SuccessorLeavingFallback_WithMatchingServerDepletion_ConcludesBattle()
+    {
+        var (ctx, _, _, _) = SetupTwoAlliedPlayersInBattle();
+        ClearPartyRoster(ctx.DefenderPartyId);
+
+        SetBattleHost(ctx.MapEventId);
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
+            Assert.True(mapEvent.AttackerSide.RecalculateMemberCountOfSide() > 0);
+            Assert.Equal(0, mapEvent.DefenderSide.RecalculateMemberCountOfSide());
+        });
+
+        var disabled = BattleMenuSurrenderDisabledMethods()
+            .Append(AccessTools.Method(typeof(MapEvent), "CaptureDefeatedPartyMembers"))
+            .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)))
+            .Append(AccessTools.Method(typeof(MapEventRegistry), "CloseDestroyedMapEventEncounterIfNeeded"))
+            .ToList();
+
+        var successor = Clients.Last();
+        successor.Call(() => successor.Resolve<INetwork>().SendAll(
+            new NetworkChangeBattleState(ctx.MapEventId, BattleState.AttackerVictory, isLeavingFallback: true)),
+            disabled);
+
+        AssertMapEventRemoved(Server, ctx.MapEventId);
+        foreach (var client in Clients)
+            AssertMapEventRemoved(client, ctx.MapEventId);
+    }
+
+    [Fact]
+    public void SuccessorLeavingFallback_WhileServerLoserStillHealthy_IsRefused()
+    {
+        var (ctx, _, _, _) = SetupTwoAlliedPlayersInBattle();
+
+        SetBattleHost(ctx.MapEventId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
+            Assert.True(mapEvent.AttackerSide.RecalculateMemberCountOfSide() > 0);
+            Assert.True(mapEvent.DefenderSide.RecalculateMemberCountOfSide() > 0);
+        });
+
+        var successor = Clients.Last();
+        successor.Call(() => successor.Resolve<INetwork>().SendAll(
+            new NetworkChangeBattleState(ctx.MapEventId, BattleState.AttackerVictory, isLeavingFallback: true)),
+            MapEventDisabledMethods);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
+            Assert.Equal(BattleState.None, mapEvent.BattleState);
+        });
+    }
+
+    [Fact]
+    public void NonHostVictoryWithoutLeavingFallback_IsRefusedWhenServerLoserIsDepleted()
+    {
+        var (ctx, _, _, _) = SetupTwoAlliedPlayersInBattle();
+        ClearPartyRoster(ctx.DefenderPartyId);
+        SetBattleHost(ctx.MapEventId);
+
+        var successor = Clients.Last();
+        successor.Call(() => successor.Resolve<INetwork>().SendAll(
+            new NetworkChangeBattleState(ctx.MapEventId, BattleState.AttackerVictory, isLeavingFallback: false)),
+            MapEventDisabledMethods);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
+            Assert.Equal(BattleState.None, mapEvent.BattleState);
+        });
+    }
+
+    [Fact]
     public void DuplicateBattleStateChange_AfterServerConclusion_DoesNotPublishSecondClose()
     {
         var (ctx, _, _, _) = SetupTwoAlliedPlayersInBattle();
@@ -332,7 +409,8 @@ public class CoopBattleFinalizeTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
             mapEvent._battleState = BattleState.AttackerVictory;
 
-            Server.Resolve<IMessageBroker>().Publish(this, new NetworkChangeBattleState(ctx.MapEventId, BattleState.AttackerVictory));
+            Server.Resolve<IMessageBroker>().Publish(this,
+                new NetworkChangeBattleState(ctx.MapEventId, BattleState.AttackerVictory, isLeavingFallback: false));
         }, disabled);
 
         Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out _));
@@ -393,6 +471,28 @@ public class CoopBattleFinalizeTests : MapEventTestBase
             .Append(AccessTools.Method(typeof(MapEvent), "CommitCalculatedMapEventResults"))
             .Append(AccessTools.Method(typeof(MapEvent), "MovePartyToSuitablePositionOnMapEventFinalize"))
             .ToList();
+
+    private void ClearPartyRoster(string partyId)
+    {
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            party.MemberRoster.Clear();
+        });
+    }
+
+    private void SetBattleHost(string mapEventId)
+    {
+        var host = Clients.First();
+        var successor = Clients.Last();
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            playerManager.SetPeer("1", host.NetPeer);
+            playerManager.SetPeer("2", successor.NetPeer);
+            Server.Resolve<IBattleHostRegistry>().Set(mapEventId, new BattleHostAssignment("1", new[] { "2" }));
+        });
+    }
 
     /// <summary>
     /// Builds a shared battle with two opposing player parties, registers both as players, makes each client's

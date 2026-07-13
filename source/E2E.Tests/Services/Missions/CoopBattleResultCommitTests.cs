@@ -1,11 +1,14 @@
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.ObjectManager;
 using System;
 using System.Linq;
 using Common.Messaging;
+using Common.Network;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.MapEvents.Messages;
 using Missions.Battles;
+using Moq;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.Core;
 using Xunit;
@@ -59,6 +62,42 @@ public class CoopBattleResultCommitTests : MissionTestEnvironment
 
         // The host committed the AI's victory, which the server applies (OnBattleWon -> capture) and auto-finalizes.
         Assert.Equal(BattleState.DefenderVictory, committed);
+    }
+
+    [Fact]
+    public void SuccessorLeavesWithResolvedVictory_SubmitsValidatedFallback()
+    {
+        using var fixture = new MissionEngineFixture();
+        var successor = Clients.First();
+
+        successor.Call(() =>
+        {
+            var mock = fixture.CreateMission(successor);
+            mock.Shell.MissionResult = new MissionResult(BattleState.AttackerVictory,
+                playerVictory: true, playerDefeated: false, enemyRetreated: false);
+
+            var mapEvent = successor.CreateRegisteredObject<MapEvent>("mapEvent1");
+            mapEvent._battleState = BattleState.AttackerVictory;
+
+            var objectManager = new Mock<IObjectManager>();
+            var session = new Mock<IBattleSession>();
+            var hostRegistry = new Mock<IBattleHostRegistry>();
+            var network = new Mock<INetwork>();
+            IMessage sent = null;
+
+            objectManager.Setup(x => x.TryGetObject<MapEvent>("mapEvent1", out mapEvent)).Returns(true);
+            session.SetupGet(x => x.InstanceId).Returns("mapEvent1");
+            session.SetupGet(x => x.IsLocalHost).Returns(false);
+            network.Setup(x => x.SendAll(It.IsAny<IMessage>())).Callback<IMessage>(message => sent = message);
+
+            var committer = new BattleResultCommitter(objectManager.Object, session.Object, hostRegistry.Object, network.Object);
+            committer.CommitResolvedResult();
+
+            var fallback = Assert.IsType<NetworkChangeBattleState>(sent);
+            Assert.Equal("mapEvent1", fallback.MapEventId);
+            Assert.Equal(BattleState.AttackerVictory, fallback.BattleState);
+            Assert.True(fallback.IsLeavingFallback);
+        });
     }
 
     /// <summary>

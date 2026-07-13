@@ -20,6 +20,29 @@ internal class BattleTeamKillCommands
 {
     public static readonly ILogger Logger = LogManager.GetLogger<BattleTeamKillCommands>();
 
+    private const string SuppressVictoryRelayUsage =
+@"Usage:
+  coop.debug.mapevent.suppress_next_host_victory_relay
+
+Suppresses the elected battle host's next mission-derived victory relay. Diagnostic only: use immediately before
+coop.debug.mapevent.kill_enemy_team to reproduce a missing authoritative battle conclusion.";
+
+    [CommandLineArgumentFunction("suppress_next_host_victory_relay", "coop.debug.mapevent")]
+    public static string SuppressNextHostVictoryRelay(List<string> args)
+    {
+        var ctx = new CommandContext("suppress_next_host_victory_relay", SuppressVictoryRelayUsage, args);
+        if (!ctx.RequireArgCount(0, out var error))
+            return error;
+
+        if (!BattleConclusionGate.IsInCoopBattleMission)
+            return "Failed: no active coop battle mission.";
+        if (!BattleConclusionGate.IsLocalBattleHost)
+            return "Failed: run this on the elected battle host.";
+
+        BattleConclusionGate.SuppressNextHostVictoryRelay = true;
+        return "Armed: the elected host's next victory relay will be suppressed.";
+    }
+
     private const string KillEnemyUsage =
 @"Usage:
   coop.debug.mapevent.kill_enemy

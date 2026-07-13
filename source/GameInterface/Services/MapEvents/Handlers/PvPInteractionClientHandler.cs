@@ -6,6 +6,7 @@ using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
@@ -38,6 +39,8 @@ internal class PvPInteractionClientHandler : IHandler
     // Party id the popup is currently shown for (always this client's own party), or null when nothing is shown.
     // Only touched on the game main thread.
     private string shownDefenderPartyId;
+    private PartyBase pendingEncounterParty;
+    private MapEvent pendingEncounterMapEvent;
 
     // This instance's player hero name, to tell instances apart in a combined log.
     private static string Who => Hero.MainHero?.Name?.ToString() ?? "?";
@@ -52,6 +55,7 @@ internal class PvPInteractionClientHandler : IHandler
         messageBroker.Subscribe<NetworkPlayerInteractionEnded>(Handle_NetworkPlayerInteractionEnded);
         messageBroker.Subscribe<NetworkHidePvpPopup>(Handle_NetworkHidePvpPopup);
         messageBroker.Subscribe<NetworkClosePvpEncounter>(Handle_NetworkClosePvpEncounter);
+        messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
     }
 
     public void Dispose()
@@ -60,6 +64,10 @@ internal class PvPInteractionClientHandler : IHandler
         messageBroker.Unsubscribe<NetworkPlayerInteractionEnded>(Handle_NetworkPlayerInteractionEnded);
         messageBroker.Unsubscribe<NetworkHidePvpPopup>(Handle_NetworkHidePvpPopup);
         messageBroker.Unsubscribe<NetworkClosePvpEncounter>(Handle_NetworkClosePvpEncounter);
+        messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
+
+        pendingEncounterParty = null;
+        pendingEncounterMapEvent = null;
 
         // Make sure a popup never outlives the co-op session.
         if (shownDefenderPartyId != null)
@@ -143,7 +151,15 @@ internal class PvPInteractionClientHandler : IHandler
         {
             return;
         }
-        ClearMapEventBackReferences(partyIds);
+        var activeMission = MissionState.Current != null || Mission.Current != null;
+        var localMapEvent = activeMission ? localParty?.MapEvent : null;
+        ClearMapEventBackReferences(partyIds, localMapEvent != null ? localParty : null);
+
+        if (localMapEvent != null)
+        {
+            pendingEncounterParty = localParty;
+            pendingEncounterMapEvent = localMapEvent;
+        }
 
         Logger.Information("[PvPEncounterClose] Closing local encounter; partyIds=[{PartyIds}] surrenderedPartyId={SurrenderedPartyId} mapEventId={MapEventId}",
             FormatIds(partyIds),
@@ -158,16 +174,34 @@ internal class PvPInteractionClientHandler : IHandler
         CloseEncounter(localParty);
     }
 
-    private void ClearMapEventBackReferences(string[] partyIds)
+    private void ClearMapEventBackReferences(string[] partyIds, PartyBase deferredParty = null)
     {
         foreach (var partyId in partyIds ?? Array.Empty<string>())
         {
             if (!objectManager.TryGetObject<PartyBase>(partyId, out var party))
                 continue;
 
+            if (party == deferredParty)
+                continue;
+
             if (party.MapEventSide != null)
                 party._mapEventSide = null;
         }
+    }
+
+    private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
+    {
+        if (ModInformation.IsServer) return;
+        if (pendingEncounterMapEvent == null) return;
+        if (MissionState.Current != null || Mission.Current != null || PlayerEncounter.Current != null) return;
+
+        var party = pendingEncounterParty;
+        var mapEvent = pendingEncounterMapEvent;
+        pendingEncounterParty = null;
+        pendingEncounterMapEvent = null;
+
+        if (party?.MapEvent == mapEvent)
+            party._mapEventSide = null;
     }
 
     private bool TryGetLocalParty(string[] partyIds, out PartyBase party)
@@ -407,8 +441,9 @@ internal class PvPInteractionClientHandler : IHandler
 
         if (MissionState.Current != null || Mission.Current != null)
         {
-            Logger.Information("[PvPEncounterClose] Ending active mission before forced campaign close");
-            ForceEndCurrentMission();
+            // Keep this party attached until vanilla processes its result screens after the player exits the mission.
+            Logger.Information("[PvPEncounterClose] Leaving active mission open until the local player exits");
+            return;
         }
 
         // A joiner stays bound to its map-event side after the attacker abandons the encounter: the abandon tears
@@ -430,25 +465,6 @@ internal class PvPInteractionClientHandler : IHandler
 
         // Leaving an encounter is handled by PlayerEncounter.Update, which is required to bring up loot screens and more
         // Do not finish the PlayerEncounter here
-    }
-
-    private void ForceEndCurrentMission()
-    {
-        var mission = Mission.Current ?? MissionState.Current?.CurrentMission;
-        if (mission == null)
-        {
-            return;
-        }
-
-        try
-        {
-            if (!mission.MissionEnded && !mission.MissionIsEnding)
-                mission.EndMission();
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "[PvPEncounterClose] ForceEndCurrentMission failed");
-        }
     }
 
     private static void ExitMapMenuMode(Campaign campaign, MapState mapState)

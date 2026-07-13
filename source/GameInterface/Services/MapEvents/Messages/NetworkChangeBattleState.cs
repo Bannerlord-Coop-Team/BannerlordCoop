@@ -11,10 +11,13 @@ public readonly struct NetworkChangeBattleState : ICommand
     public readonly string MapEventId;
     [ProtoMember(2)]
     public readonly BattleState BattleState;
+    [ProtoMember(3)]
+    public readonly bool IsLeavingFallback;
 
-    public NetworkChangeBattleState(string mapEventId, BattleState battleState)
+    public NetworkChangeBattleState(string mapEventId, BattleState battleState, bool isLeavingFallback)
     {
         MapEventId = mapEventId;
         BattleState = battleState;
+        IsLeavingFallback = isLeavingFallback;
     }
 }

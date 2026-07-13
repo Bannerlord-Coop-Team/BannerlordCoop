@@ -13,4 +13,6 @@ public static class BattleConclusionGate
     public static bool IsInCoopBattleMission;
 
     public static bool IsLocalBattleHost;
+
+    public static bool SuppressNextHostVictoryRelay;
 }

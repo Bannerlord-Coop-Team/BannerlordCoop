@@ -1,5 +1,7 @@
 using Common.Logging;
+using Common.Network;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -19,9 +21,8 @@ public interface IBattleResultCommitter
     /// Commit this concluded battle's result. Setting <c>MapEvent.BattleState</c> runs the native
     /// setter, which the coop intercept (<c>MapEventPatches</c>) syncs to the server; there it runs
     /// <c>OnBattleWon</c> (capturing the defeated players) and the auto-finalize (closing every player's
-    /// encounter). A retreat (unresolved result) commits nothing; an already-resolved state is left untouched.
-    /// This is intentionally not host-gated: the first client to finish the battle and click Done must
-    /// resolve the shared campaign battle for everyone.
+    /// encounter). A retreat (unresolved result) commits nothing. A leaving successor submits its resolved
+    /// result as a fallback, which the server validates against its live rosters.
     /// </summary>
     void CommitResolvedResult();
 }
@@ -34,12 +35,15 @@ public class BattleResultCommitter : IBattleResultCommitter
     private readonly IObjectManager objectManager;
     private readonly IBattleSession session;
     private readonly IBattleHostRegistry hostRegistry;
+    private readonly INetwork network;
 
-    public BattleResultCommitter(IObjectManager objectManager, IBattleSession session, IBattleHostRegistry hostRegistry)
+    public BattleResultCommitter(IObjectManager objectManager, IBattleSession session, IBattleHostRegistry hostRegistry,
+        INetwork network)
     {
         this.objectManager = objectManager;
         this.session = session;
         this.hostRegistry = hostRegistry;
+        this.network = network;
     }
 
     public void CommitResolvedResult()
@@ -62,15 +66,22 @@ public class BattleResultCommitter : IBattleResultCommitter
             return;
         }
 
+        if (!session.IsLocalHost)
+        {
+            Logger.Information("[BattleSync] Submitting leaving fallback {State} for instance {Instance}",
+                result.BattleState, session.InstanceId);
+            network.SendAll(new NetworkChangeBattleState(session.InstanceId, result.BattleState, isLeavingFallback: true));
+            return;
+        }
+
         if (mapEvent.BattleState != BattleState.None)
         {
             return;
         }
 
-        // If the current host is leaving while successors are still assigned, this mission end is a retreat or
-        // host handoff, not the shared battle's Done result. A successor will commit once the battle truly ends.
-        if (session.IsLocalHost &&
-            hostRegistry.TryGet(session.InstanceId, out var assignment) &&
+        // A host leaving while successors remain is a retreat or handoff. A successor supplies any missing
+        // resolved result when it later leaves.
+        if (hostRegistry.TryGet(session.InstanceId, out var assignment) &&
             assignment.SuccessorControllerIds.Count > 0)
         {
             Logger.Information("[BattleSync] Not committing battle result for {Instance}: {Count} successor(s) still in the battle",

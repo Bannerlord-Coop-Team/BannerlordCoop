@@ -109,9 +109,21 @@ internal class MapEventPatches
         // fights. Only the battle host relays a mission victory; the local set still runs so the
         // peer's own mission winds down, and the real result arrives through the sync.
         if ((value == BattleState.AttackerVictory || value == BattleState.DefenderVictory)
-            && BattleConclusionGate.IsInCoopBattleMission && !BattleConclusionGate.IsLocalBattleHost)
+            && BattleConclusionGate.IsInCoopBattleMission)
         {
-            return true;
+            if (!BattleConclusionGate.IsLocalBattleHost)
+            {
+                return true;
+            }
+
+            if (BattleConclusionGate.SuppressNextHostVictoryRelay)
+            {
+                BattleConclusionGate.SuppressNextHostVictoryRelay = false;
+                Logger.Warning("[BattleSyncRepro] Suppressed elected host victory relay for {MapEventId}; state={BattleState}",
+                    __instance.StringId,
+                    value);
+                return true;
+            }
         }
 
         var message = new MapEventBattleStateChangeAttempted(__instance, value);
