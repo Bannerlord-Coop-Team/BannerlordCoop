@@ -88,6 +88,8 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     // be judged on its own, not as a leftover retreat.
     private void Handle_PeerEntered(MessagePayload<NetworkMissionPeerEntered> payload)
     {
+        if (payload.What.InstanceId != null && payload.What.InstanceId != session.InstanceId) return;
+
         retreatedHosts.Remove(payload.What.ControllerId);
     }
 

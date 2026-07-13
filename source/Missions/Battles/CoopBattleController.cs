@@ -254,6 +254,8 @@ public class CoopBattleController : CoopMissionController
             replicator.BroadcastOwnDeployedTroops();
     }
 
+    protected override string CurrentInstanceId => Session.InstanceId;
+
     protected override void SendJoinInfo(string controllerId)
     {
         // Announce presence so the handshake completes and the P2P link is proven.

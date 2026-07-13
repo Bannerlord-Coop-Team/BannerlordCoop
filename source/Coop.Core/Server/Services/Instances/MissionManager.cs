@@ -132,6 +132,12 @@ public class MissionManager : IMissionManager
     {
         lock (gate)
         {
+            // A controller is in at most one instance — TryHandleDisconnect relies on that when it removes
+            // the first match. A controller whose previous mission never announced its leave (teardown died
+            // before MissionLeft) would otherwise linger in the old table, so entering here evicts it
+            // everywhere else (the relay-table analogue of RemoveEndpointEverywhere).
+            RemoveControllerEverywhere(controllerId, exceptInstanceId: instanceId);
+
             // Shares the instance dictionary with the NAT-punch flow, so the relay context and the punch
             // endpoints for one mission live in the SAME MissionInstance — provided both sides derive the
             // same instance id (see MissionEntered).
@@ -231,6 +237,22 @@ public class MissionManager : IMissionManager
         foreach (var instance in byInstanceId.Values)
         {
             instance.PunchEndpoints.RemoveAll(e => e.External.Equals(external));
+        }
+    }
+
+    // A controller is in at most one instance, so any other relay mapping is stale on a new entry.
+    // Caller holds the lock.
+    private void RemoveControllerEverywhere(string controllerId, string exceptInstanceId)
+    {
+        foreach (var entry in byInstanceId)
+        {
+            if (entry.Key == exceptInstanceId) continue;
+
+            if (entry.Value.RemoveController(controllerId))
+            {
+                Logger.Information("Evicted stale relay mapping of {Controller} from instance {Instance} on entering {NewInstance}",
+                    controllerId, entry.Key, exceptInstanceId);
+            }
         }
     }
 }

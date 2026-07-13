@@ -59,6 +59,76 @@ public class MissionMembershipTests
         Leave(members[2]);
 
         AssertControllersEquivalent(members.Take(2).ToList());
+
+        // The leaver's own mirror is dropped with the instance — the server never tells a departed member
+        // about later departures, so anything kept here would go stale.
+        Assert.Empty(members[2].Instance.Resolve<MissionContext>().ControllersInMission);
+    }
+
+    [Fact]
+    public void Membership_DoesNotLeakIntoTheNextInstance()
+    {
+        const string NextInstanceId = "MapEvent_Next";
+        var members = SetupClients();
+
+        // Two members share an instance; one leaves first. (At battle end everyone leaves at once — the
+        // server only fans a departure out to members still in its table, so whoever it processes first is
+        // never told about the later leavers.)
+        Join(members[0]);
+        Join(members[1]);
+        Leave(members[0]);
+
+        // The early leaver then enters a different instance alone.
+        Join(members[0], NextInstanceId);
+
+        // Nothing from the previous instance may linger in its mirror: a lingering member here made every
+        // broadcast of the new mission relay at a controller the server has no mapping for in this instance
+        // ("Failed to get peer for instance (...) controller (...)").
+        Assert.Empty(members[0].Instance.Resolve<MissionContext>().ControllersInMission);
+
+        // And the server-side lookup those relays would perform: only the actual member resolves.
+        var missionManager = TestEnvironment.Server.Resolve<IMissionManager>();
+        Assert.True(missionManager.TryGetControllers(NextInstanceId, out var controllers));
+        Assert.Equal(new[] { members[0].ControllerId }, controllers.ToArray());
+        Assert.False(missionManager.TryGetRelayTarget(NextInstanceId, members[1].ControllerId, out _));
+        Assert.True(missionManager.TryGetRelayTarget(NextInstanceId, members[0].ControllerId, out _));
+    }
+
+    [Fact]
+    public void CrossInstanceIntroduction_IsIgnored()
+    {
+        var members = SetupClients();
+
+        Join(members[0]);
+        Join(members[1]);
+
+        // A stray introduction for a DIFFERENT instance (stale, or in flight while its recipient moved on)
+        // must not enter the mirror — broadcasts would relay at a controller the server has no mapping for
+        // in this instance.
+        members[0].Instance.Resolve<IMessageBroker>().Publish(this,
+            new NetworkMissionPeerEntered("Stranger", "SomeOtherInstance"));
+
+        var context = members[0].Instance.Resolve<MissionContext>();
+        Assert.Equal(new[] { members[1].ControllerId }, context.ControllersInMission.ToArray());
+    }
+
+    [Fact]
+    public void EnterMission_EvictsTheControllerFromItsPriorInstance()
+    {
+        const string NextInstanceId = "MapEvent_Next";
+        var members = SetupClients();
+
+        // A mission whose teardown died never announces its leave; the member then enters another instance.
+        Join(members[0]);
+        Join(members[0], NextInstanceId);
+
+        // A controller is in at most one instance: the stale mapping is evicted, so relays into the OLD
+        // instance no longer resolve and only the new instance routes to it.
+        var missionManager = TestEnvironment.Server.Resolve<IMissionManager>();
+        Assert.True(missionManager.TryGetControllers(InstanceId, out var oldControllers));
+        Assert.Empty(oldControllers);
+        Assert.False(missionManager.TryGetRelayTarget(InstanceId, members[0].ControllerId, out _));
+        Assert.True(missionManager.TryGetRelayTarget(NextInstanceId, members[0].ControllerId, out _));
     }
 
     [Fact]
@@ -106,13 +176,27 @@ public class MissionMembershipTests
         return members;
     }
 
-    /// <summary>Simulates the server receiving a MissionEntered over the member's connection.</summary>
-    private void Join(Member member) =>
-        TestEnvironment.Server.SimulateMessage(member.Instance.NetPeer, new NetworkMissionEntered(member.ControllerId, InstanceId));
+    /// <summary>
+    /// Simulates the member entering an instance the way the real client does: the mission connect scopes its
+    /// MissionContext to the instance (LiteNetP2PClient.ConnectToInstance → BeginInstance), then the entry is
+    /// announced to the server.
+    /// </summary>
+    private void Join(Member member, string instanceId = InstanceId)
+    {
+        member.Instance.Resolve<MissionContext>().BeginInstance(instanceId);
+        TestEnvironment.Server.SimulateMessage(member.Instance.NetPeer, new NetworkMissionEntered(member.ControllerId, instanceId));
+    }
 
-    /// <summary>Simulates the server receiving a MissionLeft over the member's connection.</summary>
-    private void Leave(Member member) =>
-        TestEnvironment.Server.SimulateMessage(member.Instance.NetPeer, new NetworkMissionLeft(member.ControllerId, InstanceId));
+    /// <summary>
+    /// Simulates the member leaving an instance the way the real client does: the departure is announced to
+    /// the server, then the mission network teardown drops the membership mirror
+    /// (LiteNetP2PClient.DisconnectPeers → EndInstance).
+    /// </summary>
+    private void Leave(Member member, string instanceId = InstanceId)
+    {
+        TestEnvironment.Server.SimulateMessage(member.Instance.NetPeer, new NetworkMissionLeft(member.ControllerId, instanceId));
+        member.Instance.Resolve<MissionContext>().EndInstance();
+    }
 
     /// <summary>
     /// Asserts the server's instance controllers equal the present members, and each present member's

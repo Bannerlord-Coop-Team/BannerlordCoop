@@ -84,7 +84,7 @@ sequenceDiagram
     Ctrl->>Mesh: SendAll(NetworkLeaveMission(controllerId))
     Mesh->>Peer: deliver LeaveMission (reliable)
     Ctrl->>Mesh: Stop()
-    note right of Mesh: Stop() ⇒ DisconnectPeers():<br/>FlushReliableSends (drain queue ≤100ms)<br/>then DisconnectAll, poller.Stop, netManager.Stop
+    note right of Mesh: Stop() ⇒ DisconnectPeers():<br/>FlushReliableSends (drain queue ≤100ms)<br/>then DisconnectAll + MissionContext.EndInstance<br/>(drop instance membership), poller.Stop, netManager.Stop
     Ctrl->>Ctrl: agentRegistry.Clear() + Dispose()
 
     alt graceful leave

@@ -137,6 +137,12 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         netManager.DisconnectAll();
 
         instanceId = null;
+
+        // The mission-scoped membership must not outlive the instance: the server only fans a departure out
+        // to members still in its table, so whoever leaves first never hears about the later leavers — left
+        // in place, those entries would make every broadcast of the NEXT mission relay at controllers the
+        // server has no mapping for there.
+        missionContext.EndInstance();
     }
 
     // LiteNetLib 1.3.1 has no synchronous flush, so nudge the logic thread and wait (bounded) for each
@@ -174,6 +180,11 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         // The relay send and the connection-accept check both read this, so it is set even
         // when the punch below is skipped.
         this.instanceId = instanceId;
+
+        // Scope the membership mirror to this instance BEFORE the caller announces the entry, so the
+        // introductions the announce triggers are accepted while anything left from a previous instance
+        // (or arriving late for one) is dropped.
+        missionContext.BeginInstance(instanceId);
 
         // A tunneled session cannot punch: the rendezvous only observes loopback pump
         // endpoints, so mission traffic stays on the per-send server relay fallback.
@@ -299,6 +310,14 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         if (missionContext.TryGetPeer(controllerId, out var peer))
         {
             Send(peer, packet);
+            return;
+        }
+
+        // Outside an instance the relay has nothing to route by — the server would just fail the lookup.
+        // Reached only by a send racing mission teardown, so drop it rather than error server-side.
+        if (instanceId == null)
+        {
+            Logger.Warning("Dropping {PacketType} to {Controller} — not connected to an instance", packet.GetType().Name, controllerId);
             return;
         }
 

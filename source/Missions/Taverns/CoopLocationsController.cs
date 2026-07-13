@@ -177,6 +177,8 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         );
     }
 
+    protected override string CurrentInstanceId => instanceId;
+
     protected override void SendJoinInfo(string controllerId)
     {
         Logger.Debug("Sending join request");
@@ -203,8 +205,9 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
 
     protected override void OnLeaving()
     {
+        // network.Stop() ends the instance on the MissionContext (via DisconnectPeers), so the membership
+        // mirror is dropped for locations and battles through the same choke point.
         relayNetwork.SendAll(new NetworkMissionLeft(controllerIdProvider.ControllerId, instanceId));
-        messageBroker.Publish(this, new PlayerLeftLocation());
         network.Stop();
     }
 

@@ -38,7 +38,11 @@ internal class RelayPacketHandler : IPacketHandler
 
         if (!missionManager.TryGetRelayTarget(relayPacket.InstanceId, relayPacket.ControllerId, out var target))
         {
-            Logger.Error("Failed to get peer for instance ({InstanceId}) controller ({ControllerId})", relayPacket.InstanceId, relayPacket.ControllerId);
+            // Expected briefly around departures: the target is removed from the instance the moment its
+            // leave/disconnect is processed, while senders keep relaying at it until the departure fan-out
+            // reaches them. Sustained misses for one controller mean its membership diverged (see
+            // MissionContext.BeginInstance/EndInstance).
+            Logger.Warning("Failed to get peer for instance ({InstanceId}) controller ({ControllerId})", relayPacket.InstanceId, relayPacket.ControllerId);
             return;
         }
 

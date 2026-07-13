@@ -72,6 +72,17 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
 
     private void Handle_MissionPeerEntered(MessagePayload<NetworkMissionPeerEntered> payload)
     {
+        // Only answer introductions into OUR instance. One for another instance (stale, or in flight while we
+        // moved on to the next mission) would send join info — and the whole joiner catch-up — at a controller
+        // the server has no relay mapping for in this instance. A null instance id is tolerated as a wildcard,
+        // matching the BattleAuthorityMigrator filter (only locally published legacy/test messages omit it).
+        if (payload.What.InstanceId != null && payload.What.InstanceId != CurrentInstanceId)
+        {
+            Logger.Debug("Ignoring introduction of {Controller} for instance {Instance} — current instance is {Current}",
+                payload.What.ControllerId, payload.What.InstanceId, CurrentInstanceId ?? "<none>");
+            return;
+        }
+
         // Server-mediated replacement for PeerConnected: a controller entered our instance (the notification
         // arrived over the campaign/relay connection), so send it our join info over the mesh.
         SendJoinInfo(payload.What.ControllerId);
@@ -81,6 +92,13 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
     {
         HandleJoinInfo((NetPeer)payload.Who, payload.What);
     }
+
+    /// <summary>
+    /// The P2P instance this mission is connected to (battles: the map event's object-manager id; locations:
+    /// settlement + location). Null until the mission has entered its instance — introductions carrying a
+    /// different (non-null) instance id are ignored.
+    /// </summary>
+    protected abstract string CurrentInstanceId { get; }
 
     /// <summary>Build and send this client's join info to <paramref name="controllerId"/>, a controller that just entered our instance.</summary>
     protected abstract void SendJoinInfo(string controllerId);

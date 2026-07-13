@@ -61,6 +61,24 @@ internal class MissionInstance
         }
     }
 
+    /// <summary>
+    /// Drop a member by its controller id (e.g. when the controller turns up in another instance). Unlike
+    /// <see cref="RemovePeer"/> this also clears a mapping whose connection has since been replaced.
+    /// </summary>
+    public bool RemoveController(string controllerId)
+    {
+        if (controllerToPeer.TryRemove(controllerId, out var peer) == false) return false;
+
+        // Only unmap the reverse entry while it still points at this controller — MapPeer may have
+        // re-purposed the connection for another id in the meantime.
+        if (peerToController.TryGetValue(peer, out var mapped) && mapped == controllerId)
+        {
+            peerToController.TryRemove(peer, out _);
+        }
+
+        return true;
+    }
+
     /// <summary>Resolve a single member's live connection.</summary>
     public bool TryGetPeer(string controllerId, out NetPeer peer) =>
         controllerToPeer.TryGetValue(controllerId, out peer);
