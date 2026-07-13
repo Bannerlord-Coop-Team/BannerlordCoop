@@ -172,7 +172,6 @@ internal class BattleSimulationRunHandler : IHandler
             var previousObserver = mapEvent.BattleObserver;
             mapEvent.BattleObserver = observer;
             mapEvent.SimulateBattleSetup(null);
-            // Setup must see an observer so vanilla tracks upgrades; discard its initial scoreboard population.
             observer.FlushRound();
 
             lock (simLock)
