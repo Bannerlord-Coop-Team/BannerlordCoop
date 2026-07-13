@@ -21,7 +21,7 @@ namespace GameInterface.Tests.Services.MapEvents
     /// members Party, MobileParty and _actualClan are assigned directly; _sides and _battleParties are
     /// readonly fields, so they are set by reflection.
     /// </summary>
-    public class CanPartyJoinBattleGuardTests
+    public class InteractionPatchesCanEvaluateJoinBattleTests
     {
         private static readonly FieldInfo SidesField =
             typeof(MapEvent).GetField("_sides", BindingFlags.NonPublic | BindingFlags.Instance)!;

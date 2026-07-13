@@ -450,15 +450,4 @@ internal class PvPInteractionClientHandler : IHandler
             Logger.Error(ex, "[PvPEncounterClose] ForceEndCurrentMission failed");
         }
     }
-
-    private static void ExitMapMenuMode(Campaign campaign, MapState mapState)
-    {
-        if (mapState?.AtMenu == true)
-            mapState.ExitMenuMode();
-
-        if (mapState != null)
-            mapState.GameMenuId = null;
-        if (campaign?.MapStateData != null)
-            campaign.MapStateData.GameMenuId = null;
-    }
 }

@@ -16,7 +16,6 @@ public interface INetworkAgentRegistry : IDisposable
     /// <summary>Clears all data.</summary>
     void Clear();
     bool TryRegisterAgent(string controllerId, Guid agentId, Agent agent);
-    bool RemoveController(string controllerId);
     bool RemoveAgent(Guid agentId);
     bool RemoveAgent(Agent agent);
     bool TryGetAgentInfo(Agent agent, out CoopAgentInfo agentInfo);
@@ -187,29 +186,6 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
         }
     }
 
-    public bool RemoveController(string controllerId)
-    {
-        if (string.IsNullOrEmpty(controllerId))
-        {
-            Logger.Error($"{nameof(controllerId)} is null or empty.");
-            return false;
-        }
-
-        lock (gate)
-        {
-            if (!ControllerAgentMap.TryGetValue(controllerId, out var controlledAgents))
-                return false;
-
-            foreach (var agentInfo in controlledAgents)
-            {
-                IdToInfo.Remove(agentInfo.AgentId);
-                AgentToInfo.Remove(agentInfo.Agent);
-            }
-
-            return ControllerAgentMap.Remove(controllerId);
-        }
-    }
-
     /// <inheritdoc/>
     public IReadOnlyCollection<CoopAgentInfo> GetAgents(string controllerId)
     {
@@ -257,7 +233,7 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
                 return true;
 
             // Detach from the current authority's list, pruning the entry when it empties so the map
-            // stays consistent with RemoveController (which drops the whole key).
+            // never retains a controller key with no agents.
             if (ControllerAgentMap.TryGetValue(agentInfo.CurrentAuthority, out var currentAgents))
             {
                 currentAgents.Remove(agentInfo);

@@ -72,7 +72,6 @@ public class CoopBattleController : CoopMissionController
     // Whether the pre-live hold on vanilla's battle-end checks has been lifted (see OnMissionTick).
     private bool endConditionHoldReleased;
     private readonly ISupplyProgressReporter supplyReporter;
-    private readonly BattleTeamDiagnostics diagnostics = new BattleTeamDiagnostics();
 
     public CoopBattleController(
         IBattleNetwork network,
@@ -181,7 +180,6 @@ public class CoopBattleController : CoopMissionController
 
         siegeEngineDeployment.DrainPending(dt);
         siegeMachineState.Tick(dt);
-        diagnostics.Tick(dt);
         supplyReporter.Tick(dt);
     }
 

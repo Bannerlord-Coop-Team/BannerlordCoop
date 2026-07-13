@@ -257,9 +257,6 @@ internal class InteractionPatches
         public bool Expired => CampaignTime.Now > ExpiresAt;
     }
 
-
-    private static readonly ConditionalWeakTable<MobileParty, PlayerBattleAiJoinWindow> interactionDebounce = new();
-
     [HarmonyPatch(typeof(PartyBase), "TaleWorlds.CampaignSystem.Map.IInteractablePoint.CanPartyInteract")]
     [HarmonyPostfix]
     private static void Postfix_CanPartyInteract(

@@ -1,12 +1,9 @@
 ﻿using Common;
-using Common.Messaging;
 using GameInterface.Policies;
-using GameInterface.Services.MapEvents.Messages.Start;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
@@ -21,8 +18,7 @@ internal class StartBattleActionPatches
 
         if (ModInformation.IsClient)
         {
-            var requestBattleMessgae = new StartBattleAttempted(attackerParty, defenderParty, subject as Settlement, battleType);
-            MessageBroker.Instance.Publish(null, requestBattleMessgae);
+            // Clients cannot natively start a battle — the server drives battle start. Suppress the vanilla call.
             return false;
         }
 
