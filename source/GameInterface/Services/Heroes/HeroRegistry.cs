@@ -58,16 +58,9 @@ internal class HeroRegistry : AutoRegistryBase<Hero>
             obj._heroDeveloper = new HeroDeveloper(obj);
         }
 
-        MBObjectManager.Instance?.RegisterObjectInternalWithoutTypeId(obj, false, out _);
-
-        // Vanilla-equivalent registration: AddHero assigns the hero's MBGUID and then calls
-        // OnHeroAdded. Calling OnHeroAdded directly (as this used to) skipped the Id assignment,
-        // leaving every client-created hero with Id == 0. MBObjectBase.GetHashCode is Id-based, so
-        // those heroes all collide in any Id-hashed dictionary, and any later Id assignment would
-        // strand existing entries under the old hash — the same mutating-identity defect that leaked
-        // dead-party nameplates (see MobilePartyRegistry.OnClientCreated). Assigning the Id here,
-        // before the hero is reachable by any world list or UI, keeps the hash stable for life.
         Campaign.Current?.CampaignObjectManager?.AddHero(obj);
+
+        MBObjectManager.Instance?.RegisterObjectInternalWithoutTypeId(obj, presumed: true, out _);
     }
 
     public override void OnClientDestroyed(Hero obj, string id)

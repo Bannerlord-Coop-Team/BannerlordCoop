@@ -70,40 +70,19 @@ internal class MobilePartyRegistry : AutoRegistryBase<MobileParty>
             obj.HasLandNavigationCapability = true;
         }
 
-        MBObjectManager.Instance?.RegisterObjectInternalWithoutTypeId(obj, false, out _);
-
-        // Assign the party's MBGUID now, before anything can observe the party. MBObjectBase.GetHashCode
-        // is Id-based, and the deferred AddMobileParty below otherwise assigns the Id on the game thread
-        // only after the map UI may already have keyed the party into an Id-hashed dictionary — the
-        // movement sync can make a fresh party visible (locator + spotting) within the same frame, and
-        // PartyNameplatesVM keys plates by party. A dictionary key whose hash mutates after insert is
-        // unfindable, so such a party's nameplate could never be removed again and outlived its party,
-        // rendering the dead party's name ("NameFailed - BanditPartyPatch" for bandits).
-        var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
-        if (campaignObjectManager != null)
-        {
-            obj.Id = new MBGUID(14u, campaignObjectManager.GetNextUniqueObjectIdOfType<MobileParty>());
-        }
-
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             var objectManager = Campaign.Current?.CampaignObjectManager;
             if (objectManager == null) return;
 
-            // AddMobileParty unconditionally re-assigns Id (nothing inside it reads the Id); restore
-            // the pre-assigned one so the identity every Id-hashed dictionary keyed on stays stable.
-            var preassignedId = obj.Id;
             objectManager.AddMobileParty(obj);
-            if (preassignedId.InternalValue != 0)
-            {
-                obj.Id = preassignedId;
-            }
-        });
+            MBObjectManager.Instance?.RegisterObjectInternalWithoutTypeId(obj, true, out _);
+        }, context: "MobilePartyRegistry.OnClientCreated");
     }
 
     public override void OnClientDestroyed(MobileParty obj, string id)
     {
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             using (new AllowedThread())
             {
@@ -137,7 +116,7 @@ internal class MobilePartyRegistry : AutoRegistryBase<MobileParty>
                     Logger.Error(ex, "Failed to remove party");
                 }
             }
-        });
+        }, context: "MobilePartyRegistry.OnClientDestroyed");
     }
 
     public override void OnServerCreated(MobileParty obj, string id)
