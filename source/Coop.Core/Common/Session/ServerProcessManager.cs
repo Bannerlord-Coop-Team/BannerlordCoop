@@ -10,9 +10,9 @@ using System.IO;
 namespace Coop.Core.Common.Session;
 
 /// <summary>
-/// Spawns and tracks the dedicated server process a Host click creates. Once a client has
-/// connected, the server manages its own shutdown; Stop is only the pre-connect abort path,
-/// where the child cannot be mid-save, so it kills promptly and disowns the child.
+/// Spawns and tracks the dedicated server process a Host click creates. The child remains
+/// independent until the user closes it; this manager observes and disowns the process but
+/// never terminates it.
 /// </summary>
 public class ServerProcessManager : IDisposable
 {
@@ -88,21 +88,6 @@ public class ServerProcessManager : IDisposable
         }
     }
 
-    /// <summary>
-    /// Kills the spawned server and disowns it. Only the pre-connect abort path calls this,
-    /// where the child has no save in progress, so re-hosting is unblocked immediately.
-    /// </summary>
-    public void Stop()
-    {
-        lock (stateLock)
-        {
-            if (serverProcess == null) return;
-
-            if (!HasExited(serverProcess)) TryKill(serverProcess);
-            CleanupLocked();
-        }
-    }
-
     public void Dispose()
     {
         lock (stateLock)
@@ -136,18 +121,6 @@ public class ServerProcessManager : IDisposable
         if (isCurrent)
         {
             messageBroker.Publish(this, new HostedServerExited());
-        }
-    }
-
-    private static void TryKill(Process process)
-    {
-        try
-        {
-            process.Kill();
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "Failed to kill the co-op server process");
         }
     }
 

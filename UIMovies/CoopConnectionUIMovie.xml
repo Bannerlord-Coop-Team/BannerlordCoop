@@ -159,6 +159,25 @@
                       </Children>
                     </ListPanel>
 
+                    <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="64"
+                               MarginBottom="10" StackLayout.LayoutMethod="HorizontalLeftToRight">
+                      <Children>
+                        <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="145" HeightSizePolicy="StretchToParent"
+                                    Brush="Clan.TabControl.Text" Brush.FontSize="24"
+                                    Brush.TextHorizontalAlignment="Left" Brush.TextVerticalAlignment="Center"
+                                    Text="@HostSearchLabelText"/>
+                        <EditableTextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="58"
+                                            VerticalAlignment="Center" Brush="ScoreboardPanels_2" Brush.AlphaFactor="0.75"
+                                            Brush.FontSize="26" Brush.TextHorizontalAlignment="Center"
+                                            Brush.TextVerticalAlignment="Center" Text="@SteamLobbyHostSearchText"
+                                            MaxLength="128"/>
+                        <Standard.Button WidthSizePolicy="Fixed" SuggestedWidth="150" HeightSizePolicy="Fixed" SuggestedHeight="58"
+                                         VerticalAlignment="Center" MarginLeft="12"
+                                         IsDisabled="@IsSearchSteamLobbiesDisabled"
+                                         Command.Click="ActionSearchSteamLobbies" Parameter.Text="@SearchButtonText"/>
+                      </Children>
+                    </ListPanel>
+
                     <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="52"
                                 IsVisible="@IsSteamLobbyStatusVisible" Brush="Clan.TabControl.Text"
                                 Brush.FontSize="24" Brush.FontColor="#B8B8B8FF"
@@ -177,7 +196,7 @@
                       </Children>
                     </ListPanel>
 
-                    <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="460">
+                    <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="408">
                       <Children>
                         <ScrollablePanel Id="LobbyScrollablePanel" WidthSizePolicy="StretchToParent"
                                          HeightSizePolicy="StretchToParent" MarginRight="18"

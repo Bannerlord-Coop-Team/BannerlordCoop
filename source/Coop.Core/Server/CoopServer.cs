@@ -7,14 +7,12 @@ using Common.Network.Messages;
 using Common.PacketHandlers;
 using Common.Serialization;
 using Coop.Core.Common.Network;
-using Coop.Core.Common.Session;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Instances;
 using Coop.Core.Server.Services.Session.Messages;
 using Coop.Core.Server.Services.Time;
 using GameInterface.Services.Entity;
-using GameInterface.Services.GameState;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using Serilog;
@@ -200,13 +198,6 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         }
 
         Logger.Error("Server failed to bind port {Port}; it may already be in use", Config.Port);
-
-        // A managed server that cannot listen is a zombie whose shutdown save would overwrite the
-        // live session's save; quit without saving instead of masquerading as a reachable host.
-        if (ManagedServerConfig.IsManagedServer)
-        {
-            GameThread.RunSafe(ServerShutdown.QuitToDesktop, context: "ServerBindFailed");
-        }
     }
 
     public override void SendAll(IPacket packet)

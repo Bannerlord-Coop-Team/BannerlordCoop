@@ -1,0 +1,99 @@
+using Common;
+using Common.Messaging;
+using Common.Network.Session;
+using GameInterface.Services.UI;
+using System;
+using System.Collections.Generic;
+using Xunit;
+
+namespace GameInterface.Tests.Services.UI;
+
+public class CoopConnectMenuVMTests
+{
+    [Fact]
+    public void SearchSteamLobbies_FiltersDisplayedHostNamesCaseInsensitively()
+    {
+        var browser = new TestSteamLobbyBrowser();
+        using var messageBroker = new MessageBroker();
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker);
+
+        SelectSteamLobbiesTab(viewModel);
+        browser.Complete(
+            CreateLobby(1, "Mountain King"),
+            CreateLobby(2, "River Trader"));
+
+        viewModel.SteamLobbyHostSearchText = "tAiN k";
+        viewModel.ActionSearchSteamLobbies();
+
+        var match = Assert.Single(viewModel.SteamLobbies);
+        Assert.Equal("Mountain King", match.HostText);
+        Assert.Equal(string.Empty, viewModel.SteamLobbyStatusText);
+        Assert.Equal(1, browser.RequestCount);
+    }
+
+    [Fact]
+    public void SearchSteamLobbies_UsesDisplayedFallbackAndBlankSearchRestoresAllHosts()
+    {
+        var browser = new TestSteamLobbyBrowser();
+        using var messageBroker = new MessageBroker();
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker);
+
+        SelectSteamLobbiesTab(viewModel);
+        browser.Complete(
+            CreateLobby(1, string.Empty),
+            CreateLobby(2, "River Trader"));
+
+        viewModel.SteamLobbyHostSearchText = "UNKNOWN HOST";
+        viewModel.ActionSearchSteamLobbies();
+
+        Assert.Equal("Unknown host", Assert.Single(viewModel.SteamLobbies).HostText);
+
+        viewModel.SteamLobbyHostSearchText = "missing";
+        viewModel.ActionSearchSteamLobbies();
+
+        Assert.Empty(viewModel.SteamLobbies);
+        Assert.Equal("No hosts match 'missing'.", viewModel.SteamLobbyStatusText);
+
+        viewModel.SteamLobbyHostSearchText = "  ";
+        viewModel.ActionSearchSteamLobbies();
+
+        Assert.Equal(2, viewModel.SteamLobbies.Count);
+        Assert.Equal(string.Empty, viewModel.SteamLobbyStatusText);
+    }
+
+    private static void SelectSteamLobbiesTab(CoopConnectMenuVM viewModel)
+    {
+        Assert.Equal(CoopConnectMenuVM.SteamLobbiesTabId, viewModel.Tabs[1].Id);
+        viewModel.Tabs[1].ExecuteSelection();
+    }
+
+    private static SteamLobbySummary CreateLobby(ulong lobbyId, string ownerName)
+    {
+        return new SteamLobbySummary
+        {
+            LobbyId = lobbyId,
+            OwnerName = ownerName,
+            ProtocolVersion = SessionJoinInfo.CurrentVersion,
+            ModVersion = ModInformation.BuildVersion,
+        };
+    }
+
+    private sealed class TestSteamLobbyBrowser : ISteamLobbyBrowser
+    {
+        private Action<IReadOnlyList<SteamLobbySummary>, string>? onCompleted;
+
+        public int RequestCount { get; private set; }
+
+        public void RequestLobbies(Action<IReadOnlyList<SteamLobbySummary>, string> callback)
+        {
+            RequestCount++;
+            onCompleted = callback;
+        }
+
+        public void Complete(params SteamLobbySummary[] lobbies)
+        {
+            Assert.NotNull(onCompleted);
+            onCompleted!(lobbies, string.Empty);
+        }
+    }
+}

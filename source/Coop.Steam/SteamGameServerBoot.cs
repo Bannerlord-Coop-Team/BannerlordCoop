@@ -89,9 +89,8 @@ public static class SteamGameServerBoot
         connectedCallback = Callback<SteamServersConnected_t>.CreateGameServer(OnLoggedOn);
         connectFailureCallback = Callback<SteamServerConnectFailure_t>.CreateGameServer(OnLogonFailed);
 
-        // The only teardown hook that reaches this assembly and fires for both a standalone server
-        // (window closed) and a managed server (Utilities.QuitGame); ServerShutdown lives in
-        // GameInterface, which cannot reference Coop.Steam.
+        // The teardown hook that reaches this assembly when the user closes either kind of
+        // standalone server process. GameInterface cannot reference Coop.Steam directly.
         AppDomain.CurrentDomain.ProcessExit += (_, _) => Shutdown();
 
         SteamGameServer.LogOnAnonymous();

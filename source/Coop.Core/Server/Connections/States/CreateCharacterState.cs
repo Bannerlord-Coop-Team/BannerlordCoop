@@ -4,7 +4,6 @@ using Common.Network;
 using Coop.Core.Client.Messages;
 using Coop.Core.Client.Services.Heroes.Messages;
 using Coop.Core.Server.Connections.Messages;
-using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -26,7 +25,6 @@ public class CreateCharacterState : ConnectionStateBase
     private readonly INetwork network;
     private readonly IHeroInterface heroInterface;
     private readonly IPlayerManager playerManager;
-    private readonly IGameStateInterface gameStateInterface;
     private readonly IExistingPlayerSender existingPlayerSender;
 
     public CreateCharacterState(
@@ -36,7 +34,6 @@ public class CreateCharacterState : ConnectionStateBase
         INetwork network,
         IHeroInterface heroInterface,
         IPlayerManager playerManager,
-        IGameStateInterface gameStateInterface,
         IExistingPlayerSender existingPlayerSender)
         : base(connectionLogic)
     {
@@ -45,7 +42,6 @@ public class CreateCharacterState : ConnectionStateBase
         this.network = network;
         this.heroInterface = heroInterface;
         this.playerManager = playerManager;
-        this.gameStateInterface = gameStateInterface;
         this.existingPlayerSender = existingPlayerSender;
         messageBroker.Subscribe<NetworkTransferNewHero>(Handle_NetworkTransferNewHero);
     }
@@ -70,8 +66,8 @@ public class CreateCharacterState : ConnectionStateBase
 
         if (!TryCreatePlayer(controllerId, hero, out var player))
         {
-            Logger.Error("Failed to create player");
-            gameStateInterface.GoToMainMenu();
+            Logger.Error("Failed to create player; disconnecting the joining peer");
+            ConnectionLogic.Peer.Disconnect();
             return;
         }
 

@@ -23,8 +23,10 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
 
     private readonly ISteamLobbyBrowser steamLobbyBrowser;
     private readonly IMessageBroker messageBroker;
+    private readonly List<SteamLobbyListItemVM> discoveredSteamLobbies = new();
 
     private CoopConnectionTabVM selectedTab;
+    private string steamLobbyHostSearchText = string.Empty;
     private string steamLobbyStatusText = string.Empty;
     private bool isRefreshingSteamLobbies;
     private bool disposed;
@@ -32,6 +34,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
 
     public string JoinButtonText => "Join";
     public string RefreshButtonText => "Refresh";
+    public string SearchButtonText => "Search";
     public string GithubButtonText => "Github";
     public string DiscordButtonText => "Discord";
     public string PatreonButtonText => "Patreon";
@@ -39,6 +42,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     public string MovieTextHeader => "Join Co-op Sandbox";
     public string CommunityText => "Join the Community";
     public string SteamLobbiesHeaderText => "Hosted Steam Servers";
+    public string HostSearchLabelText => "Hostname:";
     public string HostColumnText => "Host";
     public string PasswordColumnText => "Access";
     public string CompatibilityColumnText => "Status";
@@ -95,6 +99,20 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     public MBBindingList<SteamLobbyListItemVM> SteamLobbies { get; }
 
     [DataSourceProperty]
+    public string SteamLobbyHostSearchText
+    {
+        get => steamLobbyHostSearchText;
+        set
+        {
+            value ??= string.Empty;
+            if (steamLobbyHostSearchText == value) return;
+
+            steamLobbyHostSearchText = value;
+            OnPropertyChanged(nameof(SteamLobbyHostSearchText));
+        }
+    }
+
+    [DataSourceProperty]
     public CoopConnectionTabVM SelectedTab
     {
         get => selectedTab;
@@ -126,11 +144,15 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
             isRefreshingSteamLobbies = value;
             OnPropertyChanged(nameof(IsRefreshingSteamLobbies));
             OnPropertyChanged(nameof(IsRefreshSteamLobbiesDisabled));
+            OnPropertyChanged(nameof(IsSearchSteamLobbiesDisabled));
         }
     }
 
     [DataSourceProperty]
     public bool IsRefreshSteamLobbiesDisabled => steamLobbyBrowser == null || IsRefreshingSteamLobbies;
+
+    [DataSourceProperty]
+    public bool IsSearchSteamLobbiesDisabled => IsRefreshingSteamLobbies;
 
     [DataSourceProperty]
     public string SteamLobbyStatusText
@@ -213,6 +235,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     {
         if (disposed || IsRefreshingSteamLobbies) return;
 
+        discoveredSteamLobbies.Clear();
         SteamLobbies.Clear();
 
         if (steamLobbyBrowser == null)
@@ -235,6 +258,13 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
             CompleteLobbyRefresh(generation, Array.Empty<SteamLobbySummary>(),
                 $"Could not search Steam lobbies: {ex.Message}");
         }
+    }
+
+    public void ActionSearchSteamLobbies()
+    {
+        if (disposed || IsRefreshingSteamLobbies) return;
+
+        ApplySteamLobbyHostFilter();
     }
 
     public void ActionConnect()
@@ -317,6 +347,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         disposed = true;
         lobbyRequestGeneration++;
         IsRefreshingSteamLobbies = false;
+        discoveredSteamLobbies.Clear();
         SteamLobbies.Clear();
     }
 
@@ -360,7 +391,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         {
             if (lobby.LobbyId == 0) continue;
 
-            SteamLobbies.Add(new SteamLobbyListItemVM(
+            discoveredSteamLobbies.Add(new SteamLobbyListItemVM(
                 lobby.LobbyId,
                 lobby.OwnerName,
                 lobby.ProtocolVersion,
@@ -370,9 +401,35 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
                 RequestSteamLobbyJoin));
         }
 
-        SteamLobbyStatusText = SteamLobbies.Count == 0
-            ? "No hosted Steam lobbies were found."
-            : string.Empty;
+        ApplySteamLobbyHostFilter();
+    }
+
+    private void ApplySteamLobbyHostFilter()
+    {
+        SteamLobbies.Clear();
+
+        string searchText = SteamLobbyHostSearchText.Trim();
+        foreach (var lobby in discoveredSteamLobbies)
+        {
+            if (searchText.Length == 0 ||
+                lobby.HostText.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                SteamLobbies.Add(lobby);
+            }
+        }
+
+        if (SteamLobbies.Count > 0)
+        {
+            SteamLobbyStatusText = string.Empty;
+        }
+        else if (discoveredSteamLobbies.Count == 0)
+        {
+            SteamLobbyStatusText = "No hosted Steam lobbies were found.";
+        }
+        else
+        {
+            SteamLobbyStatusText = $"No hosts match '{searchText}'.";
+        }
     }
 
     private void RequestSteamLobbyJoin(ulong lobbyId)

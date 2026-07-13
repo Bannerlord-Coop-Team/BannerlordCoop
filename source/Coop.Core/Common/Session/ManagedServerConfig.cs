@@ -10,16 +10,16 @@ public static class ManagedServerConfig
     public static bool HasAutoLoadSave => SaveName != null;
 
     /// <summary>
-    /// This server is spawned and owned by a hosting client, so it manages its own
-    /// lifetime (quits when empty or abandoned). A manually launched server that only
-    /// passes /coopsave auto-loads but is NOT managed, so it stays up indefinitely.
+    /// This server was spawned by the in-game Host flow. The spawning client and player
+    /// population do not own its lifetime; it remains open until the user closes its process.
+    /// A manually launched server that only passes /coopsave is not marked as managed.
     /// </summary>
     public static bool IsManagedServer => OwnerProcessId > 0;
 
-    /// <summary>The save the server auto-loads, and a managed server saves back on shutdown.</summary>
+    /// <summary>The save the server auto-loads.</summary>
     public static string SaveName { get; set; }
 
-    /// <summary>Process id of the hosting client that spawned this server; 0 when unmanaged.</summary>
+    /// <summary>Process id of the hosting client that spawned this server; 0 when manually launched.</summary>
     public static int OwnerProcessId { get; set; }
 
     /// <summary>Optional connection password supplied on the server command line.</summary>

@@ -132,7 +132,7 @@ namespace Coop.Core
             if (serverProcessManager.IsRunning)
             {
                 InformationManager.DisplayMessage(new InformationMessage(
-                    "A hosted co-op server is still running; wait for it to shut down before hosting again"));
+                    "A hosted co-op server is still running; close its standalone server window before hosting again"));
                 return;
             }
 
@@ -174,7 +174,7 @@ namespace Coop.Core
 
                 container.Resolve<SteamJoinWatchdog>().Arm(configuration.Address, configuration.Port,
                     timeout: HostedServerStartTimeout,
-                    timeoutText: "The co-op server did not finish starting. Check that the save loads in singleplayer, then try hosting again.");
+                    timeoutText: "The co-op server did not finish starting. Check that the save loads in singleplayer. The standalone server remains open until you close it.");
 
                 InformationManager.DisplayMessage(new InformationMessage(
                     "Starting the co-op server; you will join it automatically once it is up"));
@@ -184,22 +184,15 @@ namespace Coop.Core
                 Logger.Error(ex, "Hosted co-op session failed to start");
                 hostedSession = false;
                 DestroyContainer();
-                serverProcessManager.Stop();
                 InformationManager.DisplayMessage(new InformationMessage(
-                    "Could not start the co-op session"));
+                    "Could not start the co-op client; the standalone server remains open until you close it"));
             }
         }
 
-        // A deliberate new session supersedes any half-started one left at the main menu.
+        // A deliberate new session supersedes the client-side state for any half-started attempt.
+        // Its standalone server remains independent and must be closed by the user.
         private void AbandonAnyStartingSession()
         {
-            // A never-joined spawned server from a prior Host click would otherwise idle until its
-            // own timeout; kill it now. StartAsClient/StartAsServer tear the container down themselves.
-            if (hostedSession && !clientConnectedOnce)
-            {
-                serverProcessManager.Stop();
-            }
-
             hostSessionGeneration++;
             hostedSession = false;
             clientConnectedOnce = false;
@@ -351,14 +344,8 @@ namespace Coop.Core
         {
             DestroyContainer();
 
-            // A pre-connect abort leaves a starting server behind, so backstop it. Once a
-            // connection happened the server shuts itself down when its players leave, and
-            // may legitimately keep running for friends still on it.
-            if (hostedSession && !clientConnectedOnce)
-            {
-                serverProcessManager.Stop();
-            }
-
+            // Ending the client session never owns the standalone server's lifetime. This includes
+            // startup failures and watchdog timeouts; only the user closing that process stops it.
             hostedSession = false;
             clientConnectedOnce = false;
 
