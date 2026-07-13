@@ -1,4 +1,5 @@
 using HarmonyLib;
+using Missions.Tournaments.Spectators;
 using SandBox.Tournaments.MissionLogics;
 using System.Linq;
 using TaleWorlds.MountAndBlade;
@@ -37,6 +38,27 @@ internal static class TournamentCombatPatchInstaller
             nameof(TournamentCampaignOriginGuardPatch.Prefix));
         if (setKilled != null)
             harmony.Patch(setKilled, prefix: new HarmonyMethod(campaignMutationPrefix));
+
+        var canPickUp = AccessTools.Method(typeof(Agent), nameof(Agent.CanInteractableWeaponBePickedUp));
+        var pickUpPrefix = AccessTools.Method(
+            typeof(TournamentSpectatorWeaponPickupPatch),
+            nameof(TournamentSpectatorWeaponPickupPatch.Prefix));
+        if (canPickUp != null)
+            harmony.Patch(canPickUp, prefix: new HarmonyMethod(pickUpPrefix));
+
+        var handleDrop = AccessTools.Method(typeof(Agent), nameof(Agent.HandleDropWeapon));
+        var dropPrefix = AccessTools.Method(
+            typeof(TournamentSpectatorWeaponDropPatch),
+            nameof(TournamentSpectatorWeaponDropPatch.Prefix));
+        if (handleDrop != null)
+            harmony.Patch(handleDrop, prefix: new HarmonyMethod(dropPrefix));
+
+        var missileCollision = AccessTools.Method(typeof(Mission), "HandleMissileCollisionReaction");
+        var missileCollisionPrefix = AccessTools.Method(
+            typeof(TournamentSpectatorOrangeCollisionPatch),
+            nameof(TournamentSpectatorOrangeCollisionPatch.Prefix));
+        if (missileCollision != null)
+            harmony.Patch(missileCollision, prefix: new HarmonyMethod(missileCollisionPrefix));
     }
 }
 
@@ -68,5 +90,52 @@ internal static class TournamentBlowInterceptPatch
         CoopTournamentController controller = Mission.Current?.GetMissionBehavior<CoopTournamentController>();
         if (controller == null) return true;
         return controller.InterceptBlow(__instance, blow, collisionData);
+    }
+}
+
+internal static class TournamentSpectatorWeaponPickupPatch
+{
+    public static bool Prefix(Agent __instance, SpawnedItemEntity spawnedItem, ref bool __result)
+    {
+        CoopTournamentController controller = Mission.Current?.GetMissionBehavior<CoopTournamentController>();
+        if (controller == null) return true;
+
+        bool isSpectator = controller.IsSpectatorAgent(__instance);
+        bool isOrange = controller.IsSpectatorOrange(spawnedItem?.WeaponCopy.Item);
+        if (!TournamentSpectatorOrange.ShouldBlockPickup(isSpectator, isOrange)) return true;
+
+        __result = false;
+        return false;
+    }
+}
+
+internal static class TournamentSpectatorWeaponDropPatch
+{
+    public static bool Prefix(Agent __instance)
+    {
+        CoopTournamentController controller = Mission.Current?.GetMissionBehavior<CoopTournamentController>();
+        bool isSpectator = controller?.IsSpectatorAgent(__instance) == true;
+        return !TournamentSpectatorOrange.ShouldBlockDrop(isSpectator);
+    }
+}
+
+internal static class TournamentSpectatorOrangeCollisionPatch
+{
+    public static void Prefix(
+        int missileIndex,
+        Agent attackerAgent,
+        ref Mission.MissileCollisionReaction collisionReaction)
+    {
+        CoopTournamentController controller = Mission.Current?.GetMissionBehavior<CoopTournamentController>();
+        if (controller == null) return;
+
+        Mission.Missile missile = Mission.Current.MissilesList
+            .FirstOrDefault(candidate => candidate.Index == missileIndex);
+        bool isSpectator = controller.IsSpectatorAgent(attackerAgent);
+        var item = missile?.Weapon.Item ?? attackerAgent?.WieldedWeapon.Item;
+        bool isOrange = controller.IsSpectatorOrange(item);
+        if (!TournamentSpectatorOrange.ShouldDisappearOnCollision(isSpectator, isOrange)) return;
+
+        collisionReaction = Mission.MissileCollisionReaction.BecomeInvisible;
     }
 }

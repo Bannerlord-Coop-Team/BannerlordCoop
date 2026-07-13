@@ -18,6 +18,7 @@ using TaleWorlds.Engine;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.Source.Missions;
 using Missions.Tournaments.Patches;
+using Missions.Tournaments.Spectators;
 
 namespace Missions.Tournaments;
 
@@ -35,6 +36,7 @@ public class CoopTournamentLauncher : ICoopTournamentLauncher
         typeof(ArenaAgentStateDeciderLogic),
         typeof(MissionHardBorderPlacer),
         typeof(MissionBoundaryPlacer),
+        typeof(TournamentSpectatorBarrierPlacer),
         typeof(MissionOptionsComponent),
         typeof(HighlightsController),
         typeof(SandboxHighlightsController),
@@ -137,6 +139,7 @@ public class CoopTournamentLauncher : ICoopTournamentLauncher
             new ArenaAgentStateDeciderLogic(),
             new MissionHardBorderPlacer(),
             new MissionBoundaryPlacer(),
+            new TournamentSpectatorBarrierPlacer(),
             new MissionOptionsComponent(),
             new HighlightsController(),
             new SandboxHighlightsController(),

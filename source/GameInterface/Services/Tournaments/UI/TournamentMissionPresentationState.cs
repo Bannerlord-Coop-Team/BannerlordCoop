@@ -11,6 +11,12 @@ internal readonly struct TournamentMissionPresentationState
         ShouldShowUI = shouldShowUI;
     }
 
+    public static bool ShouldShowCombatUi(
+        bool bracketVisible,
+        bool matchActive,
+        bool hasMovableSpectator)
+        => bracketVisible || matchActive && !hasMovableSpectator;
+
     public static TournamentMissionPresentationState From(TournamentSessionSnapshot snapshot)
         => new(snapshot != null &&
                snapshot.Phase != TournamentSessionPhase.LiveMatch);

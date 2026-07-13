@@ -244,8 +244,14 @@ public sealed class CoopTournamentMissionView : MissionGauntletTournamentView
     {
         if (gauntletLayer == null) return;
 
-        gauntletLayer.UIContext.ContextAlpha =
-            viewEnabled || dataSource?.IsCurrentMatchActive == true ? 1f : 0f;
+        Agent mainAgent = Mission?.MainAgent;
+        bool hasMovableSpectator = mainAgent?.IsActive() == true &&
+            mainAgent.Controller == AgentControllerType.Player &&
+            mainAgent.Team == Team.Invalid;
+        gauntletLayer.UIContext.ContextAlpha = TournamentMissionPresentationState.ShouldShowCombatUi(
+            viewEnabled,
+            dataSource?.IsCurrentMatchActive == true,
+            hasMovableSpectator) ? 1f : 0f;
     }
 
     private bool TryResolveInitialSnapshot(out TournamentSessionSnapshot snapshot)

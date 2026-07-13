@@ -12,6 +12,7 @@ using Missions.Agents;
 using Missions.Battles;
 using Missions.Messages;
 using Missions.Tournaments.Messages;
+using Missions.Tournaments.Spectators;
 using SandBox.Tournaments.MissionLogics;
 using Serilog;
 using System;
@@ -34,6 +35,7 @@ public class CoopTournamentController : CoopMissionController
     private readonly TournamentMissionSession session;
     private readonly TournamentMatchLifecycle matchLifecycle;
     private readonly TournamentAgentSpawner agentSpawner;
+    private readonly ITournamentSpectatorAgentManager spectatorAgentManager;
     private readonly TournamentSpawnManifestBuilder manifestBuilder;
     private TournamentSessionSnapshot snapshot;
     private CoopTournamentBehavior tournamentBehavior;
@@ -74,11 +76,13 @@ public class CoopTournamentController : CoopMissionController
         IControllerIdProvider controllerIdProvider,
         IObjectManager objectManager,
         ICoopMissionComponent coopMissionComponent,
-        INetworkWorldItemRegistry worldItemRegistry)
+        INetworkWorldItemRegistry worldItemRegistry,
+        ITournamentSpectatorAgentManagerFactory spectatorAgentManagerFactory)
         : base(network, messageBroker, objectManager, coopMissionComponent)
     {
         this.relayNetwork = relayNetwork;
         this.worldItemRegistry = worldItemRegistry;
+        spectatorAgentManager = spectatorAgentManagerFactory.Create(coopMissionComponent);
         session = new TournamentMissionSession(controllerIdProvider);
         matchLifecycle = new TournamentMatchLifecycle(coopMissionComponent, worldItemRegistry);
         agentSpawner = new TournamentAgentSpawner(objectManager, controllerIdProvider, coopMissionComponent);
@@ -93,6 +97,7 @@ public class CoopTournamentController : CoopMissionController
     }
 
     public ITournamentMissionSession Session => session;
+    public string LastLocalSpectatorSpawnName => spectatorAgentManager.LastLocalSpawnName;
 
     public void Initialize(
         TournamentSessionSnapshot initialSnapshot,
@@ -137,6 +142,8 @@ public class CoopTournamentController : CoopMissionController
         snapshot = updated;
         ApplySessionState(updated);
         Mission.AllowAiTicking = session.IsLocalHost;
+        if (missionReadyForManifest)
+            spectatorAgentManager.Reconcile(updated);
         tournamentBehavior.ApplySnapshot(updated);
         KnockOutDepartingContestants(previous, updated);
         if (wasLocalMember && !HasLocalMissionMember(updated))
@@ -359,13 +366,15 @@ public class CoopTournamentController : CoopMissionController
 
     public bool InterceptBlow(Agent victim, Blow blow, AttackCollisionData collisionData)
     {
+        Agent attacker = Mission.Current?.FindAgentWithIndex(blow.OwnerId);
+        if (spectatorAgentManager.IsSpectatorAgent(victim) || spectatorAgentManager.IsSpectatorAgent(attacker))
+            return false;
         if (snapshot == null || snapshot.Phase != TournamentSessionPhase.LiveMatch) return true;
         if (victim == null || !coopMissionComponent.AgentRegistry.TryGetAgentInfo(victim, out var victimInfo))
             return true;
         if (applyingDamage.Contains(victimInfo.AgentId)) return true;
 
         Guid attackerId = Guid.Empty;
-        Agent attacker = Mission.Current?.FindAgentWithIndex(blow.OwnerId);
         if (attacker == null)
         {
             if (victimInfo.CurrentAuthority != session.OwnControllerId) return false;
@@ -672,7 +681,7 @@ public class CoopTournamentController : CoopMissionController
         var joinInfo = new NetworkMissionJoinInfo(
             session.OwnControllerId,
             Mission.Current?.MainAgent?.IsActive() == true,
-            Array.Empty<CoopAgentSpawnData>());
+            spectatorAgentManager.GetLocalSpawnData());
         network.Send(controllerId, joinInfo);
 
         if (!session.IsLocalHost || latestManifest == null) return;
@@ -683,6 +692,7 @@ public class CoopTournamentController : CoopMissionController
 
     protected override void HandleJoinInfo(NetPeer peer, NetworkMissionJoinInfo joinInfo)
     {
+        spectatorAgentManager.HandleJoinInfo(joinInfo);
     }
 
     public override void OnMissionTick(float dt)
@@ -691,8 +701,10 @@ public class CoopTournamentController : CoopMissionController
         {
             missionReadyForManifest = true;
             ApplyPendingManifest();
+            spectatorAgentManager.Reconcile(snapshot);
         }
         base.OnMissionTick(dt);
+        spectatorAgentManager.Tick();
         if (snapshot == null || !session.IsLocalHost) return;
 
         TryStartHostMatch();
@@ -1535,6 +1547,10 @@ public class CoopTournamentController : CoopMissionController
             .ToArray();
     }
 
+    public bool IsSpectatorAgent(Agent agent) => spectatorAgentManager.IsSpectatorAgent(agent);
+
+    public bool IsSpectatorOrange(ItemObject item) => spectatorAgentManager.IsOrange(item);
+
     private void RequestAuthoritativeLeave()
     {
         leaveRequested = true;
@@ -1558,6 +1574,7 @@ public class CoopTournamentController : CoopMissionController
         if (session.HasInstance)
             relayNetwork.SendAll(new NetworkMissionLeft(session.OwnControllerId, session.InstanceId));
 
+        spectatorAgentManager.Clear();
         matchLifecycle.Dispose();
         manifestAgentData.Clear();
         manifestAgentInstances.Clear();

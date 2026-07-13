@@ -14,6 +14,7 @@ using Missions.Missiles.Patches;
 using Missions.Services.Network;
 using Missions.Taverns;
 using Missions.Tournaments;
+using Missions.Tournaments.Spectators;
 
 namespace Missions;
 
@@ -111,6 +112,10 @@ public class MissionModule : Module
         builder.RegisterType<CoopTournamentController>()
             .AsSelf()
             .InstancePerDependency();
+
+        builder.RegisterType<TournamentSpectatorAgentManagerFactory>()
+            .As<ITournamentSpectatorAgentManagerFactory>()
+            .InstancePerLifetimeScope();
 
         builder.RegisterType<CoopTournamentLauncher>()
             .As<ICoopTournamentLauncher>()

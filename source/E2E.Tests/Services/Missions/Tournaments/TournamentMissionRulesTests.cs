@@ -3,6 +3,7 @@ using GameInterface.Services.Tournaments;
 using GameInterface.Services.Tournaments.Data;
 using Missions;
 using Missions.Tournaments;
+using Missions.Tournaments.Spectators;
 using Moq;
 using System.Reflection;
 using SandBox.Missions.MissionLogics;
@@ -319,6 +320,7 @@ public class TournamentMissionRulesTests
             typeof(ArenaAgentStateDeciderLogic),
             typeof(MissionHardBorderPlacer),
             typeof(MissionBoundaryPlacer),
+            typeof(TournamentSpectatorBarrierPlacer),
             typeof(MissionOptionsComponent),
             typeof(HighlightsController),
             typeof(SandboxHighlightsController),
