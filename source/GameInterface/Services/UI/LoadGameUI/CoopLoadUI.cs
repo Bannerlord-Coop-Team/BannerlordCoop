@@ -67,7 +67,7 @@ namespace Coop.UI.LoadGameUI
                     "None",
                     null,
                     true,
-                    "Not listed in Server Discovery; direct connections still work."),
+                    "Hidden from Server Discovery; Steam joins, direct connections, and owner loopback still work."),
             };
 
             MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(

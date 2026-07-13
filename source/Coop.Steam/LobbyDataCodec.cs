@@ -17,8 +17,46 @@ public static class LobbyDataCodec
     public const string ModVersionKey = "coop_mod_version";
     public const string PasswordRequiredKey = "coop_password_required";
     public const string LobbyTypeKey = "coop_lobby_type";
+    public const string VisibilityKey = "coop_visibility";
     public const string StandaloneLobbyType = "standalone";
+    public const string HiddenStandaloneLobbyType = "standalone_hidden";
     public const string PlayerLobbyType = "player";
+
+    public static string EncodeVisibility(ServerVisibility visibility) => visibility switch
+    {
+        ServerVisibility.Public => "public",
+        ServerVisibility.FriendsOnly => "friends_only",
+        ServerVisibility.None => "none",
+        _ => throw new ArgumentOutOfRangeException(nameof(visibility)),
+    };
+
+    /// <summary>
+    /// Reads standalone-server discovery visibility. Missing metadata remains Public so clients
+    /// can still discover lobbies advertised by builds from before this field existed.
+    /// </summary>
+    public static bool TryDecodeVisibility(string value, out ServerVisibility visibility)
+    {
+        if (string.IsNullOrEmpty(value) || string.Equals(value, "public", StringComparison.Ordinal))
+        {
+            visibility = ServerVisibility.Public;
+            return true;
+        }
+
+        if (string.Equals(value, "friends_only", StringComparison.Ordinal))
+        {
+            visibility = ServerVisibility.FriendsOnly;
+            return true;
+        }
+
+        if (string.Equals(value, "none", StringComparison.Ordinal))
+        {
+            visibility = ServerVisibility.None;
+            return true;
+        }
+
+        visibility = ServerVisibility.None;
+        return false;
+    }
 
     public static IReadOnlyDictionary<string, string> Encode(SessionJoinInfo info)
     {
@@ -30,7 +68,9 @@ public static class LobbyDataCodec
             [ServerSteamIdKey] = info.ServerSteamId.ToString(),
             [ModVersionKey] = info.ModVersion ?? string.Empty,
             [PasswordRequiredKey] = info.PasswordRequired ? "1" : "0",
-            [LobbyTypeKey] = info.HasServerSteamId ? StandaloneLobbyType : PlayerLobbyType,
+            [LobbyTypeKey] = info.HasServerSteamId
+                ? (info.Discoverable ? StandaloneLobbyType : HiddenStandaloneLobbyType)
+                : PlayerLobbyType,
         };
     }
 
@@ -80,6 +120,8 @@ public static class LobbyDataCodec
             ServerSteamId = serverSteamId,
             ModVersion = modVersion,
             PasswordRequired = readValue(PasswordRequiredKey) == "1",
+            Discoverable = !string.Equals(
+                readValue(LobbyTypeKey), HiddenStandaloneLobbyType, StringComparison.Ordinal),
         };
         return true;
     }

@@ -17,6 +17,15 @@ namespace Coop.Tests.Steam
         private static SessionJoinInfo Info(string address = "203.0.113.7", int port = 4200) =>
             new SessionJoinInfo { Address = address, Port = port };
 
+        private static SessionJoinInfo StandaloneInfo(
+            string address = "203.0.113.7", int port = 4200) =>
+            new SessionJoinInfo
+            {
+                Address = address,
+                Port = port,
+                ServerSteamId = 76561198000000042,
+            };
+
         [Fact]
         public void Advertise_CreatesLobbyWithDataAndRichPresence()
         {
@@ -36,10 +45,14 @@ namespace Coop.Tests.Steam
         {
             var publicAdvertiser = new SteamPublicLobbyAdvertiser(api);
 
-            publicAdvertiser.Advertise(Info());
+            publicAdvertiser.Advertise(StandaloneInfo());
 
             Assert.True(publicAdvertiser.IsAdvertising);
             Assert.True(api.LastCreateWasPublic);
+            Assert.Equal("public",
+                api.GetLobbyData(api.NextCreatedLobbyId, LobbyDataCodec.VisibilityKey));
+            Assert.Equal(LobbyDataCodec.StandaloneLobbyType,
+                api.GetLobbyData(api.NextCreatedLobbyId, LobbyDataCodec.LobbyTypeKey));
         }
 
         [Fact]
@@ -47,25 +60,34 @@ namespace Coop.Tests.Steam
         {
             var friendsOnlyAdvertiser = new SteamPublicLobbyAdvertiser(api, ServerVisibility.FriendsOnly);
 
-            friendsOnlyAdvertiser.Advertise(Info());
+            friendsOnlyAdvertiser.Advertise(StandaloneInfo());
 
             Assert.True(friendsOnlyAdvertiser.IsAdvertising);
             Assert.False(api.LastCreateWasPublic);
             Assert.Equal("203.0.113.7",
                 api.GetLobbyData(api.NextCreatedLobbyId, LobbyDataCodec.AddressKey));
+            Assert.Equal("friends_only",
+                api.GetLobbyData(api.NextCreatedLobbyId, LobbyDataCodec.VisibilityKey));
         }
 
         [Fact]
-        public void StandaloneAdvertiser_None_DoesNotCreateLobbyOrRichPresence()
+        public void StandaloneAdvertiser_None_CreatesUnlistedSteamLobbyAndRichPresence()
         {
             var hiddenAdvertiser = new SteamPublicLobbyAdvertiser(api, ServerVisibility.None);
 
-            hiddenAdvertiser.Advertise(Info());
+            hiddenAdvertiser.Advertise(StandaloneInfo());
 
-            Assert.False(hiddenAdvertiser.IsAdvertising);
+            Assert.True(hiddenAdvertiser.IsAdvertising);
+            Assert.True(api.LastCreateWasPublic);
             Assert.Null(api.PendingCreateCompletion);
-            Assert.Empty(api.LobbyData);
-            Assert.Empty(api.RichPresenceConnects);
+            Assert.Equal("none",
+                api.GetLobbyData(api.NextCreatedLobbyId, LobbyDataCodec.VisibilityKey));
+            Assert.Equal("203.0.113.7",
+                api.GetLobbyData(api.NextCreatedLobbyId, LobbyDataCodec.AddressKey));
+            Assert.Equal(LobbyDataCodec.HiddenStandaloneLobbyType,
+                api.GetLobbyData(api.NextCreatedLobbyId, LobbyDataCodec.LobbyTypeKey));
+            Assert.Contains($"{SteamLobbyAdvertiser.ConnectLobbyArgument} {api.NextCreatedLobbyId}",
+                api.RichPresenceConnects);
         }
 
         [Fact]

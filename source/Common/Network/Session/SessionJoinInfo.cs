@@ -40,6 +40,12 @@ public class SessionJoinInfo
     public bool PasswordRequired { get; set; }
 
     /// <summary>
+    /// Whether this standalone session should appear in the co-op server discovery UI. This does
+    /// not disable its Steam lobby, tunnel, rich presence, or direct join paths.
+    /// </summary>
+    public bool Discoverable { get; set; } = true;
+
+    /// <summary>
     /// Password supplied locally by the joiner. This is transient join state and is never encoded
     /// into Steam lobby data.
     /// </summary>

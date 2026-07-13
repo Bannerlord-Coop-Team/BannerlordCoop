@@ -58,7 +58,7 @@ public class SteamLobbyAdvertiser : ISessionAdvertiser
         }
     }
 
-    // The standalone-server advertiser overrides this to create a browsable public lobby instead.
+    // The standalone-server advertiser overrides this to select its configured lobby visibility.
     protected virtual void RequestLobby(int maxMembers, Action<ulong, bool> onCompleted)
         => lobbyApi.CreateFriendsOnlyLobby(maxMembers, onCompleted);
 
@@ -91,6 +91,9 @@ public class SteamLobbyAdvertiser : ISessionAdvertiser
         bool applied = true;
         try
         {
+            // Specialized visibility metadata is written before LobbyTypeKey. Public searches
+            // filter on the latter, so an unlisted lobby cannot briefly appear as a legacy lobby.
+            applied &= ApplyAdditionalLobbyData(lobbyId);
             foreach (var pair in LobbyDataCodec.Encode(pendingInfo))
             {
                 applied &= lobbyApi.SetLobbyData(lobbyId, pair.Key, pair.Value);
@@ -134,6 +137,9 @@ public class SteamLobbyAdvertiser : ISessionAdvertiser
             Logger.Error(ex, "Could not set Steam rich presence for the lobby");
         }
     }
+
+    /// <summary>Allows specialized advertisers to add required metadata to the lobby atomically.</summary>
+    protected virtual bool ApplyAdditionalLobbyData(ulong targetLobbyId) => true;
 
     protected virtual void OnLobbyUnavailable(SessionJoinInfo info)
     {

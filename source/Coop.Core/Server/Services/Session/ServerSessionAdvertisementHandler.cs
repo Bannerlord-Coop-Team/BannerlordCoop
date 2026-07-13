@@ -3,7 +3,6 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Session;
-using Coop.Core.Common.Configuration;
 using Coop.Core.Server.Services.Session.Messages;
 using Coop.Steam;
 using Serilog;
@@ -14,8 +13,8 @@ namespace Coop.Core.Server.Services.Session;
 
 /// <summary>
 /// Starts the server's tunnel and configured Steam lobby after both network binding and anonymous
-/// Steam logon complete, with bounded retries for transient startup failures. Hidden servers skip
-/// the Steam tunnel and lobby entirely while their direct-IP listener remains active.
+/// Steam logon complete, with bounded retries for transient startup failures. Discovery visibility
+/// changes who sees the lobby, not whether the server participates in Steam networking.
 /// </summary>
 public class ServerSessionAdvertisementHandler : IDisposable
 {
@@ -28,7 +27,6 @@ public class ServerSessionAdvertisementHandler : IDisposable
     private readonly ISessionTunnelHost tunnelHost;
     private readonly ISessionJoinInfoSource joinInfoSource;
     private readonly INetworkConfig networkConfig;
-    private readonly bool steamAdvertisementEnabled;
 
     private bool listening;
     private bool starting;
@@ -42,17 +40,14 @@ public class ServerSessionAdvertisementHandler : IDisposable
         ISessionAdvertiser advertiser,
         ISessionTunnelHost tunnelHost,
         ISessionJoinInfoSource joinInfoSource,
-        INetworkConfig networkConfig,
-        SessionAdvertisementConfig advertisementConfig)
+        INetworkConfig networkConfig)
     {
         this.messageBroker = messageBroker;
         this.advertiser = advertiser;
         this.tunnelHost = tunnelHost;
         this.joinInfoSource = joinInfoSource;
         this.networkConfig = networkConfig;
-        steamAdvertisementEnabled = advertisementConfig.Visibility != ServerVisibility.None;
 
-        if (!steamAdvertisementEnabled) return;
         messageBroker.Subscribe<ServerListening>(Handle_ServerListening);
         SteamGameServerBoot.LoggedOn += OnGameServerLoggedOn;
     }
@@ -112,8 +107,6 @@ public class ServerSessionAdvertisementHandler : IDisposable
     {
         disposed = true;
         CancelRetry();
-        if (!steamAdvertisementEnabled) return;
-
         messageBroker.Unsubscribe<ServerListening>(Handle_ServerListening);
         SteamGameServerBoot.LoggedOn -= OnGameServerLoggedOn;
 

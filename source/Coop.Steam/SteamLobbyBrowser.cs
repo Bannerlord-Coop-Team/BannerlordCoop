@@ -149,6 +149,14 @@ public class SteamLobbyBrowser : ISteamLobbyBrowser
         var summaries = new List<SteamLobbySummary>();
         foreach (var lobbyId in lobbyIds)
         {
+            if (!LobbyDataCodec.TryDecodeVisibility(
+                    lobbyApi.GetLobbyData(lobbyId, LobbyDataCodec.VisibilityKey),
+                    out var visibility) ||
+                visibility == ServerVisibility.None)
+            {
+                continue;
+            }
+
             if (!string.Equals(
                 lobbyApi.GetLobbyData(lobbyId, LobbyDataCodec.LobbyTypeKey),
                 LobbyDataCodec.StandaloneLobbyType,

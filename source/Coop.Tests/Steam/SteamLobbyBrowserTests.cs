@@ -71,6 +71,33 @@ public class SteamLobbyBrowserTests
     }
 
     [Fact]
+    public void RequestLobbies_HidesNoneVisibilityButKeepsOlderLobbiesDiscoverable()
+    {
+        AddLobby(41, new SessionJoinInfo { Port = 4200, ServerSteamId = 76561198000000041 });
+        AddLobby(42, new SessionJoinInfo { Port = 4200, ServerSteamId = 76561198000000042 });
+        api.SetLobbyData(42, LobbyDataCodec.VisibilityKey, "none");
+
+        IReadOnlyList<SteamLobbySummary> results = null;
+        browser.RequestLobbies((lobbies, _) => results = lobbies);
+
+        Assert.Equal(41UL, Assert.Single(results).LobbyId);
+    }
+
+    [Fact]
+    public void RequestLobbies_HidesHiddenStandaloneObtainedThroughFriendPresence()
+    {
+        AddLobby(42, new SessionJoinInfo { Port = 4200, ServerSteamId = 76561198000000042 },
+            publiclyListed: false);
+        api.SetLobbyData(42, LobbyDataCodec.LobbyTypeKey, LobbyDataCodec.HiddenStandaloneLobbyType);
+        api.FriendLobbyIds.Add(42);
+
+        IReadOnlyList<SteamLobbySummary> results = null;
+        browser.RequestLobbies((lobbies, _) => results = lobbies);
+
+        Assert.Empty(results);
+    }
+
+    [Fact]
     public void RequestLobbies_WaitsForFriendLobbyMetadata()
     {
         AddLobby(42, new SessionJoinInfo { Port = 4200, ServerSteamId = 76561198000000042 },

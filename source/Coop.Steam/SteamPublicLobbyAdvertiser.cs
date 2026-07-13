@@ -8,7 +8,7 @@ namespace Coop.Steam;
 /// <summary>
 /// Publishes a standalone-server lobby from the server process's user Steam session while carrying
 /// the separate game-server identity as its connect target. The configured Steam lobby type controls
-/// whether the session is publicly browsable, restricted to friends, or not published at all.
+/// whether the session is publicly browsable, restricted to friends, or unlisted by our browser.
 /// </summary>
 public class SteamPublicLobbyAdvertiser : SteamLobbyAdvertiser
 {
@@ -48,7 +48,10 @@ public class SteamPublicLobbyAdvertiser : SteamLobbyAdvertiser
                 publicLobbyApi.CreateFriendsOnlyLobby(maxMembers, onCompleted);
                 return;
             case ServerVisibility.None:
-                throw new InvalidOperationException("A hidden server must not request a Steam lobby");
+                // None suppresses only our discovery UI. Keep a normal, fully joinable Steam
+                // lobby so the server's tunnel, rich presence, and explicit Steam joins work.
+                publicLobbyApi.CreatePublicLobby(maxMembers, onCompleted);
+                return;
             default:
                 throw new ArgumentOutOfRangeException(nameof(visibility));
         }
@@ -56,13 +59,16 @@ public class SteamPublicLobbyAdvertiser : SteamLobbyAdvertiser
 
     public override void Advertise(SessionJoinInfo info)
     {
-        if (visibility == ServerVisibility.None) return;
-
+        info.Discoverable = visibility != ServerVisibility.None;
         CancelRetry();
         retryCount = 0;
         retryInfo = null;
         base.Advertise(info);
     }
+
+    protected override bool ApplyAdditionalLobbyData(ulong targetLobbyId)
+        => lobbyApi.SetLobbyData(
+            targetLobbyId, LobbyDataCodec.VisibilityKey, LobbyDataCodec.EncodeVisibility(visibility));
 
     protected override void OnLobbyUnavailable(SessionJoinInfo info)
     {

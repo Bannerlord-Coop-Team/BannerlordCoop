@@ -58,6 +58,63 @@ namespace Coop.Tests.Steam
             Assert.False(decoded.HasAddress);
         }
 
+        [Theory]
+        [InlineData(ServerVisibility.Public, "public")]
+        [InlineData(ServerVisibility.FriendsOnly, "friends_only")]
+        [InlineData(ServerVisibility.None, "none")]
+        public void Visibility_RoundTripsCanonicalValues(ServerVisibility visibility, string encoded)
+        {
+            Assert.Equal(encoded, LobbyDataCodec.EncodeVisibility(visibility));
+            Assert.True(LobbyDataCodec.TryDecodeVisibility(encoded, out var decoded));
+            Assert.Equal(visibility, decoded);
+        }
+
+        [Fact]
+        public void Visibility_MissingMetadataDefaultsToPublicForOlderLobbies()
+        {
+            Assert.True(LobbyDataCodec.TryDecodeVisibility(string.Empty, out var visibility));
+            Assert.Equal(ServerVisibility.Public, visibility);
+        }
+
+        [Fact]
+        public void Visibility_UnknownMetadataFailsClosed()
+        {
+            Assert.False(LobbyDataCodec.TryDecodeVisibility("unexpected", out var visibility));
+            Assert.Equal(ServerVisibility.None, visibility);
+        }
+
+        [Fact]
+        public void Encode_UnlistedStandaloneUsesHiddenLobbyMarkerButStillDecodes()
+        {
+            var info = new SessionJoinInfo
+            {
+                Port = 4200,
+                ServerSteamId = 76561198000000042,
+                ModVersion = Common.ModInformation.BuildVersion,
+                Discoverable = false,
+            };
+
+            var encoded = LobbyDataCodec.Encode(info);
+
+            Assert.Equal(LobbyDataCodec.HiddenStandaloneLobbyType,
+                encoded[LobbyDataCodec.LobbyTypeKey]);
+            Assert.True(LobbyDataCodec.TryDecode(key => Read(encoded, key), out var decoded, out _));
+            Assert.False(decoded.Discoverable);
+            Assert.True(decoded.HasServerSteamId);
+        }
+
+        [Fact]
+        public void Encode_PlayerLobbyTypeIsUnaffectedByDiscoverabilityFlag()
+        {
+            var encoded = LobbyDataCodec.Encode(new SessionJoinInfo
+            {
+                Port = 4200,
+                Discoverable = false,
+            });
+
+            Assert.Equal(LobbyDataCodec.PlayerLobbyType, encoded[LobbyDataCodec.LobbyTypeKey]);
+        }
+
         [Fact]
         public void Decode_FailsWithoutVersion()
         {
