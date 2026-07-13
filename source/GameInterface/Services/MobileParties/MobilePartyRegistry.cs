@@ -126,7 +126,7 @@ internal class MobilePartyRegistry : AutoRegistryBase<MobileParty>
             // AutoRegistryHandler sends the MobileParty destroy after this callback. Drop any state
             // queued before or during teardown so no behavior update can follow that destroy.
             coalescer?.DropInstance(
-                global::GameInterface.Services.ObjectManager.ObjectManager.Compact(id, typeof(MobileParty)));
+                ObjectManager.Compact(id, typeof(MobileParty)));
         }
     }
 }
