@@ -47,6 +47,7 @@ internal class MercenaryServiceHandler : IHandler
 
     private void HandleMercenaryServiceAccepted(MessagePayload<MercenaryServiceAccepted> payload)
     {
+        // Conversation consequences publish synchronously on the game thread.
         if (!objectManager.TryGetIdWithLogging(payload.What.Kingdom, out var kingdomId)) return;
 
         network.SendAll(new RequestMercenaryService(kingdomId));
@@ -56,6 +57,7 @@ internal class MercenaryServiceHandler : IHandler
     {
         if (ModInformation.IsClient) return;
 
+        // Peer associations use a ConcurrentDictionary and are safe to resolve on the poll thread.
         if (!(payload.Who is NetPeer peer) || !playerManager.TryGetPlayer(peer, out var player))
         {
             Logger.Error("Received {Message} without a registered player peer", nameof(RequestMercenaryService));
@@ -69,6 +71,7 @@ internal class MercenaryServiceHandler : IHandler
 
     private void ApplyMercenaryService(string clanId, string heroId, string kingdomId)
     {
+        // Only called from the GameThread.RunSafe action above.
         if (!objectManager.TryGetObjectWithLogging<Clan>(clanId, out var clan)) return;
         if (!objectManager.TryGetObjectWithLogging<Hero>(heroId, out var hero)) return;
         if (!objectManager.TryGetObjectWithLogging<Kingdom>(kingdomId, out var kingdom)) return;
