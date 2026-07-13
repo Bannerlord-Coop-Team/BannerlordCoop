@@ -73,31 +73,11 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
         if (!TryGetCompactId(party, out string partyId))
             return false;
 
-        string interactablePointId = null;
-        var interactableKind = BehaviorInteractableKind.PartyBase;
-        bool hasTarget = false;
-        switch (interactablePoint)
-        {
-            case PartyBase partyBase:
-                if (!TryGetCompactId(partyBase, out interactablePointId))
-                    return false;
-                hasTarget = true;
-                break;
-            case AnchorPoint anchorPoint when anchorPoint.Owner != null:
-                if (!TryGetCompactId(anchorPoint.Owner, out interactablePointId))
-                    return false;
-                interactableKind = BehaviorInteractableKind.AnchorPoint;
-                hasTarget = true;
-                break;
-            case null:
-                break;
-            default:
-                // A successful result promises a complete snapshot. Refuse interactables that the
-                // wire contract cannot represent instead of replaying a different null target.
-                return false;
-        }
-
-        if (hasTarget && string.IsNullOrEmpty(interactablePointId))
+        if (!TryGetInteractableReference(
+                interactablePoint,
+                out string interactablePointId,
+                out BehaviorInteractableKind interactableKind,
+                out bool hasTarget))
             return false;
 
         if (!TryGetCompactId(party.TargetParty, out string targetPartyId) ||
@@ -127,6 +107,36 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
         };
 
         return true;
+    }
+
+    private bool TryGetInteractableReference(
+        IInteractablePoint interactablePoint,
+        out string interactablePointId,
+        out BehaviorInteractableKind interactableKind,
+        out bool hasTarget)
+    {
+        interactablePointId = null;
+        interactableKind = BehaviorInteractableKind.PartyBase;
+        hasTarget = false;
+
+        switch (interactablePoint)
+        {
+            case PartyBase partyBase:
+                hasTarget = true;
+                return TryGetCompactId(partyBase, out interactablePointId) &&
+                    !string.IsNullOrEmpty(interactablePointId);
+            case AnchorPoint anchorPoint when anchorPoint.Owner != null:
+                interactableKind = BehaviorInteractableKind.AnchorPoint;
+                hasTarget = true;
+                return TryGetCompactId(anchorPoint.Owner, out interactablePointId) &&
+                    !string.IsNullOrEmpty(interactablePointId);
+            case null:
+                return true;
+            default:
+                // A successful result promises a complete snapshot. Refuse interactables that the
+                // wire contract cannot represent instead of replaying a different null target.
+                return false;
+        }
     }
 
     private bool TryGetCompactId<T>(T instance, out string id)
