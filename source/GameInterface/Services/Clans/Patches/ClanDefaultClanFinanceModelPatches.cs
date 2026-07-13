@@ -5,6 +5,7 @@ using TaleWorlds.CampaignSystem.GameComponents;
 
 namespace GameInterface.Services.Clans.Patches;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_GAME_READY_CATEGORY)]
 [HarmonyPatch(typeof(DefaultClanFinanceModel))]
 internal class DefaultClanFinanceModelPatches
 {
