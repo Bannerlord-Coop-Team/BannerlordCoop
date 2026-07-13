@@ -40,7 +40,10 @@ public class NetworkConfig : INetworkConfig
 
     public TimeSpan ObjectCreationTimeout => TimeSpan.FromSeconds(5);
 
-    public TimeSpan NetworkPollInterval => TimeSpan.FromMilliseconds(50);
+    // Bounds three latencies at once: receive-event dispatch, the aggregated-message flush cadence
+    // (a sub-budget message waits at most one interval), and the overload check. 25ms keeps all
+    // three within a campaign frame or two for negligible poll-thread cost.
+    public TimeSpan NetworkPollInterval => TimeSpan.FromMilliseconds(25);
 
     #region MeshNetwork
     private string LanAddressText { get; set; } = "127.0.0.1";

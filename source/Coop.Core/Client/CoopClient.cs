@@ -227,6 +227,9 @@ public class CoopClient : CoopNetworkBase, ICoopClient
     {
         netManager.PollEvents();
 
+        // Send any sub-budget aggregated messages so nothing waits longer than one poll interval.
+        FlushPendingMessages();
+
         if (reconnectPending && DateTime.UtcNow >= reconnectAfter)
         {
             reconnectPending = false;
