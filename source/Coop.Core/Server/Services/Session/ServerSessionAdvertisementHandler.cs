@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Session;
+using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Session.Messages;
 using Coop.Steam;
 using Serilog;
@@ -32,6 +33,7 @@ public class ServerSessionAdvertisementHandler : IDisposable
     private bool starting;
     private bool advertised;
     private bool disposed;
+    private int connectedPlayers;
     private int startRetryCount;
     private Timer retryTimer;
 
@@ -49,6 +51,7 @@ public class ServerSessionAdvertisementHandler : IDisposable
         this.networkConfig = networkConfig;
 
         messageBroker.Subscribe<ServerListening>(Handle_ServerListening);
+        messageBroker.Subscribe<ConnectedPlayersChanged>(Handle_ConnectedPlayersChanged);
         SteamGameServerBoot.LoggedOn += OnGameServerLoggedOn;
     }
 
@@ -60,21 +63,26 @@ public class ServerSessionAdvertisementHandler : IDisposable
 
     private void OnGameServerLoggedOn() => TryStartAdvertising();
 
+    private void Handle_ConnectedPlayersChanged(MessagePayload<ConnectedPlayersChanged> payload)
+    {
+        int count = Math.Max(0, payload.What.ConnectedPlayers);
+        GameThread.RunSafe(() => RefreshConnectedPlayers(count), context: "ServerRefreshConnectedPlayers");
+    }
+
     private void TryStartAdvertising()
     {
         if (disposed || advertised || starting || !listening || !SteamGameServerBoot.IsLoggedOn) return;
         starting = true;
 
-        var info = joinInfoSource.Get();
-        GameThread.RunSafe(() => StartAdvertising(info), context: "ServerAdvertiseSession");
+        GameThread.RunSafe(StartAdvertising, context: "ServerAdvertiseSession");
     }
 
-    private void StartAdvertising(SessionJoinInfo info)
+    private void StartAdvertising()
     {
         try
         {
             tunnelHost.Start(networkConfig.Port);
-            advertiser.Advertise(info);
+            advertiser.Advertise(GetCurrentJoinInfo());
             advertised = true;
             starting = false;
             CancelRetry();
@@ -85,6 +93,23 @@ public class ServerSessionAdvertisementHandler : IDisposable
             Logger.Error(ex, "Could not start the standalone Steam advertisement");
             ScheduleRetry();
         }
+    }
+
+    private void RefreshConnectedPlayers(int count)
+    {
+        connectedPlayers = count;
+        // This flag is set as soon as the first Advertise call returns, including while lobby
+        // creation is in flight. Calling again then replaces the advertiser's pending metadata.
+        if (disposed || !advertised) return;
+
+        advertiser.Advertise(GetCurrentJoinInfo());
+    }
+
+    private SessionJoinInfo GetCurrentJoinInfo()
+    {
+        var info = joinInfoSource.Get();
+        info.ConnectedPlayers = connectedPlayers;
+        return info;
     }
 
     private void ScheduleRetry()
@@ -108,6 +133,7 @@ public class ServerSessionAdvertisementHandler : IDisposable
         disposed = true;
         CancelRetry();
         messageBroker.Unsubscribe<ServerListening>(Handle_ServerListening);
+        messageBroker.Unsubscribe<ConnectedPlayersChanged>(Handle_ConnectedPlayersChanged);
         SteamGameServerBoot.LoggedOn -= OnGameServerLoggedOn;
 
         GameThread.RunSafe(() =>

@@ -101,11 +101,31 @@ namespace Coop.Tests.Steam
         public void Advertise_Again_UpdatesDataWithoutSecondLobby()
         {
             advertiser.Advertise(Info());
-            advertiser.Advertise(Info(address: "198.51.100.9"));
+            var updatedInfo = Info(address: "198.51.100.9");
+            updatedInfo.ConnectedPlayers = 3;
+            advertiser.Advertise(updatedInfo);
 
             Assert.Null(api.PendingCreateCompletion);
             Assert.Equal("198.51.100.9", api.GetLobbyData(api.NextCreatedLobbyId, LobbyDataCodec.AddressKey));
+            Assert.Equal("3", api.GetLobbyData(api.NextCreatedLobbyId, LobbyDataCodec.ConnectedPlayersKey));
             Assert.Empty(api.LeftLobbies);
+        }
+
+        [Fact]
+        public void Advertise_WhileCreationInFlight_UsesLatestConnectedPlayerCount()
+        {
+            api.CompleteOperationsImmediately = false;
+            var initialInfo = Info();
+            initialInfo.ConnectedPlayers = 1;
+            var updatedInfo = Info();
+            updatedInfo.ConnectedPlayers = 2;
+
+            advertiser.Advertise(initialInfo);
+            advertiser.Advertise(updatedInfo);
+            api.CompletePendingCreate();
+
+            Assert.Equal("2", api.GetLobbyData(api.NextCreatedLobbyId,
+                LobbyDataCodec.ConnectedPlayersKey));
         }
 
         [Fact]

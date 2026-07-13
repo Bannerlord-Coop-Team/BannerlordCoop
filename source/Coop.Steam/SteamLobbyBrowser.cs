@@ -174,6 +174,9 @@ public class SteamLobbyBrowser : ISteamLobbyBrowser
             int.TryParse(lobbyApi.GetLobbyData(lobbyId, LobbyDataCodec.VersionKey), out var protocolVersion);
             var passwordRequired = lobbyApi.GetLobbyData(
                 lobbyId, LobbyDataCodec.PasswordRequiredKey) == "1";
+            int.TryParse(lobbyApi.GetLobbyData(lobbyId, LobbyDataCodec.ConnectedPlayersKey),
+                out var connectedPlayers);
+            connectedPlayers = Math.Max(0, connectedPlayers);
 
             summaries.Add(new SteamLobbySummary
             {
@@ -182,6 +185,7 @@ public class SteamLobbyBrowser : ISteamLobbyBrowser
                 ProtocolVersion = protocolVersion,
                 ModVersion = lobbyApi.GetLobbyData(lobbyId, LobbyDataCodec.ModVersionKey),
                 PasswordRequired = passwordRequired,
+                ConnectedPlayers = connectedPlayers,
             });
         }
 

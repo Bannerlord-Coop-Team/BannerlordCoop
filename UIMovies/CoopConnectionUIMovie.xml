@@ -195,10 +195,13 @@
                     <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="42"
                                MarginLeft="12" MarginRight="18" StackLayout.LayoutMethod="HorizontalLeftToRight">
                       <Children>
-                        <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="408" HeightSizePolicy="StretchToParent"
+                        <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="260" HeightSizePolicy="StretchToParent"
                                     Brush="Clan.TabControl.Text" Brush.FontSize="22" Text="@HostColumnText"/>
                         <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="180" HeightSizePolicy="StretchToParent"
                                     Brush="Clan.TabControl.Text" Brush.FontSize="22" Text="@PasswordColumnText"/>
+                        <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="200" HeightSizePolicy="StretchToParent"
+                                    Brush="Clan.TabControl.Text" Brush.FontSize="22"
+                                    Brush.TextHorizontalAlignment="Center" Text="@ConnectedPlayersColumnText"/>
                         <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
                                     Brush="Clan.TabControl.Text" Brush.FontSize="22" Text="@CompatibilityColumnText"/>
                       </Children>
@@ -230,13 +233,18 @@
                                                        MarginLeft="12" MarginRight="12"
                                                        StackLayout.LayoutMethod="HorizontalLeftToRight">
                                               <Children>
-                                                <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="408" HeightSizePolicy="StretchToParent"
+                                                <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="260" HeightSizePolicy="StretchToParent"
                                                             Brush="Clan.TabControl.Text" Brush.FontSize="21" ClipContents="true"
                                                             Brush.TextVerticalAlignment="Center" Text="@HostText"/>
                                                 <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="180" HeightSizePolicy="StretchToParent"
                                                             Brush="Clan.TabControl.Text" Brush.FontSize="21"
                                                             Brush.TextVerticalAlignment="Center" Text="@PasswordText"/>
+                                                <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="200" HeightSizePolicy="StretchToParent"
+                                                            Brush="Clan.TabControl.Text" Brush.FontSize="21"
+                                                            Brush.TextHorizontalAlignment="Center"
+                                                            Brush.TextVerticalAlignment="Center" Text="@ConnectedPlayersText"/>
                                                 <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                                                            IsVisible="@IsCompatibleStatusVisible"
                                                             Brush="Clan.TabControl.Text" Brush.FontSize="21"
                                                             Brush.FontColor="@StatusColor" Brush.TextVerticalAlignment="Center"
                                                             Text="@StatusText"/>
@@ -245,15 +253,16 @@
                                           </Children>
                                         </ButtonWidget>
 
-                                        <HintWidget DataSource="{StatusHint}" WidthSizePolicy="Fixed" SuggestedWidth="44"
-                                                    HeightSizePolicy="StretchToParent" HorizontalAlignment="Left"
-                                                    PositionXOffset="738" IsVisible="@IsStatusHintVisible"
+                                        <HintWidget DataSource="{StatusHint}" WidthSizePolicy="Fixed" SuggestedWidth="178"
+                                                    HeightSizePolicy="StretchToParent" HorizontalAlignment="Right"
+                                                    MarginRight="12" IsVisible="@IsStatusHintVisible"
                                                     Command.HoverBegin="ExecuteBeginHint" Command.HoverEnd="ExecuteEndHint">
                                           <Children>
                                             <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
                                                         DoNotAcceptEvents="true" Brush="Clan.TabControl.Text"
-                                                        Brush.FontColor="@StatusColor" Brush.TextVerticalAlignment="Center"
-                                                        Text="(i)"/>
+                                                        Brush.FontSize="26" Brush.FontColor="@StatusColor"
+                                                        Brush.TextHorizontalAlignment="Right" Brush.TextVerticalAlignment="Center"
+                                                        Text="Incompatible (i)"/>
                                           </Children>
                                         </HintWidget>
                                       </Children>

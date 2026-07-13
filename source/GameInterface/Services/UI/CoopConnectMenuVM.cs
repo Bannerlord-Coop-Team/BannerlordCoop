@@ -47,6 +47,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     public string HostSearchLabelText => "Host Name";
     public string HostSearchPlaceholderText => "Type a host name...";
     public string HostColumnText => "Host Name";
+    public string ConnectedPlayersColumnText => "Connected Players";
     public string PasswordColumnText => "Access";
     public string CompatibilityColumnText => "Status";
     public string IpText => "Server IP Address:";
@@ -401,6 +402,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
             discoveredSteamLobbies.Add(new SteamLobbyListItemVM(
                 lobby.LobbyId,
                 lobby.OwnerName,
+                lobby.ConnectedPlayers,
                 lobby.ProtocolVersion,
                 lobby.ModVersion,
                 lobby.PasswordRequired,

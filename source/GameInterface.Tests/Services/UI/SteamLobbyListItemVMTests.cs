@@ -12,6 +12,7 @@ public class SteamLobbyListItemVMTests
         var viewModel = new SteamLobbyListItemVM(
             42,
             "Test Host",
+            3,
             Common.Network.Session.SessionJoinInfo.CurrentVersion,
             Common.ModInformation.BuildVersion,
             false,
@@ -19,8 +20,11 @@ public class SteamLobbyListItemVMTests
             lobbyId => joinedLobby = lobbyId);
 
         Assert.Equal("Test Host", viewModel.HostText);
+        Assert.Equal(3, viewModel.ConnectedPlayers);
+        Assert.Equal("3", viewModel.ConnectedPlayersText);
         Assert.Equal("Compatible", viewModel.StatusText);
         Assert.Equal("#F4E1C4FF", viewModel.StatusColor);
+        Assert.True(viewModel.IsCompatibleStatusVisible);
         Assert.False(viewModel.IsStatusHintVisible);
         Assert.False(viewModel.IsJoinDisabled);
 
@@ -36,6 +40,7 @@ public class SteamLobbyListItemVMTests
         var viewModel = new SteamLobbyListItemVM(
             42,
             "Test Host",
+            3,
             Common.Network.Session.SessionJoinInfo.CurrentVersion,
             "different-build",
             false,
@@ -43,7 +48,8 @@ public class SteamLobbyListItemVMTests
             lobbyId => joinedLobby = lobbyId);
 
         Assert.Equal("Incompatible", viewModel.StatusText);
-        Assert.Equal("#FF5555FF", viewModel.StatusColor);
+        Assert.Equal("#FF8080FF", viewModel.StatusColor);
+        Assert.False(viewModel.IsCompatibleStatusVisible);
         Assert.True(viewModel.IsStatusHintVisible);
         Assert.Equal(
             $"The host's version is different-build while your version is {Common.ModInformation.BuildVersion}.",
@@ -61,6 +67,7 @@ public class SteamLobbyListItemVMTests
         var viewModel = new SteamLobbyListItemVM(
             42,
             "Test Host",
+            3,
             Common.Network.Session.SessionJoinInfo.CurrentVersion + 1,
             Common.ModInformation.BuildVersion,
             false,
@@ -79,6 +86,7 @@ public class SteamLobbyListItemVMTests
         var viewModel = new SteamLobbyListItemVM(
             42,
             string.Empty,
+            3,
             Common.Network.Session.SessionJoinInfo.CurrentVersion,
             Common.ModInformation.BuildVersion,
             false,

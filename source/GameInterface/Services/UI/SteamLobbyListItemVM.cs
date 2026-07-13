@@ -12,13 +12,14 @@ namespace GameInterface.Services.UI;
 public sealed class SteamLobbyListItemVM : ViewModel
 {
     private const string CompatibleStatusColor = "#F4E1C4FF";
-    private const string IncompatibleStatusColor = "#FF5555FF";
+    private const string IncompatibleStatusColor = "#FF8080FF";
 
     private readonly Action<ulong> onJoin;
 
     public SteamLobbyListItemVM(
         ulong lobbyId,
         string ownerName,
+        int connectedPlayers,
         int protocolVersion,
         string modVersion,
         bool passwordRequired,
@@ -27,6 +28,7 @@ public sealed class SteamLobbyListItemVM : ViewModel
     {
         LobbyId = lobbyId;
         OwnerName = ownerName?.Trim() ?? string.Empty;
+        ConnectedPlayers = Math.Max(0, connectedPlayers);
         ProtocolVersion = protocolVersion;
         ModVersion = modVersion ?? string.Empty;
         PasswordRequired = passwordRequired;
@@ -49,6 +51,7 @@ public sealed class SteamLobbyListItemVM : ViewModel
 
     public ulong LobbyId { get; }
     public string OwnerName { get; }
+    public int ConnectedPlayers { get; }
     public int ProtocolVersion { get; }
     public string ModVersion { get; }
     public bool PasswordRequired { get; }
@@ -58,6 +61,9 @@ public sealed class SteamLobbyListItemVM : ViewModel
     public string HostText => !string.IsNullOrWhiteSpace(OwnerName) ? OwnerName : "Unknown host";
 
     [DataSourceProperty]
+    public string ConnectedPlayersText => ConnectedPlayers.ToString();
+
+    [DataSourceProperty]
     public string StatusText => IsCompatible ? "Compatible" : "Incompatible";
 
     [DataSourceProperty]
@@ -65,6 +71,9 @@ public sealed class SteamLobbyListItemVM : ViewModel
 
     [DataSourceProperty]
     public string PasswordText => PasswordRequired ? "Password required" : "No password";
+
+    [DataSourceProperty]
+    public bool IsCompatibleStatusVisible => IsCompatible;
 
     [DataSourceProperty]
     public bool IsStatusHintVisible => !IsCompatible;

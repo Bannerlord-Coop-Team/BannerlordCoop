@@ -19,7 +19,7 @@ public class CoopConnectMenuVMTests
 
         SelectSteamLobbiesTab(viewModel);
         browser.Complete(
-            CreateLobby(1, "Mountain King"),
+            CreateLobby(1, "Mountain King", connectedPlayers: 3),
             CreateLobby(2, "River Trader"));
 
         viewModel.SteamLobbyHostSearchText = "tAiN k";
@@ -27,6 +27,7 @@ public class CoopConnectMenuVMTests
 
         var match = Assert.Single(viewModel.SteamLobbies);
         Assert.Equal("Mountain King", match.HostText);
+        Assert.Equal("3", match.ConnectedPlayersText);
         Assert.Equal("Hosted Steam Servers (1)", viewModel.SteamLobbiesHeaderText);
         Assert.Equal(string.Empty, viewModel.SteamLobbyStatusText);
         Assert.Equal(1, browser.RequestCount);
@@ -94,6 +95,7 @@ public class CoopConnectMenuVMTests
         Assert.Equal("Host Name", viewModel.HostSearchLabelText);
         Assert.Equal("Type a host name...", viewModel.HostSearchPlaceholderText);
         Assert.Equal("Host Name", viewModel.HostColumnText);
+        Assert.Equal("Connected Players", viewModel.ConnectedPlayersColumnText);
     }
 
     [Fact]
@@ -117,12 +119,13 @@ public class CoopConnectMenuVMTests
         viewModel.Tabs[1].ExecuteSelection();
     }
 
-    private static SteamLobbySummary CreateLobby(ulong lobbyId, string ownerName)
+    private static SteamLobbySummary CreateLobby(ulong lobbyId, string ownerName, int connectedPlayers = 0)
     {
         return new SteamLobbySummary
         {
             LobbyId = lobbyId,
             OwnerName = ownerName,
+            ConnectedPlayers = connectedPlayers,
             ProtocolVersion = SessionJoinInfo.CurrentVersion,
             ModVersion = ModInformation.BuildVersion,
         };

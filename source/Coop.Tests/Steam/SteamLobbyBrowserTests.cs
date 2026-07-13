@@ -35,6 +35,7 @@ public class SteamLobbyBrowserTests
             ServerSteamId = 76561198000000042,
             ModVersion = Common.ModInformation.BuildVersion,
             PasswordRequired = true,
+            ConnectedPlayers = 3,
         });
 
         IReadOnlyList<SteamLobbySummary> results = null;
@@ -47,6 +48,7 @@ public class SteamLobbyBrowserTests
         Assert.Equal(SessionJoinInfo.CurrentVersion, lobby.ProtocolVersion);
         Assert.Equal(Common.ModInformation.BuildVersion, lobby.ModVersion);
         Assert.True(lobby.PasswordRequired);
+        Assert.Equal(3, lobby.ConnectedPlayers);
         Assert.True(lobby.IsCompatible);
         Assert.Null(error);
     }
@@ -245,6 +247,25 @@ public class SteamLobbyBrowserTests
         browser.RequestLobbies((lobbies, _) => results = lobbies);
 
         Assert.False(Assert.Single(results).PasswordRequired);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("not-a-count")]
+    [InlineData("-1")]
+    public void RequestLobbies_UsesZeroForInvalidConnectedPlayerCount(string value)
+    {
+        AddLobby(42, new SessionJoinInfo
+        {
+            Port = 4200,
+            ServerSteamId = 76561198000000042,
+        });
+        api.SetLobbyData(42, LobbyDataCodec.ConnectedPlayersKey, value);
+
+        IReadOnlyList<SteamLobbySummary> results = null;
+        browser.RequestLobbies((lobbies, _) => results = lobbies);
+
+        Assert.Equal(0, Assert.Single(results).ConnectedPlayers);
     }
 
     [Fact]

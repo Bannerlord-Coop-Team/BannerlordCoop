@@ -22,6 +22,7 @@ namespace Coop.Tests.Steam
                 ServerSteamId = 76561198000000042,
                 ModVersion = Common.ModInformation.BuildVersion,
                 PasswordRequired = true,
+                ConnectedPlayers = 3,
                 Password = "must-not-be-advertised",
             };
 
@@ -35,6 +36,7 @@ namespace Coop.Tests.Steam
             Assert.Equal(76561198000000042UL, decoded.ServerSteamId);
             Assert.Equal(Common.ModInformation.BuildVersion, decoded.ModVersion);
             Assert.True(decoded.PasswordRequired);
+            Assert.Equal(3, decoded.ConnectedPlayers);
             Assert.Null(decoded.Password);
             Assert.True(decoded.HasAddress);
             Assert.True(decoded.HasServerSteamId);
@@ -181,6 +183,38 @@ namespace Coop.Tests.Steam
 
             Assert.True(LobbyDataCodec.TryDecode(key => Read(mutable, key), out var decoded, out _));
             Assert.False(decoded.PasswordRequired);
+        }
+
+        [Theory]
+        [InlineData("", 0)]
+        [InlineData("not-a-count", 0)]
+        [InlineData("-1", 0)]
+        [InlineData("3", 3)]
+        public void Decode_UsesSafeConnectedPlayerCount(string value, int expected)
+        {
+            var data = new Dictionary<string, string>(LobbyDataCodec.Encode(new SessionJoinInfo
+            {
+                Port = 4200,
+                ModVersion = Common.ModInformation.BuildVersion,
+            }))
+            {
+                [LobbyDataCodec.ConnectedPlayersKey] = value,
+            };
+
+            Assert.True(LobbyDataCodec.TryDecode(key => Read(data, key), out var decoded, out _));
+            Assert.Equal(expected, decoded.ConnectedPlayers);
+        }
+
+        [Fact]
+        public void Encode_ClampsNegativeConnectedPlayerCount()
+        {
+            var encoded = LobbyDataCodec.Encode(new SessionJoinInfo
+            {
+                Port = 4200,
+                ConnectedPlayers = -1,
+            });
+
+            Assert.Equal("0", encoded[LobbyDataCodec.ConnectedPlayersKey]);
         }
 
         [Fact]

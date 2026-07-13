@@ -16,6 +16,7 @@ public static class LobbyDataCodec
     public const string OwnerNameKey = "coop_owner_name";
     public const string ModVersionKey = "coop_mod_version";
     public const string PasswordRequiredKey = "coop_password_required";
+    public const string ConnectedPlayersKey = "coop_connected_players";
     public const string LobbyTypeKey = "coop_lobby_type";
     public const string VisibilityKey = "coop_visibility";
     public const string StandaloneLobbyType = "standalone";
@@ -68,6 +69,7 @@ public static class LobbyDataCodec
             [ServerSteamIdKey] = info.ServerSteamId.ToString(),
             [ModVersionKey] = info.ModVersion ?? string.Empty,
             [PasswordRequiredKey] = info.PasswordRequired ? "1" : "0",
+            [ConnectedPlayersKey] = Math.Max(0, info.ConnectedPlayers).ToString(),
             [LobbyTypeKey] = info.HasServerSteamId
                 ? (info.Discoverable ? StandaloneLobbyType : HiddenStandaloneLobbyType)
                 : PlayerLobbyType,
@@ -112,6 +114,9 @@ public static class LobbyDataCodec
         // reads as "player-hosted", so the joiner falls back to the lobby owner.
         ulong.TryParse(readValue(ServerSteamIdKey), out var serverSteamId);
 
+        int.TryParse(readValue(ConnectedPlayersKey), out var connectedPlayers);
+        connectedPlayers = Math.Max(0, connectedPlayers);
+
         info = new SessionJoinInfo
         {
             Version = version,
@@ -120,6 +125,7 @@ public static class LobbyDataCodec
             ServerSteamId = serverSteamId,
             ModVersion = modVersion,
             PasswordRequired = readValue(PasswordRequiredKey) == "1",
+            ConnectedPlayers = connectedPlayers,
             Discoverable = !string.Equals(
                 readValue(LobbyTypeKey), HiddenStandaloneLobbyType, StringComparison.Ordinal),
         };

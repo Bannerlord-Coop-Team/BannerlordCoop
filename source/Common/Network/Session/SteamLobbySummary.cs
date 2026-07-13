@@ -9,6 +9,7 @@ public class SteamLobbySummary
     public int ProtocolVersion { get; set; }
     public string ModVersion { get; set; }
     public bool PasswordRequired { get; set; }
+    public int ConnectedPlayers { get; set; }
 
     /// <summary>
     /// Whether this client uses the same lobby protocol and exact mod build as the host.

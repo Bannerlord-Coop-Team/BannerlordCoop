@@ -39,6 +39,9 @@ public class SessionJoinInfo
     /// <summary>True when the server requires a password before admitting the connection.</summary>
     public bool PasswordRequired { get; set; }
 
+    /// <summary>Players currently connected to the standalone server.</summary>
+    public int ConnectedPlayers { get; set; }
+
     /// <summary>
     /// Whether this standalone session should appear in the co-op server discovery UI. This does
     /// not disable its Steam lobby, tunnel, rich presence, or direct join paths.
