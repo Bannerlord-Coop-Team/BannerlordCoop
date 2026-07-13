@@ -1,10 +1,8 @@
 ﻿using Common;
-using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
-using GameInterface.Services.MobilePartyAIs.Messages;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
-using Serilog;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -13,8 +11,6 @@ namespace GameInterface.Services.MobilePartyAIs.Patches;
 [HarmonyPatch(typeof(MobilePartyAi))]
 internal class MobilePartyAIPatches
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<ILogger>();
-
     [HarmonyPatch(nameof(MobilePartyAi.CheckPartyNeedsUpdate))]
     [HarmonyPrefix]
     static void Prefix(ref MobilePartyAi __instance)
@@ -34,17 +30,39 @@ internal class MobilePartyAIPatches
 
     [HarmonyPatch(nameof(MobilePartyAi.AiBehaviorInteractable), MethodType.Setter)]
     [HarmonyPrefix]
-    static void AiBehaviorInteractable_Prefix(ref MobilePartyAi __instance, ref IInteractablePoint value)
+    internal static void AiBehaviorInteractable_Prefix(
+        ref MobilePartyAi __instance,
+        ref IInteractablePoint value,
+        out bool __state)
     {
+        __state = false;
+
         if (CallOriginalPolicy.IsOriginalAllowed())
             return;
 
         if (ModInformation.IsClient)
             return;
 
-        if (value == __instance.AiBehaviorInteractable)
+        __state = ShouldCaptureInteractableChange(__instance, value);
+    }
+
+    internal static bool ShouldCaptureInteractableChange(
+        MobilePartyAi partyAi,
+        IInteractablePoint value) =>
+        partyAi?._mobileParty?.IsActive == true && value != partyAi.AiBehaviorInteractable;
+
+    [HarmonyPatch(nameof(MobilePartyAi.AiBehaviorInteractable), MethodType.Setter)]
+    [HarmonyPostfix]
+    internal static void AiBehaviorInteractable_Postfix(ref MobilePartyAi __instance, bool __state)
+    {
+        var party = __instance._mobileParty;
+        if (!__state || party?.IsActive != true)
             return;
 
-        MessageBroker.Instance.Publish(__instance, new AiBehaviorInteractablePointUpdated(__instance, value));
+        // A bare setter has no enclosing MobileParty.SetMove* finalizer. Feed it into the same
+        // complete latest-wins snapshot path; nested movement calls are harmlessly coalesced.
+        MessageBroker.Instance.Publish(
+            __instance,
+            new MobilePartyMovementStateChanged(party));
     }
 }

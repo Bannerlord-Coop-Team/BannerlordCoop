@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MobileParties.Extensions;
@@ -143,6 +143,6 @@ internal static class RaidAiInterventionSuppression
             return;
 
         party.SetMoveModeHold();
-        MessageBroker.Instance.Publish(party.Ai, new PartyBehaviorChangeAttempted(party.Ai, AiBehavior.Hold, null, party.Position));
+        MessageBroker.Instance.Publish(party.Ai, new PartyBehaviorChangeAttempted(party.Ai));
     }
 }

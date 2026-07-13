@@ -4,7 +4,9 @@ using Common.Network.Coalescing;
 using Common.PacketHandlers;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Packets;
+using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Messages.Behavior;
+using GameInterface.Services.ObjectManager;
 using static GameInterface.Services.ObjectManager.ObjectManager;
 using LiteNetLib;
 using TaleWorlds.CampaignSystem.Party;
@@ -25,17 +27,23 @@ internal class RequestMobilePartyBehaviorPacketHandler : IPacketHandler
     private readonly ISendCoalescer coalescer;
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
+    private readonly IObjectManager objectManager;
+    private readonly IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot;
 
     public RequestMobilePartyBehaviorPacketHandler(
         IPacketManager packetManager,
         ISendCoalescer coalescer,
         IMessageBroker messageBroker,
-        INetwork network)
+        INetwork network,
+        IObjectManager objectManager,
+        IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot)
     {
         this.packetManager = packetManager;
         this.coalescer = coalescer;
         this.messageBroker = messageBroker;
         this.network = network;
+        this.objectManager = objectManager;
+        this.mobilePartyBehaviorSnapshot = mobilePartyBehaviorSnapshot;
         packetManager.RegisterPacketHandler(this);
 
         messageBroker.Subscribe<PartyBehaviorUpdated>(Handle_PartyBehaviorUpdated);
@@ -60,6 +68,19 @@ internal class RequestMobilePartyBehaviorPacketHandler : IPacketHandler
     private void Handle_PartyBehaviorUpdated(MessagePayload<PartyBehaviorUpdated> payload)
     {
         var data = payload.What.BehaviorUpdateData;
+
+        // Every producer converges here. Rebuild from the authoritative server object so a client
+        // request, a forced battle-finalization update, and a SetMove* capture all broadcast the
+        // same complete state instead of echoing a partial or stale request payload.
+        if (!objectManager.TryGetObject(data.MobilePartyId, out MobileParty party) ||
+            !mobilePartyBehaviorSnapshot.TryCreateCurrent(
+                party,
+                out var authoritativeData))
+            return;
+
+        authoritativeData.OriginControllerId = data.OriginControllerId;
+        authoritativeData.ForcePosition = data.ForcePosition;
+        data = authoritativeData;
 
         // Coalesce per party: repeated behavior changes to one party collapse into a single latest-wins send per tick.
         var key = new CoalesceKey(PartyBehaviorUpdateChannel, Compact(data.MobilePartyId, typeof(MobileParty)));

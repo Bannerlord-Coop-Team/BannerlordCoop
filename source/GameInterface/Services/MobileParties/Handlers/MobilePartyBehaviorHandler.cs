@@ -15,7 +15,9 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.MobileParties.Handlers;
 
@@ -37,68 +39,65 @@ internal class MobilePartyBehaviorHandler : IHandler
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IMobilePartyInterface mobilePartyInterface;
     private readonly IObjectManager objectManager;
+    private readonly IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot;
 
     public MobilePartyBehaviorHandler(
         IMessageBroker messageBroker,
         IControllerIdProvider controllerIdProvider,
         IMobilePartyInterface mobilePartyInterface,
-        IObjectManager objectManager)
+        IObjectManager objectManager,
+        IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot)
     {
         this.messageBroker = messageBroker;
         this.controllerIdProvider = controllerIdProvider;
         this.mobilePartyInterface = mobilePartyInterface;
         this.objectManager = objectManager;
+        this.mobilePartyBehaviorSnapshot = mobilePartyBehaviorSnapshot;
 
         messageBroker.Subscribe<PartyBehaviorChangeAttempted>(Handle_PartyBehaviorChanged);
+        messageBroker.Subscribe<MobilePartyMovementStateChanged>(Handle_MobilePartyMovementStateChanged);
         messageBroker.Subscribe<UpdatePartyBehavior>(Handle_UpdatePartyBehavior);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<PartyBehaviorChangeAttempted>(Handle_PartyBehaviorChanged);
+        messageBroker.Unsubscribe<MobilePartyMovementStateChanged>(Handle_MobilePartyMovementStateChanged);
         messageBroker.Unsubscribe<UpdatePartyBehavior>(Handle_UpdatePartyBehavior);
     }
 
     public void Handle_PartyBehaviorChanged(MessagePayload<PartyBehaviorChangeAttempted> obj)
     {
-        var partyAi = obj.What.PartyAi;
         var party = obj.What.PartyAi._mobileParty;
-        var interactablePoint = obj.What.InteractablePoint;
 
-        if (!objectManager.TryGetId(partyAi._mobileParty, out var partyId))
+        if (!party.IsControlledByThisInstance())
             return;
 
-        if (!partyAi._mobileParty.IsControlledByThisInstance())
+        if (!mobilePartyBehaviorSnapshot.TryCreateCurrent(
+                party,
+                out PartyBehaviorUpdateData data))
             return;
-
-        partyId = Compact(partyId, typeof(MobileParty));
-
-        string interactablePointId = null;
-        if (interactablePoint is PartyBase partyBase &&
-            !objectManager.TryGetId(partyBase, out interactablePointId))
-            return;
-
-        interactablePointId = Compact(interactablePointId, typeof(PartyBase));
-
-        PartyBehaviorUpdateData data = new PartyBehaviorUpdateData(
-            partyId,
-            obj.What.NewAiBehavior,
-            interactablePointId,
-            obj.What.BestTargetPoint,
-            interactablePoint is not null,
-            party.Position,
-            party.DefaultBehavior,
-            party.TargetPosition,
-            party.DesiredAiNavigationType
-        );
 
         if (ModInformation.IsClient)
         {
             data.OriginControllerId = controllerIdProvider.ControllerId;
-            latestPredictions[partyId] = data;
+            latestPredictions[data.MobilePartyId] = data;
+            messageBroker.Publish(this, new ControlledPartyBehaviorUpdated(data));
+            return;
         }
 
-        messageBroker.Publish(this, new ControlledPartyBehaviorUpdated(data));
+        messageBroker.Publish(this, new PartyBehaviorUpdated(ref data));
+    }
+
+    private void Handle_MobilePartyMovementStateChanged(MessagePayload<MobilePartyMovementStateChanged> obj)
+    {
+        var party = obj.What.Party;
+        if (!mobilePartyBehaviorSnapshot.TryCreateCurrent(
+                party,
+                out PartyBehaviorUpdateData data))
+            return;
+
+        messageBroker.Publish(this, new PartyBehaviorUpdated(ref data));
     }
 
     public void Handle_UpdatePartyBehavior(MessagePayload<UpdatePartyBehavior> obj)
@@ -121,15 +120,37 @@ internal class MobilePartyBehaviorHandler : IHandler
                 if (!TrySelectBehaviorUpdate(isSelfEcho, latestPredictions, ref data))
                     return;
 
-                PartyBase partyBase = null;
-                if (data.HasTarget && !objectManager.TryGetObjectWithLogging(data.InteractablePointId, out partyBase))
+                if (!TryResolveInteractablePoint(data, out IInteractablePoint interactablePoint))
                     return;
 
-                // The apply drives the Harmony-patched SetAiBehavior path; the AutoSync
-                // patch must stand down while the replicated behavior is applied.
+                MobileParty targetParty = null;
+                if (data.TargetPartyId != null &&
+                    !objectManager.TryGetObjectWithLogging(data.TargetPartyId, out targetParty))
+                    return;
+
+                Settlement targetSettlement = null;
+                if (data.TargetSettlementId != null &&
+                    !objectManager.TryGetObjectWithLogging(data.TargetSettlementId, out targetSettlement))
+                    return;
+
+                MobileParty moveTargetParty = null;
+                if (data.MoveTargetPartyId != null &&
+                    !objectManager.TryGetObjectWithLogging(data.MoveTargetPartyId, out moveTargetParty))
+                    return;
+
+                // AllowedThread keeps outbound movement patches quiet while the complete snapshot is replayed.
                 using (new AllowedThread())
                 {
-                    PartyBehaviorPatch.SetAiBehavior(party.Ai, data.NewAiBehavior, partyBase, data.BestTargetPoint);
+                    bool replaySucceeded = PartyBehaviorPatch.ApplyBehaviorSnapshot(
+                        party.Ai,
+                        data,
+                        interactablePoint,
+                        targetParty,
+                        targetSettlement,
+                        moveTargetParty);
+
+                    if (!replaySucceeded)
+                        return;
 
                     if (MobilePartyAiConfig.DEBUG)
                     {
@@ -137,27 +158,25 @@ internal class MobilePartyBehaviorHandler : IHandler
                             "Setting AI behavior. PartyId: {PartyId}, Behavior: {Behavior}, TargetParty: {TargetParty}, BestTargetPoint: {BestTargetPoint}",
                             data.MobilePartyId,
                             data.NewAiBehavior,
-                            partyBase,
+                            interactablePoint,
                             data.BestTargetPoint
                         );
                     }
 
-                    if (ModInformation.IsClient)
+                    if (ModInformation.IsServer)
                     {
-                        // Moving parties already simulate the replicated target, so an in-flight snapshot is stale.
-                        if (ShouldApplyAuthoritativePosition(
-                            isSelfEcho,
-                            data.ForcePosition,
-                            party.PartyMoveMode == MoveModeType.Hold,
-                            party.Position,
-                            data.PartyPosition))
-                            party.Position = data.PartyPosition;
+                        PublishAuthoritativeBehavior(party, data);
+                        return;
                     }
-                    else
-                    {
-                        data.PartyPosition = party.Position;
-                        messageBroker.Publish(this, new PartyBehaviorUpdated(ref data));
-                    }
+
+                    // Moving parties already simulate the replicated target, so an in-flight snapshot is stale.
+                    if (ShouldApplyAuthoritativePosition(
+                        isSelfEcho,
+                        data.ForcePosition,
+                        party.PartyMoveMode == MoveModeType.Hold,
+                        party.Position,
+                        data.PartyPosition))
+                        party.Position = data.PartyPosition;
                 }
             }
             catch (Exception e)
@@ -165,6 +184,42 @@ internal class MobilePartyBehaviorHandler : IHandler
                 Logger.Error(e, "Failed to apply {Message}", nameof(UpdatePartyBehavior));
             }
         });
+    }
+
+    private bool TryResolveInteractablePoint(
+        PartyBehaviorUpdateData data,
+        out IInteractablePoint interactablePoint)
+    {
+        interactablePoint = null;
+        if (!data.HasTarget)
+            return true;
+
+        if (data.InteractableKind == BehaviorInteractableKind.AnchorPoint)
+        {
+            if (!objectManager.TryGetObjectWithLogging(data.InteractablePointId, out MobileParty owner))
+                return false;
+
+            interactablePoint = owner.Anchor;
+            return interactablePoint != null;
+        }
+
+        if (!objectManager.TryGetObjectWithLogging(data.InteractablePointId, out PartyBase partyBase))
+            return false;
+
+        interactablePoint = partyBase;
+        return true;
+    }
+
+    private void PublishAuthoritativeBehavior(MobileParty party, PartyBehaviorUpdateData request)
+    {
+        if (!mobilePartyBehaviorSnapshot.TryCreateCurrent(
+                party,
+                out PartyBehaviorUpdateData authoritativeData))
+            return;
+
+        authoritativeData.OriginControllerId = request.OriginControllerId;
+        authoritativeData.ForcePosition = request.ForcePosition;
+        messageBroker.Publish(this, new PartyBehaviorUpdated(ref authoritativeData));
     }
 
     internal static bool TrySelectBehaviorUpdate(

@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
+using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Handlers;
 using GameInterface.Services.MobileParties.Messages.Behavior;
@@ -12,6 +13,7 @@ using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.MobilePartyAIs.Patches;
 
@@ -44,33 +46,57 @@ public static class PartyBehaviorPatch
         ref MobilePartyAi __instance,
         ref AiBehavior newAiBehavior,
         ref IInteractablePoint interactablePoint,
-        ref CampaignVec2 bestTargetPoint)
+        ref CampaignVec2 bestTargetPoint,
+        out bool __state)
     {
+        __state = false;
+
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (BehaviorIsSame(ref __instance, ref newAiBehavior, ref interactablePoint, ref bestTargetPoint)) return false;
 
-        if (__instance._mobileParty.IsControlledByThisInstance() == false) return false;
+        if (!__instance._mobileParty.IsControlledByThisInstance()) return false;
 
-        var message = new PartyBehaviorChangeAttempted(__instance, newAiBehavior, interactablePoint, bestTargetPoint);
-        MessageBroker.Instance.Publish(__instance, message);
-
-        if (MobilePartyAiConfig.DEBUG && ModInformation.IsServer)
+        if (ModInformation.IsServer)
         {
-            if (interactablePoint is null)
+            if (MobilePartyAiConfig.DEBUG)
             {
-                Logger.Debug("Pre-update. PartyId: {partyId}, Behavior: {behavior}, Target: {target}", __instance._mobileParty.StringId, newAiBehavior, null);
+                if (interactablePoint is null)
+                {
+                    Logger.Debug("Pre-update. PartyId: {partyId}, Behavior: {behavior}, Target: {target}", __instance._mobileParty.StringId, newAiBehavior, null);
+                }
+
+                if (interactablePoint is PartyBase partyBase)
+                {
+                    Logger.Debug("Pre-update. PartyId: {partyId}, Behavior: {behavior}, Target: {target}", __instance._mobileParty.StringId, newAiBehavior,
+                        partyBase.IsSettlement ? partyBase.Settlement.StringId : partyBase.MobileParty.StringId);
+                }
             }
 
-            if (interactablePoint is PartyBase partyBase)
-            {
-                Logger.Debug("Pre-update. PartyId: {partyId}, Behavior: {behavior}, Target: {target}", __instance._mobileParty.StringId, newAiBehavior,
-                    partyBase.IsSettlement ? partyBase.Settlement.StringId : partyBase.MobileParty.StringId);
-            }
+            // Server behavior is authoritative and runs with every replication patch live.
+            __state = true;
+            return true;
         }
 
-        // Clients apply their own behavior immediately; the server still replicates it to observers.
-        return ModInformation.IsClient;
+        __state = true;
+        return true;
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch("SetAiBehavior")]
+    private static void SetAiBehaviorPostfix(
+        MobilePartyAi __instance,
+        bool __state)
+    {
+        if (!__state) return;
+
+        PublishBehaviorAttempt(__instance);
+    }
+
+    private static void PublishBehaviorAttempt(MobilePartyAi partyAi)
+    {
+        var message = new PartyBehaviorChangeAttempted(partyAi);
+        MessageBroker.Instance.Publish(partyAi, message);
     }
 
     private static bool BehaviorIsSame(
@@ -87,45 +113,76 @@ public static class PartyBehaviorPatch
 
     }
 
-    public static void SetAiBehavior(
-        MobilePartyAi partyAi, AiBehavior newBehavior, IInteractablePoint interactablePoint, CampaignVec2 targetPoint)
+    public static bool ApplyBehaviorSnapshot(
+        MobilePartyAi partyAi,
+        PartyBehaviorUpdateData data,
+        IInteractablePoint interactablePoint,
+        MobileParty targetParty,
+        Settlement targetSettlement,
+        MobileParty moveTargetParty)
     {
         if (partyAi == null)
         {
             var callStack = Environment.StackTrace;
 
             Logger.Error("PartyAI was null\n{stacktrace}", callStack);
-            return;
+            return false;
         }
 
         using (new AllowedThread())
         {
-
             var mobileParty = partyAi._mobileParty;
-
-            if (interactablePoint is PartyBase partyBase)
-            {
-                partyAi.AiBehaviorPartyBase = partyBase;
-            }
-            else
-            {
-                partyAi.AiBehaviorPartyBase = null;
-            }
 
             try
             {
-                mobileParty.TargetPosition = targetPoint;
-                mobileParty.SetShortTermBehavior(newBehavior, interactablePoint);
+                // Default behavior recalculates short-term behavior immediately, so its target
+                // dependencies must be installed first. SetShortTermBehavior can in turn change
+                // DesiredAiNavigationType; restore the authoritative navigation type afterwards.
+                mobileParty.SetTargetSettlement(targetSettlement, data.IsTargetingPort);
+                mobileParty.TargetParty = targetParty;
+                mobileParty.TargetPosition = data.TargetPosition;
+                mobileParty.DefaultBehavior = data.DefaultBehavior;
+                mobileParty.SetShortTermBehavior(data.NewAiBehavior, interactablePoint);
+                mobileParty.DesiredAiNavigationType = data.DesiredAiNavigationType;
 
-                partyAi.AiBehaviorInteractable = interactablePoint;
-                partyAi.BehaviorTarget = targetPoint;
+                partyAi.BehaviorTarget = data.BestTargetPoint;
 
                 partyAi.UpdateBehavior();
+                ApplyNavigationSnapshot(mobileParty, data, moveTargetParty);
+                return true;
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
-                Logger.Error(ex, "Failed to update party behavior for {StringId}", mobileParty.StringId);
+                Logger.Error(ex, "Failed to update party behavior for {StringId}", mobileParty?.StringId);
+                return false;
             }
         }
+    }
+
+    private static void ApplyNavigationSnapshot(
+        MobileParty mobileParty,
+        PartyBehaviorUpdateData data,
+        MobileParty moveTargetParty)
+    {
+        // Use vanilla setters to keep private path state aligned with the authoritative mode.
+        switch (data.PartyMoveMode)
+        {
+            case MoveModeType.Hold:
+                mobileParty.SetNavigationModeHold();
+                break;
+            case MoveModeType.Point:
+                mobileParty.SetNavigationModePoint(data.MoveTargetPoint);
+                break;
+            case MoveModeType.Party when moveTargetParty != null:
+                mobileParty.SetNavigationModeParty(moveTargetParty);
+                break;
+            default:
+                mobileParty.PartyMoveMode = data.PartyMoveMode;
+                mobileParty.MoveTargetParty = moveTargetParty;
+                break;
+        }
+
+        mobileParty.MoveTargetPoint = data.MoveTargetPoint;
+        mobileParty.NextTargetPosition = data.NextTargetPosition;
     }
 }
