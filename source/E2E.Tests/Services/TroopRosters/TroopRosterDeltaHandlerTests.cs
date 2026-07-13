@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Common.Messaging;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
@@ -21,7 +21,7 @@ namespace E2E.Tests.Services.TroopRosters
     /// through the same vanilla mutator, found by character. The client roster starts empty, so the
     /// AddToCounts tests also prove a positive add creates the element (with correct cached totals) on an
     /// under-populated client; the Set tests seed the element first, since an absolute Set for a troop the
-    /// client does not have is skipped rather than creating a totals-corrupting placeholder.
+    /// client does not have is skipped rather than inventing an element without its earlier create delta.
     /// </remarks>
     public class TroopRosterDeltaHandlerTests : SyncTestBase
     {
@@ -100,12 +100,14 @@ namespace E2E.Tests.Services.TroopRosters
                 Resolve(Server, out var roster, out var character, CharacterId1);
                 roster.AddToCounts(character, 5);
                 roster.SetElementNumber(roster.FindIndexOfTroop(character), 12);
+                Assert.Equal(12, roster.TotalManCount);
             });
 
             foreach (var client in Clients)
             {
                 Resolve(client, out var roster, out _, CharacterId1);
                 Assert.Equal(12, roster.GetElementCopyAtIndex(0).Number);
+                Assert.Equal(12, roster.TotalManCount);
             }
         }
 
@@ -117,12 +119,16 @@ namespace E2E.Tests.Services.TroopRosters
                 Resolve(Server, out var roster, out var character, CharacterId1);
                 roster.AddToCounts(character, 5);
                 roster.SetElementWoundedNumber(roster.FindIndexOfTroop(character), 3);
+                Assert.Equal(3, roster.TotalWounded);
+                Assert.Equal(2, roster.TotalHealthyCount);
             });
 
             foreach (var client in Clients)
             {
                 Resolve(client, out var roster, out _, CharacterId1);
                 Assert.Equal(3, roster.GetElementCopyAtIndex(0).WoundedNumber);
+                Assert.Equal(3, roster.TotalWounded);
+                Assert.Equal(2, roster.TotalHealthyCount);
             }
         }
 
@@ -177,6 +183,10 @@ namespace E2E.Tests.Services.TroopRosters
                 // Zero character1 (without auto-removing it), then drop depleted elements.
                 roster.SetElementNumber(roster.FindIndexOfTroop(character1), 0);
                 roster.RemoveZeroCounts();
+
+                Assert.Equal(1, roster.Count);
+                Assert.Same(character2, roster.GetElementCopyAtIndex(0).Character);
+                Assert.Equal(4, roster.TotalManCount);
             });
 
             foreach (var client in Clients)
@@ -184,6 +194,37 @@ namespace E2E.Tests.Services.TroopRosters
                 Resolve(client, out var roster, out var character2, CharacterId2);
                 Assert.Equal(1, roster.Count);
                 Assert.Same(character2, roster.GetElementCopyAtIndex(0).Character);
+                Assert.Equal(4, roster.TotalManCount);
+            }
+        }
+
+        [Fact]
+        public void Server_RemoveZeroCountHero_RecalculatesTotalsOnAllInstances()
+        {
+            string heroId = TestEnvironment.CreateRegisteredObject<Hero>();
+
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<TroopRoster>(TroopRosterId, out var roster));
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+
+                roster.AddToCounts(hero.CharacterObject, 1);
+                roster.SetElementNumber(roster.FindIndexOfTroop(hero.CharacterObject), 0);
+
+                Assert.Equal(1, roster.Count);
+                Assert.Equal(1, roster.TotalManCount);
+
+                roster.RemoveZeroCounts();
+
+                Assert.Equal(0, roster.Count);
+                Assert.Equal(0, roster.TotalManCount);
+            });
+
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<TroopRoster>(TroopRosterId, out var roster));
+                Assert.Equal(0, roster.Count);
+                Assert.Equal(0, roster.TotalManCount);
             }
         }
 

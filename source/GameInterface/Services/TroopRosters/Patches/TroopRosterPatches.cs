@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
@@ -95,6 +95,18 @@ internal class TroopRosterPatches
         MessageBroker.Instance.Publish(__instance, new ZeroCountsRemoved(__instance));
     }
 
+    [HarmonyPatch(nameof(TroopRoster.RemoveZeroCounts))]
+    [HarmonyPostfix]
+    private static void PostfixRemoveZeroCounts(TroopRoster __instance)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+        if (ModInformation.IsClient) return;
+        if (!IsRegistered(__instance)) return;
+
+        // RemoveZeroCounts changes the element list without updating cached totals.
+        __instance.InitializeCachedData();
+    }
+
     [HarmonyPatch(nameof(TroopRoster.SetElementNumber))]
     [HarmonyPrefix]
     private static void PrefixSetElementNumber(TroopRoster __instance, int index, int number)
@@ -116,6 +128,18 @@ internal class TroopRosterPatches
         MessageBroker.Instance.Publish(__instance, new ElementNumberSet(__instance, character, number));
     }
 
+    [HarmonyPatch(nameof(TroopRoster.SetElementNumber))]
+    [HarmonyPostfix]
+    private static void PostfixSetElementNumber(TroopRoster __instance)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+        if (ModInformation.IsClient) return;
+        if (!IsRegistered(__instance)) return;
+
+        // SetElementNumber overwrites the element without updating cached totals.
+        __instance.InitializeCachedData();
+    }
+
     [HarmonyPatch(nameof(TroopRoster.SetElementWoundedNumber))]
     [HarmonyPrefix]
     private static void PrefixSetElementWoundedNumber(TroopRoster __instance, int index, int number)
@@ -133,6 +157,18 @@ internal class TroopRosterPatches
 
         var character = __instance.GetElementCopyAtIndex(index).Character;
         MessageBroker.Instance.Publish(__instance, new ElementWoundedNumberSet(__instance, character, number));
+    }
+
+    [HarmonyPatch(nameof(TroopRoster.SetElementWoundedNumber))]
+    [HarmonyPostfix]
+    private static void PostfixSetElementWoundedNumber(TroopRoster __instance)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+        if (ModInformation.IsClient) return;
+        if (!IsRegistered(__instance)) return;
+
+        // SetElementWoundedNumber overwrites the element without updating cached totals.
+        __instance.InitializeCachedData();
     }
 
     [HarmonyPatch(nameof(TroopRoster.SetElementXp))]
