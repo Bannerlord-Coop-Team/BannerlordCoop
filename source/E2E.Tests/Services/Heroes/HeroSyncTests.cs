@@ -103,6 +103,8 @@ namespace E2E.Tests.Services.Heroes
             assertHelper.AssertPropertyOwnerField<Hero, PerkObject>(nameof(Hero._heroPerks));
             assertHelper.AssertPropertyOwnerField<Hero, SkillObject>(nameof(Hero._heroSkills));
             assertHelper.AssertPropertyOwnerField<Hero, CharacterAttribute>(nameof(Hero._characterAttributes));
+
+            TestEnvironment.AssertField<Hero, float>(nameof(Hero.Level), 10, defaultValue: hero.Level);
         }
 
         // Calls the REAL patched game method (not a reflection-invoked intercept), so this covers the
