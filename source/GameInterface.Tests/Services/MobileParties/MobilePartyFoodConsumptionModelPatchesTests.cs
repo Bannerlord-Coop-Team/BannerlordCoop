@@ -19,7 +19,7 @@ namespace GameInterface.Tests.Services.MobileParties;
 /// <summary>
 /// Regression coverage for co-op food-consumption eligibility and legacy starvation repair.
 /// </summary>
-[Collection(nameof(MobilePartyAiAuthorityCollection))]
+[Collection(global::GameInterface.Tests.ModInformationRoleCollection.Name)]
 public class MobilePartyFoodConsumptionModelPatchesTests : IDisposable
 {
     private readonly ConditionalWeakTable<object, ControlledObjectInfo> playerObjects =

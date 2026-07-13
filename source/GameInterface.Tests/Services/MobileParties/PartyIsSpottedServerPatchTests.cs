@@ -12,6 +12,7 @@ namespace GameInterface.Tests.Services.MobileParties;
 /// always spotted, but a destroyed party must read as unspotted, or the map nameplate machinery
 /// keeps re-creating its banner after the destruction replicates.
 /// </summary>
+[Collection(global::GameInterface.Tests.ModInformationRoleCollection.Name)]
 public class PartyIsSpottedServerPatchTests : IDisposable
 {
     private readonly bool wasServer;

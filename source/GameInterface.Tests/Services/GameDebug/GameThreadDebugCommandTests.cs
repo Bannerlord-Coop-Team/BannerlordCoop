@@ -6,12 +6,7 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.GameDebug;
 
-[CollectionDefinition(nameof(GameThreadDebugCommandCollection), DisableParallelization = true)]
-public class GameThreadDebugCommandCollection
-{
-}
-
-[Collection(nameof(GameThreadDebugCommandCollection))]
+[Collection(global::GameInterface.Tests.ModInformationRoleCollection.Name)]
 public class GameThreadDebugCommandTests : IDisposable
 {
     private readonly bool wasServer = ModInformation.IsServer;

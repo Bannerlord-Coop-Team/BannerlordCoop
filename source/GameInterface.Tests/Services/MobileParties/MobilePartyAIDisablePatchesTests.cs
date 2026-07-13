@@ -12,17 +12,9 @@ using Xunit;
 namespace GameInterface.Tests.Services.MobileParties;
 
 /// <summary>
-/// Prevents tests that mutate global role and player-control state from running concurrently.
-/// </summary>
-[CollectionDefinition(nameof(MobilePartyAiAuthorityCollection), DisableParallelization = true)]
-public class MobilePartyAiAuthorityCollection
-{
-}
-
-/// <summary>
 /// Tests the authority boundary for campaign-map AI decisions.
 /// </summary>
-[Collection(nameof(MobilePartyAiAuthorityCollection))]
+[Collection(global::GameInterface.Tests.ModInformationRoleCollection.Name)]
 public class MobilePartyAIDisablePatchesTests : IDisposable
 {
     private readonly bool wasServer = ModInformation.IsServer;

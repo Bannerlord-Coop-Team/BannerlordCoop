@@ -12,6 +12,7 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.MobileParties;
 
+[Collection(global::GameInterface.Tests.ModInformationRoleCollection.Name)]
 public class MercenaryStockHandlerTests
 {
     private readonly Mock<IMessageBroker> messageBroker = new();
