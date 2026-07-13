@@ -253,18 +253,23 @@
                                           </Children>
                                         </ButtonWidget>
 
-                                        <HintWidget DataSource="{StatusHint}" WidthSizePolicy="Fixed" SuggestedWidth="178"
-                                                    HeightSizePolicy="StretchToParent" HorizontalAlignment="Right"
-                                                    MarginRight="12" IsVisible="@IsStatusHintVisible"
-                                                    Command.HoverBegin="ExecuteBeginHint" Command.HoverEnd="ExecuteEndHint">
+                                        <Widget WidthSizePolicy="Fixed" SuggestedWidth="178"
+                                                HeightSizePolicy="StretchToParent" HorizontalAlignment="Right"
+                                                MarginRight="12" IsVisible="@IsStatusHintVisible">
                                           <Children>
-                                            <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
-                                                        DoNotAcceptEvents="true" Brush="Clan.TabControl.Text"
-                                                        Brush.FontSize="26" Brush.FontColor="@StatusColor"
-                                                        Brush.TextHorizontalAlignment="Right" Brush.TextVerticalAlignment="Center"
-                                                        Text="Incompatible (i)"/>
+                                            <HintWidget DataSource="{StatusHint}" WidthSizePolicy="StretchToParent"
+                                                        HeightSizePolicy="StretchToParent"
+                                                        Command.HoverBegin="ExecuteBeginHint" Command.HoverEnd="ExecuteEndHint">
+                                              <Children>
+                                                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                                                            DoNotAcceptEvents="true" Brush="Clan.TabControl.Text"
+                                                            Brush.FontSize="26" Brush.FontColor="#FF8080FF"
+                                                            Brush.TextHorizontalAlignment="Right" Brush.TextVerticalAlignment="Center"
+                                                            Text="Incompatible (i)"/>
+                                              </Children>
+                                            </HintWidget>
                                           </Children>
-                                        </HintWidget>
+                                        </Widget>
                                       </Children>
                                     </Widget>
                                   </ItemTemplate>
