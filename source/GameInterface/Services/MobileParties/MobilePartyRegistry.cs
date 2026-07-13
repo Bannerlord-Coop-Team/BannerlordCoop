@@ -6,6 +6,7 @@ using GameInterface.Registry.Auto;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
+using static GameInterface.Services.ObjectManager.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -126,7 +127,7 @@ internal class MobilePartyRegistry : AutoRegistryBase<MobileParty>
             // AutoRegistryHandler sends the MobileParty destroy after this callback. Drop any state
             // queued before or during teardown so no behavior update can follow that destroy.
             coalescer?.DropInstance(
-                ObjectManager.Compact(id, typeof(MobileParty)));
+                Compact(id, typeof(MobileParty)));
         }
     }
 }
