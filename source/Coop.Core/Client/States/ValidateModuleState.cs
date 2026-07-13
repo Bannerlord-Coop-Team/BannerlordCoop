@@ -63,8 +63,7 @@ public class ValidateModuleState : ClientStateBase
         }
         else
         {
-            messageBroker.Publish(this, new SendInformationMessage("Module validation failed!\nReason: " + obj.What.Reason));
-            Logic.Disconnect();
+            FinalizeDisconnect("Module validation failed!\n\n" + obj.What.Reason);
         }
     }
 
@@ -101,12 +100,17 @@ public class ValidateModuleState : ClientStateBase
 
     public override void Disconnect()
     {
+        FinalizeDisconnect("Client has been stopped");
+    }
+
+    private void FinalizeDisconnect(string closeText)
+    {
         loadingInterface.HideLoadingScreen();
 
         // Finalize tears down coop (EndCoopMode -> DestroyContainer), which disposes the container the
         // state machine resolves from — so do NOT SetState afterwards (it would resolve from a disposed
         // container and throw). This matches the teardown in the other states (e.g. CampaignState).
-        coopFinalizer.Finalize("Client has been stopped");
+        coopFinalizer.Finalize(closeText);
     }
 
     public override void EnterCampaignState()

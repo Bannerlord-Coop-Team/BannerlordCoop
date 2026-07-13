@@ -58,6 +58,24 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
+        public void NetworkModuleVersionsValidated_Failure_FinalizesWithReason()
+        {
+            // Arrange
+            var validateState = clientLogic.SetState<ValidateModuleState>();
+            const string reason = "Wrong game version detected.";
+            var payload = new MessagePayload<NetworkModuleVersionsValidated>(
+                this, new NetworkModuleVersionsValidated(false, reason));
+
+            // Act
+            validateState.Handle_NetworkModuleVersionsValidated(payload);
+
+            // Assert
+            var popup = Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<SendPopupMessage>());
+            Assert.Equal("Module validation failed!\n\n" + reason, popup.Text);
+            Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<EndCoopMode>());
+        }
+
+        [Fact]
         public void NetworkClientValidated_Transitions_ReceivingSavedDataState()
         {
             // Arrange
