@@ -1,6 +1,7 @@
 ﻿using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
@@ -119,6 +120,49 @@ namespace E2E.Tests.Services.Heroes
                 Assert.True(client.ObjectManager.TryGetObject(HeroId, out Hero hero));
                 Assert.True(client.ObjectManager.TryGetObject(skillId, out SkillObject skill));
                 Assert.Equal(42, hero.GetSkillValue(skill));
+            }
+        }
+
+        // SetPerkValueInternal's bool->int branch defeats the transpiler, so SetPerkValuePatch routes
+        // perk changes through the cached PropertyOwner intercept - this exercises that prefix for real
+        [Fact]
+        public void Server_Hero_SetPerkValue_PropagatesToClients()
+        {
+            var perkId = TestEnvironment.CreateRegisteredObject<PerkObject>();
+
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                Assert.True(Server.ObjectManager.TryGetObject(perkId, out PerkObject perk));
+
+                hero.SetPerkValueInternal(perk, true);
+
+                Assert.True(hero.GetPerkValue(perk));
+            });
+
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                Assert.True(client.ObjectManager.TryGetObject(perkId, out PerkObject perk));
+                Assert.True(hero.GetPerkValue(perk));
+            }
+
+            // Resetting the perk rides the same message with value 0 (vanilla removes the key)
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                Assert.True(Server.ObjectManager.TryGetObject(perkId, out PerkObject perk));
+
+                hero.SetPerkValueInternal(perk, false);
+
+                Assert.False(hero.GetPerkValue(perk));
+            });
+
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                Assert.True(client.ObjectManager.TryGetObject(perkId, out PerkObject perk));
+                Assert.False(hero.GetPerkValue(perk));
             }
         }
 

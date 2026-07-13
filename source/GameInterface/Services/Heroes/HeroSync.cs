@@ -75,9 +75,10 @@ namespace GameInterface.Services.Heroes
 
             // PropertyOwner<T> fields: intercepts SetPropertyValue/ClearAllProperty inside Hero's own
             // methods (SetSkillValue, SetTraitLevel, SetAttributeValueInternal, ClearSkills, ...),
-            // which every external caller funnels through. Known gaps: SetPerkValueInternal's bool->int
-            // branch and ClearAttributes' null guard sit between the field load and the call, which the
-            // control-flow-safe IL matcher skips - perk opens and attribute clears do not broadcast.
+            // which every external caller funnels through. The control-flow-safe IL matcher skips two
+            // sites where a branch sits between the field load and the call: SetPerkValueInternal
+            // (bool->int branch, covered instead by SetPerkValuePatch) and ClearAttributes (null
+            // guard - attribute clears do not broadcast).
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._heroSkills)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._heroTraits)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._heroPerks)));
