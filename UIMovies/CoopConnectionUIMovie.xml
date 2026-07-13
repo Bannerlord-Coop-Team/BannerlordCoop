@@ -255,7 +255,7 @@
 
                                         <Widget WidthSizePolicy="Fixed" SuggestedWidth="178"
                                                 HeightSizePolicy="StretchToParent" HorizontalAlignment="Right"
-                                                MarginRight="12" IsVisible="@IsStatusHintVisible">
+                                                MarginRight="28" IsVisible="@IsStatusHintVisible">
                                           <Children>
                                             <HintWidget DataSource="{StatusHint}" WidthSizePolicy="StretchToParent"
                                                         HeightSizePolicy="StretchToParent"
