@@ -1,6 +1,7 @@
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MobilePartyAIs.Patches;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -343,6 +344,35 @@ public class MapEventEnvironmentTests : MapEventTestBase
             AssertHeroInPartyRoster(client, heroId, partyId);
             AssertPartyPrisonerCount(client, captorPartyId, 0);
         }
+    }
+
+    [Fact]
+    public void EscapeFromCaptivity_ProtectsPlayerFromFormerCaptorForTwelveHours()
+    {
+        var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
+        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        DefeatPlayerPartyInBattle(heroId, partyId, captorPartyId);
+
+        ReleasePlayerByEscapeRequest(Clients.First(), heroId, partyId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(captorPartyId, out var captorParty));
+            Assert.True(DefaultMobilePartyAIModelPatches.DisablePlayerAttackTimes.TryGetValue(captorParty.Ai, out var disabledAttackTimes));
+            Assert.True(disabledAttackTimes.ContainsKey(playerParty));
+
+            // The test bootstrap stubs HoursFromNow to Zero, so replace only the deadline before exercising IsPast.
+            var disabledUntil = Campaign.Current.MapTimeTracker.Now + CampaignTime.Hours(12);
+            DefaultMobilePartyAIModelPatches.PreventAttacksUntil(captorParty, playerParty, disabledUntil);
+            Assert.InRange(disabledUntil.RemainingHoursFromNow, 11.9f, 12.1f);
+
+            playerParty.IgnoreByOtherPartiesTill(CampaignTime.Now);
+            captorParty.RecentEventsMorale = 100f;
+
+            Assert.True(captorParty.Morale > 0f);
+            Assert.False(Campaign.Current.Models.MobilePartyAIModel.ShouldConsiderAttacking(captorParty, playerParty));
+        });
     }
 
     [Fact]

@@ -6,6 +6,7 @@ using Common.Util;
 using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MobilePartyAIs.Patches;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
@@ -370,6 +371,14 @@ internal class PlayerCaptivityServerHandler : IHandler
             playerParty.Position = releasePosition;
             playerParty.IsActive = true;
             playerParty.IgnoreForHours(4);
+            if (captorParty?.MobileParty?.IsActive == true)
+            {
+                // Vanilla protects MainParty from its former captor for 12 hours; apply it to this client party.
+                DefaultMobilePartyAIModelPatches.PreventAttacksUntil(
+                    captorParty.MobileParty,
+                    playerParty,
+                    CampaignTime.HoursFromNow(12));
+            }
             playerParty.Party.SetAsCameraFollowParty();
             playerParty.SetMoveModeHold();
             // SetMoveModeHold only resets the AI behavior, not the navigation mode, so the freed party

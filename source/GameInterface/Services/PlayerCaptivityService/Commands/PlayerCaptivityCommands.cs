@@ -93,6 +93,60 @@ Captures the given hero and assigns the given mobile party as the captor.";
         return CaptureHero(hero, newCaptor);
     }
 
+    private const string ReleasePlayerUsage =
+@"Usage:
+  coop.debug.player_captivity.release_player <heroId>
+
+Example:
+  coop.debug.player_captivity.release_player Player
+
+Releases the given player hero from captivity.";
+
+    [CommandLineArgumentFunction("release_player", "coop.debug.player_captivity")]
+    public static string ReleasePlayer(List<string> args)
+    {
+        var ctx = new CommandContext(
+            "release_player",
+            ReleasePlayerUsage,
+            args);
+
+        if (!ctx.RequireServer(out var error))
+            return error;
+
+        if (!ctx.RequireArgCount(1, out error))
+            return error;
+
+        if (!ctx.TryGetArg(0, "heroId", out var heroId, out error))
+            return error;
+
+        if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
+            return "Failed to release hero: " + error;
+
+        if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, heroId, out var hero, out error))
+            return "Failed to release hero: " + error;
+
+        if (!hero.IsPrisoner)
+            return $"Hero '{GetHeroDisplayName(hero)}' is not a prisoner.";
+
+        var captorId = hero.PartyBelongedToAsPrisoner?.MobileParty?.StringId ?? "unknown";
+
+        try
+        {
+            EndCaptivityAction.ApplyByEscape(hero);
+
+            return
+                "Hero released successfully.\n" +
+                $"Hero: {GetHeroDisplayName(hero)}\n" +
+                $"Former captor StringId: {captorId}";
+        }
+        catch (Exception ex)
+        {
+            return CommandHelpers.FormatException(
+                $"Failed to release hero '{GetHeroDisplayName(hero)}'",
+                ex);
+        }
+    }
+
     private static bool TryGetRandomCaptor(out MobileParty newCaptor, out string error)
     {
         newCaptor = null;
