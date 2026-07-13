@@ -6,6 +6,7 @@ internal class PerkObjectBuilder : IObjectBuilder
 {
     public object Build()
     {
-        return new PerkObject("BowMountedArchery");
+        string stringid = "Perk Tests";
+        return new PerkObject(stringid);
     }
 }

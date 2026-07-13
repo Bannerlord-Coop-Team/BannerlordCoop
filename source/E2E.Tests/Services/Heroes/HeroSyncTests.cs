@@ -130,6 +130,49 @@ namespace E2E.Tests.Services.Heroes
             }
         }
 
+        // SetPerkValueInternal's bool->int branch defeats the transpiler, so SetPerkValuePatch routes
+        // perk changes through the cached PropertyOwner intercept - this exercises that prefix for real
+        [Fact]
+        public void Server_Hero_SetPerkValue_PropagatesToClients()
+        {
+            var perkId = TestEnvironment.CreateRegisteredObject<PerkObject>();
+
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                Assert.True(Server.ObjectManager.TryGetObject(perkId, out PerkObject perk));
+
+                hero.SetPerkValueInternal(perk, true);
+
+                Assert.True(hero.GetPerkValue(perk));
+            });
+
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                Assert.True(client.ObjectManager.TryGetObject(perkId, out PerkObject perk));
+                Assert.True(hero.GetPerkValue(perk));
+            }
+
+            // Resetting the perk rides the same message with value 0 (vanilla removes the key)
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                Assert.True(Server.ObjectManager.TryGetObject(perkId, out PerkObject perk));
+
+                hero.SetPerkValueInternal(perk, false);
+
+                Assert.False(hero.GetPerkValue(perk));
+            });
+
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                Assert.True(client.ObjectManager.TryGetObject(perkId, out PerkObject perk));
+                Assert.False(hero.GetPerkValue(perk));
+            }
+        }
+
         // Hero.ClearSkills routes through PropertyOwner.ClearAllProperty - covers the clear message pair
         [Fact]
         public void Server_Hero_ClearSkills_PropagatesToClients()
