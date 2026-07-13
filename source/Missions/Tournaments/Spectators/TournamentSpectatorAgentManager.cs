@@ -172,20 +172,7 @@ public class TournamentSpectatorAgentManager : ITournamentSpectatorAgentManager
         var entrants = new HashSet<string>(state.SuccessorControllerIds ?? Array.Empty<string>());
         if (!string.IsNullOrEmpty(state.HostControllerId)) entrants.Add(state.HostControllerId);
 
-        var fighters = new HashSet<string>();
-        TournamentMatchData match = state.Rounds?
-            .Where(round => round?.Matches != null)
-            .SelectMany(round => round.Matches)
-            .FirstOrDefault(candidate => candidate?.MatchId == state.CurrentMatchId);
-        if (match != null)
-        {
-            var fightingSlots = new HashSet<string>(match.Teams
-                .Where(team => team?.ParticipantSlotIds != null)
-                .SelectMany(team => team.ParticipantSlotIds));
-            foreach (TournamentContestantData contestant in state.Contestants)
-                if (contestant != null && fightingSlots.Contains(contestant.SlotId))
-                    fighters.Add(contestant.ControllerId);
-        }
+        HashSet<string> fighters = GetFighterControllers(state);
 
         var eligible = new HashSet<string>(state.SpectatorControllerIds ?? Array.Empty<string>());
         foreach (TournamentContestantData contestant in state.Contestants ?? Array.Empty<TournamentContestantData>())
@@ -197,6 +184,24 @@ public class TournamentSpectatorAgentManager : ITournamentSpectatorAgentManager
         eligible.IntersectWith(entrants);
         eligible.RemoveWhere(string.IsNullOrEmpty);
         return eligible.OrderBy(controllerId => controllerId, StringComparer.Ordinal).ToArray();
+    }
+
+    private static HashSet<string> GetFighterControllers(TournamentSessionSnapshot state)
+    {
+        var fighters = new HashSet<string>();
+        TournamentMatchData match = state.Rounds?
+            .Where(round => round?.Matches != null)
+            .SelectMany(round => round.Matches)
+            .FirstOrDefault(candidate => candidate?.MatchId == state.CurrentMatchId);
+        if (match == null) return fighters;
+
+        var fightingSlots = new HashSet<string>(match.Teams
+            .Where(team => team?.ParticipantSlotIds != null)
+            .SelectMany(team => team.ParticipantSlotIds));
+        foreach (TournamentContestantData contestant in state.Contestants)
+            if (contestant != null && fightingSlots.Contains(contestant.SlotId))
+                fighters.Add(contestant.ControllerId);
+        return fighters;
     }
 
     private void ReconcileOnGameThread()
@@ -258,18 +263,11 @@ public class TournamentSpectatorAgentManager : ITournamentSpectatorAgentManager
 
     private void ProcessJoinInfo(NetworkMissionJoinInfo joinInfo)
     {
-        if (Mission.Current == null || snapshot?.Phase != TournamentSessionPhase.LiveMatch) return;
-        if (joinInfo.ControllerId == controllerIdProvider.ControllerId) return;
-        if (!GetEligibleControllers(snapshot).Contains(joinInfo.ControllerId)) return;
-        if (!TournamentSpectatorSceneLayouts.TryGet(Mission.Current.SceneName, out var layout)) return;
-        if (!TryResolveCharacter(joinInfo.ControllerId, out string characterId, out CharacterObject character)) return;
-
-        CoopAgentSpawnData[] spawnData = joinInfo.AiAgentData ?? Array.Empty<CoopAgentSpawnData>();
-        if (spawnData.Length != 1) return;
-        CoopAgentSpawnData data = spawnData[0];
-        if (data == null || data.AgentId == Guid.Empty || data.CharacterObjectId != characterId) return;
-        if (!TryResolveSpawn(layout, data.Position, out var spawn)) return;
-        if (coopMissionComponent.AgentRegistry.TryGetAgentInfo(data.AgentId, out _)) return;
+        if (!TryResolveRemoteSpectator(
+                joinInfo,
+                out CharacterObject character,
+                out CoopAgentSpawnData data,
+                out TournamentSpectatorSpawnData spawn)) return;
 
         RemoveSpectator(joinInfo.ControllerId);
         Agent agent = SpawnAgent(character, spawn, AgentControllerType.None);
@@ -282,13 +280,36 @@ public class TournamentSpectatorAgentManager : ITournamentSpectatorAgentManager
 
         spectators[joinInfo.ControllerId] = new SpectatorAgentRecord(
             data.AgentId,
-            characterId,
+            data.CharacterObjectId,
             spawn,
             agent);
         Logger.Information(
             "[TournamentSpectator] Spawned remote spectator {ControllerId} at {SpawnName}",
             joinInfo.ControllerId,
             spawn.Name);
+    }
+
+    private bool TryResolveRemoteSpectator(
+        NetworkMissionJoinInfo joinInfo,
+        out CharacterObject character,
+        out CoopAgentSpawnData data,
+        out TournamentSpectatorSpawnData spawn)
+    {
+        character = null;
+        data = null;
+        spawn = default;
+        if (Mission.Current == null || snapshot?.Phase != TournamentSessionPhase.LiveMatch) return false;
+        if (joinInfo.ControllerId == controllerIdProvider.ControllerId) return false;
+        if (!GetEligibleControllers(snapshot).Contains(joinInfo.ControllerId)) return false;
+        if (!TournamentSpectatorSceneLayouts.TryGet(Mission.Current.SceneName, out var layout)) return false;
+        if (!TryResolveCharacter(joinInfo.ControllerId, out string characterId, out character)) return false;
+
+        CoopAgentSpawnData[] spawnData = joinInfo.AiAgentData ?? Array.Empty<CoopAgentSpawnData>();
+        if (spawnData.Length != 1) return false;
+        data = spawnData[0];
+        if (data == null || data.AgentId == Guid.Empty || data.CharacterObjectId != characterId) return false;
+        if (!TryResolveSpawn(layout, data.Position, out spawn)) return false;
+        return !coopMissionComponent.AgentRegistry.TryGetAgentInfo(data.AgentId, out _);
     }
 
     private bool TryResolveOrangeItem(out ItemObject item)

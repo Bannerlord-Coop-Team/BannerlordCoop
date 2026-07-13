@@ -26,7 +26,6 @@ namespace Coop
                 "No local spectator spawnpoint has been recorded in this mission.");
         }
 
-
         private static string DisplayResult(string result)
         {
             Logger.Information("[TournamentSpectator] Debug command result: {Result}", result);

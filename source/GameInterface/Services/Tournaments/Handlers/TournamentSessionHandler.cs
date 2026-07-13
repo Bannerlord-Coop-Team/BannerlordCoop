@@ -702,7 +702,7 @@ internal sealed partial class TournamentSessionHandler : IHandler
             LeavePreparationAfterDisconnect(controllerId, snapshot);
             return;
         }
-        if (!snapshot.IsCompleted && !IsConfirmedEntrant(snapshot, controllerId))
+        if (involved)
             LeaveActive(snapshot.SessionId, snapshot.Revision, controllerId, null);
     }
 

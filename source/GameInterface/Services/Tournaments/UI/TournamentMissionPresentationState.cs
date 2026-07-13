@@ -15,7 +15,7 @@ internal readonly struct TournamentMissionPresentationState
         bool bracketVisible,
         bool matchActive,
         bool hasMovableSpectator)
-        => bracketVisible || matchActive && !hasMovableSpectator;
+        => bracketVisible || (matchActive && !hasMovableSpectator);
 
     public static TournamentMissionPresentationState From(TournamentSessionSnapshot snapshot)
         => new(snapshot != null &&

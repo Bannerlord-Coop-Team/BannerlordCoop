@@ -36,10 +36,10 @@ public static class TournamentSpectatorBarrierCollision
         float previousDeltaY = previous.y - barrier.Position.y;
         float currentDeltaX = current.x - barrier.Position.x;
         float currentDeltaY = current.y - barrier.Position.y;
-        float previousLocalX = cosine * previousDeltaX + sine * previousDeltaY;
-        float previousLocalY = -sine * previousDeltaX + cosine * previousDeltaY;
-        float currentLocalX = cosine * currentDeltaX + sine * currentDeltaY;
-        float currentLocalY = -sine * currentDeltaX + cosine * currentDeltaY;
+        float previousLocalX = (cosine * previousDeltaX) + (sine * previousDeltaY);
+        float previousLocalY = (-sine * previousDeltaX) + (cosine * previousDeltaY);
+        float currentLocalX = (cosine * currentDeltaX) + (sine * currentDeltaY);
+        float currentLocalY = (-sine * currentDeltaX) + (cosine * currentDeltaY);
         if (previousLocalY * currentLocalY > 0f) return false;
 
         float denominator = previousLocalY - currentLocalY;
@@ -47,20 +47,20 @@ public static class TournamentSpectatorBarrierCollision
         float intersection = previousLocalY / denominator;
         if (intersection < 0f || intersection > 1f) return false;
 
-        float intersectionX = previousLocalX + (currentLocalX - previousLocalX) * intersection;
-        float intersectionZ = previous.z + (current.z - previous.z) * intersection;
-        if (Math.Abs(intersectionX) > barrier.Scale.x * 0.5f + 0.5f ||
+        float intersectionX = previousLocalX + ((currentLocalX - previousLocalX) * intersection);
+        float intersectionZ = previous.z + ((current.z - previous.z) * intersection);
+        if (Math.Abs(intersectionX) > (barrier.Scale.x * 0.5f) + 0.5f ||
             intersectionZ < minimumZ ||
             intersectionZ > maximumZ)
         {
             return false;
         }
 
-        float side = previousLocalY > 0f || previousLocalY == 0f && currentLocalY < 0f ? 1f : -1f;
+        float side = previousLocalY > 0f || (previousLocalY == 0f && currentLocalY < 0f) ? 1f : -1f;
         float constrainedLocalY = side * AgentRadius;
         constrained = new Vec3(
-            barrier.Position.x + cosine * currentLocalX - sine * constrainedLocalY,
-            barrier.Position.y + sine * currentLocalX + cosine * constrainedLocalY,
+            barrier.Position.x + (cosine * currentLocalX) - (sine * constrainedLocalY),
+            barrier.Position.y + (sine * currentLocalX) + (cosine * constrainedLocalY),
             current.z);
         return true;
     }
