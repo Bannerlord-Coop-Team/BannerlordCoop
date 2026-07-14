@@ -41,10 +41,31 @@ internal class BattleMissionEntryPatch
     // The host is computed locally (deterministic, no server round-trip) so the gate already knows whether to
     // suppress this client's spawn when the troops spawn. The server's authoritative assignment still arrives
     // later and reconciles the gate (BattleHostHandler.SetLocalHost).
+    // SOAK-LOG PHASE of retiring this native battle-entry pipeline (RANK 12 — planned demotion).
+    // Both coop launchers open battles via MissionState.OpenNew, which never routes through the patched
+    // CampaignMission.OpenBattleMission wrapper, so in coop play this native path provably never fires. A future
+    // release will demote this whole patch to a blocking guard (log an error + return false) under the SAME
+    // predicate this soak warning uses — a coop session is active (a coop client campaign; the in-process server
+    // seat keeps its behavior via the IsServer early-return below), NOT merely BattleSpawnGate.IsCoopBattleActive
+    // (on the blocked native path the gate is not yet engaged). The warning fires under that exact predicate so
+    // the soak validates the real block condition before the demotion lands. If it ever shows up in the logs,
+    // some vanilla flow (a quest, a re-enabled hideout) still routes through the native open and must be handled
+    // by the unified launcher pipeline before the guard is allowed to block it.
     [HarmonyPrefix]
-    private static void Prefix()
+    private static void Prefix(MissionInitializerRecord __0)
     {
         if (ModInformation.IsServer) return;
+
+        // A live coop DI container == a coop session is running (client or server). This is the predicate the
+        // final guard will block on; log loudly here first (no behavior change) to prove it never fires in coop.
+        if (ContainerProvider.TryGetContainer(out _))
+        {
+            Logger.Warning(
+                "[BattleSync][SOAK] Native CampaignMission.OpenBattleMission executed while a coop session is active — scene '{Scene}'. " +
+                "This native battle-entry path is slated for demotion to a blocking guard; the coop launchers (MissionState.OpenNew) are meant to be the only battle-entry layer.",
+                __0.SceneName);
+        }
+
         if (!BattleSpawnConfig.Enabled) return;
 
         var mapEvent = PlayerEncounter.Battle ?? MobileParty.MainParty?.MapEvent;

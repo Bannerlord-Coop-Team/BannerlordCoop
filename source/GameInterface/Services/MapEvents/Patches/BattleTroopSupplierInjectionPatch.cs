@@ -37,6 +37,16 @@ internal class BattleTroopSupplierInjectionPatch
         // for any spawn logic the native path constructs while a coop battle is active.
         if (suppliers.Length > 0 && suppliers[0] is CoopTroopSupplier) return;
 
+        // SOAK-LOG PHASE of retiring this native substitution path (RANK 12 — planned demotion; see
+        // BattleMissionEntryPatch). The coop launchers install CoopTroopSuppliers themselves, so reaching this
+        // substitution means a native OpenBattleMission constructed the spawn logic while a coop battle is active
+        // — the very path slated to be blocked. Log loudly (no behavior change) so the soak proves whether this
+        // ever happens in coop play before the demotion to a blocking guard lands.
+        Logger.Warning(
+            "[TroopSupply][SOAK] Substituting CoopTroopSuppliers for native suppliers during an active coop battle (mapEvent={MapEvent}). " +
+            "This native substitution path is slated for demotion to a blocking guard.",
+            mapEventId);
+
         // No DI here (static patch), so resolve the object manager ONCE and hand it to the suppliers (they no
         // longer hit the service locator per agent on the supply path).
         ContainerProvider.TryResolve<IObjectManager>(out var objectManager);
