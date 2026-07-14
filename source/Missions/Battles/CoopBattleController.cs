@@ -187,24 +187,8 @@ public class CoopBattleController : CoopMissionController
     // teams like any agent). Mirrors CoopBattleDepletionPatch's live-agent count.
     private bool BattleReadyForEndChecks()
     {
-        bool attackerFielded = false;
-        bool defenderFielded = false;
-        foreach (var team in Mission.Teams)
-        {
-            if (team.Side != BattleSideEnum.Attacker && team.Side != BattleSideEnum.Defender) continue;
-            if (team.Side == BattleSideEnum.Attacker && attackerFielded) continue;
-            if (team.Side == BattleSideEnum.Defender && defenderFielded) continue;
-
-            foreach (var agent in team.ActiveAgents)
-            {
-                if (!agent.IsHuman) continue;
-                if (team.Side == BattleSideEnum.Attacker) attackerFielded = true;
-                else defenderFielded = true;
-                break;
-            }
-
-            if (attackerFielded && defenderFielded) break;
-        }
+        bool attackerFielded = BattleSideLiveness.CountLiveHumanAgents(Mission, BattleSideEnum.Attacker) > 0;
+        bool defenderFielded = BattleSideLiveness.CountLiveHumanAgents(Mission, BattleSideEnum.Defender) > 0;
 
         return ShouldReleaseEndConditionHold(
             Deployment.IsActivated,

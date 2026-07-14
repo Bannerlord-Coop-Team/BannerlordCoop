@@ -108,8 +108,8 @@ internal class PlayerEncounterPatches
 
         Logger.Information(
             "[PvPBattleEncounterTrace] Battle encounter option clicked: surrender; party={PartyId} mapEvent={MapEventId} menu={Menu} encounter={Encounter}",
-            DescribePartyForTrace(MobileParty.MainParty?.Party),
-            DescribeMapEventForTrace(GetCurrentMapEventForTrace()),
+            BattleTrace.DescribePartyForTrace(MobileParty.MainParty?.Party),
+            BattleTrace.DescribeMapEventForTrace(BattleTrace.GetCurrentMapEventForTrace(includeEncounterMapEvent: true)),
             Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "<none>",
             PlayerEncounter.Current != null);
 
@@ -196,8 +196,8 @@ internal class PlayerEncounterPatches
         var isBattleJoiner = IsBattleJoiner();
         Logger.Information(
             "[PvPBattleEncounterTrace] Battle encounter option clicked: leave; party={PartyId} mapEvent={MapEventId} isBattleJoiner={IsBattleJoiner} menu={Menu} encounter={Encounter}",
-            DescribePartyForTrace(mainParty.Party),
-            DescribeMapEventForTrace(mapEvent),
+            BattleTrace.DescribePartyForTrace(mainParty.Party),
+            BattleTrace.DescribeMapEventForTrace(mapEvent),
             isBattleJoiner,
             Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "<none>",
             PlayerEncounter.Current != null);
@@ -245,46 +245,6 @@ internal class PlayerEncounterPatches
     {
         var side = MobileParty.MainParty?.Party?.MapEventSide;
         return side != null && side.LeaderParty != MobileParty.MainParty.Party;
-    }
-
-    private static MapEvent GetCurrentMapEventForTrace()
-    {
-        var encounter = PlayerEncounter.Current;
-        return encounter?._mapEvent ?? GetPlayerEncounterBattleForTrace() ?? MobileParty.MainParty?.MapEvent;
-    }
-
-    private static MapEvent GetPlayerEncounterBattleForTrace()
-    {
-        try
-        {
-            return PlayerEncounter.Battle;
-        }
-        catch (NullReferenceException)
-        {
-            return null;
-        }
-    }
-
-    private static string DescribePartyForTrace(PartyBase party)
-    {
-        if (party == null)
-            return "<null>";
-
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) && objectManager.TryGetId(party, out var partyId))
-            return partyId;
-
-        return party.MobileParty?.StringId ?? party.Name?.ToString() ?? "<unregistered-party>";
-    }
-
-    private static string DescribeMapEventForTrace(MapEvent mapEvent)
-    {
-        if (mapEvent == null)
-            return "<null>";
-
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) && objectManager.TryGetId(mapEvent, out var mapEventId))
-            return mapEventId;
-
-        return mapEvent.StringId ?? "<unregistered-map-event>";
     }
 
     private static void ClearEngageOrder(MobileParty party)

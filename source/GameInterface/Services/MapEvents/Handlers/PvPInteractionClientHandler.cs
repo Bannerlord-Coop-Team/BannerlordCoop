@@ -254,8 +254,8 @@ internal class PvPInteractionClientHandler : IHandler
 
         var encounter = PlayerEncounter.Current;
         if (IsMapEventId(encounter?._mapEvent, message.MapEventId) ||
-            IsMapEventId(GetPlayerEncounterBattle(), message.MapEventId) ||
-            IsMapEventId(GetPlayerEncounterEncounteredBattle(), message.MapEventId))
+            IsMapEventId(BattleTrace.GetPlayerEncounterBattleForTrace(), message.MapEventId) ||
+            IsMapEventId(BattleTrace.GetPlayerEncounterEncounteredBattleForTrace(), message.MapEventId))
         {
             if (IsLocalParty(encounter?._attackerParty))
                 party = encounter._attackerParty;
@@ -323,30 +323,6 @@ internal class PvPInteractionClientHandler : IHandler
 
     private static string FormatIds(string[] ids)
         => ids == null || ids.Length == 0 ? "<none>" : string.Join(",", ids);
-
-    private static MapEvent GetPlayerEncounterBattle()
-    {
-        try
-        {
-            return PlayerEncounter.Battle;
-        }
-        catch (NullReferenceException)
-        {
-            return null;
-        }
-    }
-
-    private static MapEvent GetPlayerEncounterEncounteredBattle()
-    {
-        try
-        {
-            return PlayerEncounter.EncounteredBattle;
-        }
-        catch (NullReferenceException)
-        {
-            return null;
-        }
-    }
 
     /// <summary>The defender was added to the map event (battle started); drop the popup — the battle menu blocks them now.</summary>
     private void Handle_NetworkHidePvpPopup(MessagePayload<NetworkHidePvpPopup> payload)

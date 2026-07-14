@@ -411,45 +411,8 @@ internal class BattleMissionStartHandler : IHandler
             // The encounter can end (or another mission can open) between the server
             // round-trip and this running, so everything the mission depends on is
             // re-validated here rather than at message arrival.
-            if (Campaign.Current == null)
-            {
-                Logger.Warning("Received {Message} but the campaign was not loaded, not opening battle mission", nameof(NetworkStartAttackMission));
+            if (!TryGetValidBattle(nameof(NetworkStartAttackMission), mapEventId, out var battle))
                 return;
-            }
-
-            var battle = PlayerEncounter.Battle;
-            if (battle == null)
-            {
-                Logger.Warning("Received {Message} but PlayerEncounter.Battle was null, not opening battle mission", nameof(NetworkStartAttackMission));
-                return;
-            }
-
-            if (!ContainerProvider.TryResolve(out IObjectManager objectManager) ||
-                !objectManager.TryGetId(battle, out var battleMapEventId) ||
-                battleMapEventId != mapEventId)
-            {
-                Logger.Warning("Received {Message} for map event {MapEventId}, but the local player is not in that battle; not opening battle mission", nameof(NetworkStartAttackMission), mapEventId);
-                return;
-            }
-
-            // A finalized battle keeps PlayerEncounter.Battle set but releases the
-            // main party from the map event, which the mission setup dereferences.
-            if (MobileParty.MainParty?.MapEvent == null)
-            {
-                Logger.Warning("Received {Message} but the main party is no longer in a map event, not opening battle mission", nameof(NetworkStartAttackMission));
-                return;
-            }
-
-            // Pressing attack again while the request is in flight produces a second
-            // mission start; opening on top of the running mission corrupts the game
-            // state stack. MissionState.Current is set synchronously by the state
-            // push, unlike Mission.Current which is only set on the mission's first
-            // tick, so it also covers two mission starts queued in the same frame.
-            if (MissionState.Current != null)
-            {
-                Logger.Warning("Received {Message} but a mission is already open, not opening battle mission", nameof(NetworkStartAttackMission));
-                return;
-            }
 
             MissionInitializerRecord rec2 = missionInitializerResolver.Create(battle, randomTerrainSeed, atmosphereOnCampaign);
 
@@ -459,9 +422,9 @@ internal class BattleMissionStartHandler : IHandler
             // who fields which troops is decided by the server-fed reserves (CoopTroopSupplier).
             if (BattleSpawnConfig.Enabled)
             {
-                BattleSpawnGate.BeginBattle(battleMapEventId);
+                BattleSpawnGate.BeginBattle(mapEventId);
                 spawnGateEngaged = true;
-                Logger.Information("[BattleSync] Engaged spawn gate in OpenAttackMission: mapEvent={MapEventId}", battleMapEventId);
+                Logger.Information("[BattleSync] Engaged spawn gate in OpenAttackMission: mapEvent={MapEventId}", mapEventId);
             }
 
             // Coop opens a custom battle mission (per-client troop suppliers) instead of the native one; the

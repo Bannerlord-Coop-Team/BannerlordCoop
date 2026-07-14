@@ -36,13 +36,7 @@ internal class CoopBattleDepletionPatch
         var mission = Mission.Current;
         if (mission == null) { __result = false; return false; }
 
-        int active = 0;
-        foreach (var team in mission.Teams)
-        {
-            if (team.Side != side) continue;
-            foreach (var agent in team.ActiveAgents)
-                if (agent.IsHuman) active++;
-        }
+        int active = BattleSideLiveness.CountLiveHumanAgents(mission, side);
 
         var had = SideHadAgents.GetValue(__instance, _ => new bool[2]);
         if (active > 0)

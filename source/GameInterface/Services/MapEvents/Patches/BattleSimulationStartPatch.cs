@@ -49,8 +49,8 @@ internal class BattleSimulationStartPatch
 
         Logger.Information(
             "[PvPBattleEncounterTrace] Battle encounter option clicked: order attack; party={PartyId} mapEvent={MapEventId} menu={Menu} encounter={Encounter}",
-            DescribePartyForTrace(MobileParty.MainParty?.Party),
-            DescribeMapEventForTrace(GetCurrentMapEventForTrace()),
+            BattleTrace.DescribePartyForTrace(MobileParty.MainParty?.Party),
+            BattleTrace.DescribeMapEventForTrace(BattleTrace.GetCurrentMapEventForTrace()),
             Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "<none>",
             PlayerEncounter.Current != null);
 
@@ -58,7 +58,7 @@ internal class BattleSimulationStartPatch
         if (coordinator == null)
             return true; // not wired (shouldn't happen in a live session) — fall back to native behavior
 
-        var mapEvent = GetPlayerEncounterBattleForTrace() ?? MobileParty.MainParty?.MapEvent;
+        var mapEvent = BattleTrace.GetPlayerEncounterBattleForTrace() ?? MobileParty.MainParty?.MapEvent;
         if (mapEvent == null)
             return true;
 
@@ -77,42 +77,4 @@ internal class BattleSimulationStartPatch
         return true;
     }
 
-    private static MapEvent GetCurrentMapEventForTrace()
-    {
-        return GetPlayerEncounterBattleForTrace() ?? MobileParty.MainParty?.MapEvent;
-    }
-
-    private static MapEvent GetPlayerEncounterBattleForTrace()
-    {
-        try
-        {
-            return PlayerEncounter.Battle;
-        }
-        catch (NullReferenceException)
-        {
-            return null;
-        }
-    }
-
-    private static string DescribePartyForTrace(PartyBase party)
-    {
-        if (party == null)
-            return "<null>";
-
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) && objectManager.TryGetId(party, out var partyId))
-            return partyId;
-
-        return party.MobileParty?.StringId ?? party.Name?.ToString() ?? "<unregistered-party>";
-    }
-
-    private static string DescribeMapEventForTrace(MapEvent mapEvent)
-    {
-        if (mapEvent == null)
-            return "<null>";
-
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) && objectManager.TryGetId(mapEvent, out var mapEventId))
-            return mapEventId;
-
-        return mapEvent.StringId ?? "<unregistered-map-event>";
-    }
 }

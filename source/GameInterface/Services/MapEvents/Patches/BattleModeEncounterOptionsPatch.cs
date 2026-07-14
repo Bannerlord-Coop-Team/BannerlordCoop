@@ -80,7 +80,7 @@ internal class BattleModeEncounterOptionsPatch
         // Server never opens the menu; mode trackers are client state.
         if (ModInformation.IsServer) return;
 
-        var mapEvent = GetPlayerEncounterBattle() ?? MobileParty.MainParty?.MapEvent;
+        var mapEvent = BattleTrace.GetPlayerEncounterBattleForTrace() ?? MobileParty.MainParty?.MapEvent;
         if (mapEvent == null) return;
 
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return;
@@ -131,21 +131,9 @@ internal class BattleModeEncounterOptionsPatch
            PlayerEncounter.Current != null ||
            MobileParty.MainParty?.MapEvent != null;
 
-    private static MapEvent GetPlayerEncounterBattle()
-    {
-        try
-        {
-            return PlayerEncounter.Battle;
-        }
-        catch (NullReferenceException)
-        {
-            return null;
-        }
-    }
-
     private static string DescribeEncounterState()
     {
         var encounter = PlayerEncounter.Current;
-        return $"menu={Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "<none>"}; encounter={(encounter != null)}; mainPartyMapEvent={(MobileParty.MainParty?.MapEvent != null)}; battle={(GetPlayerEncounterBattle() != null)}; attacker={(encounter?._attackerParty != null)}; defender={(encounter?._defenderParty != null)}";
+        return $"menu={Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "<none>"}; encounter={(encounter != null)}; mainPartyMapEvent={(MobileParty.MainParty?.MapEvent != null)}; battle={(BattleTrace.GetPlayerEncounterBattleForTrace() != null)}; attacker={(encounter?._attackerParty != null)}; defender={(encounter?._defenderParty != null)}";
     }
 }
