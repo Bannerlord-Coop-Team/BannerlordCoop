@@ -1,4 +1,6 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
+using Serilog;
 using Steamworks;
 using System;
 using System.Runtime.CompilerServices;
@@ -13,6 +15,8 @@ namespace Coop.Steam;
 /// </summary>
 public static class SteamBoot
 {
+    private static readonly ILogger Logger = LogManager.GetLogger(typeof(SteamBoot));
+
     // Strong root: MessageBroker subscriptions are weak references, so the listener must be
     // reachable for the process lifetime or its subscriptions silently die.
     public static SteamJoinListener JoinListener { get; private set; }
@@ -32,9 +36,10 @@ public static class SteamBoot
         {
             available = ProbeSteam();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
             // Steamworks.NET.dll absent (non-Steam install) or SteamAPI not initialized.
+            Logger.Warning(ex, "Steam client bootstrap failed during the runtime probe");
             available = false;
         }
 
@@ -47,7 +52,20 @@ public static class SteamBoot
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static bool ProbeSteam()
     {
-        return SteamAPI.IsSteamRunning() && SteamUser.GetSteamID().IsValid();
+        bool steamRunning = SteamAPI.IsSteamRunning();
+        if (!steamRunning)
+        {
+            Logger.Warning("Steam client unavailable: SteamAPI.IsSteamRunning returned false");
+            return false;
+        }
+
+        CSteamID steamId = SteamUser.GetSteamID();
+        bool validSteamId = steamId.IsValid();
+        if (!validSteamId)
+        {
+            Logger.Warning("Steam client unavailable: SteamUser.GetSteamID returned an invalid identity");
+        }
+        return validSteamId;
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]

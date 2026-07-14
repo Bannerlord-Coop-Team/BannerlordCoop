@@ -40,7 +40,7 @@ public static class SteamIntegrationBoot
             catch (Exception ex)
             {
                 // Also catches type-load/JIT failures before the non-inlined helper can enter its own guard.
-                Logger.Warning("Server Steam integration unavailable: {Reason}", ex.Message);
+                Logger.Warning(ex, "Server Steam integration unavailable");
                 return null;
             }
         }
@@ -51,7 +51,7 @@ public static class SteamIntegrationBoot
         }
         catch (Exception ex)
         {
-            Logger.Information("Steam integration unavailable: {Reason}", ex.Message);
+            Logger.Warning(ex, "Steam integration unavailable");
             return null;
         }
 
@@ -61,7 +61,7 @@ public static class SteamIntegrationBoot
         }
         else
         {
-            Logger.Information("Steam integration inactive (Steam not running or not a Steam install)");
+            Logger.Information("Steam integration inactive; see SteamBoot diagnostics above");
         }
 
         return null;
@@ -76,17 +76,18 @@ public static class SteamIntegrationBoot
         }
         catch (Exception ex)
         {
-            Logger.Warning("Server Steam integration unavailable: {Reason}", ex.Message);
+            Logger.Warning(ex, "Server Steam integration unavailable");
             return null;
         }
 
         if (!SessionDiscovery.SteamAvailable)
         {
-            Logger.Information("Server Steam integration inactive (Steam not running or game-server login failed)");
+            Logger.Information(
+                "Server Steam integration inactive; initialization did not reach anonymous logon. See SteamGameServerBoot diagnostics above");
             return null;
         }
 
-        Logger.Information("Server Steam integration active");
+        Logger.Information("Server Steam game-server initialized; anonymous logon pending");
         return new GameServerCallbackPump();
     }
 }
