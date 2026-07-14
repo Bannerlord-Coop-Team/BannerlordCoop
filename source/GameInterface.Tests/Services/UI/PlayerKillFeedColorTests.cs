@@ -106,7 +106,6 @@ public class PlayerKillFeedColorTests
         Assert.True(viewModel.IsApplyButtonVisible);
         var section = Assert.IsType<KillFeedSection>(Assert.Single(tab.Sections));
         Assert.Equal(KillFeedSection.SectionId, section.Id);
-
     }
 
     [Fact]
