@@ -2,6 +2,7 @@ using Common.Messaging;
 using GameInterface;
 using GameInterface.Services.UI.CoopOptions.Providers;
 using GameInterface.Services.UI.CoopOptions.Providers.KillFeedTab;
+using System;
 using TaleWorlds.Library;
 using TaleWorlds.ScreenSystem;
 
@@ -16,24 +17,35 @@ public class CoopOptionsVM : ViewModel
 
     private readonly ICoopOptionsStore optionsStore;
     private readonly IMessageBroker messageBroker;
+    private readonly Action close;
 
     private CoopOptionsTabVM selectedTab;
 
     public string MovieTextHeader => "Coop Options";
     public string ApplyButtonText => "Apply";
 
-    public CoopOptionsVM() : this(ResolveOptionsStore(), MessageBroker.Instance)
+    public CoopOptionsVM() : this(ResolveOptionsStore(), MessageBroker.Instance, ScreenManager.PopScreen)
     {
     }
 
-    public CoopOptionsVM(ICoopOptionsStore optionsStore) : this(optionsStore, MessageBroker.Instance)
+    public CoopOptionsVM(Action close) : this(ResolveOptionsStore(), MessageBroker.Instance, close)
     {
     }
 
-    public CoopOptionsVM(ICoopOptionsStore optionsStore, IMessageBroker messageBroker)
+    public CoopOptionsVM(ICoopOptionsStore optionsStore) : this(optionsStore, MessageBroker.Instance, ScreenManager.PopScreen)
+    {
+    }
+
+    public CoopOptionsVM(ICoopOptionsStore optionsStore, IMessageBroker messageBroker) :
+        this(optionsStore, messageBroker, ScreenManager.PopScreen)
+    {
+    }
+
+    public CoopOptionsVM(ICoopOptionsStore optionsStore, IMessageBroker messageBroker, Action close)
     {
         this.optionsStore = optionsStore;
         this.messageBroker = messageBroker;
+        this.close = close;
 
         Tabs = new MBBindingList<CoopOptionsTabVM>();
         InitializeTabs(optionsStore.LoadOrDefault());
@@ -83,7 +95,7 @@ public class CoopOptionsVM : ViewModel
 
     public void ActionCancel()
     {
-        ScreenManager.PopScreen();
+        close();
     }
 
     private void InitializeTabs(CoopOptionsData options)
