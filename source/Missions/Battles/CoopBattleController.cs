@@ -158,11 +158,9 @@ public class CoopBattleController : CoopMissionController
         BattleConclusionGate.IsInCoopBattleMission = true;
         BattleConclusionGate.IsLocalBattleHost = Session.IsLocalHost;
 
-        // Drain terminal events after the buffered puppet batch registers, then let the end-condition gate
-        // observe the resulting live-agent state on this same tick.
+        // Register the buffered puppet batch before the one-shot end-condition gate so it can observe both
+        // sides as fielded even when a queued terminal event removes every agent on one side this tick.
         puppetSpawner.DrainPendingPuppets();
-        puppetDeathApplier.DrainPendingDeaths();
-        puppetRoutApplier.DrainPendingRouts();
 
         // Vanilla's end checks unlock at the LOCAL deployment finish, but a side whose troops arrive as
         // another client's puppets can be empty long after activation (own-party troops stay withheld
@@ -181,6 +179,11 @@ public class CoopBattleController : CoopMissionController
                 if (battleLive) endConditionHoldReleased = true;
             }
         }
+
+        // Terminal events can now remove freshly registered puppets without preventing the one-shot gate
+        // above from releasing. Vanilla end checks will observe the resulting depletion normally.
+        puppetDeathApplier.DrainPendingDeaths();
+        puppetRoutApplier.DrainPendingRouts();
 
         siegeEngineDeployment.DrainPending(dt);
         siegeMachineState.Tick(dt);
