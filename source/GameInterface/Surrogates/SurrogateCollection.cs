@@ -38,8 +38,6 @@ public class SurrogateCollection : ISurrogateCollection
             AddSurrogate<ExplainedNumber.StatExplainer, StatExplainerSurrogate>();
             AddSurrogate<ExplanationLine, ExplanationLineSurrogate>();
 
-            AddSurrogate<PropertyObject, PropertyObjectSurrogate>();
-
             AddSurrogate<Vec3, Vec3Surrogate>();
             AddSurrogate<Mat3, Mat3Surrogate>();
             AddSurrogate<MatrixFrame, MatrixFrameSurrogate>();

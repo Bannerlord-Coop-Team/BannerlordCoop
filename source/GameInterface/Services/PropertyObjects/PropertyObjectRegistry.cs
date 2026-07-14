@@ -22,6 +22,7 @@ internal class PropertyObjectRegistry : AutoRegistryBase<PropertyObject>
     public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
     // Needed for dictionaries that use PropertyObject as a key. Can't use surrogate because it won't be the same instance
+    // If this is deleted, skills and other synced fields that use these as keys will stop working
     public override void RegisterAllObjects()
     {
     }
