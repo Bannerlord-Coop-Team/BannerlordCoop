@@ -1,4 +1,5 @@
 using Autofac;
+using Common.Network.Session;
 using GameInterface;
 using GameInterface.Services.Locations;
 using GameInterface.Services.MapEvents;
@@ -30,6 +31,7 @@ public class MissionModule : Module
             MissilePatchCategory));
 
         builder.RegisterType<LiteNetP2PClient>().As<IBattleNetwork>().InstancePerLifetimeScope();
+        builder.RegisterType<NoopSteamMissionBridge>().As<ISteamMissionBridge>().InstancePerLifetimeScope();
 
         // MissionContext mirrors the server's instance membership and must live for the whole client
         // session (it subscribes to the MissionPeer* messages over the campaign connection), so it is a

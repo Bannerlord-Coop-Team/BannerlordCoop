@@ -5,6 +5,7 @@
     <LangVersion>10</LangVersion>
     <Platforms>x64</Platforms>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <InformationalVersion>$(CoopVersion)</InformationalVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
