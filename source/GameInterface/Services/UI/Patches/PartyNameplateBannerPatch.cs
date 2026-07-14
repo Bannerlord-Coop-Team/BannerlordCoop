@@ -1,31 +1,54 @@
 ﻿using Common;
 using HarmonyLib;
 using SandBox.ViewModelCollection.Nameplate;
+using System.Runtime.CompilerServices;
 
 namespace GameInterface.Services.UI.Patches;
 
 /// <summary>
-/// Rebuilds a party nameplate's banner icon once the party's banner data exists.
-/// On clients a newly spawned party can be spotted before its clan and party
-/// component have synced, so the nameplate caches an empty banner image and
-/// nothing marks it dirty again afterwards.
+/// Rebuilds a party nameplate's banner icon after delayed sync or a faction change.
 /// </summary>
 [HarmonyPatch(typeof(PartyNameplateVM))]
 internal class PartyNameplateBannerPatch
 {
+    private static readonly ConditionalWeakTable<PartyNameplateVM, PartyBannerCodeTracker> bannerTrackers = new();
+
     [HarmonyPatch(nameof(PartyNameplateVM.RefreshDynamicProperties))]
     [HarmonyPostfix]
     private static void Postfix(PartyNameplateVM __instance)
     {
         if (ModInformation.IsServer) return;
 
-        if (__instance.PartyBanner == null || !__instance.PartyBanner.IsEmpty) return;
+        var bannerCode = __instance.Party?.Banner?.BannerCode;
+        if (string.IsNullOrEmpty(bannerCode)) return;
 
-        // Only re-dirty once the banner would produce a non-empty image,
-        // otherwise an empty banner code would trigger a rebuild every frame.
-        var banner = __instance.Party?.Banner;
-        if (banner == null || string.IsNullOrEmpty(banner.BannerCode)) return;
+        // AutoSync changes Clan._kingdom without the native OnClanChangeKingdom callback.
+        var bannerChanged = bannerTrackers
+            .GetValue(__instance, _ => new PartyBannerCodeTracker())
+            .Update(bannerCode);
 
-        __instance._isPartyBannerDirty = true;
+        if (bannerChanged)
+        {
+            __instance.Party?.Party?.SetVisualAsDirty();
+        }
+
+        if (bannerChanged || __instance.PartyBanner == null || __instance.PartyBanner.IsEmpty)
+        {
+            __instance._isPartyBannerDirty = true;
+        }
+    }
+}
+
+internal sealed class PartyBannerCodeTracker
+{
+    private string bannerCode;
+    private bool hasBannerCode;
+
+    internal bool Update(string newBannerCode)
+    {
+        bool changed = hasBannerCode && bannerCode != newBannerCode;
+        bannerCode = newBannerCode;
+        hasBannerCode = true;
+        return changed;
     }
 }
