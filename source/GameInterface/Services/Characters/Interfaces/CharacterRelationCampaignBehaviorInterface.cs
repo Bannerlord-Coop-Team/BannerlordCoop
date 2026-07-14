@@ -56,8 +56,16 @@ public class CharacterRelationCampaignBehaviorInterface : ICharacterRelationCamp
                 if (relationChangeForExecutingHero != 0)
                 {
                     Hero leader = clan.Leader;
-                    ResolvedMainHeroContext.ResolvedMainHero = killer;
-                    ChangeRelationAction.ApplyPlayerRelation(leader, relationChangeForExecutingHero, true, false);
+                    try
+                    {
+                        ResolvedMainHeroContext.ResolvedMainHero = killer;
+                        ChangeRelationAction.ApplyPlayerRelation(leader, relationChangeForExecutingHero, true, false);
+                    }
+                    finally
+                    {
+                        ResolvedMainHeroContext.ResolvedMainHero = null;
+                    }
+                    
                     if (showQuickNotification)
                     {
                         numberOfClansWithHurtRelations++;
