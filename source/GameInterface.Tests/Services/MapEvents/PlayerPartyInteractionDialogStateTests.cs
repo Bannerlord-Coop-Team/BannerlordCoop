@@ -41,7 +41,7 @@ public class PlayerPartyInteractionDialogStateTests
                 "RandomPlayer",
                 PlayerPartyInteractionPhase.WaitingForResponse,
                 PlayerPartyInteractionProposal.Trade,
-                new PlayerPartyInteractionOption[0],
+                System.Array.Empty<PlayerPartyInteractionOption>(),
                 isInitiator: true));
 
             Assert.Equal("Awaiting response from RandomPlayer...", PlayerPartyInteractionDialogState.GetDialogText());
