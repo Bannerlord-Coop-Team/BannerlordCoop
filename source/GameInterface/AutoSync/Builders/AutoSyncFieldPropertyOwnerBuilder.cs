@@ -28,11 +28,19 @@ public class AutoSyncFieldPropertyOwnerBuilder : AutoSyncBuilderBase
         string localMessage = TemplateParser.Parse("Messages.LocalPropertyOwnerSetMessageTemplate", templateData);
         string networkMessage = TemplateParser.Parse("Messages.NetworkPropertyOwnerSetReferenceMessageTemplate", templateData);
 
+        string localClearMessage = TemplateParser.Parse("Messages.LocalPropertyOwnerClearMessageTemplate", templateData);
+        string networkClearMessage = TemplateParser.Parse("Messages.NetworkPropertyOwnerClearMessageTemplate", templateData);
+
         AutoSyncConfiguration.ExportFile($"{fieldInfo.DeclaringType.Name}/{fieldInfo.DeclaringType.Name}_{fieldInfo.Name}_SetLocalMessage.cs", localMessage);
         AutoSyncConfiguration.ExportFile($"{fieldInfo.DeclaringType.Name}/{fieldInfo.DeclaringType.Name}_{fieldInfo.Name}_SetNetworkMessage.cs", networkMessage);
 
+        AutoSyncConfiguration.ExportFile($"{fieldInfo.DeclaringType.Name}/Local_{fieldInfo.DeclaringType.Name}_{fieldInfo.Name}_PropertyOwnerClear.cs", localClearMessage);
+        AutoSyncConfiguration.ExportFile($"{fieldInfo.DeclaringType.Name}/Network_{fieldInfo.DeclaringType.Name}_{fieldInfo.Name}_PropertyOwnerClear.cs", networkClearMessage);
+
         yield return localMessage;
         yield return networkMessage;
+        yield return localClearMessage;
+        yield return networkClearMessage;
     }
 
     public string GetSubscription(Debuggable<FieldInfo> fieldItem)

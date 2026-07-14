@@ -21,10 +21,8 @@ public interface IMissionContext : IDisposable
 }
 
 /// <summary>
-/// Client-side mirror of the server's mission-instance membership. The server announces who is in the
-/// instance over the campaign connection via <see cref="NetworkMissionPeerEntered"/> / <see cref="MissionPeerLeft"/>
-/// / <see cref="MissionPeerDisconnected"/>; this tracks that set so <see cref="ControllersInMission"/> stays
-/// equivalent to the server's view (minus the local controller).
+/// Mirrors server-announced mission membership and maps verified direct peers to controller IDs,
+/// excluding the local controller from <see cref="ControllersInMission"/>.
 /// </summary>
 public class MissionContext : IMissionContext, IHandler
 {
@@ -39,10 +37,18 @@ public class MissionContext : IMissionContext, IHandler
 
     private readonly object gate = new();
 
-    public IReadOnlyCollection<string> ControllersInMission =>
-        controllersInMission
-            .Where(controllerId => controllerId != controllerIdProvider.ControllerId)
-            .ToArray();
+    public IReadOnlyCollection<string> ControllersInMission
+    {
+        get
+        {
+            lock (gate)
+            {
+                return controllersInMission
+                    .Where(controllerId => controllerId != controllerIdProvider.ControllerId)
+                    .ToArray();
+            }
+        }
+    }
 
     public MissionContext(
         IMessageBroker messageBroker,
@@ -73,9 +79,12 @@ public class MissionContext : IMissionContext, IHandler
 
     private void Clear()
     {
-        controllersInMission.Clear();
-        idToPeer.Clear();
-        peerToId.Clear();
+        lock (gate)
+        {
+            controllersInMission.Clear();
+            idToPeer.Clear();
+            peerToId.Clear();
+        }
     }
 
     public void MapPeer(string controllerId, NetPeer peer)
@@ -110,9 +119,10 @@ public class MissionContext : IMissionContext, IHandler
 
     public bool TryGetPeer(string controllerId, out NetPeer netPeer)
     {
-        netPeer = null;
-
-        return idToPeer.TryGetValue(controllerId, out netPeer);
+        lock (gate)
+        {
+            return idToPeer.TryGetValue(controllerId, out netPeer);
+        }
     }
 
     private void Handle_MissionPeerEntered(MessagePayload<NetworkMissionPeerEntered> payload)
@@ -130,6 +140,7 @@ public class MissionContext : IMissionContext, IHandler
         lock (gate)
         {
             controllersInMission.Remove(controllerId);
+            RemoveControllerMapping(controllerId);
         }
     }
 
@@ -139,7 +150,15 @@ public class MissionContext : IMissionContext, IHandler
         lock (gate)
         {
             controllersInMission.Remove(controllerId);
+            RemoveControllerMapping(controllerId);
         }
+    }
+
+    private void RemoveControllerMapping(string controllerId)
+    {
+        if (!idToPeer.TryGetValue(controllerId, out var peer)) return;
+        idToPeer.Remove(controllerId);
+        peerToId.Remove(peer);
     }
 
     private void Handle_PlayerLeftLocation(MessagePayload<PlayerLeftLocation> payload)

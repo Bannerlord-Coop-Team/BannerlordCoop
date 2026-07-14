@@ -22,7 +22,9 @@ internal class PlayerLeaveSettlementPatch
         typeof(EncounterGameMenuBehavior).GetMethod("army_encounter_leave_on_consequence", BindingFlags.NonPublic | BindingFlags.Instance),
     };
 
-    private static bool Prefix()
+    private static bool Prefix() => RequestLeave();
+
+    internal static bool RequestLeave()
     {
         var party = MobileParty.MainParty;
 

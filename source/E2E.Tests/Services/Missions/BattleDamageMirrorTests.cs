@@ -7,6 +7,7 @@ using E2E.Tests.Environment.MockEngine;
 using Missions;
 using Missions.Battles;
 using Missions.Messages;
+using System.Reflection;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 using Xunit;
@@ -16,8 +17,8 @@ namespace E2E.Tests.Services.Missions;
 
 /// <summary>
 /// Phase B: the routed-damage application path against the mock engine. Drives the real
-/// <see cref="CoopBattleController"/> damage handler so its missile handling (clearing the projectile flag
-/// before re-applying a blow) is verified headlessly — the regression guard for the live
+/// <see cref="CoopBattleController"/> damage handler so its missile handling (presentation gating and clearing
+/// the sender-local projectile index before re-applying a blow) is verified headlessly — the regression guard for the live
 /// <c>Mission.OnAgentHit</c> <c>_missilesDictionary</c> KeyNotFound crash.
 /// </summary>
 public class BattleDamageMirrorTests : MissionTestEnvironment
@@ -43,14 +44,19 @@ public class BattleDamageMirrorTests : MissionTestEnvironment
             var victimId = Guid.NewGuid();
             Assert.True(registry.TryRegisterAgent("owner", victimId, agent)); // owner == this client's controller id
 
-            // A missile blow whose projectile index is NOT in this client's mission (unsynced) — the exact
-            // condition that crashed live. The owner's handler must neutralize the missile flag before applying,
+            // A missile blow whose source projectile has no matching reconstruction on this client. The owner's
+            // handler must neutralize the missile flag before applying,
             // or the modeled Mission.OnAgentHit lookup throws KeyNotFound (swallowed by RunSafe -> no damage).
             var blow = new Blow(0) { InflictedDamage = 30, DamageType = DamageTypes.Pierce };
             blow.WeaponRecord._isMissile = true;
             blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex = 999;
 
             client.Resolve<IMessageBroker>().Publish(this, new NetworkApplyBattleDamage(victimId, Guid.Empty, blow, default));
+
+            var field = typeof(CoopBattleController).GetField("damageRouter", BindingFlags.Instance | BindingFlags.NonPublic);
+            var router = Assert.IsAssignableFrom<IBattleDamageRouter>(field?.GetValue(controller));
+            for (int i = 0; i < 11; i++)
+                router.Tick(0.05f);
 
             Assert.True(AgentMirror.TryGet(agent, out var mirror));
             Assert.Equal(70f, mirror.Health); // 100 - 30: damage landed

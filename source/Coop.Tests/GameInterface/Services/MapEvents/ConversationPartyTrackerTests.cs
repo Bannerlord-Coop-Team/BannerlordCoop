@@ -1,4 +1,4 @@
-using GameInterface.Services.MapEvents;
+﻿using GameInterface.Services.MapEvents;
 using Xunit;
 
 namespace Coop.Tests.GameInterface.Services.MapEvents;
@@ -20,18 +20,6 @@ public class ConversationPartyTrackerTests
         Assert.Equal(firstPlayer, engagement.EngagerKey);
         Assert.Equal("player1", engagement.EngagerPartyId);
         Assert.False(engagement.WasAiDisabled);
-    }
-
-    [Fact]
-    public void TryBeginEngagement_WhenPartyEngagedByOtherPlayer_Fails()
-    {
-        tracker.TryBeginEngagement(firstPlayer, "player1", "lord1", wasAiDisabled: false);
-
-        var began = tracker.TryBeginEngagement(secondPlayer, "player2", "lord1", wasAiDisabled: false);
-
-        Assert.False(began);
-        Assert.True(tracker.TryGetEngagement("lord1", out var engagement));
-        Assert.Equal(firstPlayer, engagement.EngagerKey);
     }
 
     [Fact]
@@ -104,6 +92,23 @@ public class ConversationPartyTrackerTests
         Assert.False(tracker.TryGetEngagement("lord1", out _));
         Assert.True(tracker.TryGetEngagement("lord2", out _));
         Assert.False(tracker.IsEmpty);
+    }
+
+    [Fact]
+    public void TryEndEngagement_SharedParty_ReleasesOnlyAfterLastPlayer()
+    {
+        tracker.TryBeginEngagement(firstPlayer, "player1", "lord1", wasAiDisabled: false);
+        Assert.True(tracker.TryBeginEngagement(secondPlayer, "player2", "lord1", wasAiDisabled: true));
+        Assert.True(tracker.IsEngagerParty("lord1", "player2"));
+
+        tracker.TryEndEngagement(firstPlayer, out _, out _, out var releaseAfterFirst);
+        Assert.False(releaseAfterFirst);
+        Assert.True(tracker.TryGetEngagement("lord1", out var remaining));
+        Assert.False(remaining.WasAiDisabled);
+
+        tracker.TryEndEngagement(secondPlayer, out _, out _, out var releaseAfterSecond);
+        Assert.True(releaseAfterSecond);
+        Assert.True(tracker.IsEmpty);
     }
 
     [Fact]

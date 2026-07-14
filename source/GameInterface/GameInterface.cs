@@ -2,12 +2,14 @@
 using GameInterface.Utils;
 using HarmonyLib;
 using System;
+using System.Collections.Generic;
 
 namespace GameInterface;
 
 public interface IGameInterface : IDisposable
 {
     void PatchAll();
+    void PatchGameStarted();
     void UnpatchAll();
 }
 
@@ -17,16 +19,27 @@ public class GameInterface : IGameInterface
 
     // Applied at boot by CoopMod, not by PatchAll: the loading-window keepalive must already be live while a host waits on PatchAll itself
     public const string HARMONY_UI_LOADING_CATEGORY = "UILoadingPatches";
+
+    // Applied from CoopMod.OnGameStart because these patches compile types whose initializers require Game.Current
+    public const string HARMONY_GAME_STARTED_CATEGORY = "GameStartedPatches";
+
+    private static bool gameStartedPatchesApplied;
     
     private readonly Harmony harmony;
     private readonly IAutoSyncPatchCollector patchCollector;
     private readonly AutoSyncPatcher AutoSyncPatcher;
+    private readonly IEnumerable<HarmonyPatchCategoryRegistration> patchCategories;
 
-    public GameInterface(Harmony harmony, IAutoSyncPatchCollector patchCollector, AutoSyncPatcher AutoSyncPatcher)
+    public GameInterface(
+        Harmony harmony,
+        IAutoSyncPatchCollector patchCollector,
+        AutoSyncPatcher AutoSyncPatcher,
+        IEnumerable<HarmonyPatchCategoryRegistration> patchCategories)
     {
         this.harmony = harmony;
         this.patchCollector = patchCollector;
         this.AutoSyncPatcher = AutoSyncPatcher;
+        this.patchCategories = patchCategories;
     }
 
     public void Dispose()
@@ -54,7 +67,21 @@ public class GameInterface : IGameInterface
 
         harmony.PatchCategory(assembly, HARMONY_STATIC_FIXES_CATEGORY);
         harmony.PatchAllUncategorized(assembly);
+
+        foreach (HarmonyPatchCategoryRegistration patchCategory in patchCategories)
+        {
+            patchCategory.Apply(harmony);
+        }
+
         AutoSyncPatcher.PatchAll();
+    }
+
+    public void PatchGameStarted()
+    {
+        if (gameStartedPatchesApplied) return;
+
+        harmony.PatchCategory(typeof(GameInterface).Assembly, HARMONY_GAME_STARTED_CATEGORY);
+        gameStartedPatchesApplied = true;
     }
 
     public void UnpatchAll()

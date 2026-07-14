@@ -3,17 +3,23 @@ using Common.LogicStates;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
+using Common.Network.Session;
 using Common.PacketHandlers;
 using Coop.Core.Common;
+using Coop.Core.Common.Configuration;
+using Coop.Core.Common.Session;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Policies;
 using Coop.Core.Server.Services.Instances;
 using Coop.Core.Server.Services.Save;
+using Coop.Core.Server.Services.Session;
 using Coop.Core.Server.Services.Time;
 using Coop.Core.Server.States;
+using Coop.Steam;
 using GameInterface.Policies;
 using LiteNetLib;
 using Missions;
+using System.Runtime.CompilerServices;
 
 namespace Coop.Core.Server;
 
@@ -52,7 +58,48 @@ public class ServerModule : CommonModule
         // Policies
         builder.RegisterType<ServerSyncPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();
 
+        // The standalone server logs into Steam itself and advertises with the host-selected lobby
+        // visibility, so eligible players can join without port forwarding while the owner never
+        // plays. Same guard as ClientModule: only touch Steam types when the boot probe found Steam.
+        if (SessionDiscovery.SteamAvailable)
+        {
+            RegisterSteamSessionServices(builder);
+        }
+        else
+        {
+            builder.RegisterType<NoopSessionAdvertiser>().As<ISessionAdvertiser>().InstancePerLifetimeScope();
+            builder.RegisterType<NoopSessionTunnelHost>()
+                .As<ISessionTunnelHost>()
+                .As<ISessionTunnelIdentityResolver>()
+                .InstancePerLifetimeScope();
+        }
+
+        builder.RegisterType<SessionAdvertisementConfig>().AsSelf().InstancePerLifetimeScope();
+
         RegisterAllTypesWithInterface<ServerModule, IHandler>(builder, autoInstantiate: true);
         RegisterAllTypesWithInterface<ServerModule, IPacketHandler>(builder, autoInstantiate: true);
+    }
+
+    // Non-inlined so referencing the Steam tunnel transport (its layout embeds Steamworks value
+    // types) never pulls Steamworks.NET into Load's JIT on a non-Steam install.
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void RegisterSteamSessionServices(ContainerBuilder builder)
+    {
+        builder.RegisterType<SteamLobbyApi>()
+            .As<ISteamLobbyApi>()
+            .As<ISteamPublicLobbyApi>()
+            .InstancePerLifetimeScope();
+        builder.Register(context => new SteamPublicLobbyAdvertiser(
+                context.Resolve<ISteamPublicLobbyApi>(),
+                context.Resolve<SessionAdvertisementConfig>().Visibility))
+            .As<ISessionAdvertiser>()
+            .InstancePerLifetimeScope();
+        builder.RegisterType<SteamGameServerNetworkingTunnelTransport>().As<ISteamTunnelTransport>().InstancePerLifetimeScope();
+        builder.RegisterType<SteamTunnelHost>()
+            .As<ISessionTunnelHost>()
+            .As<ISessionTunnelIdentityResolver>()
+            .InstancePerLifetimeScope();
+        builder.RegisterType<ServerSessionJoinInfoSource>().As<ISessionJoinInfoSource>().InstancePerLifetimeScope();
+        builder.RegisterType<ServerSessionAdvertisementHandler>().AsSelf().InstancePerLifetimeScope().AutoActivate();
     }
 }

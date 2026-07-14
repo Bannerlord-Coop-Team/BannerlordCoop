@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
@@ -27,6 +28,9 @@ internal class EncounterManagerPatches
     [HarmonyPatch(nameof(EncounterManager.StartSettlementEncounter))]
     private static bool Prefix(MobileParty attackerParty, Settlement settlement)
     {
+        if (IsPendingParty(attackerParty?.Party))
+            return false;
+
         if (RaidAiInterventionSuppression.ShouldSuppressSettlementEncounter(attackerParty, settlement))
             return false;
 
@@ -48,6 +52,9 @@ internal class EncounterManagerPatches
     [HarmonyPatch(nameof(EncounterManager.StartPartyEncounter))]
     private static bool StartPartyEncounterPrefix(PartyBase attackerParty, PartyBase defenderParty)
     {
+        if (IsPendingParty(attackerParty) || IsPendingParty(defenderParty))
+            return false;
+
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (TryRequestActiveSlowRaidSettlementEncounter(attackerParty, defenderParty))
@@ -60,6 +67,9 @@ internal class EncounterManagerPatches
     [HarmonyPatch(nameof(EncounterManager.HandleEncounterForMobileParty))]
     internal static bool HandleEncounterForMobilePartyPatch(ref MobileParty mobileParty, ref float dt)
     {
+        if (IsPendingParty(mobileParty?.Party))
+            return false;
+
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsServer && RaidAiInterventionSuppression.ShouldSuppressMobilePartyEncounter(mobileParty))
@@ -86,12 +96,18 @@ internal class EncounterManagerPatches
         return true;
     }
 
+    internal static bool IsPendingParty(PartyBase party) =>
+        PendingMapEventPartyMovementPatch.IsPending(party);
+
     // EncounterManager.RestartPlayerEncounter is private; patch by name. It is the path that opens the encounter
     // menu/conversation (it calls PlayerEncounter.Current.Init). Parameter order here is (attacker, defender).
     [HarmonyPatch("RestartPlayerEncounter")]
     [HarmonyPrefix]
     private static bool RestartPlayerEncounterPrefix(PartyBase attackerParty, PartyBase defenderParty)
     {
+        if (IsPendingParty(attackerParty) || IsPendingParty(defenderParty))
+            return false;
+
         // Our own server-approved re-run (AllowedThread) runs the real method.
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
