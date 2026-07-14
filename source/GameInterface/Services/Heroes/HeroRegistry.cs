@@ -1,4 +1,5 @@
-﻿using Common.Util;
+﻿using Common;
+using Common.Util;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
@@ -58,9 +59,12 @@ internal class HeroRegistry : AutoRegistryBase<Hero>
             obj._heroDeveloper = new HeroDeveloper(obj);
         }
 
-        Campaign.Current?.CampaignObjectManager?.AddHero(obj);
+        GameThread.RunSafe(() =>
+        {
+            Campaign.Current?.CampaignObjectManager?.AddHero(obj);
 
-        MBObjectManager.Instance?.RegisterObjectInternalWithoutTypeId(obj, presumed: true, out _);
+            MBObjectManager.Instance?.RegisterObjectInternalWithoutTypeId(obj, presumed: false, out _);
+        });
     }
 
     public override void OnClientDestroyed(Hero obj, string id)

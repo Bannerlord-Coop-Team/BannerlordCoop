@@ -76,7 +76,7 @@ internal class MobilePartyRegistry : AutoRegistryBase<MobileParty>
             if (objectManager == null) return;
 
             objectManager.AddMobileParty(obj);
-            MBObjectManager.Instance?.RegisterObjectInternalWithoutTypeId(obj, true, out _);
+            MBObjectManager.Instance?.RegisterObjectInternalWithoutTypeId(obj, presumed: false, out _);
         }, context: "MobilePartyRegistry.OnClientCreated");
     }
 
