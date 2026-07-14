@@ -41,15 +41,22 @@ internal class EscapeMenuCoopOptionsPatch
 internal class MissionEscapeMenuCoopOptionsPatch
 {
     [HarmonyPostfix]
-    static void AddCoopOptionsItem(List<EscapeMenuItemVM> __result)
+    static void AddCoopOptionsItem(MissionGauntletSingleplayerEscapeMenu __instance, List<EscapeMenuItemVM> __result)
     {
         if (ModInformation.IsServer) return;
 
         __result.Insert(2, new EscapeMenuItemVM(
             new TextObject("Coop Options"),
-            _ => ScreenManager.PushScreen(ViewCreatorManager.CreateScreenView<CoopOptionsUI>()),
+            _ => OpenCoopOptions(__instance),
             identifier: null,
             getIsDisabledAndReason: () => new Tuple<bool, TextObject>(false, new TextObject("")),
             isPositiveBehaviored: false));
+    }
+
+    private static void OpenCoopOptions(MissionGauntletSingleplayerEscapeMenu escapeMenu)
+    {
+        var owner = ScreenManager.TopScreen;
+        escapeMenu.OnEscape();
+        CoopOptionsOverlay.Show(owner);
     }
 }

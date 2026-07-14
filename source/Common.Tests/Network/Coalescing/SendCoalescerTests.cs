@@ -93,6 +93,24 @@ public class SendCoalescerTests
     }
 
     [Fact]
+    public void Flush_SendsDistinctKeysInFirstEnqueueOrder()
+    {
+        var (coalescer, network, sent) = NewFixture();
+
+        coalescer.Enqueue(new CoalesceKey("hero", "h1", "Power"), new LatestWinsPayload(new TestMessage("first", 1)));
+        coalescer.Enqueue(new CoalesceKey("hero", "h1", "Morale"), new LatestWinsPayload(new TestMessage("second", 2)));
+        coalescer.Enqueue(new CoalesceKey("hero", "h1", "Power"), new LatestWinsPayload(new TestMessage("firstUpdated", 3)));
+        coalescer.Enqueue(new CoalesceKey("hero", "h2", "Power"), new LatestWinsPayload(new TestMessage("third", 4)));
+
+        coalescer.Flush(network);
+
+        Assert.Collection(sent,
+            first => Assert.Equal("firstUpdated", TagOf(first)),
+            second => Assert.Equal("second", TagOf(second)),
+            third => Assert.Equal("third", TagOf(third)));
+    }
+
+    [Fact]
     public void Flush_ClearsPending()
     {
         var (coalescer, network, sent) = NewFixture();
@@ -121,6 +139,22 @@ public class SendCoalescerTests
         sent.Clear();
         coalescer.Flush(network);
         Assert.Equal("h2Power", TagOf(Assert.Single(sent)));
+    }
+
+    [Fact]
+    public void FlushInstance_PreservesRelativeEnqueueOrderForThatInstance()
+    {
+        var (coalescer, network, sent) = NewFixture();
+        coalescer.Enqueue(new CoalesceKey("hero", "h1", "Power"), new LatestWinsPayload(new TestMessage("first", 1)));
+        coalescer.Enqueue(new CoalesceKey("hero", "h2", "Power"), new LatestWinsPayload(new TestMessage("other", 2)));
+        coalescer.Enqueue(new CoalesceKey("hero", "h1", "Morale"), new LatestWinsPayload(new TestMessage("second", 3)));
+        coalescer.Enqueue(new CoalesceKey("hero", "h1", "Power"), new LatestWinsPayload(new TestMessage("firstUpdated", 4)));
+
+        coalescer.FlushInstance("h1", network);
+
+        Assert.Collection(sent,
+            first => Assert.Equal("firstUpdated", TagOf(first)),
+            second => Assert.Equal("second", TagOf(second)));
     }
 
     [Fact]

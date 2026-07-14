@@ -96,5 +96,70 @@ namespace E2E.Tests.Services.Heroes
             TestEnvironment.AssertReferenceField<Hero, CultureObject>(nameof(Hero.Culture));
             TestEnvironment.AssertField<Hero, float>(nameof(Hero._power), 4.4f, defaultValue: hero._power);
         }
+
+        // Calls the REAL patched game method (not a reflection-invoked intercept), so this covers the
+        // PropertyOwner transpiler's IL rewrite of Hero.SetSkillValue end to end.
+        [Fact]
+        public void Server_Hero_SetSkillValue_PropagatesToClients()
+        {
+            var skillId = TestEnvironment.CreateRegisteredObject<SkillObject>();
+
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                Assert.True(Server.ObjectManager.TryGetObject(skillId, out SkillObject skill));
+
+                hero.SetSkillValue(skill, 42);
+
+                Assert.Equal(42, hero.GetSkillValue(skill));
+            });
+
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                Assert.True(client.ObjectManager.TryGetObject(skillId, out SkillObject skill));
+                Assert.Equal(42, hero.GetSkillValue(skill));
+            }
+        }
+
+        // Hero.ClearSkills routes through PropertyOwner.ClearAllProperty - covers the clear message pair
+        [Fact]
+        public void Server_Hero_ClearSkills_PropagatesToClients()
+        {
+            var skillId = TestEnvironment.CreateRegisteredObject<SkillObject>();
+
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                Assert.True(Server.ObjectManager.TryGetObject(skillId, out SkillObject skill));
+
+                hero.SetSkillValue(skill, 17);
+            });
+
+            // The set must land on clients first, so the clear observably removes it
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                Assert.True(client.ObjectManager.TryGetObject(skillId, out SkillObject skill));
+                Assert.Equal(17, hero.GetSkillValue(skill));
+            }
+
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                Assert.True(Server.ObjectManager.TryGetObject(skillId, out SkillObject skill));
+
+                hero.ClearSkills();
+
+                Assert.Equal(0, hero.GetSkillValue(skill));
+            });
+
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                Assert.True(client.ObjectManager.TryGetObject(skillId, out SkillObject skill));
+                Assert.Equal(0, hero.GetSkillValue(skill));
+            }
+        }
     }
 }

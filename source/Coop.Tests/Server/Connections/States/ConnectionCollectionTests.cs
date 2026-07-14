@@ -77,6 +77,35 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
+        public void ConnectedPlayers_BroadcastsAfterSuccessfulChangesOnly()
+        {
+            var connectPayload = new MessagePayload<PlayerConnected>(this, new PlayerConnected(playerPeer));
+            var disconnectPayload = new MessagePayload<PlayerDisconnected>(this,
+                new PlayerDisconnected(playerPeer, default));
+            serverComponent.TestMessageBroker.Messages.Clear();
+
+            connectionCollection.PlayerJoiningHandler(connectPayload);
+
+            var connected = Assert.Single(
+                serverComponent.TestMessageBroker.GetMessagesFromType<ConnectedPlayersChanged>());
+            Assert.Equal(1, connected.ConnectedPlayers);
+
+            serverComponent.TestMessageBroker.Messages.Clear();
+            connectionCollection.PlayerJoiningHandler(connectPayload);
+            Assert.Empty(serverComponent.TestMessageBroker.GetMessagesFromType<ConnectedPlayersChanged>());
+
+            serverComponent.TestMessageBroker.Messages.Clear();
+            connectionCollection.PlayerDisconnectedHandler(disconnectPayload);
+            var disconnected = Assert.Single(
+                serverComponent.TestMessageBroker.GetMessagesFromType<ConnectedPlayersChanged>());
+            Assert.Equal(0, disconnected.ConnectedPlayers);
+
+            serverComponent.TestMessageBroker.Messages.Clear();
+            connectionCollection.PlayerDisconnectedHandler(disconnectPayload);
+            Assert.Empty(serverComponent.TestMessageBroker.GetMessagesFromType<ConnectedPlayersChanged>());
+        }
+
+        [Fact]
         public void PlayersLoading_BlockedUntilPlayerEntersCampaign()
         {
             // Arrange

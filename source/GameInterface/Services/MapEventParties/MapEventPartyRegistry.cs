@@ -1,5 +1,4 @@
-﻿using Common.Util;
-using GameInterface.Registry.Auto;
+﻿using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
@@ -39,16 +38,8 @@ internal class MapEventPartyRegistry : AutoRegistryBase<MapEventParty>
         }
     }
 
-    public override void OnClientCreated(MapEventParty obj, string id)
-    {
-        using (new AllowedThread())
-        {
-            obj._woundedInBattle = new TroopRoster();
-            obj._diedInBattle = new TroopRoster();
-            obj._routedInBattle = new TroopRoster();
-            obj._roster = new FlattenedTroopRoster();
-        }
-    }
+    public override void OnClientCreated(MapEventParty obj, string id) =>
+        obj._roster = new FlattenedTroopRoster();
 
     public override void OnClientDestroyed(MapEventParty obj, string id)
     {

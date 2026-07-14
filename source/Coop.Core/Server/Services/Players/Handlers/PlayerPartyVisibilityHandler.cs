@@ -5,21 +5,26 @@ using Common.Network;
 using Common.Network.Messages;
 using Common.Util;
 using Coop.Core.Server.Connections.Messages;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.PartyVisuals.Extensions;
+using GameInterface.Services.PartyVisuals.Messages;
 using GameInterface.Services.Players;
 using HarmonyLib;
 using LiteNetLib;
 using SandBox.View.Map.Managers;
 using Serilog;
+using System.Collections.Generic;
+using System.Linq;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
-using GameInterface.Services.PartyVisuals.Messages;
 
 namespace Coop.Core.Server.Services.Players.Handlers;
 /// <summary>
 /// Server-side: hides a disconnected player's party from the map and stops it being simulated, then
-/// restores it once the peer is back in the campaign.
+/// restores it once the peer is back in the campaign. Parties in a MapEvent remain active so reconnect
+/// saves preserve their battle membership.
 /// <see cref="MobileParty.IsActive"/> gates spotting/interaction/ticking (see
 /// PartyVisibilityServerPatches, MobilePartyVisualManagerPatches) and is an AutoSync property, so
 /// changing it syncs automatically. But it does NOT remove the party's rendered map figure.
@@ -35,6 +40,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly Dictionary<MobileParty, MapEvent> deferredMapEventParking = new();
 
     public PlayerPartyVisibilityHandler(
         IMessageBroker messageBroker,
@@ -49,15 +55,18 @@ internal class PlayerPartyVisibilityHandler : IHandler
 
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
         messageBroker.Subscribe<PlayerCampaignEntered>(Handle_PlayerCampaignEntered);
+        messageBroker.Subscribe<MapEventFinalized>(Handle_MapEventFinalized);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
         messageBroker.Unsubscribe<PlayerCampaignEntered>(Handle_PlayerCampaignEntered);
+        messageBroker.Unsubscribe<MapEventFinalized>(Handle_MapEventFinalized);
+        deferredMapEventParking.Clear();
     }
 
-    /// <summary> A peer dropped: park its party and remove its map figure.
+    /// <summary> A peer dropped: park its party and remove its map figure unless it is in a MapEvent.
     private void Handle_PlayerDisconnected(MessagePayload<PlayerDisconnected> payload)
     {
         if (ModInformation.IsClient) return;
@@ -76,6 +85,18 @@ internal class PlayerPartyVisibilityHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            var mapEvent = party.MapEvent;
+            if (mapEvent != null)
+            {
+                deferredMapEventParking[party] = mapEvent;
+                Logger.Information(
+                    "Keeping party {PartyId} active in MapEvent {MapEventId} after peer {Peer} disconnected",
+                    party.StringId,
+                    mapEvent.StringId,
+                    peer.Id);
+                return;
+            }
+
             if (!party.IsActive)
             {
                 Logger.Debug("Party {PartyId} already parked, skipping", party.StringId);
@@ -106,6 +127,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            deferredMapEventParking.Remove(party);
             if (party.IsActive)
             {
                 return; // fresh join, never parked, nothing to restore
@@ -117,6 +139,34 @@ internal class PlayerPartyVisibilityHandler : IHandler
             Logger.Information("Restored party {PartyId} for reconnected peer {Peer}", party.StringId, peer.Id);
         });
     }
+
+    private void Handle_MapEventFinalized(MessagePayload<MapEventFinalized> payload)
+    {
+        if (ModInformation.IsClient) return;
+
+        foreach (var party in deferredMapEventParking
+            .Where(entry => ReferenceEquals(entry.Value, payload.What.MapEvent))
+            .Select(entry => entry.Key)
+            .ToArray())
+        {
+            if (party.MapEvent != null) continue;
+
+            deferredMapEventParking.Remove(party);
+            if (!party.IsActive || !IsDisconnectedPlayerParty(party)) continue;
+
+            party.IsActive = false;
+            RemoveVisual(party);
+            Logger.Information(
+                "Parked party {PartyId} after its MapEvent ended while its player was disconnected",
+                party.StringId);
+        }
+    }
+
+    private bool IsDisconnectedPlayerParty(MobileParty party) =>
+        playerManager.Players.Any(player =>
+            !playerManager.IsConnected(player) &&
+            objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty) &&
+            ReferenceEquals(playerParty, party));
 
     /// <summary>
     /// Removes the party's map figure and tells every client to do the same, mirroring

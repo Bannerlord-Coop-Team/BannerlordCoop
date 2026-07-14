@@ -111,6 +111,14 @@ internal static class PlayerPartyTradeContext
         return barterable.OriginalParty == LocalParty;
     }
 
+    public static bool CanSetOfferedAmount(Barterable barterable, int currentAmount, int newAmount)
+    {
+        if (!IsActive || isApplyingServerOffer) return true;
+        if (currentAmount == 0 && newAmount == 1) return true;
+
+        return CanOffer(barterable);
+    }
+
     public static bool CanAccept()
         => !IsActive || !LocalAccepted;
 

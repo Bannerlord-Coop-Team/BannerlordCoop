@@ -114,6 +114,9 @@ internal class SettlementInterface : ISettlementInterface
 
         try
         {
+            if (PlayerEncounter.Current == null && mainParty.CurrentSettlement != null)
+                PlayerEncounter.LeaveSettlement();
+
             PlayerEncounter.Finish(true);
         }
         finally

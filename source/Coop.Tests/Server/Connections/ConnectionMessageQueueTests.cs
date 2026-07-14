@@ -31,6 +31,12 @@ public class ConnectionMessageQueueTests
         public DeliveryMethod DeliveryMethod => DeliveryMethod.ReliableOrdered;
     }
 
+    private sealed class FakeCampaignTimePacket : IPacket
+    {
+        public PacketType PacketType => PacketType.CampaignTime;
+        public DeliveryMethod DeliveryMethod => DeliveryMethod.Sequenced;
+    }
+
     /// <summary>Creates a peer and drives it to the Dropping phase (connected, pre-save).</summary>
     private NetPeer Connect()
     {
@@ -93,6 +99,18 @@ public class ConnectionMessageQueueTests
         messageBroker.Publish(this, new PlayerCampaignEntered(peer));
 
         Assert.Equal(new IPacket[] { first, second, third }, network.GetPeerPackets(peer));
+    }
+
+    [Fact]
+    public void CampaignTimeBypassesTheLoadQueue()
+    {
+        var peer = Connect();
+        queue.BeginQueueing(peer);
+
+        Assert.False(queue.TryHandleBroadcast(peer, new FakeCampaignTimePacket()));
+
+        messageBroker.Publish(this, new PlayerCampaignEntered(peer));
+        Assert.True(NothingSentTo(peer));
     }
 
     [Fact]
