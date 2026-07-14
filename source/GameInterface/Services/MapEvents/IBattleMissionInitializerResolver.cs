@@ -7,5 +7,5 @@ namespace GameInterface.Services.MapEvents;
 
 internal interface IBattleMissionInitializerResolver : IGameAbstraction
 {
-    MissionInitializerRecord Create(MapEvent mapEvent, int randomTerrainSeed, AtmosphereInfo atmosphereOnCampaign);
+    MissionInitializerRecord Create(MapEvent mapEvent, int randomTerrainSeed, AtmosphereInfo atmosphereOnCampaign, BattleMissionStartContext context = null);
 }

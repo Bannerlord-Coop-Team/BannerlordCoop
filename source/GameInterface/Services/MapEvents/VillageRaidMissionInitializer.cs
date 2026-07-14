@@ -27,7 +27,7 @@ internal class VillageRaidMissionInitializer : IBattleMissionInitializer
         return TryGetVillageScene(battle, out _, out _, logWarnings: true);
     }
 
-    public MissionInitializerRecord Create(MapEvent battle, int randomTerrainSeed, AtmosphereInfo atmosphereOnCampaign)
+    public MissionInitializerRecord Create(MapEvent battle, int randomTerrainSeed, AtmosphereInfo atmosphereOnCampaign, BattleMissionStartContext context = null)
     {
         if (!TryGetVillageScene(battle, out Settlement settlement, out string villageScene, logWarnings: false))
             throw new InvalidOperationException("Village raid mission initializer could not resolve a village raid scene");
@@ -37,9 +37,8 @@ internal class VillageRaidMissionInitializer : IBattleMissionInitializer
             LandRaidSceneLevel,
             false,
             DecalAtlasGroup.Battle);
-        record.RandomTerrainSeed = randomTerrainSeed;
-        record.PlayingInCampaignMode = true;
-        record.AtmosphereOnCampaign = atmosphereOnCampaign;
+        RecordDefaults.ApplyTerrainSeed(record, randomTerrainSeed);
+        RecordDefaults.ApplyCampaignMode(record, atmosphereOnCampaign);
 
         Logger.Information("[BattleSync] Using village raid battle scene {Scene} for settlement {Settlement}",
             villageScene,

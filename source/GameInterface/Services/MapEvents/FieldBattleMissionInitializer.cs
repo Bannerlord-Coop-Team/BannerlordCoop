@@ -14,7 +14,7 @@ internal class FieldBattleMissionInitializer : IBattleMissionInitializer
 
     public bool CanHandle(MapEvent mapEvent) => true;
 
-    public MissionInitializerRecord Create(MapEvent battle, int randomTerrainSeed, AtmosphereInfo atmosphereOnCampaign)
+    public MissionInitializerRecord Create(MapEvent battle, int randomTerrainSeed, AtmosphereInfo atmosphereOnCampaign, BattleMissionStartContext context = null)
     {
         bool isNavalEncounter = PlayerEncounter.IsNavalEncounter();
         CampaignVec2 position = MobileParty.MainParty.Position;
@@ -26,15 +26,13 @@ internal class FieldBattleMissionInitializer : IBattleMissionInitializer
         MissionInitializerRecord record = new MissionInitializerRecord(battleScene);
         TerrainType faceTerrainType2 = Campaign.Current.MapSceneWrapper.GetFaceTerrainType(MobileParty.MainParty.CurrentNavigationFace);
         record.TerrainType = (int)faceTerrainType2;
-        record.DamageToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier();
-        record.DamageFromPlayerToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier();
+        RecordDefaults.ApplyDamageMultipliers(record);
         record.NeedsRandomTerrain = false;
-        record.PlayingInCampaignMode = true;
+        RecordDefaults.ApplyCampaignMode(record, atmosphereOnCampaign);
 
         // Seed chosen server-side and carried in NetworkStartAttackMission so every
         // client uses the same terrain seed for this battle.
-        record.RandomTerrainSeed = randomTerrainSeed;
-        record.AtmosphereOnCampaign = atmosphereOnCampaign;
+        RecordDefaults.ApplyTerrainSeed(record, randomTerrainSeed);
         record.SceneHasMapPatch = true;
         record.DecalAtlasGroup = 2;
         record.PatchCoordinates = mapPatchAtPosition.normalizedCoordinates;

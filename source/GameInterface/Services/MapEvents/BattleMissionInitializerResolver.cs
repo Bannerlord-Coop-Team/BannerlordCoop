@@ -22,7 +22,7 @@ internal class BattleMissionInitializerResolver : IBattleMissionInitializerResol
             .ToArray();
     }
 
-    public MissionInitializerRecord Create(MapEvent mapEvent, int randomTerrainSeed, AtmosphereInfo atmosphereOnCampaign)
+    public MissionInitializerRecord Create(MapEvent mapEvent, int randomTerrainSeed, AtmosphereInfo atmosphereOnCampaign, BattleMissionStartContext context = null)
     {
         foreach (var initializer in initializers)
         {
@@ -30,7 +30,7 @@ internal class BattleMissionInitializerResolver : IBattleMissionInitializerResol
                 continue;
 
             Logger.Information("[BattleSync] Using {Initializer} for battle mission initializer", initializer.GetType().Name);
-            return initializer.Create(mapEvent, randomTerrainSeed, atmosphereOnCampaign);
+            return initializer.Create(mapEvent, randomTerrainSeed, atmosphereOnCampaign, context);
         }
 
         throw new InvalidOperationException("No battle mission initializer could handle the map event");

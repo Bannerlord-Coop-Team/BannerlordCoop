@@ -300,20 +300,12 @@ internal class BattleMissionStartHandler : IHandler
                 return;
             }
 
-            // The scene is the fixed settlement scene keyed by wall level — no terrain seed on the siege
-            // path. Mirrors vanilla CreateSandBoxMissionInitializerRecord; atmosphere is client-local,
-            // same tolerance as the field path.
-            string sceneName = settlement.LocationComplex.GetLocationWithId("center").GetSceneName(payload.WallLevel);
-            var rec = new MissionInitializerRecord(sceneName)
-            {
-                SceneLevels = Campaign.Current.Models.LocationModel.GetUpgradeLevelTag(payload.WallLevel) + " siege",
-                DamageToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier(),
-                DamageFromPlayerToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier(),
-                PlayingInCampaignMode = true,
-                AtmosphereOnCampaign = Campaign.Current.Models.MapWeatherModel.GetAtmosphereModel(MobileParty.MainParty.Position),
-                TerrainType = (int)Campaign.Current.MapSceneWrapper.GetFaceTerrainType(MobileParty.MainParty.CurrentNavigationFace),
-                DecalAtlasGroup = 3,
-            };
+            // Build the siege record through the shared per-type resolver, mirroring the field path. The wall
+            // level comes from the server snapshot carried in the message (never live settlement state), so a
+            // mid-assault joiner loads the same scene as the first entrant. The siege initializer computes its
+            // own client-local atmosphere and uses no terrain seed, so the seed/atmosphere args are unused here.
+            var siegeContext = new BattleMissionStartContext(payload.WallLevel);
+            var rec = missionInitializerResolver.Create(battle, randomTerrainSeed: 0, atmosphereOnCampaign: default, siegeContext);
 
             var attackerWeapons = SiegeEngineStateConverter.ToMissionWeapons(payload.AttackerEngines);
             var defenderWeapons = SiegeEngineStateConverter.ToMissionWeapons(payload.DefenderEngines);
