@@ -87,6 +87,11 @@ class AutoRegistryHandler<T> : IHandler where T : class
     {
         // TODO drop on loading clients
 
+        GameThread.RunSafe(() => CreateClientInstance(payload), context: $"NetworkCreate {typeof(T).Name}");
+    }
+
+    private void CreateClientInstance(MessagePayload<NetworkCreateInstance<T>> payload)
+    {
         var newInstance = ObjectHelper.SkipConstructor<T>();
 
         var id = payload.What.InstanceId;
@@ -107,9 +112,9 @@ class AutoRegistryHandler<T> : IHandler where T : class
 
         if (Registry.Debug)
         {
-            Logger.Debug("[Client][{CallingMethod}] Created new instance of {type} with id {id}.", 
+            Logger.Debug("[Client][{CallingMethod}] Created new instance of {type} with id {id}.",
                 $"{nameof(AutoRegistryHandler<T>)}.{nameof(Handle_NetworkCreateInstance)}",
-                typeof(T).Name, 
+                typeof(T).Name,
                 payload.What.InstanceId);
         }
 

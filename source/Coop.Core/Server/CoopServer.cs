@@ -7,14 +7,14 @@ using Common.Network.Messages;
 using Common.PacketHandlers;
 using Common.Serialization;
 using Coop.Core.Common.Network;
-using Coop.Core.Common.Session;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Instances;
+using Coop.Core.Server.Services.Session.Messages;
 using Coop.Core.Server.Services.Time;
 using GameInterface.Services.Entity;
-using GameInterface.Services.GameState;
 using LiteNetLib;
+using LiteNetLib.Utils;
 using Serilog;
 using System;
 using System.Net;
@@ -82,8 +82,34 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void OnConnectionRequest(ConnectionRequest request)
     {
+        string suppliedPassword;
+        try
+        {
+            suppliedPassword = request.Data.GetString(ConnectionPassword.MaxLength);
+        }
+        catch (Exception)
+        {
+            Logger.Warning("Client connection rejected for {Endpoint}: malformed password data", request.RemoteEndPoint);
+            RejectIncorrectPassword(request);
+            return;
+        }
+
+        if (!ConnectionPassword.IsAccepted(Config.Token, suppliedPassword))
+        {
+            Logger.Warning("Client connection rejected for {Endpoint}: incorrect password", request.RemoteEndPoint);
+            RejectIncorrectPassword(request);
+            return;
+        }
+
         Logger.Information("Client connection accepted for {Endpoint}", request.RemoteEndPoint);
         request.Accept();
+    }
+
+    private static void RejectIncorrectPassword(ConnectionRequest request)
+    {
+        var reason = new NetDataWriter();
+        reason.Put((byte)ConnectionRejectCode.IncorrectPassword);
+        request.Reject(reason);
     }
 
     public void OnNatIntroductionRequest(IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token)
@@ -165,16 +191,13 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     {
         Logger.Information("Server starting on port {Port}", Config.Port);
 
-        if (netManager.Start(IPAddress.Any, IPAddress.IPv6Any, Config.Port)) return;
+        if (netManager.Start(IPAddress.Any, IPAddress.IPv6Any, Config.Port))
+        {
+            messageBroker.Publish(this, new ServerListening());
+            return;
+        }
 
         Logger.Error("Server failed to bind port {Port}; it may already be in use", Config.Port);
-
-        // A managed server that cannot listen is a zombie whose shutdown save would overwrite the
-        // live session's save; quit without saving instead of masquerading as a reachable host.
-        if (ManagedServerConfig.IsManagedServer)
-        {
-            GameThread.RunSafe(ServerShutdown.QuitToDesktop, context: "ServerBindFailed");
-        }
     }
 
     public override void SendAll(IPacket packet)

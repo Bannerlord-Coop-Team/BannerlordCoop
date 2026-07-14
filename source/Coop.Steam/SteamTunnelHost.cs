@@ -12,12 +12,10 @@ namespace Coop.Steam;
 
 /// <inheritdoc cref="ISessionTunnelHost"/>
 /// <remarks>
-/// Runs in the hosting player's client. Each accepted Steam peer gets its own loopback UDP
-/// socket toward the local server, because LiteNetLib keys peers by endpoint: a shared
-/// socket would merge every tunneled client into one peer, and the per-peer port must stay
-/// stable for the session (AllowPeerAddressChange is off).
+/// Gives every accepted Steam peer a stable, distinct loopback UDP endpoint because LiteNetLib
+/// keys peers by endpoint and would merge clients sharing one socket.
 /// </remarks>
-public class SteamTunnelHost : ISessionTunnelHost
+public class SteamTunnelHost : ISessionTunnelHost, ISessionTunnelIdentityResolver
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SteamTunnelHost>();
 
@@ -26,13 +24,17 @@ public class SteamTunnelHost : ISessionTunnelHost
     private sealed class TunnelPeer
     {
         public Socket Socket;
+        public IPEndPoint ServerPeerEndpoint;
+        public ulong RemoteSteamId;
         public byte[] PendingDatagram = new byte[SteamTunnel.MaxDatagramBytes];
         public int PendingLength;
     }
 
     private readonly ISteamTunnelTransport transport;
     private readonly object gate = new object();
+    private readonly HashSet<uint> connectingConnections = new HashSet<uint>();
     private readonly Dictionary<uint, TunnelPeer> peers = new Dictionary<uint, TunnelPeer>();
+    private readonly Dictionary<IPEndPoint, ulong> remoteSteamIds = new Dictionary<IPEndPoint, ulong>();
     private readonly byte[] serverBuffer = new byte[SteamTunnel.MaxDatagramBytes];
     private readonly byte[] steamBuffer = new byte[SteamTunnel.MaxDatagramBytes];
 
@@ -55,23 +57,70 @@ public class SteamTunnelHost : ISessionTunnelHost
         transport.ConnectionStateChanged += OnConnectionStateChanged;
     }
 
+    /// <summary>Raised when an established remote Steam peer closes unexpectedly.</summary>
+    public event Action<ulong> PeerDisconnected;
+
     public bool IsListening => listening;
 
     public int PeerCount => peerSnapshot.Length;
 
+    public bool TryGetRemoteSteamId(IPEndPoint serverPeerEndpoint, out ulong steamId)
+    {
+        lock (gate)
+        {
+            if (serverPeerEndpoint != null)
+            {
+                return remoteSteamIds.TryGetValue(serverPeerEndpoint, out steamId);
+            }
+
+            steamId = 0;
+            return false;
+        }
+    }
+
     public void Start(int serverPort)
+    {
+        Start(serverPort, SteamTunnel.VirtualPort);
+    }
+
+    public void Start(int serverPort, int virtualPort)
     {
         if (listening) return;
 
         serverEndpoint = new IPEndPoint(IPAddress.Loopback, serverPort);
         transport.EnsureRelayAccess();
-        transport.ListenForClients(SteamTunnel.VirtualPort);
+        transport.ListenForClients(virtualPort);
 
         poller = new Poller(Update, SteamTunnel.PumpInterval);
         poller.Start();
         listening = true;
 
-        Logger.Information("Steam tunnel host listening; forwarding peers to {ServerEndpoint}", serverEndpoint);
+        Logger.Information("Steam tunnel host listening on virtual port {VirtualPort}; forwarding peers to {ServerEndpoint}",
+            virtualPort, serverEndpoint);
+    }
+
+    public void ClosePeer(ulong remoteSteamId)
+    {
+        if (remoteSteamId == 0) return;
+
+        uint connection = 0;
+        TunnelPeer peer = null;
+        lock (gate)
+        {
+            foreach (var pair in peers)
+            {
+                if (pair.Value.RemoteSteamId != remoteSteamId) continue;
+                connection = pair.Key;
+                peer = pair.Value;
+                break;
+            }
+
+            if (peer != null) RemovePeerLocked(connection, peer);
+        }
+
+        if (peer == null) return;
+        transport.CloseConnection(connection);
+        peer.Socket.Close();
     }
 
     public void Stop()
@@ -84,13 +133,18 @@ public class SteamTunnelHost : ISessionTunnelHost
         poller?.StopAndWait(TimeSpan.FromSeconds(1));
 
         KeyValuePair<uint, TunnelPeer>[] remaining;
+        uint[] pending;
         lock (gate)
         {
             remaining = peers.ToArray();
+            pending = connectingConnections.ToArray();
             peers.Clear();
+            connectingConnections.Clear();
+            remoteSteamIds.Clear();
             peerSnapshot = Array.Empty<KeyValuePair<uint, TunnelPeer>>();
         }
 
+        foreach (var connection in pending) transport.CloseConnection(connection);
         foreach (var peer in remaining)
         {
             transport.CloseConnection(peer.Key);
@@ -105,42 +159,88 @@ public class SteamTunnelHost : ISessionTunnelHost
         switch (state)
         {
             case TunnelConnectionState.Connecting:
-                if (!listening) return;
+                bool acceptConnection;
+                lock (gate)
+                {
+                    acceptConnection = listening;
+                    if (acceptConnection) connectingConnections.Add(connection);
+                }
 
-                transport.AcceptConnection(connection);
+                if (acceptConnection)
+                {
+                    transport.AcceptConnection(connection);
+                }
+                else
+                {
+                    transport.CloseConnection(connection);
+                }
                 break;
 
             case TunnelConnectionState.Connected:
+                bool closeLateConnection = false;
                 lock (gate)
                 {
-                    if (!listening || peers.ContainsKey(connection)) return;
+                    if (peers.ContainsKey(connection)) return;
 
-                    var socket = TunnelSocket.CreateLoopbackDatagramSocket();
-                    socket.Connect(serverEndpoint);
-                    peers[connection] = new TunnelPeer { Socket = socket };
-                    peerSnapshot = peers.ToArray();
+                    bool wasAccepted = connectingConnections.Remove(connection);
+                    if (!listening || !wasAccepted)
+                    {
+                        closeLateConnection = true;
+                    }
 
-                    // The effective sendRate/buffer here also proves whether the listen
-                    // socket's config options reached the accepted connection.
-                    Logger.Information("Tunnel peer {Connection} connected; local relay port {Port}; {Status}",
-                        connection, ((IPEndPoint)socket.LocalEndPoint).Port, transport.DescribeConnection(connection));
+                    if (!closeLateConnection)
+                    {
+                        var socket = TunnelSocket.CreateLoopbackDatagramSocket();
+                        socket.Connect(serverEndpoint);
+                        var serverPeerEndpoint = (IPEndPoint)socket.LocalEndPoint;
+                        ulong steamId = 0;
+                        if (transport is ISteamTunnelConnectionIdentityResolver identityResolver)
+                        {
+                            identityResolver.TryGetRemoteSteamId(connection, out steamId);
+                        }
+                        peers[connection] = new TunnelPeer
+                        {
+                            Socket = socket,
+                            ServerPeerEndpoint = serverPeerEndpoint,
+                            RemoteSteamId = steamId,
+                        };
+                        if (steamId != 0)
+                        {
+                            remoteSteamIds[serverPeerEndpoint] = steamId;
+                        }
+                        peerSnapshot = peers.ToArray();
+
+                        // The effective sendRate/buffer here also proves whether the listen
+                        // socket's config options reached the accepted connection.
+                        Logger.Information("Tunnel peer {Connection} connected; local relay port {Port}; {Status}",
+                            connection, serverPeerEndpoint.Port, transport.DescribeConnection(connection));
+                    }
                 }
+
+                if (closeLateConnection) transport.CloseConnection(connection);
                 break;
 
             case TunnelConnectionState.Closed:
                 TunnelPeer closedPeer;
                 lock (gate)
                 {
+                    connectingConnections.Remove(connection);
                     if (!peers.TryGetValue(connection, out closedPeer)) return;
-
-                    peers.Remove(connection);
-                    peerSnapshot = peers.ToArray();
+                    RemovePeerLocked(connection, closedPeer);
                 }
 
                 closedPeer.Socket.Close();
                 Logger.Information("Tunnel peer {Connection} disconnected", connection);
+                if (closedPeer.RemoteSteamId != 0) PeerDisconnected?.Invoke(closedPeer.RemoteSteamId);
                 break;
         }
+    }
+
+    private void RemovePeerLocked(uint connection, TunnelPeer peer)
+    {
+        peers.Remove(connection);
+        remoteSteamIds.Remove(peer.ServerPeerEndpoint);
+        peerSnapshot = peers.ToArray();
     }
 
     private void Update(TimeSpan deltaTime)

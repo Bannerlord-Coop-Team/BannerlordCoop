@@ -1,8 +1,11 @@
 ﻿using Common.Messaging;
+using Common.Network;
+using Common.Network.Session;
 using GameInterface.Services.UI.Messages;
 using SandBox.View;
 using SandBox.ViewModelCollection.SaveLoad;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem.Extensions;
 using TaleWorlds.Core;
@@ -45,6 +48,67 @@ namespace Coop.UI.LoadGameUI
             if (IsCorrupted || IsDisabled)
                 return;
 
+            var visibilityOptions = new List<InquiryElement>
+            {
+                new InquiryElement(
+                    ServerVisibility.Public,
+                    "Public",
+                    null,
+                    true,
+                    "Listed in Server Discovery for everyone."),
+                new InquiryElement(
+                    ServerVisibility.FriendsOnly,
+                    "Friends Only",
+                    null,
+                    true,
+                    "Listed in Server Discovery for your Steam friends only."),
+                new InquiryElement(
+                    ServerVisibility.None,
+                    "None",
+                    null,
+                    true,
+                    "Hidden from Server Discovery; Steam joins, direct connections, and owner loopback still work."),
+            };
+
+            MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
+                "Server visibility",
+                "Choose who can discover this server.",
+                visibilityOptions,
+                isExitShown: true,
+                minSelectableOptionCount: 1,
+                maxSelectableOptionCount: 1,
+                "Continue",
+                "Cancel",
+                selected => ShowPasswordInquiry((ServerVisibility)selected.Single().Identifier),
+                _ => { }),
+                pauseGameActiveState: true);
+        }
+
+        private void ShowPasswordInquiry(ServerVisibility visibility)
+        {
+            InformationManager.ShowTextInquiry(new TextInquiryData(
+                "Server Password",
+                "Set an optional password for this server. Leave it blank to allow anyone to join.",
+                true,
+                true,
+                "Host",
+                "Cancel",
+                password => StartHosting(password, visibility),
+                () => { },
+                shouldInputBeObfuscated: true,
+                textCondition: ValidatePassword));
+        }
+
+        private static Tuple<bool, string> ValidatePassword(string password)
+        {
+            bool valid = ConnectionPassword.IsValid(password);
+            return Tuple.Create(valid, valid
+                ? string.Empty
+                : $"Password cannot exceed {ConnectionPassword.MaxLength} characters");
+        }
+
+        private void StartHosting(string password, ServerVisibility visibility)
+        {
             if (Game.Current != null)
             {
                 ScreenManager.PopScreen();
@@ -53,7 +117,8 @@ namespace Coop.UI.LoadGameUI
             }
 
             // The handler decides spawn-managed (Steam) vs in-process hosting.
-            MessageBroker.Instance.Publish(this, new AttemptHost(Save.Name));
+            MessageBroker.Instance.Publish(this,
+                new AttemptHost(Save.Name, password ?? string.Empty, visibility));
         }
 	}
 

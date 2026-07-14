@@ -202,6 +202,9 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
 
         foreach (var element in roster)
         {
+            if (element.IsWounded || element.IsRouted || element.IsKilled)
+                continue;
+
             var character = element.Troop;
             if (character == null)
                 continue;

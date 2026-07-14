@@ -1,30 +1,44 @@
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
+using Common.Network.Session;
+using Coop.Core.Common.Session;
 using LiteNetLib;
 using Missions.Messages;
+using System.Globalization;
+using System.Net;
 
 namespace Coop.Core.Server.Services.Instances.Handlers;
 
 /// <summary>
-/// Server-side relay membership + join/leave introduction. A client's <see cref="NetworkMissionEntered"/> maps the
-/// controller to its connection and introduces it and the existing members to each other via
-/// <see cref="NetworkMissionPeerEntered"/> (each side then sends its join info over the mesh). Departures are fanned
-/// out to the remaining members so they release the leaver's party: a <see cref="NetworkMissionLeft"/> becomes a
-/// <see cref="MissionPeerLeft"/> (graceful) and an observed <see cref="PlayerDisconnected"/> becomes a
-/// <see cref="MissionPeerDisconnected"/> (ungraceful — the reliable counterpart to the best-effort mesh path).
+/// Tracks relay membership, introduces both sides with <see cref="NetworkMissionPeerEntered"/>, and fans
+/// graceful or disconnected departures to the remaining mission members.
 /// </summary>
 public class ServerMissionMembershipHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;
     private readonly IMissionManager missionManager;
     private readonly INetwork network;
+    private readonly ISessionTunnelIdentityResolver tunnelIdentityResolver;
 
-    public ServerMissionMembershipHandler(IMessageBroker messageBroker, IMissionManager missionManager, INetwork network)
+    public ServerMissionMembershipHandler(
+        IMessageBroker messageBroker,
+        IMissionManager missionManager,
+        INetwork network)
+        : this(messageBroker, missionManager, network, null)
+    {
+    }
+
+    public ServerMissionMembershipHandler(
+        IMessageBroker messageBroker,
+        IMissionManager missionManager,
+        INetwork network,
+        ISessionTunnelIdentityResolver tunnelIdentityResolver)
     {
         this.messageBroker = messageBroker;
         this.missionManager = missionManager;
         this.network = network;
+        this.tunnelIdentityResolver = tunnelIdentityResolver;
 
         messageBroker.Subscribe<NetworkMissionEntered>(Handle_MissionEntered);
         messageBroker.Subscribe<NetworkMissionLeft>(Handle_MissionLeft);
@@ -48,11 +62,36 @@ public class ServerMissionMembershipHandler : IHandler
         // Introduce the newcomer and each existing member to each other so BOTH sides send their join info
         // (replaces the direct PeerConnected trigger). The introduction travels over the campaign/relay
         // connection; the join info itself still flows over the IBattleNetwork mesh.
+        var newcomerSteamId = ResolveSteamId(peer, message.ControllerId);
         foreach (var (otherControllerId, otherPeer) in others)
         {
-            network.Send(otherPeer, new NetworkMissionPeerEntered(message.ControllerId, message.InstanceId));
-            network.Send(peer, new NetworkMissionPeerEntered(otherControllerId, message.InstanceId));
+            var existingSteamId = ResolveSteamId(otherPeer, otherControllerId);
+
+            network.Send(otherPeer, new NetworkMissionPeerEntered(
+                message.ControllerId, message.InstanceId, newcomerSteamId));
+            network.Send(peer, new NetworkMissionPeerEntered(
+                otherControllerId, message.InstanceId, existingSteamId));
         }
+    }
+
+    private ulong ResolveSteamId(NetPeer peer, string controllerId)
+    {
+        var endpoint = new IPEndPoint(peer.Address, peer.Port);
+        if (tunnelIdentityResolver != null
+            && tunnelIdentityResolver.TryGetRemoteSteamId(endpoint, out var steamId))
+            return steamId;
+
+        // The hosting client reaches its spawned server directly over loopback, so it has no tunnel
+        // endpoint to map. In Release its controller id is its Steam id; constrain that fallback to a
+        // managed server's local peer so arbitrary direct-IP controller ids are never treated as Steam.
+        if (ManagedServerConfig.IsManagedServer
+            && IPAddress.IsLoopback(peer.Address)
+            && ulong.TryParse(controllerId, NumberStyles.None, CultureInfo.InvariantCulture, out steamId))
+        {
+            return steamId;
+        }
+
+        return 0;
     }
 
     private void Handle_MissionLeft(MessagePayload<NetworkMissionLeft> payload)

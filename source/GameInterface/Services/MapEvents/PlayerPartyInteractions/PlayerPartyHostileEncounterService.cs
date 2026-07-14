@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -29,7 +29,11 @@ internal class PlayerPartyHostileEncounterService : IPlayerPartyHostileEncounter
     private readonly IMessageBroker messageBroker;
     private readonly IPlayerManager playerManager;
 
-    public PlayerPartyHostileEncounterService(IObjectManager objectManager, INetwork network, IMessageBroker messageBroker, IPlayerManager playerManager)
+    public PlayerPartyHostileEncounterService(
+        IObjectManager objectManager,
+        INetwork network,
+        IMessageBroker messageBroker,
+        IPlayerManager playerManager)
     {
         this.objectManager = objectManager;
         this.network = network;

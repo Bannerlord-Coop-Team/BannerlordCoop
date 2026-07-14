@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Serilog;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -25,11 +25,20 @@ internal sealed class MapEventBattleFactory
 
     /// <summary>
     /// Creates the <see cref="MapEvent"/> the supplied parties would produce in <c>StartBattleInternal</c>.
-    /// Must be called on the main thread inside an <see cref="Common.Util.AllowedThread"/> scope.
+    /// Must be called on the main thread with synchronization patches enabled.
     /// </summary>
     /// <returns>The created <see cref="MapEvent"/>, or null if no proper type could be determined.</returns>
     public static MapEvent CreateMapEvent(PartyBase attacker, PartyBase defender, BattleCreationFlags flags)
     {
+        if (!CanCreateMapEvent(attacker, defender, flags))
+        {
+            Logger.Warning(
+                "Rejecting map event creation for unavailable parties. Attacker={Attacker}, Defender={Defender}",
+                attacker?.MobileParty?.StringId ?? attacker?.Settlement?.StringId,
+                defender?.MobileParty?.StringId ?? defender?.Settlement?.StringId);
+            return null;
+        }
+
         var mapEventManager = Campaign.Current.MapEventManager;
 
         if (TryCreateForcedMapEvent(attacker, defender, flags, mapEventManager, out var mapEvent))
@@ -45,6 +54,35 @@ internal sealed class MapEventBattleFactory
             return mapEvent;
 
         return CreateFieldBattleEvent(attacker, defender, mapEventManager);
+    }
+
+    internal static bool CanCreateMapEvent(PartyBase attacker, PartyBase defender, BattleCreationFlags flags)
+    {
+        if (attacker == null || defender == null || ReferenceEquals(attacker, defender) ||
+            attacker.MapEventSide != null || defender.MapEventSide != null) return false;
+
+        if (!WillCreateFieldBattle(attacker, defender, flags)) return true;
+        var attackerMobileParty = attacker.MobileParty;
+        var defenderMobileParty = defender.MobileParty;
+        return attackerMobileParty?.IsActive == true && defenderMobileParty?.IsActive == true &&
+            attackerMobileParty.CurrentSettlement == null && defenderMobileParty.CurrentSettlement == null;
+    }
+
+    private static bool WillCreateFieldBattle(PartyBase attacker, PartyBase defender, BattleCreationFlags flags)
+    {
+        if (flags.ForceRaid || flags.ForceSallyOut || flags.ForceVolunteers || flags.ForceSupplies)
+            return false;
+
+        if (defender.IsSettlement)
+            return false;
+
+        if (flags.IsSallyOutAmbush || flags.ForceBlockadeAttack || flags.ForceBlockadeSallyOutAttack)
+            return false;
+
+        if (attacker.IsMobile && attacker.MobileParty.CurrentSettlement?.SiegeEvent != null)
+            return false;
+
+        return !defender.IsMobile || defender.MobileParty.BesiegedSettlement == null;
     }
 
     private static bool TryCreateForcedMapEvent(

@@ -202,14 +202,22 @@ internal class TroopRosterDeltaHandler : IHandler
     {
         var m = payload.What;
         ApplyToExisting(m.RosterId, m.CharacterId, nameof(NetworkTroopRosterSetNumber),
-            (roster, index) => roster.SetElementNumber(index, m.Number));
+            (roster, index) =>
+            {
+                roster.SetElementNumber(index, m.Number);
+                roster.InitializeCachedData();
+            });
     }
 
     private void Handle_NetworkSetWoundedNumber(MessagePayload<NetworkTroopRosterSetWoundedNumber> payload)
     {
         var m = payload.What;
         ApplyToExisting(m.RosterId, m.CharacterId, nameof(NetworkTroopRosterSetWoundedNumber),
-            (roster, index) => roster.SetElementWoundedNumber(index, m.Number));
+            (roster, index) =>
+            {
+                roster.SetElementWoundedNumber(index, m.Number);
+                roster.InitializeCachedData();
+            });
     }
 
     private void Handle_NetworkElementBatch(MessagePayload<NetworkTroopRosterElementBatch> payload)
@@ -250,6 +258,7 @@ internal class TroopRosterDeltaHandler : IHandler
             {
                 if (!objectManager.TryGetObjectWithLogging<TroopRoster>(rosterId, out var roster)) return;
                 roster.RemoveZeroCounts();
+                roster.InitializeCachedData();
             }
         }, context: nameof(NetworkTroopRosterRemoveZeroCounts));
     }
@@ -278,9 +287,8 @@ internal class TroopRosterDeltaHandler : IHandler
     /// Resolves the roster and element (via <see cref="Apply"/>) and runs <paramref name="apply"/> only when
     /// the element already exists in the roster. An absent element means this client is under-populated for
     /// that troop; the create that adds it is its own earlier, reliably-ordered delta. We deliberately do NOT
-    /// create a placeholder for an absolute Set: SetElementNumber/WoundedNumber/Xp do not maintain the
-    /// roster's cached totals (only AddToCounts does), so a placeholder would under-count TotalManCount and be
-    /// wiped by the next RemoveZeroCounts. Skipping keeps the client consistent until the create arrives.
+    /// create a placeholder for an absolute Set: element creation is carried by an earlier AddToCounts delta.
+    /// Skipping keeps the client consistent until the create arrives.
     /// </summary>
     private void ApplyToExisting(string rosterId, string characterId, string messageName, Action<TroopRoster, int> apply)
     {

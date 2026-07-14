@@ -8,6 +8,8 @@
     {
         public static class MainLoop
         {
+            public const int SteamCallbacks = 5000;         // Dispatches the standalone server's game-server Steam callbacks, before anything consumes them.
+
             public const int Update = 4000;                 // The update loop of the client.
             public const int PollNetwork = Update - 1;      // Polls all events received over the network connection.
             public const int RailGun = PollNetwork - 1;     // The update loop of the clientside RailGun instance.

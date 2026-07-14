@@ -53,6 +53,52 @@ public class BanditPartyComponentTests : SyncTestBase
     }
 
     [Fact]
+    public void ServerCreateLooterParty_SyncAllClients()
+    {
+        // Arrange
+        var server = TestEnvironment.Server;
+
+        // Act
+        string? partyId = null;
+        string? clanId = null;
+
+        server.Call(() =>
+        {
+            var clan = GameObjectCreator.CreateInitializedObject<Clan>();
+            var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+            var template = GameObjectCreator.CreateInitializedObject<PartyTemplateObject>();
+
+            // Mirrors BanditSpawnCampaignBehavior's looter spawn: the settlement ctor
+            // (no hideout) plus InitializationArgs carrying the clan that OnMobilePartySetOnCreation
+            // writes into MobileParty.ActualClan - the field BanditPartyComponent.Name resolves
+            // the display name through (MapFaction.Name).
+            var newParty = BanditPartyComponent.CreateLooterParty("TestLooterId", clan, settlement, false, template, new CampaignVec2(new Vec2(2, 2), true));
+
+            Assert.True(server.ObjectManager.TryGetId(newParty, out partyId));
+            Assert.True(server.ObjectManager.TryGetId(clan, out clanId));
+            Assert.Same(clan, newParty.ActualClan);
+        });
+
+        // Assert
+        Assert.NotNull(partyId);
+        Assert.NotNull(clanId);
+
+        foreach (var client in TestEnvironment.Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var newParty));
+
+            // Component link: without it MobileParty.Name falls back to "unnamedMobileParty".
+            Assert.NotNull(newParty.PartyComponent);
+            Assert.IsType<BanditPartyComponent>(newParty.PartyComponent);
+
+            // Name source: BanditPartyComponent.Name = MobileParty.MapFaction.Name, and
+            // MapFaction resolves via ActualClan for bandit parties.
+            Assert.True(client.ObjectManager.TryGetObject<Clan>(clanId, out var clientClan));
+            Assert.Same(clientClan, newParty.ActualClan);
+        }
+    }
+
+    [Fact]
     public void ClientCreateParty_DoesNothing()
     {
         // Arrange

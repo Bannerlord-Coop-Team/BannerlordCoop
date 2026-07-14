@@ -80,6 +80,50 @@ public class PartyDestructionTests : IDisposable
     }
 
     [Fact]
+    public void ServerRemoveParty_FiresClientMobilePartyDestroyedEvent()
+    {
+        // Arrange
+        var server = TestEnvironment.Server;
+        var client1 = TestEnvironment.Clients.First();
+
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        MobileParty? clientParty = null;
+        bool clientDestroyedEventFired = false;
+
+        client1.Call(() =>
+        {
+            Assert.True(client1.ObjectManager.TryGetObject(partyId, out clientParty));
+
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, (party, destroyer) =>
+            {
+                if (ReferenceEquals(party, clientParty)) clientDestroyedEventFired = true;
+            });
+        });
+
+        // Act
+        // A direct RemoveParty (no DestroyPartyAction) replicates to clients only as the
+        // registry-level destroy (NetworkDestroyInstance), so the client-side teardown itself
+        // must raise MobilePartyDestroyed: vanilla map UI - most visibly PartyNameplatesVM -
+        // only removes a dead party's UI on that event (or a visibility flip, which does not
+        // sync either). Without it the dead party's nameplate leaks and keeps rendering its
+        // post-teardown name ("NameFailed - BanditPartyPatch" for bandits).
+        server.Call(() =>
+        {
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            party.RemoveParty();
+        });
+
+        // Assert
+        foreach (var client in TestEnvironment.Clients)
+        {
+            Assert.False(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var _));
+        }
+
+        Assert.True(clientDestroyedEventFired);
+    }
+
+    [Fact]
     public void ClientDestroyParty_DoesNothing()
     {
         // Arrange
