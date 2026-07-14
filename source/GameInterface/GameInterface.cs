@@ -2,6 +2,7 @@
 using GameInterface.Utils;
 using HarmonyLib;
 using System;
+using System.Collections.Generic;
 
 namespace GameInterface;
 
@@ -27,12 +28,18 @@ public class GameInterface : IGameInterface
     private readonly Harmony harmony;
     private readonly IAutoSyncPatchCollector patchCollector;
     private readonly AutoSyncPatcher AutoSyncPatcher;
+    private readonly IEnumerable<HarmonyPatchCategoryRegistration> patchCategories;
 
-    public GameInterface(Harmony harmony, IAutoSyncPatchCollector patchCollector, AutoSyncPatcher AutoSyncPatcher)
+    public GameInterface(
+        Harmony harmony,
+        IAutoSyncPatchCollector patchCollector,
+        AutoSyncPatcher AutoSyncPatcher,
+        IEnumerable<HarmonyPatchCategoryRegistration> patchCategories)
     {
         this.harmony = harmony;
         this.patchCollector = patchCollector;
         this.AutoSyncPatcher = AutoSyncPatcher;
+        this.patchCategories = patchCategories;
     }
 
     public void Dispose()
@@ -60,6 +67,12 @@ public class GameInterface : IGameInterface
 
         harmony.PatchCategory(assembly, HARMONY_STATIC_FIXES_CATEGORY);
         harmony.PatchAllUncategorized(assembly);
+
+        foreach (HarmonyPatchCategoryRegistration patchCategory in patchCategories)
+        {
+            patchCategory.Apply(harmony);
+        }
+
         AutoSyncPatcher.PatchAll();
     }
 
