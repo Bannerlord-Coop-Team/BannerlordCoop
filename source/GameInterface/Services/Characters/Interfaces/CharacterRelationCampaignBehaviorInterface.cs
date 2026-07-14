@@ -3,6 +3,7 @@ using Common.Network;
 using GameInterface.Extentions;
 using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.UI.Notifications.Messages;
 using Helpers;
@@ -49,12 +50,13 @@ public class CharacterRelationCampaignBehaviorInterface : ICharacterRelationCamp
         int numberOfClansWithHurtRelations = 0;
         foreach (Clan clan in Clan.All)
         {
-            if (!clan.IsEliminated && !clan.IsBanditFaction && clan != Clan.PlayerClan)
+            if (!clan.IsEliminated && !clan.IsBanditFaction && clan != killer.Clan)
             {
                 int relationChangeForExecutingHero = Campaign.Current.Models.ExecutionRelationModel.GetRelationChangeForExecutingHero(victim, clan.Leader, out bool showQuickNotification);
                 if (relationChangeForExecutingHero != 0)
                 {
                     Hero leader = clan.Leader;
+                    ResolvedMainHeroContext.ResolvedMainHero = killer;
                     ChangeRelationAction.ApplyPlayerRelation(leader, relationChangeForExecutingHero, true, false);
                     if (showQuickNotification)
                     {
@@ -102,7 +104,7 @@ public class CharacterRelationCampaignBehaviorInterface : ICharacterRelationCamp
         {
             playerSettlementOwnerRelationChanges[playerHero] = (false, false);
 
-            if (Settlement.CurrentSettlement != null && playerHero.GetPerkValue(DefaultPerks.Charm.ForgivableGrievances) && MBRandom.RandomFloat < DefaultPerks.Charm.ForgivableGrievances.SecondaryBonus)
+            if (playerHero.CurrentSettlement != null && playerHero.GetPerkValue(DefaultPerks.Charm.ForgivableGrievances) && MBRandom.RandomFloat < DefaultPerks.Charm.ForgivableGrievances.SecondaryBonus)
             {
                 MBList<Hero> heroesToIncreaseRelations = new MBList<Hero>();
                 foreach (Hero hero in SettlementHelper.GetAllHeroesOfSettlement(playerHero.CurrentSettlement, true))
@@ -132,7 +134,7 @@ public class CharacterRelationCampaignBehaviorInterface : ICharacterRelationCamp
                 {
                     foreach (var notable in settlement.Notables)
                     {
-                        if ((notable.IsArtisan || notable.IsMerchant) && MBRandom.RandomFloat < 1f)//0.05f)
+                        if ((notable.IsArtisan || notable.IsMerchant) && MBRandom.RandomFloat < 0.05f)
                         {
                             var owner = settlement.OwnerClan.Leader;
                             ChangeRelationAction.ApplyRelationChangeBetweenHeroes(owner, notable, settlementSecurityModel.DailyNotableRelationBonus, false);
