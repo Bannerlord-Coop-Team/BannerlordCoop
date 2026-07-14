@@ -1,4 +1,5 @@
 using Common;
+using GameInterface;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.RomanceFlow;
 using GameInterface.Services.ObjectManager;
@@ -83,7 +84,8 @@ internal class RomanceDebugCommand
         return RunOnGameThread(command, () =>
         {
             if (!TryGetPlayerNpcPair(context.Args, out var playerHero, out var targetHero, out error)) return error;
-            if (!RomanceAuthority.TryValidateMarriage(playerHero, targetHero, out error)) return error;
+            if (!TryGetRomanceAuthority(out var romanceAuthority, out error)) return error;
+            if (!romanceAuthority.TryValidateMarriage(playerHero, targetHero, out error)) return error;
 
             MarriageAction.Apply(playerHero, targetHero);
             return playerHero.Spouse == targetHero && targetHero.Spouse == playerHero
@@ -130,7 +132,8 @@ internal class RomanceDebugCommand
         return RunOnGameThread(command, () =>
         {
             if (!TryGetPlayerNpcPair(context.Args, out var playerHero, out var targetHero, out error)) return error;
-            if (!RomanceAuthority.TryValidateStateChange(playerHero, targetHero, requestedLevel, out error)) return error;
+            if (!TryGetRomanceAuthority(out var romanceAuthority, out error)) return error;
+            if (!romanceAuthority.TryValidateStateChange(playerHero, targetHero, requestedLevel, out error)) return error;
 
             ChangeRomanticStateAction.Apply(playerHero, targetHero, requestedLevel);
             return $"Changed romance between {playerHero.Name} and {targetHero.Name} to {requestedLevel}.";
@@ -196,6 +199,18 @@ internal class RomanceDebugCommand
         var result = $"{command} did not complete.";
         GameThread.RunSafe(() => result = action(), blocking: true, context: command);
         return result;
+    }
+
+    private static bool TryGetRomanceAuthority(out IRomanceAuthority romanceAuthority, out string error)
+    {
+        if (ContainerProvider.TryResolve(out romanceAuthority))
+        {
+            error = null;
+            return true;
+        }
+
+        error = "Could not resolve RomanceAuthority from container.";
+        return false;
     }
 
     private static string FormatState(Romance.RomanticState state, IObjectManager objectManager)

@@ -6,17 +6,16 @@ using Common.Util;
 using GameInterface.Registry.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.Messages.RomanceFlow;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Heroes.RomanceFlow;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
-using HarmonyLib;
 using LiteNetLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.BarterSystem;
@@ -31,24 +30,25 @@ namespace GameInterface.Services.Heroes.Handlers;
 internal class RomanceHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<RomanceHandler>();
-    private static readonly FieldInfo PrisonerCharacterField =
-        AccessTools.Field(typeof(TransferPrisonerBarterable), "_prisonerCharacter");
 
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
+    private readonly IRomanceAuthority romanceAuthority;
 
     public RomanceHandler(
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        IRomanceAuthority romanceAuthority)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
+        this.romanceAuthority = romanceAuthority;
 
         messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
         messageBroker.Subscribe<RomanticStateChangeRequested>(Handle_RomanticStateChangeRequested);
@@ -122,11 +122,13 @@ internal class RomanceHandler : IHandler
     private void Handle_NetworkRequestRomanceStateChange(MessagePayload<NetworkRequestRomanceStateChange> payload)
     {
         if (ModInformation.IsClient) return;
-        if (!TryResolveRequester(payload.Who, out var peer, out _, out var playerHero)) return;
 
+        var sender = payload.Who;
         var request = payload.What;
         GameThread.RunSafe(() =>
         {
+            if (!TryResolveRequester(sender, out var peer, out _, out var playerHero)) return;
+
             if (!TryResolveHero(request.TargetHeroId, out var targetHero))
             {
                 Reject(peer, "The selected hero no longer exists.");
@@ -140,7 +142,7 @@ internal class RomanceHandler : IHandler
             }
 
             var requestedLevel = (Romance.RomanceLevelEnum)request.RequestedLevel;
-            if (!RomanceAuthority.TryValidateStateChange(playerHero, targetHero, requestedLevel, out var reason))
+            if (!romanceAuthority.TryValidateStateChange(playerHero, targetHero, requestedLevel, out var reason))
             {
                 Reject(peer, reason);
                 return;
@@ -177,18 +179,20 @@ internal class RomanceHandler : IHandler
     private void Handle_NetworkRequestRomanceMarriage(MessagePayload<NetworkRequestRomanceMarriage> payload)
     {
         if (ModInformation.IsClient) return;
-        if (!TryResolveRequester(payload.Who, out var peer, out _, out var playerHero)) return;
 
+        var sender = payload.Who;
         var request = payload.What;
         GameThread.RunSafe(() =>
         {
+            if (!TryResolveRequester(sender, out var peer, out _, out var playerHero)) return;
+
             if (!TryResolveHero(request.TargetHeroId, out var targetHero))
             {
                 Reject(peer, "The selected hero no longer exists.");
                 return;
             }
 
-            if (!RomanceAuthority.TryValidateMarriage(playerHero, targetHero, out var reason))
+            if (!romanceAuthority.TryValidateMarriage(playerHero, targetHero, out var reason))
             {
                 Reject(peer, reason);
                 return;
@@ -205,11 +209,13 @@ internal class RomanceHandler : IHandler
     private void Handle_NetworkRequestRomanceMarriageBarter(MessagePayload<NetworkRequestRomanceMarriageBarter> payload)
     {
         if (ModInformation.IsClient) return;
-        if (!TryResolveRequester(payload.Who, out var peer, out var player, out var playerHero)) return;
 
+        var sender = payload.Who;
         var request = payload.What;
         GameThread.RunSafe(() =>
         {
+            if (!TryResolveRequester(sender, out var peer, out var player, out var playerHero)) return;
+
             try
             {
                 if (!TryResolveHero(request.TargetHeroId, out var targetHero))
@@ -218,7 +224,7 @@ internal class RomanceHandler : IHandler
                     return;
                 }
 
-                if (!RomanceAuthority.TryValidateMarriage(playerHero, targetHero, out var reason))
+                if (!romanceAuthority.TryValidateMarriage(playerHero, targetHero, out var reason))
                 {
                     Reject(peer, reason);
                     return;
@@ -230,14 +236,21 @@ internal class RomanceHandler : IHandler
                     return;
                 }
 
-                if (BarterManager.Instance == null ||
-                    !BarterManager.Instance.IsOfferAcceptable(barterData, targetHero, targetHero.PartyBelongedTo?.Party))
+                var barterManager = BarterManager.Instance;
+                if (barterManager == null ||
+                    !barterManager.IsOfferAcceptable(barterData, barterData.OtherHero, barterData.OtherParty))
                 {
                     Reject(peer, "The marriage offer is not acceptable.");
                     return;
                 }
 
-                BarterManager.Instance.ApplyAndFinalizePlayerBarter(playerHero, targetHero, barterData);
+                var overpayAmount = barterManager.GetOfferValue(
+                    barterData.OtherHero,
+                    barterData.OtherParty,
+                    barterData.OffererParty,
+                    barterData.GetOfferedBarterables());
+                barterManager.ApplyAndFinalizePlayerBarter(playerHero, barterData.OtherHero, barterData);
+                ApplyOverpayRelationBonus(playerHero, barterData.OtherHero, overpayAmount);
                 if (playerHero.Spouse != targetHero || targetHero.Spouse != playerHero)
                 {
                     Reject(peer, "The marriage could not be completed.");
@@ -260,7 +273,13 @@ internal class RomanceHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            BarterManager.Instance?.Close();
+            RomanceMarriageBarterPatches.CompleteMarriageBarterRequest();
+            if (BarterManager.Instance != null)
+            {
+                BarterManager.Instance.LastBarterIsAccepted = true;
+                BarterManager.Instance.Close();
+            }
+
             if (Campaign.Current?.ConversationManager?.IsConversationInProgress == true)
                 Campaign.Current.ConversationManager.ContinueConversation();
 
@@ -277,7 +296,11 @@ internal class RomanceHandler : IHandler
             : payload.What.Reason;
 
         GameThread.RunSafe(
-            () => InformationManager.DisplayMessage(new InformationMessage(reason)),
+            () =>
+            {
+                RomanceMarriageBarterPatches.CompleteMarriageBarterRequest();
+                InformationManager.DisplayMessage(new InformationMessage(reason));
+            },
             context: nameof(Handle_NetworkRomanceRequestRejected));
     }
 
@@ -460,16 +483,17 @@ internal class RomanceHandler : IHandler
         reason = null;
 
         var playerParty = GetPlayerParty(player, playerHero);
-        var targetParty = targetHero.PartyBelongedTo?.Party;
+        var counterpartyHero = targetHero.Clan?.Leader ?? targetHero;
+        var counterpartyParty = counterpartyHero.PartyBelongedTo?.Party;
         var romanticState = Romance.GetRomanticState(playerHero, targetHero);
         var persuasionCostReduction = (int)(romanticState?.ScoreFromPersuasion ?? 0f);
         var marriageBarterable = new MarriageBarterable(playerHero, playerParty, targetHero, playerHero);
 
         barterData = new BarterData(
             playerHero,
-            targetHero,
+            counterpartyHero,
             playerParty,
-            targetParty,
+            counterpartyParty,
             null,
             persuasionCostReduction,
             false);
@@ -482,7 +506,7 @@ internal class RomanceHandler : IHandler
 
         return TryApplyRequestedTerms(
             playerHero,
-            targetHero,
+            counterpartyHero,
             barterData,
             terms ?? Array.Empty<RomanceBarterTerm>(),
             out reason);
@@ -501,7 +525,7 @@ internal class RomanceHandler : IHandler
 
     private bool TryApplyRequestedTerms(
         Hero playerHero,
-        Hero targetHero,
+        Hero counterpartyHero,
         BarterData barterData,
         RomanceBarterTerm[] terms,
         out string reason)
@@ -523,7 +547,7 @@ internal class RomanceHandler : IHandler
 
             var termType = (RomanceBarterTermType)term.Type;
             var barterable = barterData.GetBarterables().FirstOrDefault(candidate =>
-                (candidate.OriginalOwner == playerHero || candidate.OriginalOwner == targetHero) &&
+                (candidate.OriginalOwner == playerHero || candidate.OriginalOwner == counterpartyHero) &&
                 objectManager.TryGetId(candidate.OriginalOwner, out var ownerHeroId) &&
                 ownerHeroId == term.OwnerHeroId &&
                 MatchesTerm(candidate, termType, term));
@@ -578,9 +602,28 @@ internal class RomanceHandler : IHandler
 
     private bool MatchesPrisoner(TransferPrisonerBarterable barterable, RomanceBarterTerm term)
     {
-        var prisoner = PrisonerCharacterField?.GetValue(barterable) as Hero;
+        var prisoner = barterable._prisonerCharacter;
         return prisoner?.CharacterObject != null &&
                objectManager.TryGetId(prisoner.CharacterObject, out var characterId) &&
                characterId == term.ObjectId;
+    }
+
+    private static void ApplyOverpayRelationBonus(Hero playerHero, Hero otherHero, float overpayAmount)
+    {
+        var campaign = Campaign.Current;
+        if (playerHero == Hero.MainHero ||
+            otherHero == null ||
+            overpayAmount <= 0f ||
+            playerHero.MapFaction == null ||
+            otherHero.MapFaction == null ||
+            otherHero.MapFaction.IsAtWarWith(playerHero.MapFaction) ||
+            campaign == null)
+        {
+            return;
+        }
+
+        var relationBonus = campaign.Models.BarterModel.CalculateOverpayRelationIncreaseCosts(otherHero, overpayAmount);
+        if (relationBonus > 0)
+            ChangeRelationAction.ApplyRelationChangeBetweenHeroes(playerHero, otherHero, relationBonus);
     }
 }

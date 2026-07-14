@@ -5,9 +5,20 @@ using Romance = TaleWorlds.CampaignSystem.Romance;
 
 namespace GameInterface.Services.Heroes.RomanceFlow;
 
-internal static class RomanceAuthority
+internal interface IRomanceAuthority : IGameAbstraction
 {
-    public static bool TryValidateStateChange(
+    bool TryValidateStateChange(
+        Hero playerHero,
+        Hero targetHero,
+        Romance.RomanceLevelEnum requestedLevel,
+        out string reason);
+
+    bool TryValidateMarriage(Hero playerHero, Hero targetHero, out string reason);
+}
+
+internal class RomanceAuthority : IRomanceAuthority
+{
+    public bool TryValidateStateChange(
         Hero playerHero,
         Hero targetHero,
         Romance.RomanceLevelEnum requestedLevel,
@@ -39,7 +50,7 @@ internal static class RomanceAuthority
         return true;
     }
 
-    public static bool TryValidateMarriage(Hero playerHero, Hero targetHero, out string reason)
+    public bool TryValidateMarriage(Hero playerHero, Hero targetHero, out string reason)
     {
         if (!TryValidatePair(playerHero, targetHero, out reason)) return false;
 

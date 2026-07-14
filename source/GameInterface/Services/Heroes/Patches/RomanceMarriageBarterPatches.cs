@@ -7,7 +7,6 @@ using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.BarterSystem;
 using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
@@ -19,8 +18,7 @@ namespace GameInterface.Services.Heroes.Patches;
 [HarmonyPatch(typeof(BarterManager))]
 internal class RomanceMarriageBarterPatches
 {
-    private static readonly FieldInfo PrisonerCharacterField =
-        AccessTools.Field(typeof(TransferPrisonerBarterable), "_prisonerCharacter");
+    private static BarterData pendingMarriageBarter;
 
     [HarmonyPatch(nameof(BarterManager.ApplyAndFinalizePlayerBarter))]
     [HarmonyPrefix]
@@ -32,6 +30,7 @@ internal class RomanceMarriageBarterPatches
 
         var marriageBarterable = barterData.GetOfferedBarterables().OfType<MarriageBarterable>().FirstOrDefault();
         if (marriageBarterable == null) return true;
+        if (ReferenceEquals(pendingMarriageBarter, barterData)) return false;
 
         if (!TryGetTarget(offererHero, marriageBarterable, out var targetHero))
         {
@@ -53,9 +52,13 @@ internal class RomanceMarriageBarterPatches
             return false;
         }
 
+        pendingMarriageBarter = barterData;
         network.SendAll(new NetworkRequestRomanceMarriageBarter(targetHeroId, terms.ToArray()));
         return false;
     }
+
+    internal static void CompleteMarriageBarterRequest()
+        => pendingMarriageBarter = null;
 
     private static bool TryGetTarget(Hero offererHero, MarriageBarterable marriageBarterable, out Hero targetHero)
     {
@@ -165,7 +168,7 @@ internal class RomanceMarriageBarterPatches
         out RomanceBarterTerm term)
     {
         term = default;
-        var prisoner = PrisonerCharacterField?.GetValue(barterable) as Hero;
+        var prisoner = barterable._prisonerCharacter;
         if (prisoner?.CharacterObject == null ||
             !objectManager.TryGetId(prisoner.CharacterObject, out var characterId))
         {
