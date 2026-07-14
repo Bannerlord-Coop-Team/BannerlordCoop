@@ -43,7 +43,28 @@ public class ServerMissionMembershipHandler : IHandler
         var peer = (NetPeer)payload.Who;
         var message = payload.What;
 
-        var others = missionManager.EnterMission(peer, message.ControllerId, message.InstanceId);
+        var others = missionManager.EnterMission(peer, message.ControllerId, message.InstanceId, out var staleDepartures);
+
+        // The controller was still listed in a prior instance whose leave never reached us (its mission teardown
+        // died before the MissionLeft). Entering evicted it there; apply that missed departure now, exactly as a
+        // graceful leave would have — otherwise the members still present keep it in their mirror and relay every
+        // broadcast at a controller the server no longer maps in that instance.
+        foreach (var stale in staleDepartures)
+        {
+            foreach (var (_, otherPeer) in stale.Remaining)
+            {
+                network.Send(otherPeer, new MissionPeerLeft(message.ControllerId, stale.InstanceId));
+            }
+
+            // Local signal for battle host migration / successor cleanup (no-op for non-battle instances).
+            // Treated as a retreat, matching the graceful leave this stands in for: the controller is alive —
+            // it just entered another instance — so its troops withdraw rather than being adopted.
+            messageBroker.Publish(this, new MissionMemberDeparted(
+                message.ControllerId,
+                stale.InstanceId,
+                wasRetreat: true,
+                isInstanceEmpty: stale.Remaining.Count == 0));
+        }
 
         // Introduce the newcomer and each existing member to each other so BOTH sides send their join info
         // (replaces the direct PeerConnected trigger). The introduction travels over the campaign/relay

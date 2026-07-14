@@ -9,6 +9,7 @@ using LiteNetLib;
 using Missions.Agents;
 using Missions.Agents.Packets;
 using Missions.Messages;
+using Missions.Services.Network;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -53,6 +54,7 @@ public class AgentMovementHandler : IAgentMovementHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetworkAgentRegistry agentRegistry;
     private readonly IControllerIdProvider controllerIdProvider;
+    private readonly IMissionContext missionContext;
 
     // A puppet's horse, remembered when its owner dismounts, so a later re-mount can put it back on the
     // same one. Touched only on the game thread (inside HandlePacket's apply), so no lock; per-mission
@@ -79,7 +81,8 @@ public class AgentMovementHandler : IAgentMovementHandler
         IPacketManager packetManager,
         IMessageBroker messageBroker,
         INetworkAgentRegistry agentRegistry,
-        IControllerIdProvider controllerIdProvider)
+        IControllerIdProvider controllerIdProvider,
+        IMissionContext missionContext)
     {
         Logger.Verbose("Creating {handlerType}", typeof(AgentMovementHandler));
 
@@ -88,6 +91,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         this.messageBroker = messageBroker;
         this.agentRegistry = agentRegistry;
         this.controllerIdProvider = controllerIdProvider;
+        this.missionContext = missionContext;
 
         // Server-mediated membership. A peer entering is the cue to clear any STALE party it left behind
         // on a missed disconnect (so its rejoin re-spawns clean); a leave/disconnect releases its party.
@@ -334,6 +338,14 @@ public class AgentMovementHandler : IAgentMovementHandler
 
     private void Handle_PeerEntered(MessagePayload<NetworkMissionPeerEntered> payload)
     {
+        // Only act on an entry into OUR instance. A stale or in-flight introduction for another instance (e.g.
+        // one sent for the previous mission just as we moved on) would despawn a party that legitimately belongs
+        // to the current instance — the same reason MissionContext and CoopMissionController filter it. A null
+        // instance id stays a wildcard (only locally published legacy/test messages omit it; the server fan-out
+        // always carries the id).
+        if (payload.What.InstanceId != null && payload.What.InstanceId != missionContext.CurrentInstanceId)
+            return;
+
         // Defensive: if this controller still has a party registered, we missed its earlier departure —
         // clear it so the fresh join re-spawns instead of being deduped as "already registered".
         RemoveControllerParty(payload.What.ControllerId, "peer entered (stale cleanup)");

@@ -31,8 +31,16 @@ public interface IMissionManager
     /// the connection the announcement arrived on (<paramref name="peer"/>) so the relay fallback can reach
     /// it. Creates the instance if this is its first member. Driven by a client <c>MissionEntered</c>.
     /// Returns the members already present (excluding the newcomer) so the caller can introduce them to it.
+    /// <para>
+    /// <paramref name="staleDepartures"/> reports any prior instance the controller was still listed in — its
+    /// leave never reached the server (mission teardown died before the <c>MissionLeft</c>), so entering here
+    /// evicted it. Each entry carries the members still present there so the caller can announce the missed
+    /// departure to them (otherwise they keep relaying at a controller that has moved on). Normally empty.
+    /// </para>
     /// </summary>
-    IReadOnlyList<(string controllerId, NetPeer peer)> EnterMission(NetPeer peer, string controllerId, string instanceId);
+    IReadOnlyList<(string controllerId, NetPeer peer)> EnterMission(
+        NetPeer peer, string controllerId, string instanceId,
+        out IReadOnlyList<StaleDeparture> staleDepartures);
 
     /// <summary>
     /// Record that <paramref name="controllerId"/> (on <paramref name="peer"/>) has left
@@ -56,6 +64,27 @@ public interface IMissionManager
     /// Returns false if the instance is unknown.
     /// </summary>
     bool TryGetControllers(string instanceId, out IReadOnlyCollection<string> controllers);
+}
+
+/// <summary>
+/// A prior instance a controller was still routed through when it entered another — its leave never reached the
+/// server (mission teardown died before the <c>MissionLeft</c>), so the entry evicted it. Surfaced by
+/// <see cref="IMissionManager.EnterMission"/> with the members still present, so the caller can announce that
+/// missed departure to them.
+/// </summary>
+public readonly struct StaleDeparture
+{
+    public StaleDeparture(string instanceId, IReadOnlyList<(string controllerId, NetPeer peer)> remaining)
+    {
+        InstanceId = instanceId;
+        Remaining = remaining;
+    }
+
+    /// <summary>The prior instance the controller was evicted from.</summary>
+    public string InstanceId { get; }
+
+    /// <summary>The members still present in that instance after the eviction.</summary>
+    public IReadOnlyList<(string controllerId, NetPeer peer)> Remaining { get; }
 }
 
 /// <inheritdoc cref="IMissionManager"/>
@@ -128,15 +157,18 @@ public class MissionManager : IMissionManager
         }
     }
 
-    public IReadOnlyList<(string controllerId, NetPeer peer)> EnterMission(NetPeer peer, string controllerId, string instanceId)
+    public IReadOnlyList<(string controllerId, NetPeer peer)> EnterMission(
+        NetPeer peer, string controllerId, string instanceId,
+        out IReadOnlyList<StaleDeparture> staleDepartures)
     {
         lock (gate)
         {
             // A controller is in at most one instance — TryHandleDisconnect relies on that when it removes
             // the first match. A controller whose previous mission never announced its leave (teardown died
             // before MissionLeft) would otherwise linger in the old table, so entering here evicts it
-            // everywhere else (the relay-table analogue of RemoveEndpointEverywhere).
-            RemoveControllerEverywhere(controllerId, exceptInstanceId: instanceId);
+            // everywhere else (the relay-table analogue of RemoveEndpointEverywhere). The evicted-from
+            // instances are surfaced so the caller can tell the members still there it is gone.
+            staleDepartures = RemoveControllerEverywhere(controllerId, exceptInstanceId: instanceId);
 
             // Shares the instance dictionary with the NAT-punch flow, so the relay context and the punch
             // endpoints for one mission live in the SAME MissionInstance — provided both sides derive the
@@ -240,10 +272,12 @@ public class MissionManager : IMissionManager
         }
     }
 
-    // A controller is in at most one instance, so any other relay mapping is stale on a new entry.
-    // Caller holds the lock.
-    private void RemoveControllerEverywhere(string controllerId, string exceptInstanceId)
+    // A controller is in at most one instance, so any other relay mapping is stale on a new entry. Returns the
+    // instances it was actually evicted from, each with the members still present, so the caller can announce
+    // the missed departure to them. Caller holds the lock.
+    private IReadOnlyList<StaleDeparture> RemoveControllerEverywhere(string controllerId, string exceptInstanceId)
     {
+        List<StaleDeparture> departures = null;
         foreach (var entry in byInstanceId)
         {
             if (entry.Key == exceptInstanceId) continue;
@@ -252,7 +286,12 @@ public class MissionManager : IMissionManager
             {
                 Logger.Information("Evicted stale relay mapping of {Controller} from instance {Instance} on entering {NewInstance}",
                     controllerId, entry.Key, exceptInstanceId);
+
+                // Snapshot the members still present AFTER the eviction — they are the ones to notify.
+                (departures ??= new List<StaleDeparture>()).Add(new StaleDeparture(entry.Key, Members(entry.Value)));
             }
         }
+
+        return departures ?? (IReadOnlyList<StaleDeparture>)Array.Empty<StaleDeparture>();
     }
 }

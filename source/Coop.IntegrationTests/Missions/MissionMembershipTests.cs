@@ -132,6 +132,35 @@ public class MissionMembershipTests
     }
 
     [Fact]
+    public void EnterMission_NotifiesPeersStillInThePriorInstance()
+    {
+        const string NextInstanceId = "MapEvent_Next";
+        var members = SetupClients();
+
+        // Two members share an instance, so members[1] mirrors members[0].
+        Join(members[0]);
+        Join(members[1]);
+        Assert.Equal(new[] { members[0].ControllerId },
+            members[1].Instance.Resolve<MissionContext>().ControllersInMission.ToArray());
+
+        // members[0]'s mission teardown dies — it never announces its leave — and it then enters another
+        // instance while members[1] is still present. (Note: no Leave(members[0]) first.)
+        Join(members[0], NextInstanceId);
+
+        // The member still in the old instance is told the evicted controller is gone, so it stops mirroring
+        // it — otherwise every broadcast would relay at a controller the server no longer maps there.
+        Assert.Empty(members[1].Instance.Resolve<MissionContext>().ControllersInMission);
+
+        // Server view stays consistent: the old instance holds only the member that stayed; the new one only
+        // the controller that moved on.
+        var missionManager = TestEnvironment.Server.Resolve<IMissionManager>();
+        Assert.True(missionManager.TryGetControllers(InstanceId, out var oldControllers));
+        Assert.Equal(new[] { members[1].ControllerId }, oldControllers.ToArray());
+        Assert.True(missionManager.TryGetControllers(NextInstanceId, out var newControllers));
+        Assert.Equal(new[] { members[0].ControllerId }, newControllers.ToArray());
+    }
+
+    [Fact]
     public void ClientLeaves_DepartureMarksWhetherInstanceIsEmpty()
     {
         var members = SetupClients().Take(2).ToArray();

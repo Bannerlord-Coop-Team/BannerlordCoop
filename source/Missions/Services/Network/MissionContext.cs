@@ -16,6 +16,15 @@ namespace Missions.Services.Network;
 public interface IMissionContext : IDisposable
 {
     IReadOnlyCollection<string> ControllersInMission { get; }
+
+    /// <summary>
+    /// The instance this mission is currently scoped to (set by <see cref="BeginInstance"/>, cleared by
+    /// <see cref="EndInstance"/>); null while not in an instance. The unified client-side "current instance id"
+    /// for both battle and location missions — handlers that must ignore introductions for another instance
+    /// (a stale or in-flight one) compare against it.
+    /// </summary>
+    string CurrentInstanceId { get; }
+
     void MapPeer(string controllerId, NetPeer peer);
     void RemovePeer(NetPeer peer);
     bool TryGetPeer(string controllerId, out NetPeer netPeer);
@@ -81,6 +90,11 @@ public class MissionContext : IMissionContext, IHandler
                     .ToArray();
             }
         }
+    }
+
+    public string CurrentInstanceId
+    {
+        get { lock (gate) { return currentInstanceId; } }
     }
 
     public MissionContext(
