@@ -109,7 +109,7 @@ public class CharacterRelationCampaignBehaviorInterface : ICharacterRelationCamp
                 MBList<Hero> heroesToIncreaseRelations = new MBList<Hero>();
                 foreach (Hero hero in SettlementHelper.GetAllHeroesOfSettlement(playerHero.CurrentSettlement, true))
                 {
-                    if (!hero.IsPlayerHero() && hero.GetRelationWithPlayer() < 0f)
+                    if (!hero.IsPlayerHero() && playerHero.GetRelation(hero) < 0f)
                     {
                         heroesToIncreaseRelations.Add(hero);
                     }
