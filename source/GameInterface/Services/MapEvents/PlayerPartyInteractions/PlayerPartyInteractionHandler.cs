@@ -700,7 +700,8 @@ internal class PlayerPartyInteractionHandler : IHandler
             partyItems,
             otherPartyItems,
             enabledOptions,
-            session.IsHostile));
+            session.IsHostile,
+            session.VassalUnavailableReason));
     }
 
     private void SendResponderState(
@@ -731,7 +732,8 @@ internal class PlayerPartyInteractionHandler : IHandler
             partyItems,
             otherPartyItems,
             enabledOptions,
-            session.IsHostile));
+            session.IsHostile,
+            session.VassalUnavailableReason));
     }
 
     private void EndSession(PlayerPartyInteractionSession session, PlayerPartyInteractionOutcomeType outcomeType)
@@ -771,10 +773,12 @@ internal class PlayerPartyInteractionHandler : IHandler
         AddInitiatorOption(session, PlayerPartyInteractionOption.OfferServices, enabled: !session.IsHostile);
         AddInitiatorOption(session, PlayerPartyInteractionOption.HostileDemand, hostileEncounterService.CanStartHostileEncounter(initiatorParty, responderParty));
         AddInitiatorOption(session, PlayerPartyInteractionOption.JoinClan, enabled: false);
+        var vassalAvailable = IsVassalServiceAvailable(initiatorParty, responderParty, out var vassalUnavailableReason);
+        session.VassalUnavailableReason = vassalUnavailableReason;
         AddInitiatorOption(
             session,
             PlayerPartyInteractionOption.Vassal,
-            IsVassalServiceAvailable(initiatorParty, responderParty));
+            vassalAvailable);
         AddInitiatorOption(session, PlayerPartyInteractionOption.Leave, enabled: true);
     }
 
@@ -785,16 +789,41 @@ internal class PlayerPartyInteractionHandler : IHandler
             session.InitiatorEnabledOptions.Add(option);
     }
 
-    private static bool IsVassalServiceAvailable(PartyBase initiatorParty, PartyBase responderParty)
+    private static bool IsVassalServiceAvailable(
+        PartyBase initiatorParty,
+        PartyBase responderParty,
+        out PlayerPartyInteractionVassalUnavailableReason unavailableReason)
     {
         var initiatorClan = initiatorParty.LeaderHero?.Clan ?? initiatorParty.MobileParty?.ActualClan;
         var responderHero = responderParty.LeaderHero;
         var responderKingdom = responderHero?.Clan?.Kingdom;
 
-        return responderHero?.IsKingdomLeader == true &&
-               responderKingdom?.RulingClan == responderHero.Clan &&
-               initiatorClan?.Kingdom == null &&
-               initiatorClan.Tier >= 2;
+        if (responderHero?.IsKingdomLeader != true || responderKingdom?.RulingClan != responderHero.Clan)
+        {
+            unavailableReason = PlayerPartyInteractionVassalUnavailableReason.TargetIsNotKingdomLeader;
+            return false;
+        }
+
+        if (initiatorClan == null)
+        {
+            unavailableReason = PlayerPartyInteractionVassalUnavailableReason.InitiatorHasNoClan;
+            return false;
+        }
+
+        if (initiatorClan.Kingdom != null)
+        {
+            unavailableReason = PlayerPartyInteractionVassalUnavailableReason.InitiatorIsInKingdom;
+            return false;
+        }
+
+        if (initiatorClan.Tier < 2)
+        {
+            unavailableReason = PlayerPartyInteractionVassalUnavailableReason.InitiatorClanTierTooLow;
+            return false;
+        }
+
+        unavailableReason = PlayerPartyInteractionVassalUnavailableReason.None;
+        return true;
     }
 
     private static PlayerPartyInteractionProposal ToProposal(PlayerPartyInteractionOption option)
