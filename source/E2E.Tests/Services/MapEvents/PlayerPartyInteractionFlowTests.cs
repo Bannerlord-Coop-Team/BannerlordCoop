@@ -797,6 +797,23 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Fact]
+    public void EndedInteraction_IgnoresDelayedStateForSameSession()
+    {
+        var (client1, _, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+        var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
+        var initialState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>()
+            .Single(state => state.SessionId == sessionId && state.PartyId == initiatorPartyId);
+
+        SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.Leave);
+        AssertInteractionStateCleared(client1);
+
+        client1.SimulateMessage(Server.NetPeer, initialState);
+
+        AssertInteractionStateCleared(client1);
+    }
+
+    [Fact]
     public void TradeProposal_DeclinedByResponder_EndsInteraction()
     {
         var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();

@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using Common.Network.Session;
 using Coop.Core.Common.Session.Messages;
 using GameInterface.Services.GameState;
 using Serilog;
@@ -10,9 +11,9 @@ using System.IO;
 namespace Coop.Core.Common.Session;
 
 /// <summary>
-/// Spawns and tracks the dedicated server process a Host click creates. Once a client has
-/// connected, the server manages its own shutdown; Stop is only the pre-connect abort path,
-/// where the child cannot be mid-save, so it kills promptly and disowns the child.
+/// Spawns and tracks the dedicated server process a Host click creates. The child remains
+/// independent until the user closes it; this manager observes and disowns the process but
+/// never terminates it.
 /// </summary>
 public class ServerProcessManager : IDisposable
 {
@@ -39,7 +40,11 @@ public class ServerProcessManager : IDisposable
         }
     }
 
-    public void Start(string saveName)
+    public void Start(string saveName) => Start(saveName, null, ServerVisibility.Public);
+
+    public void Start(string saveName, string password) => Start(saveName, password, ServerVisibility.Public);
+
+    public void Start(string saveName, string password, ServerVisibility visibility)
     {
         lock (stateLock)
         {
@@ -51,9 +56,10 @@ public class ServerProcessManager : IDisposable
             var currentProcess = Process.GetCurrentProcess();
             var exePath = ManagedServerLauncher.GetEngineExecutablePath();
             var arguments = ServerLaunchArguments.BuildManagedServerArguments(
-                ManagedServerLauncher.GetActiveModuleIds(), saveName, currentProcess.Id);
+                ManagedServerLauncher.GetActiveModuleIds(), saveName, currentProcess.Id, password, visibility);
 
-            Logger.Information("Spawning co-op server for save '{SaveName}': {Exe} {Arguments}", saveName, exePath, arguments);
+            // The arguments may contain the hosted-server password, so never write them to a log.
+            Logger.Information("Spawning co-op server for save '{SaveName}': {Exe}", saveName, exePath);
 
             var process = new Process
             {
@@ -82,21 +88,6 @@ public class ServerProcessManager : IDisposable
                 CleanupLocked();
                 throw;
             }
-        }
-    }
-
-    /// <summary>
-    /// Kills the spawned server and disowns it. Only the pre-connect abort path calls this,
-    /// where the child has no save in progress, so re-hosting is unblocked immediately.
-    /// </summary>
-    public void Stop()
-    {
-        lock (stateLock)
-        {
-            if (serverProcess == null) return;
-
-            if (!HasExited(serverProcess)) TryKill(serverProcess);
-            CleanupLocked();
         }
     }
 
@@ -133,18 +124,6 @@ public class ServerProcessManager : IDisposable
         if (isCurrent)
         {
             messageBroker.Publish(this, new HostedServerExited());
-        }
-    }
-
-    private static void TryKill(Process process)
-    {
-        try
-        {
-            process.Kill();
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "Failed to kill the co-op server process");
         }
     }
 
