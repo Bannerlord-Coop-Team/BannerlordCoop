@@ -10,10 +10,10 @@ namespace GameInterface.Services.MobileParties.Messages.Behavior;
 /// <seealso cref="MobilePartyBehaviorHandler"/>
 internal readonly struct PartyBehaviorChangeAttempted : IEvent
 {
-    public readonly MobilePartyAi PartyAi;
+    public readonly MobileParty Party;
 
-    public PartyBehaviorChangeAttempted(MobilePartyAi partyAi)
+    public PartyBehaviorChangeAttempted(MobileParty party)
     {
-        PartyAi = partyAi;
+        Party = party;
     }
 }

@@ -1,7 +1,5 @@
 ﻿using GameInterface.Services.ObjectManager;
 using static GameInterface.Services.ObjectManager.ObjectManager;
-using System;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
@@ -9,89 +7,39 @@ using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.MobileParties.Data;
 
-/// <summary>
-/// Creates complete movement and AI behavior snapshots for mobile parties.
-/// </summary>
 public interface IMobilePartyBehaviorSnapshot
 {
-    bool TryCreateCurrent(
-        MobileParty party,
-        out PartyBehaviorUpdateData data);
-
-    bool TryCreate(
-        MobileParty party,
-        AiBehavior shortTermBehavior,
-        IInteractablePoint interactablePoint,
-        CampaignVec2 behaviorTarget,
-        CampaignVec2 moveTargetPoint,
-        out PartyBehaviorUpdateData data);
+    bool TryCreate(MobileParty party, out PartyBehaviorUpdateData data);
+    bool TryApply(MobileParty party, PartyBehaviorUpdateData data, out IInteractablePoint interactable);
 }
 
-/// <summary>
-/// Builds the complete movement and AI behavior snapshot replicated for one mobile party.
-/// </summary>
 public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
 {
     private readonly IObjectManager objectManager;
 
-    public MobilePartyBehaviorSnapshot(IObjectManager objectManager)
-    {
-        if (objectManager == null)
-            throw new ArgumentNullException(nameof(objectManager));
-
-        this.objectManager = objectManager;
-    }
-
-    public bool TryCreateCurrent(
-        MobileParty party,
-        out PartyBehaviorUpdateData data)
-    {
-        data = default;
-
-        return party?.Ai != null &&
-            TryCreate(
-                party,
-                party.ShortTermBehavior,
-                party.Ai.AiBehaviorInteractable,
-                party.Ai.BehaviorTarget,
-                party.MoveTargetPoint,
-                out data);
-    }
+    public MobilePartyBehaviorSnapshot(IObjectManager objectManager) => this.objectManager = objectManager;
 
     public bool TryCreate(
         MobileParty party,
-        AiBehavior shortTermBehavior,
-        IInteractablePoint interactablePoint,
-        CampaignVec2 behaviorTarget,
-        CampaignVec2 moveTargetPoint,
         out PartyBehaviorUpdateData data)
     {
         data = default;
-
-        if (party == null)
+        if (party?.Ai == null)
             return false;
-
-        if (!TryGetCompactId(party, out string partyId))
-            return false;
-
-        if (!TryGetInteractableReference(
-                interactablePoint,
+        if (!TryGetCompactId(party, out string partyId) ||
+            !TryGetInteractableReference(
+                party.Ai.AiBehaviorInteractable,
                 out string interactablePointId,
-                out BehaviorInteractableKind interactableKind,
-                out bool hasTarget))
-            return false;
-
-        if (!TryGetCompactId(party.TargetParty, out string targetPartyId) ||
+                out bool isInteractableAnchor) ||
+            !TryGetCompactId(party.TargetParty, out string targetPartyId) ||
             !TryGetCompactId(party.TargetSettlement, out string targetSettlementId) ||
             !TryGetCompactId(party.MoveTargetParty, out string moveTargetPartyId))
             return false;
-
         data = new PartyBehaviorUpdateData(
             partyId,
-            shortTermBehavior,
+            party.ShortTermBehavior,
             interactablePointId,
-            behaviorTarget,
-            hasTarget,
+            party.Ai.BehaviorTarget,
             party.Position,
             party.DefaultBehavior,
             party.TargetPosition,
@@ -99,58 +47,92 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
         {
             TargetPartyId = targetPartyId,
             TargetSettlementId = targetSettlementId,
-            MoveTargetPoint = moveTargetPoint,
+            MoveTargetPoint = party.MoveTargetPoint,
             IsTargetingPort = party.IsTargetingPort,
             PartyMoveMode = party.PartyMoveMode,
             MoveTargetPartyId = moveTargetPartyId,
-            NextTargetPosition = party.NextTargetPosition,
-            InteractableKind = interactableKind,
+            IsInteractableAnchor = isInteractableAnchor,
         };
-
         return true;
     }
 
-    private bool TryGetInteractableReference(
-        IInteractablePoint interactablePoint,
-        out string interactablePointId,
-        out BehaviorInteractableKind interactableKind,
-        out bool hasTarget)
+    public bool TryApply(MobileParty party, PartyBehaviorUpdateData data, out IInteractablePoint interactable)
     {
-        interactablePointId = null;
-        interactableKind = BehaviorInteractableKind.PartyBase;
-        hasTarget = false;
-
-        switch (interactablePoint)
+        interactable = null;
+        if (party?.Ai == null ||
+            !TryResolveInteractable(data, out interactable) ||
+            !TryResolve(data.TargetPartyId, out MobileParty targetParty) ||
+            !TryResolve(data.TargetSettlementId, out Settlement targetSettlement) ||
+            !TryResolve(data.MoveTargetPartyId, out MobileParty moveTargetParty))
+            return false;
+        // Install targets first because DefaultBehavior can immediately recalculate short-term state.
+        party.SetTargetSettlement(targetSettlement, data.IsTargetingPort);
+        party.TargetParty = targetParty;
+        party.TargetPosition = data.TargetPosition;
+        party.DefaultBehavior = data.DefaultBehavior;
+        party.SetShortTermBehavior(data.NewAiBehavior, interactable);
+        party.DesiredAiNavigationType = data.DesiredAiNavigationType;
+        party.Ai.BehaviorTarget = data.BestTargetPoint;
+        party.Ai.UpdateBehavior();
+        // Use vanilla setters so private path state stays aligned with the replicated move mode.
+        switch (data.PartyMoveMode)
         {
-            case PartyBase partyBase:
-                hasTarget = true;
-                return TryGetCompactId(partyBase, out interactablePointId) &&
-                    !string.IsNullOrEmpty(interactablePointId);
-            case AnchorPoint anchorPoint when anchorPoint.Owner != null:
-                interactableKind = BehaviorInteractableKind.AnchorPoint;
-                hasTarget = true;
-                return TryGetCompactId(anchorPoint.Owner, out interactablePointId) &&
-                    !string.IsNullOrEmpty(interactablePointId);
-            case null:
-                return true;
+            case MoveModeType.Hold:
+                party.SetNavigationModeHold();
+                break;
+            case MoveModeType.Point:
+                party.SetNavigationModePoint(data.MoveTargetPoint);
+                break;
+            case MoveModeType.Party when moveTargetParty != null:
+                party.SetNavigationModeParty(moveTargetParty);
+                break;
             default:
-                // A successful result promises a complete snapshot. Refuse interactables that the
-                // wire contract cannot represent instead of replaying a different null target.
-                return false;
+                party.PartyMoveMode = data.PartyMoveMode;
+                party.MoveTargetParty = moveTargetParty;
+                break;
         }
+        party.MoveTargetPoint = data.MoveTargetPoint;
+        return true;
+    }
+
+    private bool TryResolveInteractable(PartyBehaviorUpdateData data, out IInteractablePoint interactable)
+    {
+        interactable = null;
+        if (data.InteractablePointId == null)
+            return true;
+        if (data.IsInteractableAnchor)
+            return TryResolve(data.InteractablePointId, out MobileParty owner) &&
+                (interactable = owner.Anchor) != null;
+        return TryResolve(data.InteractablePointId, out PartyBase partyBase) &&
+            (interactable = partyBase) != null;
+    }
+
+    private bool TryResolve<T>(string id, out T value) where T : class
+    {
+        value = null;
+        return id == null || objectManager.TryGetObjectWithLogging(id, out value);
+    }
+
+    private bool TryGetInteractableReference(IInteractablePoint interactable, out string id, out bool isAnchor)
+    {
+        isAnchor = interactable is AnchorPoint;
+        if (interactable is PartyBase partyBase)
+            return TryGetCompactId(partyBase, out id);
+        if (interactable is AnchorPoint anchor && anchor.Owner != null)
+            return TryGetCompactId(anchor.Owner, out id);
+        id = null;
+        return interactable == null;
     }
 
     private bool TryGetCompactId<T>(T instance, out string id)
         where T : class
     {
-        id = null;
-        if (instance == null)
+        if (instance != null && objectManager.TryGetId(instance, out id))
+        {
+            id = Compact(id, typeof(T));
             return true;
-
-        if (!objectManager.TryGetId(instance, out id))
-            return false;
-
-        id = Compact(id, typeof(T));
-        return true;
+        }
+        id = null;
+        return instance == null;
     }
 }

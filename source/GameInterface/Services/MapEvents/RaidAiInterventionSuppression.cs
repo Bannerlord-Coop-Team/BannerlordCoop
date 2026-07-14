@@ -143,6 +143,6 @@ internal static class RaidAiInterventionSuppression
             return;
 
         party.SetMoveModeHold();
-        MessageBroker.Instance.Publish(party.Ai, new PartyBehaviorChangeAttempted(party.Ai));
+        MessageBroker.Instance.Publish(party.Ai, new PartyBehaviorChangeAttempted(party));
     }
 }
