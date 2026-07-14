@@ -1,5 +1,6 @@
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
+using System;
 using Xunit;
 
 namespace GameInterface.Tests.Services.MapEvents;
@@ -41,7 +42,7 @@ public class PlayerPartyInteractionDialogStateTests
                 "RandomPlayer",
                 PlayerPartyInteractionPhase.WaitingForResponse,
                 PlayerPartyInteractionProposal.Trade,
-                System.Array.Empty<PlayerPartyInteractionOption>(),
+                Array.Empty<PlayerPartyInteractionOption>(),
                 isInitiator: true));
 
             Assert.Equal("Awaiting response from RandomPlayer...", PlayerPartyInteractionDialogState.GetDialogText());
@@ -103,7 +104,7 @@ public class PlayerPartyInteractionDialogStateTests
                 PlayerPartyInteractionProposal.None,
                 new[] { PlayerPartyInteractionOption.Vassal },
                 isInitiator: true,
-                enabledOptions: new PlayerPartyInteractionOption[0],
+                enabledOptions: Array.Empty<PlayerPartyInteractionOption>(),
                 vassalUnavailableReason: unavailableReason));
 
             Assert.False(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Vassal, out var explanation));
