@@ -15,7 +15,9 @@ internal class HeroDeveloperCommands
     private static readonly ILogger Logger = LogManager.GetLogger<HeroDeveloperCommands>();
 
     /// <summary>
-    /// Add troops to a hero's party
+    /// Add skill xp to a hero with a skill object name.
+    /// Examples: 
+    /// coop.debug.herodeveloper.addskillxp RandomPlayer OneHanded 3000
     /// </summary>
     [CommandLineArgumentFunction("addskillxp", "coop.debug.herodeveloper")]
     public static string AddSkillXpCommand(List<string> strings)

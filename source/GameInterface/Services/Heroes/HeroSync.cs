@@ -1,8 +1,11 @@
 ﻿using GameInterface.AutoSync;
 using HarmonyLib;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 
 namespace GameInterface.Services.Heroes
@@ -13,11 +16,10 @@ namespace GameInterface.Services.Heroes
         {
             AccessTools.Method(typeof(HeroDeveloper), nameof(HeroDeveloper.CheckLevel)),
             AccessTools.Method(typeof(HeroDeveloper), nameof(HeroDeveloper.ClearHeroLevel)),
-            //AccessTools.Method(typeof(MakePregnantAction), nameof(MakePregnantAction.ApplyInternal)),
-            //AccessTools.Method(typeof(PregnancyCampaignBehavior), "CheckOffspringsToDeliver", new Type[] { typeof(Hero) }),
-            //AccessTools.Method(typeof(PregnancyCampaignBehavior), "CheckOffspringsToDeliver", new Type[] { typeof(PregnancyCampaignBehavior.Pregnancy) }),
-            //AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.CreateRelativeNotableHero)),
-            //AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.DeliverOffSpring)),
+            AccessTools.Method(typeof(MakePregnantAction), nameof(MakePregnantAction.ApplyInternal)),
+            AccessTools.Method(typeof(PregnancyCampaignBehavior), nameof(PregnancyCampaignBehavior.CheckOffspringsToDeliver)),
+            AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.CreateRelativeNotableHero)),
+            AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.DeliverOffSpring)),
         };
 
         public HeroSync(AutoSyncRegistry autoSyncBuilder)
