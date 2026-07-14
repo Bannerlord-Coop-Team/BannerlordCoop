@@ -1,6 +1,4 @@
 using GameInterface.Services.UI.CoopOptions.Providers;
-using GameInterface.Services.UI.CoopOptions.Providers.KillFeedTab;
-using GameInterface.Services.UI.CoopOptions.Providers.TacticalSymbolsTab;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.Library;
@@ -13,17 +11,11 @@ public class CoopOptionsTabVM : ViewModel
 
     private bool isSelected;
 
-    public CoopOptionsTabVM(
-        string id,
-        string name,
-        IEnumerable<CoopOptionsSectionVM> sections,
-        Action<CoopOptionsTabVM> onSelect,
-        bool persistsOptions = true)
+    public CoopOptionsTabVM(string id, string name, IEnumerable<CoopOptionsSectionVM> sections, Action<CoopOptionsTabVM> onSelect)
     {
         Id = id;
         Name = name;
         this.onSelect = onSelect;
-        PersistsOptions = persistsOptions;
 
         Sections = new MBBindingList<CoopOptionsSectionVM>();
         foreach (var section in sections)
@@ -39,8 +31,6 @@ public class CoopOptionsTabVM : ViewModel
 
     [DataSourceProperty]
     public MBBindingList<CoopOptionsSectionVM> Sections { get; }
-
-    public bool PersistsOptions { get; }
 
     [DataSourceProperty]
     public bool CanApply
@@ -68,12 +58,6 @@ public class CoopOptionsTabVM : ViewModel
             OnPropertyChanged(nameof(IsSelected));
         }
     }
-
-    [DataSourceProperty]
-    public bool IsKillFeedTab => Id == KillFeedOptionsTabProvider.TabId;
-
-    [DataSourceProperty]
-    public bool IsTacticalSymbolsTab => Id == TacticalSymbolsOptionsTabProvider.TabId;
 
     public void ExecuteSelection()
     {

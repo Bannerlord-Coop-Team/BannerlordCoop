@@ -1,5 +1,5 @@
 <ListPanel DataSource="{SelectedTab}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
-           LayoutImp.LayoutMethod="VerticalTopToBottom" IsVisible="@IsKillFeedTab">
+           LayoutImp.LayoutMethod="VerticalTopToBottom">
   <Children>
     <ListPanel DataSource="{Sections}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
                LayoutImp.LayoutMethod="VerticalTopToBottom">

@@ -1,87 +1,62 @@
+using Autofac;
 using Common;
 using Common.Messaging;
 using Common.Network;
 using Coop.Tests.Mocks;
 using GameInterface.Services.UI;
-using GameInterface.Services.UI.CoopOptions;
-using GameInterface.Services.UI.CoopOptions.Providers.TacticalSymbolsTab;
-using GameInterface.Services.UI.CoopOptions.Providers.TacticalSymbolsTab.Sections;
+using GameInterface.Services.UI.Commands;
 using GameInterface.Services.UI.Handlers;
 using GameInterface.Services.UI.Interfaces;
 using GameInterface.Services.UI.Messages;
 using GameInterface.Tests;
 using Moq;
-using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Xunit;
 
 namespace GameInterface.Tests.Services.UI;
 
 [Collection(ModInformationRoleCollection.Name)]
-public class TacticalSymbolsOptionsTests
+public class TacticalUnitSymbolsConfigTests
 {
-    static TacticalSymbolsOptionsTests()
+    static TacticalUnitSymbolsConfigTests()
     {
         RuntimeHelpers.RunModuleConstructor(typeof(TestNetwork).Module.ModuleHandle);
     }
 
     [Fact]
-    public void TacticalSymbolsSection_DoesNotPersistTheSessionSetting()
+    public void ServerConsoleCommand_WhenClient_ReturnsServerOnlyError()
     {
-        var section = new TacticalSymbolsSection(false, new MessageBroker());
-        var options = new CoopOptionsData();
+        var wasServer = ModInformation.IsServer;
+        ModInformation.IsServer = false;
 
-        section.ExecuteToggleHideTacticalUnitSymbols();
-        section.Apply(TacticalSymbolsOptionsTabProvider.TabId, options);
+        try
+        {
+            var result = TacticalUnitSymbolsDebugCommand.TacticalSymbols(new List<string> { "on" });
 
-        Assert.True(section.HideTacticalUnitSymbols);
-        Assert.False(options.Tabs.ContainsKey(TacticalSymbolsOptionsTabProvider.TabId));
+            Assert.Equal(
+                "The 'coop.debug.ui.tactical_symbols' command cannot be used on the client. It is intended for server use only.",
+                result);
+        }
+        finally
+        {
+            ModInformation.IsServer = wasServer;
+        }
     }
 
     [Fact]
-    public void TacticalSymbolsTab_UsesTheSynchronizedSetting()
+    public void ServerConsoleCommand_Status_ReturnsCurrentSetting()
     {
+        var wasServer = ModInformation.IsServer;
         var previous = TacticalUnitSymbolsSettings.HideTacticalUnitSymbols;
+        ModInformation.IsServer = true;
         TacticalUnitSymbolsSettings.SetHideTacticalUnitSymbols(true);
 
         try
         {
-            var provider = new TacticalSymbolsOptionsTabProvider();
-            var tab = provider.CreateTab(new CoopOptionsData(), new MessageBroker(), _ => { });
-            var section = Assert.IsType<TacticalSymbolsSection>(Assert.Single(tab.Sections));
+            var result = TacticalUnitSymbolsDebugCommand.TacticalSymbols(new List<string> { "status" });
 
-            Assert.True(section.HideTacticalUnitSymbols);
-            Assert.False(tab.PersistsOptions);
-        }
-        finally
-        {
-            TacticalUnitSymbolsSettings.SetHideTacticalUnitSymbols(previous);
-        }
-    }
-
-    [Fact]
-    public void Handler_ClientSelection_RequestsServerUpdateWithoutChangingLocalSetting()
-    {
-        var wasServer = ModInformation.IsServer;
-        var previous = TacticalUnitSymbolsSettings.HideTacticalUnitSymbols;
-        ModInformation.IsServer = false;
-        TacticalUnitSymbolsSettings.SetHideTacticalUnitSymbols(false);
-
-        try
-        {
-            var broker = new MessageBroker();
-            var network = new Mock<INetwork>();
-            IMessage sent = null!;
-            network.Setup(n => n.SendAll(It.IsAny<IMessage>()))
-                .Callback<IMessage>(message => sent = message);
-
-            using var handler = new TacticalUnitSymbolsOptionsHandler(broker, network.Object);
-
-            broker.Publish(this, new TacticalUnitSymbolsVisibilitySelected(true));
-
-            Assert.False(TacticalUnitSymbolsSettings.HideTacticalUnitSymbols);
-            var request = Assert.IsType<NetworkRequestTacticalUnitSymbolsVisibilityChange>(sent);
-            Assert.True(request.HideTacticalUnitSymbols);
+            Assert.Equal("Tactical unit symbols are hidden.", result);
         }
         finally
         {
@@ -91,7 +66,7 @@ public class TacticalSymbolsOptionsTests
     }
 
     [Fact]
-    public void Handler_ServerRequest_UpdatesAndBroadcastsTheAuthoritativeSetting()
+    public void ServerConsoleCommand_On_UpdatesAndBroadcastsTheAuthoritativeSetting()
     {
         var wasServer = ModInformation.IsServer;
         var previous = TacticalUnitSymbolsSettings.HideTacticalUnitSymbols;
@@ -106,16 +81,23 @@ public class TacticalSymbolsOptionsTests
             network.Setup(n => n.SendAll(It.IsAny<IMessage>()))
                 .Callback<IMessage>(message => sent = message);
 
-            using var handler = new TacticalUnitSymbolsOptionsHandler(broker, network.Object);
+            var builder = new ContainerBuilder();
+            builder.RegisterInstance(broker).As<IMessageBroker>();
+            builder.RegisterInstance(network.Object).As<INetwork>();
+            builder.RegisterType<TacticalUnitSymbolsConfigHandler>().AsSelf();
+            using var container = builder.Build();
+            ContainerProvider.SetContainer(container);
 
-            broker.Publish(this, new NetworkRequestTacticalUnitSymbolsVisibilityChange(true));
+            var result = TacticalUnitSymbolsDebugCommand.TacticalSymbols(new List<string> { "on" });
 
+            Assert.Equal("Tactical unit symbols are hidden.", result);
             Assert.True(TacticalUnitSymbolsSettings.HideTacticalUnitSymbols);
             var changed = Assert.IsType<NetworkTacticalUnitSymbolsVisibilityChanged>(sent);
             Assert.True(changed.HideTacticalUnitSymbols);
         }
         finally
         {
+            ContainerProvider.Clear();
             TacticalUnitSymbolsSettings.SetHideTacticalUnitSymbols(previous);
             ModInformation.IsServer = wasServer;
         }
@@ -132,7 +114,7 @@ public class TacticalSymbolsOptionsTests
         try
         {
             var broker = new MessageBroker();
-            using var handler = new TacticalUnitSymbolsOptionsHandler(broker, Mock.Of<INetwork>());
+            using var handler = new TacticalUnitSymbolsConfigHandler(broker, Mock.Of<INetwork>());
 
             broker.Publish(this, new NetworkTacticalUnitSymbolsVisibilityChanged(true));
 
