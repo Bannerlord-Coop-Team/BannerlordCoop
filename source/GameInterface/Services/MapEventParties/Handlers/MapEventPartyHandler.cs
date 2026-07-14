@@ -64,6 +64,10 @@ internal class MapEventPartyHandler : IHandler
 
         messageBroker.Unsubscribe<OnTroopScoreHitAttempted>(Handle_OnTroopScoreHitAttempted);
         messageBroker.Unsubscribe<NetworkTroopScoreHit>(Handle_NetworkTroopScoreHit);
+        messageBroker.Unsubscribe<RequestMapEventPartyUpdate>(Handle_RequestMapEventPartyUpdate);
+        messageBroker.Unsubscribe<NetworkRequestMapEventPartyUpdate>(Handle_NetworkRequestMapEventPartyUpdate);
+        messageBroker.Unsubscribe<MapEventPartyUpdated>(Handle_MapEventPartyUpdated);
+        messageBroker.Unsubscribe<NetworkUpdateMapEventParty>(Handle_NetworkUpdateMapEventParty);
     }
 
     private void Handle_RequestMapEventPartyUpdate(MessagePayload<RequestMapEventPartyUpdate> payload)
@@ -111,11 +115,6 @@ internal class MapEventPartyHandler : IHandler
     {
         var obj = payload.What;
 
-        // Deserialize is pure CPU work, so it stays on the network thread; only the
-        // roster assignment is deferred. The game loop reads and iterates the roster,
-        // so writing it from the network thread races the tick.
-        var roster = FlattenedTroopSerializer.Deserialize(obj.FlattenedTroops, objectManager);
-
         GameThread.Run(() =>
         {
             try
@@ -123,7 +122,7 @@ internal class MapEventPartyHandler : IHandler
                 if (!objectManager.TryGetObjectWithLogging<MapEventParty>(obj.MapEventPartyId, out var mapEventParty))
                     return;
 
-                mapEventParty._roster = roster;
+                mapEventParty._roster = FlattenedTroopSerializer.Deserialize(obj.FlattenedTroops, objectManager);
 
                 messageBroker.Publish(this, new MapEventTroopsUpdated(mapEventParty));
             }

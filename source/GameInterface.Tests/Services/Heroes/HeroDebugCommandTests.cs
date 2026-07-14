@@ -1,10 +1,12 @@
-using Common;
+﻿using Common;
 using GameInterface.Services.Heroes.Commands;
+using GameInterface.Tests;
 using System.Collections.Generic;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Heroes;
 
+[Collection(ModInformationRoleCollection.Name)]
 public class HeroDebugCommandTests
 {
     [Fact]

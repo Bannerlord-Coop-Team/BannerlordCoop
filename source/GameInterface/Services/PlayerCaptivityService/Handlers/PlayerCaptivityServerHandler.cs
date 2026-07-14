@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -135,26 +135,16 @@ internal class PlayerCaptivityServerHandler : IHandler
     /// <summary>
     /// Empties a roster to exactly zero by removing each element by its actual current count, then dropping the
     /// depleted entries. Unlike <see cref="TroopRoster.Clear"/>, this can never drive a count negative even when
-    /// an element was already removed-to-zero elsewhere (e.g. a captured hero the native TakePrisonerAction
-    /// already depleted but left in the roster).
+    /// an earlier roster mutation left a depleted element behind.
     /// </summary>
     private static void EmptyRoster(TroopRoster roster)
     {
         if (roster == null) return;
 
-        // Remove each element by its actual count, but NEVER subtract more men than the cached total still
-        // reports. A captured party's MemberRoster can arrive INCONSISTENT here: it holds more element-men than
-        // TotalManCount reflects (a phantom troop whose add never updated the cached total - the same server-side
-        // sync gap behind the recurring "X is not in roster yet" client skips). Removing every element outright
-        // then drives the cached total negative (the live "captured party roster goes to -1" bug). Clamping each
-        // removal to the remaining total keeps it pinned at zero instead of underflowing.
         for (int i = roster.Count - 1; i >= 0; i--)
         {
-            int remaining = roster.TotalManCount;
-            if (remaining <= 0) break;
-
             var element = roster.GetElementCopyAtIndex(i);
-            int removeNumber = Math.Min(Math.Max(element.Number, 0), remaining);
+            int removeNumber = Math.Max(element.Number, 0);
             if (removeNumber > 0 || element.WoundedNumber > 0)
                 roster.AddToCounts(element.Character, -removeNumber, false, -element.WoundedNumber, 0, true);
         }

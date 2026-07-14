@@ -1,6 +1,8 @@
 ﻿using Autofac;
 using Common.LogicStates;
 using Common.Network;
+using Common.Network.Session;
+using Coop.Core.Common.Configuration;
 using Coop.Core.Client;
 using Coop.Core.Server;
 using GameInterface;
@@ -42,6 +44,23 @@ namespace Coop.Tests.Autofac
 
             var logic = container.Resolve<ILogic>();
             Assert.NotNull(logic);
+        }
+
+        [Theory]
+        [InlineData(ServerVisibility.FriendsOnly)]
+        [InlineData(ServerVisibility.None)]
+        public void Server_Container_UsesHostSelectedAdvertisementConfig(ServerVisibility visibility)
+        {
+            var selectedConfig = new SessionAdvertisementConfig { Visibility = visibility };
+            ContainerBuilder builder = new ContainerBuilder();
+            builder.RegisterModule<ServerModule>();
+            builder.RegisterModule<GameInterfaceModule>();
+            builder.RegisterInstance(selectedConfig).AsSelf().SingleInstance();
+
+            using var container = builder.Build();
+
+            Assert.Same(selectedConfig, container.Resolve<SessionAdvertisementConfig>());
+            Assert.Equal(visibility, container.Resolve<SessionAdvertisementConfig>().Visibility);
         }
     }
 }

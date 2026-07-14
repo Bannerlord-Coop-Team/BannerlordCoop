@@ -102,8 +102,13 @@ public class SteamJoinListener : IDisposable
             // Membership is only needed to read the join info; leaving keeps the host's slots free.
             bool decoded = LobbyDataCodec.TryDecode(key => lobbyApi.GetLobbyData(lobbyId, key), out var info, out var error);
 
-            // The owner runs the tunnel on tunnel-capable lobbies; readable only while still a member.
-            if (decoded && info.Version >= SessionJoinInfo.MinTunnelVersion)
+            // A standalone server advertises its own game-server identity to tunnel to; otherwise the
+            // lobby owner runs the tunnel. Either is only readable while still a member of the lobby.
+            if (decoded && info.HasServerSteamId)
+            {
+                info.HostSteamId = info.ServerSteamId;
+            }
+            else if (decoded && info.Version >= SessionJoinInfo.MinTunnelVersion)
             {
                 info.HostSteamId = lobbyApi.GetLobbyOwner(lobbyId);
             }

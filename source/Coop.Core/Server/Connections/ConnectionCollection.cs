@@ -55,7 +55,10 @@ public class ConnectionCollection : IConnectionCollection
     internal void PlayerJoiningHandler(MessagePayload<PlayerConnected> obj)
     {
         var playerPeer = obj.What.PlayerPeer;
-        ConnectionStates.TryAdd(playerPeer, new ConnectionLogic(playerPeer, connectionContext));
+        if (ConnectionStates.TryAdd(playerPeer, new ConnectionLogic(playerPeer, connectionContext)))
+        {
+            BroadcastConnectedPlayersChanged();
+        }
     }
 
     internal void PlayerDisconnectedHandler(MessagePayload<PlayerDisconnected> obj)
@@ -65,6 +68,7 @@ public class ConnectionCollection : IConnectionCollection
         if (ConnectionStates.TryRemove(playerId, out IConnectionLogic logic))
         {
             logic.Dispose();
+            BroadcastConnectedPlayersChanged();
         }
 
         BroadcastLoadingStateIfChanged();
@@ -87,6 +91,11 @@ public class ConnectionCollection : IConnectionCollection
 
         lastBroadcastLoadingCount = loadingCount;
         messageBroker.Publish(this, new LoadingPlayersChanged(loadingCount));
+    }
+
+    private void BroadcastConnectedPlayersChanged()
+    {
+        messageBroker.Publish(this, new ConnectedPlayersChanged(ConnectionStates.Count));
     }
 
     public IEnumerator<IConnectionLogic> GetEnumerator() => ConnectionStates.Values.GetEnumerator();
