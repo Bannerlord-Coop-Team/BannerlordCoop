@@ -1,9 +1,10 @@
-using Autofac;
+﻿using Autofac;
 using Common.Network.Session;
 using GameInterface;
 using GameInterface.Services.Locations;
 using GameInterface.Services.MapEvents;
 using Missions.Agents.Handlers;
+using Missions.Agents.Patches;
 using Missions.Battles;
 using Missions.Missiles.Handlers;
 using Missions.Missiles.Patches;
@@ -21,6 +22,7 @@ namespace Missions;
 public class MissionModule : Module
 {
     internal const string MissilePatchCategory = "CoopMissilePatches";
+    internal const string AgentVoicePatchCategory = "CoopAgentVoicePatches";
 
     protected override void Load(ContainerBuilder builder)
     {
@@ -29,6 +31,9 @@ public class MissionModule : Module
         builder.RegisterInstance(new HarmonyPatchCategoryRegistration(
             typeof(AddMissileAuxPatch).Assembly,
             MissilePatchCategory));
+        builder.RegisterInstance(new HarmonyPatchCategoryRegistration(
+            typeof(AgentVoicePatch).Assembly,
+            AgentVoicePatchCategory));
 
         builder.RegisterType<LiteNetP2PClient>().As<IBattleNetwork>().InstancePerLifetimeScope();
         builder.RegisterType<NoopSteamMissionBridge>().As<ISteamMissionBridge>().InstancePerLifetimeScope();
@@ -112,6 +117,7 @@ public class MissionModule : Module
         builder.RegisterType<MissileHandler>().As<IMissileHandler>().InstancePerDependency();
         builder.RegisterType<AgentMovementHandler>().As<IAgentMovementHandler>().InstancePerDependency();
         builder.RegisterType<AgentActionHandler>().As<IAgentActionHandler>().InstancePerDependency();
+        builder.RegisterType<AgentVoiceHandler>().As<IAgentVoiceHandler>().InstancePerDependency();
         builder.RegisterType<WeaponDropHandler>().As<IWeaponDropHandler>().InstancePerDependency();
         builder.RegisterType<WeaponPickupHandler>().As<IWeaponPickupHandler>().InstancePerDependency();
         builder.RegisterType<ShieldDamageHandler>().As<IShieldDamageHandler>().InstancePerDependency();

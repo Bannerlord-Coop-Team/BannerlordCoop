@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
@@ -102,6 +102,7 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         // finalizer runs.
         coopMissionComponent.AgentMovementHandler.Dispose();
         coopMissionComponent.AgentActionHandler.Dispose();
+        coopMissionComponent.AgentVoiceHandler.Dispose();
 
         coopMissionComponent.MissileHandler.Dispose();
         coopMissionComponent.WeaponDropHandler.Dispose();
