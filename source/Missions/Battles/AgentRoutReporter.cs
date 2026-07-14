@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using Missions.Messages;
 using Serilog;
@@ -26,20 +27,20 @@ public class AgentRoutReporter : IAgentRoutReporter
     private readonly IBattleNetwork network;
     private readonly IMessageBroker messageBroker;
     private readonly ICoopMissionComponent coopMissionComponent;
-    private readonly IBattleSession session;
+    private readonly IAgentAuthority authority;
     private readonly ICasualtyAttributionMap casualties;
 
     public AgentRoutReporter(
         IBattleNetwork network,
         IMessageBroker messageBroker,
         ICoopMissionComponent coopMissionComponent,
-        IBattleSession session,
+        IAgentAuthority authority,
         ICasualtyAttributionMap casualties)
     {
         this.network = network;
         this.messageBroker = messageBroker;
         this.coopMissionComponent = coopMissionComponent;
-        this.session = session;
+        this.authority = authority;
         this.casualties = casualties;
 
         messageBroker.Subscribe<BattleAgentRouted>(Handle_BattleAgentRouted);
@@ -57,7 +58,7 @@ public class AgentRoutReporter : IAgentRoutReporter
         GameThread.RunSafe(() =>
         {
             if (!registry.TryGetAgentInfo(payload.What.Agent, out var info)) return;
-            if (info.CurrentAuthority != session.OwnControllerId) return;
+            if (!authority.IsMine(payload.What.Agent)) return;
 
             Logger.Information("[DeathDiag] Broadcasting rout of agent {AgentId} to the battle mesh", info.AgentId);
             network.SendAll(new NetworkBattleAgentRouted(info.AgentId));

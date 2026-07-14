@@ -40,6 +40,7 @@ public class AgentDeathReporter : IAgentDeathReporter
     private readonly IObjectManager objectManager;
     private readonly ICoopMissionComponent coopMissionComponent;
     private readonly IBattleSession session;
+    private readonly IAgentAuthority authority;
     private readonly ICasualtyAttributionMap casualties;
 
     public AgentDeathReporter(
@@ -49,6 +50,7 @@ public class AgentDeathReporter : IAgentDeathReporter
         IObjectManager objectManager,
         ICoopMissionComponent coopMissionComponent,
         IBattleSession session,
+        IAgentAuthority authority,
         ICasualtyAttributionMap casualties)
     {
         this.network = network;
@@ -57,6 +59,7 @@ public class AgentDeathReporter : IAgentDeathReporter
         this.objectManager = objectManager;
         this.coopMissionComponent = coopMissionComponent;
         this.session = session;
+        this.authority = authority;
         this.casualties = casualties;
 
         messageBroker.Subscribe<BattleAgentDied>(Handle_BattleAgentDied);
@@ -97,7 +100,7 @@ public class AgentDeathReporter : IAgentDeathReporter
                 Logger.Information("[DeathDiag] An agent died but is not in our registry — not ours to broadcast (a puppet or an uncaptured agent)");
                 return;
             }
-            if (info.CurrentAuthority != session.OwnControllerId)
+            if (!authority.IsMine(payload.What.Agent))
             {
                 Logger.Information("[DeathDiag] Agent {AgentId} died but its authority is {Auth}, not us ({Us}) — not broadcasting", info.AgentId, info.CurrentAuthority, session.OwnControllerId);
                 return;

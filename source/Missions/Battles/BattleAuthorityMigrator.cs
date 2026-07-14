@@ -149,7 +149,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
             foreach (var info in registry.GetAgents(controllerId))
             {
                 var agent = info.Agent;
-                if (agent == null || agent.IsMount || !IsOwnPartyAgent(agent, playerParty, playerHero)) continue;
+                if (agent == null || agent.IsMount || !BattlePartyOwnership.IsOwnPartyAgent(agent, playerParty, playerHero)) continue;
 
                 if (agent.IsActive())
                     agent.FadeOut(false, true);
@@ -403,24 +403,14 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         return party != null;
     }
 
-    // Whether an agent belongs to the given player's OWN party: the player's hero, or a troop whose origin
-    // party is that player's party. The remote counterpart of OwnedAgentReplicator.IsOwnPartyAgent (which can
-    // compare against PartyBase.MainParty locally); the hero check is a belt for a hero agent whose origin
-    // party did not resolve at spawn.
-    private static bool IsOwnPartyAgent(Agent agent, PartyBase playerParty, Hero playerHero)
-    {
-        if (playerHero != null && agent.Character is CharacterObject character && character.IsHero && character.HeroObject == playerHero)
-            return true;
-        return agent.Origin is CoopAgentOrigin origin && origin.Party == playerParty;
-    }
-
     // An agent that withdraws with the retreating player rather than being adopted: an own-party troop, or the
-    // horse one of them is riding (a horse has no origin party of its own — it follows its rider out).
+    // horse one of them is riding (a horse has no origin party of its own — it follows its rider out). Uses the
+    // shared BattlePartyOwnership.IsOwnPartyAgent (remote flavor: an explicitly resolved player party/hero).
     private static bool IsRetreatersAgent(Agent agent, PartyBase playerParty, Hero playerHero)
     {
         if (agent.IsMount)
-            return agent.RiderAgent is Agent rider && IsOwnPartyAgent(rider, playerParty, playerHero);
-        return IsOwnPartyAgent(agent, playerParty, playerHero);
+            return agent.RiderAgent is Agent rider && BattlePartyOwnership.IsOwnPartyAgent(rider, playerParty, playerHero);
+        return BattlePartyOwnership.IsOwnPartyAgent(agent, playerParty, playerHero);
     }
 
     // [Owner, game thread] Ask the server for our current owned reserve (after adopting a departed owner's

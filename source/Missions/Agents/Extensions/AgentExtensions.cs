@@ -1,4 +1,5 @@
 ﻿using GameInterface;
+using GameInterface.Services.MapEvents;
 using System.Runtime.CompilerServices;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -11,6 +12,12 @@ public static class AgentExtensions
 
     public static bool IsLocallyControlled(this Agent agent)
     {
+        // Prefer the installed authority seam (a coop battle installs it): this keeps the per-blow hot path off
+        // the container resolve below. Non-battle missions (board games, taverns) never install the bridge, so
+        // fall back to resolving the per-mission registry directly.
+        if (BattleSpawnGate.AgentAuthority is IAgentAuthority authority)
+            return authority.IsMine(agent);
+
         if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var networkAgentRegistry))
             return false;
 

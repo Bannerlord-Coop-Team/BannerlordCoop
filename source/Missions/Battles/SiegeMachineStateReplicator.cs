@@ -54,6 +54,7 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     private readonly IMessageBroker messageBroker;
     private readonly IBattleSession session;
     private readonly INetworkAgentRegistry agentRegistry;
+    private readonly IAgentAuthority authority;
 
     // Machine cache + last broadcast state per machine id / deactivated ids (peers).
     // Game-thread only; reset when the mission changes (MissionObjectIds recycle across missions).
@@ -93,12 +94,13 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     private int trackedObjectCount;
     private float pollTimer;
 
-    public SiegeMachineStateReplicator(IBattleNetwork network, IMessageBroker messageBroker, IBattleSession session, INetworkAgentRegistry agentRegistry)
+    public SiegeMachineStateReplicator(IBattleNetwork network, IMessageBroker messageBroker, IBattleSession session, INetworkAgentRegistry agentRegistry, IAgentAuthority authority)
     {
         this.network = network;
         this.messageBroker = messageBroker;
         this.session = session;
         this.agentRegistry = agentRegistry;
+        this.authority = authority;
 
         messageBroker.Subscribe<NetworkSiegeMachineState>(Handle_NetworkMachineState);
         messageBroker.Subscribe<NetworkSiegeMachineClaim>(Handle_NetworkMachineClaim);
@@ -525,9 +527,8 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             if (!agent.IsHuman || !agent.IsActive() || agent.IsRunningAway) continue;
             if (agent.Team == null) continue;
 
-            var controller = agentRegistry.TryGetAgentInfo(agent, out var info)
-                ? info.CurrentAuthority
-                : session.OwnControllerId;
+            // Unregistered agents (e.g. the local player's own hero before capture) count as ours.
+            var controller = authority.Owner(agent) ?? session.OwnControllerId;
             if (string.IsNullOrEmpty(controller)) continue;
 
             crewCandidates.Add(new CrewCandidate { Controller = controller, Side = agent.Team.Side, Position = agent.Position });

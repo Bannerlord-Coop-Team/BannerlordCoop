@@ -55,14 +55,13 @@ public static class BattleSpawnGate
     }
 
     /// <summary>
-    /// Set by the live battle's <c>BattleDamageRouter</c>: resolves whether a MOUNT agent is registered in the
-    /// battle's agent registry and, if so, whether its authority is remote. <c>true</c> → the horse is another
-    /// client's — <c>BattleBlowInterceptPatch</c> suppresses the local blow and routes it (even for a masterless
-    /// horse, whose rider-based gate would otherwise apply it locally and diverge). <c>false</c> → the horse is
-    /// ours — apply locally. <c>null</c> (or no probe installed) → unregistered — the patch falls back to
-    /// rider-keyed gating. Process-global like the rest of this gate: one live battle per game process.
+    /// The live battle's authority seam, installed by <c>CoopBattleController</c> on entry and cleared on
+    /// dispose. It is how the static, DI-less battle patches (e.g. <c>BattleBlowInterceptPatch</c>) reach the
+    /// per-mission agent registry to decide whether an agent is ours or a puppet. Null when no coop battle is
+    /// active. Process-global like the rest of this gate: one live battle per game process. Replaces the old
+    /// <c>MountAuthorityProbe</c> delegate (which only answered the mount branch).
     /// </summary>
-    public static Func<Agent, bool?> MountAuthorityProbe { get; set; }
+    public static IAgentAuthority AgentAuthority { get; set; }
 
     /// <summary>Runs a replicated puppet death with the owner's kill-feed metadata available to UI patches.</summary>
     public static void RunWithReplicatedDeath(

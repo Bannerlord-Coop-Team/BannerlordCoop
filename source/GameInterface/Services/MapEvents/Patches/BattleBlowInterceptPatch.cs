@@ -24,9 +24,10 @@ namespace GameInterface.Services.MapEvents.Patches;
 /// <para>
 /// Mounts are registered with their own identity (see <c>OwnedAgentReplicator</c>/<c>PuppetSpawner</c>), so a
 /// blow against a registered horse is gated by the HORSE's own authority (via
-/// <see cref="BattleSpawnGate.MountAuthorityProbe"/> — this static patch cannot reach the per-mission
-/// registry). That also covers a masterless horse whose rider died. An UNregistered horse (e.g. a loose
-/// native one) falls back to its rider's ownership.
+/// <see cref="BattleSpawnGate.AgentAuthority"/> — this static patch cannot reach the per-mission registry).
+/// That also covers a masterless horse whose rider died. An UNregistered horse (e.g. a loose native one) falls
+/// back to its rider's ownership. All of that puppet decision-making lives in
+/// <see cref="IAgentAuthority.IsPuppet"/>.
 /// </para>
 /// </summary>
 [HarmonyPatch(typeof(Agent), nameof(Agent.RegisterBlow))]
@@ -42,6 +43,11 @@ internal class BattleBlowInterceptPatch
         if (__instance == null) return true;
         if (BattleSpawnGate.IsReplicatedDeath(__instance)) return true;
 
+        // The authority seam is installed for the lifetime of the coop battle; if it is somehow absent, fall
+        // back to applying the blow locally (the pre-seam default for own agents).
+        var authority = BattleSpawnGate.AgentAuthority;
+        if (authority == null) return true;
+
         // A missile blow credited to a puppet (another client's agent) is the replicated cosmetic siege stone;
         // its owner routes the real agent damage, so drop it here. Wall damage lands on a different path, so the
         // peer's walls still break from their own replica shot.
@@ -53,27 +59,11 @@ internal class BattleBlowInterceptPatch
         }
 
         bool isMount = !__instance.IsHuman;
-        if (isMount)
-        {
-            bool? remotelyOwned = BattleSpawnGate.MountAuthorityProbe?.Invoke(__instance);
-            if (remotelyOwned == false) return true; // our registered horse — we are its authority
-            if (remotelyOwned == null)
-            {
-                // Unregistered horse: key off its rider's ownership. A masterless one, or one carrying our
-                // own rider, has no ownership conflict — take the blow locally.
-                var rider = __instance.RiderAgent;
-                if (rider == null || rider.Controller != AgentControllerType.None)
-                    return true;
-            }
-            // remotelyOwned == true means another client's registered horse: suppress and route below.
-        }
-        else
-        {
-            // A puppet is an agent this client does not own: own troops are AI-controlled and the own hero is
-            // Player; every replicated puppet is spawned with AgentControllerType.None.
-            if (__instance.Controller != AgentControllerType.None)
-                return true;
-        }
+
+        // One decision for every agent kind: registered → authority compare; unregistered human → engine
+        // Controller==None; unregistered mount → rider-keyed fallback (the old MountAuthorityProbe tri-state now
+        // lives inside IsPuppet). Not a puppet → take the blow locally.
+        if (!authority.IsPuppet(__instance)) return true;
 
         var attacker = Mission.Current?.FindAgentWithIndex(blow.OwnerId);
         PlaySuppressedHitSound(__instance, attacker, blow, collisionData);

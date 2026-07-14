@@ -31,45 +31,27 @@ public class BattleDamageRouter : IBattleDamageRouter
     private readonly IBattleNetwork network;
     private readonly IMessageBroker messageBroker;
     private readonly ICoopMissionComponent coopMissionComponent;
-    private readonly IBattleSession session;
-    private readonly Func<Agent, bool?> mountAuthorityProbe;
+    private readonly IAgentAuthority authority;
 
     public BattleDamageRouter(
         IBattleNetwork network,
         IMessageBroker messageBroker,
         ICoopMissionComponent coopMissionComponent,
-        IBattleSession session)
+        IAgentAuthority authority)
     {
         this.network = network;
         this.messageBroker = messageBroker;
         this.coopMissionComponent = coopMissionComponent;
-        this.session = session;
+        this.authority = authority;
 
         messageBroker.Subscribe<BattlePuppetHit>(Handle_BattlePuppetHit);
         messageBroker.Subscribe<NetworkApplyBattleDamage>(Handle_NetworkApplyBattleDamage);
-
-        // Let the (static, DI-less) intercept patch gate mount hits by the horse's OWN registration — a
-        // registered horse under a remote authority is suppressed+routed even when masterless. Kept as a
-        // field so Dispose only clears a probe this instance installed.
-        mountAuthorityProbe = ProbeMountAuthority;
-        BattleSpawnGate.MountAuthorityProbe = mountAuthorityProbe;
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<BattlePuppetHit>(Handle_BattlePuppetHit);
         messageBroker.Unsubscribe<NetworkApplyBattleDamage>(Handle_NetworkApplyBattleDamage);
-
-        if (BattleSpawnGate.MountAuthorityProbe == mountAuthorityProbe)
-            BattleSpawnGate.MountAuthorityProbe = null;
-    }
-
-    // Whether a mount agent is registered and remotely owned: true → puppet-gated (suppress + route), false →
-    // ours (apply locally), null → unregistered (the patch falls back to rider-keyed gating).
-    private bool? ProbeMountAuthority(Agent mount)
-    {
-        if (!coopMissionComponent.AgentRegistry.TryGetAgentInfo(mount, out var info)) return null;
-        return info.CurrentAuthority != session.OwnControllerId;
     }
 
     // [Attacker's node] A local troop hit a puppet (suppressed locally by BattleBlowInterceptPatch). Route the
@@ -122,7 +104,7 @@ public class BattleDamageRouter : IBattleDamageRouter
         GameThread.RunSafe(() =>
         {
             if (!registry.TryGetAgentInfo(payload.What.VictimAgentId, out var info)) return;
-            if (info.CurrentAuthority != session.OwnControllerId) return;
+            if (!authority.IsMine(payload.What.VictimAgentId)) return;
 
             var victim = payload.What.IsMount ? info.Agent?.MountAgent : info.Agent;
             var blow = payload.What.Blow;

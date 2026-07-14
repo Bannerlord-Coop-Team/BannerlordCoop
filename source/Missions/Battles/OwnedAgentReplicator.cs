@@ -131,7 +131,7 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
             var agent = info.Agent;
             if (agent == null || !agent.IsActive() || agent.IsMount || !(agent.Character is CharacterObject character)) continue;
 
-            bool isOwnParty = IsOwnPartyAgent(agent, character);
+            bool isOwnParty = IsOwnPartyAgent(agent);
             if (ownPartyOnly && !isOwnParty) continue;
             // Consistent with the per-spawn withhold: don't replay own-party while our deployment is uncommitted,
             // or a joiner catch-up spawns them at their pre-arrangement formation and dedupes the commit broadcast
@@ -183,11 +183,9 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
     // Whether an agent belongs to the LOCAL player's own party — the troops withheld until deployment commit
     // (requirement #4). The player's hero and the troops the local supplier spawned for MainParty are own-party;
     // the host's enemy/allied AI (a different origin party) is not, so it shows up frozen during deployment (#1).
-    internal static bool IsOwnPartyAgent(Agent agent, CharacterObject character)
-    {
-        if (character.IsHero && character.HeroObject == Hero.MainHero) return true;
-        return agent.Origin is CoopAgentOrigin origin && origin.Party == PartyBase.MainParty;
-    }
+    // The local flavor of the shared predicate (against MainParty/MainHero).
+    private static bool IsOwnPartyAgent(Agent agent)
+        => BattlePartyOwnership.IsOwnPartyAgent(agent, PartyBase.MainParty, Hero.MainHero);
 
     // [Owner] An agent WE spawned into the battle was captured (BattleAgentSpawnedPatch). Each client spawns
     // only the troops it owns — its own party, plus the AI/enemy side on the host — so we are this agent's
@@ -260,7 +258,7 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         // see them mid-deployment. They are broadcast at their deployed positions when we commit (see
         // BroadcastOwnDeployedTroops). NPC/AI agents WE own (the host's enemy side) are not withheld —
         // they must show up frozen on every client during deployment (requirement #1).
-        if (deployment.ShouldWithhold(IsOwnPartyAgent(agent, character)))
+        if (deployment.ShouldWithhold(IsOwnPartyAgent(agent)))
         {
             Logger.Information("[BattleSync] Withholding own spawn {Char} (agent {AgentId}) until deployment commit", characterId, agentId);
             return;

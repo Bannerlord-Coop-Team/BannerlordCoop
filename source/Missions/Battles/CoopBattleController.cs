@@ -68,6 +68,7 @@ public class CoopBattleController : CoopMissionController
     private readonly ISiegeWeaponFireReplicator siegeWeaponFire;
     private readonly ISiegeEngineStateReporter siegeEngineStateReporter;
     private readonly IBattleHostRegistry hostRegistryRef;
+    private readonly IAgentAuthority authority;
 
     // Whether the pre-live hold on vanilla's battle-end checks has been lifted (see OnMissionTick).
     private bool endConditionHoldReleased;
@@ -88,20 +89,27 @@ public class CoopBattleController : CoopMissionController
         var session = new BattleSession(controllerIdProvider, hostRegistry);
         var casualties = new CasualtyAttributionMap();
 
+        // The single "am I authoritative over this agent" seam for this battle, over the per-mission registry +
+        // session. Shared by the read-path components below and installed into the static bridge (see below) so
+        // the DI-less GameInterface battle patches read the same answer.
+        var authority = new BattleAgentAuthority(coopMissionComponent.AgentRegistry, session);
+        this.authority = authority;
+        BattleSpawnGate.AgentAuthority = authority;
+
         var deployment = new BattleDeploymentCoordinator(network, messageBroker, session);
 
         lifecycle = new BattleInstanceLifecycle(network, relayNetwork, messageBroker, objectManager, coopMissionComponent, session);
         replicator = new OwnedAgentReplicator(network, messageBroker, objectManager, coopMissionComponent, session, casualties, deployment);
-        deathReporter = new AgentDeathReporter(network, relayNetwork, messageBroker, objectManager, coopMissionComponent, session, casualties);
-        routReporter = new AgentRoutReporter(network, messageBroker, coopMissionComponent, session, casualties);
+        deathReporter = new AgentDeathReporter(network, relayNetwork, messageBroker, objectManager, coopMissionComponent, session, authority, casualties);
+        routReporter = new AgentRoutReporter(network, messageBroker, coopMissionComponent, authority, casualties);
         puppetSpawner = new PuppetSpawner(messageBroker, objectManager, coopMissionComponent, session, casualties, deployment, formationAssigner);
         puppetDeathApplier = new PuppetDeathApplier(messageBroker, coopMissionComponent, casualties);
         puppetRoutApplier = new PuppetRoutApplier(messageBroker, coopMissionComponent, casualties);
-        damageRouter = new BattleDamageRouter(network, messageBroker, coopMissionComponent, session);
+        damageRouter = new BattleDamageRouter(network, messageBroker, coopMissionComponent, authority);
         authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner);
         reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, session, deployment, formationAssigner);
         siegeEngineDeployment = new SiegeEngineDeploymentReplicator(network, messageBroker, session);
-        siegeMachineState = new SiegeMachineStateReplicator(network, messageBroker, session, coopMissionComponent.AgentRegistry);
+        siegeMachineState = new SiegeMachineStateReplicator(network, messageBroker, session, coopMissionComponent.AgentRegistry, authority);
         siegeWeaponFire = new SiegeWeaponFireReplicator(network, messageBroker, coopMissionComponent.AgentRegistry);
         supplyReporter = new SupplyProgressReporter(relayNetwork, session);
 
@@ -128,6 +136,12 @@ public class CoopBattleController : CoopMissionController
         siegeMachineState.Dispose();
         siegeWeaponFire.Dispose();
         Deployment.Dispose();
+
+        // Clear the authority seam bridge (installed at construction) only if it is still ours, mirroring the
+        // old MountAuthorityProbe teardown — a later battle installs its own before this one's Dispose could
+        // otherwise null out the wrong one.
+        if (ReferenceEquals(BattleSpawnGate.AgentAuthority, authority))
+            BattleSpawnGate.AgentAuthority = null;
 
         // OnMissionTick sets these each frame; reset them here (their owner) so a stale authority
         // never bleeds into the next siege before the first tick refreshes it.
