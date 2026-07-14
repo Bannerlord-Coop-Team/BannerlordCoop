@@ -58,10 +58,10 @@ internal class HeroRegistry : AutoRegistryBase<Hero>
             AccessTools.Property(typeof(Hero), nameof(Hero.OwnedCaravans)).SetValue(obj, new MBList<CaravanPartyComponent>());
             AccessTools.Field(typeof(Hero), nameof(Hero.VolunteerTypes)).SetValue(obj, new CharacterObject[6]);
             obj._heroDeveloper = new HeroDeveloper(obj);
-            AccessTools.Field(typeof(Hero), nameof(Hero._heroTraits)).SetValue(obj, new PropertyOwner<TraitObject>());
-            AccessTools.Field(typeof(Hero), nameof(Hero._heroPerks)).SetValue(obj, new PropertyOwner<PerkObject>());
-            AccessTools.Field(typeof(Hero), nameof(Hero._heroSkills)).SetValue(obj, new PropertyOwner<SkillObject>());
-            AccessTools.Field(typeof(Hero), nameof(Hero._characterAttributes)).SetValue(obj, new PropertyOwner<CharacterAttribute>());
+            obj._heroTraits = new PropertyOwner<TraitObject>();
+            obj._heroPerks = new PropertyOwner<PerkObject>();
+            obj._heroSkills = new PropertyOwner<SkillObject>();
+            obj._characterAttributes = new PropertyOwner<CharacterAttribute>();
         }
 
         GameThread.RunSafe(() =>
