@@ -574,5 +574,4 @@ public class MobilePartyMovementTests : SyncTestBase
         Assert.True(client.ObjectManager.TryGetId(clientValue, out var clientId));
         Assert.Equal(serverId, clientId);
     }
-
 }
