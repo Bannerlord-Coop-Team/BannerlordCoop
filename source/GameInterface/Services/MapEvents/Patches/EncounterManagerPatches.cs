@@ -6,6 +6,7 @@ using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
+using GameInterface.Services.Players;
 using HarmonyLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -55,6 +56,9 @@ internal class EncounterManagerPatches
         if (IsPendingParty(attackerParty) || IsPendingParty(defenderParty))
             return false;
 
+        if (IsAwaitingBattleMissionExit(attackerParty) || IsAwaitingBattleMissionExit(defenderParty))
+            return false;
+
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (TryRequestActiveSlowRaidSettlementEncounter(attackerParty, defenderParty))
@@ -98,6 +102,18 @@ internal class EncounterManagerPatches
 
     internal static bool IsPendingParty(PartyBase party) =>
         PendingMapEventPartyMovementPatch.IsPending(party);
+
+    internal static bool IsAwaitingBattleMissionExit(PartyBase party)
+    {
+        if (ModInformation.IsClient || party?.MapEvent != null || party?.MobileParty == null)
+            return false;
+
+        if (!PlayerManager.TryGetControlledObjectInfo(party.MobileParty, out var controlledObject))
+            return false;
+
+        return ContainerProvider.TryResolve<IBattleHostRegistry>(out var hostRegistry)
+            && hostRegistry.IsControllerAssigned(controlledObject.ObjectControllerId);
+    }
 
     // EncounterManager.RestartPlayerEncounter is private; patch by name. It is the path that opens the encounter
     // menu/conversation (it calls PlayerEncounter.Current.Init). Parameter order here is (attacker, defender).
