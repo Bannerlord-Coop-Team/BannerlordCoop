@@ -20,7 +20,7 @@ public class DonatePopupVM : ViewModel
         "Donations help cover servers, development tools, and other project costs so we can keep improving the mod.\n\n" +
         "If you enjoy the project and would like to support its development, consider donating.";
     public string BuyMeACoffeeButtonText => "Buy a Coffee";
-    public string AfdianButtonText => "ifdian";
+    public string IfdianButtonText => "ifdian";
     public string CloseButtonText => "Close";
 
     public void ActionBuyMeACoffee()
@@ -28,7 +28,7 @@ public class DonatePopupVM : ViewModel
         System.Diagnostics.Process.Start("https://buymeacoffee.com/bannerlordcoop");
     }
 
-    public void ActionAfdian()
+    public void ActionIfdian()
     {
         System.Diagnostics.Process.Start("https://ifdian.net/a/BannerlordCoop");
     }
