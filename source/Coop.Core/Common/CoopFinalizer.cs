@@ -1,3 +1,4 @@
+using Common;
 using Common.Messaging;
 using Coop.Core.Common.Services.Connection.Messages;
 using GameInterface.Services.GameDebug.Messages;
@@ -38,7 +39,13 @@ public class CoopFinalizer : ICoopFinalizer
         // module validation was denied — leaves the player stuck on the loading screen forever,
         // with the pop-up explaining why hidden behind it. No-op when no loading window exists
         // (headless server).
-        loadingInterface.HideLoadingScreen();
+        //
+        // HideLoadingScreen disables the native Gauntlet loading window, so it must run on the game
+        // thread. Finalize is reached from the network poller thread as well (a client state's
+        // message handler denying validation runs there), so marshal it. Blocking so the screen is
+        // down before the teardown messages below, and inline (no marshal) when already on the game
+        // thread — e.g. the validation-timeout path.
+        GameThread.RunSafe(loadingInterface.HideLoadingScreen, blocking: true);
 
         // Only show pop-up with valid message
         if (string.IsNullOrEmpty(closeText) == false)

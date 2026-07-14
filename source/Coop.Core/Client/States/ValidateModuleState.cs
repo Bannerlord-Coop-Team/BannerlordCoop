@@ -39,6 +39,12 @@ public class ValidateModuleState : ClientStateBase
     private readonly Timer validationTimeoutTimer;
 
     private volatile bool disposed;
+
+    // Teardown can be started from the game thread (validation-timeout timer) and the poller thread
+    // (a denied or late validation response) at the same instant. This latch, claimed via Interlocked,
+    // runs the teardown exactly once. Dispose claims it too, so a timeout firing as the state cleanly
+    // transitions no-ops instead of tearing the new state down.
+    private int teardownClaimed;
     private string disconnectReason;
 
     public ValidateModuleState(
@@ -69,14 +75,18 @@ public class ValidateModuleState : ClientStateBase
 
         // One-shot deadline covering this state's whole exchange; leaving the state disposes it.
         // The timer thread only marshals — the decision runs on the game thread like every other
-        // state transition.
+        // state transition. RunSafe (not Run) so a throw during teardown is logged instead of
+        // escaping into the game-loop pump and killing that frame's queue drain.
         validationTimeoutTimer = new Timer(
-            _ => GameThread.Run(TimeoutValidation), null, ValidationTimeout, Timeout.InfiniteTimeSpan);
+            _ => GameThread.RunSafe(TimeoutValidation), null, ValidationTimeout, Timeout.InfiniteTimeSpan);
     }
 
     public override void Dispose()
     {
         disposed = true;
+        // Claim the teardown latch so an in-flight timeout callback that already passed its guard
+        // finds teardown handled and no-ops (see TimeoutValidation / Disconnect).
+        Interlocked.Exchange(ref teardownClaimed, 1);
         validationTimeoutTimer?.Dispose();
         messageBroker.Unsubscribe<NetworkModuleVersionsValidated>(Handle_NetworkModuleVersionsValidated);
         messageBroker.Unsubscribe<NetworkClientValidated>(Handle_NetworkClientValidated);
@@ -85,8 +95,11 @@ public class ValidateModuleState : ClientStateBase
 
     internal void TimeoutValidation()
     {
-        // The state may have been left (Dispose) or coop torn down between the timer firing and
-        // this running on the game thread.
+        // Marshaled onto the game thread by the timer callback. The guard skips the spurious error log
+        // when the state was already left; correctness does not depend on it being atomic, because the
+        // teardown below goes through THIS state's Disconnect (never Logic.Disconnect, which would hit
+        // whatever state replaced it), and Disconnect's Interlocked latch — also claimed by Dispose —
+        // makes a denied/late response landing at the same instant tear down exactly once.
         if (disposed || Logic.State != this) return;
 
         Logger.Error(
@@ -96,7 +109,7 @@ public class ValidateModuleState : ClientStateBase
         disconnectReason =
             "Timed out waiting for the server to validate the connection.\n" +
             "The server may be running an incompatible version of the mod.";
-        Logic.Disconnect();
+        Disconnect();
     }
 
     internal void Handle_NetworkModuleVersionsValidated(MessagePayload<NetworkModuleVersionsValidated> obj)
@@ -150,6 +163,11 @@ public class ValidateModuleState : ClientStateBase
 
     public override void Disconnect()
     {
+        // Teardown can be initiated from the game thread (validation-timeout timer) and the poller
+        // thread (a denied or late validation response) at the same instant; the latch runs
+        // CoopFinalizer exactly once.
+        if (Interlocked.Exchange(ref teardownClaimed, 1) != 0) return;
+
         validationTimeoutTimer?.Dispose();
 
         // Finalize tears down coop (EndCoopMode -> DestroyContainer), which disposes the container the
