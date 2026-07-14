@@ -1,5 +1,8 @@
-using E2E.Tests.Environment.Instance;
+﻿using E2E.Tests.Environment.Instance;
+using Common.Messaging;
+using Common.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -415,6 +418,30 @@ public class MapEventEnvironmentTests : MapEventTestBase
         {
             AssertHeroInPartyRoster(client, heroId, partyId);
         }
+    }
+
+    [Fact]
+    public void CaptureWithDepletedHeroElement_RecalculatesEmptyRosterTotal()
+    {
+        var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
+        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(captorPartyId, out var captorParty));
+
+            using (new AllowedThread())
+            {
+                playerParty.MemberRoster.AddNewElement(hero.CharacterObject, -1);
+            }
+
+            Server.Resolve<IMessageBroker>().Publish(this, new PrisonerTaken(captorParty.Party, hero, playerParty));
+
+            Assert.Equal(0, playerParty.MemberRoster.Count);
+            Assert.Equal(0, playerParty.MemberRoster.TotalManCount);
+        });
     }
 
     [Fact]

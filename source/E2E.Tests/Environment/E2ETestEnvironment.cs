@@ -303,6 +303,30 @@ public class E2ETestEnvironment : IDisposable
     }
 
     /// <summary>
+    /// Gets the PropertyOwner SetPropertyValue intercept from the given <paramref name="member"/>.
+    /// PropertyOwner intercepts take (instance, owner, ...) argument order.
+    /// </summary>
+    /// <param name="member">Member to get intercept from</param>
+    /// <returns>PropertyOwner set intercept as <see cref="MethodInfo"/></returns>
+    public MethodInfo GetPropertyOwnerSetIntercept(MemberInfo member)
+    {
+        Assert.True(GenericPatchHelpers.PropertyOwnerSetInterceptCache.TryGetValue(member, out var intercept));
+        return intercept;
+    }
+
+    /// <summary>
+    /// Gets the PropertyOwner ClearAllProperty intercept from the given <paramref name="member"/>.
+    /// PropertyOwner intercepts take (instance, owner) argument order.
+    /// </summary>
+    /// <param name="member">Member to get intercept from</param>
+    /// <returns>PropertyOwner clear intercept as <see cref="MethodInfo"/></returns>
+    public MethodInfo GetPropertyOwnerClearIntercept(MemberInfo member)
+    {
+        Assert.True(GenericPatchHelpers.PropertyOwnerClearInterceptCache.TryGetValue(member, out var intercept));
+        return intercept;
+    }
+
+    /// <summary>
     /// Drains the server's per-tick send coalescer the way <c>CoopServer.Update</c> does, delivering any
     /// coalesced sends (e.g. Hero.Gold) to clients. A no-op when nothing is buffered.
     /// </summary>
@@ -1150,7 +1174,8 @@ public class E2ETestEnvironment : IDisposable
         {
             var expectedId = testEnvironment.CreateRegisteredObject<TItem>();
             var fieldInfo = AccessTools.Field(typeof(TDeclaring), fieldName);
-            var intercept = testEnvironment.GetCollectionAddIntercept(fieldInfo);
+            var setIntercept = testEnvironment.GetPropertyOwnerSetIntercept(fieldInfo);
+            var clearIntercept = testEnvironment.GetPropertyOwnerClearIntercept(fieldInfo);
             foreach (var client in Clients)
             {
                 Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
@@ -1164,7 +1189,7 @@ public class E2ETestEnvironment : IDisposable
 
                 var owner = (PropertyOwner<TItem>)fieldInfo.GetValue(serverInstance);
                 Assert.NotNull(owner);
-                intercept.Invoke(null, new object[] { owner, serverTrait, 1, serverInstance });
+                setIntercept.Invoke(null, new object[] { serverInstance, owner, serverTrait, 1 });
 
                 Assert.Equal(1, owner.GetPropertyValue(serverTrait));
             });
@@ -1175,11 +1200,29 @@ public class E2ETestEnvironment : IDisposable
                 Assert.True(client.ObjectManager.TryGetObject<TItem>(expectedId, out var clientTrait));
 
                 var owner = (PropertyOwner<TItem>)fieldInfo.GetValue(clientInstance);
-                Assert.NotNull(clientInstance);
                 Assert.NotNull(owner);
                 Assert.Equal(1, owner.GetPropertyValue(clientTrait));
-                Assert.NotNull(owner);
-                Assert.Equal(1, owner.GetPropertyValue(clientTrait));
+            }
+
+            // Clear propagates through its own message pair and empties the owner in place
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
+                Assert.True(Server.ObjectManager.TryGetObject<TItem>(expectedId, out var serverTrait));
+
+                var owner = (PropertyOwner<TItem>)fieldInfo.GetValue(serverInstance);
+                clearIntercept.Invoke(null, new object[] { serverInstance, owner });
+
+                Assert.Equal(0, owner.GetPropertyValue(serverTrait));
+            });
+
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
+                Assert.True(client.ObjectManager.TryGetObject<TItem>(expectedId, out var clientTrait));
+
+                var owner = (PropertyOwner<TItem>)fieldInfo.GetValue(clientInstance);
+                Assert.Equal(0, owner.GetPropertyValue(clientTrait));
             }
         }
 

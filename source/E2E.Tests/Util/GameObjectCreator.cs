@@ -62,6 +62,7 @@ internal class GameObjectCreator
         { typeof(VillageType), new VillageTypeBuilder() },
         { typeof(VillagerPartyComponent), new VillagerPartyComponentBuilder() },
         { typeof(TraitObject), new TraitObjectBuilder() },
+        { typeof(SkillObject), new SkillObjectBuilder() },
         { typeof(PropertyOwner<TraitObject>), new PropertyOwnerBuilder() },
         { typeof(SiegeEngineType), new SiegeEngineTypeBuilder() },
         { typeof(SiegeEngineConstructionProgress), new SiegeEngineConstructionProgressBuilder()  },
