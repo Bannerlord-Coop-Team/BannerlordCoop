@@ -1,4 +1,15 @@
-﻿using TaleWorlds.CampaignSystem.MapEvents;
+﻿using Common.Network.Messages;
+using Coop.Core.Server.Connections.Messages;
+using E2E.Tests.Environment.Instance;
+using E2E.Tests.Util;
+using GameInterface.Services.Players;
+using GameInterface.Services.MapEventSides.Messages;
+using GameInterface.Services.MapEvents.Initialization;
+using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MapEvents.Patches;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.MapEvents;
@@ -7,42 +18,125 @@ public class MapEventCollectionTests : MapEventTestBase
 {
     public MapEventCollectionTests(ITestOutputHelper output) : base(output) { }
 
-    [Fact(Skip = "MapEvent._sides is a fixed-size MapEventSide[2] array, not a dynamic collection; AssertCollectionReferenceField does not apply")]
+    [Fact(Skip = "MapEvent._sides is a fixed-size MapEventSide[2] array")]
     public void Server_MapEvent_Sides_IsFixedArray() { }
 
     [Fact]
-    public void Server_MapEvent_Initialize_SyncsSidesToClients()
+    public void Server_MapEvent_CommitPublishesCompleteLockedGraph()
     {
-        // Act
-        var mapEventCtx = CreateServerMapEvent();
+        Server.NetworkSentMessages.Clear();
+        var staged = CreateServerMapEvent(commit: false);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkMapEventInitialized>());
+        Assert.Equal(2, Server.NetworkSentMessages.GetMessages<NetworkMapEventPartyPending>().Count());
+        var messages = Server.NetworkSentMessages.Messages.ToList();
+        Assert.True(messages.FindLastIndex(x => x is NetworkMapEventPartyPending) <
+            messages.FindIndex(x => x is NetworkAssignMapEventSide));
+        Server.Call(() => Assert.False(PendingMapEventPartyMovementPatch.CanAdvancePosition(
+            Get<MobileParty>(Server, staged.DefenderPartyId).Party)));
+        foreach (var client in Clients) AssertPending(client, staged, true);
 
-        // Resolve the side IDs from the server
-        string? attackerSideId = null;
-        string? defenderSideId = null;
-        string? attackerMapEventPartyId = null;
-        string? defenderMapEventPartyId = null;
+        Server.Call(() => Campaign.Current.MapEventManager.OnMapEventCreated(
+            Get<MapEvent>(Server, staged.MapEventId)), MapEventDisabledMethods);
+
+        var marker = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkMapEventInitialized>());
+        Assert.False(marker.IsTerminal);
+        Assert.NotNull(marker.TroopUpgradeTrackerId);
+        Assert.NotNull(marker.ComponentId);
+        foreach (var instance in AllInstances) AssertCommitted(instance, staged);
+        foreach (var client in Clients) AssertPending(client, staged, false);
+    }
+
+    [Fact]
+    public void Server_MapEvent_AbortDestroysStagedGraph()
+    {
+        Server.NetworkSentMessages.Clear();
+        var staged = CreateServerMapEvent(commit: false);
 
         Server.Call(() =>
         {
-            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out var mapEvent));
-            Assert.True(Server.ObjectManager.TryGetId(mapEvent.AttackerSide, out attackerSideId));
-            Assert.True(Server.ObjectManager.TryGetId(mapEvent.DefenderSide, out defenderSideId));
-            Assert.True(Server.ObjectManager.TryGetId(mapEvent.AttackerSide.Parties[0], out attackerMapEventPartyId));
-            Assert.True(Server.ObjectManager.TryGetId(mapEvent.DefenderSide.Parties[0], out defenderMapEventPartyId));
+            var mapEvent = Get<MapEvent>(Server, staged.MapEventId);
+            Server.Resolve<IMapEventInitializationBarrier>().AbortServer(mapEvent);
+        }, MapEventDisabledMethods);
+
+        Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkMapEventInitialized>()).IsTerminal);
+        foreach (var instance in AllInstances) instance.Call(() =>
+        {
+            Assert.False(instance.ObjectManager.Contains(staged.MapEventId));
+            Assert.Null(Get<MobileParty>(instance, staged.AttackerPartyId).MapEvent);
+            Assert.Null(Get<MobileParty>(instance, staged.DefenderPartyId).MapEvent);
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PlayerDisconnect_MapEventParkingFollowsReconnectState(bool reconnectBeforeMapEventEnds)
+    {
+        var mapEvent = CreateServerMapEvent();
+        var client = Clients.First();
+        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        RegisterAsPlayerParty("PlayerOne", heroId, mapEvent.AttackerPartyId);
+
+        Server.Call(() =>
+        {
+            Get<MobileParty>(Server, mapEvent.AttackerPartyId).IsActive = true;
+            Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
         });
 
-        Assert.NotNull(attackerSideId);
-        Assert.NotNull(defenderSideId);
-        Assert.NotNull(attackerMapEventPartyId);
-        Assert.NotNull(defenderMapEventPartyId);
+        Server.SimulateMessage(this, new PlayerDisconnected(client.NetPeer, default));
 
-        // Assert — sides and parties propagated to all clients
-        foreach (var client in Clients)
+        Server.Call(() =>
         {
-            Assert.True(client.ObjectManager.TryGetObject<MapEventSide>(attackerSideId, out _));
-            Assert.True(client.ObjectManager.TryGetObject<MapEventSide>(defenderSideId, out _));
-            Assert.True(client.ObjectManager.TryGetObject<MapEventParty>(attackerMapEventPartyId, out _));
-            Assert.True(client.ObjectManager.TryGetObject<MapEventParty>(defenderMapEventPartyId, out _));
+            var party = Get<MobileParty>(Server, mapEvent.AttackerPartyId);
+            Assert.True(party.IsActive);
+            Assert.NotNull(party.MapEvent);
+        });
+
+        if (reconnectBeforeMapEventEnds)
+        {
+            Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer));
+            Server.SimulateMessage(this, new PlayerCampaignEntered(client.NetPeer));
         }
+
+        DestroyServerMapEvent(mapEvent.MapEventId);
+
+        Server.Call(() =>
+        {
+            var party = Get<MobileParty>(Server, mapEvent.AttackerPartyId);
+            Assert.Equal(reconnectBeforeMapEventEnds, party.IsActive);
+            Assert.Null(party.MapEvent);
+        });
     }
+
+    private static void AssertCommitted(EnvironmentInstance instance, MapEventContext staged) => instance.Call(() =>
+    {
+        var mapEvent = Get<MapEvent>(instance, staged.MapEventId);
+        var attacker = Get<MobileParty>(instance, staged.AttackerPartyId);
+        var defender = Get<MobileParty>(instance, staged.DefenderPartyId);
+        Assert.Contains(mapEvent, Campaign.Current.MapEventManager.MapEvents);
+        Assert.All(new[] { attacker, defender }, party => Assert.Same(mapEvent, party.MapEvent));
+        Assert.Equal(2, mapEvent.TroopUpgradeTracker._mapEventParties.Count);
+    });
+
+    private static void AssertPending(EnvironmentInstance instance, MapEventContext staged, bool expected) =>
+        instance.Call(() =>
+        {
+            var barrier = instance.Resolve<IMapEventInitializationBarrier>();
+            var attacker = Get<MobileParty>(instance, staged.AttackerPartyId).Party;
+            var defender = Get<MobileParty>(instance, staged.DefenderPartyId).Party;
+            foreach (var party in new[] { attacker, defender })
+            {
+                Assert.Equal(expected, barrier.IsPartyPending(party));
+                Assert.Equal(expected, party.MapEventSide == null);
+            }
+            Assert.Equal(!expected, PendingMapEventPartyMovementPatch.CanAdvancePosition(defender));
+        });
+
+    private static T Get<T>(EnvironmentInstance instance, string id) where T : class
+    {
+        Assert.True(instance.ObjectManager.TryGetObject<T>(id, out var value));
+        return value;
+    }
+
+    private IEnumerable<EnvironmentInstance> AllInstances => Clients.Prepend(Server);
 }

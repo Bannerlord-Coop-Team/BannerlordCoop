@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -64,6 +65,24 @@ internal class TroopRosterRegistry : AutoRegistryBase<TroopRoster>
             if (settlement?.Party?.PrisonRoster == null) continue;
 
             RegisterExistingObject($"{nameof(Settlement.Party.PrisonRoster)}_{settlement.StringId}", settlement.Party.PrisonRoster);
+        }
+
+        var mapEvents = Campaign.Current?.MapEventManager?.MapEvents;
+        if (mapEvents == null) return;
+        foreach (var mapEvent in mapEvents)
+        {
+            int partyIndex = 1;
+            foreach (var side in mapEvent?._sides ?? Array.Empty<MapEventSide>())
+            {
+                if (side?.Parties == null) continue;
+                foreach (var party in side.Parties)
+                {
+                    string owner = $"{nameof(MapEventParty)}_{mapEvent.StringId}_{partyIndex++}";
+                    RegisterExistingObject($"{owner}_{nameof(MapEventParty.WoundedInBattle)}", party?._woundedInBattle);
+                    RegisterExistingObject($"{owner}_{nameof(MapEventParty.DiedInBattle)}", party?._diedInBattle);
+                    RegisterExistingObject($"{owner}_{nameof(MapEventParty.RoutedInBattle)}", party?._routedInBattle);
+                }
+            }
         }
     }
 

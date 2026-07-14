@@ -1,4 +1,5 @@
-using Common.Messaging;
+﻿using Common.Messaging;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEventParties.Messages;
 using Helpers;
 using TaleWorlds.CampaignSystem;
@@ -10,13 +11,9 @@ using TaleWorlds.Library;
 namespace GameInterface.Services.MapEvents.TroopSupply;
 
 /// <summary>
-/// Agent origin for server-supplied coop battle troops. Mirrors <c>SimpleAgentOrigin</c> but carries the
-/// troop's <see cref="Party"/> for EVERY troop (not just heroes) — <c>SimpleAgentOrigin.Party</c> is null for
-/// non-heroes, which leaves <c>BattleCombatant</c> null so the engine can't put an enemy soldier on a team
-/// (it never spawns) and can't recognise the player's hero (the player isn't attached). Casualty hooks are
-/// no-ops: deaths flow through the existing <c>Agent.Die</c> → server path, so applying them here too would
-/// double-count. Score hits are the exception — they have no other path, so <c>OnScoreHit</c> reports them
-/// to the server (see the method).
+/// Agent origin for server-supplied coop battle troops. It carries each troop's party so the engine can assign
+/// teams, leaves roster casualties to the network death path, and preserves the controlled hero's final health.
+/// Score hits are reported here because they have no other server path.
 /// </summary>
 public class CoopAgentOrigin : IAgentOriginBase
 {
@@ -105,7 +102,18 @@ public class CoopAgentOrigin : IAgentOriginBase
     public void SetWounded() { }
     public void SetKilled() { }
     public void SetRouted(bool isOrderRetreat) { }
-    public void OnAgentRemoved(float agentHealth) { }
+    public void OnAgentRemoved(float agentHealth)
+    {
+        // Unlike the casualty hooks above, final agent health has no other path back to Hero.HitPoints. Vanilla
+        // performs this transfer in the origin hook, which also covers injured survivors removed during teardown.
+        if (!_troop.IsHero) return;
+
+        var hero = _troop.HeroObject;
+        if (hero.HeroState == Hero.CharacterStates.Dead) return;
+        if (!hero.IsControlledByThisInstance()) return;
+
+        hero.HitPoints = MathF.Max(1, MathF.Round(agentHealth));
+    }
 
     // Unlike the casualty hooks above, score hits have NO other path to the map event party in a coop battle
     // (the native PartyGroupAgentOrigin → supplier chain is substituted away), so this is where they are

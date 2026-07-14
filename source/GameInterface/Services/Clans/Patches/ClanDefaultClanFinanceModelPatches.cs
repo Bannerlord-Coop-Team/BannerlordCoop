@@ -6,6 +6,7 @@ using TaleWorlds.CampaignSystem.GameComponents;
 namespace GameInterface.Services.Clans.Patches;
 
 [HarmonyPatch(typeof(DefaultClanFinanceModel))]
+[HarmonyPatchCategory(GameInterface.HARMONY_GAME_STARTED_CATEGORY)]
 internal class DefaultClanFinanceModelPatches
 {
     [HarmonyPatch(nameof(DefaultClanFinanceModel.AddExpenseFromLeaderParty))]

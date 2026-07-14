@@ -1,4 +1,6 @@
-﻿namespace Coop.Core.Common.Configuration;
+﻿using Common.Network.Session;
+
+namespace Coop.Core.Common.Configuration;
 
 /// <summary>
 /// The hosting player's choices for advertising the session, carried from the connect
@@ -7,6 +9,9 @@
 public class SessionAdvertisementConfig
 {
     public bool EnableSteamInvites { get; set; }
+
+    /// <summary>Who can discover a standalone server through Steam.</summary>
+    public ServerVisibility Visibility { get; set; } = ServerVisibility.Public;
 
     /// <summary>
     /// The externally reachable address friends should dial (the host's public IP or

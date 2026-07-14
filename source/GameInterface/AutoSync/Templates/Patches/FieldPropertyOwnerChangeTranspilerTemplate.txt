@@ -1,2 +1,2 @@
-﻿[HarmonyTranspiler]
-static IEnumerable<CodeInstruction> {{MemberName}}ChangeTranspiler(IEnumerable<CodeInstruction> instructions) => PropertyOwnerFieldChangeTranspiler<{{ElementType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetLocalMessage>(instructions, "{{MemberName}}");
+[HarmonyTranspiler]
+static IEnumerable<CodeInstruction> {{MemberName}}ChangeTranspiler(IEnumerable<CodeInstruction> instructions) => PropertyOwnerFieldChangeTranspiler<{{ElementType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetLocalMessage, Local_{{ MemberDeclaringTypeName}}_{{ MemberName }}_PropertyOwnerClear>(instructions, "{{MemberName}}");

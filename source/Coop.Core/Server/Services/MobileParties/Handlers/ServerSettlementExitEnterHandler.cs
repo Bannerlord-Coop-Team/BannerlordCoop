@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -61,21 +61,26 @@ public class ServerSettlementExitEnterHandler : IHandler
         var payload = obj.What;
         var peer = (NetPeer)obj.Who;
 
-        network.Send(peer, new NetworkStartSettlementEncounter(payload));
-
-        // Tell the other clients to apply the entry synchronously here, so the broadcast does not depend
-        // on the game-loop pump (the server's own apply below is marshalled onto the game thread).
-        network.SendAllBut(peer, new NetworkPartyEnterSettlement(
-            Compact(payload.SettlementId, typeof(Settlement)),
-            Compact(payload.PartyId, typeof(MobileParty))));
-
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging(payload.PartyId, out MobileParty mobileParty)) return;
             if (!objectManager.TryGetObjectWithLogging(payload.SettlementId, out Settlement settlement)) return;
 
+            if (mobileParty.Party?.MapEventSide != null)
+            {
+                Logger.Warning(
+                    "Rejecting settlement entry for party {PartyId} because it is already in a map event",
+                    payload.PartyId);
+                return;
+            }
+
+            network.Send(peer, new NetworkStartSettlementEncounter(payload));
+            network.SendAllBut(peer, new NetworkPartyEnterSettlement(
+                Compact(payload.SettlementId, typeof(Settlement)),
+                Compact(payload.PartyId, typeof(MobileParty))));
+
             settlementInterface.PartyEnterSettlement(mobileParty, settlement);
-        });
+        }, context: nameof(NetworkRequestStartSettlementEncounter));
     }
 
     private void Handle(MessagePayload<NetworkRequestEndSettlementEncounter> obj)
