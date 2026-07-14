@@ -1,6 +1,7 @@
 ﻿using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
+using TaleWorlds.CampaignSystem.ViewModelCollection;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
 
@@ -35,5 +36,29 @@ public class HeroDeveloperSyncTests : SyncTestBase
         //TestEnvironment.AssertDictionaryField<HeroDeveloper, (PropertyObject, float)>(nameof(HeroDeveloper._skillXps));
         assertHelper.AssertPropertyOwnerField<HeroDeveloper, SkillObject>(nameof(HeroDeveloper._newFocuses));
         TestEnvironment.AssertField<HeroDeveloper, int>(nameof(HeroDeveloper._totalXp), 123, defaultValue: heroDeveloper._totalXp);
+    }
+
+    [Fact]
+    public void Server_HeroDeveloper_SetFocusValue_PropagatesToClients()
+    {
+        var skillObjectId = TestEnvironment.CreateRegisteredObject<SkillObject>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject(HeroDeveloperId, out HeroDeveloper heroDeveloper));
+            Assert.True(Server.ObjectManager.TryGetObject(skillObjectId, out SkillObject skill));
+
+            heroDeveloper.SetFocus(skill, 3);
+
+            Assert.Equal(3, heroDeveloper.GetFocus(skill));
+        });
+
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject(HeroDeveloperId, out HeroDeveloper heroDeveloper));
+            Assert.True(client.ObjectManager.TryGetObject(skillObjectId, out SkillObject skill));
+
+            Assert.Equal(3, heroDeveloper.GetFocus(skill));
+        }
     }
 }
