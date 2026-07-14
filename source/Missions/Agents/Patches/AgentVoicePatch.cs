@@ -20,7 +20,7 @@ internal static class AgentVoicePatch
     [HarmonyPostfix]
     private static void Postfix(Agent __instance, SkinVoiceManager.SkinVoiceType voiceType)
     {
-        if (AllowedThread.IsThisThreadAllowed()) return;
+        if (AllowedThread.IsThisThreadAllowed() || !OrderVoiceContextPatch.IsActive) return;
 
         MessageBroker.Instance.Publish(__instance, new AgentVoicePlayed(__instance, voiceType.TypeID));
     }

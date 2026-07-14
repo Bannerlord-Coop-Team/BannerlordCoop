@@ -1,4 +1,5 @@
 ﻿using Missions.Agents.Handlers;
+using Missions.Agents.Patches;
 using Xunit;
 
 namespace E2E.Tests.Services.Missions;
@@ -27,23 +28,33 @@ public class AgentOrderPresentationTests
         Assert.False(AgentActionHandler.IsOrderGesture(actionName));
     }
 
-    [Theory]
-    [InlineData("Everyone")]
-    [InlineData("Follow")]
-    [InlineData("Infantry")]
-    [InlineData("FormShieldWall")]
-    public void IsOrderVoice_AcceptsFormationAndOrderVoices(string voiceTypeId)
+    [Fact]
+    public void OrderVoiceContext_TracksNestedCalls()
     {
-        Assert.True(AgentVoiceHandler.IsOrderVoice(voiceTypeId));
-    }
+        Assert.False(OrderVoiceContextPatch.IsActive);
 
-    [Theory]
-    [InlineData(null)]
-    [InlineData("Pain")]
-    [InlineData("Death")]
-    [InlineData("Yell")]
-    public void IsOrderVoice_RejectsUnrelatedCombatVoices(string? voiceTypeId)
-    {
-        Assert.False(AgentVoiceHandler.IsOrderVoice(voiceTypeId));
+        OrderVoiceContextPatch.Enter();
+        try
+        {
+            Assert.True(OrderVoiceContextPatch.IsActive);
+
+            OrderVoiceContextPatch.Enter();
+            try
+            {
+                Assert.True(OrderVoiceContextPatch.IsActive);
+            }
+            finally
+            {
+                OrderVoiceContextPatch.Exit();
+            }
+
+            Assert.True(OrderVoiceContextPatch.IsActive);
+        }
+        finally
+        {
+            OrderVoiceContextPatch.Exit();
+        }
+
+        Assert.False(OrderVoiceContextPatch.IsActive);
     }
 }

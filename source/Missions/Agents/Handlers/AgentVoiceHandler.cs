@@ -4,7 +4,6 @@ using Common.Messaging;
 using Common.Util;
 using Missions.Agents.Messages;
 using Serilog;
-using System.Collections.Generic;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Agents.Handlers;
@@ -20,46 +19,6 @@ public interface IAgentVoiceHandler : IHandler
 public class AgentVoiceHandler : IAgentVoiceHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<AgentVoiceHandler>();
-    private static readonly HashSet<string> OrderVoiceTypeIds = new HashSet<string>
-    {
-        "Infantry",
-        "Cavalry",
-        "Archers",
-        "HorseArchers",
-        "Everyone",
-        "Mixed",
-        "Move",
-        "Follow",
-        "Charge",
-        "Advance",
-        "FallBack",
-        "Stop",
-        "Retreat",
-        "Mount",
-        "Dismount",
-        "FireAtWill",
-        "HoldFire",
-        "PickSpears",
-        "PickDefault",
-        "FaceEnemy",
-        "FaceDirection",
-        "UseSiegeWeapon",
-        "UseLadders",
-        "AttackGate",
-        "CommandDelegate",
-        "CommandUndelegate",
-        "BoardAtWill",
-        "AvoidBoarding",
-        "FormLine",
-        "FormShieldWall",
-        "FormLoose",
-        "FormCircle",
-        "FormSquare",
-        "FormSkein",
-        "FormColumn",
-        "FormScatter",
-    };
-
     private readonly INetworkAgentRegistry agentRegistry;
     private readonly IBattleNetwork network;
     private readonly IMessageBroker messageBroker;
@@ -81,7 +40,6 @@ public class AgentVoiceHandler : IAgentVoiceHandler
     private void HandleLocalVoice(MessagePayload<AgentVoicePlayed> payload)
     {
         AgentVoicePlayed voice = payload.What;
-        if (!IsOrderVoice(voice.VoiceTypeId)) return;
         if (Mission.Current == null || voice.Agent != Mission.Current.MainAgent) return;
         if (!agentRegistry.IsLocallyControlled(voice.Agent)) return;
 
@@ -97,7 +55,7 @@ public class AgentVoiceHandler : IAgentVoiceHandler
     private void HandleNetworkVoice(MessagePayload<NetworkAgentVoicePlayed> payload)
     {
         NetworkAgentVoicePlayed voice = payload.What;
-        if (!IsOrderVoice(voice.VoiceTypeId)) return;
+        if (string.IsNullOrEmpty(voice.VoiceTypeId)) return;
 
         GameThread.RunSafe(() =>
         {
@@ -121,11 +79,6 @@ public class AgentVoiceHandler : IAgentVoiceHandler
                     SkinVoiceManager.CombatVoiceNetworkPredictionType.NoPrediction);
             }
         });
-    }
-
-    internal static bool IsOrderVoice(string voiceTypeId)
-    {
-        return voiceTypeId != null && OrderVoiceTypeIds.Contains(voiceTypeId);
     }
 
     public void Dispose()
