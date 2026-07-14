@@ -26,6 +26,7 @@ using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Time.Interfaces;
 using GameInterface.Services.TroopRosters.Interfaces;
+using GameInterface.Services.UI;
 using GameInterface.Services.UI.Interfaces;
 using GameInterface.Services.Villages.Interfaces;
 using Moq;
@@ -105,6 +106,7 @@ internal abstract class TestComponentBase
         RegisterMock<IAutoRegistryFactory>(builder);
         RegisterMock<IBattleTroopReserveBuilder>(builder);
         RegisterMock<IMapEventInitializationBarrier>(builder);
+        RegisterMock<IConnectedPlayerCountService>(builder);
         // BattleHostHandler (MissionModule, auto-activated) needs the registry, which the real
         // containers get from GameInterfaceModule — not loaded here.
         RegisterMock<IBattleHostRegistry>(builder);
