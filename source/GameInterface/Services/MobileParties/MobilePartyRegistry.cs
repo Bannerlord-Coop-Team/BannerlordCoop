@@ -75,22 +75,42 @@ internal class MobilePartyRegistry : AutoRegistryBase<MobileParty>
             obj.HasLandNavigationCapability = true;
         }
 
-        MBObjectManager.Instance?.RegisterObjectInternalWithoutTypeId(obj, false, out _);
-
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
-            Campaign.Current?.CampaignObjectManager?.AddMobileParty(obj);
-        });
+            var objectManager = Campaign.Current?.CampaignObjectManager;
+            if (objectManager == null) return;
+
+            objectManager.AddMobileParty(obj);
+            MBObjectManager.Instance?.RegisterObjectInternalWithoutTypeId(obj, presumed: false, out _);
+        }, context: "MobilePartyRegistry.OnClientCreated");
     }
 
     public override void OnClientDestroyed(MobileParty obj, string id)
     {
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             using (new AllowedThread())
             {
                 try
                 {
+                    // A destroy that reaches the client only as this registry message never ran the
+                    // vanilla DestroyPartyAction locally: a server-side destroy inside an AllowedThread
+                    // scope skips publishing DestroyPartyApplied, while its RemoveParty (deferred out of
+                    // that scope by DestroyPartyActionPatches.ApplyInternalPrefix) still publishes
+                    // InstanceDestroyed. Vanilla map UI tears down on MobilePartyDestroyed — the party
+                    // nameplate only removes plates on that event or a visibility change — so without it
+                    // the dead party's plate leaks and forever renders its post-teardown name, which for
+                    // bandits (ActualClan nulled in OnRemoveParty) is "NameFailed - BanditPartyPatch".
+                    // Fire the events vanilla ApplyInternal would have. Membership in the world list
+                    // discriminates: vanilla OnRemoveParty removes the party from CampaignObjectManager,
+                    // so a party still listed here never had its local vanilla destroy, and a party that
+                    // did is not double-notified.
+                    if (Campaign.Current.MobileParties.Contains(obj))
+                    {
+                        CampaignEventDispatcher.Instance.OnMobilePartyDestroyed(obj, null);
+                        CampaignEventDispatcher.Instance.OnMapInteractableDestroyed(obj.Party);
+                    }
+
                     Campaign.Current.MobilePartyLocator.RemoveLocatable(obj);
                     Campaign.Current.VisualTrackerManager.RemoveTrackedObject(obj, true);
                     CampaignEventDispatcher.Instance.OnPartyRemoved(obj.Party);
@@ -101,7 +121,7 @@ internal class MobilePartyRegistry : AutoRegistryBase<MobileParty>
                     Logger.Error(ex, "Failed to remove party");
                 }
             }
-        });
+        }, context: "MobilePartyRegistry.OnClientDestroyed");
     }
 
     public override void OnServerCreated(MobileParty obj, string id)

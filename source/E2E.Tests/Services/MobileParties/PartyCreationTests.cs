@@ -48,6 +48,49 @@ public class PartyCreationTests : IDisposable
     }
 
     [Fact]
+    public void ServerCreateParty_ClientPartyGetsStableNonZeroId()
+    {
+        // Arrange
+        var server = TestEnvironment.Server;
+        var client1 = TestEnvironment.Clients.First();
+
+        // Act
+        string? partyId = null;
+        server.Call(() =>
+        {
+            var partyComponent = GameObjectCreator.CreateInitializedObject<LordPartyComponent>();
+            var clan = GameObjectCreator.CreateInitializedObject<Clan>();
+            var party = MobileParty.CreateParty("StableIdTestParty", partyComponent);
+
+            Assert.True(server.ObjectManager.TryGetId(party, out partyId));
+        });
+
+        Assert.NotNull(partyId);
+
+        // MBObjectBase.GetHashCode is Id-based, so the Id must be assigned before anything can key
+        // the party into a dictionary (e.g. PartyNameplatesVM) and never change afterwards; a hash
+        // that mutates after insert strands the entry and made dead parties' nameplates
+        // unremovable ("NameFailed - BanditPartyPatch" ghosts).
+        uint firstObservedId = 0;
+        client1.Call(() =>
+        {
+            Assert.True(client1.ObjectManager.TryGetObject<MobileParty>(partyId, out var clientParty));
+            firstObservedId = clientParty.Id.InternalValue;
+            Assert.NotEqual(0u, firstObservedId);
+        });
+
+        // Pump another roundtrip so any deferred game-thread work (the world-list add) has run,
+        // then confirm the Id did not change.
+        server.Call(() => { });
+
+        client1.Call(() =>
+        {
+            Assert.True(client1.ObjectManager.TryGetObject<MobileParty>(partyId, out var clientParty));
+            Assert.Equal(firstObservedId, clientParty.Id.InternalValue);
+        });
+    }
+
+    [Fact]
     public void ClientCreateParty_DoesNothing()
     {
         // Arrange
