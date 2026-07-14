@@ -13,6 +13,7 @@ using GameInterface.Tests;
 using Moq;
 using System;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using Xunit;
 
@@ -98,7 +99,9 @@ public class PlayerKillFeedColorTests
         var filePath = CreateTempFilePath();
         var viewModel = new CoopOptionsVM(new CoopOptionsStore(filePath), new MessageBroker());
 
-        var tab = Assert.Single(viewModel.Tabs);
+        Assert.Equal(2, viewModel.Tabs.Count);
+
+        var tab = viewModel.Tabs[0];
         Assert.Equal(KillFeedOptionsTabProvider.TabName, tab.Name);
         Assert.Equal(KillFeedOptionsTabProvider.TabId, tab.Id);
         Assert.Same(tab, viewModel.SelectedTab);
@@ -106,6 +109,11 @@ public class PlayerKillFeedColorTests
         Assert.True(viewModel.IsApplyButtonVisible);
         var section = Assert.IsType<KillFeedSection>(Assert.Single(tab.Sections));
         Assert.Equal(KillFeedSection.SectionId, section.Id);
+
+        var tacticalSymbolsTab = viewModel.Tabs[1];
+        Assert.Equal("Tactical Symbols", tacticalSymbolsTab.Name);
+        Assert.False(tacticalSymbolsTab.IsSelected);
+        Assert.True(tacticalSymbolsTab.IsTacticalSymbolsTab);
     }
 
     [Fact]
@@ -218,7 +226,7 @@ public class PlayerKillFeedColorTests
 
     private static KillFeedSection GetKillFeedSection(CoopOptionsVM viewModel)
     {
-        var tab = Assert.Single(viewModel.Tabs);
+        var tab = viewModel.Tabs.Single(tab => tab.Id == KillFeedOptionsTabProvider.TabId);
         return Assert.IsType<KillFeedSection>(Assert.Single(tab.Sections));
     }
 

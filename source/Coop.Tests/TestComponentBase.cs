@@ -109,6 +109,7 @@ internal abstract class TestComponentBase
         // containers get from GameInterfaceModule — not loaded here.
         RegisterMock<IBattleHostRegistry>(builder);
         RegisterMock<IRaidAiInterventionConfigInterface>(builder);
+        RegisterMock<ITacticalUnitSymbolsConfigInterface>(builder);
         RegisterMock<IVillageHostileActionInterface>(builder);
 
         // ISaveInterface is consumed by TransferSaveState's constructor, which packages a save the

@@ -2,6 +2,7 @@ using Common.Messaging;
 using GameInterface;
 using GameInterface.Services.UI.CoopOptions.Providers;
 using GameInterface.Services.UI.CoopOptions.Providers.KillFeedTab;
+using GameInterface.Services.UI.CoopOptions.Providers.TacticalSymbolsTab;
 using System;
 using TaleWorlds.Library;
 using TaleWorlds.ScreenSystem;
@@ -12,7 +13,8 @@ public class CoopOptionsVM : ViewModel
 {
     private static readonly ICoopOptionsTabProvider[] TabDefinitions =
     {
-        new KillFeedOptionsTabProvider()
+        new KillFeedOptionsTabProvider(),
+        new TacticalSymbolsOptionsTabProvider()
     };
 
     private readonly ICoopOptionsStore optionsStore;
@@ -80,9 +82,13 @@ public class CoopOptionsVM : ViewModel
 
         try
         {
-            var options = optionsStore.LoadOrDefault();
-            tab.Apply(options);
-            optionsStore.Save(options);
+            if (tab.PersistsOptions)
+            {
+                var options = optionsStore.LoadOrDefault();
+                tab.Apply(options);
+                optionsStore.Save(options);
+            }
+
             tab.AfterApply();
         }
         catch

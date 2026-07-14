@@ -20,6 +20,8 @@ Current persisted shape:
 }
 ```
 
+The Tactical Symbols tab is session-scoped rather than persisted. Applying it requests a server update; the server broadcasts the result to every client and sends the current value to players joining later.
+
 For external reads, use provider helpers instead of hard-coding ids. For example, `KillFeedOptionsTabProvider.TryGetKillFeedColor(options, out var color)` reads from the provider-owned tab and section path.
 
 ## UI XML

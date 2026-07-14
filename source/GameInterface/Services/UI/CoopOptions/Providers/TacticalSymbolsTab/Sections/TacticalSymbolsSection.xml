@@ -1,0 +1,25 @@
+<ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+           LayoutImp.LayoutMethod="VerticalTopToBottom">
+  <Children>
+    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="48"
+                Brush="Clan.TabControl.Text" Brush.FontSize="36"
+                Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                Text="@TitleText"/>
+    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="58"
+                Brush="Clan.TabControl.Text" Brush.FontSize="22" Brush.FontColor="#B8B8B8FF"
+                Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                Text="@DescriptionText"/>
+
+    <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="78"
+               LayoutImp.LayoutMethod="HorizontalLeftToRight">
+      <Children>
+        <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="560" HeightSizePolicy="StretchToParent"
+                    Brush="Clan.TabControl.Text" Brush.FontSize="28"
+                    Brush.TextVerticalAlignment="Center" Text="@HideTacticalUnitSymbolsText"/>
+        <Standard.Button WidthSizePolicy="Fixed" SuggestedWidth="140" SuggestedHeight="58"
+                         VerticalAlignment="Center" Command.Click="ExecuteToggleHideTacticalUnitSymbols"
+                         Parameter.Text="@HideTacticalUnitSymbolsValueText"/>
+      </Children>
+    </ListPanel>
+  </Children>
+</ListPanel>
