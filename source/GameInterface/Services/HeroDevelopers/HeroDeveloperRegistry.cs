@@ -27,12 +27,12 @@ internal class HeroDeveloperRegistry : AutoRegistryBase<HeroDeveloper>
     {
         foreach (var hero in Hero.AllAliveHeroes)
         {
-            RegisterExistingObject($"{hero.StringId}_{nameof(HeroDeveloper)}", hero.HeroDeveloper);
+            RegisterExistingObject($"{hero.StringId}", hero.HeroDeveloper);
         }
 
         foreach (var hero in Hero.DeadOrDisabledHeroes)
         {
-            RegisterExistingObject($"{hero.StringId}_{nameof(HeroDeveloper)}", hero.HeroDeveloper);
+            RegisterExistingObject($"{hero.StringId}", hero.HeroDeveloper);
         }
     }
 

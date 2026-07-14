@@ -17,6 +17,7 @@ using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -216,6 +217,9 @@ internal class HeroInterface : IHeroInterface
         RegisterPrimary(party, NewServerStringId(party));
         RegisterPrimary(hero.Clan, NewServerStringId(hero.Clan));
         RegisterPrimary(hero.CharacterObject, hero.StringId);
+
+        // HeroDeveloper is not a child of MBObjectBase, can't use RegisterPrimary
+        objectManager.AddExisting($"{nameof(HeroDeveloper)}_{hero.StringId}", hero.HeroDeveloper); 
 
         RegisterPartyChildren(party);
     }
