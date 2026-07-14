@@ -17,6 +17,9 @@ public static class SteamBoot
     // reachable for the process lifetime or its subscriptions silently die.
     public static SteamJoinListener JoinListener { get; private set; }
 
+    // Strong root for the main-menu browser exposed through SessionDiscovery.
+    public static SteamLobbyBrowser LobbyBrowser { get; private set; }
+
     // Created before any session container exists, so it lives here rather than in DI.
     public static SteamTunnelJoinEndpointPreparer TunnelPreparer { get; private set; }
 
@@ -50,7 +53,10 @@ public static class SteamBoot
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void CreateServices(IMessageBroker messageBroker, string commandLine)
     {
-        JoinListener = new SteamJoinListener(messageBroker, new SteamLobbyApi());
+        var lobbyApi = new SteamLobbyApi();
+        JoinListener = new SteamJoinListener(messageBroker, lobbyApi);
+        LobbyBrowser = new SteamLobbyBrowser(lobbyApi);
+        Common.Network.Session.SessionDiscovery.SteamLobbyBrowser = LobbyBrowser;
         TunnelPreparer = new SteamTunnelJoinEndpointPreparer();
         JoinListener.ProcessLaunchArguments(commandLine);
     }

@@ -28,10 +28,8 @@ public static class SteamTunnel
     public const int SendBufferBytes = 8 * 1024 * 1024;
 
     /// <summary>
-    /// Floor for Steam's send pacing, and in practice the effective transfer rate: this
-    /// Steam build never raises the rate toward the ceiling on its own (observed pinned at
-    /// the 256 KB/s default while saturated on a 3 ms link), so the floor is what carries
-    /// the ~55 MB join payload in seconds instead of minutes.
+    /// Effective send-rate floor. This Steam build stays near its minimum while saturated, so the
+    /// elevated floor keeps large join saves from taking minutes.
     /// </summary>
     public const int SendRateMinBytesPerSecond = 2 * 1024 * 1024;
 
@@ -45,12 +43,8 @@ public static class SteamTunnel
     public const int LoopbackBufferBytes = 2 * 1024 * 1024;
 
     /// <summary>
-    /// True when the datagram's sender tolerates loss, so the tunnel may keep it off the
-    /// reliable Steam lane and drop it under pressure instead of stalling newer traffic.
-    /// LiteNetLib 1.3.1 wire format: the packet property is the low five bits of the first
-    /// byte; Unreliable (0), Ping (3), and Pong (4) are droppable by contract. Anything
-    /// else — channeled traffic, acks, handshake, merged datagrams — and any unknown value
-    /// is delivered reliably.
+    /// Classifies LiteNetLib's low-five-bit packet property. Unreliable, Ping, and Pong may be
+    /// dropped under pressure; channeled traffic, acks, handshakes, and unknown values stay reliable.
     /// </summary>
     public static bool IsDroppableDatagram(byte[] data, int length)
     {
@@ -69,10 +63,8 @@ public enum TunnelConnectionState
 }
 
 /// <summary>
-/// Minimal seam over the Steam networking-sockets surface the tunnel pumps use, so they can
-/// be tested against a fake and a differently-flavored implementation can slot in later.
-/// Implementations only raise <see cref="ConnectionStateChanged"/> for connections they own:
-/// ones opened via <see cref="ConnectToHost"/> or arriving on <see cref="ListenForClients"/>.
+/// Testable seam over Steam networking sockets. Implementations report only connections opened
+/// through this instance or accepted by its listener.
 /// </summary>
 public interface ISteamTunnelTransport : IDisposable
 {
@@ -94,10 +86,8 @@ public interface ISteamTunnelTransport : IDisposable
     void CloseConnection(uint connection);
 
     /// <summary>
-    /// Queues one datagram for delivery. A droppable datagram may be discarded when the
-    /// send buffer is full (its sender tolerates loss); otherwise false means the buffer is
-    /// full and the caller must retry the same datagram later — never drop it. A dead
-    /// connection swallows the datagram, so a retry loop can never wedge on it.
+    /// Queues a datagram. False asks reliable callers to retry after backpressure; droppable or
+    /// dead-connection traffic is consumed so the pump cannot wedge.
     /// </summary>
     bool SendDatagram(uint connection, byte[] data, int length, bool droppable);
 
@@ -106,4 +96,10 @@ public interface ISteamTunnelTransport : IDisposable
 
     /// <summary>One-line live status (effective send rate, backlog, throughput, ping) for logs.</summary>
     string DescribeConnection(uint connection);
+}
+
+/// <summary>Optional authenticated-identity capability for a Steam tunnel transport.</summary>
+public interface ISteamTunnelConnectionIdentityResolver
+{
+    bool TryGetRemoteSteamId(uint connection, out ulong steamId);
 }

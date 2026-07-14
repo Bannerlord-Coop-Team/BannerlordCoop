@@ -1,4 +1,4 @@
-using Coop.Core.Server.Services.Stances.Messages;
+﻿using Coop.Core.Server.Services.Stances.Messages;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
@@ -65,6 +65,18 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             s.Phase == PlayerPartyInteractionPhase.WaitingForProposal &&
             !s.IsInitiator &&
             s.Options.SequenceEqual(new[] { PlayerPartyInteractionOption.Leave }));
+    }
+
+    [Fact]
+    public void OppositeDirectionInteractionRequest_ForReservedPair_IsIdempotent()
+    {
+        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+        RequestInteraction(client2, responderPartyId, initiatorPartyId);
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionDenied>());
     }
 
     [Fact]

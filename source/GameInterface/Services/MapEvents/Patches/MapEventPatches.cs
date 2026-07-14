@@ -15,7 +15,6 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 
@@ -27,8 +26,8 @@ internal class MapEventPatches
     private static readonly ILogger Logger = LogManager.GetLogger<MapEventPatches>();
 
     [HarmonyPatch(nameof(MapEvent.AddInvolvedPartyInternal))]
-    [HarmonyPrefix]
-    private static void Prefix_AddInvolvedPartyInternal(MapEvent __instance, MapEventParty mapEventParty)
+    [HarmonyPostfix]
+    private static void Postfix_AddInvolvedPartyInternal(MapEvent __instance, MapEventParty mapEventParty)
     {
         // Broadcast the involved parties to clients when a player joins, OR when an AI party joins as a
         // reinforcement while the join window is still open (InteractionPatches.IsWithinAiJoinWindow). Parties
@@ -38,20 +37,9 @@ internal class MapEventPatches
         if (!isPlayerJoin && !InteractionPatches.IsWithinAiJoinWindow(__instance))
             return;
 
-        var partiesAdded = new List<MapEventParty>();
-
-        __instance.TroopUpgradeTracker = new TroopUpgradeTracker();
-        MapEventSide[] sides = __instance._sides;
-        for (int i = 0; i < sides.Length; i++)
-        {
-            foreach (var existingParty in sides[i].Parties)
-            {
-                __instance.TroopUpgradeTracker.AddParty(existingParty);
-                partiesAdded.Add(existingParty);
-            }
-        }
-
-        var message = new MapEventInvolvedPartiesAdded(__instance, partiesAdded);
+        var message = new MapEventInvolvedPartiesAdded(
+            __instance,
+            __instance._sides.SelectMany(side => side.Parties).ToList());
         MessageBroker.Instance.Publish(__instance, message);
     }
 

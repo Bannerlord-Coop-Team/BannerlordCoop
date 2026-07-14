@@ -1,4 +1,4 @@
-using Common.Network;
+﻿using Common.Network;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
@@ -59,7 +59,7 @@ public abstract class MapEventTestBase : IDisposable
     /// Creates and registers a <see cref="MapEvent"/> on the server with two <see cref="MobileParty"/>
     /// participants, returning the IDs of the map event, attacker party, and defender party.
     /// </summary>
-    protected MapEventContext CreateServerMapEvent()
+    protected MapEventContext CreateServerMapEvent(bool commit = true)
     {
         string? mapEventId = null;
         string? attackerPartyId = null;
@@ -78,7 +78,15 @@ public abstract class MapEventTestBase : IDisposable
             // Construction has already replicated the MapEvent to the clients, where the real
             // MapEventRegistry.OnClientCreated runs and allocates their _sides array. The synchronous
             // MapEventSideAssigned replication produced by Initialize therefore lands on a non-null array.
-            mapEvent.Initialize(attackerParty.Party, defenderParty.Party);
+            mapEvent.Initialize(
+                attackerParty.Party,
+                defenderParty.Party,
+                new FieldBattleEventComponent(mapEvent),
+                MapEvent.BattleTypes.FieldBattle);
+            mapEvent.MapEventVisual = null;
+
+            if (commit && !Campaign.Current.MapEventManager.MapEvents.Contains(mapEvent))
+                Campaign.Current.MapEventManager.OnMapEventCreated(mapEvent);
 
             Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
             Assert.True(Server.ObjectManager.TryGetId(attackerParty, out attackerPartyId));
@@ -183,8 +191,7 @@ public abstract class MapEventTestBase : IDisposable
             // MapEventSide.AddPartyInternal internally. Calling AddPartyInternal directly skips that wiring,
             // leaving Side == None (-1) and throwing IndexOutOfRange in
             // RecalculateRenownAndInfluenceValuesOnPartyInvolved. It is NOT wrapped in AllowedThread: the
-            // collection-add must go through the patched MBList.Add so the server broadcasts the new party to
-            // the clients (MapEventSideCollectionPatches.ListAddOverride).
+            // MapEventSidePatches.AddIntercept broadcasts this collection add to clients.
             party.Party.MapEventSide = side;
 
             var joined = side.Parties.LastOrDefault(p => p?.Party == party.Party);

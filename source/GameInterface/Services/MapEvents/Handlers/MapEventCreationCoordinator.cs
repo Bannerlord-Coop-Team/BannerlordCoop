@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -6,33 +6,22 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using GameInterface.Services.Villages.Interfaces;
 using LiteNetLib;
 using Serilog;
 using System;
 using System.Linq;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.MapEvents.Handlers;
 
 /// <summary>
-/// Coordinates the blocking "client asks the server to create a battle's <see cref="MapEvent"/>" round trip.
+/// Coordinates server-authoritative MapEvent creation and client-side publication.
 /// </summary>
-/// <remarks>
-/// <para>
-/// On the client, <see cref="RequestBlocking"/> sends a <see cref="NetworkRequestCreateMapEvent"/> and blocks the
-/// calling (game main) thread until the server replies with a <see cref="NetworkMapEventCreated"/> (or it times out).
-/// Blocking the main thread is safe here: the network is polled on a dedicated thread (see
-/// <c>CoopNetworkBase.UpdateThread</c>), so the response — and the AutoRegistry create broadcast that actually
-/// materializes the MapEvent on this client — are still received and dispatched while the main thread waits.
-/// </para>
-/// <para>
-/// On the server, it handles <see cref="NetworkRequestCreateMapEvent"/> by creating the MapEvent authoritatively
-/// (via <see cref="MapEventBattleFactory"/>), resolving its id through <see cref="IObjectManager"/>, and replying
-/// to the requesting peer.
-/// </para>
-/// </remarks>
 internal class MapEventCreationCoordinator : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MapEventCreationCoordinator>();
@@ -40,6 +29,7 @@ internal class MapEventCreationCoordinator : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
+    private readonly IPlayerManager playerManager;
     private readonly INetworkConfig configuration;
     private readonly IVillageHostileActionInterface villageHostileActionInterface;
 
@@ -51,12 +41,14 @@ internal class MapEventCreationCoordinator : IHandler
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
+        IPlayerManager playerManager,
         INetworkConfig configuration,
         IVillageHostileActionInterface villageHostileActionInterface)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
+        this.playerManager = playerManager;
         this.configuration = configuration;
         this.villageHostileActionInterface = villageHostileActionInterface;
 
@@ -71,8 +63,8 @@ internal class MapEventCreationCoordinator : IHandler
     }
 
     /// <summary>
-    /// [Client] Blocks until the server creates the authoritative MapEvent for the given parties and it becomes
-    /// resolvable on this client, then returns it. Returns null on timeout (caller should abort the battle start).
+    /// [Client] Blocks until the server creates the authoritative MapEvent and its initialization is committed
+    /// on this client. Returns null on timeout.
     /// </summary>
     public MapEvent RequestBlocking(PartyBase attacker, PartyBase defender, BattleCreationFlags flags)
     {
@@ -119,24 +111,19 @@ internal class MapEventCreationCoordinator : IHandler
 
             // Phase two — unique to map-event creation, layered on the shared gate: the MapEvent object is
             // materialized on this client by the AutoRegistry create broadcast, which is sent just before the reply;
-            // keep pumping in case the reply is processed first. Resolving the bare MapEvent isn't enough: the
-            // parties' side attachment lands via separate, GameThread-deferred messages sent right after, so wait for
-            // those on the same deadline too.
+            // keep pumping in case the reply is processed first. Resolving the bare MapEvent isn't enough: the parties'
+            // side attachment lands via separate, GameThread-deferred messages sent right after, so wait until the
+            // event is registered with the manager and both sides point at it, on the same deadline.
             MapEvent mapEvent = null;
-            bool BothSidesAttached() =>
-                attacker.MapEventSide != null && defender.MapEventSide != null
-                && attacker.MapEventSide.Parties.Any(p => p.Party == attacker)
-                && defender.MapEventSide.Parties.Any(p => p.Party == defender)
-                && (mapEvent.AttackerSide == attacker.MapEventSide || mapEvent.DefenderSide == attacker.MapEventSide)
-                && (mapEvent.AttackerSide == defender.MapEventSide || mapEvent.DefenderSide == defender.MapEventSide);
-
             if (!GameThread.WaitWhilePumping(
                     () => objectManager.TryGetObject(pending.Reply, out mapEvent) && mapEvent != null
-                        && BothSidesAttached(),
+                        && Campaign.Current.MapEventManager.MapEvents.Contains(mapEvent)
+                        && ReferenceEquals(attacker.MapEvent, mapEvent)
+                        && ReferenceEquals(defender.MapEvent, mapEvent),
                     deadline))
             {
                 Logger.Error(
-                    "Server created map event {MapEventId} but it (or the attacker/defender side attachment) was not resolvable on this client before timeout. RequestId={RequestId}",
+                    "Server created map event {MapEventId} but it (or the attacker/defender side attachment) was not committed on this client before timeout. RequestId={RequestId}",
                     pending.Reply, pending.RequestId);
                 return null;
             }
@@ -168,21 +155,38 @@ internal class MapEventCreationCoordinator : IHandler
             return;
 
         if (!TryResolveRequestParties(request, out var attacker, out var defender))
-            return;
-
-        if (!TryConsumeApprovedMapEventStart(request, attacker, defender))
-            return;
-
-        string mapEventId = CreateMapEvent(request, attacker, defender);
-        if (string.IsNullOrEmpty(mapEventId))
         {
-            // Intentionally do not respond; the client will time out and abort its battle start.
-            Logger.Error("Server failed to create a map event for RequestId={RequestId}; not responding", request.RequestId);
+            SendCreatedReply(requestingPeer, request, null);
             return;
         }
 
-        Logger.Debug("Server created map event {MapEventId} for RequestId={RequestId}. Responding to client.", mapEventId, request.RequestId);
+        if (!playerManager.TryGetPlayer(requestingPeer, out var player) ||
+            !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var requestingParty) ||
+            (!ReferenceEquals(attacker.MobileParty, requestingParty) &&
+             !ReferenceEquals(defender.MobileParty, requestingParty)))
+        {
+            SendCreatedReply(requestingPeer, request, null);
+            return;
+        }
 
+        if (TryHandleExistingMapEventRequest(request, attacker, defender, requestingParty, out var existingMapEventId))
+        {
+            SendCreatedReply(requestingPeer, request, existingMapEventId);
+            return;
+        }
+
+        if (!TryConsumeApprovedMapEventStart(request, attacker, defender))
+        {
+            SendCreatedReply(requestingPeer, request, null);
+            return;
+        }
+
+        SendCreatedReply(requestingPeer, request, CreateMapEvent(request, attacker, defender));
+    }
+
+    private void SendCreatedReply(NetPeer requestingPeer, NetworkRequestCreateMapEvent request, string mapEventId)
+    {
+        Logger.Debug("Server resolved map event {MapEventId} for RequestId={RequestId}. Responding to client.", mapEventId, request.RequestId);
         network.Send(requestingPeer, new NetworkMapEventCreated(request.RequestId, mapEventId));
     }
 
@@ -229,6 +233,61 @@ internal class MapEventCreationCoordinator : IHandler
             reason);
         return false;
     }
+
+    private bool TryHandleExistingMapEventRequest(
+        NetworkRequestCreateMapEvent request,
+        PartyBase attacker,
+        PartyBase defender,
+        MobileParty requestingParty,
+        out string mapEventId)
+    {
+        mapEventId = null;
+        var attackerSide = attacker.MapEventSide;
+        var defenderSide = defender.MapEventSide;
+        if (attackerSide == null && defenderSide == null)
+            return false;
+
+        if (ReferenceEquals(attacker, defender) || request.Flags.IsForced) return true;
+
+        if (attackerSide != null && defenderSide != null)
+        {
+            var attackerEvent = attackerSide.MapEvent;
+            if (IsActiveFieldBattle(attackerEvent) &&
+                ReferenceEquals(attackerEvent, defenderSide.MapEvent) &&
+                ReferenceEquals(attackerSide.OtherSide, defenderSide))
+                objectManager.TryGetIdWithLogging(attackerEvent, out mapEventId);
+            return true;
+        }
+
+        var occupiedSide = attackerSide ?? defenderSide;
+        var joiningParty = attackerSide == null ? attacker : defender;
+        var mapEvent = occupiedSide?.MapEvent;
+        var joiningSide = occupiedSide?.OtherSide;
+        var joiningMobileParty = joiningParty.MobileParty;
+        if (!ReferenceEquals(joiningMobileParty, requestingParty) || !IsActiveFieldBattle(mapEvent) ||
+            joiningSide == null || joiningMobileParty?.IsActive != true ||
+            joiningMobileParty.CurrentSettlement != null || !CanJoinFieldBattle(joiningParty, joiningSide))
+            return true;
+
+        joiningParty.MapEventSide = joiningSide;
+        objectManager.TryGetIdWithLogging(mapEvent, out mapEventId);
+        return true;
+    }
+
+    private static bool IsActiveFieldBattle(MapEvent mapEvent) =>
+        mapEvent?.IsFieldBattle == true && mapEvent.BattleState == BattleState.None && !mapEvent.IsFinalized;
+
+    private static bool CanJoinFieldBattle(PartyBase party, MapEventSide side)
+    {
+        var faction = party?.MapFaction;
+        return faction != null && side?.OtherSide != null &&
+            side.Parties.All(x => IsFactionCompatible(x?.Party, faction, false)) &&
+            side.OtherSide.Parties.All(x => IsFactionCompatible(x?.Party, faction, true));
+    }
+
+    private static bool IsFactionCompatible(PartyBase involved, IFaction joining, bool hostile) =>
+        involved?.MapFaction != null && involved.IsActive &&
+        VillageHostileFactionStanceHelper.HasWarStance(involved.MapFaction, joining) == hostile;
 
     private string CreateMapEvent(
         NetworkRequestCreateMapEvent request,

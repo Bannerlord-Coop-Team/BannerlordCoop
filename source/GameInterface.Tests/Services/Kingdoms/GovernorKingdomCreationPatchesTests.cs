@@ -1,10 +1,11 @@
-using Autofac;
+﻿using Autofac;
 using Common;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Kingdoms.Patches;
+using GameInterface.Tests;
 using GameInterface.Tests.Bootstrap;
 using System;
 using System.Collections.Generic;
@@ -15,6 +16,7 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.Kingdoms;
 
+[Collection(ModInformationRoleCollection.Name)]
 public class GovernorKingdomCreationPatchesTests
 {
     private static GovernorCampaignBehavior CreateGovernorBehavior(string kingdomName, string cultureId)

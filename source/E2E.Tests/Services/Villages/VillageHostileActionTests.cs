@@ -25,6 +25,7 @@ using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using GameInterface.Services.Villages.Commands;
 using GameInterface.Services.Villages.Data;
 using GameInterface.Services.Villages.Interfaces;
@@ -512,7 +513,67 @@ public class VillageHostileActionTests : MapEventTestBase
             target.SettlementPartyId,
             RaidFlags())));
 
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkMapEventCreated>());
+        Assert.Null(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkMapEventCreated>()).MapEventId);
+    }
+
+    [Fact]
+    public void FieldMapEventCreation_OverlappingRequest_JoinsFreePartyToExistingBattle()
+    {
+        var firstClient = Clients.First();
+        var secondClient = Clients.Skip(1).First();
+        var (_, firstPlayerId) = CreatePlayerHeroParty("PlayerOne");
+        var (_, secondPlayerId) = CreatePlayerHeroParty("PlayerTwo");
+        var aiId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        firstClient.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne");
+        secondClient.Resolve<IControllerIdProvider>().SetControllerId("PlayerTwo");
+        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", firstClient.NetPeer);
+        Server.Resolve<IPlayerManager>().SetPeer("PlayerTwo", secondClient.NetPeer);
+        var firstPartyId = GetPartyBaseId(firstPlayerId);
+        var secondPartyId = GetPartyBaseId(secondPlayerId);
+        var aiPartyId = GetPartyBaseId(aiId);
+        var playerClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        var aiClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(firstPlayerId, out var firstPlayer));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(secondPlayerId, out var secondPlayer));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(aiId, out var ai));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(playerClanId, out var playerClan));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(aiClanId, out var aiClan));
+            firstPlayer.ActualClan = secondPlayer.ActualClan = playerClan;
+            ai.ActualClan = aiClan;
+            VillageHostileFactionStanceHelper.ApplyWarStance(playerClan, aiClan);
+        });
+        Server.NetworkSentMessages.Clear();
+
+        RequestConversation(firstClient, firstPartyId, aiPartyId);
+        RequestConversation(secondClient, secondPartyId, aiPartyId);
+        Server.NetworkSentMessages.Clear();
+
+        firstClient.Call(() => firstClient.Resolve<INetwork>().SendAll(
+            new NetworkRequestCreateMapEvent("FirstBattle", firstPartyId, aiPartyId, default)), MapEventDisabledMethods);
+        var firstReply = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkMapEventCreated>());
+        Server.NetworkSentMessages.Clear();
+
+        secondClient.Call(() => secondClient.Resolve<INetwork>().SendAll(
+            new NetworkRequestCreateMapEvent("OverlappingBattle", secondPartyId, aiPartyId, default)), MapEventDisabledMethods);
+        var secondReply = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkMapEventCreated>());
+        var pending = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkMapEventPartyPending>());
+        Assert.Equal(firstReply.MapEventId, pending.MapEventId);
+        Assert.Equal(secondPartyId, pending.PartyId);
+        var overlapMessages = Server.NetworkSentMessages.Messages.ToList();
+        var pendingIndex = overlapMessages.FindIndex(message => message is NetworkMapEventPartyPending);
+        Assert.True(pendingIndex < overlapMessages.FindIndex(message => message is NetworkAddBattleParty) &&
+            pendingIndex < overlapMessages.FindIndex(message => message is NetworkMapEventCreated));
+        Assert.Equal(firstReply.MapEventId, secondReply.MapEventId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(firstReply.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(secondPlayerId, out var secondPlayer));
+            Assert.Same(mapEvent, secondPlayer.MapEvent);
+            Assert.Same(mapEvent.AttackerSide, secondPlayer.MapEventSide);
+        });
     }
 
     [Theory]
@@ -2616,7 +2677,7 @@ public class VillageHostileActionTests : MapEventTestBase
         });
     }
 
-    private static MapEvent CreateHostileActionMapEvent(PartyBase attacker, PartyBase defender, VillageHostileAction action)
+    private MapEvent CreateHostileActionMapEvent(PartyBase attacker, PartyBase defender, VillageHostileAction action)
     {
         var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
         mapEvent.MapEventVisual = MockMapEventVisual();
@@ -2647,6 +2708,8 @@ public class VillageHostileActionTests : MapEventTestBase
         mapEvent.State = MapEventState.Wait;
 
         SetVillageStateForHostileAction(defender.Settlement, action);
+        mapEvent.MapEventVisual = null;
+        Campaign.Current.MapEventManager.OnMapEventCreated(mapEvent);
         return mapEvent;
     }
 
@@ -2673,7 +2736,7 @@ public class VillageHostileActionTests : MapEventTestBase
         party._mapEventSide = side;
         var mapEventParty = new MapEventParty(party);
         side._battleParties.Add(mapEventParty);
-        MessageBroker.Instance.Publish(side, new MapEventPartyAdded(side, mapEventParty));
+        MessageBroker.Instance.Publish(side, new MapEventPartyBattlePartyAdded(side, mapEventParty));
     }
 
     private RaidMapEventContext CreateHostileActionWithOnePlayerParty(VillageHostileAction action)

@@ -197,6 +197,12 @@ public class CoopBattleController : CoopMissionController
         supplyReporter.Tick(dt);
     }
 
+    public override void OnPreDisplayMissionTick(float dt)
+    {
+        base.OnPreDisplayMissionTick(dt);
+        damageRouter.Tick(dt);
+    }
+
     // A side counts as fielded once some team of it has a live human agent (puppets qualify; they join
     // teams like any agent). Mirrors CoopBattleDepletionPatch's live-agent count.
     private bool BattleReadyForEndChecks()
@@ -280,6 +286,8 @@ public class CoopBattleController : CoopMissionController
 
     protected override void OnLeaving()
     {
+        damageRouter.FlushForMissionEnd();
+
         // Report engine states before the commit, so the server applies them while the siege still exists.
         siegeEngineStateReporter.ReportIfHost();
 
