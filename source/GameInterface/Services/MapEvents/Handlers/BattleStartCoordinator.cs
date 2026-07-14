@@ -1,13 +1,9 @@
-using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Common.Util;
 using GameInterface.Services.MapEvents.Messages.Start;
 using Serilog;
 using System;
-using System.Collections.Concurrent;
-using System.Threading;
 
 namespace GameInterface.Services.MapEvents.Handlers;
 
@@ -22,10 +18,10 @@ internal enum BattleStartMode
 /// <summary>
 /// Client-side blocking gate for starting a battle. The attack / send-troops consequence prefixes call
 /// <see cref="RequestBlocking"/>, which asks the server to start the battle in the given mode and blocks the game
-/// thread (pumping) until the server accepts or rejects. The server-side gate + setup lives in the mode handlers
-/// (<see cref="BattleHandler"/> for a live mission, <see cref="BattleSimulationRunHandler"/> for an auto-resolve);
-/// each subscribes the shared <see cref="NetworkBattleStartRequest"/>, handles its own mode, and answers with
-/// <see cref="NetworkBattleStartReply"/>. Mirrors <see cref="MapEventCreationCoordinator"/>'s blocking round trip.
+/// thread (pumping) until the server accepts or rejects. The round-trip plumbing is the shared
+/// <see cref="BlockingRequestGate{TReply}"/>; the server-side gate + setup lives behind
+/// <see cref="BattleStartDispatcher"/>, which claims the mode and delegates to the per-mode starters, each of which
+/// answers with <see cref="NetworkBattleStartReply"/>.
 /// </summary>
 internal class BattleStartCoordinator : IHandler
 {
@@ -36,7 +32,7 @@ internal class BattleStartCoordinator : IHandler
 
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
-    private readonly ConcurrentDictionary<string, PendingRequest> pendingRequests = new();
+    private readonly BlockingRequestGate<bool> gate = new BlockingRequestGate<bool>();
 
     public BattleStartCoordinator(IMessageBroker messageBroker, INetwork network)
     {
@@ -57,49 +53,37 @@ internal class BattleStartCoordinator : IHandler
 
     /// <summary>
     /// [Client] Blocks until the server accepts or rejects starting the battle in <paramref name="mode"/> for the
-    /// given map event, then returns whether it was accepted. Blocking the game thread is safe here:
-    /// GameThread.WaitWhilePumping keeps draining the queue so the network thread (and the reply) still make progress.
+    /// given map event, then returns whether it was accepted. Blocking the game thread is safe here: the gate's
+    /// WaitWhilePumping keeps draining the queue so the network thread (and the reply) still make progress.
     /// </summary>
     public bool RequestBlocking(BattleStartMode mode, string mapEventId, string attackerPartyId)
     {
-        var requestId = Guid.NewGuid().ToString();
-        var pending = new PendingRequest();
-        pendingRequests[requestId] = pending;
+        var pending = gate.Register();
 
         try
         {
             var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
 
             // On a client, SendAll targets the server (its only connected peer).
-            network.SendAll(new NetworkBattleStartRequest(requestId, (int)mode, mapEventId, attackerPartyId));
+            network.SendAll(new NetworkBattleStartRequest(pending.RequestId, (int)mode, mapEventId, attackerPartyId));
 
-            if (!GameThread.WaitWhilePumping(() => pending.Completed.IsSet, deadline))
+            if (!gate.WaitWhilePumping(pending, deadline))
             {
                 Logger.Error("Timed out waiting for the server to accept the {Mode} battle start. MapEventId={MapEventId}", mode, mapEventId);
                 return false;
             }
 
-            return pending.Accepted;
+            return pending.Reply;
         }
         finally
         {
-            pendingRequests.TryRemove(requestId, out _);
+            gate.Release(pending);
         }
     }
 
-    /// <summary>[Server -&gt; Client] A mode handler answered; complete the matching blocking request.</summary>
+    /// <summary>[Server -&gt; Client] A mode starter answered; complete the matching blocking request.</summary>
     private void Handle_NetworkBattleStartReply(MessagePayload<NetworkBattleStartReply> payload)
     {
-        if (pendingRequests.TryGetValue(payload.What.RequestId, out var pending))
-        {
-            pending.Accepted = payload.What.Accepted;
-            pending.Completed.Set();
-        }
-    }
-
-    private sealed class PendingRequest
-    {
-        public ManualResetEventSlim Completed { get; } = new(false);
-        public bool Accepted { get; set; }
+        gate.Complete(payload.What.RequestId, payload.What.Accepted);
     }
 }

@@ -41,4 +41,39 @@ public class ServerBattleModeArbiterTests
             ServerBattleModeArbiter.Release(mapEventId);
         }
     }
+
+    [Fact]
+    public void ClaimMission_FirstThenSameMode_ReportsNewThenAlreadyClaimed()
+    {
+        // A mid-battle joiner's start request against an already-claimed mission event (requirement R1): the
+        // dispatcher must be able to tell a fresh claim apart from a same-mode re-claim so the mission starter can
+        // still run its full body (rebroadcast) for the joiner.
+        const string mapEventId = "same-mode-reclaim";
+
+        try
+        {
+            Assert.Equal(BattleClaimResult.NewClaim, ServerBattleModeArbiter.ClaimMission(mapEventId));
+            Assert.Equal(BattleClaimResult.AlreadyClaimedSameMode, ServerBattleModeArbiter.ClaimMission(mapEventId));
+        }
+        finally
+        {
+            ServerBattleModeArbiter.Release(mapEventId);
+        }
+    }
+
+    [Fact]
+    public void ClaimSimulation_AfterMissionClaim_IsRefused()
+    {
+        const string mapEventId = "cross-mode-refused";
+
+        try
+        {
+            Assert.Equal(BattleClaimResult.NewClaim, ServerBattleModeArbiter.ClaimMission(mapEventId));
+            Assert.Equal(BattleClaimResult.Refused, ServerBattleModeArbiter.ClaimSimulation(mapEventId));
+        }
+        finally
+        {
+            ServerBattleModeArbiter.Release(mapEventId);
+        }
+    }
 }

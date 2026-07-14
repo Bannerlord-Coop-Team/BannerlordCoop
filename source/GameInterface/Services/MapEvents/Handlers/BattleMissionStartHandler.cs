@@ -26,14 +26,17 @@ using TaleWorlds.ObjectSystem;
 namespace GameInterface.Services.MapEvents.Handlers;
 
 /// <summary>
-/// Owns the live battle-mission start flow (split out of <see cref="BattleHandler"/>). On the server it answers the
-/// mission-mode <see cref="NetworkBattleStartRequest"/>: gate it against <see cref="ServerBattleModeArbiter"/>, apply
-/// the attack's hostile consequences, make the sides mission-ready, reply, broadcast the mission start
-/// (<see cref="NetworkStartAttackMission"/>), and claim the mission mode on every client
+/// Owns the live battle-mission start flow (split out of <see cref="BattleHandler"/>). It is the mission-mode
+/// <see cref="IBattleModeStarter"/>: <see cref="BattleStartDispatcher"/> resolves the event and hands it the request,
+/// then this runs the mission-only rejection gates, invokes the dispatcher-supplied claim, applies the attack's
+/// hostile consequences, makes the sides mission-ready, replies, broadcasts the mission start
+/// (<see cref="NetworkStartAttackMission"/>), and claims the mission mode on every client
 /// (<see cref="NetworkBattleModeSet"/>). Clients in the map event open the coop field-battle mission.
 /// </summary>
-internal class BattleMissionStartHandler : IHandler
+internal class BattleMissionStartHandler : IHandler, IBattleModeStarter
 {
+    public BattleStartMode Mode => BattleStartMode.Mission;
+
     private static readonly ILogger Logger = LogManager.GetLogger<BattleMissionStartHandler>();
 
     // Exclusive upper bound for the terrain seed, preserving the range of the original
@@ -69,7 +72,7 @@ internal class BattleMissionStartHandler : IHandler
         this.mapEventLogger = mapEventLogger;
         this.missionInitializerResolver = missionInitializerResolver;
 
-        messageBroker.Subscribe<NetworkBattleStartRequest>(Handle_NetworkBattleStartRequest);
+        // NetworkBattleStartRequest is owned by BattleStartDispatcher, which routes it here via HandleRequest.
         messageBroker.Subscribe<NetworkStartAttackMission>(Handle_NetworkStartAttackMission);
         messageBroker.Subscribe<NetworkStartSiegeMission>(Handle_NetworkStartSiegeMission);
         messageBroker.Subscribe<MapEventFinalized>(Handle_MapEventFinalized);
@@ -77,7 +80,6 @@ internal class BattleMissionStartHandler : IHandler
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<NetworkBattleStartRequest>(Handle_NetworkBattleStartRequest);
         messageBroker.Unsubscribe<NetworkStartAttackMission>(Handle_NetworkStartAttackMission);
         messageBroker.Unsubscribe<NetworkStartSiegeMission>(Handle_NetworkStartSiegeMission);
         messageBroker.Unsubscribe<MapEventFinalized>(Handle_MapEventFinalized);
@@ -93,119 +95,103 @@ internal class BattleMissionStartHandler : IHandler
         }
     }
 
-    /// <summary>[Server] Handle a battle-start request for the live-mission mode: gate it, make the sides
-    /// mission-ready, broadcast the mission start, and reply. Requests for other modes are ignored here.</summary>
-    private void Handle_NetworkBattleStartRequest(MessagePayload<NetworkBattleStartRequest> payload)
+    /// <summary>
+    /// [Server, game thread] Start (or join) the live mission for a battle-start request. Runs the mission-only
+    /// rejection gates, invokes the dispatcher-supplied <paramref name="claim"/>, makes the sides mission-ready,
+    /// replies, and broadcasts the mission start. Runs its full body on <see cref="BattleClaimResult.AlreadyClaimedSameMode"/>
+    /// too: that is how a mid-battle joiner opens the mission off the rebroadcast (in-mission clients self-filter via
+    /// MissionState.Current). The dispatcher already re-resolved the event at drain time and owns the claim.
+    /// </summary>
+    public void HandleRequest(MapEvent mapEvent, NetworkBattleStartRequest request, NetPeer requester, Func<BattleClaimResult> claim)
     {
-        if (ModInformation.IsClient)
-            return;
+        var operation = "validate hostile action mode";
 
-        if (payload.What.Mode != (int)BattleStartMode.Mission)
-            return;
-
-        if (!objectManager.TryGetObject(payload.What.MapEventId, out MapEvent _))
-            return;
-
-        // Roll the terrain seed once for this map event and reuse it for every client
-        // that opens the battle, so they all use the same terrain seed. The seed is
-        // chosen server-side and carried in the message instead of rolled per machine.
-        var randomTerrainSeed = mapEventTerrainSeeds.GetOrAdd(payload.What.MapEventId, _ => RollTerrainSeed());
-        var requester = payload.Who as NetPeer;
-
-        // _sides is game state the main-thread tick also touches; mutating it from the
-        // network thread races the tick. Make the sides mission-ready on the main thread.
-        // Re-resolve the event at drain time: it may have finalized between this request
-        // arriving and the queued action running, in which case a captured reference would
-        // point at a torn-down event.
-        GameThread.RunSafe(() =>
+        try
         {
-            var operation = "resolve map event";
-
-            try
+            if (mapEvent.IsUnsupportedMultiPlayerHostileAction())
             {
-                if (!objectManager.TryGetObject(payload.What.MapEventId, out MapEvent mapEvent))
-                    return;
-
-                operation = "validate hostile action mode";
-                if (mapEvent.IsUnsupportedMultiPlayerHostileAction())
-                {
-                    Logger.Warning("Rejecting attack mission start for map event {MapEventId}: this hostile action does not support multiple player parties", payload.What.MapEventId);
-                    network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
-                    return;
-                }
-
-                // The lords-hall stage is not supported: CurrentSiegeState never advances past OnTheWalls in
-                // co-op (SiegeMissionEndPatches), so this only trips on a save that carried the state in.
-                // Rejected before the arbiter claim so the event stays open for auto-resolve.
-                operation = "validate siege stage";
-                if (mapEvent.IsSiegeAssault && mapEvent.MapEventSettlement?.CurrentSiegeState == Settlement.SiegeState.InTheLordsHall)
-                {
-                    Logger.Error("Rejecting siege mission for {MapEventId}: lords-hall stage is not supported", payload.What.MapEventId);
-                    network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
-                    return;
-                }
-
-                // Server-authoritative mode gate: accept the live mission only if no auto-resolve simulation already
-                // owns this event. On reject, don't make the sides mission-ready or reply — the requesting client
-                // waits for NetworkStartAttackMission to open the mission, so it simply stays at the encounter menu.
-                operation = "claim mission mode";
-                if (!ServerBattleModeArbiter.TryClaimMission(payload.What.MapEventId))
-                {
-                    mapEventLogger.DebugMapEvent(mapEvent, "Rejecting attack mission: an auto-resolve simulation is already underway for this event");
-                    network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
-                    return;
-                }
-
-                mapEventLogger.DebugMapEvent(mapEvent, "Handling network attack mission attempted for map event. Making sides mission-ready and replying with mission start");
-
-                // Apply the diplomatic consequences of the client's attack (war / relation)
-                // authoritatively before the mission opens, reproducing the hostile-action head of
-                // vanilla EncounterAttackConsequence that neither the client nor the server runs.
-                operation = "apply attack hostile-action consequences";
-                ApplyClientAttackHostileConsequences(mapEvent, payload.What.AttackerPartyId);
-
-                operation = "make map event sides mission-ready";
-                foreach (var side in mapEvent._sides)
-                {
-                    side.MakeReadyForMission(null);
-                }
-
-                // Reply first so the requesting client's blocked consequence unblocks before the mission-open
-                // message arrives — the mission then opens off the menu-consequence stack, as in the pre-coordinator
-                // flow, rather than re-entrantly during the blocking wait.
-                operation = "send battle start reply";
-                network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, true));
-
-                if (mapEvent.IsSiegeAssault)
-                {
-                    operation = "send siege mission snapshot";
-                    var snapshot = siegeMissionSnapshots.GetOrAdd(payload.What.MapEventId, _ => BuildSiegeMissionSnapshot(payload.What.MapEventId, mapEvent));
-                    // Broadcast like the field path: every involved player (co-besiegers, a player defender) opens the
-                    // mission and joins the leader-hosted assault. Non-involved clients self-filter in OpenSiegeMission
-                    // (TryGetValidBattle needs their own PlayerEncounter.Battle), so only participants open it.
-                    network.SendAll(snapshot);
-                }
-                else
-                {
-                    operation = "read campaign atmosphere";
-                    AtmosphereInfo atmosphereOnCampaign = GetAtmosphereOnCampaign(mapEvent);
-
-                    operation = "send attack mission start";
-                    network.SendAll(new NetworkStartAttackMission(payload.What.MapEventId, randomTerrainSeed, atmosphereOnCampaign));
-                }
-
-                // Claim the event for the mission mode on every client, so one still sitting at the encounter menu
-                // greys out the auto-resolve option — a map event is fought as a live mission XOR an auto-resolve,
-                // never both (see BattleModeEncounterOptionsPatch / BattleModeRegistry).
-                operation = "send battle mode";
-                network.SendAll(new NetworkBattleModeSet(payload.What.MapEventId, (int)BattleStartMode.Mission));
+                Logger.Warning("Rejecting attack mission start for map event {MapEventId}: this hostile action does not support multiple player parties", request.MapEventId);
+                network.Send(requester, new NetworkBattleStartReply(request.RequestId, false));
+                return;
             }
-            catch (Exception e)
+
+            // The lords-hall stage is not supported: CurrentSiegeState never advances past OnTheWalls in
+            // co-op (SiegeMissionEndPatches), so this only trips on a save that carried the state in.
+            // Rejected before the arbiter claim so the event stays open for auto-resolve.
+            operation = "validate siege stage";
+            if (mapEvent.IsSiegeAssault && mapEvent.MapEventSettlement?.CurrentSiegeState == Settlement.SiegeState.InTheLordsHall)
             {
-                Logger.Error(e, "Failed to {Operation} for {Message}", operation, nameof(NetworkBattleStartRequest));
-                network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
+                Logger.Error("Rejecting siege mission for {MapEventId}: lords-hall stage is not supported", request.MapEventId);
+                network.Send(requester, new NetworkBattleStartReply(request.RequestId, false));
+                return;
             }
-        }, context: nameof(Handle_NetworkBattleStartRequest));
+
+            // Server-authoritative mode gate (owned by the dispatcher): accept the live mission only if no
+            // auto-resolve simulation already owns this event. On reject, don't make the sides mission-ready or
+            // reply — the requesting client waits for NetworkStartAttackMission to open the mission, so it simply
+            // stays at the encounter menu.
+            operation = "claim mission mode";
+            if (claim() == BattleClaimResult.Refused)
+            {
+                mapEventLogger.DebugMapEvent(mapEvent, "Rejecting attack mission: an auto-resolve simulation is already underway for this event");
+                network.Send(requester, new NetworkBattleStartReply(request.RequestId, false));
+                return;
+            }
+
+            // Roll the terrain seed once for this map event and reuse it for every client that opens the battle, so
+            // they all use the same terrain seed. The seed is chosen server-side and carried in the message instead
+            // of rolled per machine.
+            var randomTerrainSeed = mapEventTerrainSeeds.GetOrAdd(request.MapEventId, _ => RollTerrainSeed());
+
+            mapEventLogger.DebugMapEvent(mapEvent, "Handling network attack mission attempted for map event. Making sides mission-ready and replying with mission start");
+
+            // Apply the diplomatic consequences of the client's attack (war / relation)
+            // authoritatively before the mission opens, reproducing the hostile-action head of
+            // vanilla EncounterAttackConsequence that neither the client nor the server runs.
+            operation = "apply attack hostile-action consequences";
+            ApplyClientAttackHostileConsequences(mapEvent, request.AttackerPartyId);
+
+            operation = "make map event sides mission-ready";
+            foreach (var side in mapEvent._sides)
+            {
+                side.MakeReadyForMission(null);
+            }
+
+            // Reply first so the requesting client's blocked consequence unblocks before the mission-open
+            // message arrives — the mission then opens off the menu-consequence stack, as in the pre-coordinator
+            // flow, rather than re-entrantly during the blocking wait.
+            operation = "send battle start reply";
+            network.Send(requester, new NetworkBattleStartReply(request.RequestId, true));
+
+            if (mapEvent.IsSiegeAssault)
+            {
+                operation = "send siege mission snapshot";
+                var snapshot = siegeMissionSnapshots.GetOrAdd(request.MapEventId, _ => BuildSiegeMissionSnapshot(request.MapEventId, mapEvent));
+                // Broadcast like the field path: every involved player (co-besiegers, a player defender) opens the
+                // mission and joins the leader-hosted assault. Non-involved clients self-filter in OpenSiegeMission
+                // (TryGetValidBattle needs their own PlayerEncounter.Battle), so only participants open it.
+                network.SendAll(snapshot);
+            }
+            else
+            {
+                operation = "read campaign atmosphere";
+                AtmosphereInfo atmosphereOnCampaign = GetAtmosphereOnCampaign(mapEvent);
+
+                operation = "send attack mission start";
+                network.SendAll(new NetworkStartAttackMission(request.MapEventId, randomTerrainSeed, atmosphereOnCampaign));
+            }
+
+            // Claim the event for the mission mode on every client, so one still sitting at the encounter menu
+            // greys out the auto-resolve option — a map event is fought as a live mission XOR an auto-resolve,
+            // never both (see BattleModeEncounterOptionsPatch / BattleModeRegistry).
+            operation = "send battle mode";
+            network.SendAll(new NetworkBattleModeSet(request.MapEventId, (int)BattleStartMode.Mission));
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Failed to {Operation} for {Message}", operation, nameof(NetworkBattleStartRequest));
+            network.Send(requester, new NetworkBattleStartReply(request.RequestId, false));
+        }
     }
 
     private static AtmosphereInfo GetAtmosphereOnCampaign(MapEvent mapEvent)

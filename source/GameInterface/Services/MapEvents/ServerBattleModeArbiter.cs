@@ -3,6 +3,18 @@ using System.Collections.Generic;
 namespace GameInterface.Services.MapEvents;
 
 /// <summary>
+/// The outcome of a battle-mode claim attempt: the event became newly claimed for the requested mode, it was
+/// already claimed for the same mode (a joiner starting against an already-claimed event — the caller decides
+/// whether to proceed), or a different mode already owns it and the claim is refused.
+/// </summary>
+internal enum BattleClaimResult
+{
+    NewClaim,
+    AlreadyClaimedSameMode,
+    Refused,
+}
+
+/// <summary>
 /// [Server] Authoritative gate that keeps a map event in a single battle-resolution mode: the first player to start
 /// a live mission OR an auto-resolve simulation claims the event, and the other mode is refused until the claim is
 /// released. A mission claim ends when its mission instance becomes empty; either claim ends when the event
@@ -21,28 +33,41 @@ internal static class ServerBattleModeArbiter
     private static readonly Dictionary<string, Mode> modes = new();
 
     /// <summary>
+    /// Claim the event for a live mission, reporting whether the claim is new, a same-mode re-claim (a player
+    /// joining the same mission), or refused because an auto-resolve simulation already owns the event.
+    /// </summary>
+    public static BattleClaimResult ClaimMission(string mapEventId) => Claim(mapEventId, Mode.Mission);
+
+    /// <summary>
+    /// Claim the event for an auto-resolve simulation, reporting whether the claim is new, a same-mode re-claim, or
+    /// refused because a live mission already owns the event.
+    /// </summary>
+    public static BattleClaimResult ClaimSimulation(string mapEventId) => Claim(mapEventId, Mode.Simulation);
+
+    /// <summary>
     /// Try to claim the event for a live mission. Succeeds if the event is unclaimed or already a mission (another
     /// player joining the same mission); fails only if an auto-resolve simulation already owns the event.
     /// </summary>
-    public static bool TryClaimMission(string mapEventId) => TryClaim(mapEventId, Mode.Mission);
+    public static bool TryClaimMission(string mapEventId) => ClaimMission(mapEventId) != BattleClaimResult.Refused;
 
     /// <summary>
     /// Try to claim the event for an auto-resolve simulation. Succeeds if the event is unclaimed or already a
     /// simulation; fails only if a live mission already owns the event.
     /// </summary>
-    public static bool TryClaimSimulation(string mapEventId) => TryClaim(mapEventId, Mode.Simulation);
+    public static bool TryClaimSimulation(string mapEventId) => ClaimSimulation(mapEventId) != BattleClaimResult.Refused;
 
-    private static bool TryClaim(string mapEventId, Mode mode)
+    private static BattleClaimResult Claim(string mapEventId, Mode mode)
     {
-        if (mapEventId == null) return true;
+        // A null id has no event to gate; treat it as a fresh claim (matches the historical "return true").
+        if (mapEventId == null) return BattleClaimResult.NewClaim;
 
         lock (lockObj)
         {
             if (modes.TryGetValue(mapEventId, out var current))
-                return current == mode;
+                return current == mode ? BattleClaimResult.AlreadyClaimedSameMode : BattleClaimResult.Refused;
 
             modes[mapEventId] = mode;
-            return true;
+            return BattleClaimResult.NewClaim;
         }
     }
 

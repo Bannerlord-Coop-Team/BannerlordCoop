@@ -10,9 +10,7 @@ using GameInterface.Services.Villages.Interfaces;
 using LiteNetLib;
 using Serilog;
 using System;
-using System.Collections.Concurrent;
 using System.Linq;
-using System.Threading;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -39,18 +37,15 @@ internal class MapEventCreationCoordinator : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MapEventCreationCoordinator>();
 
-    /// <summary>
-    /// Statically accessible instance so the (static) <c>StartBattleInternal</c> Harmony prefix can reach the
-    /// DI-wired coordinator. Set on construction by the auto-activated handler registration.
-    /// </summary>
-    internal static MapEventCreationCoordinator Instance { get; private set; }
-
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly INetworkConfig configuration;
     private readonly IVillageHostileActionInterface villageHostileActionInterface;
-    private readonly ConcurrentDictionary<string, PendingRequest> pendingRequests = new ConcurrentDictionary<string, PendingRequest>();
+
+    // The map-event id the server assigns is the round-trip reply; the "both sides attached" wait below is this
+    // coordinator's own second phase, layered on top of the shared gate.
+    private readonly BlockingRequestGate<string> gate = new BlockingRequestGate<string>();
 
     public MapEventCreationCoordinator(
         IMessageBroker messageBroker,
@@ -65,8 +60,6 @@ internal class MapEventCreationCoordinator : IHandler
         this.configuration = configuration;
         this.villageHostileActionInterface = villageHostileActionInterface;
 
-        Instance = this;
-
         messageBroker.Subscribe<NetworkRequestCreateMapEvent>(Handle_NetworkRequestCreateMapEvent);
         messageBroker.Subscribe<NetworkMapEventCreated>(Handle_NetworkMapEventCreated);
     }
@@ -75,8 +68,6 @@ internal class MapEventCreationCoordinator : IHandler
     {
         messageBroker.Unsubscribe<NetworkRequestCreateMapEvent>(Handle_NetworkRequestCreateMapEvent);
         messageBroker.Unsubscribe<NetworkMapEventCreated>(Handle_NetworkMapEventCreated);
-
-        if (Instance == this) Instance = null;
     }
 
     /// <summary>
@@ -94,9 +85,7 @@ internal class MapEventCreationCoordinator : IHandler
         if (!objectManager.TryGetIdWithLogging(attacker, out var attackerId)) return null;
         if (!objectManager.TryGetIdWithLogging(defender, out var defenderId)) return null;
 
-        var requestId = Guid.NewGuid().ToString();
-        var pending = new PendingRequest();
-        pendingRequests[requestId] = pending;
+        var pending = gate.Register();
 
         try
         {
@@ -105,35 +94,34 @@ internal class MapEventCreationCoordinator : IHandler
 
             Logger.Debug(
                 "Requesting authoritative map event creation from server. RequestId={RequestId}, AttackerId={AttackerId}, DefenderId={DefenderId}",
-                requestId, attackerId, defenderId);
+                pending.RequestId, attackerId, defenderId);
 
             // On a client, SendAll targets the server (its only connected peer).
-            network.SendAll(new NetworkRequestCreateMapEvent(requestId, attackerId, defenderId, flags));
+            network.SendAll(new NetworkRequestCreateMapEvent(pending.RequestId, attackerId, defenderId, flags));
 
-            // This runs on the game-loop thread (the StartBattleInternal prefix, during a campaign tick). A
-            // bare blocking wait here stops the thread from pumping GameThread.Update, which the network
-            // thread relies on: it processes messages in order, and a message ahead of the reply (e.g. a
-            // NetworkMapEventFinalizeAttempted, applied through a blocking GameThread.Run) waits for that
-            // pump. The reply — and the AutoRegistry create broadcast that materializes the MapEvent — then
-            // sits behind a handler that can never complete, so the wait always times out under battle load.
-            // GameThread.WaitWhilePumping keeps draining the queue while we wait so the network thread makes
-            // progress (it falls back to a plain poll when not on the game-loop thread).
-            if (!GameThread.WaitWhilePumping(() => pending.Completed.IsSet, deadline))
+            // Phase one — the shared round trip: wait for the server's create reply, which carries the assigned
+            // map-event id. This runs on the game-loop thread (the StartBattleInternal prefix, during a campaign
+            // tick). A bare blocking wait here would stop the thread from pumping GameThread.Update, which the
+            // network thread relies on: it processes messages in order, and a message ahead of the reply (e.g. a
+            // NetworkMapEventFinalizeAttempted, applied through a blocking GameThread.Run) waits for that pump. The
+            // gate's WaitWhilePumping keeps draining the queue while we wait so the network thread makes progress.
+            if (!gate.WaitWhilePumping(pending, deadline))
             {
-                Logger.Error("Timed out after {Timeout} waiting for the server to create the map event. RequestId={RequestId}", timeout, requestId);
+                Logger.Error("Timed out after {Timeout} waiting for the server to create the map event. RequestId={RequestId}", timeout, pending.RequestId);
                 return null;
             }
 
-            if (string.IsNullOrEmpty(pending.MapEventId))
+            if (string.IsNullOrEmpty(pending.Reply))
             {
-                Logger.Error("Server reported that it could not create a map event. RequestId={RequestId}", requestId);
+                Logger.Error("Server reported that it could not create a map event. RequestId={RequestId}", pending.RequestId);
                 return null;
             }
 
-            // The MapEvent object is materialized on this client by the AutoRegistry create broadcast, which is
-            // sent just before the reply; keep pumping in case the reply is processed first. Resolving the bare
-            // MapEvent isn't enough: the parties' side attachment lands via separate, GameThread-deferred
-            // messages sent right after, so wait for those on the same deadline too.
+            // Phase two — unique to map-event creation, layered on the shared gate: the MapEvent object is
+            // materialized on this client by the AutoRegistry create broadcast, which is sent just before the reply;
+            // keep pumping in case the reply is processed first. Resolving the bare MapEvent isn't enough: the
+            // parties' side attachment lands via separate, GameThread-deferred messages sent right after, so wait for
+            // those on the same deadline too.
             MapEvent mapEvent = null;
             bool BothSidesAttached() =>
                 attacker.MapEventSide != null && defender.MapEventSide != null
@@ -143,22 +131,22 @@ internal class MapEventCreationCoordinator : IHandler
                 && (mapEvent.AttackerSide == defender.MapEventSide || mapEvent.DefenderSide == defender.MapEventSide);
 
             if (!GameThread.WaitWhilePumping(
-                    () => objectManager.TryGetObject(pending.MapEventId, out mapEvent) && mapEvent != null
+                    () => objectManager.TryGetObject(pending.Reply, out mapEvent) && mapEvent != null
                         && BothSidesAttached(),
                     deadline))
             {
                 Logger.Error(
                     "Server created map event {MapEventId} but it (or the attacker/defender side attachment) was not resolvable on this client before timeout. RequestId={RequestId}",
-                    pending.MapEventId, requestId);
+                    pending.Reply, pending.RequestId);
                 return null;
             }
 
-            Logger.Debug("Resolved server-created map event {MapEventId}. RequestId={RequestId}", pending.MapEventId, requestId);
+            Logger.Debug("Resolved server-created map event {MapEventId}. RequestId={RequestId}", pending.Reply, pending.RequestId);
             return mapEvent;
         }
         finally
         {
-            pendingRequests.TryRemove(requestId, out _);
+            gate.Release(pending);
         }
     }
 
@@ -281,25 +269,10 @@ internal class MapEventCreationCoordinator : IHandler
     {
         var message = payload.What;
 
-        if (!pendingRequests.TryGetValue(message.RequestId, out var pending))
+        if (!gate.Complete(message.RequestId, message.MapEventId))
         {
             // Late arrival (already timed out and removed) or a response for another instance.
             Logger.Warning("Received {Message} for unknown or expired RequestId={RequestId}", nameof(NetworkMapEventCreated), message.RequestId);
-            return;
         }
-
-        pending.MapEventId = message.MapEventId;
-        pending.Completed.Set();
-    }
-
-    /// <summary>
-    /// Tracks a single in-flight request. <see cref="Completed"/> is deliberately not disposed: the network thread
-    /// may signal it concurrently with the requesting thread giving up, and a low-frequency battle event does not
-    /// justify the extra synchronization to dispose it safely.
-    /// </summary>
-    private sealed class PendingRequest
-    {
-        public ManualResetEventSlim Completed { get; } = new ManualResetEventSlim(false);
-        public string MapEventId { get; set; }
     }
 }
