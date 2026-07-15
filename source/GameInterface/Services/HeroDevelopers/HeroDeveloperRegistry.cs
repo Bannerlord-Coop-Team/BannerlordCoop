@@ -27,11 +27,15 @@ internal class HeroDeveloperRegistry : AutoRegistryBase<HeroDeveloper>
     {
         foreach (var hero in Hero.AllAliveHeroes)
         {
+            if (hero.HeroDeveloper == null) continue;
+
             RegisterExistingObject($"{hero.StringId}", hero.HeroDeveloper);
         }
 
         foreach (var hero in Hero.DeadOrDisabledHeroes)
         {
+            if (hero.HeroDeveloper == null) continue;
+
             RegisterExistingObject($"{hero.StringId}", hero.HeroDeveloper);
         }
     }
