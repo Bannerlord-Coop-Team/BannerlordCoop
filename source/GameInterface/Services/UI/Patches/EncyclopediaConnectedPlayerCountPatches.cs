@@ -4,6 +4,9 @@ using System;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem.ViewModelCollection.Encyclopedia;
 using TaleWorlds.CampaignSystem.ViewModelCollection.Encyclopedia.Pages;
+using TaleWorlds.Engine.GauntletUI;
+using TaleWorlds.GauntletUI.BaseTypes;
+using TaleWorlds.GauntletUI.Data;
 
 namespace GameInterface.Services.UI.Patches;
 
@@ -72,5 +75,31 @@ internal static class EncyclopediaConnectedPlayerCountPatches
         {
             service.ConnectedPlayersChanged -= RefreshTitle;
         }
+    }
+}
+
+/// <summary>
+/// Reduces the encyclopedia title font so the online player count fits the stock plaque.
+/// </summary>
+[HarmonyPatch(typeof(GauntletLayer), "LoadMovieAux")]
+internal static class EncyclopediaConnectedPlayerCountFontPatch
+{
+    private const string EncyclopediaMovieName = "EncyclopediaBar";
+    private const string TitleBrushName = "Recruitment.Popup.Title.Text";
+    private const int ConnectedPlayersTitleFontSize = 40;
+
+    [HarmonyPostfix]
+    private static void ReduceTitleFont(IGauntletMovie __result)
+    {
+        if (ModInformation.IsServer) return;
+        if (__result == null || __result.MovieName != EncyclopediaMovieName) return;
+
+        RichTextWidget title = __result.RootWidget.GetFirstInChildrenRecursive(widget =>
+            widget is RichTextWidget richText &&
+            richText.ReadOnlyBrush.Name?.StartsWith(TitleBrushName, StringComparison.Ordinal) == true) as RichTextWidget;
+        if (title == null) return;
+
+        // Vanilla uses 46; 40 keeps "online" inside the fixed-width title plaque.
+        title.Brush.FontSize = ConnectedPlayersTitleFontSize;
     }
 }
