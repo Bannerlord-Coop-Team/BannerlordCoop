@@ -184,6 +184,26 @@ authority stayed with the absent controller), incl. a three-deep departure chain
 pre-existing via stash-bisect at base). Side effect: each swept controller fires one extra
 idempotent reserve re-request — the ledger re-scope question stays with its own tracked task.
 
+**Alignment increment 8 (2026-07-15) — reserve re-scope across disconnect/reconnect FIXED (red → green; BR-020/BR-033).**
+The briefed premise was wrong, and the truth was worse in a different way: a disconnect only
+clears the peer link — the `Player` registration survives — so a dropped player's parties never
+fell to the host at all. The adoption-time reserve re-request was served nothing: the dropped
+player's **unspawned reinforcements were orphaned** (nobody fielded them) rather than double-held.
+Fix implements both halves: on a non-retreat departure the reserve builder resolves absent owners
+(and absent army leaders) to null so their parties fall to the host at current ledger pointers;
+on the owner's re-entry the server un-marks them **before** computing the grant and re-feeds the
+current host its shrunk owned set (existing `NetworkBattleTroopReserve` REPLACE semantics — same
+shape as migration re-feeds, no new messages). Ordering: server-game-thread serialization + per-
+peer reliable-ordered stream (last REPLACE wins) + monotonic pointers (no rewind, resume at
+max(local, server)). `BattleReserveReconnectScopeTests` 4/4 red→green (one first ran green for a
+wrong reason — a static supplier-registry leak between test phases — and was hardened before
+being trusted), + REPLACE lock-in and 3 absent-owner unit tests. Suites: full E2E **559 passed /
+4 pre-existing skips / 0 failed** (563 total), Coop.Tests 386/387.
+**Residuals:** an absent member of a *connected* player-led army conservatively falls to the host
+(leader-fields-absent-members is future authority work); a drop before any host election leaves
+the reserve orphaned until the owner returns (pre-existing, narrow); the ≤1 s supplied-but-
+unreported window on re-feeds is the same bounded window migration re-feeds already have.
+
 Harness lessons for later waves: never disable-patch `MapEvent.FinalizeEventAux` in an E2E
 PatchScope (it already carries a production prefix — two-prefix `InvalidProgramException`, and the
 broken patch state poisons every later test in the run); harness-created parties spawn with

@@ -48,6 +48,36 @@ public class BattleTroopReserveBuilderAuthorityTests
         Assert.Null(BattleTroopReserveBuilder.ResolveOwningController(partyOwnerController: null, armyLeaderController: null));
     }
 
+    // --- Absent owners (dropped from the battle, not yet returned): their parties fall to the host ---
+
+    [Fact]
+    [Trait("Requirement", "BR-020")]
+    public void DroppedOwnersParty_FallsToHost_WhileAbsent()
+    {
+        // Player registrations survive a disconnect, so the owner still resolves — the absent set is what
+        // hands its parties to the host (the reserve half of the BR-031 adoption).
+        Assert.Null(BattleTroopReserveBuilder.ResolveOwningController(
+            partyOwnerController: "playerB", armyLeaderController: null, absentControllers: new[] { "playerB" }));
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-020")]
+    public void AiPartyOfDroppedArmyLeader_FallsToHost_WhileLeaderAbsent()
+    {
+        // An AI party fielded via a player-led army follows its leader out: leader absent -> host fields it.
+        Assert.Null(BattleTroopReserveBuilder.ResolveOwningController(
+            partyOwnerController: null, armyLeaderController: "playerA", absentControllers: new[] { "playerA" }));
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-033")]
+    public void PresentOwnersParty_IsUntouchedByAnotherOwnersAbsence()
+    {
+        // Isolation: a connected player's scope never changes because someone else dropped or returned.
+        Assert.Equal("playerB", BattleTroopReserveBuilder.ResolveOwningController(
+            partyOwnerController: "playerB", armyLeaderController: null, absentControllers: new[] { "playerC" }));
+    }
+
     // --- IsOwnedByRequester: does a specific requester field the party ---
 
     [Fact]
