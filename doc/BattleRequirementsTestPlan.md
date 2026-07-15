@@ -94,6 +94,24 @@ no assertion weakened. Full E2E suite after the fix: 540 tests, 536 passed / 4 p
 skips / 0 failed; Coop.Tests 368/369 (1 pre-existing skip). The BR-010/BR-013 rows' "elects at
 ENTRY" drift notes are superseded by this increment.
 
+**Alignment increment 3 (2026-07-15) — BR-102 FIXED (red → green).**
+Host assignments now carry a server-issued **epoch**: 1 at election, incremented only when the
+host actually changes (successor appends re-broadcast unchanged); a per-instance issuance
+watermark survives assignment removal so an abandoned-and-re-entered battle can never reuse an
+epoch clients still hold. Clients ignore lower-epoch assignments. Host-authority messages stamped
+and gated: `NetworkChangeBattleState` victory reports (closes the A→B→A re-promotion hole the
+sender-identity gate could not — an in-flight report from a player's *earlier* hosting stint) and
+`NetworkSiegeEngineStatesReport` (non-idempotent campaign write-back). Deliberately unstamped:
+`NetworkBattleActivated` (monotonic latch, legitimately re-sent by any activated peer) and all
+owner-authority traffic. Tests: `HostEpochTests` (3) + `HostEpochStaleConclusionTests` (1), red
+confirmed with issuance wired but rejection absent. Suites: full E2E 540 passed / 4 pre-existing
+skips / 0 failed; Coop.Tests 368/369.
+**Residuals (BR-102 follow-ups):** siege P2P mesh traffic (`NetworkSiegeMachineAuthority`,
+host-gated machine snapshots, placement resends) is not yet epoch-stamped — battle-local, races
+self-heal via periodic host snapshots; the siege-report gate mirrors the tested battle-state gate
+but has no dedicated test; a host leaving with no successors still doesn't broadcast the
+assignment removal (pre-existing — the watermark makes the next election supersede it).
+
 Harness lessons for later waves: never disable-patch `MapEvent.FinalizeEventAux` in an E2E
 PatchScope (it already carries a production prefix — two-prefix `InvalidProgramException`, and the
 broken patch state poisons every later test in the run); harness-created parties spawn with

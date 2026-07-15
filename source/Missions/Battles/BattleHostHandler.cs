@@ -50,6 +50,13 @@ internal class BattleHostHandler : IHandler
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IBattleTroopReserveBuilder reserveBuilder;
 
+    // [Server] Highest host epoch ever issued per battle instance (BR-102), retained across assignment
+    // removal: clients keep their last assignment when a battle is fully abandoned (only the server's entry
+    // is removed), so a re-election for the SAME map event must issue a HIGHER epoch than any earlier
+    // generation or the clients would ignore the new election as stale. Only touched on the game thread
+    // (election and migration both run under GameThread.RunSafe).
+    private readonly Dictionary<string, int> issuedEpochs = new Dictionary<string, int>();
+
     public BattleHostHandler(
         IMessageBroker messageBroker,
         INetwork network,
@@ -158,10 +165,14 @@ internal class BattleHostHandler : IHandler
             }
             else
             {
-                var assignment = new BattleHostAssignment(requesterId, Array.Empty<string>());
+                // BR-102: the election issues the battle's next hosting generation — epoch 1 for a fresh
+                // battle, or one past the last generation if this map event was abandoned and re-entered.
+                var epoch = NextEpoch(mapEventId);
+                var assignment = new BattleHostAssignment(requesterId, Array.Empty<string>(), epoch);
                 hostRegistry.Set(mapEventId, assignment);
 
-                Logger.Information("[BattleHost] Elected host {Host} (first mission-ready) for battle {MapEventId}", requesterId, mapEventId);
+                Logger.Information("[BattleHost] Elected host {Host} (first mission-ready) for battle {MapEventId} at epoch {Epoch}",
+                    requesterId, mapEventId, epoch);
 
                 network.SendAll(ToMessage(mapEventId, assignment));
             }
@@ -264,19 +275,21 @@ internal class BattleHostHandler : IHandler
                 }
 
                 // Promote the earliest-joined successor still present (the line is kept current as members leave).
+                // BR-102: the host CHANGED, so the promotion opens the next hosting generation (epoch + 1).
                 var newHost = successors[0];
                 successors.RemoveAt(0);
-                var promoted = new BattleHostAssignment(newHost, successors);
+                var promoted = new BattleHostAssignment(newHost, successors, NextEpoch(mapEventId, assignment.Epoch));
                 hostRegistry.Set(mapEventId, promoted);
 
-                Logger.Information("[BattleHost] Host {Old} left battle {MapEventId}; promoted {New} (successors: {Successors})",
-                    controllerId, mapEventId, newHost, string.Join(", ", successors));
+                Logger.Information("[BattleHost] Host {Old} left battle {MapEventId}; promoted {New} at epoch {Epoch} (successors: {Successors})",
+                    controllerId, mapEventId, newHost, promoted.Epoch, string.Join(", ", successors));
 
                 network.SendAll(ToMessage(mapEventId, promoted));
             }
             else if (successors.Remove(controllerId))
             {
-                var updated = new BattleHostAssignment(assignment.HostControllerId, successors);
+                // Successor-line cleanup: the host did not change, so the epoch is unchanged (BR-102).
+                var updated = new BattleHostAssignment(assignment.HostControllerId, successors, assignment.Epoch);
                 hostRegistry.Set(mapEventId, updated);
 
                 Logger.Information("[BattleHost] Successor {Controller} left battle {MapEventId}; successor line now: {Successors}",
@@ -295,17 +308,33 @@ internal class BattleHostHandler : IHandler
         var message = payload.What;
 
         // Capture the host we knew before applying the update, so we can detect a migration TO us.
-        string previousHost = hostRegistry.TryGet(message.MapEventId, out var previous) ? previous.HostControllerId : null;
+        string previousHost = null;
+        if (hostRegistry.TryGet(message.MapEventId, out var previous))
+        {
+            // BR-102: assignments are ordered by their host epoch. One LOWER than what we already hold is a
+            // stale/out-of-order broadcast (e.g. re-delivered around a migration) and must not overwrite the
+            // newer assignment; an EQUAL epoch is a successor-line update for the same host and applies.
+            if (message.Epoch < previous.Epoch)
+            {
+                Logger.Information("[BattleHost] Ignoring stale host assignment for {MapEventId}: epoch {Stale} < current {Current} (named {Host})",
+                    message.MapEventId, message.Epoch, previous.Epoch, message.HostControllerId);
+                return;
+            }
+
+            previousHost = previous.HostControllerId;
+        }
 
         var assignment = new BattleHostAssignment(
             message.HostControllerId,
-            message.SuccessorControllerIds ?? Array.Empty<string>());
+            message.SuccessorControllerIds ?? Array.Empty<string>(),
+            message.Epoch);
         hostRegistry.Set(message.MapEventId, assignment);
 
-        Logger.Information("[BattleHost] Battle {MapEventId} host is {Host}{IsMe} (successors: {Successors})",
+        Logger.Information("[BattleHost] Battle {MapEventId} host is {Host}{IsMe} at epoch {Epoch} (successors: {Successors})",
             message.MapEventId,
             message.HostControllerId,
             hostRegistry.IsHost(message.MapEventId) ? " (this client)" : "",
+            message.Epoch,
             string.Join(", ", assignment.SuccessorControllerIds));
 
         // Migration: the host changed and it is now us — adopt the previous host's orphaned agents so the
@@ -344,9 +373,22 @@ internal class BattleHostHandler : IHandler
             if (successor == requesterId)
                 return false;
 
+        // The host did not change, so the assignment stays in the same hosting generation (BR-102).
         var successors = new List<string>(existing.SuccessorControllerIds) { requesterId };
-        updated = new BattleHostAssignment(existing.HostControllerId, successors);
+        updated = new BattleHostAssignment(existing.HostControllerId, successors, existing.Epoch);
         return true;
+    }
+
+    // [Server] Issue the battle's next host epoch (BR-102): one past the highest ever issued for this map
+    // event (and past <paramref name="floor"/>, the current assignment's epoch when promoting — it may have
+    // been seeded out-of-band), starting at 1. The watermark survives assignment removal so an
+    // abandoned-and-re-entered battle cannot reuse an epoch (see the field's remarks).
+    private int NextEpoch(string mapEventId, int floor = 0)
+    {
+        issuedEpochs.TryGetValue(mapEventId, out var last);
+        var next = Math.Max(last, floor) + 1;
+        issuedEpochs[mapEventId] = next;
+        return next;
     }
 
     private static NetworkBattleHostAssigned ToMessage(string mapEventId, BattleHostAssignment assignment)
@@ -355,6 +397,6 @@ internal class BattleHostHandler : IHandler
         for (int i = 0; i < successors.Length; i++)
             successors[i] = assignment.SuccessorControllerIds[i];
 
-        return new NetworkBattleHostAssigned(mapEventId, assignment.HostControllerId, successors);
+        return new NetworkBattleHostAssigned(mapEventId, assignment.HostControllerId, successors, assignment.Epoch);
     }
 }
