@@ -237,6 +237,9 @@ internal class HeroInterface : IHeroInterface
         RegisterPrimary(hero.Clan, StripTypePrefix(player.ClanId, hero.Clan));
         RegisterPrimary(hero.CharacterObject, StripTypePrefix(player.CharacterObjectId, hero.CharacterObject));
 
+        // HeroDeveloper is not a child of MBObjectBase, can't use RegisterPrimary
+        objectManager.AddExisting($"{nameof(HeroDeveloper)}_{StripTypePrefix(player.HeroId, hero)}", hero.HeroDeveloper);
+
         RegisterPartyChildren(party);
     }
 
