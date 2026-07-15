@@ -130,6 +130,23 @@ pre-existing skips / 0 failed**, Coop.Tests + IntegrationTests green.
 under parallel class runs (fails ~4/8 on base code, passes in isolation) — harness static-broker
 swapping under xUnit parallelism; tracked separately.
 
+**Alignment increment 5 (2026-07-15) — BR-025 DONE (red → green).**
+Per-player deployment time limit: pure `BattleDeploymentTimer` gate (activator-style, fake-clock
+testable) started at mission-ready by `CoopBattleController.AfterStart`, ticked on the game
+thread (no background Timer — the known harness trap); expiry invokes the native
+`DeploymentHandler.FinishDeployment()` — Cecil-traced as the Start Battle button's exact path
+(virtual, so the siege override dispatches) — guarded to fire once, only while the deployment
+controller is still present, and disarmed by any finish. Config:
+`BattleDeploymentConfig.DeploymentTimeLimitSeconds` (default 120s; zero/negative disables).
+15 new tests (9 timer unit + 6 wiring), honest red: with `Tick` stubbed, 8 genuinely failed /
+7 no-op guards passed; all green after wiring. Suites: Coop.Tests battle 63/63, full Coop.Tests
+383 passed / 1 pre-existing skip, full E2E 546 passed / 4 pre-existing skips / 0 failed.
+**Residuals:** the live engine-side consequences of expiry (un-pause, hero handoff, OoB view
+teardown) are manual — 3 new rows in [BattleManualTestChecklist.md](BattleManualTestChecklist.md);
+a reserve-starved deployment (`TeamSetupOver == false`) deliberately skips auto-finish (the spawn
+handler's own deadline ends such missions); the config is a code-level static like the repo's
+other configs — no user-facing settings surface yet.
+
 Harness lessons for later waves: never disable-patch `MapEvent.FinalizeEventAux` in an E2E
 PatchScope (it already carries a production prefix — two-prefix `InvalidProgramException`, and the
 broken patch state poisons every later test in the run); harness-created parties spawn with

@@ -48,6 +48,20 @@ public interface IBattleDeploymentCoordinator : IDisposable
     /// the receipt is idempotent. A no-op while the battle is not live.
     /// </summary>
     void CatchUpJoiner(string controllerId);
+
+    /// <summary>
+    /// This client became MISSION-READY (finished loading the battle mission): start its local deployment
+    /// time limit (BR-025). The clock is per-player and local — each client times its own deployment.
+    /// </summary>
+    void OnMissionReady();
+
+    /// <summary>
+    /// Game-thread mission tick. Expires the deployment time limit (BR-025): when the limit elapses with the
+    /// local player still deploying, their deployment is finished automatically through the SAME native path
+    /// the Start Battle button uses, so the announce/activation (BR-024) and reveal (BR-023) follow exactly
+    /// as a manual finish. Fires at most once; a no-op after a manual finish or without a deployment phase.
+    /// </summary>
+    void Tick(float dt);
 }
 
 /// <inheritdoc cref="IBattleDeploymentCoordinator"/>
@@ -61,6 +75,12 @@ public class BattleDeploymentCoordinator : IBattleDeploymentCoordinator
 
     private readonly IBattleDeploymentActivator activator = new BattleDeploymentActivator();
 
+    // BR-025: the pure per-player deployment time limit gate, fed elapsed time by the mission tick, and the
+    // expiry side effect — invoking the native deployment finish (a seam so headless tests can observe the
+    // expiry driving the same commit path as a manual finish; the default is the real native call).
+    private readonly IBattleDeploymentTimer deploymentTimer;
+    private readonly Action finishNativeDeployment;
+
     // Requirement #4 "hidden everywhere until deployed": own-party spawns are withheld from peers until the
     // local deployment commit (spawned locally so they can be placed, but not replicated); this latch is the
     // whole reveal gate. After commit nothing is withheld: own-party reinforcements replicate at once.
@@ -71,11 +91,18 @@ public class BattleDeploymentCoordinator : IBattleDeploymentCoordinator
     // commit have happened.
     private bool deployerFinished;
 
-    public BattleDeploymentCoordinator(IBattleNetwork network, IMessageBroker messageBroker, IBattleSession session)
+    public BattleDeploymentCoordinator(
+        IBattleNetwork network,
+        IMessageBroker messageBroker,
+        IBattleSession session,
+        IBattleDeploymentTimer deploymentTimer = null,
+        Action finishNativeDeployment = null)
     {
         this.network = network;
         this.messageBroker = messageBroker;
         this.session = session;
+        this.deploymentTimer = deploymentTimer ?? new BattleDeploymentTimer();
+        this.finishNativeDeployment = finishNativeDeployment ?? FinishNativeDeployment;
 
         // Clients announce when they finish deploying; the host releases the NPC AI on the first announcement
         // from any client and broadcasts that the battle is live (so a migrated host knows to release the NPCs
@@ -102,6 +129,11 @@ public class BattleDeploymentCoordinator : IBattleDeploymentCoordinator
     // FinishDeployment un-paused our own troops and handed us our hero.
     public bool OnLocalDeploymentFinished()
     {
+        // The deployment finished (manually, or via this very gate's expiry) — the time limit no longer
+        // applies (BR-025). Disarming here also covers the native auto-finish paths (e.g. a leaderless
+        // rejoiner skipping the Order of Battle), which reach us through the same behavior fan-out.
+        deploymentTimer.OnDeploymentFinished();
+
         // Announce it to the battle mesh so the host releases the NPC AI on the first finish from ANY client.
         network.SendAll(new NetworkBattleDeploymentFinished(session.OwnControllerId));
 
@@ -140,6 +172,58 @@ public class BattleDeploymentCoordinator : IBattleDeploymentCoordinator
 
         network.Send(controllerId, new NetworkBattleActivated(session.InstanceId));
         Logger.Information("[BattleSync] Told joining {Controller} the battle is already activated", controllerId);
+    }
+
+    public void OnMissionReady() => deploymentTimer.OnMissionReady();
+
+    // [Game thread — CoopBattleController.OnMissionTick] BR-025: the countdown is driven by the mission tick
+    // (never a background Timer — those hang the single-threaded harness when they touch the broker/network).
+    public void Tick(float dt)
+    {
+        if (!deploymentTimer.Tick(dt)) return;
+
+        Logger.Information("[BattleSync] Deployment time limit expired — finishing the local deployment automatically (BR-025)");
+        finishNativeDeployment();
+    }
+
+    // [Game thread] BR-025 expiry: finish the local deployment through the SAME native entry point the
+    // deployment UI's Start Battle button funnels into — the button chain is OrderOfBattleVM.ExecuteBeginMission
+    // → MissionGauntletOrderOfBattleUIHandler.OnBeginMission → MissionGauntletSingleplayerOrderUIHandler
+    // .OnBeginMission → MissionOrderDeploymentControllerVM.ExecuteBeginMission → DeploymentHandler
+    // .FinishDeployment() (virtual: the siege subclass adds its deployment-point cleanup) →
+    // DeploymentMissionController.FinishDeployment(). That native call un-pauses our troops at their current
+    // positions, hands us our hero, and fans MissionBehavior.OnDeploymentFinished out — which re-enters
+    // CoopBattleController.OnDeploymentFinished → this coordinator's OnLocalDeploymentFinished, so the mesh
+    // announce (BR-024 activation input) and the first-commit reveal (BR-023) run exactly as a manual finish.
+    // Guards: the DeploymentMissionController REMOVES ITSELF from the mission when deployment finishes, so its
+    // presence == the local player is still deploying; a mission without a deployment phase never had the
+    // behaviors at all. TeamSetupOver keeps us from finishing a deployment that never began (reserve-starved
+    // missions are ended by the spawn handler's own deadline long before this limit).
+    private static void FinishNativeDeployment()
+    {
+        var mission = Mission.Current;
+        var deploymentController = mission?.GetMissionBehavior<DeploymentMissionController>();
+        if (deploymentController == null)
+        {
+            Logger.Information("[BattleSync] Deployment limit expiry: no active deployment phase — nothing to auto-finish");
+            return;
+        }
+
+        if (!deploymentController.TeamSetupOver)
+        {
+            Logger.Warning("[BattleSync] Deployment limit expired before the teams were set up — skipping the auto-finish");
+            return;
+        }
+
+        var deploymentHandler = mission.GetMissionBehavior<DeploymentHandler>();
+        if (deploymentHandler == null)
+        {
+            Logger.Warning("[BattleSync] Deployment limit expired but no DeploymentHandler is attached — cannot auto-finish");
+            return;
+        }
+
+        Logger.Information("[BattleSync] Auto-finishing the local deployment via the native DeploymentHandler.FinishDeployment");
+        deploymentHandler.FinishDeployment();
     }
 
     // [Host] A peer finished deploying before we did. Release the NPC AI now so it engages while we (and any

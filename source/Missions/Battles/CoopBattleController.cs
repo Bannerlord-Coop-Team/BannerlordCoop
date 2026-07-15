@@ -150,6 +150,9 @@ public class CoopBattleController : CoopMissionController
     {
         base.AfterStart();
 
+        // BR-025: the deployment time limit begins when this player becomes mission-ready — right here.
+        Deployment.OnMissionReady();
+
         if (Session.HasInstance)
             messageBroker.Publish(this, new BattleMissionReady(Session.InstanceId));
         else
@@ -198,6 +201,10 @@ public class CoopBattleController : CoopMissionController
         siegeMachineState.Tick(dt);
         diagnostics.Tick(dt);
         supplyReporter.Tick(dt);
+
+        // BR-025: expire the local deployment time limit (auto-finishes deployment via the native Start
+        // Battle path when the game-configured limit elapses; a no-op once deployment has finished).
+        Deployment.Tick(dt);
     }
 
     public override void OnPreDisplayMissionTick(float dt)

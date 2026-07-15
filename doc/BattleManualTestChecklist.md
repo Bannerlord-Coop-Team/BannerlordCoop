@@ -25,6 +25,20 @@ coop contribution is two Harmony reshapes: the retreat-confirmation inquiry stil
 | BR-050 | Retreat inquiry still pauses/prompts (not auto-confirmed) | Trigger a `NeedsPlayerConfirmation` retreat and observe the prompt. | Exactly one retreat inquiry is shown and it waits for the player's choice (the coop patch preserves the confirmation, it does not silently auto-retreat or skip the prompt). |
 | BR-050 | Siege defender leave is a personal retreat, not a garrison surrender | In an active coop siege with multiple players on the defending side, have one defender player leave the mission. | The leave is treated as a personal retreat (ordinary confirmation prompt), NOT a whole-garrison `SurrenderSiege`. The leaver's surviving troops are adopted via host migration (BR-031) and the siege continues for the remaining players. |
 
+## BR-025 — Deployment Time Limit (native auto-finish on expiry)
+
+The timer gate and its commit wiring are unit-tested headlessly (`BattleDeploymentTimerTests`,
+`BattleDeploymentTimeLimitWiringTests`); what only a live mission can verify is the expiry actually invoking
+the native finish — `DeploymentHandler.FinishDeployment()`, the same method the deployment UI's Start Battle
+button funnels into — so the un-pause, hero handoff, deployment-view teardown, reveal (BR-023), and NPC
+release (BR-024) all run as if the button had been clicked.
+
+| BR | Scenario | Steps | Expected |
+|---|---|---|---|
+| BR-025 | Deployment auto-finishes when the limit expires | Set `BattleDeploymentConfig.DeploymentTimeLimitSeconds` to a short value (e.g. 20). Host + client enter a shared field battle; BOTH players idle on the Order-of-Battle screen without clicking Start Battle. | About 20s after each player's loading screen ends (per-player clocks — a slower loader expires later), that player's deployment finishes by itself: the OoB screen closes, the player gets their hero at the deployed position, and their troops stand at their current placements. The first expiry releases the NPC AI (BR-024) and each player's own troops become visible to the other on that player's expiry (BR-023). |
+| BR-025 | Manual finish inside the limit disarms the timer | Same setup; one player clicks Start Battle well before the limit while the other idles past it. | The clicking player's battle starts immediately on the click and nothing re-fires at the limit mark; the idle player is auto-finished at their own expiry. Exactly one deployment-finish per player (no duplicate reveal, no re-announce burst in the log). |
+| BR-025 | Zero disables the limit | Set `BattleDeploymentConfig.DeploymentTimeLimitSeconds = 0` and idle in deployment far longer than the old limit. | Deployment never auto-finishes; the player commits only via Start Battle. |
+
 ## Residuals for later waves (noted here, not yet scripted)
 
 These are live-mission behaviors adjacent to this wave's requirements; capture them as their own manual
