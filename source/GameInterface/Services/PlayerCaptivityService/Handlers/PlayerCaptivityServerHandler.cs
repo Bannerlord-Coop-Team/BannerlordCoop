@@ -40,6 +40,8 @@ namespace GameInterface.Services.PlayerCaptivityService.Handlers;
 /// the server, which then captures the player through the normal defeat path.</item>
 /// <item><see cref="NetworkEndPlayerCaptivityAttempted"/> — a client requests release from captivity;
 /// apply it and confirm with <see cref="NetworkPlayerCaptivityEnded"/>.</item>
+/// <item><see cref="NetworkEndCaptivityAttempted"/> — a client chose to release another hero;
+/// apply the release through the authoritative game action.</item>
 /// <item><see cref="CampaignTick"/> — keep captive players' parties glued to their captor
 /// (the server-side replacement for native <see cref="PlayerCaptivity"/>.Update).</item>
 /// </list>
@@ -69,6 +71,7 @@ internal class PlayerCaptivityServerHandler : IHandler
         messageBroker.Subscribe<PrisonerTaken>(Handle_PrisonerTaken);
         messageBroker.Subscribe<NetworkPlayerSurrendered>(Handle_NetworkPlayerSurrendered);
         messageBroker.Subscribe<NetworkEndPlayerCaptivityAttempted>(Handle_NetworkEndPlayerCaptivityAttempted);
+        messageBroker.Subscribe<NetworkEndCaptivityAttempted>(Handle_NetworkEndCaptivityAttempted);
         messageBroker.Subscribe<PlayerCaptivityEndedByServer>(Handle_PlayerCaptivityEndedByServer);
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
     }
@@ -78,6 +81,7 @@ internal class PlayerCaptivityServerHandler : IHandler
         messageBroker.Unsubscribe<PrisonerTaken>(Handle_PrisonerTaken);
         messageBroker.Unsubscribe<NetworkPlayerSurrendered>(Handle_NetworkPlayerSurrendered);
         messageBroker.Unsubscribe<NetworkEndPlayerCaptivityAttempted>(Handle_NetworkEndPlayerCaptivityAttempted);
+        messageBroker.Unsubscribe<NetworkEndCaptivityAttempted>(Handle_NetworkEndCaptivityAttempted);
         messageBroker.Unsubscribe<PlayerCaptivityEndedByServer>(Handle_PlayerCaptivityEndedByServer);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
     }
@@ -187,6 +191,31 @@ internal class PlayerCaptivityServerHandler : IHandler
                 Logger.Error(ex, "Failed to surrender");
             }
         }, blocking: true);
+    }
+
+    /// <summary>
+    /// A client chose to release another hero. Apply the vanilla action on the server so its
+    /// patches and synchronized side effects remain authoritative.
+    /// </summary>
+    private void Handle_NetworkEndCaptivityAttempted(MessagePayload<NetworkEndCaptivityAttempted> payload)
+    {
+        if (ModInformation.IsClient) return;
+
+        var data = payload.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.PrisonerId, out var prisoner)) return;
+            if (!prisoner.IsPrisoner) return;
+
+            Hero facilitator = null;
+            if (data.FacilitatorId != null && !objectManager.TryGetObjectWithLogging(data.FacilitatorId, out facilitator)) return;
+
+            PlayerCaptivityLogger.Debug("Handle_NetworkEndCaptivityAttempted (server): prisoner={HeroId} detail={Detail} facilitator={FacilitatorId}",
+                prisoner.StringId, data.Detail, facilitator?.StringId);
+
+            EndCaptivityAction.ApplyInternal(prisoner, data.Detail, facilitator, data.ShowNotification);
+        }, context: nameof(Handle_NetworkEndCaptivityAttempted));
     }
 
     /// <summary>
