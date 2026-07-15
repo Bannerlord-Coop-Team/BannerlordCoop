@@ -6,6 +6,7 @@ using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Missions.Messages;
+using Missions.Services.Network;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -23,7 +24,11 @@ namespace Missions.Battles;
 /// vanishing — server-mediated, so it fires even on a silent P2P drop. And when the departed player WAS the
 /// host, the server promotes a successor, which adopts the old host's orphaned agents — everything on a
 /// disconnect; on a retreat only the AI it was running (enemy side + allied NPC parties), while its own party
-/// still withdraws. When a disconnected player RECONNECTS, the holder hands the surviving assigned agents
+/// still withdraws. Because that adoption is holder-LOCAL (only the acting host re-keys; every other registry
+/// keeps the dropped player's agents keyed to the absent player), the promotion also SWEEPS: the new host
+/// adopts every agent still keyed to ANY controller no longer in the mission, not just the departed host's —
+/// otherwise agents the old host merely HELD by adoption would be left driverless. When a disconnected player
+/// RECONNECTS, the holder hands the surviving assigned agents
 /// back (BR-033): authority returns to the original owner and the host's temporary AI control is released —
 /// agents removed while the player was away are gone from the registry and stay gone (BR-034).
 /// </summary>
@@ -45,6 +50,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     private readonly ICasualtyAttributionMap casualties;
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly IAgentFormationAssigner formationAssigner;
+    private readonly IMissionContext missionContext;
 
     // Hosts that RETREATED (graceful leave) — read when the promotion lands so the adoption knows to leave the
     // retreater's own-party troops to the despawn instead of adopting them. Only touched from broker handlers,
@@ -61,7 +67,8 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         IBattleSession session,
         ICasualtyAttributionMap casualties,
         IBattleDeploymentCoordinator deployment,
-        IAgentFormationAssigner formationAssigner)
+        IAgentFormationAssigner formationAssigner,
+        IMissionContext missionContext)
     {
         this.relayNetwork = relayNetwork;
         this.messageBroker = messageBroker;
@@ -72,6 +79,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         this.casualties = casualties;
         this.deployment = deployment;
         this.formationAssigner = formationAssigner;
+        this.missionContext = missionContext;
 
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
         messageBroker.Subscribe<MissionPeerLeft>(Handle_PeerLeft);
@@ -295,10 +303,42 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         var previousHost = payload.What.PreviousHostControllerId;
         AdoptAgentsFrom(previousHost, "host migration", wasRetreat: retreatedHosts.Remove(previousHost));
 
+        // The departed host may have been HOLDING more than its own agents. The BR-031 adoption is
+        // holder-LOCAL: when C disconnected earlier, only the then-host's registry re-keyed C's survivors to
+        // itself — OURS still keys them to the absent C. So "adopt everything keyed to the departed host"
+        // misses them: after this migration NO client would drive them (frozen orphans), and — because the
+        // joiner catch-up replays only agents a client HOLDS — a returning C would get nothing back either.
+        // Sweep by EFFECTIVE holder instead: adopt every still-registered agent whose current authority is a
+        // controller that is no longer in the mission (the same server-mediated membership the adoption path
+        // already trusts). AdoptAgentsFrom preserves the assignment (OriginalOwner), so the BR-033 reclaim
+        // still returns them when their owner reconnects. Idempotent: once swept, the agents are keyed to us
+        // and a duplicate migration event finds nothing absent-keyed.
+        SweepAgentsOfAbsentControllers(previousHost);
+
         // If the battle was already live when we were promoted, release the NPC AI we just adopted — a still-
         // deploying new host has AI ticking off, which would otherwise hold them frozen even though they were
         // moving under the previous host. If the battle was not live yet, this is a no-op (the gate holds).
         deployment.OnPromotedToHost();
+    }
+
+    // [New host] Adopt the agents of every controller that holds registry entries here but is no longer in
+    // the mission — orphans left behind by earlier holder-local adoptions of the host line that just
+    // departed. The retreat record is consumed per swept controller for the same reason as the migration
+    // adoption above: a host that retreated earlier in the chain had its own-party troops despawned locally,
+    // and only the AI it ran should be (re-)adopted.
+    private void SweepAgentsOfAbsentControllers(string previousHost)
+    {
+        var present = new HashSet<string>(missionContext.ControllersInMission);
+
+        foreach (var controllerId in coopMissionComponent.AgentRegistry.GetControllerIds())
+        {
+            if (string.IsNullOrEmpty(controllerId)) continue;
+            if (controllerId == previousHost) continue; // the migration adoption above already took these
+            if (session.IsOwn(controllerId)) continue;
+            if (present.Contains(controllerId)) continue; // still connected — its owner drives them
+
+            AdoptAgentsFrom(controllerId, "host migration orphan sweep", wasRetreat: retreatedHosts.Remove(controllerId));
+        }
     }
 
     // Take over the agents owned by the departed controller: move authority to us (so the movement poller

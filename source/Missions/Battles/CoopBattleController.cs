@@ -8,6 +8,7 @@ using GameInterface.Services.Players;
 using LiteNetLib;
 using Missions.Data;
 using Missions.Messages;
+using Missions.Services.Network;
 using Serilog;
 using System;
 using TaleWorlds.Core;
@@ -83,7 +84,8 @@ public class CoopBattleController : CoopMissionController
         IPlayerManager playerManager,
         ICoopMissionComponent coopMissionComponent,
         IBattleHostRegistry hostRegistry,
-        IAgentFormationAssigner formationAssigner)
+        IAgentFormationAssigner formationAssigner,
+        IMissionContext missionContext)
         : base(network, messageBroker, objectManager, coopMissionComponent)
     {
         var session = new BattleSession(controllerIdProvider, hostRegistry);
@@ -99,7 +101,7 @@ public class CoopBattleController : CoopMissionController
         puppetDeathApplier = new PuppetDeathApplier(messageBroker, coopMissionComponent, casualties);
         puppetRoutApplier = new PuppetRoutApplier(messageBroker, coopMissionComponent, casualties);
         damageRouter = new BattleDamageRouter(network, messageBroker, coopMissionComponent, session);
-        authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner);
+        authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, missionContext);
         reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, session, deployment, formationAssigner);
         siegeEngineDeployment = new SiegeEngineDeploymentReplicator(network, messageBroker, session);
         siegeMachineState = new SiegeMachineStateReplicator(network, messageBroker, session, coopMissionComponent.AgentRegistry);

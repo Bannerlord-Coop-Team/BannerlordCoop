@@ -166,6 +166,24 @@ not re-scoped on reclaim (stale host supplier could double-spawn the returner's 
 supply-layer follow-up); orphan chain when the adopting host also leaves (pre-existing, flagged
 as a separate background task with repro).
 
+**Alignment increment 7 (2026-07-15) — adopted-agent orphan chain FIXED (red → green; BR-031/BR-016).**
+Pre-existing: when a disconnected player's adopting host ALSO left, the promoted successor only
+adopted agents its registry keyed to the departed host — the first player's adoptees (keyed to
+the absent player, holder-locally) were orphaned frozen, and a returner could never get them
+back. Fix = option (b): adoption stays holder-local; on promotion the successor **sweeps by
+effective holder** — adopts every registered agent whose CurrentAuthority is absent from the
+mission membership mirror (`SweepAgentsOfAbsentControllers`, reusing `AdoptAgentsFrom` so
+interpolator-Forget/OriginalOwner/AI-wake apply identically). Option (a) (global re-keying) was
+rejected: it changes the asserted non-host-inaction contract for no functional gain and has a
+mid-migration ordering hazard (the "acting host" is exactly what's in flux). Composes with the
+BR-033 reclaim: post-sweep the successor HOLDS the agents, so catch-up replays them and the
+returner reclaims. `BattleMigrationOrphanChainTests` 4/4 red→green (red at the exact symptom:
+authority stayed with the absent controller), incl. a three-deep departure chain with
+`OriginalOwner` intact. Suites: targeted 39/39, full E2E **554 passed / 4 pre-existing skips /
+0 failed**, Coop.Tests + IntegrationTests green (the known disconnect-detection flake re-confirmed
+pre-existing via stash-bisect at base). Side effect: each swept controller fires one extra
+idempotent reserve re-request — the ledger re-scope question stays with its own tracked task.
+
 Harness lessons for later waves: never disable-patch `MapEvent.FinalizeEventAux` in an E2E
 PatchScope (it already carries a production prefix — two-prefix `InvalidProgramException`, and the
 broken patch state poisons every later test in the run); harness-created parties spawn with
