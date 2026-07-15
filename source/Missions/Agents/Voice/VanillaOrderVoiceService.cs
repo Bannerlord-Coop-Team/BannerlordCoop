@@ -10,7 +10,6 @@ using System.Linq;
 using System.Reflection;
 using System.Security.Cryptography;
 using TaleWorlds.Engine;
-using TaleWorlds.Library;
 using TaleWorlds.ModuleManager;
 using TaleWorlds.MountAndBlade;
 
@@ -61,8 +60,7 @@ public sealed class VanillaOrderVoiceService : IVanillaOrderVoiceService
 {
     private const string ManifestResourceName =
         "Missions.Agents.Voice.vanilla_order_voice_manifest.json";
-    private const string ProgrammerEventPath = "event:/Extra/voiceover";
-    private const float OrderVoiceMaxDistance = 450f;
+    private const string ProgrammerEventPath = "event:/mod/mission/voice_shout";
 
     private static readonly ILogger Logger = LogManager.GetLogger<VanillaOrderVoiceService>();
 
@@ -162,9 +160,6 @@ public sealed class VanillaOrderVoiceService : IVanillaOrderVoiceService
                 return false;
             }
 
-            Vec3 voiceDistance = soundEvent.GetEventMinMaxDistance();
-            voiceDistance.y = OrderVoiceMaxDistance;
-            soundEvent.SetEventMinMaxDistance(voiceDistance);
             soundEvent.SetPosition(agent.GetEyeGlobalPosition());
             if (!soundEvent.Play())
             {
