@@ -1,12 +1,7 @@
 ﻿using Common;
-using GameInterface.Services.MapEvents;
-using GameInterface.Services.Tournaments.UI;
 using HarmonyLib;
 using SandBox.View.Map;
-using System;
 using System.Collections.Generic;
-using TaleWorlds.MountAndBlade;
-using TaleWorlds.MountAndBlade.View.Screens;
 using TaleWorlds.MountAndBlade.ViewModelCollection.EscapeMenu;
 
 namespace GameInterface.Services.UI.Patches
@@ -18,9 +13,6 @@ namespace GameInterface.Services.UI.Patches
         [HarmonyPrefix]
         static bool OnEscapeMenuToggled(MapScreen __instance, bool isOpened)
         {
-            if (isOpened && !IsEscapeHotKeyReleased(__instance))
-                return false;
-
             GameThread.Run(() =>
             {
                 __instance.MapCameraView.OnEscapeMenuToggled(isOpened);
@@ -47,40 +39,5 @@ namespace GameInterface.Services.UI.Patches
 
             return false;
         }
-
-        private static bool IsEscapeHotKeyReleased(MapScreen mapScreen)
-        {
-            try
-            {
-                return mapScreen.SceneLayer?.Input?.IsHotKeyReleased("Exit") == true;
-            }
-            catch (NullReferenceException)
-            {
-                return false;
-            }
-        }
-    }
-
-    [HarmonyPatch(typeof(MissionScreen))]
-    internal class MissionEscapeMenuNoFocusLoss
-    {
-        [HarmonyPatch(nameof(MissionScreen.IsOpeningEscapeMenuOnFocusChangeAllowed))]
-        [HarmonyPostfix]
-        static void IsOpeningEscapeMenuOnFocusChangeAllowed(ref bool __result)
-        {
-            if (BattleSpawnGate.IsCoopBattleActive || IsCoopTournamentActive())
-                __result = false;
-        }
-
-        internal static bool IsCoopTournamentActive() =>
-            ContainerProvider.TryResolve<TournamentMissionUIContext>(out var context) &&
-            context.TryGet(out _);
-    }
-
-    [HarmonyPatch(typeof(MBCommon), nameof(MBCommon.PauseGameEngine))]
-    internal class TournamentEscapeMenuNoPause
-    {
-        [HarmonyPrefix]
-        static bool PauseGameEngine() => !MissionEscapeMenuNoFocusLoss.IsCoopTournamentActive();
     }
 }
