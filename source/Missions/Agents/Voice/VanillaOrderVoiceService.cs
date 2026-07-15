@@ -10,6 +10,7 @@ using System.Linq;
 using System.Reflection;
 using System.Security.Cryptography;
 using TaleWorlds.Engine;
+using TaleWorlds.Library;
 using TaleWorlds.ModuleManager;
 using TaleWorlds.MountAndBlade;
 
