@@ -100,10 +100,11 @@ internal class VillagerConversationsPatches
         // Locally set player interaction, and then save in CoopSession on server
         __instance.SetPlayerInteraction(MobileParty.ConversationParty, VillagerCampaignBehavior.PlayerInteraction.Hostile);
 
-        PlayerEncounter.LeaveEncounter = true;
-
         var message = new VillagersTookPrisonerOnConsequence(Hero.MainHero, MobileParty.MainParty, encounteredMobileParty, itemRosterElements);
         MessageBroker.Instance.Publish(__instance, message);
+
+        // Finish now so the modal screens cannot return to the same encounter.
+        PlayerEncounter.Finish();
 
         return false;
     }
