@@ -109,9 +109,15 @@ public class AgentActionHandler : IAgentActionHandler
             var defendFlags = AgentActionData.GetDefendMovementFlags(agent.MovementFlags);
 
             bool hadState = _lastActions.TryGetValue(info.AgentId, out var last);
-            bool defendChanged = hadState
-                ? last.DefendFlags != defendFlags
-                : defendFlags != Agent.MovementControlFlag.None;
+            bool defendChanged;
+            if (hadState)
+            {
+                defendChanged = last.DefendFlags != defendFlags;
+            }
+            else
+            {
+                defendChanged = defendFlags != Agent.MovementControlFlag.None;
+            }
             if (hadState && last.Action0 == action0 && last.Action1 == action1 && !defendChanged)
                 continue;
 
