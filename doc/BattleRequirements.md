@@ -1,7 +1,7 @@
 # Battle Requirements
 
-**Version:** 1.0 (2026-07-15)
-**Status:** Baseline
+**Version:** 1.1 (2026-07-15)
+**Status:** Baseline (v1.1 amends BR-017 — abandonment destroys the instance only; the map event persists for player-discretion resolution — with matching scope updates to BR-003 and BR-054)
 
 ## Scope
 
@@ -57,9 +57,12 @@ be available for a map event after a playable battle mission has been created fo
 A playable battle mission shall not be created for a map event after player simulation of that map
 event has begun.
 
-This requirement restricts **player simulation only**. It does not restrict map-side simulation of
-AI-vs-AI map events before a player joins, nor server-initiated resolution of an abandoned battle
-(BR-017).
+This requirement restricts **player simulation only**; it does not restrict map-side simulation of
+AI-vs-AI map events before a player joins.
+
+The mutual exclusion is scoped to the battle instance: if the battle instance is destroyed while
+its map event is still unresolved (BR-017, BR-054), both resolution options become available
+again.
 
 ### BR-004 — Player Eligibility
 
@@ -140,13 +143,15 @@ no players remain in the mission instance. If no players remain, BR-017 applies.
 Host migration shall not restart the battle mission, respawn defeated troops, or reset battle
 progress.
 
-### BR-017 — Abandoned Battle Resolution
+### BR-017 — Abandoned Battle
 
 If no players remain in an active battle mission — through disconnection, retreat, or leaving —
-the server shall destroy the battle instance and resolve the remaining map event by automatic
-simulation from the last synchronized battle state.
+the server shall destroy the battle instance.
 
-This server-initiated resolution is not restricted by BR-003.
+The map event itself shall persist, reflecting the last synchronized battle state, and shall
+remain available for resolution at the players' discretion: a re-engaging player may start a new
+playable battle mission (BR-002, BR-054), or players may choose player simulation — BR-003's
+mutual exclusion resets when the battle instance is destroyed.
 
 ---
 
@@ -297,7 +302,7 @@ retreat.
 A player who retreats shall be removed from the battle instance's mission mesh.
 
 If no players remain in the battle instance after the retreat, the battle instance shall be
-destroyed (BR-017 applies to the map event if it remains unresolved).
+destroyed (BR-017; the map event persists in its last synchronized state).
 
 If other players remain, the battle instance shall persist, and a retreated player who re-engages
 the same map event shall re-enter that persisting battle instance, with their troops entering as

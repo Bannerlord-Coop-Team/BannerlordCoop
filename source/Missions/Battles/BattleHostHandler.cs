@@ -246,6 +246,32 @@ internal class BattleHostHandler : IHandler
         // Mutates the shared assignment, so run on the main thread (serializes with election).
         GameThread.RunSafe(() =>
         {
+            // BR-017: no players remain in the mission instance — destroy the battle instance record
+            // outright, regardless of whether the departed controller was the recorded host. Keying on the
+            // server-observed empty instance (not on who left last) also covers a successor emptying the
+            // instance while the host's own departure was never observed: an out-of-date successor line must
+            // not leave the assignment — or a promotion to an already-departed player — behind. The map
+            // event itself PERSISTS at its last synchronized state; the mode release above reopens both
+            // resolution options for it (a new mission per BR-002/BR-054, or player simulation — BR-003's
+            // exclusion resets with the instance). Idempotent: a duplicate empty departure finds nothing.
+            if (payload.What.IsInstanceEmpty)
+            {
+                if (hostRegistry.TryGet(mapEventId, out _))
+                {
+                    Logger.Information("[BattleHost] Battle {MapEventId} instance is empty after {Controller} departed; clearing host assignment",
+                        mapEventId, controllerId);
+                    hostRegistry.Remove(mapEventId);
+                }
+
+                // Forget the WHOLE map event's reserves — not just the leaver's own party — so restarting the
+                // SAME map event re-flattens every party (the AI/enemy parties the host had been fielding
+                // included). Otherwise their supplied pointers stay at the end and only the re-flattened
+                // rejoiner's party re-spawns.
+                if (objectManager.TryGetObject<MapEvent>(mapEventId, out var abandonedEvent))
+                    reserveBuilder.ForgetMapEvent(abandonedEvent);
+                return;
+            }
+
             if (!hostRegistry.TryGet(mapEventId, out var assignment))
                 return; // no host assignment for this instance — not a battle
 
@@ -265,10 +291,9 @@ internal class BattleHostHandler : IHandler
                         controllerId, mapEventId);
                     hostRegistry.Remove(mapEventId);
 
-                    // The battle is fully abandoned (no one left to continue it). Forget the WHOLE map event's
-                    // reserves — not just the leaver's own party (ForgetController above) — so restarting the
-                    // SAME map event re-flattens the AI/enemy parties the host had been fielding. Otherwise their
-                    // supplied pointers stay at the end and only the host's own re-flattened party re-spawns.
+                    // Fully abandoned even though the membership signal did not mark the instance empty (e.g.
+                    // a member still on the loading screen was never mission-ready): forget the WHOLE map
+                    // event's reserves for the same reason as the empty-instance branch above.
                     if (objectManager.TryGetObject<MapEvent>(mapEventId, out var abandonedEvent))
                         reserveBuilder.ForgetMapEvent(abandonedEvent);
                     return;

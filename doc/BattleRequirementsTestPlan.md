@@ -112,6 +112,24 @@ self-heal via periodic host snapshots; the siege-report gate mirrors the tested 
 but has no dedicated test; a host leaving with no successors still doesn't broadcast the
 assignment removal (pre-existing — the watermark makes the next election supersede it).
 
+**Alignment increment 4 (2026-07-15) — BR-017 (v1.1 semantics) DONE.**
+Requirement amended by the user mid-increment (doc v1.1): abandonment **destroys the battle
+instance only** — the map event persists at the last synchronized state for player-discretion
+resolution (re-engage or simulate; BR-003's exclusion resets on instance destruction).
+Investigation confirmed the persistence is structural: `MapEventPatches.PrefixUpdate` skips native
+ticking for any player-involved event, so nothing resolves it behind the players' backs.
+Implementation closed the two real teardown gaps: a **non-host** last leaver now also destroys the
+instance record (host assignment + reserves previously leaked in that path), and
+`MissionManager.byInstanceId` is finally **pruned** on empty (the long-standing residual).
+`BattleAbandonmentTests` (6 tests): 2 red→green (the gaps above), 4 already-green (persistence,
+retreat path, reopening with fresh election/epoch + simulation claim, idempotent teardown) —
+honest finding: most teardown already existed. Suites: targeted 46/46, full E2E **546 passed / 4
+pre-existing skips / 0 failed**, Coop.Tests + IntegrationTests green.
+**Note:** a pre-existing intermittent failure in
+`Coop.IntegrationTests…MissionDisconnectDetectionTests.ServerDetectedDisconnect_NotifiesRemainingMembers…`
+under parallel class runs (fails ~4/8 on base code, passes in isolation) — harness static-broker
+swapping under xUnit parallelism; tracked separately.
+
 Harness lessons for later waves: never disable-patch `MapEvent.FinalizeEventAux` in an E2E
 PatchScope (it already carries a production prefix — two-prefix `InvalidProgramException`, and the
 broken patch state poisons every later test in the run); harness-created parties spawn with
