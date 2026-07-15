@@ -12,23 +12,21 @@ namespace GameInterface.Services.Heroes
 {
     internal class HeroSync : IAutoSync
     {
-        private IEnumerable<MethodInfo> externalMethods => new MethodInfo[]
+        private IEnumerable<MethodInfo> ExternalMethods => new MethodInfo[]
         {
-            AccessTools.Method(typeof(HeroDeveloper), "CheckLevel"),
-            AccessTools.Method(typeof(HeroDeveloper), "ClearHeroLevel"),
+            AccessTools.Method(typeof(HeroDeveloper), nameof(HeroDeveloper.CheckLevel)),
+            AccessTools.Method(typeof(HeroDeveloper), nameof(HeroDeveloper.ClearHeroLevel)),
             AccessTools.Method(typeof(MakePregnantAction), nameof(MakePregnantAction.ApplyInternal)),
-            AccessTools.Method(typeof(PregnancyCampaignBehavior), "CheckOffspringsToDeliver", new Type[] { typeof(Hero) }),
-            AccessTools.Method(typeof(PregnancyCampaignBehavior), "CheckOffspringsToDeliver", new Type[] { typeof(PregnancyCampaignBehavior.Pregnancy) }),
+            AccessTools.Method(typeof(PregnancyCampaignBehavior), nameof(PregnancyCampaignBehavior.CheckOffspringsToDeliver)),
             AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.CreateRelativeNotableHero)),
             AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.DeliverOffSpring)),
         };
 
         public HeroSync(AutoSyncRegistry autoSyncBuilder)
         {
-            foreach (var method in externalMethods)
+            foreach (var method in ExternalMethods)
             {
-                //ISSUES WITH THIS
-                //autoSyncBuilder.AddTargetMethod(typeof(Hero), method);
+                autoSyncBuilder.AddTargetMethod(typeof(Hero), method);
             }
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.StaticBodyProperties)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Weight)));
@@ -72,16 +70,12 @@ namespace GameInterface.Services.Heroes
             // TODO add all fields
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero.Culture)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._power)));
-
-            // PropertyOwner<T> fields: intercepts SetPropertyValue/ClearAllProperty inside Hero's own
-            // methods (SetSkillValue, SetTraitLevel, SetAttributeValueInternal, ClearSkills, ...),
-            // which every external caller funnels through. Known gaps: SetPerkValueInternal's bool->int
-            // branch and ClearAttributes' null guard sit between the field load and the call, which the
-            // control-flow-safe IL matcher skips - perk opens and attribute clears do not broadcast.
-            autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._heroSkills)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._heroDeveloper)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._heroTraits)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._heroPerks)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._heroSkills)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._characterAttributes)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero.Level)));
         }
     }
 }
