@@ -87,9 +87,9 @@ internal class PlayerCaptivityServerHandler : IHandler
     /// applied with patches live (hero state → Prisoner, member-roster removal, prison-roster add —
     /// each replicating to the clients as its own message, with
     /// <see cref="Hero.PartyBelongedToAsPrisoner"/> auto-synced). Only the coop-specific extras happen
-    /// here: the player party's remaining troops are forfeited so native
-    /// <see cref="MapEvent.CaptureDefeatedPartyMembers"/> cannot re-process or scatter them, and the
-    /// party is parked until captivity ends.
+    /// here: the player party's remaining troops are recorded as prisoners of the captor (BR-061), the
+    /// emptied rosters keep native <see cref="MapEvent.CaptureDefeatedPartyMembers"/> from re-processing
+    /// or scattering them, and the party is parked until captivity ends.
     /// </summary>
     private void Handle_PrisonerTaken(MessagePayload<PrisonerTaken> payload)
     {
@@ -118,6 +118,11 @@ internal class PlayerCaptivityServerHandler : IHandler
             return;
         }
 
+        // BR-061: the surrendered party's remaining troops become prisoners of the captor. Transfer them
+        // into the captor's prison roster BEFORE the rosters are emptied below; the additions run with
+        // patches live, so they replicate to the clients the same way the removals do.
+        TransferTroopsToCaptorPrisonRoster(playerParty.MemberRoster, payload.What.CapturerParty);
+
         // Park the now-leaderless player party so native post-battle processing cannot scatter or destroy it;
         // the captivity-end flow reactivates it. Empty the rosters by each element's ACTUAL current count rather
         // than TroopRoster.Clear(): the native TakePrisonerAction (run by Prefix_CaptureDefeatedPartyMembers)
@@ -130,6 +135,29 @@ internal class PlayerCaptivityServerHandler : IHandler
         RemoveVisual(playerParty);
         if (playerParty.LeaderHero != null)
             playerParty.ChangePartyLeader(null);
+    }
+
+    /// <summary>
+    /// Records the surrendered party's remaining regular troops as prisoners of the captor (BR-061): each
+    /// non-hero member element is added to the captor's prison roster, wounded staying wounded. Heroes are
+    /// excluded — a hero capture must go through <see cref="TakePrisonerAction"/>, which manages the hero
+    /// state a raw roster add would bypass. The subsequent <see cref="EmptyRoster"/> removes the source
+    /// elements, so native post-battle capture finds nothing to double-process.
+    /// </summary>
+    private static void TransferTroopsToCaptorPrisonRoster(TroopRoster memberRoster, PartyBase captor)
+    {
+        if (memberRoster == null || captor?.PrisonRoster == null) return;
+
+        for (int i = 0; i < memberRoster.Count; i++)
+        {
+            var element = memberRoster.GetElementCopyAtIndex(i);
+            if (element.Character == null || element.Character.IsHero) continue;
+
+            int number = Math.Max(element.Number, 0);
+            if (number == 0) continue;
+
+            captor.PrisonRoster.AddToCounts(element.Character, number, false, Math.Max(element.WoundedNumber, 0), 0, true);
+        }
     }
 
     /// <summary>

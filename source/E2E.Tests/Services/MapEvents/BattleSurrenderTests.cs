@@ -102,13 +102,12 @@ public class BattleSurrenderTests : MapEventTestBase
     }
 
     /// <summary>
-    /// BR-061 (TDD red): the requirement says the final result records surrendered HEROES AND TROOPS as
-    /// prisoners. For a player-party surrender the current implementation forfeits the party's troops (empties
-    /// the roster) instead of recording them as prisoners of the captor, so this strong test is left skipped
-    /// rather than weakened: when the "troops as prisoners" clause is implemented, the captor's prison roster
-    /// will hold the surrendered troops on every instance.
+    /// BR-061: the final result records surrendered HEROES AND TROOPS as prisoners. The server transfers the
+    /// surrendered party's remaining regular troops into the captor's prison roster (wounded stay wounded)
+    /// before parking the party, and the roster additions replicate, so the captor's prison roster holds the
+    /// surrendered troops on every instance.
     /// </summary>
-    [Fact(Skip = "BR-061 TDD red: surrendered player-party troops are forfeited (roster emptied), not recorded as prisoners of the captor")]
+    [Fact]
     [Trait("Requirement", "BR-061")]
     public void RecipientSurrender_RecordsSurrenderedTroopsAsPrisonersOfCaptor()
     {

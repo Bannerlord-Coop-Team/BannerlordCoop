@@ -599,6 +599,54 @@ public abstract class MapEventTestBase : IDisposable
     }
 
     /// <summary>
+    /// Reads the member-roster man count of the party on the given instance. Baseline helper: harness
+    /// parties spawn with nondeterministic rosters, so tests assert relative to a snapshot, never absolute.
+    /// </summary>
+    protected int GetPartyManCount(EnvironmentInstance instance, string partyId)
+    {
+        int count = 0;
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            count = party.MemberRoster.TotalManCount;
+        });
+        return count;
+    }
+
+    /// <summary>
+    /// Reads the member-roster man count of NON-hero elements only (see <see cref="GetPartyManCount"/>).
+    /// The capture/surrender transfer moves regular troops to the captor but never raw hero elements
+    /// (heroes are captured individually via TakePrisonerAction), so prisoner expectations build on this.
+    /// </summary>
+    protected int GetPartyNonHeroManCount(EnvironmentInstance instance, string partyId)
+    {
+        int count = 0;
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            for (int i = 0; i < party.MemberRoster.Count; i++)
+            {
+                var element = party.MemberRoster.GetElementCopyAtIndex(i);
+                if (element.Character?.IsHero != true)
+                    count += Math.Max(element.Number, 0);
+            }
+        });
+        return count;
+    }
+
+    /// <summary>Reads the prison-roster man count of the party on the given instance (see <see cref="GetPartyManCount"/>).</summary>
+    protected int GetPartyPrisonerCount(EnvironmentInstance instance, string partyId)
+    {
+        int count = 0;
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            count = party.PrisonRoster.TotalManCount;
+        });
+        return count;
+    }
+
+    /// <summary>
     /// Frees the player hero the way native does when its captor party is defeated in battle:
     /// <see cref="MapEvent.LootDefeatedPartyPrisoners"/> calls
     /// <see cref="EndCaptivityAction.ApplyByReleasedAfterBattle"/> for each freed prisoner. Invoking that

@@ -1156,6 +1156,12 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.HostileDemand);
         SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.ConfirmHostileDemand);
 
+        // BR-061 baseline: the responder's hero and regular troops become the initiator's prisoners on the
+        // yield, so snapshot the rosters first — harness parties spawn with their own rosters, and raw hero
+        // roster elements are never transferred (heroes are captured individually via TakePrisonerAction).
+        var responderTroopsAtSurrender = GetPartyNonHeroManCount(Server, responderMobilePartyId);
+        var initiatorPrisonersBefore = GetPartyPrisonerCount(Server, initiatorMobilePartyId);
+
         Server.NetworkSentMessages.Clear();
         SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.YieldHostileDemand, HostileDemandSurrenderDisabledMethods());
 
@@ -1172,7 +1178,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
 
         AssertWarDeclared(Server, initiatorClanId, responderClanId);
         AssertCaptivity(Server, responderHeroId, initiatorMobilePartyId);
-        AssertPartyPrisonerCount(Server, initiatorMobilePartyId, 1);
+        // BR-061: the yielded party's hero (+1) AND regular troops are all recorded as the initiator's prisoners.
+        AssertPartyPrisonerCount(Server, initiatorMobilePartyId, initiatorPrisonersBefore + responderTroopsAtSurrender + 1);
         AssertPartyManCount(Server, responderMobilePartyId, 0);
         AssertHostileEncounterTornDown(Server, initiatorPartyId);
         AssertCapturedPlayerPartyParked(Server, responderPartyId);
