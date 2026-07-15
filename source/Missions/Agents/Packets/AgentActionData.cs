@@ -7,6 +7,9 @@ namespace Missions.Agents.Packets
     [ProtoContract(SkipConstructor = true)]
     public class AgentActionData
     {
+        internal const Agent.MovementControlFlag DefendMovementFlagsMask =
+            Agent.MovementControlFlag.DefendMask | Agent.MovementControlFlag.DefendBlock;
+
         // MBAPI.IMBAnimation is a non-public static field. The publicizer makes it compile, but the
         // emitted IgnoresAccessChecksTo isn't honored in every runtime load context (it throws
         // FieldAccessException in live play). Reflecting a non-public static field always works, so
@@ -26,6 +29,12 @@ namespace Missions.Agents.Packets
             }
 
             return getActionNameWithCode?.Invoke(animation, new object[] { actionCode }) as string;
+        }
+
+        internal static Agent.MovementControlFlag GetDefendMovementFlags(
+            Agent.MovementControlFlag movementFlags)
+        {
+            return movementFlags & DefendMovementFlagsMask;
         }
 
         public AgentActionData(Agent agent)
@@ -51,8 +60,9 @@ namespace Missions.Agents.Packets
 
         public void Apply(Agent agent)
         {
+            Agent.MovementControlFlag movementFlags = (Agent.MovementControlFlag)MovementFlag;
             agent.EventControlFlags |= (Agent.EventControlFlag)EventFlag;
-            agent.MovementFlags = (Agent.MovementControlFlag)MovementFlag;
+            agent.MovementFlags = movementFlags;
 
             // apply the animation on channel 0 if none exists
             if (agent.GetCurrentAction(0) == ActionIndexCache.act_none || agent.GetCurrentAction(0).Index != Action0Index)
@@ -87,39 +97,8 @@ namespace Missions.Agents.Packets
                 agent.SetCurrentActionProgress(1, Action1Progress);
             }
 
-            // Set the movement flags to none
-            agent.MovementFlags = 0U;
-
-            // Check the action of the agent; if they are defending, apply the defending movement flag
-            if (Action1CodeType >= (int)Agent.ActionCodeType.DefendAllBegin && Action1CodeType <= (int)Agent.ActionCodeType.DefendAllEnd)
-            {
-                agent.MovementFlags = (Agent.MovementControlFlag)MovementFlag;
-                return;
-            }
-
-
-            //// Check if there is a melee; this breaks the game if we don't do it.
-            //if ((Agent.ActionCodeType)Action1CodeType != Agent.ActionCodeType.BlockedMelee)
-            //{
-            //    // if the animation is none, start it
-            //    if (agent.GetCurrentAction(1) == ActionIndexCache.act_none || agent.GetCurrentAction(1).Index != Action1Index)
-            //    {
-            //        string actionName2 = GetActionNameWithCode(Action1Index);
-            //        if (actionName2 != null)
-            //            agent.SetActionChannel(1, ActionIndexCache.Create(actionName2), additionalFlags: (AnimFlags)Action1Flag, startProgress: Action1Progress);
-
-            //    }
-            //    // otherwise continue it
-            //    else
-            //    {
-            //        agent.SetCurrentActionProgress(1, Action1Progress);
-            //    }
-            //}
-            //else
-            //{
-            //    // otherwise just cancel it
-            //    agent.SetActionChannel(1, ActionIndexCache.act_none, ignorePriority: true, startProgress: 100);
-            //}
+            // Keep held defend input on the puppet; later reliable transitions replace or clear these bits.
+            agent.MovementFlags = GetDefendMovementFlags(movementFlags);
         }
 
         [ProtoMember(1)]
