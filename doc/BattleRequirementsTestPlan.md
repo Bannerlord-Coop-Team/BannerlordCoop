@@ -147,6 +147,25 @@ a reserve-starved deployment (`TeamSetupOver == false`) deliberately skips auto-
 handler's own deadline ends such missions); the config is a code-level static like the repo's
 other configs — no user-facing settings surface yet.
 
+**Alignment increment 6 (2026-07-15) — BR-033/BR-034 DONE (red → green).**
+Reconnect troop restore, mirroring BR-031 adoption's propagation exactly (a LOCAL rule on the
+server-mediated peer-entered event — no wire message, because `CurrentAuthority` is only ever
+consumed locally as "am I the authority"): on a returner's re-entry, whoever holds agents whose
+`OriginalOwner` is the returner transfers them back and releases live control (Controller=None,
+interpolator `Forget` so nothing freezes — the migration lesson applied in reverse); the returner
+re-adopts its hero (Player + MainAgent) and its troops as locally driven. Works against a
+migrated host; killed-while-away agents provably don't resurrect (BR-034). Along the way:
+`OwnedAgentReplicator` records now stamp `OriginalOwner` (assignment) instead of the sender;
+fixed a latent `PuppetSpawner` bug (every own record became Player+MainAgent — now hero-only);
+deleted the dead `AgentControlChanged` stub; fixed a pre-existing harness gap
+(`Formation.GetHashCode` NRE silently aborting multi-agent adoption in tests).
+`BattleReconnectControlTests` 4/4 red→green; targeted suites 53/53; full E2E **554 total — 550
+passed / 4 pre-existing skips / 0 failed**; full Coop.Tests 383/384.
+**Residuals:** live movement-after-reclaim → manual checklist row; unspawned-reserve ownership is
+not re-scoped on reclaim (stale host supplier could double-spawn the returner's reinforcements —
+supply-layer follow-up); orphan chain when the adopting host also leaves (pre-existing, flagged
+as a separate background task with repro).
+
 Harness lessons for later waves: never disable-patch `MapEvent.FinalizeEventAux` in an E2E
 PatchScope (it already carries a production prefix — two-prefix `InvalidProgramException`, and the
 broken patch state poisons every later test in the run); harness-created parties spawn with

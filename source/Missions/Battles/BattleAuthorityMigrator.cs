@@ -17,12 +17,15 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Battles;
 
 /// <summary>
-/// Ownership changes when a player leaves a coop battle. A graceful leave is a RETREAT: the player withdraws,
-/// so their own-party troops despawn on every client. A disconnect is NOT a retreat: the host adopts the
-/// dropped player's troops (authority + AI control) so they keep fighting instead of vanishing —
-/// server-mediated, so it fires even on a silent P2P drop. And when the departed player WAS the host, the
-/// server promotes a successor, which adopts the old host's orphaned agents — everything on a disconnect; on
-/// a retreat only the AI it was running (enemy side + allied NPC parties), while its own party still withdraws.
+/// Ownership changes when a player leaves — or returns to — a coop battle. A graceful leave is a RETREAT: the
+/// player withdraws, so their own-party troops despawn on every client. A disconnect is NOT a retreat: the
+/// host adopts the dropped player's troops (authority + AI control, BR-031) so they keep fighting instead of
+/// vanishing — server-mediated, so it fires even on a silent P2P drop. And when the departed player WAS the
+/// host, the server promotes a successor, which adopts the old host's orphaned agents — everything on a
+/// disconnect; on a retreat only the AI it was running (enemy side + allied NPC parties), while its own party
+/// still withdraws. When a disconnected player RECONNECTS, the holder hands the surviving assigned agents
+/// back (BR-033): authority returns to the original owner and the host's temporary AI control is released —
+/// agents removed while the player was away are gone from the registry and stay gone (BR-034).
 /// </summary>
 public interface IBattleAuthorityMigrator : IDisposable
 {
@@ -85,10 +88,14 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     }
 
     // A controller (re-)entered the instance: any recorded retreat of it is history — a later departure must
-    // be judged on its own, not as a leftover retreat.
+    // be judged on its own, not as a leftover retreat. And if WE are holding agents whose assignment is that
+    // controller (the BR-031 adoption of a disconnected player's survivors), hand them back (BR-033).
     private void Handle_PeerEntered(MessagePayload<NetworkMissionPeerEntered> payload)
     {
         retreatedHosts.Remove(payload.What.ControllerId);
+
+        if (payload.What.InstanceId != null && payload.What.InstanceId != session.InstanceId) return;
+        ReclaimAgentsFor(payload.What.ControllerId);
     }
 
     // A graceful leave is a RETREAT: the player withdraws, so their own troops despawn on every client — the
@@ -383,6 +390,94 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         // owned set at the current ledger pointers) so we can spawn their reinforcements from where the
         // departed owner left off. Runs even with no on-field agents adopted (reserve may still be unspawned).
         RequestReserves();
+    }
+
+    // [All clients] BR-033/BR-034 reclaim: a controller re-entered this battle instance — the same
+    // server-mediated entry that drives the join-info/catch-up exchange. Whatever WE currently hold whose
+    // ASSIGNMENT (OriginalOwner, preserved by the BR-031 adoption) is that controller goes back to it: the
+    // authority transfers, and each live agent we were driving is released from host AI back to an inert
+    // puppet the returning owner now drives. Only still-registered agents qualify — death/removal while the
+    // owner was away deregistered them everywhere, so nothing is restored for them (BR-034). Mirrors the
+    // adoption's propagation pattern (a local rule on the server-mediated membership event, no wire message):
+    // non-holders have nothing keyed to themselves and no-op, so every registry converges — the non-host
+    // clients never applied the adoption and already key these agents to the returning owner.
+    //
+    // ORDER MATTERS relative to the joiner catch-up: CoopMissionController's own NetworkMissionPeerEntered
+    // handler (subscribed in the base constructor, before this component exists) replays the agents we hold
+    // to the returner FIRST — the replay is built from OUR controller's registry list, so it must run before
+    // this transfer moves them out of it. Both paths queue through GameThread.RunSafe, preserving that order.
+    //
+    // Idempotent: after the first reclaim nothing of the returner's remains keyed to us, so a duplicate
+    // entered-event finds nothing. A controller that never owned agents here finds nothing either.
+    private void ReclaimAgentsFor(string controllerId)
+    {
+        if (string.IsNullOrEmpty(controllerId)) return;
+        if (session.IsOwn(controllerId)) return;
+
+        var registry = coopMissionComponent.AgentRegistry;
+
+        GameThread.RunSafe(() =>
+        {
+            var reclaimed = new List<CoopAgentInfo>();
+            foreach (var info in registry.GetAgents(session.OwnControllerId))
+            {
+                if (info.OriginalOwner != controllerId) continue;
+
+                // A mount a LIVE rider of another owner sits on stays with that rider's owner — the mirror of
+                // CleanUpDepartedMounts' re-key rule: horse-keyed routing must answer to whoever drives the
+                // rider, and every client applies the same rider test, so they converge.
+                if (info.Agent is Agent mount && mount.IsMount && IsRiddenByAnotherOwner(mount, controllerId)) continue;
+
+                reclaimed.Add(info);
+            }
+
+            if (reclaimed.Count == 0) return;
+
+            foreach (var info in reclaimed)
+                registry.TryTransferAuthority(controllerId, info.AgentId);
+
+            if (Mission.Current == null) return;
+
+            var interpolator = coopMissionComponent.AgentMovementHandler.Interpolator;
+            int released = 0;
+            foreach (var info in reclaimed)
+            {
+                var agent = info.Agent;
+                if (agent == null || !agent.IsActive()) continue;
+
+                // Same staleness treatment as the adoption: the authority just changed hands, so any tracked
+                // interpolation target is a ghost — left in place it would pin the agent against the returning
+                // owner's live movement (the "adopted agents frozen" bug, in reverse). Fresh targets arrive
+                // with the owner's next movement packets.
+                interpolator.Forget(agent);
+                if (agent.MountAgent != null) interpolator.Forget(agent.MountAgent);
+
+                // A reclaimed MOUNT only changes authority back — it was never converted to a combatant.
+                if (agent.IsMount) continue;
+
+                // Undo the adoption's puppet-to-AI conversion: back to an inert puppet the owner drives over
+                // the mesh, un-paused so it follows the replicated movement (exactly the state SpawnPuppet
+                // leaves a fresh puppet in). It keeps the formation slot it fought in, like any puppet.
+                agent.Controller = AgentControllerType.None;
+                agent.SetIsAIPaused(false);
+                released++;
+            }
+
+            Logger.Information("[BattleSync] Reclaim: returned {Count} agent(s) to reconnected {Controller} ({Released} released from local AI control)",
+                reclaimed.Count, controllerId, released);
+        });
+    }
+
+    // [Game thread] Whether another owner's live rider sits on this mount — its registration then follows the
+    // rider's owner (see CleanUpDepartedMounts), not the mount's returning original owner. An unregistered
+    // live rider also blocks the reclaim: better to leave the horse with its current holder than to hand
+    // authority to an owner whose rider isn't the one riding it.
+    private bool IsRiddenByAnotherOwner(Agent mount, string returningControllerId)
+    {
+        var rider = mount.RiderAgent;
+        if (rider == null || !rider.IsActive()) return false;
+        if (!coopMissionComponent.AgentRegistry.TryGetAgentInfo(rider, out var riderInfo)) return true;
+        return riderInfo.OriginalOwner != returningControllerId;
     }
 
     // [Game thread] The player party (and hero) behind a controller id, from the session-scoped player

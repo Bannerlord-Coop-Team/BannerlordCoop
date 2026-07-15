@@ -145,9 +145,14 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
             var side = agent.Team != null ? agent.Team.Side : BattleSideEnum.None;
             int formationIndex = agent.Formation != null ? (int)agent.Formation.FormationIndex : -1;
 
+            // The record carries the agent's ASSIGNMENT (OriginalOwner), not our current authority. For our own
+            // spawns the two are identical; for agents we only HOLD under temporary host control (BR-031) the
+            // difference matters twice: a fresh late joiner registers them under the same owner every other
+            // client already has them under, and a RECONNECTING owner recognizes its own troops in the catch-up
+            // replay and re-adopts them as locally driven (BR-033, see PuppetSpawner).
             records.Add(new BattleAgentSpawnData(
                 info.AgentId, characterId, agent.Position, side, agent.Health,
-                session.OwnControllerId, attribution.MapEventPartyId, attribution.TroopSeed,
+                info.OriginalOwner, attribution.MapEventPartyId, attribution.TroopSeed,
                 ResolveMountIdFor(info.AgentId, agent), formationIndex));
         }
         return records;
