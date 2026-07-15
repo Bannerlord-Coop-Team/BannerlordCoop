@@ -86,7 +86,7 @@ internal static class EncyclopediaConnectedPlayerCountFontPatch
 {
     private const string EncyclopediaMovieName = "EncyclopediaBar";
     private const string TitleBrushName = "Recruitment.Popup.Title.Text";
-    private const int ConnectedPlayersTitleFontSize = 40;
+    private const int ConnectedPlayersTitleFontSize = 36;
 
     [HarmonyPostfix]
     private static void ReduceTitleFont(IGauntletMovie __result)
@@ -99,7 +99,7 @@ internal static class EncyclopediaConnectedPlayerCountFontPatch
             richText.ReadOnlyBrush.Name?.StartsWith(TitleBrushName, StringComparison.Ordinal) == true) as RichTextWidget;
         if (title == null) return;
 
-        // Vanilla uses 46; 40 keeps "online" inside the fixed-width title plaque.
+        // Vanilla uses 46; 36 keeps "online" clear of the fixed-width plaque's end caps.
         title.Brush.FontSize = ConnectedPlayersTitleFontSize;
     }
 }
