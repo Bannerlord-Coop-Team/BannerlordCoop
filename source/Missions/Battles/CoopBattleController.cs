@@ -141,6 +141,21 @@ public class CoopBattleController : CoopMissionController
         base.Dispose();
     }
 
+    // MISSION-READY (BR-010): the native MissionState.FinishMissionLoading fans Mission.AfterStart() out to
+    // the behaviors only once Mission.IsLoadingFinished turned true, so this is the moment this client has
+    // FINISHED LOADING the battle mission. Announce it so BattleHostHandler requests the host election —
+    // the server's per-battle order becomes the mission-ready order (BR-013), not the entry order. The
+    // session began at entry (PlayerEnteredBattle -> BattleInstanceLifecycle), well before loading finishes.
+    public override void AfterStart()
+    {
+        base.AfterStart();
+
+        if (Session.HasInstance)
+            messageBroker.Publish(this, new BattleMissionReady(Session.InstanceId));
+        else
+            Logger.Warning("[BattleHost] Battle mission finished loading with no instance session — cannot announce mission-ready");
+    }
+
     public override void OnMissionTick(float dt)
     {
         base.OnMissionTick(dt);

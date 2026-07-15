@@ -66,8 +66,9 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
         var mission = CreateCoopFieldBattle(rec, mapEventId);
 
         // Same post-open coop entry the native path drove via BattleMissionEntryPatch: the controller requests
-        // the P2P instance and the host handler requests election + this client's troop reserves. The reserves
-        // reach the (already-registered) suppliers during scene load, before AfterStart sizes them.
+        // the P2P instance and the host handler requests this client's OWN troop reserves, which reach the
+        // (already-registered) suppliers during scene load. The host election follows at mission-ready
+        // (CoopBattleController.AfterStart, once loading finishes) and delivers the remaining sides.
         messageBroker.Publish(mapEvent, new PlayerEnteredBattle(mapEvent));
         return mission;
     }

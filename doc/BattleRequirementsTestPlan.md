@@ -61,6 +61,39 @@ rosters after capturing the hero; the hero-as-prisoner half works. The failing t
 `BattleSurrenderTests.RecipientSurrender_RecordsSurrenderedTroops…`, skip-marked
 `"BR-061 TDD red"` — unskip when fixing.
 
+**Alignment increment 1 (2026-07-15) — BR-061 FIXED (red → green).**
+`PlayerCaptivityServerHandler.Handle_PrisonerTaken` now transfers the surrendered party's regular
+troops into the captor's prison roster (wounded stay wounded) before parking/emptying the party;
+the adds replicate as roster deltas. The Wave-1 red test is unskipped and green. Two pre-existing
+tests encoded the old forfeit behavior and were re-aligned to the requirement with
+baseline-relative expectations (`HostileDemand_ResponderYields…`, `EscapeFromCaptivity…` — the
+latter now also asserts that escape frees the hero while the captured troops remain prisoners).
+Full E2E suite after the fix: 536 tests, 532 passed / 4 pre-existing skips / 0 failed.
+**Residual (BR-061, follow-up):** companion heroes in a surrendered player party are still
+discarded by the roster emptying rather than captured — hero elements can't be raw-roster-
+transferred (hero state lives in `TakePrisonerAction`), so the capture flow needs a per-companion
+`TakePrisonerAction` pass. Harness note: the captor's prison-roster adds are coalesced non-hero
+deltas — call `TestEnvironment.FlushCoalescer()` before asserting client-side counts.
+
+**Alignment increment 2 (2026-07-15) — BR-010/BR-013 FIXED (entry-election drift → mission-ready
+election, red → green).** Entry and election are now split: at `PlayerEnteredBattle` the client
+requests only its OWN reserves (`NetworkRequestBattleReserves`; the server reply skips empty sides
+so an unowned side can't prematurely mark a supplier populated), and the election request
+(`NetworkRequestBattleHost`) fires from the new local `BattleMissionReady` event, published by
+`CoopBattleController.AfterStart` — the native `MissionState.FinishMissionLoading` calls
+`Mission.AfterStart()` only once `Mission.IsLoadingFinished` is true, so this is exactly
+"finished loading, as observed by the server". The server election reply includes both sides with
+explicit empties (the NPC grant travels WITH the election to the host; a ready non-host gets the
+empty enemy side so sizing proceeds). Successor line = mission-ready order by construction;
+migration machinery untouched. New tests (`MissionReadyElectionTests`, red-then-green):
+ready-order-not-entry-order election, loading-screen player absent from the connection order until
+ready, NPC-grant-with-election + explicit-empty-side delivery, promotion follows ready order.
+Existing entry-election tests were preserved by making the harness `EnterBattle` signal
+entry+mission-ready in one step (a `missionReady: false` parameter models a still-loading player);
+no assertion weakened. Full E2E suite after the fix: 540 tests, 536 passed / 4 pre-existing
+skips / 0 failed; Coop.Tests 368/369 (1 pre-existing skip). The BR-010/BR-013 rows' "elects at
+ENTRY" drift notes are superseded by this increment.
+
 Harness lessons for later waves: never disable-patch `MapEvent.FinalizeEventAux` in an E2E
 PatchScope (it already carries a production prefix — two-prefix `InvalidProgramException`, and the
 broken patch state poisons every later test in the run); harness-created parties spawn with

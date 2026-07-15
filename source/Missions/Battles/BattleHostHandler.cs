@@ -26,11 +26,16 @@ namespace Missions.Battles;
 /// client-side receipt of that assignment. Lives in the Missions stack and runs on both sides because
 /// MissionModule is registered into the client and the server containers.
 /// <para>
-/// Client: on entering a battle (<see cref="PlayerEnteredBattle"/>) it asks the server to elect via
+/// Client: on entering a battle (<see cref="PlayerEnteredBattle"/>) it only requests its OWN troop reserves
+/// (<see cref="NetworkRequestBattleReserves"/>) so they feed its suppliers during the scene load; once the
+/// mission has FINISHED LOADING (<see cref="BattleMissionReady"/>, published by
+/// <c>CoopBattleController.AfterStart</c>) it asks the server to elect via
 /// <see cref="NetworkRequestBattleHost"/>, and stores the reply (<see cref="NetworkBattleHostAssigned"/>).
-/// Server: the first client to enter a battle becomes its host; later entrants append to the successor line
-/// in join order (so migration promotes the earliest joiner still in the mission). The result is cached, so
-/// a duplicate request just re-confirms, and every change is broadcast to all clients.
+/// Server: the first MISSION-READY client becomes the battle's host (BR-010); later ready clients append to
+/// the successor line in mission-ready order (BR-013), so migration promotes the earliest still in the
+/// mission. The unowned (NPC) reserves are issued to the elected host together with the election, and every
+/// ready client's reply includes its sides with explicit empties so its spawn sizing can proceed. The result
+/// is cached, so a duplicate request just re-confirms, and every change is broadcast to all clients.
 /// </para>
 /// </summary>
 internal class BattleHostHandler : IHandler
@@ -63,6 +68,7 @@ internal class BattleHostHandler : IHandler
         this.reserveBuilder = reserveBuilder;
 
         messageBroker.Subscribe<PlayerEnteredBattle>(Handle_PlayerEnteredBattle);
+        messageBroker.Subscribe<BattleMissionReady>(Handle_BattleMissionReady);
         messageBroker.Subscribe<NetworkRequestBattleHost>(Handle_NetworkRequestBattleHost);
         messageBroker.Subscribe<NetworkBattleHostAssigned>(Handle_NetworkBattleHostAssigned);
         messageBroker.Subscribe<MissionMemberDeparted>(Handle_MissionMemberDeparted);
@@ -72,13 +78,16 @@ internal class BattleHostHandler : IHandler
     public void Dispose()
     {
         messageBroker.Unsubscribe<PlayerEnteredBattle>(Handle_PlayerEnteredBattle);
+        messageBroker.Unsubscribe<BattleMissionReady>(Handle_BattleMissionReady);
         messageBroker.Unsubscribe<NetworkRequestBattleHost>(Handle_NetworkRequestBattleHost);
         messageBroker.Unsubscribe<NetworkBattleHostAssigned>(Handle_NetworkBattleHostAssigned);
         messageBroker.Unsubscribe<MissionMemberDeparted>(Handle_MissionMemberDeparted);
         messageBroker.Unsubscribe<NetworkRequestBattleReserves>(Handle_NetworkRequestBattleReserves);
     }
 
-    /// <summary>[Client] Entering a battle: ask the server who the host is.</summary>
+    /// <summary>[Client] Entering a battle (still loading): request only the reserves we already OWN, so our
+    /// party's troops feed the suppliers during the scene load. No election here — a player on the loading
+    /// screen has not yet joined (BR-013); the unowned/NPC sides are decided by the election at mission-ready.</summary>
     private void Handle_PlayerEnteredBattle(MessagePayload<PlayerEnteredBattle> payload)
     {
         if (ModInformation.IsServer) return;
@@ -86,14 +95,28 @@ internal class BattleHostHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(payload.What.MapEvent, out var mapEventId))
             return;
 
-        // On a client, SendAll targets the server (its only connected peer). Carry our controller id so the
-        // server records join order (first to enter = host).
-        network.SendAll(new NetworkRequestBattleHost(mapEventId, controllerIdProvider.ControllerId));
-        Logger.Information("[BattleHost] Requested host election for battle {MapEventId}", mapEventId);
+        // On a client, SendAll targets the server (its only connected peer).
+        network.SendAll(new NetworkRequestBattleReserves(mapEventId, controllerIdProvider.ControllerId));
+        Logger.Information("[BattleHost] Requested own battle reserves at entry for battle {MapEventId}", mapEventId);
     }
 
-    /// <summary>[Server] Elect the host (first requester wins) and append later requesters to the successor
-    /// line in join order; broadcast the assignment. A duplicate/late requester just gets a re-confirm.</summary>
+    /// <summary>[Client] The battle mission FINISHED LOADING (we are mission-ready, BR-010): ask the server to
+    /// elect (or report) the host. The server records these requests in arrival order, so its per-battle
+    /// connection order is the mission-ready order (BR-013).</summary>
+    private void Handle_BattleMissionReady(MessagePayload<BattleMissionReady> payload)
+    {
+        if (ModInformation.IsServer) return;
+
+        var mapEventId = payload.What.MapEventId;
+        if (string.IsNullOrEmpty(mapEventId)) return;
+
+        network.SendAll(new NetworkRequestBattleHost(mapEventId, controllerIdProvider.ControllerId));
+        Logger.Information("[BattleHost] Mission ready — requested host election for battle {MapEventId}", mapEventId);
+    }
+
+    /// <summary>[Server] Elect the host (first MISSION-READY requester wins, BR-010) and append later ready
+    /// requesters to the successor line in arrival (= mission-ready, BR-013) order; broadcast the assignment.
+    /// A duplicate/late requester just gets a re-confirm.</summary>
     private void Handle_NetworkRequestBattleHost(MessagePayload<NetworkRequestBattleHost> payload)
     {
         if (ModInformation.IsClient) return;
@@ -104,7 +127,7 @@ internal class BattleHostHandler : IHandler
 
         // Reads campaign collections and the shared assignment, so run on the main thread. That also
         // serializes requests for one battle: the first the server processes becomes the host, the rest
-        // append in arrival (= join) order, so concurrent requests cannot double-elect.
+        // append in arrival (= mission-ready) order, so concurrent requests cannot double-elect.
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<MapEvent>(mapEventId, out var mapEvent))
@@ -138,19 +161,25 @@ internal class BattleHostHandler : IHandler
                 var assignment = new BattleHostAssignment(requesterId, Array.Empty<string>());
                 hostRegistry.Set(mapEventId, assignment);
 
-                Logger.Information("[BattleHost] Elected host {Host} (first to join) for battle {MapEventId}", requesterId, mapEventId);
+                Logger.Information("[BattleHost] Elected host {Host} (first mission-ready) for battle {MapEventId}", requesterId, mapEventId);
 
                 network.SendAll(ToMessage(mapEventId, assignment));
             }
 
-            // Feed the entrant the troop reserves it owns (its own party; plus the AI/enemy side if it is the
-            // host) so its mission's troop supplier can spawn them. Buffered client-side until that supplier exists.
-            SendOwnedReserves(mapEventId, mapEvent, requester, requesterId);
+            // Feed the ready client the troop reserves it owns — its own parties, plus the unowned (NPC)
+            // parties when it is the elected host (BR-010: the NPC grant travels WITH the election). Empties
+            // are included here so a side this client owns nothing on is explicitly final and its joint spawn
+            // sizing can proceed. Buffered client-side until the supplier exists.
+            SendOwnedReserves(mapEventId, mapEvent, requester, requesterId, includeEmptySides: true);
         });
     }
 
-    /// <summary>[Server] A new owner (host adopting a leaver, or a promoted successor) asks for its now-larger
-    /// reserve; reply with its full owned set at the current ledger pointers so adopted parties resume cleanly.</summary>
+    /// <summary>[Server] A client asks for the reserves it currently owns: at battle ENTRY (feed its own
+    /// parties while it loads), or after taking over a departed owner's troops (a host adopting a leaver, or
+    /// a promoted successor) — the reply carries the full owned set at the current ledger pointers so adopted
+    /// parties resume cleanly. Empty sides are SKIPPED: before the election answers, an empty unowned side
+    /// must not mark the requester's enemy-side supplier populated (sizing would run prematurely); the
+    /// explicit empties arrive with the election reply instead.</summary>
     private void Handle_NetworkRequestBattleReserves(MessagePayload<NetworkRequestBattleReserves> payload)
     {
         if (ModInformation.IsClient) return;
@@ -164,12 +193,15 @@ internal class BattleHostHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MapEvent>(mapEventId, out var mapEvent))
                 return;
 
-            SendOwnedReserves(mapEventId, mapEvent, requester, requesterId);
+            SendOwnedReserves(mapEventId, mapEvent, requester, requesterId, includeEmptySides: false);
         });
     }
 
-    /// <summary>[Server] Send the entrant every reserve it owns, one message per side.</summary>
-    private void SendOwnedReserves(string mapEventId, MapEvent mapEvent, NetPeer requester, string requesterId)
+    /// <summary>[Server] Send the requester every reserve it owns, one message per side. With
+    /// <paramref name="includeEmptySides"/> a side the requester owns nothing on is sent as an explicit empty
+    /// (election/migration replies — finalizes the side so sizing proceeds); without it, empty sides are
+    /// skipped (entry replies — the unowned sides are not decided until the election).</summary>
+    private void SendOwnedReserves(string mapEventId, MapEvent mapEvent, NetPeer requester, string requesterId, bool includeEmptySides)
     {
         if (requester == null) return;
 
@@ -178,6 +210,9 @@ internal class BattleHostHandler : IHandler
 
         foreach (var sideReserve in reserveBuilder.GetOwnedReserves(mapEvent, requesterId, isHost))
         {
+            if (!includeEmptySides && (sideReserve.Parties == null || sideReserve.Parties.Length == 0))
+                continue;
+
             network.Send(requester, new NetworkBattleTroopReserve(
                 mapEventId, (int)sideReserve.Side, sideReserve.Parties));
         }

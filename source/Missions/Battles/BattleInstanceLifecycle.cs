@@ -67,7 +67,8 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
     // The battle mission was opened locally and the controller attached by BattleMissionEntryPatch before the
     // event was published, so this is the live, mission-scoped owner of the P2P connection.
     // The spawn gate is engaged earlier, in BattleMissionEntryPatch's prefix (before the mission's troops
-    // spawn). This handler only owns the P2P instance connect + host-election request.
+    // spawn). This handler only owns the P2P instance connect; BattleHostHandler requests the entry reserves
+    // here and the host election later, at mission-ready (CoopBattleController.AfterStart).
     private void Handle_PlayerEnteredBattle(MessagePayload<PlayerEnteredBattle> payload)
     {
         var mapEvent = payload.What.MapEvent;
