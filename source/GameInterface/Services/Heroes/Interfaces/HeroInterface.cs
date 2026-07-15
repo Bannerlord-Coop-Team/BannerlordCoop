@@ -176,7 +176,8 @@ internal class HeroInterface : IHeroInterface
             return;
         }
 
-        // Repair before registration so no roster delta is broadcast ahead of the hero creation message.
+        // Restore the roster before assignNetworkIds registers it. Otherwise the AllowedThread AddToCounts
+        // patch sends a roster update before clients receive the hero creation message.
         RestorePlayerMemberships(hero, party);
 
         // Assign the network StringIds BEFORE adding to the CampaignObjectManager. FindNextUniqueStringId derives
@@ -211,10 +212,12 @@ internal class HeroInterface : IHeroInterface
 
     internal static void RestorePlayerMemberships(Hero hero, MobileParty party)
     {
-        // ID-based clan caches and serialized rosters omit the unregistered root hero.
+        // PackageMainHero unregisters the player hero before packaging, so ClanBinaryPackage cannot store its
+        // network ID in the clan's hero and alive-lord caches.
         if (!hero.Clan.Heroes.Contains(hero))
             hero.Clan.OnLordAdded(hero);
 
+        // TroopRosterBinaryPackage excludes roster elements, so the imported party has an empty member roster.
         if (party.MemberRoster.GetTroopCount(hero.CharacterObject) == 0)
             party.MemberRoster.AddToCounts(hero.CharacterObject, 1, insertAtFront: true);
     }
