@@ -567,6 +567,8 @@ internal class BattleFinalizeHandler : IHandler
             mobileParty.DesiredAiNavigationType)
         {
             ForcePosition = true,
+            IsCurrentlyAtSea = mobileParty.IsCurrentlyAtSea,
+            ResetMovementToHold = true,
         };
 
         // The gate reset must reach clients before the encounter close allows another map command.

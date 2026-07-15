@@ -90,7 +90,12 @@ internal class MobilePartyBehaviorHandler : IHandler
             party.DefaultBehavior,
             party.TargetPosition,
             party.DesiredAiNavigationType
-        );
+        )
+        {
+            ForcePosition = obj.What.ForcePosition,
+            IsCurrentlyAtSea = obj.What.IsCurrentlyAtSea,
+            ResetMovementToHold = obj.What.ResetMovementToHold,
+        };
 
         if (ModInformation.IsClient)
         {
@@ -125,11 +130,31 @@ internal class MobilePartyBehaviorHandler : IHandler
                 if (data.HasTarget && !objectManager.TryGetObjectWithLogging(data.InteractablePointId, out partyBase))
                     return;
 
+                List<MobileParty> attachedParties = null;
+                if (ModInformation.IsServer && data.ForcePosition)
+                {
+                    attachedParties = ApplyServerForcedPosition(party, data.PartyPosition, data.IsCurrentlyAtSea);
+                    if (data.ResetMovementToHold)
+                    {
+                        party.SetMoveModeHold();
+                        party.ResetNavigationToHold();
+                    }
+                }
+
                 // The apply drives the Harmony-patched SetAiBehavior path; the AutoSync
                 // patch must stand down while the replicated behavior is applied.
                 using (new AllowedThread())
                 {
-                    PartyBehaviorPatch.SetAiBehavior(party.Ai, data.NewAiBehavior, partyBase, data.BestTargetPoint);
+                    if (ModInformation.IsClient && data.ForcePosition)
+                        ApplyForcedPosition(party, data.PartyPosition, data.IsCurrentlyAtSea);
+
+                    if (ModInformation.IsClient && data.ResetMovementToHold)
+                    {
+                        party.SetMoveModeHold();
+                        party.ResetNavigationToHold();
+                    }
+                    else if (!ModInformation.IsServer || !data.ResetMovementToHold)
+                        PartyBehaviorPatch.SetAiBehavior(party.Ai, data.NewAiBehavior, partyBase, data.BestTargetPoint);
 
                     if (MobilePartyAiConfig.DEBUG)
                     {
@@ -145,7 +170,7 @@ internal class MobilePartyBehaviorHandler : IHandler
                     if (ModInformation.IsClient)
                     {
                         // Moving parties already simulate the replicated target, so an in-flight snapshot is stale.
-                        if (ShouldApplyAuthoritativePosition(
+                        if (!data.ForcePosition && ShouldApplyAuthoritativePosition(
                             isSelfEcho,
                             data.ForcePosition,
                             party.PartyMoveMode == MoveModeType.Hold,
@@ -159,12 +184,79 @@ internal class MobilePartyBehaviorHandler : IHandler
                         messageBroker.Publish(this, new PartyBehaviorUpdated(ref data));
                     }
                 }
+
+                if (attachedParties != null)
+                {
+                    foreach (var attachedParty in attachedParties)
+                        PublishForcedPosition(attachedParty);
+                }
             }
             catch (Exception e)
             {
                 Logger.Error(e, "Failed to apply {Message}", nameof(UpdatePartyBehavior));
             }
         });
+    }
+
+    private static void ApplyForcedPosition(MobileParty party, CampaignVec2 position, bool isCurrentlyAtSea)
+    {
+        party.Position = position;
+
+        if (party.IsCurrentlyAtSea != isCurrentlyAtSea)
+            party.ChangeIsCurrentlyAtSeaCheat();
+    }
+
+    private static List<MobileParty> ApplyServerForcedPosition(
+        MobileParty party,
+        CampaignVec2 position,
+        bool isCurrentlyAtSea)
+    {
+        ApplyForcedPosition(party, position, isCurrentlyAtSea);
+
+        if (party.Army == null)
+            return null;
+
+        List<MobileParty> attachedParties = null;
+        foreach (var attachedParty in party.Army.LeaderParty.AttachedParties)
+        {
+            if (attachedParty == party)
+                continue;
+
+            attachedParty.Position = position;
+            attachedParties ??= new List<MobileParty>();
+            attachedParties.Add(attachedParty);
+        }
+
+        return attachedParties;
+    }
+
+    private void PublishForcedPosition(MobileParty party)
+    {
+        if (party.Ai == null || !objectManager.TryGetId(party, out var partyId))
+            return;
+
+        string interactablePointId = null;
+        PartyBase partyBase = party.Ai.AiBehaviorInteractable as PartyBase;
+        bool hasTarget = partyBase != null;
+        if (hasTarget && !objectManager.TryGetId(partyBase, out interactablePointId))
+            return;
+
+        var data = new PartyBehaviorUpdateData(
+            Compact(partyId, typeof(MobileParty)),
+            party.ShortTermBehavior,
+            Compact(interactablePointId, typeof(PartyBase)),
+            party.Ai.BehaviorTarget,
+            hasTarget,
+            party.Position,
+            party.DefaultBehavior,
+            party.TargetPosition,
+            party.DesiredAiNavigationType)
+        {
+            ForcePosition = true,
+            IsCurrentlyAtSea = party.IsCurrentlyAtSea,
+        };
+
+        messageBroker.Publish(this, new PartyBehaviorUpdated(ref data));
     }
 
     internal static bool TrySelectBehaviorUpdate(

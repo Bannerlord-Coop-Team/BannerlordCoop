@@ -47,6 +47,12 @@ public struct PartyBehaviorUpdateData
     [ProtoMember(14)]
     public bool ForcePosition { get; set; }
 
+    [ProtoMember(15)]
+    public bool IsCurrentlyAtSea { get; set; }
+
+    [ProtoMember(16)]
+    public bool ResetMovementToHold { get; set; }
+
     public PartyBehaviorUpdateData(
         string mobilePartyId,
         AiBehavior newAiBehavior,
@@ -69,5 +75,7 @@ public struct PartyBehaviorUpdateData
         DesiredAiNavigationType = desiredAiNavigationType;
         OriginControllerId = null;
         ForcePosition = false;
+        IsCurrentlyAtSea = false;
+        ResetMovementToHold = false;
     }
 }

@@ -16,12 +16,25 @@ internal readonly struct PartyBehaviorChangeAttempted : IEvent
     public readonly AiBehavior NewAiBehavior;
     public readonly IInteractablePoint InteractablePoint;
     public readonly CampaignVec2 BestTargetPoint;
+    public readonly bool ForcePosition;
+    public readonly bool IsCurrentlyAtSea;
+    public readonly bool ResetMovementToHold;
 
-    public PartyBehaviorChangeAttempted(MobilePartyAi partyAi, AiBehavior newAiBehavior, IInteractablePoint interactablePoint, CampaignVec2 bestTargetPoint)
+    public PartyBehaviorChangeAttempted(
+        MobilePartyAi partyAi,
+        AiBehavior newAiBehavior,
+        IInteractablePoint interactablePoint,
+        CampaignVec2 bestTargetPoint,
+        bool forcePosition = false,
+        bool isCurrentlyAtSea = false,
+        bool resetMovementToHold = false)
     {
         PartyAi = partyAi;
         NewAiBehavior = newAiBehavior;
         InteractablePoint = interactablePoint;
         BestTargetPoint = bestTargetPoint;
+        ForcePosition = forcePosition;
+        IsCurrentlyAtSea = isCurrentlyAtSea;
+        ResetMovementToHold = resetMovementToHold;
     }
 }

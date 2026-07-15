@@ -133,6 +133,8 @@ public class PartyBehaviorTest
         var immediate = new PartyBehaviorUpdateData(fullPartyId, default, default, default, false, default, default, default, default)
         {
             ForcePosition = true,
+            IsCurrentlyAtSea = true,
+            ResetMovementToHold = true,
         };
 
         var server = TestEnvironment.Server;
@@ -147,15 +149,21 @@ public class PartyBehaviorTest
         var sent = Assert.Single(server.NetworkSentMessages.GetMessages<NetworkUpdatePartyBehavior>());
         Assert.False(sent.BehaviorUpdateData.HasTarget);
         Assert.True(sent.BehaviorUpdateData.ForcePosition);
+        Assert.True(sent.BehaviorUpdateData.IsCurrentlyAtSea);
+        Assert.True(sent.BehaviorUpdateData.ResetMovementToHold);
 
         var serialized = server.EnsureSerializable(sent);
         Assert.True(serialized.BehaviorUpdateData.ForcePosition);
+        Assert.True(serialized.BehaviorUpdateData.IsCurrentlyAtSea);
+        Assert.True(serialized.BehaviorUpdateData.ResetMovementToHold);
 
         foreach (var client in TestEnvironment.Clients)
         {
             var update = Assert.Single(client.InternalMessages.GetMessages<UpdatePartyBehavior>());
             Assert.False(update.BehaviorUpdateData.HasTarget);
             Assert.True(update.BehaviorUpdateData.ForcePosition);
+            Assert.True(update.BehaviorUpdateData.IsCurrentlyAtSea);
+            Assert.True(update.BehaviorUpdateData.ResetMovementToHold);
         }
     }
 
