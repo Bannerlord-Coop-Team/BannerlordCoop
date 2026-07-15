@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using static TaleWorlds.Library.CommandLineFunctionality;
@@ -89,6 +90,51 @@ public class SiegeDebugCommand
         Campaign.Current.SiegeEventManager.StartSiegeEvent(settlement, besieger);
 
         return $"{besieger.Name} ({besieger.StringId}) is now besieging {settlement.Name}";
+    }
+
+    // coop.debug.siege.assault
+    /// <summary>
+    /// Starts the wall assault for an active siege. Server only; the assault replicates to clients.
+    /// </summary>
+    /// <param name="args">first arg : settlementId</param>
+    /// <returns>Result of the operation as a string</returns>
+    [CommandLineArgumentFunction("assault", "coop.debug.siege")]
+    public static string StartAssault(List<string> args)
+    {
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.siege.assault <settlementId>";
+        }
+
+        if (ModInformation.IsClient)
+        {
+            return "This command can only be used by the server";
+        }
+
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        if (!objectManager.TryGetObject<Settlement>(args[0], out var settlement))
+        {
+            return $"Settlement with id {args[0]} not found";
+        }
+
+        var leaderParty = settlement.SiegeEvent?.BesiegerCamp?.LeaderParty;
+        if (leaderParty == null)
+        {
+            return $"{settlement.Name} is not under siege";
+        }
+
+        if (settlement.Party.MapEvent != null)
+        {
+            return $"{settlement.Name} already has an active siege assault";
+        }
+
+        StartBattleAction.ApplyStartAssaultAgainstWalls(leaderParty, settlement);
+
+        return $"{leaderParty.Name} ({leaderParty.StringId}) started an assault against {settlement.Name}";
     }
 
     // coop.debug.siege.list
