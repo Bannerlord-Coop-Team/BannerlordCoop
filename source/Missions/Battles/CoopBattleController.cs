@@ -100,7 +100,7 @@ public class CoopBattleController : CoopMissionController
         puppetRoutApplier = new PuppetRoutApplier(messageBroker, coopMissionComponent, casualties);
         damageRouter = new BattleDamageRouter(network, messageBroker, coopMissionComponent, session);
         authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner);
-        reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, session, deployment, formationAssigner);
+        reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, coopMissionComponent, session, deployment, formationAssigner);
         siegeEngineDeployment = new SiegeEngineDeploymentReplicator(network, messageBroker, session);
         siegeMachineState = new SiegeMachineStateReplicator(network, messageBroker, session, coopMissionComponent.AgentRegistry);
         siegeWeaponFire = new SiegeWeaponFireReplicator(network, messageBroker, coopMissionComponent.AgentRegistry);
@@ -160,6 +160,7 @@ public class CoopBattleController : CoopMissionController
 
         // Drain before the end-condition gate below so a release sees this tick's fresh puppets.
         puppetSpawner.DrainPendingPuppets();
+        reinforcementFielder.Tick();
 
         // Vanilla's end checks unlock at the LOCAL deployment finish, but a side whose troops arrive as
         // another client's puppets can be empty long after activation (own-party troops stay withheld

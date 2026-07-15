@@ -92,4 +92,64 @@ public class CoopBattleMissionSpawnHandlerSizingTests
             attackerMissingReserveAccepted: true,
             defenderMissingReserveAccepted: true));
     }
+
+    [Fact]
+    public void MigrationRecoveryTargets_LargeArmyReserves_StayWithinJointBattleSize()
+    {
+        var targets = ReinforcementFielder.RecoveryTargets.Calculate(
+            defenderTotal: 1154,
+            attackerTotal: 1336,
+            battleSize: 1000,
+            maximumSideRatio: 0.75f,
+            defenderAdvantageFactor: 1f);
+
+        Assert.Equal(464, targets.Defenders);
+        Assert.Equal(536, targets.Attackers);
+        Assert.Equal(1000, targets.Defenders + targets.Attackers);
+    }
+
+    [Fact]
+    public void MigrationRecoveryTargets_OneSidedReserve_UsesAvailableBattleCapacity()
+    {
+        var targets = ReinforcementFielder.RecoveryTargets.Calculate(
+            defenderTotal: 1000,
+            attackerTotal: 0,
+            battleSize: 500,
+            maximumSideRatio: 0.75f,
+            defenderAdvantageFactor: 1f);
+
+        Assert.Equal(500, targets.Defenders);
+        Assert.Equal(0, targets.Attackers);
+    }
+
+    [Fact]
+    public void MigrationRecoveryTargets_SmallBattle_DoesNotInventTroops()
+    {
+        var targets = ReinforcementFielder.RecoveryTargets.Calculate(
+            defenderTotal: 40,
+            attackerTotal: 60,
+            battleSize: 1000,
+            maximumSideRatio: 0.75f,
+            defenderAdvantageFactor: 1f);
+
+        Assert.Equal(40, targets.Defenders);
+        Assert.Equal(60, targets.Attackers);
+    }
+
+    [Theory]
+    [InlineData(false, 10, false, true)]
+    [InlineData(true, 10, false, false)]
+    [InlineData(false, 0, false, false)]
+    [InlineData(false, 10, true, false)]
+    public void MigrationRecoveryParty_RequiresNewRemainingReserveWithoutLiveAgent(
+        bool wasPreviouslyOwned,
+        int remainingTroops,
+        bool hasLiveAgent,
+        bool expected)
+    {
+        Assert.Equal(expected, ReinforcementFielder.ShouldRecoverParty(
+            wasPreviouslyOwned,
+            remainingTroops,
+            hasLiveAgent));
+    }
 }

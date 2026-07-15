@@ -1,4 +1,4 @@
-using GameInterface.Services.MapEvents.TroopSupply;
+﻿using GameInterface.Services.MapEvents.TroopSupply;
 using System.Linq;
 using TaleWorlds.Core;
 
@@ -132,5 +132,45 @@ public class CoopTroopSupplierTests
 
         supplier.SupplyTroops(2);
         Assert.Equal(9, SuppliedFor(supplier, "A"));
+    }
+
+    [Fact]
+    public void SetReserve_IncrementsRevision_ForEachAuthoritativeSnapshot()
+    {
+        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Defender, null);
+
+        Assert.Equal(0, supplier.ReserveRevision);
+
+        supplier.SetReserve(new[] { Party("A", 2) });
+        supplier.SetReserve(new[] { Party("A", 2) });
+
+        Assert.Equal(2, supplier.ReserveRevision);
+    }
+
+    [Fact]
+    public void SupplyOneTroopFromParty_AdvancesOnlyTheSelectedParty()
+    {
+        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null);
+        supplier.SetReserve(new[] { Party("A", 3, supplied: 1), Party("B", 4) });
+
+        supplier.SupplyOneTroopFromParty("B");
+        supplier.SupplyOneTroopFromParty("B");
+
+        Assert.Equal(1, SuppliedFor(supplier, "A"));
+        Assert.Equal(2, SuppliedFor(supplier, "B"));
+        Assert.Equal(2, supplier.GetRemainingForParty("A"));
+        Assert.Equal(2, supplier.GetRemainingForParty("B"));
+    }
+
+    [Fact]
+    public void SupplyOneTroopFromParty_MissingParty_DoesNotConsumeAnotherParty()
+    {
+        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null);
+        supplier.SetReserve(new[] { Party("A", 3) });
+
+        Assert.Null(supplier.SupplyOneTroopFromParty("missing"));
+
+        Assert.Equal(0, SuppliedFor(supplier, "A"));
+        Assert.Equal(3, supplier.GetRemainingForParty("A"));
     }
 }

@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -380,8 +380,8 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         });
 
         // We now own the departed controller's parties — pull our updated reserve from the server (the full
-        // owned set at the current ledger pointers) so we can spawn their reinforcements from where the
-        // departed owner left off. Runs even with no on-field agents adopted (reserve may still be unspawned).
+        // owned set at the current ledger pointers). ReinforcementFielder recovers newly-owned parties that had
+        // no agents to adopt and continues them from those pointers. Runs even when nothing was adopted.
         RequestReserves();
     }
 
