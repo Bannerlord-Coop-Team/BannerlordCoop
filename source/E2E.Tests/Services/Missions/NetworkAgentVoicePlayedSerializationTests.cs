@@ -13,15 +13,30 @@ namespace E2E.Tests.Services.Missions;
 public class NetworkAgentVoicePlayedSerializationTests
 {
     [Fact]
-    public void NetworkAgentVoicePlayed_RoundTripsAgentAndVoiceType()
+    public void NetworkAgentVoicePlayed_RoundTripsAgentVoiceTypeAndSample()
     {
-        var original = new NetworkAgentVoicePlayed(Guid.NewGuid(), "Follow");
+        var original = new NetworkAgentVoicePlayed(Guid.NewGuid(), "Charge", "rick_charge_03");
         var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
         MessagePacket packet = MessagePacket.Create(original, serializer);
 
         var result = Assert.IsType<NetworkAgentVoicePlayed>(serializer.Deserialize<IMessage>(packet.Data));
 
         Assert.Equal(original.AgentId, result.AgentId);
-        Assert.Equal("Follow", result.VoiceTypeId);
+        Assert.Equal("Charge", result.VoiceTypeId);
+        Assert.Equal("rick_charge_03", result.SampleName);
+    }
+
+    [Fact]
+    public void NetworkAgentVoicePlayed_RoundTripsVanillaFallback()
+    {
+        var original = new NetworkAgentVoicePlayed(Guid.NewGuid(), "AttackGate", null);
+        var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+        MessagePacket packet = MessagePacket.Create(original, serializer);
+
+        var result = Assert.IsType<NetworkAgentVoicePlayed>(serializer.Deserialize<IMessage>(packet.Data));
+
+        Assert.Equal(original.AgentId, result.AgentId);
+        Assert.Equal("AttackGate", result.VoiceTypeId);
+        Assert.Null(result.SampleName);
     }
 }

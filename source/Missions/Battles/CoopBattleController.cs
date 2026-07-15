@@ -111,6 +111,9 @@ public class CoopBattleController : CoopMissionController
         Deployment = deployment;
         ResultCommitter = new BattleResultCommitter(objectManager, session, hostRegistry);
         siegeEngineStateReporter = new SiegeEngineStateReporter(objectManager, session, hostRegistry, relayNetwork);
+
+        // Decode order clips during battle setup so the first issued order does not hitch.
+        coopMissionComponent.AgentVoiceHandler.WarmUp();
     }
 
     public override void Dispose()

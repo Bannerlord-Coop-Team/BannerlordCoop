@@ -5,6 +5,7 @@ using GameInterface.Services.Locations;
 using GameInterface.Services.MapEvents;
 using Missions.Agents.Handlers;
 using Missions.Agents.Patches;
+using Missions.Agents.Voice;
 using Missions.Battles;
 using Missions.Missiles.Handlers;
 using Missions.Missiles.Patches;
@@ -117,6 +118,9 @@ public class MissionModule : Module
         builder.RegisterType<MissileHandler>().As<IMissileHandler>().InstancePerDependency();
         builder.RegisterType<AgentMovementHandler>().As<IAgentMovementHandler>().InstancePerDependency();
         builder.RegisterType<AgentActionHandler>().As<IAgentActionHandler>().InstancePerDependency();
+        builder.RegisterType<VanillaOrderVoiceService>()
+            .As<IVanillaOrderVoiceService>()
+            .InstancePerDependency();
         builder.RegisterType<AgentVoiceHandler>().As<IAgentVoiceHandler>().InstancePerDependency();
         builder.RegisterType<WeaponDropHandler>().As<IWeaponDropHandler>().InstancePerDependency();
         builder.RegisterType<WeaponPickupHandler>().As<IWeaponPickupHandler>().InstancePerDependency();

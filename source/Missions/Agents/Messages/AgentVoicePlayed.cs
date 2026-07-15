@@ -4,12 +4,13 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Agents.Messages;
 
 /// <summary>
-/// A voice event emitted by a local mission agent.
+/// Offers a local order voice to the mission handler before vanilla chooses a recording.
 /// </summary>
-public readonly struct AgentVoicePlayed : IEvent
+public sealed class AgentVoicePlayed : IEvent
 {
     public Agent Agent { get; }
     public string VoiceTypeId { get; }
+    public bool Handled { get; set; }
 
     public AgentVoicePlayed(Agent agent, string voiceTypeId)
     {

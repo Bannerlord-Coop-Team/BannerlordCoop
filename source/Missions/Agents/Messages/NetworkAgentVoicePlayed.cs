@@ -5,7 +5,7 @@ using System;
 namespace Missions.Agents.Messages;
 
 /// <summary>
-/// Replicates a player's battle-order voice event to the other mission clients.
+/// Replicates a player's battle-order voice and exact vanilla recording to the other mission clients.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public readonly struct NetworkAgentVoicePlayed : IEvent
@@ -16,9 +16,13 @@ public readonly struct NetworkAgentVoicePlayed : IEvent
     [ProtoMember(2)]
     public string VoiceTypeId { get; }
 
-    public NetworkAgentVoicePlayed(Guid agentId, string voiceTypeId)
+    [ProtoMember(3)]
+    public string SampleName { get; }
+
+    public NetworkAgentVoicePlayed(Guid agentId, string voiceTypeId, string sampleName)
     {
         AgentId = agentId;
         VoiceTypeId = voiceTypeId;
+        SampleName = sampleName;
     }
 }

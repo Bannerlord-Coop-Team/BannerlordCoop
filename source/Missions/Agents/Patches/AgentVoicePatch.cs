@@ -7,7 +7,7 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Agents.Patches;
 
 /// <summary>
-/// Captures mission-agent voice events for the per-mission voice handler.
+/// Lets the per-mission handler replace a local order voice before native FMOD randomizes it.
 /// </summary>
 [HarmonyPatch(typeof(Agent), nameof(Agent.MakeVoice), new[]
 {
@@ -17,11 +17,13 @@ namespace Missions.Agents.Patches;
 [HarmonyPatchCategory(MissionModule.AgentVoicePatchCategory)]
 internal static class AgentVoicePatch
 {
-    [HarmonyPostfix]
-    private static void Postfix(Agent __instance, SkinVoiceManager.SkinVoiceType voiceType)
+    [HarmonyPrefix]
+    private static bool Prefix(Agent __instance, SkinVoiceManager.SkinVoiceType voiceType)
     {
-        if (AllowedThread.IsThisThreadAllowed() || !OrderVoiceContextPatch.IsActive) return;
+        if (AllowedThread.IsThisThreadAllowed() || !OrderVoiceContextPatch.IsActive) return true;
 
-        MessageBroker.Instance.Publish(__instance, new AgentVoicePlayed(__instance, voiceType.TypeID));
+        var voice = new AgentVoicePlayed(__instance, voiceType.TypeID);
+        MessageBroker.Instance.Publish(__instance, voice);
+        return !voice.Handled;
     }
 }

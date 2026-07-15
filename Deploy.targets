@@ -36,9 +36,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- All build outputs (DLLs) for this project. -->
-    <DeployDllFiles Include="$(TargetDir)**\*.dll" />
-
     <!-- Static module files (start-*.bat, instructions); SubModule.xml is templated separately. -->
     <DeployStaticFiles Include="$(DeploySourceDir)\**\*"
                        Exclude="$(SubModuleTemplate)" />
@@ -54,6 +51,11 @@
     <Message Importance="high" Text="Deploying $(ModName) -> $(ModDir)" />
 
     <MakeDir Directories="$(ModBinDir);$(ModPrefabDir)" />
+
+    <!-- Evaluate after Build so DLLs created by a clean build are included. -->
+    <ItemGroup>
+      <DeployDllFiles Include="$(TargetDir)**\*.dll" />
+    </ItemGroup>
 
     <!-- DLLs -->
     <Copy SourceFiles="@(DeployDllFiles)"
