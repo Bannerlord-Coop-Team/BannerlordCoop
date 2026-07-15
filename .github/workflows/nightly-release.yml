@@ -88,51 +88,22 @@ jobs:
             -p:NuGetAudit=false \
             --consoleLoggerParameters:ErrorsOnly
 
-      - name: Build changelog
+      - name: Build release metadata
         id: release
         env:
           PREVIOUS_SHA: ${{ steps.previous.outputs.result }}
         run: |
-          # shellcheck disable=SC2016
           set -eu
           release_date=$(TZ=America/Chicago date +%F)
           display_date=$(TZ=America/Chicago date +%m-%d-%Y)
           file_name="Coop $display_date.7z"
           head_sha=$(git rev-parse HEAD)
           base_sha="$PREVIOUS_SHA"
-          range=
-          if [ -n "$base_sha" ] && git merge-base --is-ancestor "$base_sha" "$head_sha"; then
-            range="$base_sha..$head_sha"
-          else
+          if [ -z "$base_sha" ] || ! git merge-base --is-ancestor "$base_sha" "$head_sha"; then
             base_sha=
           fi
 
           mkdir -p artifact
-          changelog=artifact/changelog.md
-          printf '%s\n' '**Changelog**' > "$changelog"
-          if [ -n "$range" ]; then
-            commit_count=$(git rev-list --count "$range")
-          else
-            commit_count=$(git rev-list --count --since='24 hours ago' "$head_sha")
-          fi
-          if [ "$commit_count" -eq 0 ]; then
-            printf '%s\n' 'No changes since the previous nightly build.' >> "$changelog"
-          else
-            if [ -n "$range" ]; then
-              git log -n 20 --format='%H%x09%s' "$range"
-            else
-              git log -n 20 --since='24 hours ago' --format='%H%x09%s' "$head_sha"
-            fi | while IFS="$(printf '\t')" read -r commit_sha subject; do
-              short_sha=$(printf '%.7s' "$commit_sha")
-              safe_subject=$(printf '%s' "$subject" | sed 's/`/'\''/g; s/@/＠/g')
-              printf -- "- [\`%s\`](https://github.com/%s/commit/%s) %s\n" \
-                "$short_sha" "$GITHUB_REPOSITORY" "$commit_sha" "$safe_subject" >> "$changelog"
-            done
-            if [ "$commit_count" -gt 20 ]; then
-              printf -- '- %s more commits\n' "$((commit_count - 20))" >> "$changelog"
-            fi
-          fi
-
           printf 'release_date=%s\nfile_name=%s\nhead_sha=%s\nbase_sha=%s\n' \
             "$release_date" "$file_name" "$head_sha" "$base_sha" >> "$GITHUB_OUTPUT"
 
