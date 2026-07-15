@@ -15,10 +15,19 @@ public class NetworkSiegeEnginePlacement : IEvent
     public readonly int PointId;
     [ProtoMember(2)]
     public readonly string WeaponTypeName;
+    /// <summary>
+    /// BR-102: the deploying host's epoch for this battle. Placement mutates vanilla's ordered
+    /// undeployed-weapon lists (order-sensitive, replayed to joiners), so receivers drop a placement
+    /// stamped by an earlier hosting generation (a deposed deployer in flight across a migration);
+    /// 0 = unstamped (sender had no assignment yet), always accepted.
+    /// </summary>
+    [ProtoMember(3)]
+    public readonly int HostEpoch;
 
-    public NetworkSiegeEnginePlacement(int pointId, string weaponTypeName)
+    public NetworkSiegeEnginePlacement(int pointId, string weaponTypeName, int hostEpoch = 0)
     {
         PointId = pointId;
         WeaponTypeName = weaponTypeName;
+        HostEpoch = hostEpoch;
     }
 }

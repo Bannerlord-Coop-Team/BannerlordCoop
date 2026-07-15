@@ -23,6 +23,13 @@ public interface IBattleSession
     bool IsLocalHost { get; }
 
     /// <summary>
+    /// The epoch of the current host assignment for this battle (BR-102): the server issues 1 at the
+    /// election and +1 per host change. 0 while no instance is set or no assignment has been received
+    /// yet — senders stamp 0 ("unstamped") and receivers with 0 cannot judge staleness, so they accept.
+    /// </summary>
+    int HostEpoch { get; }
+
+    /// <summary>
     /// Record the battle instance on entry. Returns false (and changes nothing) when the session has already
     /// begun — OpenBattleMission can fire more than once around an encounter, and the battle must connect once.
     /// </summary>
@@ -56,6 +63,10 @@ public class BattleSession : IBattleSession
     public bool HasInstance => InstanceId != null;
 
     public bool IsLocalHost => InstanceId != null && hostRegistry.IsHost(InstanceId);
+
+    public int HostEpoch => InstanceId != null && hostRegistry.TryGet(InstanceId, out var assignment)
+        ? assignment.Epoch
+        : 0;
 
     public bool TryBegin(string instanceId)
     {

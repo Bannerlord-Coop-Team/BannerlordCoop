@@ -204,6 +204,45 @@ being trusted), + REPLACE lock-in and 3 absent-owner unit tests. Suites: full E2
 the reserve orphaned until the owner returns (pre-existing, narrow); the ≤1 s supplied-but-
 unreported window on re-feeds is the same bounded window migration re-feeds already have.
 
+**Alignment increment 9 (2026-07-15) — BR-102 residual closed: siege P2P host-authority traffic epoch-stamped (red → green).**
+Closes increment 3's residuals. (1) The siege-report gate (`SiegeEngineStateCommitHandler`) now
+has dedicated tests — already green on arrival (honest lock-in), verified to exercise the refusal
+branch: a stale-epoch report returns BEFORE the write-back's map-event lookup (mocked object
+manager; A→B→A shape — the sender IS the current host, only the epoch refuses its earlier-stint
+report), and the same report at the current epoch reaches the lookup. (2) The siege mesh traffic
+is stamped + gated: `NetworkSiegeEnginePlacement` (host-only, order-sensitive, joiner-replayed
+history — stale placements refused before `Record`), `NetworkSiegeMachineAuthority` (the host's
+arbitration — stale decisions refused before the claim table), `NetworkSiegeMachineState`
+(host-owned damage fields — stale snapshots refused before apply or pending-buffering). All
+additive ProtoMembers (wire-safe; ctor default 0 = unstamped legacy). Receiver policy
+(`HostEpochPolicy`) is deliberately looser than the server gates' strict equality: drop ONLY a
+strictly-lower stamped epoch — epoch 0 (sender without an assignment yet, e.g. a pre-election
+claimant), local epoch 0 (receiver cannot judge) and epoch-AHEAD (sender heard the migration
+first; dropping would silence the NEW host until the assignment broadcast lands) all accepted, so
+the self-healing convergence race stays one-directional. Catch-up resends re-stamp the sender's
+CURRENT epoch (a promoted successor's replay must not be dropped by an up-to-date joiner).
+Deliberately unstamped, same standard as `NetworkBattleActivated`: `NetworkSiegeMachineClaim`
+(peer request — the host's epoch-stamped ANSWER is the gate), `NetworkBattleDeploymentFinished`
+(monotonic latch + receiver-side host-identity check), and the fire replicator's
+`NetworkSiegeWeaponFired`/`NetworkRamHit`/`NetworkGateHit` (machine-SIMULATOR/owner authority,
+cosmetic or vanilla-path-bounded at receivers). Tests: 25 new in Coop.Tests, 11 honest red →
+green (3 policy, 3 receiver gates, 5 sender stamps); the rest lock in the accept policy, the
+session epoch source (`IBattleSession.HostEpoch`), and the pre-existing report gate. Unit-level
+through the REAL handlers via a new `MissionCurrentScope` (identity-only `Mission.Current`,
+reflection-set `_current`/`_missionObjects`): the E2E harness cannot host a siege mission, and
+materializing ANY MissionObject test double runs the native `ScriptComponentBehavior` type
+initializer — so the two native-adjacent send paths got seams (`BroadcastPlacement`, `Stamp`)
+with the remaining one-line call sites code-review-covered. Suites: full Coop.Tests 411 passed /
+1 pre-existing skip (412), targeted E2E 36/36, full E2E **559 passed / 4 pre-existing skips /
+0 failed** (563), Coop.IntegrationTests 114/117 (2 template skips + the known
+disconnect-detection parallel flake, re-verified green in isolation).
+**Residuals:** `SiegeEngineStateReporter.ReportIfHost`'s stamp line needs a live mission — code
+review only; the server-side gates keep strict `!=` (epoch 0 with an assignment present is
+refused there — a dead branch in practice, since a reporting host by definition holds the
+assignment it stamps from); a claimant lagging behind a receiver's newer assignment has its state
+deltas dropped for the sub-second convergence window (self-heals on the assignment broadcast /
+next state change).
+
 Harness lessons for later waves: never disable-patch `MapEvent.FinalizeEventAux` in an E2E
 PatchScope (it already carries a production prefix — two-prefix `InvalidProgramException`, and the
 broken patch state poisons every later test in the run); harness-created parties spawn with

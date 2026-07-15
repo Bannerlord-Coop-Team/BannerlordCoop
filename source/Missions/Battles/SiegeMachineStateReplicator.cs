@@ -228,8 +228,31 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             }
 
             lastSent[machineId] = state;
-            network.SendAll(state);
+            network.SendAll(Stamp(state));
         }
+    }
+
+    // BR-102: an outgoing state asserts this sender's simulation authority NOW, so stamp the current
+    // host epoch at the send boundary (CaptureState stays a pure machine read; lastSent keeps the
+    // unstamped capture, whose delta comparison never looks at the epoch).
+    private NetworkSiegeMachineState Stamp(NetworkSiegeMachineState state)
+    {
+        return new NetworkSiegeMachineState(state.MachineId, state.HitPoints, state.DestructionState,
+            state.GateState, state.LadderState, state.MoveDistance, state.HasArrived, state.WeaponState,
+            state.AimDirection, state.AimReleaseAngle, session.HostEpoch);
+    }
+
+    // BR-102: drop a host-authority message stamped by an earlier hosting generation (a deposed host
+    // in flight across a migration). Unstamped (0) senders, an unassigned (0) receiver, and epochs at
+    // or ahead of our assignment are accepted — see HostEpochPolicy for the convergence rationale.
+    private bool DropStaleHostEpoch(int messageEpoch, string messageName)
+    {
+        int localEpoch = session.HostEpoch;
+        if (!HostEpochPolicy.IsStale(messageEpoch, localEpoch)) return false;
+
+        Logger.Information("[BattleSync] Dropped {Message} stamped with stale host epoch {Stale} (current {Current})",
+            messageName, messageEpoch, localEpoch);
+        return true;
     }
 
     // Capture exactly the fields this simulator owns. The same routine is used for steady-state deltas and
@@ -747,13 +770,13 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
                     return;
                 }
 
-                network.SendAll(new NetworkSiegeMachineAuthority(obj.MachineId, current));
+                network.SendAll(new NetworkSiegeMachineAuthority(obj.MachineId, current, session.HostEpoch));
                 return;
             }
 
             if (machinesById.TryGetValue(obj.MachineId, out var machine) && HasLocalPlayerUser(machine))
             {
-                network.SendAll(new NetworkSiegeMachineAuthority(obj.MachineId, string.Empty));
+                network.SendAll(new NetworkSiegeMachineAuthority(obj.MachineId, string.Empty, session.HostEpoch));
                 return;
             }
 
@@ -776,7 +799,8 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
 
         PushClaimsToGate();
         RefreshMachineGates();
-        network.SendAll(new NetworkSiegeMachineAuthority(machineId, controllerId ?? string.Empty));
+        // BR-102: the arbitration decision is THE host-authority act here — stamp our hosting generation.
+        network.SendAll(new NetworkSiegeMachineAuthority(machineId, controllerId ?? string.Empty, session.HostEpoch));
     }
 
     private void Handle_NetworkMachineAuthority(MessagePayload<NetworkSiegeMachineAuthority> payload)
@@ -786,6 +810,9 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         GameThread.RunSafe(() =>
         {
             if (Mission.Current == null || session.IsLocalHost) return;
+
+            // BR-102: a deposed host's in-flight arbitration must not move a machine's simulation.
+            if (DropStaleHostEpoch(obj.HostEpoch, nameof(NetworkSiegeMachineAuthority))) return;
 
             // Refresh BEFORE mutating, like every sibling handler: on a freshly-opened mission the
             // refresh takes the mission-change clear branch, which would wipe the claim just written.
@@ -963,6 +990,10 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         GameThread.RunSafe(() =>
         {
             if (Mission.Current == null) return;
+
+            // BR-102: a deposed host's snapshot (its host-owned fields carry damage and removal-relevant
+            // state) must not fight the promoted host's simulation — nor even be buffered for re-apply.
+            if (DropStaleHostEpoch(obj.HostEpoch, nameof(NetworkSiegeMachineState))) return;
 
             RefreshMachineCache();
             if (!machinesById.TryGetValue(obj.MachineId, out var machine))
@@ -1164,9 +1195,13 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             bool isHost = session.IsLocalHost;
             if (isHost)
             {
+                // BR-102: the replay asserts arbitration authority NOW, so it carries the CURRENT epoch
+                // (not the epoch each claim was granted under) — a joiner already holds the newest
+                // assignment the server gave it on entry.
+                int hostEpoch = session.HostEpoch;
                 foreach (var claim in claimedMachines)
                 {
-                    network.Send(controllerId, new NetworkSiegeMachineAuthority(claim.Key, claim.Value));
+                    network.Send(controllerId, new NetworkSiegeMachineAuthority(claim.Key, claim.Value, hostEpoch));
                 }
             }
 
@@ -1183,7 +1218,7 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
                 machineIds,
                 claimedMachines,
                 (machineId, simulatedLocally) => CaptureState(machinesById[machineId], isHost, simulatedLocally),
-                state => network.Send(controllerId, state));
+                state => network.Send(controllerId, Stamp(state)));
 
             if (sent > 0)
                 Logger.Information("[BattleSync] Replayed {Count} siege machine state(s) to joining {Controller} as {Role}",
