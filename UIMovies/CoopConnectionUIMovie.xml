@@ -65,30 +65,6 @@
                     </ListPanel>
 
                     <ListPanel WidthSizePolicy="Fixed" SuggestedWidth="760" HeightSizePolicy="Fixed" SuggestedHeight="76"
-                               HorizontalAlignment="Center" IsVisible="@PublicAddressVisible"
-                               StackLayout.LayoutMethod="HorizontalLeftToRight">
-                      <Children>
-                        <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="270" HeightSizePolicy="StretchToParent"
-                                    Brush="Clan.TabControl.Text" Brush.FontSize="28"
-                                    Brush.TextHorizontalAlignment="Right" Brush.TextVerticalAlignment="Center"
-                                    MarginRight="20" Text="@PublicAddressText"/>
-                        <EditableTextWidget WidthSizePolicy="Fixed" SuggestedWidth="390" HeightSizePolicy="Fixed" SuggestedHeight="58"
-                                            VerticalAlignment="Center" Brush="ScoreboardPanels_2" Brush.AlphaFactor="0.75"
-                                            Brush.FontSize="28" Brush.TextHorizontalAlignment="Center"
-                                            Brush.TextVerticalAlignment="Center" Text="@PublicAddress"/>
-                        <HintWidget DataSource="{FriendsAddressHint}" WidthSizePolicy="Fixed" SuggestedWidth="44"
-                                    HeightSizePolicy="StretchToParent" MarginLeft="14"
-                                    Command.HoverBegin="ExecuteBeginHint" Command.HoverEnd="ExecuteEndHint">
-                          <Children>
-                            <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
-                                        DoNotAcceptEvents="true" Brush="Clan.TabControl.Text"
-                                        Brush.TextVerticalAlignment="Center" Text="(i)"/>
-                          </Children>
-                        </HintWidget>
-                      </Children>
-                    </ListPanel>
-
-                    <ListPanel WidthSizePolicy="Fixed" SuggestedWidth="760" HeightSizePolicy="Fixed" SuggestedHeight="76"
                                HorizontalAlignment="Center" StackLayout.LayoutMethod="HorizontalLeftToRight">
                       <Children>
                         <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="270" HeightSizePolicy="StretchToParent"

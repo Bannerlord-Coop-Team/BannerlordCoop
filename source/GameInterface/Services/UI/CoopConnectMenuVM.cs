@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Network;
 using Common.Network.Session;
 using Common.Network.Session.Messages;
@@ -53,15 +53,10 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     public string IpText => "Server IP Address:";
     public string PortText => "Port:";
     public string PasswordText => "Password:";
-    public string PublicAddressText => "IP Address for Friends:";
 
     [DataSourceProperty]
     public HintViewModel ServerAddressHint { get; } = new HintViewModel(new TextObject(
         "The address of the co-op server to join. Keep localhost if you are the host; otherwise, type the address your friend shared to join their game."));
-
-    [DataSourceProperty]
-    public HintViewModel FriendsAddressHint { get; } = new HintViewModel(new TextObject(
-        "When you're hosting, this is the address friends use to reach your session over the internet. Search 'what is my IP' to find it, and forward UDP ports 4200-4201 on your router. Friends on your own network can use your LAN address instead: run ipconfig in command prompt and share the 'IPv4 Address' with your friends."));
 
     [DataSourceProperty]
     public HintViewModel PortHint { get; } = new HintViewModel(new TextObject(
@@ -74,7 +69,6 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     public string connectIP = "localhost";
     public string connectPort = "4200";
     public string connectPassword = "";
-    public string publicAddress = "";
 
     public CoopConnectMenuVM()
         : this(SessionDiscovery.SteamLobbyBrowser, MessageBroker.Instance)
@@ -176,24 +170,6 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     [DataSourceProperty]
     public bool IsSteamLobbyStatusVisible => !string.IsNullOrEmpty(SteamLobbyStatusText);
 
-    // Connecting to your own local server is hosting, so the public address to advertise
-    // to Steam friends is asked for exactly then; any other address is a direct join.
-    [DataSourceProperty]
-    public bool PublicAddressVisible => SessionDiscovery.SteamAvailable && IsLoopbackAddress(connectIP);
-
-    [DataSourceProperty]
-    public string PublicAddress
-    {
-        get => publicAddress;
-        set
-        {
-            if (value == publicAddress) return;
-
-            publicAddress = value;
-            OnPropertyChanged(nameof(PublicAddress));
-        }
-    }
-
     [DataSourceProperty]
     public string Ip
     {
@@ -204,7 +180,6 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
 
             connectIP = value;
             OnPropertyChanged(nameof(Ip));
-            OnPropertyChanged(nameof(PublicAddressVisible));
         }
     }
 
@@ -289,8 +264,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
 
         try
         {
-            // Advertise exactly when the screen offered the public address field.
-            bool steamInvites = PublicAddressVisible;
+            bool steamInvites = SessionDiscovery.SteamAvailable && IsLoopbackAddress(connectIP);
 
             IPAddress ip;
 
@@ -310,8 +284,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
                 }
             }
 
-            messageBroker.Publish(this, new AttemptJoin(
-                ip, port, connectPassword, steamInvites, publicAddress?.Trim()));
+            messageBroker.Publish(this, new AttemptJoin(ip, port, connectPassword, steamInvites));
         }
         catch (Exception ex)
         {
