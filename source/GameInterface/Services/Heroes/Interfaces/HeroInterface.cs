@@ -176,6 +176,9 @@ internal class HeroInterface : IHeroInterface
             return;
         }
 
+        // Repair before registration so no roster delta is broadcast ahead of the hero creation message.
+        RestorePlayerMemberships(hero, party);
+
         // Assign the network StringIds BEFORE adding to the CampaignObjectManager. FindNextUniqueStringId derives
         // the next "PlayerN" from CampaignObjectType.MaxCreatedPostfixIndex, which is cached in OnItemAdded when an
         // object is *added* (using the StringId at that instant). If we add first (with the deserialized
@@ -204,6 +207,16 @@ internal class HeroInterface : IHeroInterface
         campaignObjectManager.AddHero(hero);
         campaignObjectManager.AddMobileParty(party);
         campaignObjectManager.AddClan(hero.Clan);
+    }
+
+    internal static void RestorePlayerMemberships(Hero hero, MobileParty party)
+    {
+        // ID-based clan caches and serialized rosters omit the unregistered root hero.
+        if (!hero.Clan.Heroes.Contains(hero))
+            hero.Clan.OnLordAdded(hero);
+
+        if (party.MemberRoster.GetTroopCount(hero.CharacterObject) == 0)
+            party.MemberRoster.AddToCounts(hero.CharacterObject, 1, insertAtFront: true);
     }
 
     /// <summary>
