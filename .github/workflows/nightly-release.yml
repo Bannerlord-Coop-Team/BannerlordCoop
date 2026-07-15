@@ -2,7 +2,7 @@ name: Nightly Release
 
 on:
   schedule:
-    - cron: '1 0 * * *'
+    - cron: '57 23 * * *'
       timezone: America/Chicago
   workflow_dispatch:
 
@@ -31,6 +31,9 @@ jobs:
 
       - name: Trust checkout directory
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Install timezone data
+        run: apk add --no-cache tzdata >/dev/null
 
       - name: Find previous nightly commit
         id: previous
