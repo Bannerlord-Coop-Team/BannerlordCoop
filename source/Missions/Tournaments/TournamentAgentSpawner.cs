@@ -118,8 +118,8 @@ public class TournamentAgentSpawner
             null,
             new UniqueTroopDescriptor(data.DescriptorSeed));
         var buildData = new AgentBuildData(origin);
-        buildData.InitialPosition(new Vec3(data.PositionX, data.PositionY, data.PositionZ));
-        buildData.InitialDirection(new Vec2(data.DirectionX, data.DirectionY));
+        buildData.InitialPosition(data.Position);
+        buildData.InitialDirection(data.Direction);
         buildData.Team(team);
         buildData.Equipment(equipment);
         buildData.Controller(role switch
@@ -145,7 +145,6 @@ public class TournamentAgentSpawner
             return;
         }
         agent.Health = data.Health;
-        ApplyMissionWeaponState(agent, data.Equipment);
         agent.SetWatchState(Agent.WatchState.Alarmed);
         agent.WieldInitialWeapons(
             Agent.WeaponWieldActionType.InstantAfterPickUp,
@@ -169,7 +168,6 @@ public class TournamentAgentSpawner
                 ? AgentControllerType.None
                 : AgentControllerType.AI;
             agent.MountAgent.Health = data.MountHealth;
-            ApplyMissionWeaponState(agent.MountAgent, data.MountEquipment);
             coopMissionComponent.AgentRegistry.TryRegisterAgent(
                 data.ControllerId,
                 data.MountAgentId,
@@ -179,7 +177,7 @@ public class TournamentAgentSpawner
 
     private void ApplyMountEquipment(
         Equipment riderEquipment,
-        TournamentEquipmentElementData[] mountElements)
+        EquipmentElement[] mountElements)
     {
         Equipment mountEquipment = BuildEquipment(mountElements);
         foreach (EquipmentIndex index in new[] { EquipmentIndex.Horse, EquipmentIndex.HorseHarness })
@@ -218,62 +216,17 @@ public class TournamentAgentSpawner
             agent.FadeOut(false, true);
     }
 
-    private Equipment BuildEquipment(TournamentEquipmentElementData[] elements)
+    private static Equipment BuildEquipment(EquipmentElement[] elements)
     {
         var equipment = new Equipment();
         if (elements == null) return equipment;
-        foreach (TournamentEquipmentElementData data in elements)
+
+        int count = Math.Min(elements.Length, (int)EquipmentIndex.NumEquipmentSetSlots);
+        for (int i = 0; i < count; i++)
         {
-            if (data == null) continue;
-            if (data.SlotIndex < 0 || data.SlotIndex >= (int)EquipmentIndex.NumEquipmentSetSlots) continue;
-            if (!objectManager.TryGetObject(data.ItemId, out ItemObject item)) continue;
-
-            ItemModifier modifier = null;
-            if (!string.IsNullOrEmpty(data.ItemModifierId))
-                objectManager.TryGetObject(data.ItemModifierId, out modifier);
-
-            equipment[(EquipmentIndex)data.SlotIndex] = new EquipmentElement(item, modifier);
+            if (!elements[i].IsEmpty)
+                equipment[(EquipmentIndex)i] = elements[i];
         }
         return equipment;
-    }
-
-    private void ApplyMissionWeaponState(
-        Agent agent,
-        TournamentEquipmentElementData[] elements)
-    {
-        if (agent == null || elements == null) return;
-        foreach (TournamentEquipmentElementData data in elements)
-            ApplyMissionWeaponSlot(agent, data);
-    }
-
-    private void ApplyMissionWeaponSlot(Agent agent, TournamentEquipmentElementData data)
-    {
-        if (data == null || !data.HasDataValue ||
-            data.SlotIndex < 0 ||
-            data.SlotIndex >= (int)EquipmentIndex.NumAllWeaponSlots ||
-            !objectManager.TryGetObject(data.ItemId, out ItemObject item)) return;
-
-        ItemModifier modifier = null;
-        if (!string.IsNullOrEmpty(data.ItemModifierId) &&
-            !objectManager.TryGetObject(data.ItemModifierId, out modifier)) return;
-
-        Banner banner = string.IsNullOrEmpty(data.BannerCode)
-            ? null
-            : new Banner(data.BannerCode);
-        var weapon = new MissionWeapon(item, modifier, banner, data.DataValue);
-        EquipmentIndex slot = (EquipmentIndex)data.SlotIndex;
-        MissionWeapon current = agent.Equipment[slot];
-        if (MissionWeaponsMatch(current, weapon)) return;
-        if (!current.IsEmpty)
-            agent.RemoveEquippedWeapon(slot);
-        agent.EquipWeaponWithNewEntity(slot, ref weapon);
-    }
-
-    private static bool MissionWeaponsMatch(MissionWeapon current, MissionWeapon weapon)
-    {
-        return current.Item == weapon.Item &&
-            current.ItemModifier == weapon.ItemModifier &&
-            current.RawDataForNetwork == weapon.RawDataForNetwork &&
-            current.Banner?.Serialize() == weapon.Banner?.Serialize();
     }
 }

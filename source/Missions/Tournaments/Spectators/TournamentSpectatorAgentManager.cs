@@ -23,7 +23,6 @@ namespace Missions.Tournaments.Spectators;
 public interface ITournamentSpectatorAgentManager
 {
     void Reconcile(TournamentSessionSnapshot snapshot);
-    void Tick();
     void HandleJoinInfo(NetworkMissionJoinInfo joinInfo);
     CoopAgentSpawnData[] GetLocalSpawnData();
     string LastLocalSpawnName { get; }
@@ -100,21 +99,6 @@ public class TournamentSpectatorAgentManager : ITournamentSpectatorAgentManager
     {
         snapshot = updated;
         GameThread.RunSafe(ReconcileOnGameThread, blocking: true);
-    }
-
-    public void Tick()
-    {
-        string controllerId = controllerIdProvider.ControllerId;
-        if (!spectators.TryGetValue(controllerId, out var record)) return;
-        Agent agent = record.Agent;
-        if (agent == null || !agent.IsActive() || !TryResolveOrangeItem(out ItemObject item)) return;
-
-        MissionWeapon weapon = agent.Equipment[TournamentSpectatorOrange.EquipmentSlot];
-        if (!TournamentSpectatorOrange.ShouldRefill(weapon.Item, item, weapon.Amount)) return;
-        agent.SetWeaponAmountInSlot(
-            TournamentSpectatorOrange.EquipmentSlot,
-            TournamentSpectatorOrange.RefillAmount,
-            false);
     }
 
     public void HandleJoinInfo(NetworkMissionJoinInfo joinInfo)

@@ -38,7 +38,6 @@ internal sealed partial class TournamentSessionHandler : IHandler
     private readonly ITournamentSessionRegistry sessionRegistry;
     private readonly ITournamentGameInterface tournamentGameInterface;
     private readonly ITournamentNativeRemovalAuthorization nativeRemovalAuthorization;
-    private readonly ITournamentSaveDeferral saveDeferral;
     private readonly Dictionary<string, BetLedgerEntry> betLedger = new();
     private readonly Dictionary<string, TournamentCompletionTransaction> completionTransactions = new();
     private readonly HashSet<string> completionInProgress = new();
@@ -54,8 +53,7 @@ internal sealed partial class TournamentSessionHandler : IHandler
         IControllerIdProvider controllerIdProvider,
         ITournamentSessionRegistry sessionRegistry,
         ITournamentGameInterface tournamentGameInterface,
-        ITournamentNativeRemovalAuthorization nativeRemovalAuthorization,
-        ITournamentSaveDeferral saveDeferral)
+        ITournamentNativeRemovalAuthorization nativeRemovalAuthorization)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -65,7 +63,6 @@ internal sealed partial class TournamentSessionHandler : IHandler
         this.sessionRegistry = sessionRegistry;
         this.tournamentGameInterface = tournamentGameInterface;
         this.nativeRemovalAuthorization = nativeRemovalAuthorization;
-        this.saveDeferral = saveDeferral;
 
         messageBroker.Subscribe<NetworkRequestJoinTournament>(Handle_Join);
         messageBroker.Subscribe<NetworkRequestLeaveTournamentPreparation>(Handle_LeavePreparation);
@@ -1022,7 +1019,6 @@ internal sealed partial class TournamentSessionHandler : IHandler
                 winnerData,
                 manager,
                 transaction);
-            saveDeferral.Flush();
         }
         catch (Exception ex)
         {
@@ -1133,7 +1129,6 @@ internal sealed partial class TournamentSessionHandler : IHandler
             Logger.Information(
                 "[Tournament] Finalized completed tournament session={SessionId}; ejecting all mission members",
                 snapshot.SessionId);
-            saveDeferral.Flush();
         }
         catch (Exception ex)
         {
@@ -1344,13 +1339,14 @@ internal sealed partial class TournamentSessionHandler : IHandler
         return true;
     }
 
-    private bool HasValidEquipmentObjects(TournamentEquipmentElementData[] equipment)
+    private bool HasValidEquipmentObjects(EquipmentElement[] equipment)
     {
-        foreach (TournamentEquipmentElementData element in equipment)
+        foreach (EquipmentElement element in equipment)
         {
-            if (!objectManager.TryGetObject(element.ItemId, out ItemObject _) ||
-                (!string.IsNullOrEmpty(element.ItemModifierId) &&
-                 !objectManager.TryGetObject(element.ItemModifierId, out ItemModifier _)))
+            if (element.IsEmpty) continue;
+            if (!objectManager.TryGetId(element.Item, out string _) ||
+                (element.ItemModifier != null &&
+                 !objectManager.TryGetId(element.ItemModifier, out string _)))
             {
                 return false;
             }

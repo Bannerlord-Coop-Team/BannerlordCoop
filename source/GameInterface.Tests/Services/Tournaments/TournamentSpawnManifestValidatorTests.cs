@@ -1,12 +1,46 @@
 using GameInterface.Services.Tournaments;
+using GameInterface.Tests.Bootstrap;
 using GameInterface.Services.Tournaments.Data;
+using GameInterface.Surrogates;
+using ProtoBuf;
 using System;
+using System.IO;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
+using TaleWorlds.ObjectSystem;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Tournaments;
 
 public class TournamentSpawnManifestValidatorTests
 {
+    [Fact]
+    public void TournamentAgentSpawnData_RoundTripsSerializableVectors()
+    {
+        GameBootStrap.Initialize();
+        new SurrogateCollection();
+        TournamentSessionSnapshot snapshot = CreateSnapshot();
+        TournamentSpawnManifestData manifest = CreateManifest(snapshot, "player", "host");
+        ItemObject equipmentItem = manifest.Agents[0].Equipment[0].Item;
+        MBObjectManager.Instance.RegisterObject(equipmentItem);
+
+        TournamentSpawnManifestData deserialized;
+        using (var stream = new MemoryStream())
+        {
+            Serializer.Serialize(stream, manifest);
+            stream.Position = 0;
+            deserialized = Serializer.Deserialize<TournamentSpawnManifestData>(stream);
+        }
+
+        Assert.Equal(manifest.Agents[1].Position.x, deserialized.Agents[1].Position.x);
+        Assert.Equal(manifest.Agents[1].Position.y, deserialized.Agents[1].Position.y);
+        Assert.Equal(manifest.Agents[1].Position.z, deserialized.Agents[1].Position.z);
+        Assert.Equal(manifest.Agents[1].Direction.X, deserialized.Agents[1].Direction.X);
+        Assert.Equal(manifest.Agents[1].Direction.Y, deserialized.Agents[1].Direction.Y);
+        Assert.Equal(manifest.Agents[1].Equipment.Length, deserialized.Agents[1].Equipment.Length);
+        Assert.Equal(equipmentItem, deserialized.Agents[1].Equipment[0].Item);
+    }
+
     [Fact]
     public void IsValid_EnforcesCanonicalHumanAndNpcOwnership()
     {
@@ -39,11 +73,8 @@ public class TournamentSpawnManifestValidatorTests
             "wrong-banner",
             second.ControllerId,
             second.Equipment,
-            second.PositionX,
-            second.PositionY,
-            second.PositionZ,
-            second.DirectionX,
-            second.DirectionY,
+            second.Position,
+            second.Direction,
             second.Health,
             second.MountAgentId,
             second.MountCharacterId,
@@ -70,16 +101,13 @@ public class TournamentSpawnManifestValidatorTests
             npc.TeamBannerCode,
             npc.ControllerId,
             npc.Equipment,
-            npc.PositionX,
-            npc.PositionY,
-            npc.PositionZ,
-            npc.DirectionX,
-            npc.DirectionY,
+            npc.Position,
+            npc.Direction,
             npc.Health,
             Guid.NewGuid(),
             null,
             77,
-            new[] { new TournamentEquipmentElementData(10, "horse", null) },
+            EquipmentAt(EquipmentIndex.Horse, new ItemObject("horse")),
             90);
 
         Assert.True(TournamentSpawnManifestValidator.IsValid(manifest, snapshot));
@@ -105,23 +133,31 @@ public class TournamentSpawnManifestValidatorTests
             0, 0, 2, false, false, null);
     }
 
+    private static EquipmentElement[] EquipmentAt(EquipmentIndex index, ItemObject item)
+    {
+        var equipment = new EquipmentElement[(int)EquipmentIndex.NumEquipmentSetSlots];
+        equipment[(int)index] = new EquipmentElement(item);
+        return equipment;
+    }
     private static TournamentSpawnManifestData CreateManifest(
         TournamentSessionSnapshot snapshot,
         string humanOwner,
         string npcOwner)
     {
         TournamentTeamData[] teams = snapshot.Rounds[0].Matches[0].Teams;
-        var equipment = new[] { new TournamentEquipmentElementData(0, "weapon", null) };
+        var equipment = EquipmentAt(
+            EquipmentIndex.WeaponItemBeginSlot,
+            new ItemObject($"weapon-{Guid.NewGuid()}"));
         var agents = new[]
         {
             new TournamentAgentSpawnData(
                 Guid.NewGuid(), "human", "hero", 1, teams[0].TeamId, teams[0].TeamColor,
-                teams[0].BannerCode, humanOwner, equipment, 0, 0, 0, 0, 1, 100,
-                Guid.Empty, null, 0, Array.Empty<TournamentEquipmentElementData>(), 0),
+                teams[0].BannerCode, humanOwner, equipment, Vec3.Zero, new Vec2(0, 1), 100,
+                Guid.Empty, null, 0, Array.Empty<EquipmentElement>(), 0),
             new TournamentAgentSpawnData(
                 Guid.NewGuid(), "npc", "troop", 2, teams[1].TeamId, teams[1].TeamColor,
-                teams[1].BannerCode, npcOwner, equipment, 1, 0, 0, 0, 1, 100,
-                Guid.Empty, null, 0, Array.Empty<TournamentEquipmentElementData>(), 0)
+                teams[1].BannerCode, npcOwner, equipment, new Vec3(1, 0, 0), new Vec2(0, 1), 100,
+                Guid.Empty, null, 0, Array.Empty<EquipmentElement>(), 0)
         };
         return new TournamentSpawnManifestData(
             snapshot.SessionId,

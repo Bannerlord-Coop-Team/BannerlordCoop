@@ -8,16 +8,14 @@ namespace Missions.Tournaments.Patches;
 
 internal static class TournamentCombatPatchInstaller
 {
-    private const string HarmonyId = "Coop.TournamentCombat";
-
-    public static void Install()
+    public static void Install(Harmony harmony)
     {
         var target = AccessTools.Method(typeof(Agent), nameof(Agent.RegisterBlow));
         if (target == null) return;
-        if (Harmony.GetPatchInfo(target)?.Prefixes.Any(patch => patch.owner == HarmonyId) == true) return;
-
         var prefix = AccessTools.Method(typeof(TournamentBlowInterceptPatch), nameof(TournamentBlowInterceptPatch.Prefix));
-        var harmony = new Harmony(HarmonyId);
+        if (prefix == null) return;
+        if (Harmony.GetPatchInfo(target)?.Prefixes.Any(patch => patch.PatchMethod == prefix) == true) return;
+
         harmony.Patch(target, prefix: new HarmonyMethod(prefix));
 
         var reward = AccessTools.Method(typeof(TournamentFightMissionController), "EnemyHitReward");

@@ -60,15 +60,22 @@ public class TournamentMissionRulesTests
         string mountCharacterId = "horse-character")
         => new TournamentAgentSpawnData(
             agentId, slotId, characterId, seed, teamId, color, null, controllerId,
-            new[] { new TournamentEquipmentElementData(0, "weapon", null, null, 37) },
-            1, 2, 3, 0, 1, 100,
+            EquipmentAt(EquipmentIndex.WeaponItemBeginSlot, new ItemObject("weapon")),
+            new Vec3(1, 2, 3), new Vec2(0, 1), 100,
             mountId,
             mountId == Guid.Empty ? null : mountCharacterId,
             77,
             mountId == Guid.Empty
-                ? Array.Empty<TournamentEquipmentElementData>()
-                : new[] { new TournamentEquipmentElementData(10, "horse-item", null) },
+                ? Array.Empty<EquipmentElement>()
+                : EquipmentAt(EquipmentIndex.Horse, new ItemObject("horse-item")),
             mountId == Guid.Empty ? 0 : 90);
+
+    private static EquipmentElement[] EquipmentAt(EquipmentIndex index, ItemObject item)
+    {
+        var equipment = new EquipmentElement[(int)EquipmentIndex.NumEquipmentSetSlots];
+        equipment[(int)index] = new EquipmentElement(item);
+        return equipment;
+    }
 
     [Fact]
     public void HostControlPolicy_KeepsNpcsAiAndOnlyOwnHumanPlayerControlled()
@@ -235,10 +242,9 @@ public class TournamentMissionRulesTests
         Assert.Equal(mountId, mounted.MountAgentId);
         Assert.Equal("horse-character", mounted.MountCharacterId);
         Assert.Equal(77, mounted.MountDescriptorSeed);
-        Assert.Equal("horse-item", Assert.Single(mounted.MountEquipment).ItemId);
+        Assert.Equal("horse-item", mounted.MountEquipment[(int)EquipmentIndex.Horse].Item.StringId);
         Assert.All(manifest.Agents, agent => Assert.Equal(uint.MaxValue, agent.TeamColor2));
-        Assert.Equal(37, manifest.Agents[0].Equipment[0].DataValue);
-        Assert.True(manifest.Agents[0].Equipment[0].HasDataValue);
+        Assert.Equal("weapon", manifest.Agents[0].Equipment[(int)EquipmentIndex.WeaponItemBeginSlot].Item.StringId);
 
         var malformed = Common.Util.ObjectHelper.SkipConstructor<TournamentSpawnManifestData>();
         Assert.False(TournamentSpawnManifestValidator.IsValid(malformed, snapshot));
@@ -287,7 +293,9 @@ public class TournamentMissionRulesTests
         bool succeeded = (bool)serialize.Invoke(builder, arguments);
 
         Assert.True(succeeded);
-        Assert.Empty((TournamentEquipmentElementData[])arguments[2]);
+        var equipment = (EquipmentElement[])arguments[2];
+        Assert.Equal((int)EquipmentIndex.NumEquipmentSetSlots, equipment.Length);
+        Assert.All(equipment, element => Assert.True(element.IsEmpty));
     }
 
     [Fact]

@@ -182,7 +182,7 @@ public class TournamentSpectatorRulesTests
         Assert.Null(item.Attribute("scale_factor"));
         XElement weapon = item.Element("ItemComponent")?.Element("Weapon");
         Assert.NotNull(weapon);
-        Assert.Equal(TournamentSpectatorOrange.RefillAmount.ToString(), weapon.Attribute("stack_amount")?.Value);
+        Assert.Equal(TournamentSpectatorOrange.ThrowCount.ToString(), weapon.Attribute("stack_amount")?.Value);
         Assert.Equal("0", weapon.Attribute("thrust_damage")?.Value);
         Assert.Null(weapon.Attribute("trail_particle_name"));
         Assert.Null(weapon.Element("WeaponFlags")?.Attribute("AttachAmmoToVisual"));
@@ -239,17 +239,6 @@ public class TournamentSpectatorRulesTests
         }
     }
 
-    [Fact]
-    public void OrangeRefillRules_RefillOnlyAfterSingleOrangeIsConsumed()
-    {
-        var orange = new ItemObject();
-        var other = new ItemObject();
-
-        Assert.True(TournamentSpectatorOrange.ShouldRefill(orange, orange, 0));
-        Assert.False(TournamentSpectatorOrange.ShouldRefill(orange, orange, 1));
-        Assert.False(TournamentSpectatorOrange.ShouldRefill(other, orange, 0));
-        Assert.False(TournamentSpectatorOrange.ShouldRefill(null, orange, 0));
-    }
     [Theory]
     [InlineData(true, false, true)]
     [InlineData(false, true, true)]

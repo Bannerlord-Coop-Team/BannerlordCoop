@@ -1,6 +1,7 @@
 using GameInterface.Services.Tournaments.Data;
 using Missions.Tournaments;
 using Missions.Tournaments.Messages;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 
 namespace E2E.Tests.Services.Missions.Tournaments;
@@ -43,17 +44,14 @@ public class TournamentManifestAuthorityTests
             1,
             null,
             controllerId,
-            System.Array.Empty<TournamentEquipmentElementData>(),
-            1,
-            2,
-            3,
-            0,
-            1,
+            System.Array.Empty<EquipmentElement>(),
+            new Vec3(1, 2, 3),
+            new Vec2(0, 1),
             100,
             Guid.Empty,
             null,
             0,
-            System.Array.Empty<TournamentEquipmentElementData>(),
+            System.Array.Empty<EquipmentElement>(),
             0);
 
     private static TournamentContestantData Contestant(

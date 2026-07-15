@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.Tournaments;
 
@@ -83,14 +84,9 @@ public static class TournamentSpawnManifestValidator
 
     private static bool HasValidTransformAndEquipment(TournamentAgentSpawnData agent)
     {
-        float directionLengthSquared =
-            (agent.DirectionX * agent.DirectionX) + (agent.DirectionY * agent.DirectionY);
-        return IsFinite(agent.PositionX) &&
-            IsFinite(agent.PositionY) &&
-            IsFinite(agent.PositionZ) &&
-            IsFinite(agent.DirectionX) &&
-            IsFinite(agent.DirectionY) &&
-            directionLengthSquared >= 0.01f &&
+        return IsFinite(agent.Position) &&
+            IsFinite(agent.Direction) &&
+            agent.Direction.LengthSquared >= 0.01f &&
             IsFinite(agent.Health) &&
             agent.Health > 0 &&
             ValidEquipment(agent.Equipment);
@@ -107,15 +103,15 @@ public static class TournamentSpawnManifestValidator
             agent.MountHealth > 0 &&
             ValidEquipment(agent.MountEquipment);
     }
-    private static bool ValidEquipment(TournamentEquipmentElementData[] equipment)
+    private static bool ValidEquipment(EquipmentElement[] equipment)
         => equipment != null &&
-           equipment.All(element =>
-               element != null && element.SlotIndex >= 0 &&
-               element.SlotIndex < (int)EquipmentIndex.NumEquipmentSetSlots &&
-               !string.IsNullOrEmpty(element.ItemId) && element.ItemId.Length <= 256 &&
-               (element.ItemModifierId?.Length ?? 0) <= 256 &&
-               (element.BannerCode?.Length ?? 0) <= 4096) &&
-           equipment.Select(element => element.SlotIndex).Distinct().Count() == equipment.Length;
+           equipment.Length <= (int)EquipmentIndex.NumEquipmentSetSlots;
+
+    private static bool IsFinite(Vec3 value)
+        => IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z);
+
+    private static bool IsFinite(Vec2 value)
+        => IsFinite(value.X) && IsFinite(value.Y);
 
     private static bool IsFinite(float value)
         => !float.IsNaN(value) && !float.IsInfinity(value);

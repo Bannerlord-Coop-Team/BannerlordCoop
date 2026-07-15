@@ -3,6 +3,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Tournaments;
 using GameInterface.Services.Tournaments.Data;
 using GameInterface.Services.Tournaments.UI;
+using HarmonyLib;
 using SandBox;
 using SandBox.Missions.MissionLogics;
 using SandBox.Missions.MissionLogics.Arena;
@@ -48,6 +49,7 @@ public class CoopTournamentLauncher : ICoopTournamentLauncher
     private readonly Func<CoopTournamentController> controllerFactory;
 
     public CoopTournamentLauncher(
+        Harmony harmony,
         IObjectManager objectManager,
         ITournamentGameInterface tournamentGameInterface,
         Func<CoopTournamentController> controllerFactory)
@@ -55,7 +57,7 @@ public class CoopTournamentLauncher : ICoopTournamentLauncher
         this.objectManager = objectManager;
         this.tournamentGameInterface = tournamentGameInterface;
         this.controllerFactory = controllerFactory;
-        TournamentCombatPatchInstaller.Install();
+        TournamentCombatPatchInstaller.Install(harmony);
     }
 
     public Mission OpenCoopTournament(TournamentSessionSnapshot snapshot, bool isSpectator)

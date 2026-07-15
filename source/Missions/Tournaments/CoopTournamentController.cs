@@ -704,7 +704,6 @@ public class CoopTournamentController : CoopMissionController
             spectatorAgentManager.Reconcile(snapshot);
         }
         base.OnMissionTick(dt);
-        spectatorAgentManager.Tick();
         if (snapshot == null || !session.IsLocalHost) return;
 
         TryStartHostMatch();

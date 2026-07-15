@@ -3,6 +3,8 @@ using GameInterface.Services.Tournaments.Data;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Tournaments;
@@ -736,9 +738,9 @@ public class TournamentSessionRegistryTests
                 return new TournamentAgentSpawnData(
                     Guid.NewGuid(), contestant.SlotId, contestant.CharacterId, contestant.DescriptorSeed,
                     entry.team.TeamId, entry.team.TeamColor, entry.team.BannerCode, owner,
-                    new[] { new TournamentEquipmentElementData(0, "weapon", null) },
-                    0, 0, 0, 0, 1, 100,
-                    Guid.Empty, null, 0, Array.Empty<TournamentEquipmentElementData>(), 0);
+                    new[] { new EquipmentElement(new ItemObject("weapon")) },
+                    Vec3.Zero, new Vec2(0, 1), 100,
+                    Guid.Empty, null, 0, Array.Empty<EquipmentElement>(), 0);
             })
             .ToArray();
         return new TournamentSpawnManifestData(

@@ -248,11 +248,8 @@ public class TournamentSpawnManifestBuilder
             team.BannerCode,
             owner,
             equipment,
-            agent.Position.X,
-            agent.Position.Y,
-            agent.Position.Z,
-            direction.X,
-            direction.Y,
+            agent.Position,
+            direction,
             agent.Health,
             mountId,
             mountCharacterId,
@@ -288,26 +285,24 @@ public class TournamentSpawnManifestBuilder
     private bool TrySerializeEquipment(
         MissionEquipment missionEquipment,
         Equipment spawnEquipment,
-        out TournamentEquipmentElementData[] serialized)
+        out EquipmentElement[] serialized)
     {
         if (missionEquipment == null && spawnEquipment == null)
         {
-            serialized = Array.Empty<TournamentEquipmentElementData>();
+            serialized = Array.Empty<EquipmentElement>();
             return true;
         }
 
-        var records = new List<TournamentEquipmentElementData>();
-        for (int i = 0; i < (int)EquipmentIndex.NumEquipmentSetSlots; i++)
+        var records = new EquipmentElement[(int)EquipmentIndex.NumEquipmentSetSlots];
+        for (int i = 0; i < records.Length; i++)
         {
-            if (!TrySerializeEquipmentSlot(missionEquipment, spawnEquipment, i, out var data))
+            if (!TrySerializeEquipmentSlot(missionEquipment, spawnEquipment, i, out records[i]))
             {
                 serialized = null;
                 return false;
             }
-            if (data != null)
-                records.Add(data);
         }
-        serialized = records.ToArray();
+        serialized = records;
         return true;
     }
 
@@ -315,15 +310,15 @@ public class TournamentSpawnManifestBuilder
         MissionEquipment missionEquipment,
         Equipment spawnEquipment,
         int slotIndex,
-        out TournamentEquipmentElementData data)
+        out EquipmentElement data)
     {
-        data = null;
+        data = default;
         EquipmentIndex index = (EquipmentIndex)slotIndex;
         if (missionEquipment != null && slotIndex < (int)EquipmentIndex.NumAllWeaponSlots)
         {
             MissionWeapon weapon = missionEquipment[index];
             if (!weapon.IsEmpty)
-                return TrySerializeMissionWeapon(slotIndex, weapon, out data);
+                return TrySerializeMissionWeapon(weapon, out data);
         }
 
         if (spawnEquipment == null)
@@ -331,38 +326,32 @@ public class TournamentSpawnManifestBuilder
         EquipmentElement element = spawnEquipment[index];
         if (element.IsEmpty)
             return true;
-        if (!objectManager.TryGetId(element.Item, out string itemId))
+        if (!IsSerializable(element))
             return false;
 
-        string modifierId = null;
-        if (element.ItemModifier != null &&
-            !objectManager.TryGetId(element.ItemModifier, out modifierId))
-            return false;
-
-        data = new TournamentEquipmentElementData(slotIndex, itemId, modifierId);
+        data = element;
         return true;
     }
-    private bool TrySerializeMissionWeapon(
-        int slotIndex,
-        MissionWeapon weapon,
-        out TournamentEquipmentElementData data)
+
+    private bool TrySerializeMissionWeapon(MissionWeapon weapon, out EquipmentElement data)
     {
-        data = null;
-        if (weapon.Item == null || !objectManager.TryGetId(weapon.Item, out string itemId))
+        data = default;
+        if (weapon.Item == null)
             return false;
 
-        string modifierId = null;
-        if (weapon.ItemModifier != null &&
-            !objectManager.TryGetId(weapon.ItemModifier, out modifierId))
-        {
+        var element = new EquipmentElement(weapon.Item, weapon.ItemModifier);
+        if (!IsSerializable(element))
             return false;
-        }
-        data = new TournamentEquipmentElementData(
-            slotIndex,
-            itemId,
-            modifierId,
-            weapon.Banner?.Serialize(),
-            weapon.RawDataForNetwork);
+
+        data = element;
         return true;
+    }
+
+    private bool IsSerializable(EquipmentElement element)
+    {
+        if (!objectManager.TryGetId(element.Item, out string _))
+            return false;
+        return element.ItemModifier == null ||
+            objectManager.TryGetId(element.ItemModifier, out string _);
     }
 }

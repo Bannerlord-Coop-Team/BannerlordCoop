@@ -16,7 +16,7 @@
       <Weapon
         weapon_class="Stone"
         ammo_class="Stone"
-        stack_amount="1"
+        stack_amount="10"
         physics_material="missile"
         accuracy="50"
         thrust_speed="102"

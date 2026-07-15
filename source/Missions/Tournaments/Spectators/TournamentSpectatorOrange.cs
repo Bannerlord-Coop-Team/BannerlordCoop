@@ -5,7 +5,7 @@ namespace Missions.Tournaments.Spectators;
 public static class TournamentSpectatorOrange
 {
     public const string ItemId = "coop_spectator_orange";
-    public const short RefillAmount = 1;
+    public const short ThrowCount = 10;
     public const EquipmentIndex EquipmentSlot = EquipmentIndex.Weapon0;
 
     public static Equipment BuildEquipment(Equipment civilianEquipment, ItemObject orangeItem)
@@ -25,11 +25,6 @@ public static class TournamentSpectatorOrange
         return equipment;
     }
 
-    public static bool ShouldRefill(ItemObject equippedItem, ItemObject orangeItem, short amount)
-        => equippedItem != null &&
-           orangeItem != null &&
-           ReferenceEquals(equippedItem, orangeItem) &&
-           amount < RefillAmount;
     public static bool ShouldBlockPickup(bool isSpectator, bool isOrange)
         => isSpectator || isOrange;
 
