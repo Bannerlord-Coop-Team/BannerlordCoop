@@ -9,6 +9,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Security.Cryptography;
+using System.Xml.Linq;
 using TaleWorlds.Engine;
 using TaleWorlds.ModuleManager;
 using TaleWorlds.MountAndBlade;
@@ -260,12 +261,12 @@ public sealed class VanillaOrderVoiceService : IVanillaOrderVoiceService
     private void LoadVoiceClips()
     {
         VoiceManifest manifest = LoadManifest();
-        if (manifest.SchemaVersion != 1)
+        if (manifest.SchemaVersion != 2)
             throw new InvalidDataException($"Unsupported vanilla order voice manifest schema {manifest.SchemaVersion}.");
-        if (manifest.VoiceDefinitions == null || manifest.VoiceDefinitions.Count == 0)
-            throw new InvalidDataException("The vanilla order voice manifest has no voice definitions.");
         if (manifest.Events == null || manifest.Events.Count == 0)
             throw new InvalidDataException("The vanilla order voice manifest has no events.");
+        if (string.IsNullOrEmpty(manifest.VoiceBankSha256))
+            throw new InvalidDataException("The vanilla order voice manifest has no voice bank hash.");
         if (!string.Equals(manifest.PlayMode, "SmartRandom", StringComparison.Ordinal) ||
             !string.Equals(manifest.SelectionMode, "Normal", StringComparison.Ordinal))
         {
@@ -286,6 +287,14 @@ public sealed class VanillaOrderVoiceService : IVanillaOrderVoiceService
 
         string nativeModulePath = ModuleHelper.GetModuleFullPath("Native");
         string bankPath = System.IO.Path.Combine(nativeModulePath, "Sounds", "PC", "voice.bank");
+        ValidateVoiceBank(bankPath, manifest.VoiceBankSha256);
+
+        VoiceDefinitionEntry[] voiceDefinitions;
+        using (FileStream stream = File.OpenRead(ModuleHelper.GetXmlPath("Native", "voice_definitions")))
+            voiceDefinitions = ParseVoiceDefinitions(stream);
+        if (voiceDefinitions.Length == 0)
+            throw new InvalidDataException("The vanilla voice definitions document has no voices.");
+
         byte[] fsbBytes = ReadEmbeddedFsb(bankPath);
         FmodSoundBank soundBank = FsbLoader.LoadFsbFromByteArray(fsbBytes);
 
@@ -313,48 +322,38 @@ public sealed class VanillaOrderVoiceService : IVanillaOrderVoiceService
         foreach (VoiceEvent voiceEvent in manifest.Events.Values)
             voiceEvent?.Prepare(audioBySample);
 
-        foreach (var definitionPair in manifest.VoiceDefinitions)
+        foreach (VoiceDefinitionEntry definition in voiceDefinitions)
         {
-            string voiceDefinition = definitionPair.Key;
-            if (definitionPair.Value == null) continue;
-
-            foreach (var voicePair in definitionPair.Value)
+            if (!manifest.Events.TryGetValue(definition.EventPath, out var voiceEvent) ||
+                voiceEvent.AvailableSamples.Length == 0)
             {
-                string voiceType = voicePair.Key;
-                VoiceDefinition voiceDefinitionEntry = voicePair.Value;
-                if (voiceDefinitionEntry == null ||
-                    string.IsNullOrEmpty(voiceDefinitionEntry.Event) ||
-                    !manifest.Events.TryGetValue(voiceDefinitionEntry.Event, out var voiceEvent) ||
-                    voiceEvent.AvailableSamples.Length == 0)
+                continue;
+            }
+
+            entriesByVoice[GetVoiceKey(definition.VoiceDefinition, definition.VoiceType)] =
+                new VoiceMapping(definition.VoiceType, definition.FaceAnimation, voiceEvent);
+        }
+
+        foreach (VoiceMapping mapping in entriesByVoice.Values)
+        {
+            foreach (VoiceSample sample in mapping.Event.AvailableSamples)
+            {
+                if (!entriesBySample.TryGetValue(sample.Name, out var entries))
                 {
-                    continue;
+                    entries = new List<VoiceMapping>();
+                    entriesBySample.Add(sample.Name, entries);
                 }
 
-                var mapping = new VoiceMapping(
-                    voiceType,
-                    voiceDefinitionEntry.FaceAnimation,
-                    voiceEvent);
-                entriesByVoice[GetVoiceKey(voiceDefinition, voiceType)] = mapping;
-
-                foreach (VoiceSample sample in voiceEvent.AvailableSamples)
-                {
-                    if (!entriesBySample.TryGetValue(sample.Name, out var entries))
-                    {
-                        entries = new List<VoiceMapping>();
-                        entriesBySample.Add(sample.Name, entries);
-                    }
-
-                    entries.Add(mapping);
-                }
+                entries.Add(mapping);
             }
         }
 
         Logger.Information(
             "Loaded {ClipCount} exact vanilla order voice clips from FSB version {FsbVersion} " +
-            "using manifest bank version {ManifestBankVersion}; {MissingCount} missing, {FailedCount} failed",
+            "using manifest bank format {ManifestBankFormat}; {MissingCount} missing, {FailedCount} failed",
             audioBySample.Count,
             soundBank.Header.Version,
-            manifest.BankVersion,
+            manifest.BankFormatVersion,
             missingSamples,
             failedSamples);
     }
@@ -372,6 +371,72 @@ public sealed class VanillaOrderVoiceService : IVanillaOrderVoiceService
             throw new InvalidDataException("Failed to deserialize the vanilla order voice manifest.");
 
         return manifest;
+    }
+
+    internal static VoiceDefinitionEntry[] ParseVoiceDefinitions(Stream stream)
+    {
+        if (stream == null) throw new ArgumentNullException(nameof(stream));
+
+        XDocument document = XDocument.Load(stream);
+        XElement root = document.Root;
+        if (root == null || !string.Equals(root.Name.LocalName, "voice_definitions", StringComparison.Ordinal))
+            throw new InvalidDataException("Invalid vanilla voice definitions document.");
+
+        var entries = new List<VoiceDefinitionEntry>();
+        foreach (XElement definition in root.Elements()
+                     .Where(element => string.Equals(
+                         element.Name.LocalName,
+                         "voice_definition",
+                         StringComparison.Ordinal)))
+        {
+            string voiceDefinition = (string)definition.Attribute("name");
+            if (string.IsNullOrEmpty(voiceDefinition)) continue;
+
+            foreach (XElement voice in definition.Elements()
+                         .Where(element => string.Equals(
+                             element.Name.LocalName,
+                             "voice",
+                             StringComparison.Ordinal)))
+            {
+                string voiceType = (string)voice.Attribute("type");
+                string eventPath = (string)voice.Attribute("path");
+                if (string.IsNullOrEmpty(voiceType) || string.IsNullOrEmpty(eventPath)) continue;
+
+                entries.Add(new VoiceDefinitionEntry(
+                    voiceDefinition,
+                    voiceType,
+                    eventPath,
+                    (string)voice.Attribute("face_anim")));
+            }
+        }
+
+        return entries.ToArray();
+    }
+
+    private static void ValidateVoiceBank(string bankPath, string expectedSha256)
+    {
+        string actualSha256;
+        using (FileStream stream = File.OpenRead(bankPath))
+            actualSha256 = ComputeSha256(stream);
+
+        if (!string.Equals(actualSha256, expectedSha256, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException(
+                $"The installed vanilla voice bank does not match the order voice manifest " +
+                $"(expected {expectedSha256}, found {actualSha256}).");
+        }
+    }
+
+    internal static string ComputeSha256(Stream stream)
+    {
+        if (stream == null) throw new ArgumentNullException(nameof(stream));
+
+        using (SHA256 sha256 = SHA256.Create())
+        {
+            return BitConverter.ToString(sha256.ComputeHash(stream))
+                .Replace("-", string.Empty)
+                .ToLowerInvariant();
+        }
     }
 
     private static byte[] ReadEmbeddedFsb(string bankPath)
@@ -606,8 +671,11 @@ public sealed class VanillaOrderVoiceService : IVanillaOrderVoiceService
         [JsonProperty("SchemaVersion")]
         public int SchemaVersion { get; set; }
 
-        [JsonProperty("BankVersion")]
-        public int BankVersion { get; set; }
+        [JsonProperty("BankFormatVersion")]
+        public int BankFormatVersion { get; set; }
+
+        [JsonProperty("VoiceBankSha256")]
+        public string VoiceBankSha256 { get; set; }
 
         [JsonProperty("PlayMode")]
         public string PlayMode { get; set; }
@@ -615,20 +683,28 @@ public sealed class VanillaOrderVoiceService : IVanillaOrderVoiceService
         [JsonProperty("SelectionMode")]
         public string SelectionMode { get; set; }
 
-        [JsonProperty("VoiceDefinitions")]
-        public Dictionary<string, Dictionary<string, VoiceDefinition>> VoiceDefinitions { get; set; }
-
         [JsonProperty("Events")]
         public Dictionary<string, VoiceEvent> Events { get; set; }
     }
 
-    private sealed class VoiceDefinition
+    internal sealed class VoiceDefinitionEntry
     {
-        [JsonProperty("Event")]
-        public string Event { get; set; }
+        public string VoiceDefinition { get; }
+        public string VoiceType { get; }
+        public string EventPath { get; }
+        public string FaceAnimation { get; }
 
-        [JsonProperty("FaceAnimation")]
-        public string FaceAnimation { get; set; }
+        public VoiceDefinitionEntry(
+            string voiceDefinition,
+            string voiceType,
+            string eventPath,
+            string faceAnimation)
+        {
+            VoiceDefinition = voiceDefinition;
+            VoiceType = voiceType;
+            EventPath = eventPath;
+            FaceAnimation = faceAnimation;
+        }
     }
 
     internal sealed class VoiceEvent

@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
@@ -13,7 +14,7 @@ namespace E2E.Tests.Services.Missions;
 public class VanillaOrderVoiceManifestTests
 {
     [Fact]
-    public void EmbeddedManifest_MapsEveryVoiceToAnInstalledEventCatalog()
+    public void EmbeddedManifest_ContainsOnlyTheGeneratedEventCatalog()
     {
         using Stream stream = Assert.IsAssignableFrom<Stream>(
             typeof(VanillaOrderVoiceService).Assembly.GetManifestResourceStream(
@@ -21,26 +22,72 @@ public class VanillaOrderVoiceManifestTests
 
         using var reader = new StreamReader(stream);
         JObject manifest = JObject.Parse(reader.ReadToEnd());
-        var voiceDefinitions = Assert.IsType<JObject>(manifest["VoiceDefinitions"]);
         var events = Assert.IsType<JObject>(manifest["Events"]);
 
-        Assert.Equal(1, manifest.Value<int>("SchemaVersion"));
+        Assert.Equal(2, manifest.Value<int>("SchemaVersion"));
+        Assert.Null(manifest["VoiceDefinitions"]);
+        Assert.Matches("^[0-9a-f]{64}$", manifest.Value<string>("VoiceBankSha256"));
         Assert.Equal("SmartRandom", manifest.Value<string>("PlayMode"));
         Assert.Equal("Normal", manifest.Value<string>("SelectionMode"));
-        Assert.Equal(13, voiceDefinitions.Count);
         Assert.Equal(208, events.Count);
+    }
 
-        foreach (JProperty definition in voiceDefinitions.Properties())
-        {
-            var voices = Assert.IsType<JObject>(definition.Value);
-            foreach (JProperty voice in voices.Properties())
+    [Fact]
+    public void ParseVoiceDefinitions_PreservesAliasesAndSkipsIncompleteVoices()
+    {
+        const string xml = @"
+            <voice_definitions>
+              <voice_definition name=""male_01"">
+                <voice type=""Charge"" path=""event:/voice/combat/male/04/commands/charge"" face_anim=""attack"" />
+                <voice type=""MissingPath"" />
+              </voice_definition>
+              <voice_definition name=""male_02"">
+                <voice type=""Charge"" path=""event:/voice/combat/male/04/commands/charge"" />
+              </voice_definition>
+              <voice_definition>
+                <voice type=""Charge"" path=""event:/ignored"" />
+              </voice_definition>
+            </voice_definitions>";
+
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(xml));
+        VanillaOrderVoiceService.VoiceDefinitionEntry[] entries =
+            VanillaOrderVoiceService.ParseVoiceDefinitions(stream);
+
+        Assert.Collection(
+            entries,
+            entry =>
             {
-                var mapping = Assert.IsType<JObject>(voice.Value);
-                string eventPath = Assert.IsType<JValue>(mapping["Event"]).Value<string>();
-                Assert.True(events.ContainsKey(eventPath),
-                    $"{definition.Name}/{voice.Name} references missing event {eventPath}");
-            }
-        }
+                Assert.Equal("male_01", entry.VoiceDefinition);
+                Assert.Equal("Charge", entry.VoiceType);
+                Assert.Equal("event:/voice/combat/male/04/commands/charge", entry.EventPath);
+                Assert.Equal("attack", entry.FaceAnimation);
+            },
+            entry =>
+            {
+                Assert.Equal("male_02", entry.VoiceDefinition);
+                Assert.Equal("Charge", entry.VoiceType);
+                Assert.Equal("event:/voice/combat/male/04/commands/charge", entry.EventPath);
+                Assert.Null(entry.FaceAnimation);
+            });
+    }
+
+    [Fact]
+    public void ParseVoiceDefinitions_InvalidRootThrows()
+    {
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes("<voices />"));
+
+        Assert.Throws<InvalidDataException>(() =>
+            VanillaOrderVoiceService.ParseVoiceDefinitions(stream));
+    }
+
+    [Fact]
+    public void ComputeSha256_ReturnsLowercaseContentHash()
+    {
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes("abc"));
+
+        Assert.Equal(
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+            VanillaOrderVoiceService.ComputeSha256(stream));
     }
 
     [Fact]

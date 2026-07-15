@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Fmod5Sharp" Version="3.1.0" />
+    <PackageReference Include="FModBankParser" Version="1.2.0" />
+    <PackageReference Include="Microsoft.Bcl.Memory" Version="9.0.17" />
+  </ItemGroup>
+</Project>
