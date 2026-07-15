@@ -5,9 +5,7 @@ using Common.Network;
 using GameInterface.Services.CharacterDevelopers.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using System;
 using System.Collections.Generic;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.Core;
 
@@ -28,207 +26,132 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
             this.network = network;
-            messageBroker.Subscribe<ApplyChangesPressed>(Handle);
-            messageBroker.Subscribe<NetworkApplyChangesServer>(Handle);
-            messageBroker.Subscribe<NetworkApplyChangesClients>(Handle);
+
+            messageBroker.Subscribe<ApplyChanges>(Handle_ApplyChanges);
+            messageBroker.Subscribe<NetworkApplyChanges>(Handle_NetworkApplyChanges);
         }
 
         public void Dispose()
         {
-            messageBroker.Unsubscribe<ApplyChangesPressed>(Handle);
-            messageBroker.Unsubscribe<NetworkApplyChangesServer>(Handle);
-            messageBroker.Unsubscribe<NetworkApplyChangesClients>(Handle);
+            messageBroker.Unsubscribe<ApplyChanges>(Handle_ApplyChanges);
+            messageBroker.Unsubscribe<NetworkApplyChanges>(Handle_NetworkApplyChanges);
         }
 
-        private void Handle(MessagePayload<ApplyChangesPressed> obj)
+        private void Handle_ApplyChanges(MessagePayload<ApplyChanges> obj)
         {
-            SendChanges(obj.What);
-        }
+            var data = obj.What;
 
-        private void Handle(MessagePayload<NetworkApplyChangesServer> obj)
-        {
-            NetworkApplyChangesClients changes = new(obj.What);
-
-            // AddFocuses overwrites SkillOrgFocusAmounts entry-by-entry during the apply
-            // (it sets each to the new focus level to track remaining points). That list is
-            // shared with the apply payload, so the relay must carry its own copy of the
-            // original deltas; relaying the applied object would send zeroed focus deltas
-            // and clients would never raise their focuses.
-            NetworkApplyChangesClients relay = new(obj.What);
-            if (obj.What.SkillOrgFocusAmounts != null)
+            GameThread.RunSafe(() =>
             {
-                relay.SkillOrgFocusAmounts = new List<int>(obj.What.SkillOrgFocusAmounts);
-            }
+                // Get hero id for transmission over the network
+                if (!objectManager.TryGetIdWithLogging(data.HeroDeveloper, out var heroDeveloperId)) return;
 
-            ApplyChanges(changes, () =>
-            {
-                if (ModInformation.IsServer)
+                // Store perk ids in a list for transmission over the network
+                var perkIds = new List<string>();
+                foreach (var perk in data.Perks._selectedPerks)
                 {
-                    network.SendAll(relay);
+                    if (!objectManager.TryGetIdWithLogging(perk, out var currentPerkId)) continue;
+
+                    perkIds.Add(currentPerkId);
                 }
+
+                // Store attribute ids and levels in lists for transmission over the network
+                var attributeIds = new List<string>();
+                var attributeIncreases = new List<int>();
+                foreach (var attributeVM in data.Attributes)
+                {
+                    if (!objectManager.TryGetIdWithLogging(attributeVM.AttributeType, out var currentAttributeId)) continue;
+
+                    attributeIds.Add(currentAttributeId);
+                    attributeIncreases.Add(attributeVM.AttributeValue - attributeVM._initialAttValue);
+                }
+
+                // Store skill ids and levels in lists for transmission over the network
+                var skillIds = new List<string>();
+                var skillFocusLevels = new List<int>();
+                var skillOrgFocusAmounts = new List<int>();
+                foreach (var skillVM in data.Skills)
+                {
+                    if (!objectManager.TryGetId(skillVM.Skill, out var currentSkillId)) continue;
+
+                    skillIds.Add(currentSkillId);
+                    skillFocusLevels.Add(skillVM.CurrentFocusLevel);
+                    skillOrgFocusAmounts.Add(skillVM._orgFocusAmount);
+                }
+
+                // Send to server from client
+                NetworkApplyChanges message = new(
+                    heroDeveloperId,
+                    perkIds,
+                    attributeIds,
+                    attributeIncreases,
+                    skillIds,
+                    skillFocusLevels,
+                    skillOrgFocusAmounts
+                );
+                network.SendAll(message);
             });
         }
 
-        private void Handle(MessagePayload<NetworkApplyChangesClients> obj)
+        private void Handle_NetworkApplyChanges(MessagePayload<NetworkApplyChanges> obj)
         {
-            ApplyChanges(obj.What);
-        }
+            var data = obj.What;
 
-        private void SendChanges(ApplyChangesPressed obj)
-        {
-            // Get hero id for transmission over the network
-            var hero = obj.HeroDeveloper.Hero;
-            if (!objectManager.TryGetId(hero, out var heroId))
+            GameThread.RunSafe(() =>
             {
-                Logger.Error("Unable to get network ID for instance of type {type}", hero?.GetType());
-                return;
-            }
+                if (!objectManager.TryGetObjectWithLogging<HeroDeveloper>(data.HeroDeveloperId, out var heroDeveloper)) return;
 
-            // Store perk ids in a list for transmission over the network
-            var perkIds = new List<string>();
-            foreach (var perk in obj.Perks._selectedPerks)
-            {
-                if (!objectManager.TryGetId(perk, out var currentPerkId))
-                {
-                    Logger.Error("Unable to get network ID for instance of type {type}", perk?.GetType());
-                    return;
-                }
-
-                perkIds.Add(currentPerkId);
-            }
-
-            // Store attribute ids and levels in lists for transmission over the network
-            var attributeIds = new List<string>();
-            var attributeIncreases = new List<int>();
-            foreach (var attributeVM in obj.Attributes)
-            {
-                if (!objectManager.TryGetId(attributeVM.AttributeType, out var currentAttributeId))
-                {
-                    Logger.Error("Unable to get network ID for instance of type {type}", attributeVM.AttributeType?.GetType());
-                    return;
-                }
-
-                attributeIds.Add(currentAttributeId);
-                attributeIncreases.Add(attributeVM.AttributeValue - attributeVM._initialAttValue);
-            }
-
-            // Store skill ids and levels in lists for transmission over the network
-            var skillIds = new List<string>();
-            var skillFocusLevels = new List<int>();
-            var skillOrgFocusAmounts = new List<int>();
-            foreach (var skillVM in obj.Skills)
-            {
-                if (!objectManager.TryGetId(skillVM.Skill, out var currentSkillId))
-                {
-                    Logger.Error("Unable to get network ID for instance of type {type}", skillVM.Skill?.GetType());
-                    return;
-                }
-
-                skillIds.Add(currentSkillId);
-                skillFocusLevels.Add(skillVM.CurrentFocusLevel);
-                skillOrgFocusAmounts.Add(skillVM._orgFocusAmount);
-            }
-
-            // Send to server from client
-            NetworkApplyChangesServer message = new(heroId,
-                perkIds,
-                attributeIds,
-                attributeIncreases,
-                skillIds,
-                skillFocusLevels,
-                skillOrgFocusAmounts
-            );
-            network.SendAll(message);
-        }
-
-        private void ApplyChanges(NetworkApplyChangesClients obj, Action afterApply = null)
-        {
-            GameThread.Run(() =>
-            {
-                try
-                {
-                    string heroId = obj.HeroId;
-                    if (!objectManager.TryGetObject(obj.HeroId, out Hero hero))
-                    {
-                        Logger.Error("Unable to get object for id {id}", heroId);
-                        return;
-                    }
-
-                    AddPerks(obj.PerkIds, hero.HeroDeveloper);
-                    AddAttributes(obj.AttributeIds, obj.AttributeIncreases, hero.HeroDeveloper);
-                    AddFocuses(obj.SkillIds, obj.SkillFocusLevels, obj.SkillOrgFocusAmounts, hero.HeroDeveloper);
-
-                    afterApply?.Invoke();
-                }
-                catch (Exception e)
-                {
-                    Logger.Error(e, "Failed to apply {Message}", nameof(NetworkApplyChangesClients));
-                }
+                AddPerks(data.PerkIds, heroDeveloper);
+                AddAttributes(data.AttributeIds, data.AttributeIncreases, heroDeveloper);
+                AddFocuses(data.SkillIds, data.SkillFocusLevels, data.SkillOrgFocusAmounts, heroDeveloper);
             });
         }
 
         private void AddPerks(List<string> perkIds, HeroDeveloper heroDeveloper)
         {
-            if (perkIds != null)
+            if (perkIds == null) return;
+
+            foreach (string perkId in perkIds)
             {
-                foreach (string perkId in perkIds)
-                {
-                    PerkObject currentPerk;
-                    if (!objectManager.TryGetObject(perkId, out currentPerk))
-                    {
-                        Logger.Error("Unable to get object for id {id}", perkId);
-                        return;
-                    }
-                    heroDeveloper.AddPerk(currentPerk);
-                }
+                if (!objectManager.TryGetObjectWithLogging<PerkObject>(perkId, out var currentPerk)) continue;
+
+                heroDeveloper.AddPerk(currentPerk);
             }
         }
 
         private void AddAttributes(List<string> attributeIds, List<int> attributeIncreases, HeroDeveloper heroDeveloper)
         {
-            if (attributeIds != null)
+            if (attributeIds == null) return;
+
+            for (int i = 0; i < attributeIds.Count; i++)
             {
-                for (int i = 0; i < attributeIds.Count; i++)
+                string attributeId = attributeIds[i];
+                if (!objectManager.TryGetObjectWithLogging<CharacterAttribute>(attributeId, out var currentAttribute)) continue;
+
+                for (int j = 0; j < attributeIncreases[i]; j++)
                 {
-                    string attributeId = attributeIds[i];
-
-                    CharacterAttribute currentAttribute;
-                    if (!objectManager.TryGetObject(attributeId, out currentAttribute))
-                    {
-                        Logger.Error("Unable to get object for id {id}", attributeId);
-                        return;
-                    }
-
-                    for (int j = 0; j < attributeIncreases[i]; j++)
-                    {
-                        heroDeveloper.AddAttribute(currentAttribute, 1);
-                    }
+                    heroDeveloper.AddAttribute(currentAttribute, 1);
                 }
             }
         }
 
         private void AddFocuses(List<string> skillIds, List<int> skillFocusLevels, List<int> skillOrgFocusAmounts, HeroDeveloper heroDeveloper)
         {
-            if (skillIds != null)
+            if (skillIds == null) return;
+
+            for (int i = 0; i < skillIds.Count; i++)
             {
-                for (int i = 0; i < skillIds.Count; i++)
+                string skillId = skillIds[i];
+
+                if (!objectManager.TryGetObjectWithLogging<SkillObject>(skillId, out var currentSkill)) continue;
+
+                for (int j = 0; j < skillFocusLevels[i] - skillOrgFocusAmounts[i]; j++)
                 {
-                    string skillId = skillIds[i];
-
-                    if (!objectManager.TryGetObject<SkillObject>(skillId, out var currentSkill))
-                    {
-                        Logger.Error("Unable to get object for id {id}", skillId);
-                        continue;
-                    }
-
-                    for (int j = 0; j < skillFocusLevels[i] - skillOrgFocusAmounts[i]; j++)
-                    {
-                        heroDeveloper.AddFocus(currentSkill, 1);
-                    }
-
-                    // Needed to calculate remaining skill points correctly
-                    skillOrgFocusAmounts[i] = skillFocusLevels[i];
+                    heroDeveloper.AddFocus(currentSkill, 1);
                 }
+
+                // Needed to calculate remaining skill points correctly
+                skillOrgFocusAmounts[i] = skillFocusLevels[i];
             }
         }
     }

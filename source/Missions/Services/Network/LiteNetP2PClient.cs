@@ -236,8 +236,22 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
             return;
         }
 
-        Logger.Information("Connecting P2P: {TargetEndPoint}", targetEndPoint);
-        netManager.Connect(targetEndPoint, token);
+        // The NAT token names the newcomer, so only existing members initiate the connection.
+        if (connectionToken.ControllerId == ControllerId) return;
+
+        lock (peerGate)
+        {
+            if (instanceId != connectionToken.InstanceId || HasTrackedPeer(connectionToken.ControllerId)) return;
+
+            Logger.Information("Connecting P2P: {TargetEndPoint}", targetEndPoint);
+            var peer = netManager.Connect(
+                targetEndPoint,
+                new ConnectionToken(ControllerId, connectionToken.InstanceId));
+            if (peer != null)
+            {
+                pendingPeerControllers[peer] = connectionToken.ControllerId;
+            }
+        }
     }
 
     public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)

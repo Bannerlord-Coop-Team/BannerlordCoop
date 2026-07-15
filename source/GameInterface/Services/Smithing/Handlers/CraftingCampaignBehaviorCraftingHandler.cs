@@ -56,6 +56,9 @@ namespace GameInterface.Services.Smithing.Handlers
             messageBroker.Subscribe<NetworkCreateCraftedWeaponInternalClients>(Handle);
 
             messageBroker.Subscribe<NetworkSetHeroCraftingStamina>(Handle);
+
+            messageBroker.Subscribe<AddSkillXpFromCrafting>(Handle);
+            messageBroker.Subscribe<NetworkAddSkillXpFromCrafting>(Handle);
         }
 
         public void Dispose()
@@ -69,6 +72,9 @@ namespace GameInterface.Services.Smithing.Handlers
             messageBroker.Unsubscribe<NetworkCreateCraftedWeaponInternalClients>(Handle);
 
             messageBroker.Unsubscribe<NetworkSetHeroCraftingStamina>(Handle);
+
+            messageBroker.Unsubscribe<AddSkillXpFromCrafting>(Handle);
+            messageBroker.Unsubscribe<NetworkAddSkillXpFromCrafting>(Handle);
         }
 
         private void Handle(MessagePayload<SmeltingDone> obj)
@@ -115,6 +121,26 @@ namespace GameInterface.Services.Smithing.Handlers
             SetHeroCraftingStaminaClients(obj.What);
         }
 
+        private void Handle(MessagePayload<AddSkillXpFromCrafting> obj)
+        {
+            GameThread.RunSafe(() =>
+            {
+                if (!objectManager.TryGetIdWithLogging(obj.What.CraftingHero, out var craftingHeroId)) return;
+
+                network.SendAll(new NetworkAddSkillXpFromCrafting(craftingHeroId, obj.What.Xp));
+            });
+        }
+
+        private void Handle(MessagePayload<NetworkAddSkillXpFromCrafting> obj)
+        {
+            GameThread.RunSafe(() =>
+            {
+                if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.CraftingHeroId, out var craftingHero)) return;
+
+                craftingHero.AddSkillXp(DefaultSkills.Crafting, obj.What.Xp);
+            });
+        }
+
         private void SendSmeltingDone(SmeltingDone obj)
         {
             if (!objectManager.TryGetIdWithLogging(obj.CraftingCampaignBehavior, out var craftingCampaignBehaviorId)) return;
@@ -147,53 +173,45 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void DoSmelting(NetworkDoSmelting obj)
         {
-            // The roster mutation and event dispatch race the host's main-thread tick, so
-            // resolve ids and apply the smelting on the game loop. The stamina and refresh
-            // broadcasts go out from inside the deferral, after the server-side apply.
-            GameThread.Run(() =>
+            GameThread.RunSafe(() =>
             {
-                try
+                if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
+                if (!objectManager.TryGetObjectWithLogging(obj.CraftingHeroId, out Hero craftingHero)) return;
+                if (!objectManager.TryGetObjectWithLogging(obj.ItemId, out ItemObject item)) return;
+
+                ItemModifier itemModifier = null;
+                if (obj.ItemModifierId != "" && !objectManager.TryGetObjectWithLogging(obj.ItemModifierId, out itemModifier)) return;
+
+                ItemObject cosmeticItem = null;
+                if (obj.CosmeticItemId != "" && !objectManager.TryGetObjectWithLogging(obj.CosmeticItemId, out cosmeticItem)) return;
+
+                // Rebuild equipmentElement on server
+                var equipmentElement = new EquipmentElement(item, itemModifier, cosmeticItem, obj.IsQuestItem);
+
+                // Replace original TaleWorlds implementation
+                ItemRoster itemRoster = craftingHero.PartyBelongedTo.ItemRoster;
+                int[] smeltingOutputForItem = Campaign.Current.Models.SmithingModel.GetSmeltingOutputForItem(item);
+
+                if (itemRoster.FindIndexOfElement(equipmentElement) < 0) return; // Needed to prevent spam clicking to smelt more than actually available
+                itemRoster.AddToCounts(equipmentElement, -1);
+                for (int i = 8; i >= 0; i--)
                 {
-                    if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
-                    if (!objectManager.TryGetObjectWithLogging(obj.CraftingHeroId, out Hero craftingHero)) return;
-                    if (!objectManager.TryGetObjectWithLogging(obj.ItemId, out ItemObject item)) return;
-
-                    ItemModifier itemModifier = null;
-                    if (obj.ItemModifierId != "" && !objectManager.TryGetObjectWithLogging(obj.ItemModifierId, out itemModifier)) return;
-
-                    ItemObject cosmeticItem = null;
-                    if (obj.CosmeticItemId != "" && !objectManager.TryGetObjectWithLogging(obj.CosmeticItemId, out cosmeticItem)) return;
-
-                    // Rebuild equipmentElement on server
-                    var equipmentElement = new EquipmentElement(item, itemModifier, cosmeticItem, obj.IsQuestItem);
-
-                    // Replace original TaleWorlds implementation
-                    ItemRoster itemRoster = craftingHero.PartyBelongedTo.ItemRoster;
-                    int[] smeltingOutputForItem = Campaign.Current.Models.SmithingModel.GetSmeltingOutputForItem(item);
-
-                    if (itemRoster.FindIndexOfElement(equipmentElement) < 0) return; // Needed to prevent spam clicking to smelt more than actually available
-                    itemRoster.AddToCounts(equipmentElement, -1);
-                    for (int i = 8; i >= 0; i--)
+                    if (smeltingOutputForItem[i] != 0)
                     {
-                        if (smeltingOutputForItem[i] != 0)
-                        {
-                            itemRoster.AddToCounts(Campaign.Current.Models.SmithingModel.GetCraftingMaterialItem((CraftingMaterials)i), smeltingOutputForItem[i]);
-                        }
+                        itemRoster.AddToCounts(Campaign.Current.Models.SmithingModel.GetCraftingMaterialItem((CraftingMaterials)i), smeltingOutputForItem[i]);
                     }
-
-                    int energyCostForSmelting = Campaign.Current.Models.SmithingModel.GetEnergyCostForSmelting(item, craftingHero);
-                    int newHeroCraftingStamina = craftingCampaignBehavior.GetHeroCraftingStamina(craftingHero) - energyCostForSmelting;
-                    craftingCampaignBehavior.SetHeroCraftingStamina(craftingHero, newHeroCraftingStamina); // Run on server
-                    network.SendAll(new NetworkSetHeroCraftingStamina(obj.CraftingCampaignBehaviorId, obj.CraftingHeroId, newHeroCraftingStamina)); // Run on clients
-
-                    CampaignEventDispatcher.Instance.OnEquipmentSmeltedByHero(craftingHero, equipmentElement);
-
-                    network.SendAll(new NetworkRefreshSmelting()); // Refresh client ViewModels
                 }
-                catch (Exception e)
-                {
-                    Logger.Error(e, "Failed to apply {Message}", nameof(NetworkDoSmelting));
-                }
+
+                craftingHero.AddSkillXp(DefaultSkills.Crafting, (float)Campaign.Current.Models.SmithingModel.GetSkillXpForSmelting(equipmentElement.Item));
+
+                int energyCostForSmelting = Campaign.Current.Models.SmithingModel.GetEnergyCostForSmelting(item, craftingHero);
+                int newHeroCraftingStamina = craftingCampaignBehavior.GetHeroCraftingStamina(craftingHero) - energyCostForSmelting;
+                craftingCampaignBehavior.SetHeroCraftingStamina(craftingHero, newHeroCraftingStamina); // Run on server
+                network.SendAll(new NetworkSetHeroCraftingStamina(obj.CraftingCampaignBehaviorId, obj.CraftingHeroId, newHeroCraftingStamina)); // Run on clients
+
+                CampaignEventDispatcher.Instance.OnEquipmentSmeltedByHero(craftingHero, equipmentElement);
+
+                network.SendAll(new NetworkRefreshSmelting()); // Refresh client ViewModels
             });
         }
 
@@ -223,62 +241,54 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void DoRefinement(NetworkDoRefinement obj)
         {
-            // The roster mutations and event dispatch race the host's main-thread tick, so
-            // resolve ids and apply the refinement on the game loop. The stamina and refresh
-            // broadcasts go out from inside the deferral, after the server-side apply.
-            GameThread.Run(() =>
+            GameThread.RunSafe(() =>
             {
-                try
+                // Get objects from objectManager
+                if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
+                if (!objectManager.TryGetObjectWithLogging(obj.CraftingHeroId, out Hero craftingHero)) return;
+
+                // Rebuild formula on server
+                var formula = new Crafting.RefiningFormula(
+                    obj.Input1, obj.Input1Count,
+                    obj.Input2, obj.Input2Count,
+                    obj.Output1, obj.Output1Count,
+                    obj.Output2, obj.Output2Count);
+
+                // Replace original TaleWorlds implementation
+                ItemRoster itemRoster = craftingHero.PartyBelongedTo.ItemRoster;
+                if (formula.Input1Count > 0)
                 {
-                    // Get objects from objectManager
-                    if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
-                    if (!objectManager.TryGetObjectWithLogging(obj.CraftingHeroId, out Hero craftingHero)) return;
-
-                    // Rebuild formula on server
-                    var formula = new Crafting.RefiningFormula(
-                        obj.Input1, obj.Input1Count,
-                        obj.Input2, obj.Input2Count,
-                        obj.Output1, obj.Output1Count,
-                        obj.Output2, obj.Output2Count);
-
-                    // Replace original TaleWorlds implementation
-                    ItemRoster itemRoster = craftingHero.PartyBelongedTo.ItemRoster;
-                    if (formula.Input1Count > 0)
-                    {
-                        ItemObject craftingMaterialItem = Campaign.Current.Models.SmithingModel.GetCraftingMaterialItem(formula.Input1);
-                        if (itemRoster.FindIndexOfElement(new EquipmentElement(craftingMaterialItem, null, null, false)) < 0) return; // Needed to prevent spam clicking to refine more than actually available
-                        itemRoster.AddToCounts(craftingMaterialItem, -formula.Input1Count);
-                    }
-                    if (formula.Input2Count > 0)
-                    {
-                        ItemObject craftingMaterialItem2 = Campaign.Current.Models.SmithingModel.GetCraftingMaterialItem(formula.Input2);
-                        if (itemRoster.FindIndexOfElement(new EquipmentElement(craftingMaterialItem2, null, null, false)) < 0) return; // Needed to prevent spam clicking to refine more than actually available
-                        itemRoster.AddToCounts(craftingMaterialItem2, -formula.Input2Count);
-                    }
-                    if (formula.OutputCount > 0)
-                    {
-                        ItemObject craftingMaterialItem3 = Campaign.Current.Models.SmithingModel.GetCraftingMaterialItem(formula.Output);
-                        itemRoster.AddToCounts(craftingMaterialItem3, formula.OutputCount);
-                    }
-                    if (formula.Output2Count > 0)
-                    {
-                        ItemObject craftingMaterialItem4 = Campaign.Current.Models.SmithingModel.GetCraftingMaterialItem(formula.Output2);
-                        itemRoster.AddToCounts(craftingMaterialItem4, formula.Output2Count);
-                    }
-
-                    int energyCostForRefining = Campaign.Current.Models.SmithingModel.GetEnergyCostForRefining(ref formula, craftingHero);
-                    int newHeroCraftingStamina = craftingCampaignBehavior.GetHeroCraftingStamina(craftingHero) - energyCostForRefining;
-                    craftingCampaignBehavior.SetHeroCraftingStamina(craftingHero, newHeroCraftingStamina); // Run on server
-                    network.SendAll(new NetworkSetHeroCraftingStamina(obj.CraftingCampaignBehaviorId, obj.CraftingHeroId, newHeroCraftingStamina)); // Run on clients
-
-                    CampaignEventDispatcher.Instance.OnItemsRefined(craftingHero, formula);
-
-                    network.SendAll(new NetworkRefreshRefinement(obj.CraftingHeroId)); // Refresh client ViewModels
+                    ItemObject craftingMaterialItem = Campaign.Current.Models.SmithingModel.GetCraftingMaterialItem(formula.Input1);
+                    if (itemRoster.FindIndexOfElement(new EquipmentElement(craftingMaterialItem, null, null, false)) < 0) return; // Needed to prevent spam clicking to refine more than actually available
+                    itemRoster.AddToCounts(craftingMaterialItem, -formula.Input1Count);
                 }
-                catch (Exception e)
+                if (formula.Input2Count > 0)
                 {
-                    Logger.Error(e, "Failed to apply {Message}", nameof(NetworkDoRefinement));
+                    ItemObject craftingMaterialItem2 = Campaign.Current.Models.SmithingModel.GetCraftingMaterialItem(formula.Input2);
+                    if (itemRoster.FindIndexOfElement(new EquipmentElement(craftingMaterialItem2, null, null, false)) < 0) return; // Needed to prevent spam clicking to refine more than actually available
+                    itemRoster.AddToCounts(craftingMaterialItem2, -formula.Input2Count);
                 }
+                if (formula.OutputCount > 0)
+                {
+                    ItemObject craftingMaterialItem3 = Campaign.Current.Models.SmithingModel.GetCraftingMaterialItem(formula.Output);
+                    itemRoster.AddToCounts(craftingMaterialItem3, formula.OutputCount);
+                }
+                if (formula.Output2Count > 0)
+                {
+                    ItemObject craftingMaterialItem4 = Campaign.Current.Models.SmithingModel.GetCraftingMaterialItem(formula.Output2);
+                    itemRoster.AddToCounts(craftingMaterialItem4, formula.Output2Count);
+                }
+
+                craftingHero.AddSkillXp(DefaultSkills.Crafting, (float)Campaign.Current.Models.SmithingModel.GetSkillXpForRefining(ref formula));
+
+                int energyCostForRefining = Campaign.Current.Models.SmithingModel.GetEnergyCostForRefining(ref formula, craftingHero);
+                int newHeroCraftingStamina = craftingCampaignBehavior.GetHeroCraftingStamina(craftingHero) - energyCostForRefining;
+                craftingCampaignBehavior.SetHeroCraftingStamina(craftingHero, newHeroCraftingStamina); // Run on server
+                network.SendAll(new NetworkSetHeroCraftingStamina(obj.CraftingCampaignBehaviorId, obj.CraftingHeroId, newHeroCraftingStamina)); // Run on clients
+
+                CampaignEventDispatcher.Instance.OnItemsRefined(craftingHero, formula);
+
+                network.SendAll(new NetworkRefreshRefinement(obj.CraftingHeroId)); // Refresh client ViewModels
             });
         }
 
@@ -336,17 +346,87 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void CreateCraftedWeaponInternalServer(NetworkCreateCraftedWeaponInternalServer obj)
         {
-            // The MBObjectManager registration, roster mutation, crafted-item id allocation
-            // and event dispatch all race the host's main-thread tick, so resolve ids and
-            // apply the crafting on the game loop. The stamina broadcast goes out from inside
-            // the deferral, after the server-side apply. Server-authoritative, so only the
-            // pre-existing inner AllowedThread around Crafting.GenerateItem is used here.
-            GameThread.Run(() =>
+            GameThread.RunSafe(() =>
             {
-                try
+                if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
+                if (!objectManager.TryGetObjectWithLogging(obj.CraftingHeroId, out Hero craftingHero)) return;
+                if (!objectManager.TryGetObjectWithLogging(obj.CraftingTemplateId, out CraftingTemplate craftingTemplate)) return;
+
+                ItemObject craftedItemObject = itemObjectInterface.UnpackItemObject(obj.CraftedItemObjectData);
+
+                ItemModifierGroup itemModifierGroup = null;
+                if (obj.ItemModifierGroupId != null && !objectManager.TryGetObjectWithLogging(obj.ItemModifierGroupId, out itemModifierGroup)) return;
+
+                if (!GetUsedPieces(obj.WeaponDesignElementCraftingPieceIds, obj.WeaponDesignElementScalePercentages, out WeaponDesignElement[] usedPieces)) return;
+
+                ItemModifier weaponModifier = null;
+                if (obj.WeaponModifierId != "" && !objectManager.TryGetObjectWithLogging(obj.WeaponModifierId, out weaponModifier)) return;
+
+                // Replace original TaleWorlds implementation
+
+                string nextCraftedItemId = craftingCampaignBehavior.GetNextCraftedItemId();
+                WeaponDesign weaponDesign = new WeaponDesign(craftingTemplate, new TextObject(obj.WeaponName), usedPieces);
+                if (obj.IsFreeMode)
+                {
+                    weaponDesign = new WeaponDesign(weaponDesign.Template, weaponDesign.WeaponName, weaponDesign.UsedPieces, nextCraftedItemId);
+                }
+
+                // Implement CraftingCampaignBehavior.SpendMaterials(weaponDesign) here as it needs the party roster, MainParty on server won't be correct
+                ItemRoster itemRoster = craftingHero.PartyBelongedTo.ItemRoster;
+                int[] smithingCostsForWeaponDesign = Campaign.Current.Models.SmithingModel.GetSmithingCostsForWeaponDesign(weaponDesign);
+                for (int i = 8; i >= 0; i--)
+                {
+                    if (smithingCostsForWeaponDesign[i] != 0)
+                    {
+                        itemRoster.AddToCounts(Campaign.Current.Models.SmithingModel.GetCraftingMaterialItem((CraftingMaterials)i), smithingCostsForWeaponDesign[i]);
+                    }
+                }
+
+                ItemObject.InitAsPlayerCraftedItem(ref craftedItemObject);
+                craftedItemObject.ItemComponent = null; // Need to clear the generated item component from the client, otherwise get duplicate weapons in Crafting.Generateitem from Add() instead of a new list
+                using (new AllowedThread())
+                {
+                    Crafting.GenerateItem(
+                    weaponDesign,
+                    craftedItemObject.Name,
+                    craftedItemObject.Culture,
+                    itemModifierGroup,
+                    ref craftedItemObject,
+                    nextCraftedItemId);
+                }
+
+                objectManager.AddExisting(nextCraftedItemId, craftedItemObject);
+                MBObjectManager.Instance.RegisterObject<ItemObject>(craftedItemObject);
+
+                if (obj.IsFreeMode)
+                {
+                    if (weaponModifier == null)
+                    {
+                        itemRoster.AddToCounts(craftedItemObject, 1);
+                    }
+                    else
+                    {
+                        EquipmentElement rosterElement = new EquipmentElement(craftedItemObject, weaponModifier, null, false);
+                        itemRoster.AddToCounts(rosterElement, 1);
+                    }
+                }
+
+                int energyCostForSmithing = Campaign.Current.Models.SmithingModel.GetEnergyCostForSmithing(craftedItemObject, craftingHero);
+                int newHeroCraftingStamina = craftingCampaignBehavior.GetHeroCraftingStamina(craftingHero) - energyCostForSmithing;
+                craftingCampaignBehavior.SetHeroCraftingStamina(craftingHero, newHeroCraftingStamina); // Run on server
+                network.SendAll(new NetworkSetHeroCraftingStamina(obj.CraftingCampaignBehaviorId, obj.CraftingHeroId, newHeroCraftingStamina)); // Run on clients
+
+                CampaignEventDispatcher.Instance.OnNewItemCrafted(craftedItemObject, weaponModifier, !obj.IsFreeMode);
+            });
+        }
+
+        private void CreateCraftedWeaponInternalClients(NetworkCreateCraftedWeaponInternalClients obj)
+        {
+            GameThread.RunSafe(() =>
+            {
+                using (new AllowedThread())
                 {
                     if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
-                    if (!objectManager.TryGetObjectWithLogging(obj.CraftingHeroId, out Hero craftingHero)) return;
                     if (!objectManager.TryGetObjectWithLogging(obj.CraftingTemplateId, out CraftingTemplate craftingTemplate)) return;
 
                     ItemObject craftedItemObject = itemObjectInterface.UnpackItemObject(obj.CraftedItemObjectData);
@@ -360,128 +440,36 @@ namespace GameInterface.Services.Smithing.Handlers
                     if (obj.WeaponModifierId != "" && !objectManager.TryGetObjectWithLogging(obj.WeaponModifierId, out weaponModifier)) return;
 
                     // Replace original TaleWorlds implementation
-
-                    string nextCraftedItemId = craftingCampaignBehavior.GetNextCraftedItemId();
+                    string nextCraftedItemId = obj.NextCraftedItemId;
                     WeaponDesign weaponDesign = new WeaponDesign(craftingTemplate, new TextObject(obj.WeaponName), usedPieces);
                     if (obj.IsFreeMode)
                     {
                         weaponDesign = new WeaponDesign(weaponDesign.Template, weaponDesign.WeaponName, weaponDesign.UsedPieces, nextCraftedItemId);
                     }
 
-                    // Implement CraftingCampaignBehavior.SpendMaterials(weaponDesign) here as it needs the party roster, MainParty on server won't be correct
-                    ItemRoster itemRoster = craftingHero.PartyBelongedTo.ItemRoster;
-                    int[] smithingCostsForWeaponDesign = Campaign.Current.Models.SmithingModel.GetSmithingCostsForWeaponDesign(weaponDesign);
-                    for (int i = 8; i >= 0; i--)
-                    {
-                        if (smithingCostsForWeaponDesign[i] != 0)
-                        {
-                            itemRoster.AddToCounts(Campaign.Current.Models.SmithingModel.GetCraftingMaterialItem((CraftingMaterials)i), smithingCostsForWeaponDesign[i]);
-                        }
-                    }
-
                     ItemObject.InitAsPlayerCraftedItem(ref craftedItemObject);
                     craftedItemObject.ItemComponent = null; // Need to clear the generated item component from the client, otherwise get duplicate weapons in Crafting.Generateitem from Add() instead of a new list
-                    using (new AllowedThread())
-                    {
-                        Crafting.GenerateItem(
+                    Crafting.GenerateItem(
                         weaponDesign,
                         craftedItemObject.Name,
                         craftedItemObject.Culture,
                         itemModifierGroup,
                         ref craftedItemObject,
                         nextCraftedItemId);
-                    }
 
-                    objectManager.AddExisting(nextCraftedItemId, craftedItemObject);
-                    MBObjectManager.Instance.RegisterObject<ItemObject>(craftedItemObject);
-
-                    if (obj.IsFreeMode)
+                    if (GameStateManager.Current.ActiveState is CraftingState currentState && currentState.CraftingLogic._craftedItemObject.StringId == nextCraftedItemId) // Only run on associated client with matching id
                     {
-                        if (weaponModifier == null)
-                        {
-                            itemRoster.AddToCounts(craftedItemObject, 1);
-                        }
-                        else
-                        {
-                            EquipmentElement rosterElement = new EquipmentElement(craftedItemObject, weaponModifier, null, false);
-                            itemRoster.AddToCounts(rosterElement, 1);
-                        }
+                        currentState.CraftingLogic._craftedItemObject = craftedItemObject;
+
+                        AddItemToHistoryPatch.OverrideAddItemToHistory(ref craftingCampaignBehavior, craftedItemObject);
                     }
-
-                    int energyCostForSmithing = Campaign.Current.Models.SmithingModel.GetEnergyCostForSmithing(craftedItemObject, craftingHero);
-                    int newHeroCraftingStamina = craftingCampaignBehavior.GetHeroCraftingStamina(craftingHero) - energyCostForSmithing;
-                    craftingCampaignBehavior.SetHeroCraftingStamina(craftingHero, newHeroCraftingStamina); // Run on server
-                    network.SendAll(new NetworkSetHeroCraftingStamina(obj.CraftingCampaignBehaviorId, obj.CraftingHeroId, newHeroCraftingStamina)); // Run on clients
-
-                    CampaignEventDispatcher.Instance.OnNewItemCrafted(craftedItemObject, weaponModifier, !obj.IsFreeMode);
-                }
-                catch (Exception e)
-                {
-                    Logger.Error(e, "Failed to apply {Message}", nameof(NetworkCreateCraftedWeaponInternalServer));
-                }
-            });
-        }
-
-        private void CreateCraftedWeaponInternalClients(NetworkCreateCraftedWeaponInternalClients obj)
-        {
-            // The vanilla crafting flow reads/writes the live CraftingState UI logic and the
-            // MBObjectManager, so resolve ids and apply on the game loop. AllowedThread wraps
-            // the whole deferred body since this is a client receive-apply of vanilla code.
-            GameThread.Run(() =>
-            {
-                try
-                {
-                    using (new AllowedThread())
+                    else // Need to update craftingCampaignBehavior._craftedItemCount for every other client
                     {
-                        if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
-                        if (!objectManager.TryGetObjectWithLogging(obj.CraftingTemplateId, out CraftingTemplate craftingTemplate)) return;
-
-                        ItemObject craftedItemObject = itemObjectInterface.UnpackItemObject(obj.CraftedItemObjectData);
-
-                        ItemModifierGroup itemModifierGroup = null;
-                        if (obj.ItemModifierGroupId != null && !objectManager.TryGetObjectWithLogging(obj.ItemModifierGroupId, out itemModifierGroup)) return;
-
-                        if (!GetUsedPieces(obj.WeaponDesignElementCraftingPieceIds, obj.WeaponDesignElementScalePercentages, out WeaponDesignElement[] usedPieces)) return;
-
-                        ItemModifier weaponModifier = null;
-                        if (obj.WeaponModifierId != "" && !objectManager.TryGetObjectWithLogging(obj.WeaponModifierId, out weaponModifier)) return;
-
-                        // Replace original TaleWorlds implementation
-                        string nextCraftedItemId = obj.NextCraftedItemId;
-                        WeaponDesign weaponDesign = new WeaponDesign(craftingTemplate, new TextObject(obj.WeaponName), usedPieces);
-                        if (obj.IsFreeMode)
-                        {
-                            weaponDesign = new WeaponDesign(weaponDesign.Template, weaponDesign.WeaponName, weaponDesign.UsedPieces, nextCraftedItemId);
-                        }
-
-                        ItemObject.InitAsPlayerCraftedItem(ref craftedItemObject);
-                        craftedItemObject.ItemComponent = null; // Need to clear the generated item component from the client, otherwise get duplicate weapons in Crafting.Generateitem from Add() instead of a new list
-                        Crafting.GenerateItem(
-                            weaponDesign,
-                            craftedItemObject.Name,
-                            craftedItemObject.Culture,
-                            itemModifierGroup,
-                            ref craftedItemObject,
-                            nextCraftedItemId);
-
-                        if (GameStateManager.Current.ActiveState is CraftingState currentState && currentState.CraftingLogic._craftedItemObject.StringId == nextCraftedItemId) // Only run on associated client with matching id
-                        {
-                            currentState.CraftingLogic._craftedItemObject = craftedItemObject;
-
-                            AddItemToHistoryPatch.OverrideAddItemToHistory(ref craftingCampaignBehavior, craftedItemObject);
-                        }
-                        else // Need to update craftingCampaignBehavior._craftedItemCount for every other client
-                        {
-                            objectManager.AddExisting(nextCraftedItemId, craftedItemObject);
-                            craftingCampaignBehavior.GetNextCraftedItemId();
-                            CampaignEventDispatcher.Instance.OnNewItemCrafted(craftedItemObject, weaponModifier, !obj.IsFreeMode);
-                            MBObjectManager.Instance.RegisterObject<ItemObject>(craftedItemObject);
-                        }
+                        objectManager.AddExisting(nextCraftedItemId, craftedItemObject);
+                        craftingCampaignBehavior.GetNextCraftedItemId();
+                        CampaignEventDispatcher.Instance.OnNewItemCrafted(craftedItemObject, weaponModifier, !obj.IsFreeMode);
+                        MBObjectManager.Instance.RegisterObject<ItemObject>(craftedItemObject);
                     }
-                }
-                catch (Exception e)
-                {
-                    Logger.Error(e, "Failed to apply {Message}", nameof(NetworkCreateCraftedWeaponInternalClients));
                 }
             });
         }
@@ -509,21 +497,12 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void SetHeroCraftingStaminaClients(NetworkSetHeroCraftingStamina obj)
         {
-            // GetRecordForCompanion can lazily create the per-companion record and the write
-            // mutates campaign state the tick reads, so resolve ids and apply on the game loop.
-            GameThread.Run(() =>
+            GameThread.RunSafe(() =>
             {
-                try
-                {
-                    if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
-                    if (!objectManager.TryGetObjectWithLogging(obj.CraftingHeroId, out Hero craftingHero)) return;
+                if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
+                if (!objectManager.TryGetObjectWithLogging(obj.CraftingHeroId, out Hero craftingHero)) return;
 
-                    craftingCampaignBehavior.GetRecordForCompanion(craftingHero).CraftingStamina = MathF.Max(0, obj.Value);
-                }
-                catch (Exception e)
-                {
-                    Logger.Error(e, "Failed to apply {Message}", nameof(NetworkSetHeroCraftingStamina));
-                }
+                craftingCampaignBehavior.GetRecordForCompanion(craftingHero).CraftingStamina = MathF.Max(0, obj.Value);
             });
         }
     }

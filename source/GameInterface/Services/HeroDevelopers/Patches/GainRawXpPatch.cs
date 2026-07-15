@@ -1,7 +1,6 @@
-﻿using Common.Logging;
-using Common.Messaging;
+﻿using Common;
+using Common.Logging;
 using GameInterface.Policies;
-using GameInterface.Services.HeroDevelopers.Messages;
 using HarmonyLib;
 using Serilog;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
@@ -13,19 +12,17 @@ namespace GameInterface.Services.HeroDevelopers.Patches
     {
         private static readonly ILogger Logger = LogManager.GetLogger<HeroDeveloper>();
 
-        [HarmonyPatch("GainRawXp")]
+        [HarmonyPatch(nameof(HeroDeveloper.GainRawXp))]
         [HarmonyPrefix]
-        public static bool GainRawXp(ref HeroDeveloper __instance, float rawXp, bool shouldNotify)
+        public static bool GainRawXpPrefix(ref HeroDeveloper __instance, float rawXp, bool shouldNotify)
         {
             // Call original if we call this function
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-            // Publish message with data
-            var message = new RawXpGain(__instance, rawXp, shouldNotify);
-            MessageBroker.Instance.Publish(__instance, message);
+            // Don't allow clients to change raw xp
+            if (ModInformation.IsClient) return false;
 
-            // Skip original to override original client saving
-            return false;
+            return true;
         }
     }
 }
