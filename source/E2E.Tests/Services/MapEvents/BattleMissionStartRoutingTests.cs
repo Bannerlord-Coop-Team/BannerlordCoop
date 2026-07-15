@@ -41,4 +41,16 @@ public class BattleMissionStartRoutingTests
             BattleSpawnGate.EndBattle();
         }
     }
+
+    [Theory]
+    [InlineData(false, "local-party", "other-party", true)]
+    [InlineData(true, "local-party", "local-party", true)]
+    [InlineData(true, "local-party", "other-party", false)]
+    [InlineData(true, null, null, false)]
+    public void MissionStart_WoundedPlayerOnlyOpensOwnBattle(
+        bool isPlayerWounded, string? localPartyId, string? initiatingPartyId, bool expected)
+    {
+        Assert.Equal(expected, BattleMissionStartHandler.ShouldOpenBattleMission(
+            isPlayerWounded, localPartyId, initiatingPartyId));
+    }
 }
