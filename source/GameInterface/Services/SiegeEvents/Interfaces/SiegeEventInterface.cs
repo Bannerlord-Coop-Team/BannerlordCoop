@@ -527,12 +527,13 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
 
         using (new AllowedThread())
         {
-            // The live encounter is the STALE pre-mission siege encounter the mission popped back to, whose map
-            // event the server already destroyed; its dead "encounter" menu NREs on the null MapEvent. Finish it.
+            // Auto-resolve drops PlayerEncounter before the event teardown arrives; detach so settlement entry can run.
+            if (MobileParty.MainParty.Party._mapEventSide != null)
+                MobileParty.MainParty.Party._mapEventSide = null;
+
+            // Finish the stale pre-mission siege encounter whose map event the server already ended.
             if (PlayerEncounter.Current != null)
             {
-                if (MobileParty.MainParty.Party._mapEventSide != null)
-                    MobileParty.MainParty.Party._mapEventSide = null;
                 PlayerEncounter.Finish(forcePlayerOutFromSettlement: false);
             }
 
