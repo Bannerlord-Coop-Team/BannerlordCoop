@@ -38,6 +38,12 @@ public sealed class MirrorAgent
     public Vec3 LookDirection { get; set; }
     public Vec2 MovementDirection { get; set; }
     public Vec2 InputVector { get; set; }
+    /// <summary>The native held guard (block) state — mirrors <c>Agent.CurrentGuardMode</c>. Read by the
+    /// <c>CurrentGuardMode</c> shim, written by the <c>SetWeaponGuard</c>/<c>ResetGuard</c> shims.</summary>
+    public Agent.GuardMode GuardMode { get; set; } = Agent.GuardMode.None;
+    /// <summary>Count of native guard writes (<c>SetWeaponGuard</c> + <c>ResetGuard</c>) this agent received.
+    /// The movement apply runs per snapshot (~100 Hz) and must only touch the guard on CHANGE.</summary>
+    public int GuardWrites { get; set; }
 }
 
 /// <summary>

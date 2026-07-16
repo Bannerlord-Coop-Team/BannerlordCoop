@@ -87,39 +87,11 @@ namespace Missions.Agents.Packets
                 agent.SetCurrentActionProgress(1, Action1Progress);
             }
 
-            // Set the movement flags to none
+            // Clear the movement flags again: persisted flags would re-trigger attacks, and they cannot HOLD a
+            // block either — flags are input, consumed only for player/AI-controlled agents, so a Controller.None
+            // puppet never reads them. The held guard is continuous state instead, asserted per movement snapshot
+            // (AgentData.GuardState -> Agent.SetWeaponGuard); this packet only starts/ends the discrete anims.
             agent.MovementFlags = 0U;
-
-            // Check the action of the agent; if they are defending, apply the defending movement flag
-            if (Action1CodeType >= (int)Agent.ActionCodeType.DefendAllBegin && Action1CodeType <= (int)Agent.ActionCodeType.DefendAllEnd)
-            {
-                agent.MovementFlags = (Agent.MovementControlFlag)MovementFlag;
-                return;
-            }
-
-
-            //// Check if there is a melee; this breaks the game if we don't do it.
-            //if ((Agent.ActionCodeType)Action1CodeType != Agent.ActionCodeType.BlockedMelee)
-            //{
-            //    // if the animation is none, start it
-            //    if (agent.GetCurrentAction(1) == ActionIndexCache.act_none || agent.GetCurrentAction(1).Index != Action1Index)
-            //    {
-            //        string actionName2 = GetActionNameWithCode(Action1Index);
-            //        if (actionName2 != null)
-            //            agent.SetActionChannel(1, ActionIndexCache.Create(actionName2), additionalFlags: (AnimFlags)Action1Flag, startProgress: Action1Progress);
-
-            //    }
-            //    // otherwise continue it
-            //    else
-            //    {
-            //        agent.SetCurrentActionProgress(1, Action1Progress);
-            //    }
-            //}
-            //else
-            //{
-            //    // otherwise just cancel it
-            //    agent.SetActionChannel(1, ActionIndexCache.act_none, ignorePriority: true, startProgress: 100);
-            //}
         }
 
         [ProtoMember(1)]

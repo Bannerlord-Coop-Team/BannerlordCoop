@@ -112,6 +112,17 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), nameof(Agent.GetCurrentAction), nameof(Agent_GetCurrentAction));
         Prefix(typeof(Agent), nameof(Agent.GetCurrentAnimationFlag), nameof(Agent_GetCurrentAnimationFlag));
         Prefix(typeof(Agent), nameof(Agent.GetCurrentActionProgress), nameof(Agent_GetCurrentActionProgress));
+        // Guard (blocking) sync: capture reads CurrentGuardMode, the puppet apply asserts it through the
+        // native guard API (SetWeaponGuard / ResetGuard) — all three resolve via the mirror.
+        Prefix(typeof(Agent), "get_CurrentGuardMode", nameof(Agent_get_CurrentGuardMode));
+        Prefix(typeof(Agent), nameof(Agent.SetWeaponGuard), nameof(Agent_SetWeaponGuard));
+        Prefix(typeof(Agent), nameof(Agent.ResetGuard), nameof(Agent_ResetGuard));
+        // The rider AgentData snapshot also reads ground speed and the wielded slots; answer static defaults
+        // (standing still, nothing wielded) so the full capture/apply path runs headless.
+        Prefix(typeof(Agent), nameof(Agent.GetRealGlobalVelocity), nameof(Agent_GetRealGlobalVelocity));
+        Prefix(typeof(Agent), nameof(Agent.GetMaximumForwardUnlimitedSpeed), nameof(Agent_GetMaximumForwardUnlimitedSpeed));
+        Prefix(typeof(Agent), nameof(Agent.GetPrimaryWieldedItemIndex), nameof(Agent_GetPrimaryWieldedItemIndex));
+        Prefix(typeof(Agent), nameof(Agent.GetOffhandWieldedItemIndex), nameof(Agent_GetOffhandWieldedItemIndex));
         Prefix(typeof(Team), nameof(Team.GetFormation), nameof(Team_GetFormation));
         Prefix(typeof(Formation), nameof(Formation.SetControlledByAI), nameof(Formation_SetControlledByAI));
         Prefix(typeof(Formation), nameof(Formation.SetMovementOrder), nameof(Formation_SetMovementOrder));
@@ -520,6 +531,65 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!AgentMirror.TryGet(__instance, out _)) return true;
         __result = 0f;
+        return false;
+    }
+
+    private static bool Agent_get_CurrentGuardMode(Agent __instance, ref Agent.GuardMode __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.GuardMode;
+        return false;
+    }
+
+    // Models the native guard API for the defend directions (all the coop sync ever passes); any other
+    // direction leaves the mirrored guard unchanged, so a wrong production mapping shows up as a miss.
+    private static bool Agent_SetWeaponGuard(Agent __instance, Agent.UsageDirection direction)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.GuardWrites++;
+        switch (direction)
+        {
+            case Agent.UsageDirection.DefendUp: m.GuardMode = Agent.GuardMode.Up; break;
+            case Agent.UsageDirection.DefendDown: m.GuardMode = Agent.GuardMode.Down; break;
+            case Agent.UsageDirection.DefendLeft: m.GuardMode = Agent.GuardMode.Left; break;
+            case Agent.UsageDirection.DefendRight: m.GuardMode = Agent.GuardMode.Right; break;
+        }
+        return false;
+    }
+
+    private static bool Agent_ResetGuard(Agent __instance)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.GuardWrites++;
+        m.GuardMode = Agent.GuardMode.None;
+        return false;
+    }
+
+    private static bool Agent_GetRealGlobalVelocity(Agent __instance, ref Vec3 __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out _)) return true;
+        __result = Vec3.Zero;
+        return false;
+    }
+
+    private static bool Agent_GetMaximumForwardUnlimitedSpeed(Agent __instance, ref float __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out _)) return true;
+        __result = 1f;
+        return false;
+    }
+
+    private static bool Agent_GetPrimaryWieldedItemIndex(Agent __instance, ref EquipmentIndex __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out _)) return true;
+        __result = EquipmentIndex.None;
+        return false;
+    }
+
+    private static bool Agent_GetOffhandWieldedItemIndex(Agent __instance, ref EquipmentIndex __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out _)) return true;
+        __result = EquipmentIndex.None;
         return false;
     }
 
