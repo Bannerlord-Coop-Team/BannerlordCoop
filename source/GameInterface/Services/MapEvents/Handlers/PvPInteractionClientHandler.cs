@@ -139,13 +139,6 @@ internal class PvPInteractionClientHandler : IHandler
     /// </summary>
     private void Handle_NetworkClosePvpEncounter(MessagePayload<NetworkClosePvpEncounter> payload)
     {
-        // Client-only, like every other handler in this class: the server's own close broadcast
-        // loops back through its local broker, and the local-party lookup below walks
-        // PlayerEncounter statics — meaningless on a host with no player encounter, and on the
-        // headless dedicated server PlayerEncounter.get_EncounteredBattle reaches a native-view
-        // UnmanagedCallersOnly placeholder (uncatchable process fatal, killed the server live).
-        if (ModInformation.IsServer) return;
-
         var message = payload.What;
 
         GameThread.RunSafe(() => ClosePvpEncounter(message), context: nameof(Handle_NetworkClosePvpEncounter));
