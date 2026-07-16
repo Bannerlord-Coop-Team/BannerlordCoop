@@ -54,8 +54,24 @@ public class TransferSaveState : ConnectionStateBase
 
             var saveResults = saveInterface.SaveCurrentGame();
 
+            // Disconnect peer on failure — before touching Data, which a failed snapshot may leave null.
+            if (!saveResults.Success)
+            {
+                Logger.Error("Join save snapshot failed for peer {PeerId}; disconnecting", connectionLogic.Peer.Id);
+                connectionLogic.Peer.Disconnect();
+                return;
+            }
+
+            var compressedSave = SaveDataCompression.Compress(saveResults.Data);
+
+            // Forensic fingerprint for join decode failures: the client logs the same fingerprint of what
+            // it RECEIVED (GameSaveDataPacketHandler) — compare the two lines when a join fails.
+            Logger.Information("Join transfer save for peer {PeerId}: raw {RawBytes} bytes → compressed {Fingerprint} (campaign {CampaignId})",
+                connectionLogic.Peer.Id, saveResults.Data?.Length ?? 0,
+                SaveDataCompression.Describe(compressedSave), saveResults.CampaignId);
+
             var savePacket = new GameSaveDataPacket(
-                SaveDataCompression.Compress(saveResults.Data),
+                compressedSave,
                 saveResults.CampaignId,
                 coopSessionProvider.CoopSession?.CraftingPlayerData,
                 coopSessionProvider.CoopSession?.WorkshopPlayerData,
@@ -63,13 +79,6 @@ public class TransferSaveState : ConnectionStateBase
                 coopSessionProvider.CoopSession?.AlleyPlayerData,
                 coopSessionProvider.CoopSession?.InteractionsPlayerData,
                 attachmentIdMapper.BuildServerMap());
-
-            // Disconnect peer on failure
-            if (!saveResults.Success)
-            {
-                connectionLogic.Peer.Disconnect();
-                return;
-            }
 
             // Start holding this peer's broadcasts now that the snapshot has been taken. The whole save
             // runs in a blocking GameThread.Run call issued from the network thread, so the poller is

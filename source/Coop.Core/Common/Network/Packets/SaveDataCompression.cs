@@ -1,5 +1,8 @@
+using System;
 using System.IO;
 using System.IO.Compression;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Coop.Core.Common.Network.Packets;
 
@@ -32,5 +35,33 @@ public static class SaveDataCompression
         using var output = new MemoryStream();
         deflate.CopyTo(output);
         return output.ToArray();
+    }
+
+    /// <summary>
+    /// Compact forensic fingerprint of a transfer buffer (length, first/last bytes, content hash), logged
+    /// on both ends of the save transfer so a join decode failure can be diagnosed by comparing the
+    /// sender's and receiver's lines: identical fingerprints mean the payload arrived intact but was never
+    /// the deflate stream this build's <see cref="Compress"/> produces (sender build mismatch); differing
+    /// fingerprints mean the transfer or the packet envelope diverged in flight.
+    /// </summary>
+    public static string Describe(byte[] data)
+    {
+        if (data == null) return "<null>";
+        if (data.Length == 0) return "<empty>";
+
+        using var sha1 = SHA1.Create();
+        var hash = sha1.ComputeHash(data);
+
+        int headLen = Math.Min(8, data.Length);
+        return $"len={data.Length} head={ToHex(data, 0, headLen)} " +
+               $"tail={ToHex(data, data.Length - headLen, headLen)} sha1={ToHex(hash, 0, 6)}";
+    }
+
+    private static string ToHex(byte[] data, int offset, int count)
+    {
+        var builder = new StringBuilder(count * 2);
+        for (int i = offset; i < offset + count; i++)
+            builder.Append(data[i].ToString("X2"));
+        return builder.ToString();
     }
 }
