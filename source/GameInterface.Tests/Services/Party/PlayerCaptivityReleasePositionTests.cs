@@ -170,7 +170,8 @@ public class PlayerCaptivityReleasePositionTests
             0,
             0,
             true,
-            releasePosition);
+            releasePosition,
+            Helpers.PartyScreenHelper.PartyScreenMode.Normal);
 
         byte[] bytes;
         using (var ms = new MemoryStream())
