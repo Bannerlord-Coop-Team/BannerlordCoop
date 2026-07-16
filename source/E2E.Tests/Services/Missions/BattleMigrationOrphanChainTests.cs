@@ -1,12 +1,16 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Common.Messaging;
+using Common.Network;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.MockEngine;
+using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
 using Missions;
 using Missions.Battles;
 using Missions.Messages;
+using Missions.Services.Network;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -86,6 +90,147 @@ public class BattleMigrationOrphanChainTests : MissionTestEnvironment
             if (isPromotedClient)
                 client.Resolve<IMessageBroker>().Publish(client, new BattleHostMigrated(mapEventId, previousHost));
         });
+    }
+
+    /// <summary>
+    /// Drive the real battle-exit teardown on <paramref name="client"/> — a graceful RETREAT — by running
+    /// <see cref="BattleInstanceLifecycle.Leave"/> against the client's own shared <see cref="IMissionContext"/>
+    /// (the same singleton the migrator's sweep consults). This is the exact production code the fix touches:
+    /// leaving a battle mission must end the local mission-membership mirror. Built directly (the lifecycle is
+    /// composed by <c>CoopBattleController</c>, not resolved from the container) with the client's real relay
+    /// and mesh services; the session is begun on the instance so <see cref="BattleInstanceLifecycle.Leave"/>
+    /// runs its full path. The object manager and mission component are left null: neither the constructor nor
+    /// <c>Leave</c> touches them (they serve only the entry handler), and resolving a throwaway mission
+    /// component would spin up a second set of per-mission handlers with broker/packet side effects.
+    /// </summary>
+    private static void RetreatViaLeave(EnvironmentInstance client, string mapEventId)
+    {
+        client.Call(() =>
+        {
+            var session = new BattleSession(client.Resolve<IControllerIdProvider>(), client.Resolve<IBattleHostRegistry>());
+            session.TryBegin(mapEventId);
+
+            var lifecycle = new BattleInstanceLifecycle(
+                client.Resolve<IBattleNetwork>(),
+                client.Resolve<INetwork>(),
+                client.Resolve<IMessageBroker>(),
+                objectManager: null,
+                coopMissionComponent: null,
+                session,
+                client.Resolve<IMissionContext>());
+
+            lifecycle.Leave();
+            lifecycle.Dispose();
+        });
+    }
+
+    private static IReadOnlyCollection<string> Membership(EnvironmentInstance client)
+    {
+        IReadOnlyCollection<string> members = null;
+        client.Call(() => members = client.Resolve<IMissionContext>().ControllersInMission);
+        return members;
+    }
+
+    /// <summary>
+    /// BR-054 re-entry composed with the absent-controller sweep (BR-016/BR-031): a graceful retreat must CLEAR
+    /// our local mission membership, or a controller that drops WHILE WE ARE AWAY is left looking present and
+    /// its orphaned agents are skipped by the sweep forever.
+    /// <para>
+    /// One client M, holding the on-field troops of host H and player C (each keyed to its owner). M's
+    /// membership mirror lists both as present. M RETREATS — <see cref="BattleInstanceLifecycle.Leave"/> runs.
+    /// While M is outside the instance, C drops; the server no longer fans that instance's churn to M, so M
+    /// never processes C's departure (modelled by publishing nothing for C). M RE-ENTERS and the server
+    /// re-announces only the still-present member (H). H then drops and M is promoted host, running
+    /// <c>SweepAgentsOfAbsentControllers</c>, which consults <c>MissionContext.ControllersInMission</c>.
+    /// </para>
+    /// <para>
+    /// PRE-FIX: <see cref="BattleInstanceLifecycle.Leave"/> left the membership mirror populated ({H, C}); the
+    /// re-entry re-announce of H is a no-op on the already-present set, so C is never removed and still looks
+    /// present. The sweep therefore treats C's agents as held by a present controller and skips them — they
+    /// stay keyed to the absent C, driverless. Both the <see cref="Assert.Empty"/> right after the retreat and
+    /// the final <c>AssertAuthority(..., "M", "C")</c> fail. POST-FIX: Leave() calls
+    /// <c>MissionContext.EndInstance()</c>, so the re-entry rebuilds membership as {H} only; the sweep sees C as
+    /// absent and adopts its orphaned agents to M (assignment intact), alive and AI-driven.
+    /// </para>
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "BR-054")]
+    [Trait("Requirement", "BR-016")]
+    [Trait("Requirement", "BR-031")]
+    public void RetreatThenReenter_ClearsStaleMembership_SweepAdoptsControllerThatDroppedWhileAway()
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, partyIds) = SetupCoopBattle("M", "H", "C");
+        var clients = Clients.ToArray();
+        var me = clients[0];
+
+        var hMepId = GetMapEventPartyId(mapEventId, partyIds[1]);
+        var cMepId = GetMapEventPartyId(mapEventId, partyIds[2]);
+        var troopCharacterId = CreateRegisteredObject<CharacterObject>();
+
+        var hTroopAgentId = Guid.NewGuid();
+        var cTroopAgentId = Guid.NewGuid();
+
+        try
+        {
+            BattleSpawnGate.BeginBattle(mapEventId);
+
+            // M in the battle: host H is the elected host, M its successor.
+            var (controller, mock) = StandUpBattleClient(fixture, me, mapEventId, new BattleHostAssignment("H", new[] { "M" }));
+
+            // Membership as M saw it in the battle: host H and player C both present.
+            Publish(me, new NetworkMissionPeerEntered("H", mapEventId));
+            Publish(me, new NetworkMissionPeerEntered("C", mapEventId));
+            Assert.Equal(new[] { "C", "H" }, Membership(me).OrderBy(id => id).ToArray());
+
+            // The on-field troops M holds of the two others, keyed to their owners in M's registry.
+            ReceiveSpawnRecords(me,
+                new BattleAgentSpawnData(hTroopAgentId, troopCharacterId, default, BattleSideEnum.Attacker, 100f, "H", hMepId, 81, new Equipment(), default),
+                new BattleAgentSpawnData(cTroopAgentId, troopCharacterId, default, BattleSideEnum.Attacker, 100f, "C", cMepId, 82, new Equipment(), default));
+
+            // M RETREATS (BR-054): the real Leave() teardown runs. The fix ends the local membership mirror here.
+            RetreatViaLeave(me, mapEventId);
+
+            // The retreat wiped the mirror: neither the host nor the other player looks present now. (PRE-FIX
+            // this is still {H, C} because Leave() never cleared it — the first assertion to fail.)
+            Assert.Empty(Membership(me));
+
+            // While M is away, C drops; M is out of the instance so its departure never reaches M (nothing is
+            // published for C). M RE-ENTERS: a fresh battle mission starts on M, re-arming the coop battle
+            // gate (Leave() ended it) as the controller does on mission begin — BEFORE the server's
+            // membership re-announce fans in. The server re-announces only the still-present member — H.
+            BattleSpawnGate.BeginBattle(mapEventId);
+            Publish(me, new NetworkMissionPeerEntered("H", mapEventId));
+            Assert.Equal(new[] { "H" }, Membership(me).ToArray()); // PRE-FIX: {C, H} — C never left the stale mirror.
+
+            // On M's re-entry the still-present host replays what it holds (the join-info catch-up), so M
+            // receives H's spawn record afresh; the spawner dedups it by agent id if M still holds the
+            // agent. C's orphan is untouched — C is not re-announced, so its agent stays registered on M,
+            // keyed to the absent C.
+            ReceiveSpawnRecords(me,
+                new BattleAgentSpawnData(hTroopAgentId, troopCharacterId, default, BattleSideEnum.Attacker, 100f, "H", hMepId, 81, new Equipment(), default));
+
+            // H drops and M is promoted host: the migration adopts H's own agents, and the absent-controller
+            // sweep must now ALSO adopt C's orphans — C is no longer falsely present in the membership mirror.
+            Publish(me, new MissionPeerDisconnected("H", mapEventId));
+            PromoteHost(me, mapEventId, new BattleHostAssignment("M", Array.Empty<string>(), epoch: 2), "H", isPromotedClient: true);
+
+            // The departed host's own troop is adopted (both pre- and post-fix, via the migration adoption)...
+            AssertAuthority(me, hTroopAgentId, "M", "H");
+            // ...and the controller that dropped while M was away is swept to M, assignment intact, alive and
+            // AI-driven. PRE-FIX the stale mirror still lists C as present, so the sweep skips it and its
+            // authority stays "C".
+            AssertAuthority(me, cTroopAgentId, "M", "C");
+            AssertController(me, cTroopAgentId, AgentControllerType.AI);
+            AssertAlive(me, cTroopAgentId);
+
+            GC.KeepAlive(controller);
+            GC.KeepAlive(mock);
+        }
+        finally
+        {
+            BattleSpawnGate.EndBattle();
+        }
     }
 
     private static void AssertAuthority(EnvironmentInstance instance, Guid agentId, string expectedAuthority, string expectedOriginalOwner)

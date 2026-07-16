@@ -85,7 +85,8 @@ public class CoopBattleController : CoopMissionController
         ICoopMissionComponent coopMissionComponent,
         IBattleHostRegistry hostRegistry,
         IAgentFormationAssigner formationAssigner,
-        IMissionContext missionContext)
+        IMissionContext missionContext,
+        IHostEpochPolicy hostEpochPolicy)
         : base(network, messageBroker, objectManager, coopMissionComponent)
     {
         var session = new BattleSession(controllerIdProvider, hostRegistry);
@@ -93,7 +94,7 @@ public class CoopBattleController : CoopMissionController
 
         var deployment = new BattleDeploymentCoordinator(network, messageBroker, session);
 
-        lifecycle = new BattleInstanceLifecycle(network, relayNetwork, messageBroker, objectManager, coopMissionComponent, session);
+        lifecycle = new BattleInstanceLifecycle(network, relayNetwork, messageBroker, objectManager, coopMissionComponent, session, missionContext);
         replicator = new OwnedAgentReplicator(network, messageBroker, objectManager, coopMissionComponent, session, casualties, deployment);
         deathReporter = new AgentDeathReporter(network, relayNetwork, messageBroker, objectManager, coopMissionComponent, session, casualties);
         routReporter = new AgentRoutReporter(network, messageBroker, coopMissionComponent, session, casualties);
@@ -103,8 +104,12 @@ public class CoopBattleController : CoopMissionController
         damageRouter = new BattleDamageRouter(network, messageBroker, coopMissionComponent, session);
         authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, missionContext);
         reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, session, deployment, formationAssigner);
-        siegeEngineDeployment = new SiegeEngineDeploymentReplicator(network, messageBroker, session);
-        siegeMachineState = new SiegeMachineStateReplicator(network, messageBroker, session, coopMissionComponent.AgentRegistry);
+        // BR-102: ONE host-epoch policy shared by both siege replicators, so its accepted-epoch
+        // watermark spans every host-authority message type (engine placement + machine state/authority)
+        // — a superseded hosting generation is dropped consistently across both. The policy is a
+        // per-battle transient (see MissionModule), so this controller's per-battle lifetime resets it.
+        siegeEngineDeployment = new SiegeEngineDeploymentReplicator(network, messageBroker, session, hostEpochPolicy);
+        siegeMachineState = new SiegeMachineStateReplicator(network, messageBroker, session, coopMissionComponent.AgentRegistry, hostEpochPolicy);
         siegeWeaponFire = new SiegeWeaponFireReplicator(network, messageBroker, coopMissionComponent.AgentRegistry);
         supplyReporter = new SupplyProgressReporter(relayNetwork, session);
 

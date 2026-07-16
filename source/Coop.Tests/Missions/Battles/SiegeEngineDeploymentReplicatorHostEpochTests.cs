@@ -41,7 +41,7 @@ public class SiegeEngineDeploymentReplicatorHostEpochTests : IDisposable
         session.SetupGet(s => s.HostEpoch).Returns(LocalEpoch);
         network.Setup(n => n.SendAll(It.IsAny<IMessage>())).Callback<IMessage>(sentToAll.Add);
 
-        sut = new SiegeEngineDeploymentReplicator(network.Object, broker, session.Object);
+        sut = new SiegeEngineDeploymentReplicator(network.Object, broker, session.Object, new HostEpochPolicy());
     }
 
     // ------------------------------------------------------------------
@@ -96,6 +96,31 @@ public class SiegeEngineDeploymentReplicatorHostEpochTests : IDisposable
         DrainGameThread();
 
         AssertSingleTransition(Transitions("placements"), 4, "Ballista");
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-102")]
+    public void AfterAcceptingAHigherEpoch_ADelayedLowerButStillAheadPlacement_IsDroppedBeforeTheHistory()
+    {
+        // BR-102 accepted-epoch watermark (the reviewer's ordering scenario). This receiver is on
+        // epoch 5 and accepts a placement from a newer generation (epoch 7). A delayed placement from
+        // the SUPERSEDED epoch-6 generation is still ahead of the stored assignment (6 > 5), so the
+        // per-message assignment check ALONE would accept it and append the older placement to the
+        // authoritative history joiners are replayed from — applying it LAST. The watermark raised to 7
+        // by the first accept drops it.
+        //
+        // Pre-fix (no watermark) the injected policy's IsStale(6, 5) returns false, the delayed
+        // placement is recorded, and Transitions("placements") holds two entries — failing the single
+        // assertion below.
+        broker.Publish(this, new NetworkSiegeEnginePlacement(1, "Ballista", hostEpoch: LocalEpoch + 2));
+        DrainGameThread();
+        broker.Publish(this, new NetworkSiegeEnginePlacement(2, "Mangonel", hostEpoch: LocalEpoch + 1));
+        DrainGameThread();
+
+        // Only the epoch-7 placement entered the history and the pending queue; the delayed epoch-6 one
+        // was dropped before both.
+        AssertSingleTransition(Transitions("placements"), 1, "Ballista");
+        AssertSingleTransition(Transitions("pending"), 1, "Ballista");
     }
 
     // ------------------------------------------------------------------

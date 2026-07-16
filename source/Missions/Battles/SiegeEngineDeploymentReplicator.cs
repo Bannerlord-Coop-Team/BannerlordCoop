@@ -41,6 +41,7 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
     private readonly IBattleNetwork network;
     private readonly IMessageBroker messageBroker;
     private readonly IBattleSession session;
+    private readonly IHostEpochPolicy hostEpochPolicy;
 
     // Every placement transition, in wire order. Deployment/Disband mutates vanilla's ordered
     // _undeployedWeapons list, so collapsing this to the latest value per point can bind a different
@@ -66,11 +67,12 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
     private float pendingStallSeconds;
     private const float PendingStallDeadlineSeconds = 15f;
 
-    public SiegeEngineDeploymentReplicator(IBattleNetwork network, IMessageBroker messageBroker, IBattleSession session)
+    public SiegeEngineDeploymentReplicator(IBattleNetwork network, IMessageBroker messageBroker, IBattleSession session, IHostEpochPolicy hostEpochPolicy)
     {
         this.network = network;
         this.messageBroker = messageBroker;
         this.session = session;
+        this.hostEpochPolicy = hostEpochPolicy;
 
         messageBroker.Subscribe<SiegeEnginePlacementChanged>(Handle_PlacementChanged);
         messageBroker.Subscribe<NetworkSiegeEnginePlacement>(Handle_NetworkPlacement);
@@ -237,7 +239,7 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
     private bool DropStaleHostEpoch(int messageEpoch, string messageName)
     {
         int localEpoch = session.HostEpoch;
-        if (!HostEpochPolicy.IsStale(messageEpoch, localEpoch)) return false;
+        if (!hostEpochPolicy.IsStale(messageEpoch, localEpoch)) return false;
 
         Logger.Information("[BattleSync] Dropped {Message} stamped with stale host epoch {Stale} (current {Current})",
             messageName, messageEpoch, localEpoch);

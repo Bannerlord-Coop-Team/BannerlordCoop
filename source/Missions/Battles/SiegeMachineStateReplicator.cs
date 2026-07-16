@@ -54,6 +54,7 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     private readonly IMessageBroker messageBroker;
     private readonly IBattleSession session;
     private readonly INetworkAgentRegistry agentRegistry;
+    private readonly IHostEpochPolicy hostEpochPolicy;
 
     // Machine cache + last broadcast state per machine id / deactivated ids (peers).
     // Game-thread only; reset when the mission changes (MissionObjectIds recycle across missions).
@@ -93,12 +94,13 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     private int trackedObjectCount;
     private float pollTimer;
 
-    public SiegeMachineStateReplicator(IBattleNetwork network, IMessageBroker messageBroker, IBattleSession session, INetworkAgentRegistry agentRegistry)
+    public SiegeMachineStateReplicator(IBattleNetwork network, IMessageBroker messageBroker, IBattleSession session, INetworkAgentRegistry agentRegistry, IHostEpochPolicy hostEpochPolicy)
     {
         this.network = network;
         this.messageBroker = messageBroker;
         this.session = session;
         this.agentRegistry = agentRegistry;
+        this.hostEpochPolicy = hostEpochPolicy;
 
         messageBroker.Subscribe<NetworkSiegeMachineState>(Handle_NetworkMachineState);
         messageBroker.Subscribe<NetworkSiegeMachineClaim>(Handle_NetworkMachineClaim);
@@ -248,7 +250,7 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     private bool DropStaleHostEpoch(int messageEpoch, string messageName)
     {
         int localEpoch = session.HostEpoch;
-        if (!HostEpochPolicy.IsStale(messageEpoch, localEpoch)) return false;
+        if (!hostEpochPolicy.IsStale(messageEpoch, localEpoch)) return false;
 
         Logger.Information("[BattleSync] Dropped {Message} stamped with stale host epoch {Stale} (current {Current})",
             messageName, messageEpoch, localEpoch);

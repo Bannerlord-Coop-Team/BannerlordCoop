@@ -48,7 +48,7 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
         session.SetupGet(s => s.HostEpoch).Returns(LocalEpoch);
         network.Setup(n => n.SendAll(It.IsAny<IMessage>())).Callback<IMessage>(sentToAll.Add);
 
-        sut = new SiegeMachineStateReplicator(network.Object, broker, session.Object, agentRegistry.Object);
+        sut = new SiegeMachineStateReplicator(network.Object, broker, session.Object, agentRegistry.Object, new HostEpochPolicy());
     }
 
     // ------------------------------------------------------------------
@@ -147,6 +147,29 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
         Assert.Equal(2, pending.Count);
         Assert.True(pending.ContainsKey(22));
         Assert.True(pending.ContainsKey(23));
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-102")]
+    public void AfterAcceptingAHigherEpoch_ADelayedLowerButStillAheadMachineState_IsDropped()
+    {
+        // BR-102 accepted-epoch watermark (the reviewer's ordering scenario). This receiver is on
+        // epoch 5 and accepts a snapshot from a newer generation (epoch 7), buffered for a machine that
+        // has not registered locally yet. A delayed snapshot from the SUPERSEDED epoch-6 generation is
+        // still ahead of the stored assignment (6 > 5), so the per-message assignment check ALONE would
+        // accept it — its host-owned damage fields would then fight the promoted host's simulation. The
+        // watermark raised to 7 by the first accept drops it before it is even buffered.
+        //
+        // Pre-fix (no watermark) the injected policy's IsStale(6, 5) returns false, machine 24's state
+        // is buffered too, and PendingStates holds two entries — failing the single assertion below.
+        broker.Publish(this, MachineState(machineId: 24, hostEpoch: LocalEpoch + 2));
+        DrainGameThread();
+        broker.Publish(this, MachineState(machineId: 25, hostEpoch: LocalEpoch + 1));
+        DrainGameThread();
+
+        var buffered = Assert.Single(PendingStates());
+        Assert.Equal(24, buffered.Key);
+        Assert.Equal(LocalEpoch + 2, buffered.Value.HostEpoch);
     }
 
     // ------------------------------------------------------------------

@@ -6,6 +6,7 @@ using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
 using Missions.Messages;
+using Missions.Services.Network;
 using Serilog;
 using System;
 
@@ -22,7 +23,8 @@ public interface IBattleInstanceLifecycle : IDisposable
 {
     /// <summary>
     /// Tear the instance down on mission end: end the spawn gate, clear this battle's troop suppliers,
-    /// announce MissionLeft over the relay and stop the mesh socket.
+    /// announce MissionLeft over the relay, stop the mesh socket, and clear the local mission-membership
+    /// mirror so a stale roster cannot survive into a later re-entry.
     /// </summary>
     void Leave();
 }
@@ -38,6 +40,7 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
     private readonly IObjectManager objectManager;
     private readonly ICoopMissionComponent coopMissionComponent;
     private readonly IBattleSession session;
+    private readonly IMissionContext missionContext;
 
     public BattleInstanceLifecycle(
         IBattleNetwork network,
@@ -45,7 +48,8 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         ICoopMissionComponent coopMissionComponent,
-        IBattleSession session)
+        IBattleSession session,
+        IMissionContext missionContext)
     {
         this.network = network;
         this.relayNetwork = relayNetwork;
@@ -53,6 +57,7 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
         this.objectManager = objectManager;
         this.coopMissionComponent = coopMissionComponent;
         this.session = session;
+        this.missionContext = missionContext;
 
         messageBroker.Subscribe<PlayerEnteredBattle>(Handle_PlayerEnteredBattle);
         messageBroker.Subscribe<NetworkMissionLeft>(Handle_LeaveMission);
@@ -109,6 +114,13 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
         }
 
         network.Stop();
+
+        // Wipe the local membership mirror on our way out. Stopping the socket clears only the direct peer
+        // mappings; the server-announced membership set (which the absent-controller sweep consults) would
+        // otherwise persist, and once we have left the server no longer fans this instance's churn to us — so
+        // a controller that drops while we are away would keep looking present. On re-entry (BR-054) the
+        // server re-announces the current members, so the mirror is rebuilt fresh.
+        missionContext.EndInstance();
     }
 
     private void Handle_LeaveMission(MessagePayload<NetworkMissionLeft> payload)
