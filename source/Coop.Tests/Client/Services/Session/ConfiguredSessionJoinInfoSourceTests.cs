@@ -1,4 +1,4 @@
-using Coop.Core.Client.Services.Session;
+﻿using Coop.Core.Client.Services.Session;
 using Coop.Core.Common.Configuration;
 using Xunit;
 
@@ -11,9 +11,7 @@ public class ConfiguredSessionJoinInfoSourceTests
     [InlineData("Secret", true)]
     public void Get_AdvertisesOnlyWhetherPasswordIsRequired(string password, bool expected)
     {
-        var source = new ConfiguredSessionJoinInfoSource(
-            new SessionAdvertisementConfig(),
-            new NetworkConfig { Token = password });
+        var source = new ConfiguredSessionJoinInfoSource(new NetworkConfig { Token = password });
 
         var info = source.Get();
 
