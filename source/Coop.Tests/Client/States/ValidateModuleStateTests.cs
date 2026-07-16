@@ -7,13 +7,17 @@ using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.UI.Interfaces;
 using LiteNetLib;
+using Moq;
+using System;
+using System.Linq;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace Coop.Tests.Client.States
 {
-    public class ValidateModuleStateTests
+    public class ValidateModuleStateTests : IDisposable
     {
         private readonly IClientLogic clientLogic;
         private readonly NetPeer serverPeer;
@@ -26,6 +30,14 @@ namespace Coop.Tests.Client.States
 
             serverPeer = clientComponent.TestNetwork.CreatePeer();
             clientLogic = container.Resolve<IClientLogic>()!;
+        }
+
+        public void Dispose()
+        {
+            // Every test enters ValidateModuleState, which arms a 30s validation-timeout Timer. Dispose
+            // the logic (and thus the current state) so that timer is torn down with the test instead of
+            // lingering and firing TimeoutValidation on a stale state after the test has finished.
+            clientLogic.Dispose();
         }
 
         [Fact]
@@ -90,6 +102,122 @@ namespace Coop.Tests.Client.States
             // Assert
             var message = Assert.Single(clientComponent.TestMessageBroker.Messages);
             Assert.IsType<StartCharacterCreation>(message);
+        }
+
+        [Fact]
+        public void NetworkModuleVersionsValidated_Denied_HidesLoadingScreenAndShowsReason()
+        {
+            // Arrange
+            var validateState = clientLogic.SetState<ValidateModuleState>();
+
+            var payload = new MessagePayload<NetworkModuleVersionsValidated>(
+                this, new NetworkModuleVersionsValidated(false, "Wrong version of module 'Coop'"));
+
+            // Act
+            validateState.Handle_NetworkModuleVersionsValidated(payload);
+
+            // Assert — the denial must tear coop down AND release the forced loading window; the
+            // reason must reach the pop-up (the information message lands in the chat log, which is
+            // hidden behind the loading screen the player is looking at).
+            Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<EndCoopMode>());
+
+            clientComponent.Container
+                .Resolve<Mock<ILoadingInterface>>()
+                .Verify(li => li.HideLoadingScreen(), Times.Once);
+
+            var popup = Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<SendPopupMessage>());
+            Assert.Contains("Wrong version of module 'Coop'", popup.Text);
+        }
+
+        [Fact]
+        public void ValidationTimeout_DisconnectsWithReason()
+        {
+            // Arrange
+            var validateState = clientLogic.SetState<ValidateModuleState>();
+
+            // Act — invoke the deadline logic directly (the Timer -> GameThread marshaling is glue).
+            validateState.TimeoutValidation();
+
+            // Assert — a server that never answers (validation crashed server-side, incompatible
+            // build) must not leave the player on the loading screen forever.
+            Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<EndCoopMode>());
+
+            clientComponent.Container
+                .Resolve<Mock<ILoadingInterface>>()
+                .Verify(li => li.HideLoadingScreen(), Times.Once);
+
+            var popup = Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<SendPopupMessage>());
+            Assert.Contains("Timed out", popup.Text);
+        }
+
+        [Fact]
+        public void ValidationTimeout_AfterStateLeft_DoesNothing()
+        {
+            // Arrange
+            var validateState = clientLogic.SetState<ValidateModuleState>();
+            clientLogic.LoadSavedData(); // transitions away, disposing the state
+
+            clientComponent.TestMessageBroker.Messages.Clear();
+
+            // Act — a timer callback that was already in flight when the state was left must no-op.
+            validateState.TimeoutValidation();
+
+            // Assert
+            Assert.Empty(clientComponent.TestMessageBroker.GetMessagesFromType<EndCoopMode>());
+        }
+
+        [Fact]
+        public void Disconnect_CalledTwice_FinalizesCoopOnce()
+        {
+            // Arrange
+            var validateState = clientLogic.SetState<ValidateModuleState>();
+
+            // Act — teardown can be raced by the timeout timer (game thread) and a denied/late
+            // response (poller thread); a second entry must be idempotent.
+            validateState.Disconnect();
+            validateState.Disconnect();
+
+            // Assert — the latch means CoopFinalizer runs exactly once, not once per caller.
+            Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<EndCoopMode>());
+            clientComponent.Container
+                .Resolve<Mock<ILoadingInterface>>()
+                .Verify(li => li.HideLoadingScreen(), Times.Once);
+        }
+
+        [Fact]
+        public void ValidationTimeout_AfterDenial_DoesNotFinalizeAgain()
+        {
+            // Arrange
+            var validateState = clientLogic.SetState<ValidateModuleState>();
+            var denial = new MessagePayload<NetworkModuleVersionsValidated>(
+                this, new NetworkModuleVersionsValidated(false, "Wrong version of module 'Coop'"));
+            validateState.Handle_NetworkModuleVersionsValidated(denial); // tears coop down
+
+            // Act — a timeout callback that fires just after the denial already tore coop down must no-op.
+            validateState.TimeoutValidation();
+
+            // Assert — still a single teardown; the timeout did not tear down again.
+            Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<EndCoopMode>());
+        }
+
+        [Fact]
+        public void NetworkClientValidated_AfterTimeout_DoesNotTransition()
+        {
+            // Arrange — the timeout (game thread) wins the completion race and tears coop down.
+            var validateState = clientLogic.SetState<ValidateModuleState>();
+            validateState.TimeoutValidation();
+
+            var payload = new MessagePayload<NetworkClientValidated>(
+                this, new NetworkClientValidated(true, new Player("12345", "111", "12345", "12345", "12345")));
+
+            // Act — the server's terminal validation response lands just after the timeout claimed
+            // completion. It must observe the claim and no-op, NOT drive LoadSavedData forward.
+            validateState.Handle_NetworkClientValidated(payload);
+
+            // Assert — no forward transition (which in production would resolve ReceivingSavedDataState
+            // from the container the timeout already tore down), and still exactly one teardown.
+            Assert.IsType<ValidateModuleState>(clientLogic.State);
+            Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<EndCoopMode>());
         }
 
         [Fact]

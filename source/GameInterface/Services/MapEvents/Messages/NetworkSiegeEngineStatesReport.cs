@@ -18,11 +18,18 @@ public record NetworkSiegeEngineStatesReport : ICommand
     public SiegeEngineState[] AttackerEngines { get; }
     [ProtoMember(3)]
     public SiegeEngineState[] DefenderEngines { get; }
+    /// <summary>
+    /// BR-102: the reporting host's epoch for this battle — the server refuses a report stamped by a stale
+    /// hosting generation, so a former host's in-flight report cannot clobber the live siege state.
+    /// </summary>
+    [ProtoMember(4)]
+    public int HostEpoch { get; }
 
-    public NetworkSiegeEngineStatesReport(string mapEventId, SiegeEngineState[] attackerEngines, SiegeEngineState[] defenderEngines)
+    public NetworkSiegeEngineStatesReport(string mapEventId, SiegeEngineState[] attackerEngines, SiegeEngineState[] defenderEngines, int hostEpoch = 0)
     {
         MapEventId = mapEventId;
         AttackerEngines = attackerEngines;
         DefenderEngines = defenderEngines;
+        HostEpoch = hostEpoch;
     }
 }

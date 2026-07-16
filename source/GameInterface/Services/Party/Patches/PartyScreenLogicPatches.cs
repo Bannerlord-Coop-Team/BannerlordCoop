@@ -8,6 +8,7 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
@@ -61,6 +62,12 @@ internal class PartyScreenLogicPatches
                 recruitedPrisonersRoster.Add(tuple.Item1, tuple.Item2, 0);
             }
 
+            var partyScreenMode = __instance._partyScreenMode;
+            if (Game.Current.GameStateManager.ActiveState is PartyState partyState)
+            {
+                partyScreenMode = partyState.PartyScreenMode;
+            }
+
             var message = new PartyDoneLogicAttempted(
                 Hero.MainHero,
                 takenPrisonersRoster,
@@ -80,7 +87,8 @@ internal class PartyScreenLogicPatches
                 __instance.CurrentData.PartyGoldChangeAmount,
                 __instance.CurrentData.PartyInfluenceChangeAmount.Item2,
                 __instance.CurrentData.PartyMoraleChangeAmount,
-                __instance.DoNotApplyGoldTransactions
+                __instance.DoNotApplyGoldTransactions,
+                partyScreenMode
             );
 
             MessageBroker.Instance.Publish(__instance, message);

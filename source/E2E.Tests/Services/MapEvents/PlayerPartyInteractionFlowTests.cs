@@ -174,6 +174,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         Assert.Contains(PlayerPartyInteractionOption.Vassal, initialState.Options);
         Assert.DoesNotContain(PlayerPartyInteractionOption.JoinClan, initialState.EnabledOptions);
         Assert.DoesNotContain(PlayerPartyInteractionOption.Vassal, initialState.EnabledOptions);
+        Assert.Equal(PlayerPartyInteractionVassalUnavailableReason.TargetIsNotKingdomLeader, initialState.VassalUnavailableReason);
 
         Server.NetworkSentMessages.Clear();
         client1.NetworkSentMessages.Clear();
@@ -241,6 +242,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             s.SessionId == sessionId &&
             s.PartyId == initiatorPartyId &&
             s.Phase == PlayerPartyInteractionPhase.InitialOptions);
+        Assert.Equal(PlayerPartyInteractionVassalUnavailableReason.InitiatorClanTierTooLow, initialState.VassalUnavailableReason);
 
         OpenServiceOptions(client1, initialState);
 
@@ -251,7 +253,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.Leave));
             Assert.True(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Leave));
             Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.Vassal));
-            Assert.False(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Vassal));
+            Assert.False(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Vassal, out var explanation));
+            Assert.Equal("Your clan must be at least tier 2 to swear allegiance.", explanation.ToString());
         });
     }
 
@@ -797,6 +800,23 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Fact]
+    public void EndedInteraction_IgnoresDelayedStateForSameSession()
+    {
+        var (client1, _, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+        var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
+        var initialState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>()
+            .Single(state => state.SessionId == sessionId && state.PartyId == initiatorPartyId);
+
+        SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.Leave);
+        AssertInteractionStateCleared(client1);
+
+        client1.SimulateMessage(Server.NetPeer, initialState);
+
+        AssertInteractionStateCleared(client1);
+    }
+
+    [Fact]
     public void TradeProposal_DeclinedByResponder_EndsInteraction()
     {
         var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
@@ -1136,6 +1156,16 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.HostileDemand);
         SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.ConfirmHostileDemand);
 
+        // BR-061 baseline: the responder's heroes and regular troops become the initiator's prisoners on
+        // the yield, so snapshot the rosters first — harness parties spawn with their own rosters, and raw
+        // hero roster elements are never transferred (each hero is captured individually via
+        // TakePrisonerAction: the responder hero directly, every other rider — the harness lord party's
+        // bootstrap lord included — through the companion capture).
+        var responderTroopsAtSurrender = GetPartyNonHeroManCount(Server, responderMobilePartyId);
+        var responderRidingHeroes = GetPartyLiveHeroCount(Server, responderMobilePartyId);
+        var initiatorPrisonersBefore = GetPartyPrisonerCount(Server, initiatorMobilePartyId);
+        var initiatorPrisonersBeforeByClient = Clients.ToDictionary(c => c, c => GetPartyPrisonerCount(c, initiatorMobilePartyId));
+
         Server.NetworkSentMessages.Clear();
         SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.YieldHostileDemand, HostileDemandSurrenderDisabledMethods());
 
@@ -1152,7 +1182,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
 
         AssertWarDeclared(Server, initiatorClanId, responderClanId);
         AssertCaptivity(Server, responderHeroId, initiatorMobilePartyId);
-        AssertPartyPrisonerCount(Server, initiatorMobilePartyId, 1);
+        // BR-061: the yielded party's heroes AND regular troops are all recorded as the initiator's prisoners.
+        AssertPartyPrisonerCount(Server, initiatorMobilePartyId, initiatorPrisonersBefore + responderTroopsAtSurrender + responderRidingHeroes);
         AssertPartyManCount(Server, responderMobilePartyId, 0);
         AssertHostileEncounterTornDown(Server, initiatorPartyId);
         AssertCapturedPlayerPartyParked(Server, responderPartyId);
@@ -1160,6 +1191,10 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         Assert.Equal(responderMobilePartyId, leaderChanged.MobilePartyId);
         Assert.Null(leaderChanged.LeaderHeroId);
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPartyComponentLeaderChanged>());
+
+        // The troop transfer replicates as coalesced roster deltas; drain them before reading client state.
+        TestEnvironment.FlushCoalescer();
+
         foreach (var syncedClient in Clients)
         {
             Assert.Contains(syncedClient.InternalMessages.GetMessages<DeclareWarChanged>(), message =>
@@ -1167,7 +1202,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
                 message.Faction2Id == responderClanId);
             AssertWarDeclared(syncedClient, initiatorClanId, responderClanId);
             AssertCaptivity(syncedClient, responderHeroId, initiatorMobilePartyId);
-            AssertPartyPrisonerCount(syncedClient, initiatorMobilePartyId, 1);
+            AssertPartyPrisonerCount(syncedClient, initiatorMobilePartyId,
+                initiatorPrisonersBeforeByClient[syncedClient] + responderTroopsAtSurrender + responderRidingHeroes);
             AssertPartyManCount(syncedClient, responderMobilePartyId, 0);
             AssertHostileEncounterTornDown(syncedClient, initiatorPartyId);
             AssertCapturedPlayerPartyParked(syncedClient, responderPartyId);

@@ -1,10 +1,8 @@
 ﻿using Common;
-using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
-using GameInterface.Services.MobilePartyAIs.Messages;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
-using Serilog;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -13,8 +11,6 @@ namespace GameInterface.Services.MobilePartyAIs.Patches;
 [HarmonyPatch(typeof(MobilePartyAi))]
 internal class MobilePartyAIPatches
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<ILogger>();
-
     [HarmonyPatch(nameof(MobilePartyAi.CheckPartyNeedsUpdate))]
     [HarmonyPrefix]
     static void Prefix(ref MobilePartyAi __instance)
@@ -32,19 +28,19 @@ internal class MobilePartyAIPatches
         __instance.DefaultBehaviorNeedsUpdate = true;
     }
 
-    [HarmonyPatch(nameof(MobilePartyAi.AiBehaviorInteractable), MethodType.Setter)]
-    [HarmonyPrefix]
-    static void AiBehaviorInteractable_Prefix(ref MobilePartyAi __instance, ref IInteractablePoint value)
+    [HarmonyPatch(nameof(MobilePartyAi.AiBehaviorInteractable), MethodType.Setter), HarmonyPrefix]
+    private static void AiBehaviorInteractablePrefix(MobilePartyAi __instance, IInteractablePoint value, out bool __state) =>
+        __state = ModInformation.IsServer &&
+            !CallOriginalPolicy.IsOriginalAllowed() &&
+            __instance?._mobileParty?.IsActive == true &&
+            value != __instance.AiBehaviorInteractable;
+
+    [HarmonyPatch(nameof(MobilePartyAi.AiBehaviorInteractable), MethodType.Setter), HarmonyPostfix]
+    private static void AiBehaviorInteractablePostfix(MobilePartyAi __instance, bool __state)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed())
-            return;
-
-        if (ModInformation.IsClient)
-            return;
-
-        if (value == __instance.AiBehaviorInteractable)
-            return;
-
-        MessageBroker.Instance.Publish(__instance, new AiBehaviorInteractablePointUpdated(__instance, value));
+        if (__state)
+            MessageBroker.Instance.Publish(
+                __instance,
+                new PartyBehaviorChangeAttempted(__instance._mobileParty));
     }
 }

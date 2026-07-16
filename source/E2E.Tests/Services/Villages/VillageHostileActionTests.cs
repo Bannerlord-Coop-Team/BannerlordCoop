@@ -1762,6 +1762,7 @@ public class VillageHostileActionTests : MapEventTestBase
 
         var start = Server.NetworkSentMessages.GetMessages<NetworkStartAttackMission>().Single();
         Assert.Equal(hostileAction.MapEventId, start.MapEventId);
+        Assert.Equal(hostileAction.AttackerPartyId, start.InitiatingPartyId);
 
         var mode = Server.NetworkSentMessages.GetMessages<NetworkBattleModeSet>().Single();
         Assert.Equal(hostileAction.MapEventId, mode.MapEventId);
@@ -1779,6 +1780,119 @@ public class VillageHostileActionTests : MapEventTestBase
         }, MapEventDisabledMethods);
 
         ServerBattleModeArbiter.Release(hostileAction.MapEventId);
+    }
+
+    [Fact]
+    public void MultiPlayerRaid_WoundedNonInitiator_MissionStart_LeavesBattle()
+    {
+        var client = Clients.First();
+        var hostileAction = CreateHostileActionWithTwoPlayerParties(VillageHostileAction.Raid);
+        string? woundedPartyId = null;
+
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.TryGetPlayer("PlayerTwo", out var woundedPlayer));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(woundedPlayer.HeroId, out var woundedHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(woundedPlayer.MobilePartyId, out var woundedParty));
+
+            woundedHero.HitPoints = 1;
+            Assert.True(woundedHero.IsWounded);
+            Assert.True(Server.ObjectManager.TryGetId(woundedParty.Party, out woundedPartyId));
+        }, MapEventDisabledMethods);
+
+        Assert.NotNull(woundedPartyId);
+        Server.NetworkSentMessages.Clear();
+
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkBattleStartRequest(
+            Guid.NewGuid().ToString(),
+            (int)BattleStartMode.Mission,
+            hostileAction.MapEventId,
+            hostileAction.AttackerPartyId)), MapEventDisabledMethods);
+
+        var left = Server.NetworkSentMessages.GetMessages<NetworkPartyLeftBattle>().Single();
+        Assert.Equal(woundedPartyId, left.PartyId);
+
+        AssertHostileActionJoinerLeft(Server, hostileAction.MapEventId, hostileAction.AttackerPartyId, woundedPartyId!);
+        foreach (var syncedClient in Clients)
+        {
+            AssertHostileActionJoinerLeft(syncedClient, hostileAction.MapEventId, hostileAction.AttackerPartyId, woundedPartyId!);
+        }
+
+        ServerBattleModeArbiter.Release(hostileAction.MapEventId);
+    }
+
+    [Fact]
+    public void MultiPlayerRaid_WoundedParticipant_LateMissionJoin_KeepsExistingPlayerInBattle()
+    {
+        var firstClient = Clients.First();
+        var secondClient = Clients.Last();
+        var hostileAction = CreateHostileActionWithTwoPlayerParties(VillageHostileAction.Raid);
+        string? firstPlayerMobilePartyId = null;
+        string? secondPlayerMobilePartyId = null;
+        string? firstPlayerPartyId = null;
+        string? secondPlayerPartyId = null;
+
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.TryGetPlayer("PlayerOne", out var firstPlayer));
+            Assert.True(playerManager.TryGetPlayer("PlayerTwo", out var secondPlayer));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(firstPlayer.HeroId, out var firstPlayerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(firstPlayer.MobilePartyId, out var firstPlayerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(secondPlayer.MobilePartyId, out var secondPlayerParty));
+            Assert.False(firstPlayerHero.IsWounded);
+
+            firstPlayerMobilePartyId = firstPlayer.MobilePartyId;
+            secondPlayerMobilePartyId = secondPlayer.MobilePartyId;
+            Assert.True(Server.ObjectManager.TryGetId(firstPlayerParty.Party, out firstPlayerPartyId));
+            Assert.True(Server.ObjectManager.TryGetId(secondPlayerParty.Party, out secondPlayerPartyId));
+        }, MapEventDisabledMethods);
+
+        Assert.NotNull(firstPlayerMobilePartyId);
+        Assert.NotNull(secondPlayerMobilePartyId);
+        Assert.NotNull(firstPlayerPartyId);
+        Assert.NotNull(secondPlayerPartyId);
+
+        try
+        {
+            firstClient.Call(() => firstClient.Resolve<INetwork>().SendAll(new NetworkBattleStartRequest(
+                Guid.NewGuid().ToString(),
+                (int)BattleStartMode.Mission,
+                hostileAction.MapEventId,
+                firstPlayerMobilePartyId!)), MapEventDisabledMethods);
+
+            Server.Call(() =>
+            {
+                var playerManager = Server.Resolve<IPlayerManager>();
+                Assert.True(playerManager.TryGetPlayer("PlayerOne", out var firstPlayer));
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(firstPlayer.HeroId, out var firstPlayerHero));
+
+                firstPlayerHero.HitPoints = 1;
+                Assert.True(firstPlayerHero.IsWounded);
+            }, MapEventDisabledMethods);
+
+            Server.NetworkSentMessages.Clear();
+
+            secondClient.Call(() => secondClient.Resolve<INetwork>().SendAll(new NetworkBattleStartRequest(
+                Guid.NewGuid().ToString(),
+                (int)BattleStartMode.Mission,
+                hostileAction.MapEventId,
+                secondPlayerMobilePartyId!)), MapEventDisabledMethods);
+
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPartyLeftBattle>());
+            AssertHostileActionJoinerPresent(Server, hostileAction.MapEventId, firstPlayerPartyId!);
+            AssertHostileActionJoinerPresent(Server, hostileAction.MapEventId, secondPlayerPartyId!);
+            foreach (var syncedClient in Clients)
+            {
+                AssertHostileActionJoinerPresent(syncedClient, hostileAction.MapEventId, firstPlayerPartyId!);
+                AssertHostileActionJoinerPresent(syncedClient, hostileAction.MapEventId, secondPlayerPartyId!);
+            }
+        }
+        finally
+        {
+            ServerBattleModeArbiter.Release(hostileAction.MapEventId);
+        }
     }
 
     [Theory]

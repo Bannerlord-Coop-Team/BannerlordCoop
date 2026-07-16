@@ -58,12 +58,9 @@ internal class HeroRegistry : AutoRegistryBase<Hero>
             AccessTools.Property(typeof(Hero), nameof(Hero.OwnedCaravans)).SetValue(obj, new MBList<CaravanPartyComponent>());
             AccessTools.Field(typeof(Hero), nameof(Hero.VolunteerTypes)).SetValue(obj, new CharacterObject[6]);
             obj._heroDeveloper = new HeroDeveloper(obj);
-
-            // Client heroes skip Hero.Init(); the PropertyOwner fields must exist for the
-            // AutoSync PropertyOwner apply handlers (skills/traits/perks/attributes)
-            obj._heroSkills = new PropertyOwner<SkillObject>();
             obj._heroTraits = new PropertyOwner<TraitObject>();
             obj._heroPerks = new PropertyOwner<PerkObject>();
+            obj._heroSkills = new PropertyOwner<SkillObject>();
             obj._characterAttributes = new PropertyOwner<CharacterAttribute>();
         }
 

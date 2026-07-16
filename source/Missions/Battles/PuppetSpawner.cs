@@ -127,10 +127,14 @@ public class PuppetSpawner : IPuppetSpawner
             return true;
         }
 
-        // We own the agent when we are its owner — i.e. our own hero. That hero is adopted as the local main
-        // agent and player-controlled; everything else is an inert puppet driven by its owner over the mesh.
+        // We own the agent when the record's ASSIGNMENT owner is us — our own hero, or one of our own troops
+        // replayed back to us (a reconnect catch-up after the host held them under BR-031, or an echoed own
+        // record). Our hero is adopted as the local player-controlled main agent; our troops become locally
+        // driven AI combatants (BR-033 — control returns to us, and our movement polling broadcasts them
+        // because they register under our controller id below). Everything else is an inert puppet driven by
+        // its owner over the mesh.
         bool isOwnAgent = session.IsOwn(data.OwnerControllerId);
-        var equipment = character.IsHero ? character.HeroObject.BattleEquipment : character.Equipment;
+        bool isOwnHero = isOwnAgent && character.IsHero && character.HeroObject == Hero.MainHero;
 
         // Carry the troop's party so the agent has a real BattleCombatant — the battle observer/scoreboard
         // reads origin.BattleCombatant, and SimpleAgentOrigin leaves it null for non-hero troops.
@@ -158,9 +162,12 @@ public class PuppetSpawner : IPuppetSpawner
         buildData.InitialPosition(data.Position);
         buildData.Team(team);
         buildData.InitialDirection(Vec2.Forward);
-        buildData.Equipment(equipment);
+        buildData.Equipment(data.SpawnEquipment); // Use calculated equipment from spawning client instead of character equipment (random per troop per client)
+        buildData.BodyProperties(data.BodyProperties);
         buildData.TroopOrigin(origin);
-        buildData.Controller(isOwnAgent ? AgentControllerType.Player : AgentControllerType.None);
+        buildData.Controller(isOwnHero ? AgentControllerType.Player
+            : isOwnAgent ? AgentControllerType.AI
+            : AgentControllerType.None);
         buildData.ClothingColor1(origin.FactionColor);
         buildData.ClothingColor2(origin.FactionColor2);
 
@@ -182,9 +189,19 @@ public class PuppetSpawner : IPuppetSpawner
         formationAssigner.Assign(agent, data.FormationIndex);
 
         // Adopt our own hero as the controllable main agent of this mission.
-        if (isOwnAgent)
+        if (isOwnHero)
         {
             Mission.Current.MainAgent = agent;
+        }
+        else if (isOwnAgent)
+        {
+            // One of our OWN troops arriving as a spawn record — the reconnect shape: it fought on under the
+            // host while we were away (BR-031) and is ours again now (BR-033). It spawned AI-controlled and
+            // LOCALLY driven (never an interpolated puppet — we are its authority the moment it registers
+            // below), so wake its AI exactly as the adopt/reinforcement paths do or it stands idle. If our
+            // hero died while we were gone, the leaderless-control path (ChargeLeaderlessOwnTroops) charges
+            // these formations at our deployment finish, exactly as it does for a fresh leaderless spawn.
+            AgentAiWaker.Wake(agent);
         }
         else
         {
