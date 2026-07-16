@@ -49,12 +49,12 @@ public class MissionDisconnectDetectionTests
         foreach (var member in members)
         {
             var id = member.ControllerId;
-            member.Instance.Resolve<IMessageBroker>().Subscribe<MissionPeerDisconnected>(p => received[id].Add(p.What));
+            member.Instance.Subscribe<MissionPeerDisconnected>(p => received[id].Add(p.What));
         }
 
         // Capture the server's local host-migration/cleanup signal.
         var departures = new List<MissionMemberDeparted>();
-        TestEnvironment.Server.Resolve<IMessageBroker>().Subscribe<MissionMemberDeparted>(p => departures.Add(p.What));
+        TestEnvironment.Server.Subscribe<MissionMemberDeparted>(p => departures.Add(p.What));
 
         foreach (var member in members)
             Join(member);
@@ -86,7 +86,7 @@ public class MissionDisconnectDetectionTests
         var members = SetupClients().Take(2).ToArray();
 
         var departures = new List<MissionMemberDeparted>();
-        TestEnvironment.Server.Resolve<IMessageBroker>().Subscribe<MissionMemberDeparted>(p => departures.Add(p.What));
+        TestEnvironment.Server.Subscribe<MissionMemberDeparted>(p => departures.Add(p.What));
 
         Join(members[0]);
         Join(members[1]);
@@ -115,11 +115,11 @@ public class MissionDisconnectDetectionTests
         foreach (var member in members)
         {
             var id = member.ControllerId;
-            member.Instance.Resolve<IMessageBroker>().Subscribe<MissionPeerDisconnected>(p => received[id].Add(p.What));
+            member.Instance.Subscribe<MissionPeerDisconnected>(p => received[id].Add(p.What));
         }
 
         var departures = new List<MissionMemberDeparted>();
-        TestEnvironment.Server.Resolve<IMessageBroker>().Subscribe<MissionMemberDeparted>(p => departures.Add(p.What));
+        TestEnvironment.Server.Subscribe<MissionMemberDeparted>(p => departures.Add(p.What));
 
         // Only two of the three ever entered the mission instance.
         Join(members[0]);

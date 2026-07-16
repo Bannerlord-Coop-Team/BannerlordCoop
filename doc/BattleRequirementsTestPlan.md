@@ -258,6 +258,23 @@ client assert). Held captives in the surrendered party's own prison roster remai
 out of BR-061's scope, noted in code. 3 new tests (2 red→green, 1 pins the dead-companion
 guard). Suites: targeted 69/69, full E2E **562 passed / 4 pre-existing skips / 0 failed** (566).
 
+**Alignment increment 11 (2026-07-15) — flaky `MissionDisconnectDetectionTests` FIXED (root-caused).**
+Not the suspected static-swap race: the real cause was the repo's known WeakDelegate footgun in
+test form — `TestMessageBroker.Subscribe` keeps only a weak reference to the delegate's target,
+and the tests subscribed with bare lambdas whose closures nothing else held, so any GC between
+subscribe and publish silently killed delivery. Class parallelism merely raised allocation
+pressure (four Autofac containers per concurrently-built environment), which is why the flake
+tracked parallel runs and vanished in isolation. Proven deterministically: a temporary
+`GC.Collect()` between subscribe and publish reproduced the exact failure 3/3 *even in
+isolation*; the same probe passed 3/3 after the fix. Fix (narrowest sound): a pinning
+`Subscribe<T>` helper on the integration harness's `EnvironmentInstance` (instance-lifetime
+strong refs — exactly how production keeps handlers alive via the DI container); six lambda
+sites switched. An xUnit `[Collection]` was explicitly rejected — it would only have reduced the
+probability. No production implication (production subscribers are container-held instance
+methods); `TestMessageBroker`'s weak semantics deliberately kept faithful. Verification: 12
+consecutive zero-fail runs of the Missions filter + 2 full-suite runs (117 total, 2 template
+skips, 0 failures).
+
 Harness lessons for later waves: never disable-patch `MapEvent.FinalizeEventAux` in an E2E
 PatchScope (it already carries a production prefix — two-prefix `InvalidProgramException`, and the
 broken patch state poisons every later test in the run); harness-created parties spawn with
