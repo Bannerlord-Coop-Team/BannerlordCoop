@@ -153,7 +153,7 @@ internal class BattleMissionStartHandler : IHandler
                 // owns this event. On reject, don't make the sides mission-ready or reply — the requesting client
                 // waits for NetworkStartAttackMission to open the mission, so it simply stays at the encounter menu.
                 operation = "claim mission mode";
-                if (!ServerBattleModeArbiter.TryClaimMission(payload.What.MapEventId))
+                if (!ServerBattleModeArbiter.TryClaimMission(payload.What.MapEventId, out var isNewMissionClaim))
                 {
                     mapEventLogger.DebugMapEvent(mapEvent, "Rejecting attack mission: an auto-resolve simulation is already underway for this event");
                     network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
@@ -168,8 +168,16 @@ internal class BattleMissionStartHandler : IHandler
                 operation = "apply attack hostile-action consequences";
                 ApplyClientAttackHostileConsequences(mapEvent, payload.What.AttackerPartyId);
 
-                operation = "remove wounded non-initiating players";
-                RemoveWoundedNonInitiatorParties(mapEvent, payload.What.AttackerPartyId);
+                if (isNewMissionClaim)
+                {
+                    operation = "remove wounded non-initiating players";
+                    if (!RemoveWoundedNonInitiatorParties(mapEvent, payload.What.AttackerPartyId))
+                    {
+                        ServerBattleModeArbiter.Release(payload.What.MapEventId);
+                        network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
+                        return;
+                    }
+                }
 
                 operation = "make map event sides mission-ready";
                 foreach (var side in mapEvent._sides)
@@ -256,7 +264,7 @@ internal class BattleMissionStartHandler : IHandler
         MapEventHostileActionConsequences.Apply(mapEvent, attackerMobileParty.Party, "attack");
     }
 
-    private void RemoveWoundedNonInitiatorParties(MapEvent mapEvent, string initiatingPartyId)
+    private bool RemoveWoundedNonInitiatorParties(MapEvent mapEvent, string initiatingPartyId)
     {
         foreach (var player in playerManager.Players)
         {
@@ -268,13 +276,15 @@ internal class BattleMissionStartHandler : IHandler
                 !objectManager.TryGetId(mobileParty.Party, out var partyId))
                 continue;
 
-            using (new AllowedThread())
-            {
-                mobileParty.Party.MapEventSide = null;
-            }
+            mobileParty.Party.MapEventSide = null;
+
+            if (mapEvent.IsFinalized)
+                return false;
 
             network.SendAll(new NetworkPartyLeftBattle(partyId));
         }
+
+        return true;
     }
 
     private int RollTerrainSeed()

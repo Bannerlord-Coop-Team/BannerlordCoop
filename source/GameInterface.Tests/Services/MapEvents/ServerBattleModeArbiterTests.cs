@@ -7,6 +7,25 @@ namespace GameInterface.Tests.Services.MapEvents;
 public class ServerBattleModeArbiterTests
 {
     [Fact]
+    public void TryClaimMission_ExistingMission_ReportsOnlyFirstClaimAsNew()
+    {
+        const string mapEventId = "existing-mission-claim";
+
+        try
+        {
+            Assert.True(ServerBattleModeArbiter.TryClaimMission(mapEventId, out var firstClaimIsNew));
+            Assert.True(firstClaimIsNew);
+
+            Assert.True(ServerBattleModeArbiter.TryClaimMission(mapEventId, out var secondClaimIsNew));
+            Assert.False(secondClaimIsNew);
+        }
+        finally
+        {
+            ServerBattleModeArbiter.Release(mapEventId);
+        }
+    }
+
+    [Fact]
     public void ReleaseMission_MissionClaim_AllowsSimulationClaim()
     {
         const string mapEventId = "release-mission-claim";
