@@ -3,6 +3,8 @@ using Common.Logging;
 using Serilog;
 using Steamworks;
 using System;
+using System.Linq;
+using System.Net.NetworkInformation;
 using System.Runtime.CompilerServices;
 using System.Threading;
 
@@ -16,8 +18,8 @@ public static class SteamGameServerBoot
 {
     private static readonly ILogger Logger = LogManager.GetLogger(typeof(SteamGameServerBoot));
 
-    // Nominal ports: discovery is via Steam lobbies and the tunnel is Steam P2P (virtual port 0),
-    // so these are only game-server metadata, not a reachable bind the owner has to forward.
+    // Steam receives these during native game-server initialization. Player traffic still uses
+    // the P2P tunnel (virtual port 0), so neither port replaces the direct-IP gameplay port.
     private const ushort GamePort = 27315;
     private const ushort QueryPort = 27316;
     private const string AppId = "261550";
@@ -58,7 +60,8 @@ public static class SteamGameServerBoot
         catch (Exception ex)
         {
             // Steamworks.NET.dll absent (non-Steam install) or the Steam client is not running.
-            Logger.Information("Game-server Steam login unavailable: {Reason}", ex.Message);
+            Logger.Warning(ex,
+                "Game-server Steam startup threw before completion; the server will not listen on Steam");
             return false;
         }
     }
@@ -66,16 +69,26 @@ public static class SteamGameServerBoot
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static bool Boot()
     {
-        if (!SteamAPI.IsSteamRunning())
+        bool steamRunning = SteamAPI.IsSteamRunning();
+        if (!steamRunning)
         {
-            Logger.Information("Steam is not running; the server will not listen on Steam");
+            Logger.Warning("Steam game-server unavailable: SteamAPI.IsSteamRunning returned false");
             return false;
         }
 
+        string runtimeAppId = GetClientRuntimeAppId();
+        string version = ModInformation.Version.ToString();
+        var steamworksAssembly = typeof(SteamAPI).Assembly;
+        Logger.Information(
+            "Calling GameServer.Init: expectedAppId={ExpectedAppId} runtimeAppId={RuntimeAppId} SteamAppId={SteamAppId} gamePort={GamePort} queryPort={QueryPort} udpListeners={UdpListeners} version={Version} cwd={WorkingDirectory} wrapperVersion={WrapperVersion} wrapperPath={WrapperPath}",
+            AppId, runtimeAppId, Environment.GetEnvironmentVariable("SteamAppId") ?? "<unset>",
+            GamePort, QueryPort, GetUdpListenerState(), version, Environment.CurrentDirectory,
+            steamworksAssembly.GetName().Version, steamworksAssembly.Location);
         if (!GameServer.Init(0, GamePort, QueryPort, EServerMode.eServerModeNoAuthentication,
-            ModInformation.Version.ToString()))
+            version))
         {
-            Logger.Error("GameServer.Init failed; the server will not listen on Steam");
+            Logger.Error(
+                "GameServer.Init returned false; anonymous logon was not attempted. Check the preceding App ID, port, and wrapper context");
             return false;
         }
 
@@ -96,6 +109,35 @@ public static class SteamGameServerBoot
         SteamGameServer.LogOnAnonymous();
         Logger.Information("Game-server anonymous logon requested");
         return true;
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static string GetClientRuntimeAppId()
+    {
+        try
+        {
+            AppId_t appId = SteamUtils.GetAppID();
+            return appId.m_AppId.ToString();
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "Steam runtime App ID could not be read by the server process");
+            return "<unavailable>";
+        }
+    }
+
+    private static string GetUdpListenerState()
+    {
+        try
+        {
+            var listeners = IPGlobalProperties.GetIPGlobalProperties().GetActiveUdpListeners();
+            return $"{GamePort}={listeners.Any(x => x.Port == GamePort)}, "
+                + $"{QueryPort}={listeners.Any(x => x.Port == QueryPort)}";
+        }
+        catch (Exception ex)
+        {
+            return $"unavailable ({ex.GetType().Name})";
+        }
     }
 
     /// <summary>Dispatches the game-server callbacks; called every tick by the pump.</summary>

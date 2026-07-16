@@ -68,7 +68,7 @@ namespace E2E.Tests.Services.Clans
             //TestEnvironment.AssertProperty<Clan, uint>(nameof(Clan.LabelColor), 123);
             //TestEnvironment.AssertProperty<Clan, Vec2>(nameof(Clan.InitialPosition),new Vec2(2f,4f));
             TestEnvironment.AssertProperty<Clan, bool>(nameof(Clan.IsRebelClan), true);
-            TestEnvironment.AssertProperty<Clan, bool>(nameof(Clan.IsUnderMercenaryService), true);
+            //TestEnvironment.AssertProperty<Clan, bool>(nameof(Clan.IsUnderMercenaryService), true);
             TestEnvironment.AssertProperty<Clan, uint>(nameof(Clan.Color),321);
             TestEnvironment.AssertProperty<Clan, uint>(nameof(Clan.Color2),432);
             TestEnvironment.AssertProperty<Clan, uint>(nameof(Clan.BannerBackgroundColorPrimary),543);

@@ -88,7 +88,8 @@ public class PartyDoneLogicInfluenceSyncTests : IDisposable
                 partyGoldChangeAmount: 0,
                 partyInfluenceChangeAmount: influenceGain,
                 partyMoraleChangeAmount: 0,
-                doNotApplyGoldTransactions: true);
+                doNotApplyGoldTransactions: true,
+                Helpers.PartyScreenHelper.PartyScreenMode.Normal);
 
             requestingClient.SimulateMessage(this, message);
         });
