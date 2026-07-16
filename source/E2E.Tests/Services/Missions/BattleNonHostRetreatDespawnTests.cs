@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using Common.Messaging;
 using Common.Util;
@@ -31,7 +31,7 @@ namespace E2E.Tests.Services.Missions;
 /// </summary>
 public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
 {
-    public BattleNonHostRetreatDespawnTests(ITestOutputHelper output) : base(output) { }
+    public BattleNonHostRetreatDespawnTests(ITestOutputHelper output) : base(output, numClients: 3) { }
 
     /// <summary>
     /// The core PVP leak: the local client fights as Defender, the retreater "A" fields its party on the
@@ -83,6 +83,129 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
                     "the retreating non-host's own-party troop must be deregistered on every remaining client");
                 Assert.True(AgentMirror.TryGet(troop, out var mirror));
                 Assert.False(mirror.IsActive, "the retreating non-host's own-party troop must fade out (withdraw)");
+
+                GC.KeepAlive(controller);
+            });
+        }
+        finally
+        {
+            BattleSpawnGate.EndBattle();
+        }
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-051")]
+    public void NonHostDisconnect_OpposingSideTroops_AreDespawnedOnRemainingClients()
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, partyIds) = SetupCoopBattle("A", "B");
+        var remaining = Clients.Skip(1).First();
+        var troopId = Guid.NewGuid();
+        var lateReplayId = Guid.NewGuid();
+        var replayCharacterId = CreateRegisteredObject<CharacterObject>();
+
+        try
+        {
+            remaining.Call(() =>
+            {
+                var mock = fixture.CreateMission(remaining);
+                var controller = remaining.Resolve<CoopBattleController>();
+                var registry = remaining.Resolve<INetworkAgentRegistry>();
+
+                controller.Session.TryBegin(mapEventId);
+                remaining.Resolve<IBattleHostRegistry>().Set(mapEventId, new BattleHostAssignment("B", new[] { "A" }));
+                BattleSpawnGate.BeginBattle(mapEventId);
+                mock.PlayerTeam = mock.DefenderTeam;
+
+                Assert.True(remaining.ObjectManager.TryGetObject<MobileParty>(partyIds[0], out var disconnectedParty));
+                var character = (CharacterObject)Game.Current.PlayerTroop;
+                var origin = new CoopAgentOrigin(character, disconnectedParty.Party, -1, null, new UniqueTroopDescriptor(101));
+                var troop = mock.SpawnAgent(new AgentBuildData(character)
+                    .Controller(AgentControllerType.None).Team(mock.AttackerTeam.Shell).TroopOrigin(origin));
+                Assert.True(registry.TryRegisterAgent("A", troopId, troop));
+
+                var broker = remaining.Resolve<IMessageBroker>();
+                broker.Publish(this, new MissionPeerDisconnected("A", mapEventId));
+
+                Assert.False(registry.TryGetAgentInfo(troopId, out _));
+                Assert.True(AgentMirror.TryGet(troop, out var mirror));
+                Assert.False(mirror.IsActive, "a disconnected player's party must fade out like a retreat");
+
+                broker.Publish(this, new NetworkSpawnBattleAgents(new[]
+                {
+                    new BattleAgentSpawnData(lateReplayId, replayCharacterId, default, BattleSideEnum.Attacker,
+                        100f, "A", null, 106, new Equipment(), default),
+                }));
+                Assert.False(registry.TryGetAgentInfo(lateReplayId, out _),
+                    "a non-host's late replay must be dropped even when its party attribution is missing");
+
+                GC.KeepAlive(controller);
+            });
+        }
+        finally
+        {
+            BattleSpawnGate.EndBattle();
+        }
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-051")]
+    public void Disconnect_LateReplayDropsPlayerParty_ButKeepsHostNpcForces()
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, partyIds) = SetupCoopBattle("A", "B");
+        var successor = Clients.Skip(1).First();
+        var playerAgentId = Guid.NewGuid();
+        var npcAgentId = Guid.NewGuid();
+        var freshPlayerAgentId = Guid.NewGuid();
+        var characterId = CreateRegisteredObject<CharacterObject>();
+
+        try
+        {
+            successor.Call(() =>
+            {
+                var mock = fixture.CreateMission(successor);
+                var controller = successor.Resolve<CoopBattleController>();
+                var registry = successor.Resolve<INetworkAgentRegistry>();
+
+                controller.Session.TryBegin(mapEventId);
+                successor.Resolve<IBattleHostRegistry>().Set(mapEventId, new BattleHostAssignment("A", new[] { "B" }));
+                BattleSpawnGate.BeginBattle(mapEventId);
+                mock.PlayerTeam = mock.DefenderTeam;
+
+                Assert.True(successor.ObjectManager.TryGetObject<MobileParty>(partyIds[0], out var disconnectedParty));
+                Assert.True(successor.ObjectManager.TryGetObject<MobileParty>(partyIds[1], out var npcParty));
+                var mapEvent = disconnectedParty.MapEvent;
+                var parties = mapEvent.AttackerSide.Parties.Concat(mapEvent.DefenderSide.Parties);
+                var disconnectedMapEventParty = parties.Single(p => p.Party == disconnectedParty.Party);
+                var npcMapEventParty = parties.Single(p => p.Party == npcParty.Party);
+                Assert.True(successor.ObjectManager.TryGetId(disconnectedMapEventParty, out var disconnectedMapEventPartyId));
+                Assert.True(successor.ObjectManager.TryGetId(npcMapEventParty, out var npcMapEventPartyId));
+
+                var broker = successor.Resolve<IMessageBroker>();
+                broker.Publish(this, new MissionPeerDisconnected("A", mapEventId));
+                broker.Publish(this, new NetworkSpawnBattleAgents(new[]
+                {
+                    new BattleAgentSpawnData(playerAgentId, characterId, default, BattleSideEnum.Attacker, 100f,
+                        "A", disconnectedMapEventPartyId, 102, new Equipment(), default),
+                    new BattleAgentSpawnData(npcAgentId, characterId, default, BattleSideEnum.Attacker, 100f,
+                        "A", npcMapEventPartyId, 103, new Equipment(), default),
+                }));
+
+                Assert.False(registry.TryGetAgentInfo(playerAgentId, out _),
+                    "a late replay must not restore the disconnected player's withdrawn party");
+                Assert.True(registry.TryGetAgentInfo(npcAgentId, out _),
+                    "a departed host's NPC forces must remain available for successor adoption");
+
+                broker.Publish(this, new NetworkMissionPeerEntered("A", mapEventId));
+                broker.Publish(this, new NetworkSpawnBattleAgents(new[]
+                {
+                    new BattleAgentSpawnData(freshPlayerAgentId, characterId, default, BattleSideEnum.Attacker, 100f,
+                        "A", disconnectedMapEventPartyId, 104, new Equipment(), default),
+                }));
+
+                Assert.True(registry.TryGetAgentInfo(freshPlayerAgentId, out _),
+                    "rejoining must clear the withdrawal guard so the player's freshly spawned party can return");
 
                 GC.KeepAlive(controller);
             });
@@ -159,13 +282,10 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
     /// <summary>
     /// The live 21:22:43 → 21:23:18 sequence: A retreats (leak), re-engages the same battle, and redeploys
     /// fresh spawn records with NEW agent ids. The registry must end up holding exactly the fresh cohort —
-    /// the pre-retreat agent must be gone (despawned at retreat). RED today: the stale agent survives the
-    /// retreat, the BR-033 reclaim no-ops (nothing was adopted, so nothing is keyed to us with OriginalOwner
-    /// "A"), and the fresh deploy stacks on top — 600 live + 600 frozen ghosts per leaky retreat, live.
+    /// the pre-retreat agent must be gone (despawned at retreat), otherwise the fresh deploy stacks on top.
     /// </summary>
     [Fact]
     [Trait("Requirement", "BR-051")]
-    [Trait("Requirement", "BR-033")]
     public void NonHostRetreat_ThenReengageRedeploy_DoesNotAccumulateStaleAgents()
     {
         using var fixture = new MissionEngineFixture();
@@ -270,7 +390,7 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
                 Assert.True(registry.TryRegisterAgent("A", ownTroopId, ownTroop));
 
                 // An enemy NPC agent A adopted while it was host earlier: OriginalOwner "C", CurrentAuthority "A"
-                // (the shape the BR-031 adoption's TryTransferAuthority produces).
+                // (the shape a host-migration adoption's TryTransferAuthority produces).
                 var heldAgent = mock.SpawnAgent(new AgentBuildData(character)
                     .Controller(AgentControllerType.None).Team(mock.AttackerTeam.Shell));
                 Assert.True(registry.TryRegisterAgent("C", heldAgentId, heldAgent));
@@ -358,6 +478,150 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
                 Assert.True(registry.TryGetAgentInfo(npcTroopId, out var npcInfo));
                 Assert.Equal("B", npcInfo.CurrentAuthority);
                 Assert.True(AgentMirror.TryGet(npcTroop, out var npcMirror));
+                Assert.Equal(AgentControllerType.AI, npcMirror.Controller);
+
+                GC.KeepAlive(controller);
+            });
+        }
+        finally
+        {
+            BattleSpawnGate.EndBattle();
+        }
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-051")]
+    public void HostDisconnect_OwnPartyWithdraws_WhileNpcForcesAreAdopted()
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, partyIds) = SetupCoopBattle("A", "B");
+        var successor = Clients.Skip(1).First();
+        var ownPartyTroopId = Guid.NewGuid();
+        var npcTroopId = Guid.NewGuid();
+
+        try
+        {
+            successor.Call(() =>
+            {
+                var mock = fixture.CreateMission(successor);
+                var controller = successor.Resolve<CoopBattleController>();
+                var registry = successor.Resolve<INetworkAgentRegistry>();
+
+                controller.Session.TryBegin(mapEventId);
+                successor.Resolve<IBattleHostRegistry>().Set(mapEventId, new BattleHostAssignment("A", new[] { "B" }));
+                BattleSpawnGate.BeginBattle(mapEventId);
+                mock.PlayerTeam = mock.DefenderTeam;
+
+                Assert.True(successor.ObjectManager.TryGetObject<MobileParty>(partyIds[0], out var hostParty));
+                var character = (CharacterObject)Game.Current.PlayerTroop;
+                var ownOrigin = new CoopAgentOrigin(character, hostParty.Party, -1, null, new UniqueTroopDescriptor(105));
+                var ownTroop = mock.SpawnAgent(new AgentBuildData(character)
+                    .Controller(AgentControllerType.None).Team(mock.AttackerTeam.Shell).TroopOrigin(ownOrigin));
+                Assert.True(registry.TryRegisterAgent("A", ownPartyTroopId, ownTroop));
+
+                var npcTroop = mock.SpawnAgent(new AgentBuildData(character)
+                    .Controller(AgentControllerType.None).Team(mock.AttackerTeam.Shell));
+                Assert.True(registry.TryRegisterAgent("A", npcTroopId, npcTroop));
+
+                var broker = successor.Resolve<IMessageBroker>();
+                broker.Publish(this, new MissionPeerDisconnected("A", mapEventId));
+                broker.Publish(this, new BattleHostMigrated(mapEventId, "A"));
+
+                Assert.False(registry.TryGetAgentInfo(ownPartyTroopId, out _));
+                Assert.True(AgentMirror.TryGet(ownTroop, out var ownMirror));
+                Assert.False(ownMirror.IsActive);
+
+                Assert.True(registry.TryGetAgentInfo(npcTroopId, out var npcInfo));
+                Assert.Equal("B", npcInfo.CurrentAuthority);
+                Assert.True(AgentMirror.TryGet(npcTroop, out var npcMirror));
+                Assert.Equal(AgentControllerType.AI, npcMirror.Controller);
+
+                GC.KeepAlive(controller);
+            });
+        }
+        finally
+        {
+            BattleSpawnGate.EndBattle();
+        }
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-016")]
+    public void RejoiningOldHost_CatchupKeepsMigratedNpcUnderCurrentSuccessor()
+    {
+        using var fixture = new MissionEngineFixture();
+        SetupCoopBattle("A", "B");
+        var returner = Clients.First();
+        var successor = Clients.Skip(1).First();
+        var npcTroopId = Guid.NewGuid();
+        var characterId = CreateRegisteredObject<CharacterObject>();
+
+        successor.Call(() =>
+        {
+            var mock = fixture.CreateMission(successor);
+            var controller = successor.Resolve<CoopBattleController>();
+            var registry = successor.Resolve<INetworkAgentRegistry>();
+
+            Assert.True(successor.ObjectManager.TryGetObject<CharacterObject>(characterId, out var character));
+            var npcTroop = mock.SpawnAgent(new AgentBuildData(character)
+                .Controller(AgentControllerType.AI).Team(mock.AttackerTeam.Shell));
+            Assert.True(registry.TryRegisterAgent("A", npcTroopId, npcTroop));
+            Assert.True(registry.TryTransferAuthority("B", npcTroopId));
+
+            successor.Resolve<IMessageBroker>().Publish(this, new NetworkMissionPeerEntered("A", null));
+
+            var record = returner.InternalMessages.GetMessages<NetworkSpawnBattleAgents>().Last().Agents.Single();
+            Assert.Equal(npcTroopId, record.AgentId);
+            Assert.Equal("B", record.OwnerControllerId);
+
+            GC.KeepAlive(controller);
+        });
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-016")]
+    public void ConsecutiveHostDisconnects_FinalSuccessorAdoptsNpcForcesFromEarlierHost()
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, _) = SetupCoopBattle("A", "B", "C");
+        var finalSuccessor = Clients.Skip(2).First();
+        var npcTroopId = Guid.NewGuid();
+
+        try
+        {
+            finalSuccessor.Call(() =>
+            {
+                var mock = fixture.CreateMission(finalSuccessor);
+                var controller = finalSuccessor.Resolve<CoopBattleController>();
+                var registry = finalSuccessor.Resolve<INetworkAgentRegistry>();
+                var hosts = finalSuccessor.Resolve<IBattleHostRegistry>();
+                var broker = finalSuccessor.Resolve<IMessageBroker>();
+
+                controller.Session.TryBegin(mapEventId);
+                hosts.Set(mapEventId, new BattleHostAssignment("A", new[] { "B", "C" }));
+                BattleSpawnGate.BeginBattle(mapEventId);
+                mock.PlayerTeam = mock.DefenderTeam;
+
+                broker.Publish(this, new NetworkMissionPeerEntered("A", mapEventId));
+                broker.Publish(this, new NetworkMissionPeerEntered("B", mapEventId));
+
+                var character = (CharacterObject)Game.Current.PlayerTroop;
+                var npcTroop = mock.SpawnAgent(new AgentBuildData(character)
+                    .Controller(AgentControllerType.None).Team(mock.AttackerTeam.Shell));
+                Assert.True(registry.TryRegisterAgent("A", npcTroopId, npcTroop));
+
+                broker.Publish(this, new MissionPeerDisconnected("A", mapEventId));
+                hosts.Set(mapEventId, new BattleHostAssignment("B", new[] { "C" }, epoch: 2));
+
+                broker.Publish(this, new MissionPeerDisconnected("B", mapEventId));
+                hosts.Set(mapEventId, new BattleHostAssignment("C", Array.Empty<string>(), epoch: 3));
+                broker.Publish(this, new BattleHostMigrated(mapEventId, "B"));
+
+                Assert.True(registry.TryGetAgentInfo(npcTroopId, out var npcInfo));
+                Assert.Equal("C", npcInfo.CurrentAuthority);
+                Assert.Equal("A", npcInfo.OriginalOwner);
+                Assert.True(AgentMirror.TryGet(npcTroop, out var npcMirror));
+                Assert.True(npcMirror.IsActive);
                 Assert.Equal(AgentControllerType.AI, npcMirror.Controller);
 
                 GC.KeepAlive(controller);

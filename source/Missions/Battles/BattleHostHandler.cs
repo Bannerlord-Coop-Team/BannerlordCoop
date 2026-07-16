@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -37,9 +37,9 @@ namespace Missions.Battles;
 /// mission. The unowned (NPC) reserves are issued to the elected host together with the election, and every
 /// ready client's reply includes its sides with explicit empties so its spawn sizing can proceed. The result
 /// is cached, so a duplicate request just re-confirms, and every change is broadcast to all clients.
-/// The server also owns the RESERVE SCOPE across membership churn: a member that DROPS (not retreats) is
-/// marked absent so its parties fall into the host's owned set (the reserve half of the BR-031 adoption),
-/// and its RETURN re-issues the current scope to both sides of the handoff — the returner's grant and a
+/// The server also supports an explicitly non-withdrawing absence: that member is marked absent so its
+/// parties fall into the host's owned set, and its RETURN re-issues the current scope to both sides of the
+/// handoff — the returner's grant and a
 /// shrunk refresh to the host (BR-033), so no two suppliers ever hold the same party's reserve. Because the
 /// host's supplied-progress reports are throttled, the shrunk refresh carries a FLUSH handshake: the host
 /// acks each flagged side with its final local pointers for the dropped parties, and the returner's grant
@@ -67,9 +67,9 @@ internal class BattleHostHandler : IHandler
     // (election and migration both run under GameThread.RunSafe).
     private readonly Dictionary<string, int> issuedEpochs = new Dictionary<string, int>();
 
-    // [Server] Per battle: members that DROPPED (not retreated) and have not re-entered. Player registrations
-    // survive a disconnect, so reserve ownership alone cannot see the drop — this set is what makes the
-    // dropped member's parties fall to the HOST's reserve scope (the reserve half of the BR-031 adoption:
+    // [Server] Per battle: members explicitly marked absent without withdrawing and not yet re-entered.
+    // Player registrations survive that absence, so reserve ownership alone cannot see it — this set makes
+    // the member's parties fall to the HOST's reserve scope (the reserve half of the BR-031 adoption:
     // the host's adoption-time re-request is served them at the current ledger pointers). Cleared per
     // controller on its re-entry (BR-033 — see HandleControllerReturn) and per battle on full teardown.
     // Game thread only (all mutation sites run under GameThread.RunSafe).
@@ -264,9 +264,8 @@ internal class BattleHostHandler : IHandler
     /// <summary>[Server] A client asks for the reserves it currently owns: at battle ENTRY (feed its own
     /// parties while it loads), or after taking over a departed owner's troops (a host adopting a leaver, or
     /// a promoted successor) — the reply carries the full owned set at the current ledger pointers so adopted
-    /// parties resume cleanly. Empty sides are SKIPPED: before the election answers, an empty unowned side
-    /// must not mark the requester's enemy-side supplier populated (sizing would run prematurely); the
-    /// explicit empties arrive with the election reply instead.</summary>
+    /// parties resume cleanly. Empty sides are skipped before the election answers, but a current host receives
+    /// both sides so a migration refresh is an explicit, complete snapshot.</summary>
     private void Handle_NetworkRequestBattleReserves(MessagePayload<NetworkRequestBattleReserves> payload)
     {
         if (ModInformation.IsClient) return;
@@ -286,16 +285,18 @@ internal class BattleHostHandler : IHandler
             // FLUSH its final local pointers (they can be AHEAD of its throttled reports in the ledger), and
             // while that handshake is in flight the returner's grant is DEFERRED — serving it from the
             // lagging ledger would re-issue descriptors the holder already fielded.
-            bool deferred = HandleControllerReturn(mapEventId, mapEvent, requesterId, requester, includeEmptySides: false);
+            bool includeEmptySides = hostRegistry.TryGet(mapEventId, out var assignment)
+                && assignment.HostControllerId == requesterId;
+            bool deferred = HandleControllerReturn(mapEventId, mapEvent, requesterId, requester, includeEmptySides);
 
             // The current host's adoption/sweep re-request also refreshes its live peer (a promoted host
             // announces itself here after a migration).
             RememberHostPeer(mapEventId, requesterId, requester);
 
-            if (deferred || TryDeferToPendingReturn(mapEventId, requesterId, requester, includeEmptySides: false))
+            if (deferred || TryDeferToPendingReturn(mapEventId, requesterId, requester, includeEmptySides))
                 return;
 
-            SendOwnedReserves(mapEventId, mapEvent, requester, requesterId, includeEmptySides: false);
+            SendOwnedReserves(mapEventId, mapEvent, requester, requesterId, includeEmptySides);
         });
     }
 
@@ -638,12 +639,11 @@ internal class BattleHostHandler : IHandler
                 return;
             }
 
-            // Departure bookkeeping runs BEFORE the host-assignment check: a member can drop while every
-            // participant is still on the loading screen, so no host has been elected yet. A retreat (graceful
-            // leave) despawned the departing player's troops, so forget their reserve party — a rejoin then
-            // re-flattens it fresh (supplied pointer reset) and re-spawns. A disconnect keeps the reserve (the
-            // host adopts the troops and reinforces them from the existing pointer) — mark the dropped member
-            // ABSENT so its parties resolve into the reserve scope of whoever fields them next. Gating this on
+            // Departure bookkeeping runs BEFORE the host-assignment check: a member can leave while every
+            // participant is still on the loading screen, so no host has been elected yet. A withdrawal
+            // forgets the player's reserve party, so a rejoin re-flattens and re-spawns it fresh. An explicit
+            // non-withdrawing absence keeps the reserve and marks the member ABSENT so its parties resolve into
+            // the reserve scope of whoever fields them next. Gating this on
             // an existing host assignment orphaned a member that dropped BEFORE any election: the eventual
             // first-ready host's reserve build never saw the drop, so it never inherited that still-registered
             // party.
@@ -811,8 +811,8 @@ internal class BattleHostHandler : IHandler
         return true;
     }
 
-    // [Server, game thread] A member DROPPED (not retreated) from this battle: its parties fall into the
-    // host's reserve scope until it returns (see HandleControllerReturn).
+    // [Server, game thread] A member was marked absent without withdrawing: its parties fall into the host's
+    // reserve scope until it returns (see HandleControllerReturn).
     private void MarkAbsent(string mapEventId, string controllerId)
     {
         if (string.IsNullOrEmpty(controllerId)) return;
@@ -824,7 +824,7 @@ internal class BattleHostHandler : IHandler
         }
 
         if (absent.Add(controllerId))
-            Logger.Information("[BattleHost] {Controller} dropped from battle {MapEventId}; its parties fall to the host's reserve scope until it returns",
+            Logger.Information("[BattleHost] {Controller} was marked absent from battle {MapEventId}; its parties fall to the host's reserve scope until it returns",
                 controllerId, mapEventId);
     }
 

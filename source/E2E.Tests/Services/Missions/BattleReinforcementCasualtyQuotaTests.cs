@@ -49,6 +49,32 @@ public class BattleReinforcementCasualtyQuotaTests : MissionTestEnvironment
         return supplier;
     }
 
+    [Fact]
+    [Trait("Requirement", "BR-031")]
+    public void MigrationRecovery_ClaimsMissingOrigins_WhenServerPointerIsAlreadyExhausted()
+    {
+        var characterId = CreateRegisteredObject<CharacterObject>();
+        var client = Clients.First();
+
+        client.Call(() =>
+        {
+            var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, client.ObjectManager);
+            supplier.SetReserve(new[]
+            {
+                new PartyReserve("unresolvable-party", suppliedCount: 10, entries: Entries(characterId, count: 10)),
+            });
+
+            var origins = supplier.ClaimRecoveryTroops(
+                "unresolvable-party",
+                new Dictionary<string, int> { [characterId] = 3 },
+                new HashSet<int> { 500, 501, 502 });
+
+            Assert.Equal(3, origins.Count);
+            Assert.Equal(new[] { 500, 501, 502 }, origins.Select(origin => origin.UniqueSeed));
+            Assert.Equal(10, Assert.Single(supplier.GetSuppliedByParty()).supplied);
+        });
+    }
+
     /// <summary>
     /// The exact call the coop death path makes for a kill — <c>origin.SetKilled()</c>, as
     /// <c>OnAgentRemovedPrefix</c> does for <c>AgentState.Killed</c> — must advance the supplier's removed

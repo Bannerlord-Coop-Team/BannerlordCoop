@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MapEvents.Messages;
@@ -148,14 +148,11 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
             var spawnEquipment = agent.SpawnEquipment;
             var bodyProperties = agent.BodyPropertiesValue;
 
-            // The record carries the agent's ASSIGNMENT (OriginalOwner), not our current authority. For our own
-            // spawns the two are identical; for agents we only HOLD under temporary host control (BR-031) the
-            // difference matters twice: a fresh late joiner registers them under the same owner every other
-            // client already has them under, and a RECONNECTING owner recognizes its own troops in the catch-up
-            // replay and re-adopts them as locally driven (BR-033, see PuppetSpawner).
+            // Catch-up records carry the current holder. A migrated NPC must stay under the successor when its
+            // original host rejoins; labeling it with the original host would make that client drive it too.
             records.Add(new BattleAgentSpawnData(
                 info.AgentId, characterId, agent.Position, side, agent.Health,
-                info.OriginalOwner, attribution.MapEventPartyId, attribution.TroopSeed,
+                session.OwnControllerId, attribution.MapEventPartyId, attribution.TroopSeed,
                 spawnEquipment, bodyProperties,
                 ResolveMountIdFor(info.AgentId, agent), formationIndex));
         }

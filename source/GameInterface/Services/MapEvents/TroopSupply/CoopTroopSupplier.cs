@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
@@ -42,6 +42,7 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     // scanning every party's entries per agent. Entry seeds are server-unique, so one seed maps to one party.
     private readonly Dictionary<int, string> seedToPartyId = new Dictionary<int, string>();
     private bool populated;
+    private int reserveRevision;
     private int numWounded, numKilled, numRouted;
     // Injected at construction (a stable per-session singleton) so the per-agent supply path resolves troop/party
     // objects without hitting the service locator each call. Null only in tests that don't exercise that path.
@@ -106,6 +107,7 @@ public class CoopTroopSupplier : IMissionTroopSupplier
                 }
             }
             populated = true;
+            reserveRevision++;
 
             // Whatever the new set did not re-claim was DROPPED by this replace.
             foreach (var prior in priorSupplied)
@@ -133,6 +135,83 @@ public class CoopTroopSupplier : IMissionTroopSupplier
 
     /// <summary>Whether the server's reserve has arrived (counts/identity known and final).</summary>
     public bool IsPopulated { get { lock (gate) { return populated; } } }
+
+    /// <summary>Monotonic count of authoritative reserve snapshots applied to this supplier.</summary>
+    public int ReserveRevision { get { lock (gate) { return reserveRevision; } } }
+
+    /// <summary>Remaining troop count for each party in the current authoritative reserve.</summary>
+    public IReadOnlyList<(string partyId, int remaining)> GetRemainingByParty()
+    {
+        lock (gate)
+        {
+            var result = new List<(string, int)>(parties.Count);
+            foreach (var party in parties)
+                result.Add((party.PartyId, party.Entries.Length - party.Supplied));
+            return result;
+        }
+    }
+
+    /// <summary>Remaining troop count for one party, or zero when it is absent or exhausted.</summary>
+    public int GetRemainingForParty(string partyId)
+    {
+        lock (gate)
+        {
+            foreach (var party in parties)
+                if (party.PartyId == partyId)
+                    return party.Entries.Length - party.Supplied;
+            return 0;
+        }
+    }
+
+    /// <summary>Whether this authoritative reserve snapshot still contains a party.</summary>
+    public bool ContainsParty(string partyId)
+    {
+        lock (gate)
+        {
+            foreach (var party in parties)
+                if (party.PartyId == partyId)
+                    return true;
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Claim the missing live troops of a newly-owned migration party for explicit recovery. The whole party
+    /// is marked supplied so the native wave path cannot also spawn entries now owned by the recovery queue.
+    /// </summary>
+    public IReadOnlyList<CoopAgentOrigin> ClaimRecoveryTroops(
+        string partyId,
+        IReadOnlyDictionary<string, int> neededByCharacter,
+        ISet<int> recoverableSeeds)
+    {
+        var origins = new List<CoopAgentOrigin>();
+        lock (gate)
+        {
+            foreach (var party in parties)
+            {
+                if (party.PartyId != partyId) continue;
+
+                var remainingNeeded = new Dictionary<string, int>();
+                foreach (var pair in neededByCharacter)
+                    remainingNeeded[pair.Key] = pair.Value;
+                foreach (var entry in party.Entries)
+                {
+                    if (!recoverableSeeds.Contains(entry.Seed)) continue;
+                    if (!remainingNeeded.TryGetValue(entry.CharacterId, out var needed) || needed <= 0) continue;
+
+                    if (CreateOrigin(entry, partyId) is CoopAgentOrigin origin)
+                    {
+                        origins.Add(origin);
+                        remainingNeeded[entry.CharacterId] = needed - 1;
+                    }
+                }
+
+                party.Supplied = party.Entries.Length;
+                break;
+            }
+        }
+        return origins;
+    }
 
     /// <summary>Total troops this side's supplier owns (across its parties), regardless of supplied state —
     /// the per-side count the coop spawn handler sizes the engine's deployment to.</summary>
@@ -215,6 +294,24 @@ public class CoopTroopSupplier : IMissionTroopSupplier
                     party.Supplied++;
                     return origin;
                 }
+            }
+            return null;
+        }
+    }
+
+    /// <summary>Supply the next remaining troop from one party without consuming any other party.</summary>
+    public IAgentOriginBase SupplyOneTroopFromParty(string partyId)
+    {
+        lock (gate)
+        {
+            foreach (var party in parties)
+            {
+                if (party.PartyId != partyId) continue;
+                if (party.Supplied >= party.Entries.Length) return null;
+
+                var origin = CreateOrigin(party.Entries[party.Supplied], party.PartyId);
+                party.Supplied++;
+                return origin;
             }
             return null;
         }

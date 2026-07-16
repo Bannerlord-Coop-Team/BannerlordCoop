@@ -1,6 +1,9 @@
-using System.Linq;
+﻿using System.Linq;
+using Common.Network;
 using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.MapEvents.TroopSupply.Messages;
 using Missions.Battles;
+using Missions.Messages;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -217,5 +220,35 @@ public class MissionReadyElectionTests : MissionTestEnvironment
         {
             CoopTroopSupplierRegistry.ClearBattle(mapEventId);
         }
+    }
+
+    /// <summary>A current host's reserve refresh carries both sides so migration recovery can observe one
+    /// complete snapshot even when every party it owns is on only one side.</summary>
+    [Fact]
+    [Trait("Requirement", "BR-031")]
+    public void CurrentHostReserveRefresh_IncludesExplicitEmptySideForMigrationCompletion()
+    {
+        var (mapEventId, _) = SetupCoopBattle("host-ctrl", "other-ctrl");
+        var clients = Clients.ToArray();
+        var host = clients[0];
+
+        EnterBattle(host, mapEventId);
+        EnterBattle(clients[1], mapEventId);
+        AssertHost(Server, mapEventId, "host-ctrl", "other-ctrl");
+
+        int baseline = host.InternalMessages.GetMessages<NetworkBattleTroopReserve>()
+            .Count(message => message.MapEventId == mapEventId);
+
+        host.Call(() => host.Resolve<INetwork>().SendAll(
+            new NetworkRequestBattleReserves(mapEventId, "host-ctrl")));
+
+        var refresh = host.InternalMessages.GetMessages<NetworkBattleTroopReserve>()
+            .Where(message => message.MapEventId == mapEventId)
+            .Skip(baseline)
+            .ToArray();
+
+        Assert.Equal(2, refresh.Length);
+        Assert.NotEmpty(Assert.Single(refresh, message => message.Side == (int)BattleSideEnum.Attacker).Parties);
+        Assert.Empty(Assert.Single(refresh, message => message.Side == (int)BattleSideEnum.Defender).Parties);
     }
 }
