@@ -36,9 +36,13 @@ namespace GameInterface.Services.UI.Patches
             CustomButtonInserted = false;
 
             Widget panel = __result.RootWidget.FindChild(EscapeMenuPanelId, includeAllChildren: true);
+            if (panel == null) return;
+
             panel.HeightSizePolicy = SizePolicy.CoverChildren;
 
             Widget buttons = panel.FindChild(ButtonsContainerId, includeAllChildren: true);
+            if (buttons == null) return;
+
             buttons.MarginBottom = ButtonsContainerBottomMargin;
         }
     }
