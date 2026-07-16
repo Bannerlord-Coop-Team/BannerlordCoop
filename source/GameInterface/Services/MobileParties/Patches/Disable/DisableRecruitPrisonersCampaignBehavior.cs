@@ -1,5 +1,4 @@
-﻿using Common;
-using GameInterface.Extentions;
+﻿using GameInterface.Extentions;
 using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -9,13 +8,6 @@ using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.MobileParties.Patches.Disable;
-
-[HarmonyPatch(typeof(RecruitPrisonersCampaignBehavior))]
-internal class DisableRecruitPrisonersCampaignBehavior
-{
-    [HarmonyPatch(nameof(RecruitPrisonersCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => ModInformation.IsServer;
-}
 
 [HarmonyPatch(typeof(RecruitPrisonersCampaignBehavior))]
 internal class RecruitPrisonersCampaignBehaviorPatches
@@ -64,4 +56,8 @@ internal class RecruitPrisonersCampaignBehaviorPatches
         // Block doing this daily tick on player parties
         return !mobileParty.IsPlayerParty();
     }
+
+    // Handled within party logic itself
+    [HarmonyPatch(nameof(RecruitPrisonersCampaignBehavior.OnMainPartyPrisonerRecruited))]
+    static bool Prefix() => false;
 }

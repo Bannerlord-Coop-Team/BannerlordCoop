@@ -127,10 +127,11 @@ internal class PartyDoneLogicHandler : IHandler
     private void Handle_CompletePartyDoneLogic(MessagePayload<NetworkCompleteDoneLogic> obj)
     {
         var message = obj.What;
-        if (!objectManager.TryGetObjectWithLogging<Hero>(message.MainHeroId, out var mainHero)) return;
-
+        
         GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(message.MainHeroId, out var mainHero)) return;
+
             if (!TryResolveCompleteDoneLogic(message, out var leftParty, out var leftPrisonerRoster, out var upgradedTroopHistory)) return;
 
             var donatedPrisonersRoster = FlattenedTroopSerializer.Deserialize(message.DonatedPrisonersRoster, objectManager);
