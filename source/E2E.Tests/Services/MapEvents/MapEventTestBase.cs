@@ -114,12 +114,10 @@ public abstract class MapEventTestBase : IDisposable
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
 
-            // Finalize the way the live server does — through FinalizeEvent, the public path battles take on
-            // the host. The AutoRegistry watches FinalizeEventAux (MapEventRegistry.DestroyMethods), which
-            // FinalizeEvent funnels into, so this drives the same destroy hook the running game does. It must
-            // NOT run inside an AllowedThread: LifetimePatches.DestroyPostfix only broadcasts the removal to
-            // clients when the call is *not* an allowed/original-policy call, so wrapping it would silently
-            // skip the sync.
+            // Finalize the way the live server does through FinalizeEvent, the public path battles take on
+            // the host. FinalizeEvent funnels into the patched FinalizeEventAux, which broadcasts removal
+            // after vanilla teardown completes. It must not run inside an AllowedThread because that makes
+            // the patches stand down and skips the sync.
             mapEvent.FinalizeEvent();
         }, MapEventDisabledMethods);
     }

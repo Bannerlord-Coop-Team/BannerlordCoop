@@ -2,6 +2,7 @@ using Common.Messaging;
 using GameInterface;
 using GameInterface.Services.UI.CoopOptions.Providers;
 using GameInterface.Services.UI.CoopOptions.Providers.KillFeedTab;
+using GameInterface.Services.UI.Donate;
 using System;
 using TaleWorlds.Library;
 using TaleWorlds.ScreenSystem;
@@ -23,6 +24,10 @@ public class CoopOptionsVM : ViewModel
 
     public string MovieTextHeader => "Coop Options";
     public string ApplyButtonText => "Apply";
+    public string CommunityText => "Join the Community";
+    public string DonateButtonText => "Donate";
+    public string PatreonButtonText => "Patreon";
+    public string DiscordButtonText => "Discord";
 
     public CoopOptionsVM() : this(ResolveOptionsStore(), MessageBroker.Instance, ScreenManager.PopScreen)
     {
@@ -97,6 +102,12 @@ public class CoopOptionsVM : ViewModel
     {
         close();
     }
+
+    public void ActionDonate() => CommunityLinks.ShowDonatePopup();
+
+    public void ActionPatreon() => CommunityLinks.OpenPatreon();
+
+    public void ActionDiscord() => CommunityLinks.OpenDiscord();
 
     private void InitializeTabs(CoopOptionsData options)
     {

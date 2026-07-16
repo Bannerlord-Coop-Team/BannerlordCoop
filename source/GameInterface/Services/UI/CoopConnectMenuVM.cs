@@ -2,6 +2,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Network.Session;
 using Common.Network.Session.Messages;
+using GameInterface.Services.UI.Donate;
 using GameInterface.Services.UI.Messages;
 using System;
 using System.Collections.Generic;
@@ -37,10 +38,9 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     public string JoinButtonText => "Join";
     public string RefreshButtonText => "Refresh";
     public string SearchButtonText => "Search";
-    public string GithubButtonText => "Github";
     public string DiscordButtonText => "Discord";
     public string PatreonButtonText => "Patreon";
-    public string BuyMeACoffeeButtonText => "Buy a Coffee";
+    public string DonateButtonText => "Donate";
     public string MovieTextHeader => "Join Co-op Sandbox";
     public string CommunityText => "Join the Community";
     public string SteamLobbiesHeaderText => $"Hosted Steam Servers ({SteamLobbies.Count})";
@@ -325,25 +325,12 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         ScreenManager.PopScreen();
     }
 
-    public void ActionGithub()
-    {
-        System.Diagnostics.Process.Start("https://github.com/Bannerlord-Coop-Team/BannerlordCoop");
-    }
+    public void ActionDiscord() => CommunityLinks.OpenDiscord();
 
-    public void ActionDiscord()
-    {
-        System.Diagnostics.Process.Start("https://discord.gg/ngC4RVb");
-    }
+    public void ActionPatreon() => CommunityLinks.OpenPatreon();
 
-    public void ActionPatreon()
-    {
-        System.Diagnostics.Process.Start("https://www.patreon.com/c/bannerlordcoop");
-    }
-
-    public void ActionBuyMeACoffee()
-    {
-        System.Diagnostics.Process.Start("https://buymeacoffee.com/bannerlordcoop");
-    }
+    // Opens a popup listing the individual donation platforms above a close button.
+    public void ActionDonate() => CommunityLinks.ShowDonatePopup();
 
     public void Dispose()
     {

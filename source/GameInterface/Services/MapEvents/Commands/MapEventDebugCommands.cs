@@ -75,6 +75,11 @@ public class MapEventDebugCommands
     [CommandLineArgumentFunction("start_nearest_looter", "coop.debug.mapevent")]
     public static string StartNearestLooterMapEvent(List<string> args)
     {
+        if (!TryGetObjectManager(out var objectManager))
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
         var mainParty = MobileParty.MainParty;
         if (mainParty == null)
         {
@@ -95,7 +100,9 @@ public class MapEventDebugCommands
 
         EncounterManager.StartPartyEncounter(mainParty.Party, nearest.Party);
 
-        return $"Started encounter with {nearest.Name} ({nearest.StringId}), " +
+        var partyId = objectManager.TryGetId(nearest, out string registryId) ? registryId : nearest.StringId;
+
+        return $"Started encounter with {nearest.Name} (StringId {nearest.StringId}, registry id {partyId}), " +
                $"{nearest.MemberRoster.TotalManCount} troops, {nearest.Position.ToVec2().Distance(mainPos):0.0} away.";
     }
 
