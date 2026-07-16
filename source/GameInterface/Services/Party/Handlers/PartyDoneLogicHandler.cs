@@ -127,13 +127,15 @@ internal class PartyDoneLogicHandler : IHandler
     private void Handle_CompletePartyDoneLogic(MessagePayload<NetworkCompleteDoneLogic> obj)
     {
         var message = obj.What;
-        if (!objectManager.TryGetObjectWithLogging<Hero>(message.MainHeroId, out var mainHero)) return;
-
+        
         GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(message.MainHeroId, out var mainHero)) return;
+
             if (!TryResolveCompleteDoneLogic(message, out var leftParty, out var leftPrisonerRoster, out var upgradedTroopHistory)) return;
 
             var donatedPrisonersRoster = FlattenedTroopSerializer.Deserialize(message.DonatedPrisonersRoster, objectManager);
+            var recruitedPrisonersRoster = FlattenedTroopSerializer.Deserialize(message.RecruitedPrisonersRoster, objectManager);
             var releasedPlayerCaptivityEvents = CreatePlayerCaptivityReleaseEvents(
                 message.LeftPrisonerRosterData,
                 message.RightPrisonerRosterData,
@@ -155,7 +157,7 @@ internal class PartyDoneLogicHandler : IHandler
             NotifyDonatedPrisonersChanged(donatedPrisonersRoster);
             ApplyPartyRewardChanges(mainHero, message);
             ApplyUpgradedTroopHistory(mainHero, upgradedTroopHistory);
-            ApplyPrisonerRecruitmentEffects(mainHero, message, donatedPrisonersRoster);
+            ApplyPrisonerRecruitmentEffects(mainHero, message, recruitedPrisonersRoster);
         });
     }
 
@@ -270,13 +272,13 @@ internal class PartyDoneLogicHandler : IHandler
     private static void ApplyPrisonerRecruitmentEffects(
         Hero mainHero,
         NetworkCompleteDoneLogic message,
-        FlattenedTroopRoster donatedPrisonersRoster)
+        FlattenedTroopRoster recruitedPrisonersRoster)
     {
         if (message.RecruitedPrisonersRoster == null) return;
-        if (donatedPrisonersRoster.IsEmpty<FlattenedTroopRosterElement>()) return;
+        if (recruitedPrisonersRoster.IsEmpty<FlattenedTroopRosterElement>()) return;
 
         // Replacement for CampaignEventDispatcher.Instance.OnMainPartyPrisonerRecruited(obj.What.RecruitedPrisonersRoster);
-        foreach (CharacterObject characterObject in donatedPrisonersRoster.Troops)
+        foreach (CharacterObject characterObject in recruitedPrisonersRoster.Troops)
         {
             ApplyPrisonerRecruitmentEffect(mainHero, characterObject);
         }
