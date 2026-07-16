@@ -8,7 +8,6 @@ using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
 using Helpers;
 using Serilog;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -47,7 +46,6 @@ public class ArmyPatches
     [HarmonyPrefix]
     static bool OnRemovePartyInternalPrefix(ref Army __instance, MobileParty mobileParty)
     {
-        Logger.Debug($"Army remove called {__instance}, {mobileParty}, is leaderparty {mobileParty == __instance.LeaderParty} {Environment.StackTrace}");
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient)
@@ -200,18 +198,27 @@ public class ArmyPatches
             if (!army._parties.Contains(mobileParty)) return;
             mobileParty.Ai.SetInitiative(1f, 1f, 24f);
             army._parties.Remove(mobileParty);
-            CampaignEventDispatcher.Instance.OnPartyRemovedFromArmy(mobileParty);
+            if (ModInformation.IsServer)
+            {
+                CampaignEventDispatcher.Instance.OnPartyRemovedFromArmy(mobileParty);
+            }
             CampaignEventDispatcher.Instance.OnArmyOverlaySetDirty();
             mobileParty.AttachedTo = null;
+            bool condition = false;
             if (ModInformation.IsServer) // only let the server destroy, autoregistry will then sync destruction to the client
             {
                 if (army.LeaderParty == mobileParty && !army._armyIsDispersing)
                 {
+                    army.FinishArmyObjective();
+                    condition = true;
                     DisbandArmyAction.ApplyByLeaderPartyRemoved(army);
                 }
                 if (((army != null) ? army.LeaderParty : null) == mobileParty)
                 {
-                    army.FinishArmyObjective();
+                    if (!condition)
+                    {
+                        army.FinishArmyObjective();
+                    }
                     if (!army._armyIsDispersing)
                     {
                         Army army2 = mobileParty.Army;
@@ -261,7 +268,7 @@ public class ArmyPatches
             {
                 mobileParty.Party.UpdateVisibilityAndInspected(clientMobileParty.Position, 0f);
             }
-            if (clientMobileParty != mobileParty)
+            if (!mobileParty.IsPlayerParty())
             {
                 mobileParty.Ai.RethinkAtNextHourlyTick = true;
             }
@@ -275,14 +282,11 @@ public class ArmyPatches
     }
     public static void SetAiBehaviorObject(Army army, IMapPoint mapPoint)
     {
-        GameThread.RunSafe(() =>
+        using (new AllowedThread())
         {
-            using (new AllowedThread())
-            {
-                // Set field directly to avoid StopTrackingTargetSettlement/StartTrackingTargetSettlement
-                // which are serverside ai behaviors not needed on client
-                army._aiBehaviorObject = mapPoint;
-            }
-        });
+            // Set field directly to avoid StopTrackingTargetSettlement/StartTrackingTargetSettlement
+            // which are serverside ai behaviors not needed on client
+            army._aiBehaviorObject = mapPoint;
+        }
     }
 }

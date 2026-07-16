@@ -189,7 +189,11 @@ internal class OtherNotificationsHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetIdWithLogging(obj.What.Hero, out var heroId)) return;
-            if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
+            string mobilePartyId = null;
+            if (obj.What.MobileParty != null)
+            {
+                if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out mobilePartyId)) return;
+            }
             if (!objectManager.TryGetIdWithLogging(obj.What.Clan, out var clanId)) return;
 
             network.SendAll(new NetworkNotifyKingdomInfluenceChanged(heroId, mobilePartyId, clanId, obj.What.GainedInfluence, obj.What.Detail));
@@ -201,7 +205,11 @@ internal class OtherNotificationsHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
-            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
+            MobileParty mobileParty = null;
+            if (obj.What.MobilePartyId != null)
+            {
+                if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out mobileParty)) return;
+            }
             if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
 
             if ((obj.What.Detail == GainKingdomInfluenceAction.InfluenceGainingReason.DonatePrisoners && mobileParty == MobileParty.MainParty) 

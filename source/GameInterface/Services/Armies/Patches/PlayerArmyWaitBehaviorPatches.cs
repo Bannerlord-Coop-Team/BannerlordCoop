@@ -1,6 +1,9 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
 using GameInterface.Services.Armies.Messages;
 using HarmonyLib;
+using Serilog;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -16,6 +19,7 @@ namespace GameInterface.Services.Armies.Patches;
 [HarmonyPatch]
 internal class PlayerArmyWaitBehaviorPatches
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<PlayerArmyWaitBehaviorPatches>();
     [HarmonyPatch(typeof(PlayerArmyWaitBehavior), nameof(PlayerArmyWaitBehavior.wait_menu_army_leave_on_consequence))]
     [HarmonyPrefix]
     private static bool WaitMenuLeavePrefix(PlayerArmyWaitBehavior __instance, MenuCallbackArgs args)
@@ -34,6 +38,24 @@ internal class PlayerArmyWaitBehaviorPatches
             PartyBase.MainParty.SetVisualAsDirty();
         }
         var message = new MobilePartyInArmyRemoved(MobileParty.MainParty.Army, MobileParty.MainParty, MobileParty.MainParty);
+        MessageBroker.Instance.Publish(__instance, message);
+        return false;
+    }
+    [HarmonyPatch(typeof(PlayerArmyWaitBehavior), nameof(PlayerArmyWaitBehavior.wait_menu_army_abandon_on_consequence))]
+    [HarmonyPrefix]
+    private static bool Prefixwait_menu_army_abandon_on_consequence(PlayerArmyWaitBehavior __instance, MenuCallbackArgs args)
+    {
+        ChangeClanInfluenceAction.Apply(Clan.PlayerClan, (float)(-(float)Campaign.Current.Models.DiplomacyModel.GetInfluenceCostOfAbandoningArmy()));
+        if (PlayerEncounter.Current != null)
+        {
+            PlayerEncounter.Finish(true);
+        }
+        else
+        {
+            GameMenu.ExitToLast();
+        }
+        var message = new MobilePartyInArmyRemoved(MobileParty.MainParty.Army, MobileParty.MainParty, MobileParty.MainParty);
+        ArmyPatches.RemoveMobilePartyInArmy(MobileParty.MainParty, MobileParty.MainParty.Army, MobileParty.MainParty);
         MessageBroker.Instance.Publish(__instance, message);
         return false;
     }

@@ -157,21 +157,24 @@ public class ArmyHandler : IHandler
     private void HandleNetworkSetArmyAiBehaviorObject(MessagePayload<NetworkSetArmyAiBehaviorObject> payload)
     {
         var obj = payload.What;
-        if (objectManager.TryGetObjectWithLogging<Army>(obj.ArmyId, out var army) == false) return;
-
-        IMapPoint mapPoint;
-        if (obj.IsSettlement)
+        GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.AiBehaviorObjectId, out var settlement)) return;
-            mapPoint = settlement;
-        }
-        else
-        {
-            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.AiBehaviorObjectId, out var party)) return;
-            mapPoint = party;
-        }
+            if (objectManager.TryGetObjectWithLogging<Army>(obj.ArmyId, out var army) == false) return;
 
-        ArmyPatches.SetAiBehaviorObject(army, mapPoint);
+            IMapPoint mapPoint;
+            if (obj.IsSettlement)
+            {
+                if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.AiBehaviorObjectId, out var settlement)) return;
+                mapPoint = settlement;
+            }
+            else
+            {
+                if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.AiBehaviorObjectId, out var party)) return;
+                mapPoint = party;
+            }
+
+            ArmyPatches.SetAiBehaviorObject(army, mapPoint);
+        });
     }
     private void HandlePlayerCreatedArmy(MessagePayload<PlayerCreatedArmy> payload)
     {
