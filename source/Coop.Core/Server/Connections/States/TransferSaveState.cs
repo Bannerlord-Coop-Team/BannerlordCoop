@@ -62,16 +62,8 @@ public class TransferSaveState : ConnectionStateBase
                 return;
             }
 
-            var compressedSave = SaveDataCompression.Compress(saveResults.Data);
-
-            // Forensic fingerprint for join decode failures: the client logs the same fingerprint of what
-            // it RECEIVED (GameSaveDataPacketHandler) — compare the two lines when a join fails.
-            Logger.Information("Join transfer save for peer {PeerId}: raw {RawBytes} bytes → compressed {Fingerprint} (campaign {CampaignId})",
-                connectionLogic.Peer.Id, saveResults.Data?.Length ?? 0,
-                SaveDataCompression.Describe(compressedSave), saveResults.CampaignId);
-
             var savePacket = new GameSaveDataPacket(
-                compressedSave,
+                SaveDataCompression.Compress(saveResults.Data),
                 saveResults.CampaignId,
                 coopSessionProvider.CoopSession?.CraftingPlayerData,
                 coopSessionProvider.CoopSession?.WorkshopPlayerData,
