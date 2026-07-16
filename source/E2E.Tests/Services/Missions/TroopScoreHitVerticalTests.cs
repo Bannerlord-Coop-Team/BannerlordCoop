@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.MapEventParties.Messages;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
@@ -167,6 +168,39 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
 
         Assert.Single(Server.NetworkSentMessages, message => IsContributionMessageFor(message, partyId));
         AssertClientsConvergedOn(partyId, serverContribution);
+    }
+
+    [Fact]
+    public void LastPartyLeave_FlushesPendingContributionBeforeLeaveBroadcast()
+    {
+        var (partyId, troopSeed, _) = SetupScoredBattleOnServer();
+
+        string? partyBaseId = null;
+        Server.NetworkSentMessages.Clear();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEventParty>(partyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetId(party.Party, out partyBaseId));
+            var victim = Server.GetRegisteredObject<CharacterObject>("e2e_victim");
+
+            party.OnTroopScoreHit(new UniqueTroopDescriptor(troopSeed), victim, 30,
+                isFatal: true, isTeamKill: false, null, isSimulatedHit: true);
+        });
+
+        Assert.NotNull(partyBaseId);
+        Assert.DoesNotContain(Server.NetworkSentMessages, message => IsContributionMessageFor(message, partyId));
+
+        Server.SimulateMessage(this, new NetworkRequestLeaveBattle(partyBaseId!));
+
+        var messages = Server.NetworkSentMessages.Messages;
+        int contributionIndex = messages.FindIndex(message => IsContributionMessageFor(message, partyId));
+        int leaveIndex = messages.FindIndex(message => message is NetworkPartyLeftBattle);
+
+        Assert.Single(messages, message => IsContributionMessageFor(message, partyId));
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPartyLeftBattle>());
+        Assert.True(contributionIndex < leaveIndex,
+            $"Contribution packet index {contributionIndex} was not before leave index {leaveIndex}");
     }
 
     private static bool IsContributionMessageFor(IMessage message, string partyId)

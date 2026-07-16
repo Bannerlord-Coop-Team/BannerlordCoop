@@ -12,6 +12,8 @@ namespace GameInterface.Services.MapEventParties;
 internal interface IMapEventContributionBarrier
 {
     void Flush(MapEvent mapEvent);
+
+    void Flush(MapEventParty mapEventParty);
 }
 
 /// <inheritdoc cref="IMapEventContributionBarrier"/>
@@ -38,6 +40,14 @@ internal sealed class MapEventContributionBarrier : IMapEventContributionBarrier
         var flushedIds = new HashSet<string>();
         FlushSide(mapEvent.AttackerSide, flushedIds);
         FlushSide(mapEvent.DefenderSide, flushedIds);
+    }
+
+    public void Flush(MapEventParty mapEventParty)
+    {
+        if (mapEventParty == null || coalescer == null) return;
+        if (!objectManager.TryGetId(mapEventParty, out var partyId)) return;
+
+        coalescer.FlushInstance(partyId, network);
     }
 
     private void FlushSide(

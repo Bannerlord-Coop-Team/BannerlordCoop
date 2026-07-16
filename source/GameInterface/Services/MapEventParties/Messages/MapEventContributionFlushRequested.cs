@@ -9,9 +9,17 @@ namespace GameInterface.Services.MapEventParties.Messages;
 internal readonly struct MapEventContributionFlushRequested : IEvent
 {
     public readonly MapEvent MapEvent;
+    public readonly MapEventParty MapEventParty;
 
     public MapEventContributionFlushRequested(MapEvent mapEvent)
     {
         MapEvent = mapEvent;
+        MapEventParty = null;
+    }
+
+    public MapEventContributionFlushRequested(MapEventParty mapEventParty)
+    {
+        MapEvent = null;
+        MapEventParty = mapEventParty;
     }
 }

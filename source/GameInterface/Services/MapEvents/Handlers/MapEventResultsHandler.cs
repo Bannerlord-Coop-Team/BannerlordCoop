@@ -57,7 +57,10 @@ internal class MapEventResultsHandler : IHandler
         if (ModInformation.IsClient) return;
 
         // Keep this inline so the publishing patch cannot continue into result or teardown before the flush.
-        contributionBarrier.Flush(payload.What.MapEvent);
+        if (payload.What.MapEventParty != null)
+            contributionBarrier.Flush(payload.What.MapEventParty);
+        else
+            contributionBarrier.Flush(payload.What.MapEvent);
     }
 
     private void Handle_CommitMapEventResults(MessagePayload<CommitMapEventResults> obj)

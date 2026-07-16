@@ -1,5 +1,8 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
+using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.MapEventParties.Messages;
 using HarmonyLib;
 using Serilog;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -15,12 +18,19 @@ internal class MapEventSideDestructionPatches
 
     [HarmonyPatch(nameof(MapEventSide.RemovePartyInternal))]
     [HarmonyPrefix]
+    [HarmonyPriority(Priority.First)]
     static bool Prefix(MapEventSide __instance, PartyBase party)
     {
+        int index = __instance._battleParties.FindIndexQ((MapEventParty p) => p.Party == party);
+
+        // Flush before native or intercepted removal detaches the party from the side. Once the last party
+        // leaves, finalization can no longer discover its pending contribution through the map-event graph.
+        if (ModInformation.IsServer && index >= 0)
+            MessageBroker.Instance.Publish(__instance,
+                new MapEventContributionFlushRequested(__instance._battleParties[index]));
+
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-        int index = __instance._battleParties.FindIndexQ((MapEventParty p) => p.Party == party);
 
         if (index == -1)
         {
