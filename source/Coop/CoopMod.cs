@@ -1,9 +1,7 @@
 ﻿using Common;
 using Common.Logging;
-using Common.Messaging;
 using Coop.Core;
 using Coop.Core.Common.Session;
-using Coop.Core.Server.Services.Session;
 using Coop.Lib.NoHarmony;
 using Coop.UI.LoadGameUI;
 using GameInterface;
@@ -37,8 +35,6 @@ namespace Coop
         public static InitialStateOption CoopCampaign;
 
         public static InitialStateOption JoinCoopGame;
-
-        private ManagedServerLifetime managedServerLifetime;
 
         private static ILogger Logger;
 
@@ -79,11 +75,14 @@ namespace Coop
 
             // GetFullCommandLineString splits on spaces, which would cut a quoted save
             // name apart; the managed-server arguments need real Windows arg parsing.
-            if (ServerLaunchArguments.TryParse(Environment.GetCommandLineArgs(), out var managedSaveName, out var ownerProcessId))
+            if (ServerLaunchArguments.TryParse(Environment.GetCommandLineArgs(), out var managedSaveName,
+                out var ownerProcessId, out var serverPassword, out var serverVisibility))
             {
                 ManagedServerConfig.SaveName = managedSaveName;
                 ManagedServerConfig.OwnerProcessId = ownerProcessId;
             }
+            ManagedServerConfig.Password = serverPassword;
+            ManagedServerConfig.Visibility = serverVisibility;
 
             SetupLogging();
 
@@ -95,7 +94,8 @@ namespace Coop
 
             if (isAutoConnect)
             {
-                Logger.Information("[AutoConnect] Full command line: {CommandLine}", fullCommandLine);
+                // Launch arguments can include the hosted-server password; never write them to logs.
+                Logger.Information("[AutoConnect] Launch arguments detected");
                 Logger.Information("[AutoConnect] isServer={IsServer} isAutoConnect={IsAutoConnect}", isServer, isAutoConnect);
                 EnsureSafeExitConfig();
             }
@@ -156,6 +156,9 @@ namespace Coop
 
         private void SetupLogging()
         {
+            const long maxLogFileSizeBytes = 30L * 1024 * 1024;
+            const long preservedLogBeginningBytes = 1L * 1024 * 1024;
+            const long compactedLogFileSizeBytes = 28L * 1024 * 1024;
             var outputTemplate = "[({ProcessId}) {Timestamp:HH:mm:ss} {Level:u3} {SourceContext}] {Message:lj}{NewLine}{Exception}";
 
             var filePostfix = isServer ? "server" : "client";
@@ -182,7 +185,12 @@ namespace Coop
             LogManager.Configuration
                 .Enrich.WithProcessId()
                 //.WriteTo.Debug(outputTemplate: outputTemplate) // Disabled: floods VS Output window causing frame hitching when debugger is attached
-                .WriteTo.File(filePath, outputTemplate: outputTemplate)
+                .WriteTo.Sink(new SizeLimitedFileSink(
+                    filePath,
+                    outputTemplate,
+                    maxLogFileSizeBytes,
+                    preservedLogBeginningBytes,
+                    compactedLogFileSizeBytes))
 #if DEBUG
                 .MinimumLevel.Debug();
 #else
@@ -255,13 +263,6 @@ namespace Coop
         {
             Coop = new CoopartiveMultiplayerExperience();
 
-            // A spawned server manages its own shutdown at process level so the timers outlive
-            // any session-container teardown that would otherwise orphan this game window.
-            if (ManagedServerConfig.IsManagedServer)
-            {
-                managedServerLifetime = new ManagedServerLifetime(MessageBroker.Instance);
-            }
-
             Updateables.Add(GameThread.Instance);
 
 
@@ -285,7 +286,7 @@ namespace Coop
 
                         if (isServer)
                         {
-                            Coop.StartAsServer();
+                            Coop.StartAsServer(null, ManagedServerConfig.Password, ManagedServerConfig.Visibility);
                         }
                         else
                         {
@@ -329,6 +330,9 @@ namespace Coop
         {
             base.OnGameStart(game, gameStarterObject);
 
+            if (ContainerProvider.TryResolve<IGameInterface>(out var gameInterface))
+                gameInterface.PatchGameStarted();
+
             if (gameStarterObject is CampaignGameStarter campaignGameStarter)
                 campaignGameStarter.AddBehavior(new PlayerPartyInteractionCampaignBehavior());
         }
@@ -342,10 +346,6 @@ namespace Coop
         public override void OnGameEnd(Game game)
         {
             base.OnGameEnd(game);
-
-            // The managed-server lifetime is intentionally NOT disposed here: OnGameEnd runs while
-            // returning to the menu, before ServerRunningState publishes EndCoopMode, so disposing
-            // now would drop the save-and-quit. It spans the process and is reaped when it quits.
 
             if (Coop.Running)
             {
@@ -373,7 +373,10 @@ namespace Coop
             if (!steamBootAttempted && GameStateManager.Current?.ActiveState is InitialState)
             {
                 steamBootAttempted = true;
-                SteamIntegrationBoot.TryStart(isServer, Utilities.GetFullCommandLineString());
+                var steamPump = SteamIntegrationBoot.TryStartWithCallbackPump(
+                    isServer, Utilities.GetFullCommandLineString());
+                // The standalone server has no game frame of its own to dispatch its game-server callbacks.
+                if (steamPump != null) Updateables.Add(steamPump);
             }
 
             TimeSpan frameTime = TimeSpan.FromSeconds(dt);
@@ -389,8 +392,8 @@ namespace Coop
         private bool _managedAutoStarted = false;
         private void TryManagedServerAutoStart()
         {
-            // Keyed on the auto-load save, not the managed flag: a manually launched
-            // /coopsave server also auto-loads, it just isn't lifetime-managed.
+            // Keyed on the auto-load save, not the UI-spawned marker: a manually launched
+            // /coopsave server also auto-loads without an owner-process id.
             if (!isServer || !ManagedServerConfig.HasAutoLoadSave || _managedAutoStarted) return;
             if (!(GameStateManager.Current?.ActiveState is InitialState)) return;
 
@@ -399,7 +402,8 @@ namespace Coop
 
             try
             {
-                Coop.StartAsServer(ManagedServerConfig.SaveName);
+                Coop.StartAsServer(ManagedServerConfig.SaveName, ManagedServerConfig.Password,
+                    ManagedServerConfig.Visibility);
             }
             catch (Exception ex)
             {
@@ -420,7 +424,7 @@ namespace Coop
                     if (isServer)
                     {
                         Logger.Information("[AutoConnect] InitialState active — auto-starting as server...");
-                        Coop.StartAsServer();
+                        Coop.StartAsServer(null, ManagedServerConfig.Password, ManagedServerConfig.Visibility);
                         Logger.Information("[AutoConnect] StartAsServer() completed");
                     }
                     else

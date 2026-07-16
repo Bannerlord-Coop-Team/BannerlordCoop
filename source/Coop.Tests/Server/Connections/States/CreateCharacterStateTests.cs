@@ -7,6 +7,7 @@ using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using Coop.Tests.Mocks;
+using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -138,21 +139,25 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
-        public void NetworkTransferNewHero_UnregisteredCharacterObject_DoesNotBroadcast()
+        public void NetworkTransferNewHero_UnregisteredCharacterObject_DisconnectsOnlyJoiningPeer()
         {
             // Arrange — the hero's CharacterObject is not registered, so TryCreatePlayer must fail to resolve its id
             // (like a missing hero/party/clan) and nothing is broadcast.
             SetupUnpackedHero(registerCharacterObject: false);
             var currentState = connectionLogic.SetState<CreateCharacterState>();
+            var gameStateMock = serverComponent.Container.Resolve<Mock<IGameStateInterface>>();
+            Assert.NotEqual(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
 
             // Act
             var payload = new MessagePayload<NetworkTransferNewHero>(
                 playerPeer, new NetworkTransferNewHero("MyId", Array.Empty<byte>()));
             currentState.Handle_NetworkTransferNewHero(payload);
 
-            // Assert — the handler bails before broadcasting or advancing: the connection stays in
-            // CreateCharacterState and nothing is sent to any peer (neither the broadcast to other peers nor the
-            // id response to the joining peer).
+            // Assert — malformed join data ejects only that peer. The standalone server campaign remains
+            // running, so its listener and public lobby are not torn down for every other player.
+            Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
+            Assert.NotEqual(ConnectionState.ShutdownRequested, differentPeer.ConnectionState);
+            gameStateMock.Verify(x => x.GoToMainMenu(), Times.Never);
             Assert.IsType<CreateCharacterState>(connectionLogic.State);
             Assert.Empty(serverComponent.TestNetwork.SentNetworkMessages);
         }

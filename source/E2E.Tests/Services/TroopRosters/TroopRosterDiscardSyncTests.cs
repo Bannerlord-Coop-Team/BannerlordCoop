@@ -1,4 +1,4 @@
-using E2E.Tests.Environment;
+﻿using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem;
@@ -51,6 +51,7 @@ public class TroopRosterDiscardSyncTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetId(hero.CharacterObject, out heroCharacterId));
             Assert.True(Server.ObjectManager.TryGetId(regular, out regularCharacterId));
         });
+        TestEnvironment.FlushCoalescer();
 
         // Sanity: every client mirrors the initial roster before the discard.
         AssertCountsOnClients(partyId, heroCharacterId, expectedHero: 1, regularCharacterId, expectedRegular: 5);
@@ -63,6 +64,7 @@ public class TroopRosterDiscardSyncTests : IDisposable
 
             party.MemberRoster.AddToCounts(regular, -2);
         });
+        TestEnvironment.FlushCoalescer();
 
         // Assert: the regulars dropped to 3 on every client and the hero is still present at 1.
         AssertCountsOnClients(partyId, heroCharacterId, expectedHero: 1, regularCharacterId, expectedRegular: 3);

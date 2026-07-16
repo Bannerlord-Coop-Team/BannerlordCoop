@@ -11,6 +11,7 @@ using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Extensions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
@@ -714,9 +715,11 @@ internal class DefaultNotificationsHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!TryGetNotificationsBehavior(out var notificationsBehavior)) return;
+            if (!TryGetViewDataTrackerBehavior(out var viewDataTrackerBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
 
             notificationsBehavior.OnHeroLevelledUp(hero, obj.What.ShouldNotify);
+            viewDataTrackerBehavior.OnHeroLevelledUp(hero, obj.What.ShouldNotify);
         });
     }
 
@@ -736,10 +739,12 @@ internal class DefaultNotificationsHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!TryGetNotificationsBehavior(out var notificationsBehavior)) return;
+            if (!TryGetViewDataTrackerBehavior(out var viewDataTrackerBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
             if (!objectManager.TryGetObjectWithLogging<SkillObject>(obj.What.SkillObjectId, out var skillObject)) return;
 
             notificationsBehavior.OnHeroGainedSkill(hero, skillObject, obj.What.Change, obj.What.ShouldNotify);
+            viewDataTrackerBehavior.OnHeroGainedSkill(hero, skillObject, obj.What.Change, obj.What.ShouldNotify);
         });
     }
 
@@ -1306,6 +1311,15 @@ internal class DefaultNotificationsHandler : IHandler
         if (campaignBehavior != null) return true;
 
         Logger.Debug("Skipping notification because DefaultNotificationsCampaignBehavior is unavailable");
+        return false;
+    }
+
+    private bool TryGetViewDataTrackerBehavior(out ViewDataTrackerCampaignBehavior viewDataTrackerBehavior)
+    {
+        viewDataTrackerBehavior = Campaign.Current?.GetCampaignBehavior<ViewDataTrackerCampaignBehavior>();
+        if (viewDataTrackerBehavior != null) return true;
+
+        Logger.Debug("Skipping view data tracker update because ViewDataTrackerCampaignBehavior is unavailable");
         return false;
     }
 }

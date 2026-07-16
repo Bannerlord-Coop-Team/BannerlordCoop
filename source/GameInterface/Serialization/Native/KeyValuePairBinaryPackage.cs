@@ -22,15 +22,8 @@ namespace GameInterface.Serialization.Native
         private string ObjectType;
         protected Type T => Type.GetType(ObjectType);
 
-        private static MethodInfo Key = typeof(KeyValuePair<,>).GetMethod("get_Key");
-
         public KeyValuePairBinaryPackage(object kvp, IBinaryPackageFactory binaryPackageFactory)
         {
-            if (kvp.GetType().GetProperty("Key").GetValue(kvp) == null)
-            {
-                ;
-            }
-
             ObjectType = kvp.GetType().AssemblyQualifiedName;
             var type = Type.GetType(ObjectType);
             Object = kvp;
@@ -52,10 +45,6 @@ namespace GameInterface.Serialization.Native
                 StoredFields.Add(field.Name, binaryPackageFactory.GetBinaryPackage(obj));
             }
 
-            if (Object.GetType().GetProperty("Key").GetValue(Object) == null)
-            {
-                ;
-            }
         }
 
         public object Unpack(IBinaryPackageFactory binaryPackageFactory)

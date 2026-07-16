@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using Common;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
 namespace GameInterface.Services.Heroes.Patches.Disable;
@@ -7,5 +8,5 @@ namespace GameInterface.Services.Heroes.Patches.Disable;
 internal class DisableNotablePowerManagementBehavior
 {
     [HarmonyPatch(nameof(NotablePowerManagementBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix() => ModInformation.IsServer;
 }

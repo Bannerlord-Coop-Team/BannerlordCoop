@@ -2,7 +2,6 @@
 using Common.Util;
 using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.MapEvents.TroopSupply;
-using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -168,35 +167,6 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
 
         Assert.Single(Server.NetworkSentMessages, message => IsContributionMessageFor(message, partyId));
         AssertClientsConvergedOn(partyId, serverContribution);
-    }
-
-    [Fact]
-    public void VictoryAndFinalizeBoundaries_FlushPendingContributionBeforeReturning()
-    {
-        var (partyId, troopSeed, _) = SetupScoredBattleOnServer();
-
-        Server.NetworkSentMessages.Clear();
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MapEventParty>(partyId, out var party));
-            var victim = Server.GetRegisteredObject<CharacterObject>("e2e_victim");
-            var mapEvent = party.Party.MapEventSide.MapEvent;
-
-            party.OnTroopScoreHit(new UniqueTroopDescriptor(troopSeed), victim, 10, isFatal: false, isTeamKill: false, null, isSimulatedHit: true);
-            Assert.DoesNotContain(Server.NetworkSentMessages, message => IsContributionMessageFor(message, partyId));
-
-            var battleStatePrefix = AccessTools.Method(typeof(MapEventPatches), "Prefix_BattleState");
-            Assert.True((bool)battleStatePrefix.Invoke(null, new object[] { mapEvent, BattleState.AttackerVictory })!);
-            Assert.Single(Server.NetworkSentMessages, message => IsContributionMessageFor(message, partyId));
-
-            party.OnTroopScoreHit(new UniqueTroopDescriptor(troopSeed), victim, 20, isFatal: false, isTeamKill: false, null, isSimulatedHit: true);
-            Assert.Single(Server.NetworkSentMessages, message => IsContributionMessageFor(message, partyId));
-
-            var finalizePrefix = AccessTools.Method(typeof(MapEventPatches), "Prefix_FinalizeEventAux");
-            Assert.True((bool)finalizePrefix.Invoke(null, new object[] { mapEvent })!);
-            Assert.Equal(2, Server.NetworkSentMessages.Count(message => IsContributionMessageFor(message, partyId)));
-        });
     }
 
     private static bool IsContributionMessageFor(IMessage message, string partyId)

@@ -1,17 +1,13 @@
 ﻿using Common;
 using GameInterface.Services.GameDebug.Commands;
+using GameInterface.Tests;
 using System;
 using System.Collections.Generic;
 using Xunit;
 
 namespace GameInterface.Tests.Services.GameDebug;
 
-[CollectionDefinition(nameof(GameThreadDebugCommandCollection), DisableParallelization = true)]
-public class GameThreadDebugCommandCollection
-{
-}
-
-[Collection(nameof(GameThreadDebugCommandCollection))]
+[Collection(ModInformationRoleCollection.Name)]
 public class GameThreadDebugCommandTests : IDisposable
 {
     private readonly bool wasServer = ModInformation.IsServer;
