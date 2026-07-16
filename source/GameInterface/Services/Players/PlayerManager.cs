@@ -69,8 +69,8 @@ public class PlayerManager : IPlayerManager
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly ConcurrentDictionary<NetPeer, Player> peerToPlayer = new();
 
-    public IReadOnlyCollection<Player> Players => _players.Values;
-    private readonly Dictionary<string, Player> _players = new();
+    public IReadOnlyCollection<Player> Players => _players;
+    private readonly HashSet<Player> _players = new HashSet<Player>();
 
     public PlayerManager(ILogger logger, IObjectManager objectManager, IControllerIdProvider controllerIdProvider)
     {
@@ -82,7 +82,7 @@ public class PlayerManager : IPlayerManager
     /// <inheritdoc cref="IPlayerManager.AddPlayer(Player)"/>
     public bool AddPlayer(Player player)
     {
-        _players[player.ControllerId] = player;
+        if (!_players.Add(player)) return false;
 
         // Add player objects for IsPlayer extension (i.e. MobilePartyExtensions)
         AddPlayerObject<MobileParty>(player.ControllerId, player.MobilePartyId);
@@ -126,7 +126,9 @@ public class PlayerManager : IPlayerManager
 
     public bool TryGetPlayer(string controllerId, out Player player)
     {
-        return _players.TryGetValue(controllerId, out player);
+        player = _players.SingleOrDefault(player => player.ControllerId == controllerId);
+
+        return player != null;
     }
 
     /// <inheritdoc cref="IPlayerManager.Contains(object)"/>
