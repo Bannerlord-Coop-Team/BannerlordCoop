@@ -84,6 +84,8 @@ jobs:
           dotnet build Coop/Coop.csproj \
             -c Release \
             -p:CustomAfterMicrosoftCommonTargets="$RUNNER_TEMP/net472/build/Microsoft.NETFramework.ReferenceAssemblies.net472.targets" \
+            -p:SourceRevisionId="$GITHUB_SHA" \
+            -p:IncludeSourceRevisionInInformationalVersion=true \
             -p:ModName= \
             -p:NuGetAudit=false \
             --consoleLoggerParameters:ErrorsOnly
