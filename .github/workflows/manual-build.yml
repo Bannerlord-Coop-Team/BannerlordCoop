@@ -1,14 +1,12 @@
-name: Nightly Release
+name: Manual Build
+run-name: Manual build ${{ inputs.commit_sha }}
 
 on:
-  schedule:
-    - cron: '57 23 * * *'
-      timezone: America/Chicago
   workflow_dispatch:
     inputs:
-      release_date:
-        description: Release date to rebuild (YYYY-MM-DD); defaults to today in Central time
-        required: false
+      commit_sha:
+        description: Full 40-character commit SHA to build
+        required: true
         type: string
 
 permissions:
@@ -16,45 +14,31 @@ permissions:
   contents: read
 
 concurrency:
-  group: nightly-release
+  group: manual-build-${{ inputs.commit_sha }}
   cancel-in-progress: false
 
 jobs:
   build:
-    if: github.ref == 'refs/heads/development'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     container:
       image: garrettluskey/bannerlordcoop:latest
 
     steps:
-      - name: Checkout development
+      - name: Checkout requested commit
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ inputs.commit_sha }}
           fetch-depth: 0
 
-      - name: Trust checkout directory
-        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-
-      - name: Install timezone data
-        run: apk add --no-cache tzdata >/dev/null
-
-      - name: Find previous nightly commit
-        id: previous
-        uses: actions/github-script@v9
-        with:
-          result-encoding: string
-          script: |
-            const response = await github.rest.actions.listWorkflowRuns({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'nightly-release.yml',
-              branch: 'development',
-              status: 'success',
-              per_page: 1,
-            });
-            return response.data.workflow_runs[0]?.head_sha ?? '';
+      - name: Trust and validate checkout
+        env:
+          REQUESTED_SHA: ${{ inputs.commit_sha }}
+        run: |
+          set -eu
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          printf '%s' "$REQUESTED_SHA" | grep -Eq '^[a-f0-9]{40}$'
+          test "$(git rev-parse HEAD)" = "$REQUESTED_SHA"
 
       - name: Link Bannerlord assemblies
         run: ln -s /home/mb2 mb2
@@ -89,58 +73,26 @@ jobs:
           dotnet build Coop/Coop.csproj \
             -c Release \
             -p:CustomAfterMicrosoftCommonTargets="$RUNNER_TEMP/net472/build/Microsoft.NETFramework.ReferenceAssemblies.net472.targets" \
-            -p:SourceRevisionId="$GITHUB_SHA" \
+            -p:SourceRevisionId="$(git rev-parse HEAD)" \
             -p:IncludeSourceRevisionInInformationalVersion=true \
             -p:ModName= \
             -p:NuGetAudit=false \
             --consoleLoggerParameters:ErrorsOnly
 
-      - name: Build release metadata
-        id: release
-        env:
-          PREVIOUS_SHA: ${{ steps.previous.outputs.result }}
-          REQUESTED_RELEASE_DATE: ${{ inputs.release_date }}
+      - name: Build artifact metadata
+        id: artifact
         run: |
           set -eu
-          if [ -n "$REQUESTED_RELEASE_DATE" ]; then
-            if ! printf '%s\n' "$REQUESTED_RELEASE_DATE" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
-              echo 'release_date must use YYYY-MM-DD' >&2
-              exit 1
-            fi
-            release_epoch=$(TZ=America/Chicago date -d "$REQUESTED_RELEASE_DATE 12:00:00" +%s)
-            if [ "$(TZ=America/Chicago date -d "@$release_epoch" +%F)" != "$REQUESTED_RELEASE_DATE" ]; then
-              echo 'release_date is not a valid calendar date' >&2
-              exit 1
-            fi
-          else
-            release_epoch=$(date +%s)
-            if [ "$GITHUB_EVENT_NAME" = schedule ]; then
-              release_hour=$(TZ=America/Chicago date +%H)
-              release_minute=$(TZ=America/Chicago date +%M)
-              if [ "$release_hour" -lt 23 ] || { [ "$release_hour" -eq 23 ] && [ "$release_minute" -lt 57 ]; }; then
-                release_epoch=$((release_epoch - 86400))
-              fi
-            fi
-          fi
-          release_date=$(TZ=America/Chicago date -d "@$release_epoch" +%F)
-          display_date=$(TZ=America/Chicago date -d "@$release_epoch" +%m-%d-%Y)
-          file_name="Coop $display_date.7z"
           head_sha=$(git rev-parse HEAD)
-          base_sha="$PREVIOUS_SHA"
-          if [ -z "$base_sha" ] || ! git merge-base --is-ancestor "$base_sha" "$head_sha"; then
-            base_sha=
-          fi
-
+          short_sha=$(printf '%.7s' "$head_sha")
+          file_name="Coop $short_sha.7z"
           mkdir -p artifact
-          printf 'release_date=%s\nfile_name=%s\nhead_sha=%s\nbase_sha=%s\n' \
-            "$release_date" "$file_name" "$head_sha" "$base_sha" >> "$GITHUB_OUTPUT"
+          printf 'file_name=%s\nhead_sha=%s\n' "$file_name" "$head_sha" >> "$GITHUB_OUTPUT"
 
       - name: Package module
         env:
-          RELEASE_DATE: ${{ steps.release.outputs.release_date }}
-          FILE_NAME: ${{ steps.release.outputs.file_name }}
-          HEAD_SHA: ${{ steps.release.outputs.head_sha }}
-          BASE_SHA: ${{ steps.release.outputs.base_sha }}
+          FILE_NAME: ${{ steps.artifact.outputs.file_name }}
+          HEAD_SHA: ${{ steps.artifact.outputs.head_sha }}
         run: |
           set -eu
           apk add --no-cache 7zip >/dev/null
@@ -181,18 +133,13 @@ jobs:
             exit 1
           fi
 
-          if [ -n "$BASE_SHA" ]; then
-            base_json="\"$BASE_SHA\""
-          else
-            base_json=null
-          fi
-          printf '{"releaseDate":"%s","fileName":"%s","branch":"development","headSha":"%s","baseSha":%s}\n' \
-            "$RELEASE_DATE" "$FILE_NAME" "$HEAD_SHA" "$base_json" > artifact/manifest.json
+          printf '{"kind":"manual-build","fileName":"%s","headSha":"%s"}\n' \
+            "$FILE_NAME" "$HEAD_SHA" > artifact/manifest.json
 
-      - name: Upload nightly artifact
+      - name: Upload manual build artifact
         uses: actions/upload-artifact@v7
         with:
-          name: nightly-release-${{ steps.release.outputs.release_date }}
+          name: manual-build-${{ steps.artifact.outputs.head_sha }}
           path: artifact/*
           compression-level: 0
           if-no-files-found: error
