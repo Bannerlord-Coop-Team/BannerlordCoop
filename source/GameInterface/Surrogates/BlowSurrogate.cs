@@ -20,7 +20,7 @@ namespace GameInterface.Surrogates
 
             IBinaryPackage package = packageFactory.GetBinaryPackage(obj);
 
-            data = BinaryFormatterSerializer.Serialize(package);
+            data = BinaryPackageSerializer.Serialize(package);
         }
 
         private Blow Deserialize()
@@ -29,7 +29,7 @@ namespace GameInterface.Surrogates
 
             if (ContainerProvider.TryResolve(out IBinaryPackageFactory packageFactory) == false) return default;
 
-            var package = BinaryFormatterSerializer.Deserialize<BlowBinaryPackage>(data);
+            var package = BinaryPackageSerializer.Deserialize<BlowBinaryPackage>(data);
 
             return package.Unpack<Blow>(packageFactory);
         }

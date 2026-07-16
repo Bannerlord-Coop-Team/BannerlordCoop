@@ -193,6 +193,16 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
     /// </summary>
     public const byte BulkChannel = 1;
 
+    protected const int MaxRegularInboundPayloadBytes = 20 * 1024 * 1024;
+    protected const int BulkEnvelopeOverheadBytes = 4 * 1024 * 1024;
+
+    protected static int GetMaxInboundPayloadBytes(byte channelNumber)
+    {
+        return channelNumber == BulkChannel
+            ? SaveDataCompression.MaxCompressedBytes + BulkEnvelopeOverheadBytes
+            : MaxRegularInboundPayloadBytes;
+    }
+
     private static byte GetChannel(IPacket packet) => packet is GameSaveDataPacket ? BulkChannel : (byte)0;
 
     #region Message aggregation

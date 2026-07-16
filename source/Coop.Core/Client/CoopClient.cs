@@ -71,6 +71,17 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 
     public override void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
     {
+        int maxPayloadBytes = GetMaxInboundPayloadBytes(channelNumber);
+        if (reader.AvailableBytes > maxPayloadBytes)
+        {
+            Logger.Warning(
+                "Disconnecting server after oversized payload: {PayloadBytes} bytes on channel {Channel}",
+                reader.AvailableBytes,
+                channelNumber);
+            peer.Disconnect();
+            return;
+        }
+
         try
         {
             object received = serializer.Deserialize(reader.GetRemainingBytes());
@@ -91,6 +102,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
         catch (Exception ex)
         {
             Logger.Error(ex, "Failed to process packet");
+            peer.Disconnect();
         }
     }
 

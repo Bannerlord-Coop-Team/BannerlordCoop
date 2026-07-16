@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
+using TaleWorlds.Library;
 
 namespace GameInterface.Serialization.Generics
 {
@@ -33,7 +34,7 @@ namespace GameInterface.Serialization.Generics
 
         public void Pack()
         {
-            var type = Type.GetType(ObjectType);
+            var type = ResolveObjectType();
             foreach (FieldInfo field in type.GetAllInstanceFields().GroupBy(o => o.Name).Select(g => g.First()))
             {
                 object obj = field.GetValue(Object);
@@ -48,7 +49,7 @@ namespace GameInterface.Serialization.Generics
             BinaryPackageFactory = binaryPackageFactory;
 
             IsUnpacked = true;
-            var type = Type.GetType(ObjectType);
+            var type = ResolveObjectType();
             Object = FormatterServices.GetUninitializedObject(type);
             var fields = type.GetAllInstanceFields();
 
@@ -69,6 +70,14 @@ namespace GameInterface.Serialization.Generics
             }
 
             return Object;
+        }
+
+        private Type ResolveObjectType()
+        {
+            return SerializedTypeResolver.ResolveGenericType(
+                ObjectType,
+                typeof(MBReadOnlyList<>),
+                typeof(MBList<>));
         }
 
         public T Unpack<T>(IBinaryPackageFactory binaryPackageFactory)

@@ -20,12 +20,12 @@ namespace GameInterface.Serialization.Native
         private Dictionary<string, IBinaryPackage> StoredFields = new Dictionary<string, IBinaryPackage>();
 
         private string ObjectType;
-        protected Type T => Type.GetType(ObjectType);
+        protected Type T => ResolveObjectType();
 
         public KeyValuePairBinaryPackage(object kvp, IBinaryPackageFactory binaryPackageFactory)
         {
             ObjectType = kvp.GetType().AssemblyQualifiedName;
-            var type = Type.GetType(ObjectType);
+            var type = ResolveObjectType();
             Object = kvp;
             this.binaryPackageFactory = binaryPackageFactory;
 
@@ -36,7 +36,7 @@ namespace GameInterface.Serialization.Native
         public void Pack()
         {
             // Iterate through all of the instance fields of the object's type
-            var fields = Type.GetType(ObjectType).GetAllInstanceFields().GroupBy(o => o.Name).Select(g => g.First());
+            var fields = ResolveObjectType().GetAllInstanceFields().GroupBy(o => o.Name).Select(g => g.First());
             foreach (FieldInfo field in fields)
             {
                 // Get the value of the current field in the object
@@ -50,7 +50,7 @@ namespace GameInterface.Serialization.Native
         public object Unpack(IBinaryPackageFactory binaryPackageFactory)
         {
             if (IsUnpacked) return Object;
-            var type = Type.GetType(ObjectType);
+            var type = ResolveObjectType();
             this.binaryPackageFactory = binaryPackageFactory;
             
             Object = FormatterServices.GetUninitializedObject(type);
@@ -58,6 +58,11 @@ namespace GameInterface.Serialization.Native
             UnpackInternal();
 
             return Object;
+        }
+
+        private Type ResolveObjectType()
+        {
+            return SerializedTypeResolver.ResolveGenericType(ObjectType, typeof(KeyValuePair<,>));
         }
 
         public T Unpack<T>(IBinaryPackageFactory binaryPackageFactory)
