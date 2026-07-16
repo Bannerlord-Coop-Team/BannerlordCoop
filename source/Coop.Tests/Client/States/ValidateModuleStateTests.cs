@@ -201,6 +201,26 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
+        public void NetworkClientValidated_AfterTimeout_DoesNotTransition()
+        {
+            // Arrange — the timeout (game thread) wins the completion race and tears coop down.
+            var validateState = clientLogic.SetState<ValidateModuleState>();
+            validateState.TimeoutValidation();
+
+            var payload = new MessagePayload<NetworkClientValidated>(
+                this, new NetworkClientValidated(true, new Player("12345", "111", "12345", "12345", "12345")));
+
+            // Act — the server's terminal validation response lands just after the timeout claimed
+            // completion. It must observe the claim and no-op, NOT drive LoadSavedData forward.
+            validateState.Handle_NetworkClientValidated(payload);
+
+            // Assert — no forward transition (which in production would resolve ReceivingSavedDataState
+            // from the container the timeout already tore down), and still exactly one teardown.
+            Assert.IsType<ValidateModuleState>(clientLogic.State);
+            Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<EndCoopMode>());
+        }
+
+        [Fact]
         public void EnterMainMenu_DoesNothing()
         {
             // Arrange

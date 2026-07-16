@@ -40,12 +40,21 @@ public class ValidateModuleState : ClientStateBase
 
     private volatile bool disposed;
 
-    // Teardown can be started from the game thread (validation-timeout timer) and the poller thread
-    // (a denied or late validation response) at the same instant. This latch, claimed via Interlocked,
-    // runs the teardown exactly once. Dispose claims it too, so a timeout firing as the state cleanly
-    // transitions no-ops instead of tearing the new state down.
-    private int teardownClaimed;
+    // The validation exchange has exactly one outcome: the server's terminal response transitions the
+    // state forward (LoadSavedData / character creation), or a failure/timeout/disconnect tears coop
+    // down. Both race across the poller thread (validation responses) and the game thread (the timeout
+    // timer), so every terminal path claims this latch via Interlocked before touching Logic — the
+    // first caller wins and runs, all others no-op. That keeps the timeout from destroying the
+    // container under an in-flight forward transition (between Handle_NetworkClientValidated starting
+    // and reaching LoadSavedData) and runs teardown exactly once. Dispose claims it too, so a timeout
+    // firing as the state cleanly transitions finds completion handled instead of tearing the next
+    // state down.
+    private int completionClaimed;
     private string disconnectReason;
+
+    // Claims this state's single completion for the calling terminal path; returns false if another
+    // terminal path (forward transition, teardown, or Dispose) already claimed it.
+    private bool TryClaimCompletion() => Interlocked.Exchange(ref completionClaimed, 1) == 0;
 
     public ValidateModuleState(
         IClientLogic logic,
@@ -84,9 +93,9 @@ public class ValidateModuleState : ClientStateBase
     public override void Dispose()
     {
         disposed = true;
-        // Claim the teardown latch so an in-flight timeout callback that already passed its guard
-        // finds teardown handled and no-ops (see TimeoutValidation / Disconnect).
-        Interlocked.Exchange(ref teardownClaimed, 1);
+        // Claim completion so an in-flight timeout callback that already passed its guard finds it
+        // handled and no-ops (see TimeoutValidation / Disconnect).
+        Interlocked.Exchange(ref completionClaimed, 1);
         validationTimeoutTimer?.Dispose();
         messageBroker.Unsubscribe<NetworkModuleVersionsValidated>(Handle_NetworkModuleVersionsValidated);
         messageBroker.Unsubscribe<NetworkClientValidated>(Handle_NetworkClientValidated);
@@ -95,12 +104,14 @@ public class ValidateModuleState : ClientStateBase
 
     internal void TimeoutValidation()
     {
-        // Marshaled onto the game thread by the timer callback. The guard skips the spurious error log
-        // when the state was already left; correctness does not depend on it being atomic, because the
-        // teardown below goes through THIS state's Disconnect (never Logic.Disconnect, which would hit
-        // whatever state replaced it), and Disconnect's Interlocked latch — also claimed by Dispose —
-        // makes a denied/late response landing at the same instant tear down exactly once.
+        // Marshaled onto the game thread by the timer callback. The guard cheaply skips the common
+        // case where the state was already left; claiming completion below — before logging or tearing
+        // down — is what actually closes the race with a validation response landing at the same
+        // instant. If that response (running on the poller thread) already claimed completion, this
+        // no-ops entirely: no spurious teardown of the container it is mid-transition into, no
+        // spurious error log.
         if (disposed || Logic.State != this) return;
+        if (!TryClaimCompletion()) return;
 
         Logger.Error(
             "Timed out after {Timeout}s waiting for the server to validate the connection",
@@ -109,7 +120,7 @@ public class ValidateModuleState : ClientStateBase
         disconnectReason =
             "Timed out waiting for the server to validate the connection.\n" +
             "The server may be running an incompatible version of the mod.";
-        Disconnect();
+        TearDown();
     }
 
     internal void Handle_NetworkModuleVersionsValidated(MessagePayload<NetworkModuleVersionsValidated> obj)
@@ -132,6 +143,12 @@ public class ValidateModuleState : ClientStateBase
 
     internal void Handle_NetworkClientValidated(MessagePayload<NetworkClientValidated> obj)
     {
+        // The server's terminal validation response. Claim completion before touching Logic so a
+        // timeout firing at the same instant loses the race and no-ops, rather than tearing the
+        // container down in the window between here and the state transition below (which would leave
+        // this handler resolving the next state from a disposed container).
+        if (!TryClaimCompletion()) return;
+
         if (obj.What.HeroExists)
         {
             Logic.Player = obj.What.Player;
@@ -139,7 +156,7 @@ public class ValidateModuleState : ClientStateBase
         }
         else
         {
-            Logic.StartCharacterCreation();   
+            Logic.StartCharacterCreation();
         }
     }
 
@@ -164,10 +181,16 @@ public class ValidateModuleState : ClientStateBase
     public override void Disconnect()
     {
         // Teardown can be initiated from the game thread (validation-timeout timer) and the poller
-        // thread (a denied or late validation response) at the same instant; the latch runs
+        // thread (a denied or late validation response) at the same instant, and it is mutually
+        // exclusive with a successful forward transition; the shared completion latch runs
         // CoopFinalizer exactly once.
-        if (Interlocked.Exchange(ref teardownClaimed, 1) != 0) return;
+        if (!TryClaimCompletion()) return;
 
+        TearDown();
+    }
+
+    private void TearDown()
+    {
         validationTimeoutTimer?.Dispose();
 
         // Finalize tears down coop (EndCoopMode -> DestroyContainer), which disposes the container the
