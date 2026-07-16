@@ -28,7 +28,13 @@ public class BattleDeploymentTimeLimitWiringTests
     private readonly Mock<IBattleSession> session = new();
     private readonly BattleDeploymentCoordinator sut;
 
-    private int nativeFinishInvocations;
+    // Models the native TeamSetupOver: true by default (teams already set up — the finish commits immediately,
+    // preserving the intent of the pre-existing cases); flip to false to emulate the limit expiring while
+    // reserves are still inside the spawn handler's hold.
+    private bool teamSetupOver = true;
+
+    private int nativeFinishInvocations; // every seam call, including the no-op retries while teams aren't set up
+    private int nativeFinishCommits;     // seam calls that actually committed the deployment (reported Finished)
     private int revealRequests;
 
     public BattleDeploymentTimeLimitWiringTests()
@@ -45,13 +51,21 @@ public class BattleDeploymentTimeLimitWiringTests
 
     private void AsHost() => session.SetupGet(s => s.IsLocalHost).Returns(true);
 
-    // Emulates the native FinishDeployment fan-out reaching CoopBattleController.OnDeploymentFinished: the
-    // controller calls OnLocalDeploymentFinished() and reveals the withheld own-party troops on a true return.
-    private void FakeNativeFinish()
+    // Emulates the native FinishDeployment seam. When the teams are set up it runs the fan-out reaching
+    // CoopBattleController.OnDeploymentFinished (calling OnLocalDeploymentFinished() and revealing the withheld
+    // own-party troops on a true return) and reports Finished. While the teams are NOT set up yet (reserves
+    // still spawning) it no-ops and reports Retry — exactly as the real FinishNativeDeployment does when the
+    // native TeamSetupOver is false.
+    private DeploymentAutoFinishResult FakeNativeFinish()
     {
         nativeFinishInvocations++;
+        if (!teamSetupOver)
+            return DeploymentAutoFinishResult.Retry;
+
+        nativeFinishCommits++;
         if (sut.OnLocalDeploymentFinished())
             revealRequests++;
+        return DeploymentAutoFinishResult.Finished;
     }
 
     [Fact]
@@ -145,5 +159,44 @@ public class BattleDeploymentTimeLimitWiringTests
 
         Assert.Equal(0, nativeFinishInvocations);
         network.Verify(n => n.SendAll(It.IsAny<NetworkBattleDeploymentFinished>()), Times.Never);
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-025")]
+    public void Expiry_WhileTeamsNotSetUp_RetriesUntilSetupCompletes_ThenCommitsExactlyOnce()
+    {
+        // Reviewer scenario (PR #2036, ShoT-UPfps): a short limit (e.g. 5s) expires while reserves are still
+        // inside CoopBattleMissionSpawnHandler's 15s hold, so the native TeamSetupOver is false and the finish
+        // no-ops. The gate must keep firing until setup completes and the finish actually commits — otherwise
+        // the AFK player is never auto-finished, no announce ever goes out, and BR-024 activation never fires.
+        //
+        // PRE-FIX MECHANISM: BattleDeploymentTimer.Tick disarmed the gate (running=false) on the FIRST tick
+        // past the limit, before the finish's outcome was known. With this harness the first Tick(Limit) fires
+        // while teamSetupOver=false → FakeNativeFinish reports Retry (nativeFinishCommits stays 0) → but the
+        // gate is already disarmed, so every later Tick returns false; nativeFinishCommits never reaches 1 and
+        // the announce is never sent, failing both post-setup assertions below.
+        AsHost();
+        sut.OnMissionReady();
+
+        teamSetupOver = false;
+        sut.Tick(Limit); // limit reached, but reserves still spawning → Retry (no-op)
+        sut.Tick(1f);    // still spawning → Retry (no-op)
+        Assert.Equal(0, nativeFinishCommits);
+        network.Verify(n => n.SendAll(It.IsAny<NetworkBattleDeploymentFinished>()), Times.Never);
+
+        teamSetupOver = true; // the spawn hold elapsed; the teams are set up
+        sut.Tick(1f);         // now the finish commits through the same path as a manual Start Battle
+        Assert.Equal(1, nativeFinishCommits);
+        network.Verify(n => n.SendAll(It.IsAny<NetworkBattleDeploymentFinished>()), Times.Once);
+        network.Verify(n => n.SendAll(It.IsAny<NetworkBattleActivated>()), Times.Once);
+        Assert.True(sut.IsActivated);
+        Assert.True(sut.IsCommitted);
+        Assert.Equal(1, revealRequests);
+
+        // Exactly one successful auto-finish: the gate is now disarmed, so further ticks do nothing.
+        sut.Tick(1f);
+        sut.Tick(1f);
+        Assert.Equal(1, nativeFinishCommits);
+        network.Verify(n => n.SendAll(It.IsAny<NetworkBattleDeploymentFinished>()), Times.Once);
     }
 }
