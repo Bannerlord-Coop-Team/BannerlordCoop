@@ -335,6 +335,26 @@ broken patch state poisons every later test in the run); harness-created parties
 nondeterministic rosters, so assert baseline-relative deltas, never absolute counts; fresh-worktree
 restores need `/p:NuGetAudit=false` (Scriban NU1902/NU1903 audit failures in Coop.Core).
 
+**Live-bug fix 1 (BR-051) (2026-07-15) — non-host retreat despawn FIXED (red → green).**
+`BattleAuthorityMigrator.DespawnControllerTroops` now selects the retreater's troops by OWNERSHIP
+exactly like the host path: `TryGetPlayerParty(controllerId)` + `IsOwnPartyAgent` (origin party +
+hero belt-check), side-agnostic — so a PVP opponent's puppets on the opposing team despawn like
+everyone else's. Fallback when the party is unresolvable: despawn the agents originally ASSIGNED
+to the retreater (registry `OriginalOwner == controllerId`); adoption preserves `OriginalOwner`,
+so agents it merely HELD from an earlier hosting stint are excluded (they stay for the
+absent-controller sweep). A WARNING now fires when the loop despawns 0 while non-mount entries
+were registered for the controller, so this class of silent leak can't hide again (the old
+success log was gated on `despawned > 0`). `CleanUpDepartedMounts(allMounts: true)` semantics and
+the FadeOut/`RemoveAgent`/`casualties.Forget` cleanup are unchanged from the host path. The 3
+Wave-1 reds in `BattleNonHostRetreatDespawnTests` are unskipped and green (red re-confirmed at
+the intended asserts first); both lock-ins (`ExHostHeldAdoptedAgents` scope guard, PVP host
+retreat) stayed green, as did `BattleMountIdentityTests` (its non-host retreat test now exercises
+the OriginalOwner fallback — no player registered for the retreater there). Suites: targeted
+migration/retreat 35/35 + mount identity 13/13; full E2E **570 passed / 8 skips (4 pre-existing +
+4 BR-073 reds) / 0 failed (578)**; Coop.Tests 419 passed / 1 skip (420).
+**Residual:** live 2-client PVP retreat re-check (the manual checklist row) still pending; the
+BR-073 reinforcement fix is the next increment.
+
 ## Suggested execution order
 
 1. **Wave 1 — the 25 `S` items:** almost all extend an existing harness pattern

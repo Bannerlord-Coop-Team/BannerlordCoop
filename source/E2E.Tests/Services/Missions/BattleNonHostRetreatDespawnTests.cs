@@ -40,7 +40,7 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
     /// RED today: <c>agent.Team.Side (Attacker) != playerSide (Defender)</c> skips every one of them —
     /// they stay registered to a controller that no longer answers (inert, effectively unkillable puppets).
     /// </summary>
-    [Fact(Skip = "BR-051 TDD red: DespawnControllerTroops filters by the LOCAL player's team side, so a PVP opponent's retreating troops are all skipped and leak")]
+    [Fact]
     [Trait("Requirement", "BR-051")]
     public void NonHostRetreat_OpposingSideTroops_AreDespawnedOnRemainingClients()
     {
@@ -100,7 +100,7 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
     /// RED today: skipped by the same local-side filter (live evidence: hero puppet
     /// CharacterObject_Player2865 remained on the host after testclient's retreat).
     /// </summary>
-    [Fact(Skip = "BR-051 TDD red: the retreater's hero puppet on the opposing team is skipped by the same local-side filter instead of the ownership/hero check")]
+    [Fact]
     [Trait("Requirement", "BR-051")]
     public void NonHostRetreat_OpposingHeroPuppet_IsDespawned()
     {
@@ -163,7 +163,7 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
     /// retreat, the BR-033 reclaim no-ops (nothing was adopted, so nothing is keyed to us with OriginalOwner
     /// "A"), and the fresh deploy stacks on top — 600 live + 600 frozen ghosts per leaky retreat, live.
     /// </summary>
-    [Fact(Skip = "BR-051 TDD red: the leaked pre-retreat agent survives into the re-engagement and the fresh redeploy stacks on top (ghost cohort accumulation)")]
+    [Fact]
     [Trait("Requirement", "BR-051")]
     [Trait("Requirement", "BR-033")]
     public void NonHostRetreat_ThenReengageRedeploy_DoesNotAccumulateStaleAgents()

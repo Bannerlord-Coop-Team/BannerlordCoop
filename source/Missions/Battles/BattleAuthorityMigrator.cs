@@ -127,7 +127,8 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
             return;
         }
 
-        // A NON-host retreat: withdraw only that player's OWN player-side troops; the host keeps running the AI.
+        // A NON-host retreat: withdraw only that player's OWN-party troops (by ownership, like the host path —
+        // in PVP its puppets sit on the opposing side locally); the host keeps running the AI.
         DespawnControllerTroops(controllerId);
     }
 
@@ -183,10 +184,16 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         });
     }
 
-    // [All clients] Withdraw a retreating NON-host's troops — only its player-SIDE agents. A non-host only
-    // ever owns its own party, so the side filter is enough here (the ownership test above is for hosts).
-    // Our own retreat tears the mission down (skip self); other clients drop its puppets. FadeOut (not
-    // Die/MakeDead) so it is a withdrawal, not a casualty — the player keeps these troops on the map.
+    // [All clients] Withdraw a retreating NON-host's troops, selected by OWNERSHIP exactly like the host path
+    // above: its hero and the troops whose origin party is the retreater's party. Battle side is NOT identity —
+    // in a PVP battle the retreater's puppets sit on the OPPOSING team of a remaining client, so the old
+    // local-PlayerTeam side filter skipped every one of them and they leaked as inert, effectively unkillable
+    // puppets keyed to a controller that no longer answers (the live BR-051 leak). When the retreater's party
+    // cannot be resolved, fall back to the agents ASSIGNED to it (registry OriginalOwner == the retreater) —
+    // adoption preserves OriginalOwner, so agents it merely HELD from an earlier hosting stint are excluded
+    // (those belong to the absent-controller sweep, not the retreat despawn). Our own retreat tears the mission
+    // down (skip self); other clients drop its puppets. FadeOut (not Die/MakeDead) so it is a withdrawal, not a
+    // casualty — the player keeps these troops on the map.
     private void DespawnControllerTroops(string controllerId)
     {
         if (string.IsNullOrEmpty(controllerId)) return;
@@ -201,20 +208,26 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
             if (troops.Count == 0) return;
             if (Mission.Current == null) return;
 
-            if (Mission.Current.PlayerTeam == null)
-            {
-                Logger.Error("PlayerTeam was not set");
-                return;
-            }
+            if (!TryGetPlayerParty(controllerId, out var retreaterParty, out var retreaterHero))
+                Logger.Warning("[BattleSync] Cannot resolve the party of retreating {Controller}; despawning the agents originally assigned to it instead", controllerId);
 
-            var playerSide = Mission.Current.PlayerTeam.Side;
+            int candidates = 0;
             int despawned = 0;
             var despawnedRiders = new HashSet<Agent>();
             foreach (var info in troops)
             {
                 var agent = info.Agent;
-                if (agent == null || agent.IsMount || agent.Team == null || agent.Team.Side != playerSide)
-                    continue;
+                if (agent == null || agent.IsMount) continue;
+                candidates++;
+
+                // Ownership, not side: the retreater's own party (origin party + the hero belt-check) — or,
+                // when its party did not resolve, whatever is still originally assigned to it. An agent it
+                // merely holds by adoption (OriginalOwner = a third controller) is not its party and must not
+                // withdraw with it — that one stays for the absent-controller sweep.
+                bool isRetreatersOwn = retreaterParty != null
+                    ? IsOwnPartyAgent(agent, retreaterParty, retreaterHero)
+                    : info.OriginalOwner == controllerId;
+                if (!isRetreatersOwn) continue;
 
                 if (agent.IsActive())
                     agent.FadeOut(false, true);
@@ -230,6 +243,8 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
 
             if (despawned > 0)
                 Logger.Information("[BattleSync] Despawned {Count} retreating troop(s) of {Controller}", despawned, controllerId);
+            else if (candidates > 0)
+                Logger.Warning("[BattleSync] Retreat despawn of {Controller} matched 0 of its {Count} registered troop(s) — selection found no own-party agents; anything left is keyed to a controller that no longer answers", controllerId, candidates);
         });
     }
 
