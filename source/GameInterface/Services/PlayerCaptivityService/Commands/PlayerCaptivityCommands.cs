@@ -54,12 +54,13 @@ Captures the given hero and assigns a random mobile party as the captor.";
 
     private const string CapturePlayerUsage =
 @"Usage:
-  coop.debug.player_captivity.capture_player <heroId> <mobilePartyStringId>
+  coop.debug.player_captivity.capture_player <heroId> <mobilePartyId>
 
 Example:
-  coop.debug.player_captivity.capture_player Player looters_1
+  coop.debug.player_captivity.capture_player lord_1_29 MobileParty_looters_248
 
-Captures the given hero and assigns the given mobile party as the captor.";
+Captures the given hero and assigns the given mobile party as the captor. The party argument accepts
+a co-op registry id or a local StringId.";
 
     [CommandLineArgumentFunction("capture_player", "coop.debug.player_captivity")]
     public static string CapturePlayer(List<string> args)
@@ -78,7 +79,7 @@ Captures the given hero and assigns the given mobile party as the captor.";
         if (!ctx.TryGetArg(0, "heroId", out var heroId, out error))
             return error;
 
-        if (!ctx.TryGetArg(1, "mobilePartyStringId", out var captorPartyId, out error))
+        if (!ctx.TryGetArg(1, "mobilePartyId", out var captorPartyId, out error))
             return error;
 
         if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
@@ -87,7 +88,8 @@ Captures the given hero and assigns the given mobile party as the captor.";
         if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, heroId, out var hero, out error))
             return "Failed to capture hero: " + error;
 
-        if (!CommandHelpers.TryGetMobileParty(captorPartyId, out var newCaptor, out error))
+        if (!objectManager.TryGetObject(captorPartyId, out MobileParty newCaptor)
+            && !CommandHelpers.TryGetMobileParty(captorPartyId, out newCaptor, out error))
             return "Failed to capture hero: " + error;
 
         return CaptureHero(hero, newCaptor);

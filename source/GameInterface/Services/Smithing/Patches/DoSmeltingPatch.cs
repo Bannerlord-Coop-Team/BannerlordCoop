@@ -29,9 +29,6 @@ namespace GameInterface.Services.Smithing.Patches
             // Need to check to prevent spam clicking giving more xp and research points
             if (currentCraftingHero.PartyBelongedTo.ItemRoster.FindIndexOfElement(equipmentElement) < 0) return false;
 
-            // AddSkillXp already synced, run on client
-            currentCraftingHero.AddSkillXp(DefaultSkills.Crafting, (float)Campaign.Current.Models.SmithingModel.GetSkillXpForSmelting(equipmentElement.Item));
-
             // Patched separately for sending to server
             __instance.AddResearchPoints(equipmentElement.Item.WeaponDesign.Template, Campaign.Current.Models.SmithingModel.GetPartResearchGainForSmeltingItem(equipmentElement.Item, currentCraftingHero));
 

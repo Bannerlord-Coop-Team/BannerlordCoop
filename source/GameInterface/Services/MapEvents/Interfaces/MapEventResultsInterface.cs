@@ -225,15 +225,17 @@ public class MapEventResultsInterface : IMapEventResultsInterface
                     MapEventParty lootReceiver = MapEvent.FindWinnerPartyToGetCurrentLootObjectBasedOnChances(lootCasualtyChances);
                     if (lootReceiver == null) continue;
 
+                    bool playerReceivesLoot = playerLootRosters.TryGetValue(lootReceiver, out ItemRoster playerLootRoster);
+
                     LootCasualtyCharacter(
                         character,
                         lootReceiver,
                         defeatedParty,
                         aiTradePenalty,
-                        winnerPlayerParties.Contains(lootReceiver)
+                        playerReceivesLoot
                             ? MBRandom.RoundRandomized(playerLootFactors[lootReceiver])
                             : int.MinValue,
-                        playerLootRosters[lootReceiver]);
+                        playerLootRoster);
                 }
             }
 
@@ -248,15 +250,17 @@ public class MapEventResultsInterface : IMapEventResultsInterface
                     MapEventParty lootReceiver = MapEvent.FindWinnerPartyToGetCurrentLootObjectBasedOnChances(lootCasualtyChances);
                     if (lootReceiver == null) continue;
 
+                    bool playerReceivesLoot = playerLootRosters.TryGetValue(lootReceiver, out ItemRoster playerLootRoster);
+
                     LootCasualtyCharacter(
                         character,
                         lootReceiver,
                         defeatedParty,
                         aiTradePenalty,
-                        winnerPlayerParties.Contains(lootReceiver)
+                        playerReceivesLoot
                             ? MBRandom.RoundRandomized(playerLootFactors[lootReceiver])
                             : int.MinValue,
-                        playerLootRosters[lootReceiver]);
+                        playerLootRoster);
                 }
             }
 
@@ -279,8 +283,10 @@ public class MapEventResultsInterface : IMapEventResultsInterface
     private void LootCasualtyCharacter(CharacterObject casualtyCharacter, MapEventParty winnerParty, MapEventParty defeatedParty, float aiTradePenalty, int maxLootedItemsPerBodyForMainParty, ItemRoster mainPartyLootFromCasualties)
     {
         Hero leaderHero = winnerParty.Party.LeaderHero;
+        if (leaderHero == null) return;
+
         float expectedLootedItemValueFromCasualty = Campaign.Current.Models.BattleRewardModel.GetExpectedLootedItemValueFromCasualty(leaderHero, casualtyCharacter);
-        if (leaderHero == null || expectedLootedItemValueFromCasualty.ApproximatelyEqualsTo(0f, 1E-05f)) return;
+        if (expectedLootedItemValueFromCasualty.ApproximatelyEqualsTo(0f, 1E-05f)) return;
 
         if (!leaderHero.IsPlayerHero())
         {

@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Util;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
@@ -7,6 +7,7 @@ using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.Settlements.Interfaces;
 using Moq;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -107,6 +108,27 @@ namespace Coop.IntegrationTests.MobileParties
                 client.Resolve<Mock<ISettlementInterface>>()
                     .Verify(s => s.PartyEnterSettlement(party, settlement), Times.Once);
             }
+        }
+
+        [Fact]
+        public void EnterSettlement_PartyAlreadyInMapEvent_IsRejectedBeforeBroadcast()
+        {
+            var client1 = TestEnvironment.Clients.First();
+            var party = ObjectHelper.SkipConstructor<MobileParty>();
+            party.Party = ObjectHelper.SkipConstructor<PartyBase>();
+            party.Party.MobileParty = party;
+            party.Party._mapEventSide = ObjectHelper.SkipConstructor<MapEventSide>();
+            var settlement = ObjectHelper.SkipConstructor<Settlement>();
+            TestEnvironment.RegisterObjectInNetwork(party, "party1");
+            TestEnvironment.RegisterObjectInNetwork(settlement, "settlement1");
+            TestEnvironment.Server.NetworkSentMessages.Clear();
+
+            RunOnGameThread(() =>
+                client1.SimulateMessage(this, new StartSettlementEncounterAttempted(party, settlement)));
+
+            TestEnvironment.Server.Resolve<Mock<ISettlementInterface>>()
+                .Verify(s => s.PartyEnterSettlement(It.IsAny<MobileParty>(), It.IsAny<Settlement>()), Times.Never);
+            Assert.Empty(TestEnvironment.Server.NetworkSentMessages.Messages);
         }
 
         /// <summary>

@@ -25,6 +25,12 @@ public class TunnelAdvertisementTests
 
         public void Stop() => Listening = false;
 
+        public bool TryGetRemoteSteamId(System.Net.IPEndPoint serverPeerEndpoint, out ulong steamId)
+        {
+            steamId = 0;
+            return false;
+        }
+
         public void Dispose()
         {
         }

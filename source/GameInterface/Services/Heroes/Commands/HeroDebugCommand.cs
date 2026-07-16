@@ -5,11 +5,14 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.ObjectManager.Extensions;
 using GameInterface.Utils.Commands;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
@@ -50,6 +53,47 @@ public class HeroDebugCommand
         }
 
         return stringBuilder.ToString();
+    }
+
+    [CommandLineArgumentFunction("id", "coop.debug.hero")]
+    public static string FindIds(List<string> args)
+    {
+        if (args == null || args.Count == 0)
+        {
+            return "Usage: coop.debug.hero.id <hero name>";
+        }
+
+        var heroName = string.Join(" ", args).Trim();
+        if (string.IsNullOrWhiteSpace(heroName)) return "Usage: coop.debug.hero.id <hero name>";
+
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        {
+            return $"Unable to get {nameof(IObjectManager)}";
+        }
+
+        var campaign = Campaign.Current;
+        if (campaign == null) return "Campaign is not loaded.";
+
+        var heroes = campaign.CampaignObjectManager.GetAllHeroes()
+            .Where(hero => string.Equals(hero.Name?.ToString(), heroName, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (heroes.Count == 0) return $"No hero named '{heroName}' was found.";
+
+        var result = new StringBuilder();
+        foreach (var hero in heroes)
+        {
+            if (objectManager.TryGetId(hero, out var id))
+            {
+                result.AppendLine($"ID: '{id}', Name: '{hero.Name}', Game StringId: {hero.StringId}");
+            }
+            else
+            {
+                result.AppendLine($"Name: '{hero.Name}' was not registered with object manager");
+            }
+        }
+
+        return result.ToString();
     }
 
     // coop.debug.hero.info
@@ -416,6 +460,26 @@ public class HeroDebugCommand
             return result;
         }
         return "Hero not found.";
+    }
+
+    /// <summary>
+    /// Runs the authoritative volunteer refresh for one settlement.
+    /// </summary>
+    [CommandLineArgumentFunction("refresh_volunteers", "coop.debug.hero")]
+    public static string RefreshVolunteersCommand(List<string> args)
+    {
+        if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.refresh_volunteers")) return error;
+        if (args.Count > 1) return "Usage: coop.debug.hero.refresh_volunteers [settlementId]";
+
+        string settlementId = args.Count == 0 ? "town_ES1" : args[0];
+        var settlement = Settlement.All.FirstOrDefault(candidate => candidate.StringId == settlementId);
+        if (settlement == null) return $"Settlement '{settlementId}' not found.";
+
+        var behavior = Campaign.Current?.GetCampaignBehavior<RecruitmentCampaignBehavior>();
+        if (behavior == null) return $"Unable to find {nameof(RecruitmentCampaignBehavior)}.";
+
+        behavior.UpdateVolunteersOfNotablesInSettlement(settlement);
+        return $"Refreshed volunteers for {settlement.Name} ({settlement.StringId}).";
     }
 
     // coop.debug.hero.set_relation

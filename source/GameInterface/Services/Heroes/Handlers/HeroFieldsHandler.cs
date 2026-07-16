@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.ObjectManager;
@@ -197,18 +198,14 @@ namespace GameInterface.Services.Heroes.Handlers
         private void Handle(MessagePayload<ChangeCharacterObject> payload)
         {
             var data = payload.What;
-            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
-            {
-                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
-                return;
-            }
-            if (objectManager.TryGetObject<CharacterObject>(data.CharacterObjectId, out var character) == false)
-            {
-                Logger.Error("Unable to find {type} with id: {id}", typeof(CharacterObject), data.CharacterObjectId);
-                return;
-            }
 
-            instance._characterObject = character;
+            GameThread.RunSafe(() =>
+            {
+                if (!objectManager.TryGetObjectWithLogging<Hero>(data.HeroId, out var instance)) return;
+                if (!objectManager.TryGetObjectWithLogging<CharacterObject>(data.CharacterObjectId, out var character)) return;
+
+                instance._characterObject = character;
+            }, context: nameof(ChangeCharacterObject));
         }
         private void Handle(MessagePayload<ChangeLastTimeStamp> payload)
         {

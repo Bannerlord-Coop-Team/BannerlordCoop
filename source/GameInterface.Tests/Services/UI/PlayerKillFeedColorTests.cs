@@ -9,6 +9,7 @@ using GameInterface.Services.UI.CoopOptions.Providers.KillFeedTab;
 using GameInterface.Services.UI.CoopOptions.Providers.KillFeedTab.Sections;
 using GameInterface.Services.UI.Handlers;
 using GameInterface.Services.UI.Messages;
+using GameInterface.Tests;
 using Moq;
 using System;
 using System.IO;
@@ -17,7 +18,7 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.UI;
 
-[Collection(global::GameInterface.Tests.ModInformationRoleCollection.Name)]
+[Collection(ModInformationRoleCollection.Name)]
 public class PlayerKillFeedColorTests
 {
     [Fact]
@@ -105,6 +106,20 @@ public class PlayerKillFeedColorTests
         Assert.True(viewModel.IsApplyButtonVisible);
         var section = Assert.IsType<KillFeedSection>(Assert.Single(tab.Sections));
         Assert.Equal(KillFeedSection.SectionId, section.Id);
+    }
+
+    [Fact]
+    public void CoopOptionsVM_ActionCancel_UsesHostCloseAction()
+    {
+        var closeCalled = false;
+        var viewModel = new CoopOptionsVM(
+            new CoopOptionsStore(CreateTempFilePath()),
+            new MessageBroker(),
+            () => closeCalled = true);
+
+        viewModel.ActionCancel();
+
+        Assert.True(closeCalled);
     }
 
     [Fact]

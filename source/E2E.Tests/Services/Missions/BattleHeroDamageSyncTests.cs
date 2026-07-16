@@ -1,7 +1,12 @@
-using System;
+﻿using System;
 using Common.Messaging;
+using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.MockEngine;
+using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using Missions;
 using Missions.Battles;
 using Missions.Messages;
@@ -14,14 +19,8 @@ using Xunit.Abstractions;
 namespace E2E.Tests.Services.Missions;
 
 /// <summary>
-/// Reproduces the live bug: damage to a HERO in a coop battle does not update its <see cref="Hero.HitPoints"/>,
-/// so the server (and everyone else) never sees the hero's health drop. The routed-damage handler
-/// (<c>CoopBattleController.Handle_NetworkApplyBattleDamage</c>) applies the blow to the agent's in-mission
-/// Health only; nothing bridges that back to the campaign <c>Hero.HitPoints</c>, which is the value that syncs
-/// to the server (via <c>HeroHitPointsRequestPatch</c>). The handler now mirrors the owned hero's post-blow
-/// <c>Agent.Health</c> onto <c>Hero.HitPoints</c>, so a surviving-but-wounded hero's health reaches the server.
-/// This is the green spec for that fix; the HitPoints→server sync itself is covered by
-/// <c>ClientWoundsControlledHero_RequestsHitPoints_SyncsToServerAndClients</c>.
+/// Covers campaign-health propagation from a co-op battle hero's routed blows and final agent removal.
+/// Client-to-server <see cref="Hero.HitPoints"/> forwarding is covered by the map-event environment tests.
 /// </summary>
 public class BattleHeroDamageSyncTests : MissionTestEnvironment
 {
@@ -64,6 +63,50 @@ public class BattleHeroDamageSyncTests : MissionTestEnvironment
             Assert.Equal(70, hero.HitPoints);
 
             GC.KeepAlive(controller);
+        });
+    }
+
+    [Theory]
+    [InlineData(42.6f, 43)]
+    [InlineData(0f, 1)]
+    public void OwnedHeroAgentRemoval_UpdatesHeroHitPoints(float agentHealth, int expectedHitPoints)
+    {
+        AssertAgentRemovalHealth("owner", "owner", agentHealth, expectedHitPoints);
+    }
+
+    [Fact]
+    public void RemoteHeroAgentRemoval_DoesNotUpdateHeroHitPoints()
+    {
+        AssertAgentRemovalHealth("owner", "observer", 25f, 100);
+    }
+
+    private void AssertAgentRemovalHealth(string ownerControllerId, string localControllerId, float agentHealth, int expectedHitPoints)
+    {
+        var client = Clients.First();
+        SetControllerId(client, localControllerId);
+
+        client.Call(() =>
+        {
+            var character = Assert.IsType<CharacterObject>(Game.Current.PlayerTroop);
+            var hero = character.HeroObject;
+            var objectManager = client.Resolve<IObjectManager>();
+            if (!objectManager.TryGetId(hero, out var heroId))
+            {
+                heroId = $"Issue1835Hero_{Guid.NewGuid():N}";
+                Assert.True(objectManager.AddExisting(heroId, hero));
+            }
+
+            var playerManager = client.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player(ownerControllerId, heroId, string.Empty, string.Empty, string.Empty)));
+
+            using (new AllowedThread())
+            {
+                hero.HitPoints = 100;
+                var origin = new CoopAgentOrigin(character, null, -1, null, new UniqueTroopDescriptor(1));
+                origin.OnAgentRemoved(agentHealth);
+            }
+
+            Assert.Equal(expectedHitPoints, hero.HitPoints);
         });
     }
 }

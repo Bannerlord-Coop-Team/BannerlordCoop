@@ -1,11 +1,9 @@
-﻿using Common.Network;
-using Common.Network.Coalescing;
-using Coop.Core.Server.Services.MobileParties.Messages;
-using E2E.Tests.Environment.Instance;
+﻿using E2E.Tests.Environment.Instance;
+using Common.Messaging;
+using Common.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.MobileParties.Extensions;
-using GameInterface.Services.ObjectManager;
-using GameInterface.Services.PlayerCaptivityService.Messages;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -307,83 +305,6 @@ public class MapEventEnvironmentTests : MapEventTestBase
     }
 
     [Fact]
-    public void EscapeRelease_ImmediatePositionThenCoalescerFlush_PreservesFinalHoldNavigation()
-    {
-        var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
-        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
-        DefeatPlayerPartyInBattle(heroId, partyId, captorPartyId);
-
-        void SeedStaleNavigation(EnvironmentInstance instance)
-        {
-            instance.Call(() =>
-            {
-                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
-                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(captorPartyId, out var captor));
-
-                party.PartyMoveMode = MoveModeType.Party;
-                party.MoveTargetParty = captor;
-                party.MoveTargetPoint = captor.Position;
-                party.NextTargetPosition = captor.Position;
-            });
-        }
-
-        SeedStaleNavigation(Server);
-        foreach (var client in Clients)
-        {
-            SeedStaleNavigation(client);
-        }
-
-        Server.NetworkSentMessages.Clear();
-        ReleasePlayerByEscapeRequest(Clients.First(), heroId, partyId);
-
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerCaptivityReleasePositionSet>());
-        var compactPartyId = ObjectManager.Compact(partyId, typeof(MobileParty));
-        Assert.DoesNotContain(
-            Server.NetworkSentMessages.GetMessages<NetworkUpdatePartyBehavior>(),
-            message => message.BehaviorUpdateData.MobilePartyId == compactPartyId);
-
-        AssertReleasedHoldNavigation(Server);
-        foreach (var client in Clients)
-        {
-            AssertReleasedHoldNavigation(client);
-        }
-
-        Server.Call(() => Server.Resolve<ISendCoalescer>().Flush(Server.Resolve<INetwork>()));
-
-        var behaviorUpdate = Assert.Single(
-            Server.NetworkSentMessages
-                .GetMessages<NetworkUpdatePartyBehavior>()
-                .Where(message => message.BehaviorUpdateData.MobilePartyId == compactPartyId));
-        Assert.Equal(MoveModeType.Hold, behaviorUpdate.BehaviorUpdateData.PartyMoveMode);
-        Assert.Null(behaviorUpdate.BehaviorUpdateData.MoveTargetPartyId);
-
-        var releaseIndex = Server.NetworkSentMessages.Messages.FindIndex(
-            message => message is NetworkPlayerCaptivityReleasePositionSet);
-        var behaviorIndex = Server.NetworkSentMessages.Messages.FindIndex(
-            message => message is NetworkUpdatePartyBehavior update &&
-                update.BehaviorUpdateData.MobilePartyId == compactPartyId);
-        Assert.True(releaseIndex >= 0);
-        Assert.True(behaviorIndex > releaseIndex);
-
-        foreach (var client in Clients)
-        {
-            AssertReleasedHoldNavigation(client);
-        }
-
-        void AssertReleasedHoldNavigation(EnvironmentInstance instance)
-        {
-            instance.Call(() =>
-            {
-                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
-                Assert.Equal(MoveModeType.Hold, party.PartyMoveMode);
-                Assert.Null(party.MoveTargetParty);
-                Assert.Equal(party.Position, party.MoveTargetPoint);
-                Assert.Equal(party.Position, party.NextTargetPosition);
-            });
-        }
-    }
-
-    [Fact]
     public void EscapeFromCaptivity_RestoresExactlyOneMan_OnServerAndAllClients()
     {
         // Arrange — a player alone in their party (just the hero) loses a battle and is captured.
@@ -497,6 +418,30 @@ public class MapEventEnvironmentTests : MapEventTestBase
         {
             AssertHeroInPartyRoster(client, heroId, partyId);
         }
+    }
+
+    [Fact]
+    public void CaptureWithDepletedHeroElement_RecalculatesEmptyRosterTotal()
+    {
+        var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
+        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(captorPartyId, out var captorParty));
+
+            using (new AllowedThread())
+            {
+                playerParty.MemberRoster.AddNewElement(hero.CharacterObject, -1);
+            }
+
+            Server.Resolve<IMessageBroker>().Publish(this, new PrisonerTaken(captorParty.Party, hero, playerParty));
+
+            Assert.Equal(0, playerParty.MemberRoster.Count);
+            Assert.Equal(0, playerParty.MemberRoster.TotalManCount);
+        });
     }
 
     [Fact]

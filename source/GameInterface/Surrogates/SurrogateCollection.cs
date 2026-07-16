@@ -30,6 +30,7 @@ public class SurrogateCollection : ISurrogateCollection
             AddSurrogate<ItemModifier, ItemModifierSurrogate>();
             AddSurrogate<TextObject, TextObjectSurrogate>();
             AddSurrogate<EquipmentElement, EquipmentElementSurrogate>();
+            AddSurrogate<Equipment, EquipmentSurrogate>();
             AddSurrogate<PropertyOwner<TraitObject>, PropertyOwnerSurrogate>();
             AddSurrogate<ItemRosterElement, ItemRosterElementSurrogate>();
             AddSurrogate<ItemData, ItemDataSurrogate>();
@@ -56,6 +57,10 @@ public class SurrogateCollection : ISurrogateCollection
             AddSurrogate<AtmosphereInfo, AtmosphereInfoSurrogate>();
             AddSurrogate<MissionInitializerRecord, MissionInitializerRecordSurrogate>();
             AddSurrogate<WeaponComponentData, WeaponComponentDataSurrogate>();
+
+            AddSurrogate<BodyProperties, BodyPropertiesSurrogate>();
+            AddSurrogate<DynamicBodyProperties, DynamicBodyPropertiesSurrogate>();
+            AddSurrogate<StaticBodyProperties, StaticBodyPropertiesSurrogate>();
         }
     }
 
