@@ -21,13 +21,8 @@ internal class MobilePartySync : IAutoSync
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._besiegerCampResetStarted)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._partyComponent)));
 
-        // Movement
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._targetSettlement)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty.MoveTargetPoint)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.TargetParty)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.DefaultBehavior)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.ShortTermBehavior)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.DesiredAiNavigationType)));
+        // Movement is replicated atomically by NetworkUpdatePartyBehavior. These members are
+        // interdependent, so independent AutoSync messages can apply a behavior before its target.
 
         // Sync Properties
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.Ai)));
