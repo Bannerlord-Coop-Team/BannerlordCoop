@@ -37,6 +37,7 @@ namespace Coop.Core
         private IContainer container;
         private readonly SteamOrDirectJoinEndpointPreparer joinEndpointPreparer = new SteamOrDirectJoinEndpointPreparer();
         private readonly ServerProcessManager serverProcessManager;
+        private readonly bool standaloneServerProcess;
         private volatile bool coopStarting;
         private volatile bool hostedSession;
         private volatile bool clientConnectedOnce;
@@ -47,12 +48,13 @@ namespace Coop.Core
         // A spawned server has to load the whole campaign save before it binds its port.
         public static readonly TimeSpan HostedServerStartTimeout = TimeSpan.FromMinutes(5);
 
-        public CoopartiveMultiplayerExperience()
+        public CoopartiveMultiplayerExperience(bool standaloneServerProcess = false)
         {
             // TODO use DI maybe?
             messageBroker = MessageBroker.Instance;
             configuration = new NetworkConfig();
             serverProcessManager = new ServerProcessManager(messageBroker);
+            this.standaloneServerProcess = standaloneServerProcess;
 
             messageBroker.Subscribe<AttemptJoin>(Handle);
             messageBroker.Subscribe<AttemptHost>(Handle);
@@ -127,6 +129,18 @@ namespace Coop.Core
             }
 
             AbandonAnyStartingSession();
+
+            // start-server.bat already launched this process with /server and its anonymous
+            // Steam game-server session owns the fixed Steam ports. Host here so the existing
+            // server container advertises the lobby instead of spawning a second server that
+            // competes for those ports.
+            if (standaloneServerProcess)
+            {
+                Logger.Information("Standalone server process hosting save '{SaveName}' in-process",
+                    obj.What.SaveName);
+                StartAsServer(obj.What.SaveName, password, visibility);
+                return;
+            }
 
             // Off Steam, keep the in-process dedicated-server behavior: this instance becomes
             // the server, and the player launches a second instance to join it.
