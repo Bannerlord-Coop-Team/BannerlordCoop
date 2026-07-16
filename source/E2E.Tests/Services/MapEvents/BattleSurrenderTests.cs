@@ -61,6 +61,10 @@ public class BattleSurrenderTests : MapEventTestBase
             var encounter = PlayerEncounter.Current;
             Assert.NotNull(encounter);
             InvokePatchedSurrender(encounter);
+            Assert.True(encounter._playerSurrender);
+
+            // A second menu activation while the authoritative response is in flight must not enqueue another request.
+            InvokePatchedSurrender(encounter);
         }, BattleMenuSurrenderDisabledMethods());
 
         // Exactly one surrender request was forwarded, carrying the participating (surrendering) player's party.
