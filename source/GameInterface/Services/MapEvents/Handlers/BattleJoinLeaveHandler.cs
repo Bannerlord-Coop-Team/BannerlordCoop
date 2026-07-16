@@ -173,7 +173,7 @@ internal class BattleJoinLeaveHandler : IHandler
             context: nameof(Handle_NetworkRequestJoinBattle));
     }
 
-    /// <summary>[Client] Bridge a joiner's leave to a server request; [Server/host] perform it directly.</summary>
+    /// <summary>[Client] Bridge a joiner's leave to a server request; [Server] perform it directly.</summary>
     private void Handle_PlayerLeaveBattleAttempted(MessagePayload<PlayerLeaveBattleAttempted> payload)
     {
         if (!objectManager.TryGetIdWithLogging(payload.What.LeavingParty, out var partyId)) return;
@@ -201,7 +201,7 @@ internal class BattleJoinLeaveHandler : IHandler
             {
                 if (!objectManager.TryGetObjectWithLogging<PartyBase>(partyId, out var party)) return;
 
-                ApplyLeave(party);
+                ApplyAuthoritativeLeave(party);
                 network.SendAll(new NetworkPartyLeftBattle(partyId));
             },
             blocking: true,
@@ -219,14 +219,21 @@ internal class BattleJoinLeaveHandler : IHandler
                 if (Campaign.Current == null) return;
                 if (!objectManager.TryGetObjectWithLogging<PartyBase>(partyId, out var party)) return;
 
-                ApplyLeave(party);
+                ApplyNetworkLeave(party);
             },
             context: nameof(Handle_NetworkPartyLeftBattle));
     }
 
-    // Remove the party from its side (idempotent) and, if it is this instance's own party, close its encounter UI.
+    // Authoritative campaign logic runs with patches live so removal, finalization, and replication stay ordered.
+    private static void ApplyAuthoritativeLeave(PartyBase party)
+    {
+        if (party.MapEventSide != null)
+            party.MapEventSide = null;
+    }
+
+    // Apply the received removal under AllowedThread and close this client's encounter UI when appropriate.
     // PlayerEncounter.Finish is safe here: with MapEventSide already cleared, LeaveBattle no longer finalizes.
-    private static void ApplyLeave(PartyBase party)
+    private static void ApplyNetworkLeave(PartyBase party)
     {
         using (new AllowedThread())
         {

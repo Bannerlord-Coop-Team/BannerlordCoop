@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Util;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.TroopSupply;
@@ -171,7 +172,7 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void LastPartyLeave_FlushesPendingContributionBeforeLeaveBroadcast()
+    public void LastPartyLeave_FlushesPendingContributionBeforeMapEventDestroy()
     {
         var (partyId, troopSeed, _) = SetupScoredBattleOnServer();
 
@@ -195,10 +196,14 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
 
         var messages = Server.NetworkSentMessages.Messages;
         int contributionIndex = messages.FindIndex(message => IsContributionMessageFor(message, partyId));
+        int destroyIndex = messages.FindIndex(message => message is NetworkDestroyInstance<MapEvent>);
         int leaveIndex = messages.FindIndex(message => message is NetworkPartyLeftBattle);
 
         Assert.Single(messages, message => IsContributionMessageFor(message, partyId));
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkDestroyInstance<MapEvent>>());
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPartyLeftBattle>());
+        Assert.True(contributionIndex < destroyIndex,
+            $"Contribution packet index {contributionIndex} was not before destroy index {destroyIndex}");
         Assert.True(contributionIndex < leaveIndex,
             $"Contribution packet index {contributionIndex} was not before leave index {leaveIndex}");
     }
