@@ -40,6 +40,7 @@ public class ReinforcementFielder : IReinforcementFielder
     private readonly IBattleSession session;
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly IAgentFormationAssigner formationAssigner;
+    private readonly ICasualtyAttributionMap casualties;
 
     // [Host] Map-event party ids we have already fielded as mid-battle reinforcements, so a repeated involved-
     // parties broadcast for the same party doesn't double-spawn it.
@@ -65,11 +66,13 @@ public class ReinforcementFielder : IReinforcementFielder
     {
         public readonly CoopTroopSupplier Supplier;
         public readonly string PartyId;
+        public readonly Queue<CoopAgentOrigin> Origins;
 
-        public RecoveryParty(CoopTroopSupplier supplier, string partyId)
+        public RecoveryParty(CoopTroopSupplier supplier, string partyId, Queue<CoopAgentOrigin> origins)
         {
             Supplier = supplier;
             PartyId = partyId;
+            Origins = origins;
         }
     }
 
@@ -89,7 +92,8 @@ public class ReinforcementFielder : IReinforcementFielder
         ICoopMissionComponent coopMissionComponent,
         IBattleSession session,
         IBattleDeploymentCoordinator deployment,
-        IAgentFormationAssigner formationAssigner)
+        IAgentFormationAssigner formationAssigner,
+        ICasualtyAttributionMap casualties)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -97,6 +101,7 @@ public class ReinforcementFielder : IReinforcementFielder
         this.session = session;
         this.deployment = deployment;
         this.formationAssigner = formationAssigner;
+        this.casualties = casualties;
 
         // [Host] A new AI party joining the live battle is fielded through our own spawn path (reinforcements).
         messageBroker.Subscribe<NetworkAddInvolvedParties>(Handle_ReinforcementPartiesAdded);
@@ -179,37 +184,96 @@ public class ReinforcementFielder : IReinforcementFielder
     private int QueueMissingParties(CoopTroopSupplier supplier, HashSet<string> knownPartyIds)
     {
         int queued = 0;
-        foreach (var (partyId, remaining) in supplier.GetRemainingByParty())
+        foreach (var (partyId, serverRemaining) in supplier.GetRemainingByParty())
         {
-            bool hasLiveAgent = HasLiveOwnedAgent(partyId);
-            if (!ShouldRecoverParty(knownPartyIds.Contains(partyId), remaining, hasLiveAgent))
-            {
-                if (!knownPartyIds.Contains(partyId) && remaining > 0 && hasLiveAgent)
-                    Logger.Information("[BattleSync] Migration reserve party {Party} already has adopted agents; leaving its remaining supplier entries untouched", partyId);
-                continue;
-            }
+            if (knownPartyIds.Contains(partyId)) continue;
             if (!recoveryPartyIds.Add(partyId)) continue;
 
-            recoveryParties[(int)supplier.Side].Add(new RecoveryParty(supplier, partyId));
+            if (!TryBuildRecoveryParty(supplier, partyId, out var recovery, out var activeRoster, out var liveAgents))
+            {
+                recoveryPartyIds.Remove(partyId);
+                continue;
+            }
+
+            recoveryParties[(int)supplier.Side].Add(recovery);
             queued++;
+            Logger.Information("[BattleSync] Migration reserve party {Party}: roster active={Roster}, locally present={Live}, queued={Queued}, server remaining={Remaining}",
+                partyId, activeRoster, liveAgents, recovery.Origins.Count, serverRemaining);
         }
         return queued;
     }
 
-    /// <summary>Whether a refreshed reserve party needs recovery rather than ordinary adoption.</summary>
-    public static bool ShouldRecoverParty(bool wasPreviouslyOwned, int remainingTroops, bool hasLiveAgent)
-        => !wasPreviouslyOwned && remainingTroops > 0 && !hasLiveAgent;
-
-    private bool HasLiveOwnedAgent(string partyId)
+    private bool TryBuildRecoveryParty(
+        CoopTroopSupplier supplier,
+        string partyId,
+        out RecoveryParty recovery,
+        out int activeRoster,
+        out int liveAgents)
     {
-        foreach (var info in coopMissionComponent.AgentRegistry.GetAgents(session.OwnControllerId))
+        recovery = null;
+        activeRoster = 0;
+        liveAgents = 0;
+        if (!objectManager.TryGetObjectWithLogging<MapEventParty>(partyId, out var mapEventParty)) return false;
+        if (mapEventParty._roster == null)
         {
-            var agent = info.Agent;
-            if (agent == null || agent.IsMount || !agent.IsActive()) continue;
-            if (agent.Origin is CoopAgentOrigin origin && origin.MapEventPartyId == partyId)
-                return true;
+            Logger.Warning("[BattleSync] Migration reserve party {Party} has no flattened roster; recovery deferred", partyId);
+            return false;
         }
-        return false;
+
+        var activeByCharacter = new Dictionary<string, int>();
+        var recoverableSeeds = new HashSet<int>();
+        foreach (var element in mapEventParty._roster)
+        {
+            if (element.IsKilled || element.IsWounded || element.IsRouted || element.Troop == null) continue;
+            if (!objectManager.TryGetId(element.Troop, out var characterId)) continue;
+
+            Increment(activeByCharacter, characterId);
+            recoverableSeeds.Add(element.Descriptor.UniqueSeed);
+            activeRoster++;
+        }
+
+        var liveByCharacter = new Dictionary<string, int>();
+        foreach (var controllerId in coopMissionComponent.AgentRegistry.GetControllerIds())
+        {
+            foreach (var info in coopMissionComponent.AgentRegistry.GetAgents(controllerId))
+            {
+                var agent = info.Agent;
+                if (agent == null || agent.IsMount || !agent.IsActive()) continue;
+
+                var attribution = casualties.GetOrDefault(info.AgentId);
+                if (attribution.MapEventPartyId != partyId) continue;
+                if (attribution.TroopCharacterId != null)
+                    Increment(liveByCharacter, attribution.TroopCharacterId);
+                recoverableSeeds.Remove(attribution.TroopSeed);
+                liveAgents++;
+            }
+        }
+
+        var neededByCharacter = CalculateMissingByCharacter(activeByCharacter, liveByCharacter);
+        var origins = supplier.ClaimRecoveryTroops(partyId, neededByCharacter, recoverableSeeds);
+        if (origins.Count == 0) return false;
+
+        recovery = new RecoveryParty(supplier, partyId, new Queue<CoopAgentOrigin>(origins));
+        return true;
+    }
+
+    private static void Increment(Dictionary<string, int> counts, string key)
+        => counts[key] = counts.TryGetValue(key, out var current) ? current + 1 : 1;
+
+    /// <summary>How many living roster troops are absent locally, grouped by character.</summary>
+    public static Dictionary<string, int> CalculateMissingByCharacter(
+        IReadOnlyDictionary<string, int> activeRoster,
+        IReadOnlyDictionary<string, int> liveAgents)
+    {
+        var missing = new Dictionary<string, int>();
+        foreach (var pair in activeRoster)
+        {
+            liveAgents.TryGetValue(pair.Key, out var live);
+            int count = Math.Max(0, pair.Value - live);
+            if (count > 0)
+                missing[pair.Key] = count;
+        }
+        return missing;
     }
 
     private bool TryGetSuppliers(out CoopTroopSupplier defenderSupplier, out CoopTroopSupplier attackerSupplier)
@@ -292,10 +356,21 @@ public class ReinforcementFielder : IReinforcementFielder
 
             int index = recoveryCursors[sideIndex];
             var recovery = parties[index];
-            var origin = recovery.Supplier.SupplyOneTroopFromParty(recovery.PartyId) as CoopAgentOrigin;
-            bool exhausted = recovery.Supplier.GetRemainingForParty(recovery.PartyId) == 0;
+            if (!recovery.Supplier.ContainsParty(recovery.PartyId))
+            {
+                recovery.Origins.Clear();
+                Logger.Information("[BattleSync] Cancelled migration recovery for party {Party}; it left this host's reserve scope", recovery.PartyId);
+            }
 
-            if (origin != null)
+            var origin = recovery.Origins.Count > 0 ? recovery.Origins.Dequeue() : null;
+            bool exhausted = recovery.Origins.Count == 0;
+
+            if (origin != null && HasLivePartySeed(recovery.PartyId, origin.UniqueSeed))
+            {
+                Logger.Information("[BattleSync] Skipped migration recovery seed {Seed} for party {Party}; a late replay already registered it",
+                    origin.UniqueSeed, recovery.PartyId);
+            }
+            else if (origin != null)
             {
                 var agent = SpawnReinforcementTroop(Mission.Current, team, origin);
                 if (agent?.Formation != null) formations.Add(agent.Formation);
@@ -316,6 +391,21 @@ public class ReinforcementFielder : IReinforcementFielder
             }
         }
         return spawned;
+    }
+
+    private bool HasLivePartySeed(string partyId, int troopSeed)
+    {
+        foreach (var controllerId in coopMissionComponent.AgentRegistry.GetControllerIds())
+        {
+            foreach (var info in coopMissionComponent.AgentRegistry.GetAgents(controllerId))
+            {
+                if (info.Agent == null || !info.Agent.IsActive()) continue;
+                var attribution = casualties.GetOrDefault(info.AgentId);
+                if (attribution.MapEventPartyId == partyId && attribution.TroopSeed == troopSeed)
+                    return true;
+            }
+        }
+        return false;
     }
 
     /// <summary>Joint active troop targets using the same battle-size allocation as native Init.</summary>

@@ -163,6 +163,56 @@ public class CoopTroopSupplier : IMissionTroopSupplier
         }
     }
 
+    /// <summary>Whether this authoritative reserve snapshot still contains a party.</summary>
+    public bool ContainsParty(string partyId)
+    {
+        lock (gate)
+        {
+            foreach (var party in parties)
+                if (party.PartyId == partyId)
+                    return true;
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Claim the missing live troops of a newly-owned migration party for explicit recovery. The whole party
+    /// is marked supplied so the native wave path cannot also spawn entries now owned by the recovery queue.
+    /// </summary>
+    public IReadOnlyList<CoopAgentOrigin> ClaimRecoveryTroops(
+        string partyId,
+        IReadOnlyDictionary<string, int> neededByCharacter,
+        ISet<int> recoverableSeeds)
+    {
+        var origins = new List<CoopAgentOrigin>();
+        lock (gate)
+        {
+            foreach (var party in parties)
+            {
+                if (party.PartyId != partyId) continue;
+
+                var remainingNeeded = new Dictionary<string, int>();
+                foreach (var pair in neededByCharacter)
+                    remainingNeeded[pair.Key] = pair.Value;
+                foreach (var entry in party.Entries)
+                {
+                    if (!recoverableSeeds.Contains(entry.Seed)) continue;
+                    if (!remainingNeeded.TryGetValue(entry.CharacterId, out var needed) || needed <= 0) continue;
+
+                    if (CreateOrigin(entry, partyId) is CoopAgentOrigin origin)
+                    {
+                        origins.Add(origin);
+                        remainingNeeded[entry.CharacterId] = needed - 1;
+                    }
+                }
+
+                party.Supplied = party.Entries.Length;
+                break;
+            }
+        }
+        return origins;
+    }
+
     /// <summary>Total troops this side's supplier owns (across its parties), regardless of supplied state —
     /// the per-side count the coop spawn handler sizes the engine's deployment to.</summary>
     public int TotalTroops

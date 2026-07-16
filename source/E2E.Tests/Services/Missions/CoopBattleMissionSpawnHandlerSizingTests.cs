@@ -1,4 +1,5 @@
 ﻿using Missions.Battles;
+using System.Collections.Generic;
 using Xunit;
 
 namespace E2E.Tests.Services.Missions;
@@ -137,20 +138,20 @@ public class CoopBattleMissionSpawnHandlerSizingTests
     }
 
     [Theory]
-    [InlineData(false, 10, false, true)]
-    [InlineData(true, 10, false, false)]
-    [InlineData(false, 0, false, false)]
-    [InlineData(false, 10, true, false)]
-    public void MigrationRecoveryParty_RequiresNewRemainingReserveWithoutLiveAgent(
-        bool wasPreviouslyOwned,
-        int remainingTroops,
-        bool hasLiveAgent,
-        bool expected)
+    [InlineData(129, 0, 129)]
+    [InlineData(129, 120, 9)]
+    [InlineData(129, 129, 0)]
+    [InlineData(129, 140, 0)]
+    public void MigrationRecoveryParty_ReconcilesActiveRosterAgainstAgentsThatActuallyArrived(
+        int activeRoster,
+        int liveAgents,
+        int expectedMissing)
     {
-        Assert.Equal(expected, ReinforcementFielder.ShouldRecoverParty(
-            wasPreviouslyOwned,
-            remainingTroops,
-            hasLiveAgent));
+        var missing = ReinforcementFielder.CalculateMissingByCharacter(
+            new Dictionary<string, int> { ["imperial_recruit"] = activeRoster },
+            new Dictionary<string, int> { ["imperial_recruit"] = liveAgents });
+
+        Assert.Equal(expectedMissing, missing.TryGetValue("imperial_recruit", out var count) ? count : 0);
     }
 
     [Fact]

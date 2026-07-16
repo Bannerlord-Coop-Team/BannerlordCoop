@@ -103,7 +103,7 @@ public class CoopBattleController : CoopMissionController
         puppetRoutApplier = new PuppetRoutApplier(messageBroker, coopMissionComponent, casualties);
         damageRouter = new BattleDamageRouter(network, messageBroker, coopMissionComponent, session);
         authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, missionContext);
-        reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, coopMissionComponent, session, deployment, formationAssigner);
+        reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, coopMissionComponent, session, deployment, formationAssigner, casualties);
         // BR-102: ONE host-epoch policy shared by both siege replicators, so its accepted-epoch
         // watermark spans every host-authority message type (engine placement + machine state/authority)
         // — a superseded hosting generation is dropped consistently across both. The policy is a
