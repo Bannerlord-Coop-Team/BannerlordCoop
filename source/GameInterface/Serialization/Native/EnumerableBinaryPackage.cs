@@ -61,7 +61,6 @@ namespace GameInterface.Serialization.Native
             throw new Exception($"Type {enumerableType} not handled");
         }
 
-
         private static readonly MethodInfo Cast = typeof(Enumerable).GetMethod(nameof(Enumerable.Cast));
         private static readonly MethodInfo ToArray = typeof(Enumerable).GetMethod(nameof(Enumerable.ToArray));
         private object UnpackList(IBinaryPackageFactory binaryPackageFactory)

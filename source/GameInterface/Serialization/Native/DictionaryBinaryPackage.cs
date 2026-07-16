@@ -59,7 +59,6 @@ namespace GameInterface.Serialization.Native
             FieldInfo key = kvpType.GetField("key", BindingFlags.Instance | BindingFlags.NonPublic);
             FieldInfo value = kvpType.GetField("value", BindingFlags.Instance | BindingFlags.NonPublic);
 
-
             foreach (object obj in unpackedArray)
             {
                 var k = key.GetValue(obj);
