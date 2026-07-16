@@ -103,8 +103,7 @@ internal class VillagerConversationsPatches
         var message = new VillagersTookPrisonerOnConsequence(Hero.MainHero, MobileParty.MainParty, encounteredMobileParty, itemRosterElements);
         MessageBroker.Instance.Publish(__instance, message);
 
-        // Finish now so the modal screens cannot return to the same encounter.
-        PlayerEncounter.Finish();
+        PlayerEncounter.LeaveEncounter = true;
 
         return false;
     }
