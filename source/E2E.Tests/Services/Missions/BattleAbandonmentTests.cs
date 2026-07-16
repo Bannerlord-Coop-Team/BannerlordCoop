@@ -6,10 +6,12 @@ using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.MapEvents.TroopSupply.Messages;
 using Missions.Messages;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using Xunit;
@@ -307,6 +309,64 @@ public class BattleAbandonmentTests : MissionTestEnvironment
         });
     }
 
+    /// <summary>
+    /// A member is still LOADING (entered, not yet mission-ready) when the elected host DISCONNECTS with no
+    /// mission-ready successor. The instance is NOT empty, so this is not an abandonment (BR-017): the departed
+    /// host must stay ABSENT-marked so that the still-loading player, once it becomes the eventual first-ready
+    /// host, inherits the disconnected host's party into its reserve scope. (The reserves themselves are still
+    /// re-flattened — with no surviving ready client nothing persists on the field — but the absent bookkeeping
+    /// must survive, which is exactly what the no-successors branch was clearing.)
+    /// <para>
+    /// PRE-FIX FAILURE MECHANISM: the no-successors host-departure branch ran <c>ClearBattleRecords</c> even
+    /// though the instance was not empty, dropping the disconnected host's absent marker. When the loading
+    /// player is then elected host, the reserve build resolves the disconnected host's (attacker-side) party to
+    /// that still-registered — and no-longer-absent — host, not to the new host, so the grant omits it: the new
+    /// host's feeds never carry the disconnected host's MapEventParty id and the final <c>Assert.Contains</c>
+    /// fails. Keeping the absent marker (skipping <c>ClearBattleRecords</c> unless the instance is truly empty)
+    /// makes the party fall to the eventual host.
+    /// </para>
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "BR-017")]
+    public void HostDisconnectsWithNoReadySuccessor_WhilePlayerStillLoading_KeepsDepartedHostAbsentForEventualHost()
+    {
+        var (mapEventId, partyIds) = SetupCoopBattle("host-ctrl", "loader-ctrl");
+        var clients = Clients.ToArray();
+
+        EnterBattle(clients[0], mapEventId);                      // host-ctrl -> host (mission-ready)
+        EnterBattle(clients[1], mapEventId, missionReady: false); // loader-ctrl entered but still loading
+        AssertHost(Server, mapEventId, "host-ctrl");              // no successor — the loader is not ready
+
+        var hostPartyMep = GetMapEventPartyId(mapEventId, partyIds[0]);
+
+        Server.NetworkSentMessages.Clear();
+
+        // The elected host disconnects; no ready successor exists, but the loader is still in the instance.
+        DepartBattle("host-ctrl", mapEventId, wasRetreat: false, isInstanceEmpty: false);
+
+        // The now-hostless assignment is removed, but the battle is NOT announced torn down — no Unclaimed mode
+        // is broadcast (that happens only on an observed-empty instance).
+        Server.Call(() => Assert.False(Server.Resolve<IBattleHostRegistry>().TryGet(mapEventId, out _),
+            "the departed host's now-hostless assignment should be removed"));
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkBattleModeSet>());
+
+        // The still-loading player becomes ready: it is elected as the eventual (fresh) host and must inherit
+        // the disconnected host's party — the departed host stayed absent, so its (attacker-side) party falls to
+        // the new host's reserve scope rather than resolving back to the still-registered departed host.
+        var loader = clients[1];
+        int loaderBaseline = loader.InternalMessages.GetMessages<NetworkBattleTroopReserve>()
+            .Count(message => message.MapEventId == mapEventId);
+        MakeMissionReady(loader, mapEventId);
+        AssertHost(Server, mapEventId, "loader-ctrl");
+
+        var grantedParties = loader.InternalMessages.GetMessages<NetworkBattleTroopReserve>()
+            .Where(message => message.MapEventId == mapEventId)
+            .Skip(loaderBaseline)
+            .SelectMany(feed => feed.Parties)
+            .Select(party => party.PartyId);
+        Assert.Contains(hostPartyMep, grantedParties);
+    }
+
     // ------------------------------------------------------------------
     // Shared asserts
     // ------------------------------------------------------------------
@@ -374,5 +434,21 @@ public class BattleAbandonmentTests : MissionTestEnvironment
         foreach (var element in roster)
             if (!element.IsKilled && !element.IsWounded && !element.IsRouted && element.Troop == troop) n++;
         return n;
+    }
+
+    /// <summary>The MapEventParty id wrapping a player's party — the key the reserve ledger uses.</summary>
+    private string GetMapEventPartyId(string mapEventId, string partyId)
+    {
+        string mepId = null;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            var mep = mapEvent.AttackerSide.Parties.Concat(mapEvent.DefenderSide.Parties)
+                .Last(p => p.Party == party.Party);
+            Assert.True(Server.ObjectManager.TryGetId(mep, out mepId));
+        }, MapEventDisabledMethods);
+        Assert.NotNull(mepId);
+        return mepId;
     }
 }

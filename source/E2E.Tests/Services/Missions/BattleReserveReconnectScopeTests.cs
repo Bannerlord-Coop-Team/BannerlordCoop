@@ -380,4 +380,68 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
             CoopTroopSupplierRegistry.ClearBattle(mapEventId);
         }
     }
+
+    /// <summary>
+    /// BR-031 residual (drop before any host election): a member DISCONNECTS while EVERY participant is still
+    /// on the loading screen, so no host has been elected yet. The drop must still mark the member ABSENT — its
+    /// still-registered party must fall to the reserve scope of whoever becomes the eventual first-ready host,
+    /// exactly as a drop after election does. Otherwise that party is orphaned: no live supplier ever fields
+    /// its reinforcements.
+    /// <para>
+    /// PRE-FIX FAILURE MECHANISM: <c>Handle_MissionMemberDeparted</c> early-returned on the missing host
+    /// assignment BEFORE it reached the drop/retreat bookkeeping, so <c>MarkAbsent</c> never ran for a member
+    /// that dropped pre-election. When the loading player then becomes the elected host, the reserve build
+    /// resolves the dropped member's party to that (still-registered, not-absent) member — not to the host —
+    /// so the host's grant feeds the dropper's side EMPTY. The Defender latest-feed therefore does not contain
+    /// the dropper's MapEventParty id and <c>Assert.Contains</c> below fails. With the bookkeeping moved above
+    /// the assignment check, the dropper is absent-marked, its party falls to the host, and the grant carries
+    /// it.
+    /// </para>
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "BR-031")]
+    public void MemberDroppingBeforeAnyElection_IsAbsentMarked_SoTheEventualHostInheritsItsParty()
+    {
+        // c0 becomes the eventual host (attacker side); c1 drops while still loading (defender side).
+        var (mapEventId, partyIds) = SetupCoopBattle("eventual-host-ctrl", "dropper-ctrl");
+        var clients = Clients.ToArray();
+        var eventualHost = clients[0];
+
+        CoopTroopSupplierRegistry.ClearBattle(mapEventId);
+        try
+        {
+            GiveRoster(mapEventId, partyIds[1], ReturnerTroopCount);
+            var dropperMepId = GetMapEventPartyId(mapEventId, partyIds[1]);
+
+            // Both participants ENTER but neither becomes mission-ready — no host is elected yet.
+            EnterBattle(clients[0], mapEventId, missionReady: false);
+            EnterBattle(clients[1], mapEventId, missionReady: false);
+            AssertNoHost(Server, mapEventId);
+
+            // The still-loading member disconnects (not a retreat; the instance is not empty — c0 is present).
+            DepartBattle("dropper-ctrl", mapEventId, wasRetreat: false, isInstanceEmpty: false);
+
+            // c0 finishes loading and is elected the (first-ready) host.
+            int hostBaseline = FeedBaseline(eventualHost, mapEventId);
+            MakeMissionReady(eventualHost, mapEventId);
+            AssertHost(Server, mapEventId, "eventual-host-ctrl");
+
+            // The elected host must inherit the dropped, still-registered member's party — the drop landed
+            // before any election, but was still absent-marked.
+            var hostFeeds = FeedsSince(eventualHost, mapEventId, hostBaseline);
+            var hostDefender = LatestSideParties(hostFeeds, BattleSideEnum.Defender);
+            Assert.NotNull(hostDefender);
+            Assert.Contains(dropperMepId, hostDefender);
+
+            // ...at the flattened roster and a fresh (unsupplied) pointer.
+            var granted = hostFeeds.Where(feed => feed.Side == (int)BattleSideEnum.Defender)
+                .Last().Parties.Single(party => party.PartyId == dropperMepId);
+            Assert.Equal(0, granted.SuppliedCount);
+            Assert.Equal(ReturnerTroopCount, granted.Entries.Length);
+        }
+        finally
+        {
+            CoopTroopSupplierRegistry.ClearBattle(mapEventId);
+        }
+    }
 }

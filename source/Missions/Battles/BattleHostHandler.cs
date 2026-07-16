@@ -371,13 +371,15 @@ internal class BattleHostHandler : IHandler
                 return;
             }
 
-            if (!hostRegistry.TryGet(mapEventId, out var assignment))
-                return; // no host assignment for this instance — not a battle
-
-            // A retreat (graceful leave) despawned the departing player's troops, so forget their reserve party
-            // — a rejoin then re-flattens it fresh (supplied pointer reset) and re-spawns. A disconnect keeps
-            // the reserve (the host adopts the troops and reinforces them from the existing pointer) — mark
-            // the dropped member ABSENT so its parties resolve into the HOST's reserve scope until it returns.
+            // Departure bookkeeping runs BEFORE the host-assignment check: a member can drop while every
+            // participant is still on the loading screen, so no host has been elected yet. A retreat (graceful
+            // leave) despawned the departing player's troops, so forget their reserve party — a rejoin then
+            // re-flattens it fresh (supplied pointer reset) and re-spawns. A disconnect keeps the reserve (the
+            // host adopts the troops and reinforces them from the existing pointer) — mark the dropped member
+            // ABSENT so its parties resolve into the reserve scope of whoever fields them next. Gating this on
+            // an existing host assignment orphaned a member that dropped BEFORE any election: the eventual
+            // first-ready host's reserve build never saw the drop, so it never inherited that still-registered
+            // party.
             if (payload.What.WasRetreat)
             {
                 if (objectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent))
@@ -388,22 +390,34 @@ internal class BattleHostHandler : IHandler
                 MarkAbsent(mapEventId, controllerId);
             }
 
+            if (!hostRegistry.TryGet(mapEventId, out var assignment))
+                return; // no host elected yet — the departure bookkeeping above is all that applies
+
             var successors = new List<string>(assignment.SuccessorControllerIds);
 
             if (assignment.HostControllerId == controllerId)
             {
                 if (successors.Count == 0)
                 {
-                    Logger.Warning("[BattleHost] Host {Host} left battle {MapEventId} with no successors; clearing assignment",
+                    // The recorded host left and no mission-ready successor exists — but the instance is NOT
+                    // empty here (the empty branch above already returned), so a participant is still LOADING
+                    // and will become the eventual host. Remove the now-hostless assignment and the departed
+                    // host's stale peer, and re-flatten the reserves (ForgetMapEvent) exactly as the empty
+                    // branch does: with no surviving ready client, none of the departed host's on-field troops
+                    // persist anywhere, so the eventual host must re-spawn the whole (casualty-reduced) roster
+                    // from a reset pointer — retaining the advanced pointer would under-spawn the troops that
+                    // vanished with the host. But do NOT clear the scope bookkeeping (no ClearBattleRecords):
+                    // the departed host stays ABSENT so its party falls to the eventual host's reserve scope.
+                    // Clearing it here (as the abandonment teardown does) let the party resolve back to the
+                    // still-registered departed host, so the eventual host never received it. The full teardown
+                    // — which also clears the absent markers — runs only when the instance is observed EMPTY.
+                    Logger.Warning("[BattleHost] Host {Host} left battle {MapEventId} with no ready successors (players still loading); re-flattening reserves but keeping the departed host absent so the eventual host inherits its party",
                         controllerId, mapEventId);
                     hostRegistry.Remove(mapEventId);
+                    hostPeers.Remove(mapEventId); // the departed host's recorded peer is stale
 
-                    // Fully abandoned even though the membership signal did not mark the instance empty (e.g.
-                    // a member still on the loading screen was never mission-ready): forget the WHOLE map
-                    // event's reserves for the same reason as the empty-instance branch above.
                     if (objectManager.TryGetObject<MapEvent>(mapEventId, out var abandonedEvent))
                         reserveBuilder.ForgetMapEvent(abandonedEvent);
-                    ClearBattleRecords(mapEventId);
                     return;
                 }
 
