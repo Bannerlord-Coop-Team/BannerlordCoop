@@ -261,7 +261,7 @@ namespace Coop
 
         public override void NoHarmonyLoad()
         {
-            Coop = new CoopartiveMultiplayerExperience();
+            Coop = new CoopartiveMultiplayerExperience(isServer);
 
             Updateables.Add(GameThread.Instance);
 
