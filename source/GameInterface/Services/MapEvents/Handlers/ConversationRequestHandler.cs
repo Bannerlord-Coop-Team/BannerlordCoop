@@ -176,6 +176,16 @@ internal class ConversationRequestHandler : IHandler
         var attackerInMapEvent = attacker.MapEvent != null;
         var defenderInMapEvent = defender.MapEvent != null;
 
+        if ((attackerIsPlayer && !attacker.MobileParty.IsActive) ||
+            (defenderIsPlayer && !defender.MobileParty.IsActive))
+        {
+            Logger.Debug(
+                "Rejecting PvP conversation: a player party is inactive. AttackerId={AttackerId}, DefenderId={DefenderId}",
+                request.AttackerId, request.DefenderId);
+            network.Send(requestingPeer, new NetworkConversationDenied());
+            return false;
+        }
+
         // PvP: a party joining an existing battle (exactly one side is already in a map event) is allowed through so
         // the joining player's PlayerEncounter can attach to that battle. There is no AI party to hold for a join.
         if (attackerInMapEvent ^ defenderInMapEvent)
