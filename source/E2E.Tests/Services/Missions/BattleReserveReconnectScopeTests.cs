@@ -219,7 +219,7 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
 
             // Exclusivity: across the two clients' latest per-side feeds, no party is held twice.
             var hostHeld = hostAttacker.Concat(hostDefender);
-            var returnerHeld = returnerDefender.Concat(LatestSideParties(returnerFeeds, BattleSideEnum.Attacker) ?? new string[0]);
+            var returnerHeld = returnerDefender.Concat(LatestSideParties(returnerFeeds, BattleSideEnum.Attacker) ?? Array.Empty<string>());
             Assert.Empty(hostHeld.Intersect(returnerHeld));
         }
         finally
@@ -372,7 +372,7 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
 
             // Exclusivity after the handoff: no party appears in both clients' latest scopes.
             var promotedHeld = refreshedAttacker.Concat(refreshedDefender);
-            var returnerHeld = returnerAttacker.Concat(LatestSideParties(returnerFeeds, BattleSideEnum.Defender) ?? new string[0]);
+            var returnerHeld = returnerAttacker.Concat(LatestSideParties(returnerFeeds, BattleSideEnum.Defender) ?? Array.Empty<string>());
             Assert.Empty(promotedHeld.Intersect(returnerHeld));
         }
         finally
