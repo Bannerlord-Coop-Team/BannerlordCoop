@@ -144,8 +144,13 @@ public class AutoSyncBuilder
         IEnumerable<string> runtimeFacades = Enumerable.Empty<string>();
         if (typeof(object).Assembly.GetName().Name != "mscorlib")
         {
+            // The runtime directory mixes the managed façades with native binaries
+            // (coreclr, clrjit, msquic, api-ms-win-crt-*, ...); a native PE fed to
+            // MetadataReference.CreateFromFile fails the whole compilation with
+            // "PE image doesn't contain managed metadata" — reference managed files only.
             runtimeFacades = Directory.EnumerateFiles(
-                Path.GetDirectoryName(typeof(object).Assembly.Location), "*.dll");
+                Path.GetDirectoryName(typeof(object).Assembly.Location), "*.dll")
+                .Where(IsManagedAssembly);
         }
 
         var dynamicAssembly = CSharpCompilation.Create(
@@ -184,5 +189,26 @@ public class AutoSyncBuilder
         }
 
         return Assembly.Load(assemblyStream.GetBuffer());
+    }
+
+    /// <summary>
+    /// True when the file at <paramref name="path"/> is a managed assembly — i.e. safe to
+    /// hand to <see cref="MetadataReference.CreateFromFile(string, MetadataReferenceProperties, DocumentationProvider)"/>.
+    /// Reads only the assembly identity; never loads the file into the AppDomain.
+    /// </summary>
+    private static bool IsManagedAssembly(string path)
+    {
+        try
+        {
+            AssemblyName.GetAssemblyName(path);
+            return true;
+        }
+        catch
+        {
+            // BadImageFormatException for native PEs, plus any unreadable/locked file —
+            // excluding those is always safe (worst case a facade is skipped and the
+            // compile reports the missing identity explicitly).
+            return false;
+        }
     }
 }
