@@ -29,6 +29,9 @@ internal class TacticalUnitSymbolsConfigSnapshotHandler : IHandler
     {
         if (ModInformation.IsClient) return;
 
-        tacticalUnitSymbolsConfigInterface.SendSnapshot(payload.What.playerId);
+        GameThread.RunSafe(
+            () => tacticalUnitSymbolsConfigInterface.SendSnapshot(payload.What.playerId),
+            blocking: true,
+            context: nameof(Handle_PlayerCampaignEntered));
     }
 }

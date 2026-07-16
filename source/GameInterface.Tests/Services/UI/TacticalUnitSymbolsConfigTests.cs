@@ -66,12 +66,12 @@ public class TacticalUnitSymbolsConfigTests
     }
 
     [Fact]
-    public void ServerConsoleCommand_On_UpdatesAndBroadcastsTheAuthoritativeSetting()
+    public void ServerConsoleCommand_On_ShowsAndBroadcastsTheAuthoritativeSetting()
     {
         var wasServer = ModInformation.IsServer;
         var previous = TacticalUnitSymbolsSettings.HideTacticalUnitSymbols;
         ModInformation.IsServer = true;
-        TacticalUnitSymbolsSettings.SetHideTacticalUnitSymbols(false);
+        TacticalUnitSymbolsSettings.SetHideTacticalUnitSymbols(true);
 
         try
         {
@@ -90,10 +90,10 @@ public class TacticalUnitSymbolsConfigTests
 
             var result = TacticalUnitSymbolsDebugCommand.TacticalSymbols(new List<string> { "on" });
 
-            Assert.Equal("Tactical unit symbols are hidden.", result);
-            Assert.True(TacticalUnitSymbolsSettings.HideTacticalUnitSymbols);
+            Assert.Equal("Tactical unit symbols are visible.", result);
+            Assert.False(TacticalUnitSymbolsSettings.HideTacticalUnitSymbols);
             var changed = Assert.IsType<NetworkTacticalUnitSymbolsVisibilityChanged>(sent);
-            Assert.True(changed.HideTacticalUnitSymbols);
+            Assert.False(changed.HideTacticalUnitSymbols);
         }
         finally
         {

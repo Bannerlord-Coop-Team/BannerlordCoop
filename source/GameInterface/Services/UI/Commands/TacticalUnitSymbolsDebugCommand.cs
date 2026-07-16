@@ -22,11 +22,11 @@ public class TacticalUnitSymbolsDebugCommand
             case "on":
             case "true":
             case "1":
-                return Apply(true);
+                return Apply(false);
             case "off":
             case "false":
             case "0":
-                return Apply(false);
+                return Apply(true);
             case "toggle":
                 return Apply(!TacticalUnitSymbolsSettings.HideTacticalUnitSymbols);
             case "status":
