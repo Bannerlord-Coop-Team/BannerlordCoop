@@ -173,7 +173,9 @@ public class MissionManager : IMissionManager
             instance.RemovePeer(peer);
             Logger.Information("Controller {Controller} left instance {Instance}", controllerId, instanceId);
 
-            return Members(instance);
+            var remaining = Members(instance);
+            PruneIfEmpty(instanceId, remaining.Count);
+            return remaining;
         }
     }
 
@@ -187,19 +189,38 @@ public class MissionManager : IMissionManager
         lock (gate)
         {
             // A peer is in at most one instance; find the one that still lists this connection.
+            MissionInstance found = null;
             foreach (var entry in byInstanceId)
             {
                 if (entry.Value.TryGetController(peer, out controllerId) == false) continue;
 
                 instanceId = entry.Key;
-                entry.Value.RemovePeer(peer);
-                remaining = Members(entry.Value);
-                Logger.Information("Controller {Controller} disconnected from instance {Instance}", controllerId, instanceId);
-                return true;
+                found = entry.Value;
+                break; // leave the enumeration before mutating the dictionary (PruneIfEmpty removes the entry)
             }
 
-            return false;
+            if (found == null)
+                return false;
+
+            found.RemovePeer(peer);
+            remaining = Members(found);
+            Logger.Information("Controller {Controller} disconnected from instance {Instance}", controllerId, instanceId);
+            PruneIfEmpty(instanceId, remaining.Count);
+            return true;
         }
+    }
+
+    // Drop the instance record once its last member is gone (BR-017: destroying the battle instance includes
+    // the membership/relay record — previously it leaked per battle). Any stale NAT-punch endpoints go with
+    // it; a later (re-)engagement of the same instance id re-punches and recreates the record from scratch,
+    // which is exactly the fresh instance BR-054/BR-002 call for. Caller holds the lock.
+    private void PruneIfEmpty(string instanceId, int remainingMembers)
+    {
+        if (remainingMembers > 0)
+            return;
+
+        byInstanceId.Remove(instanceId);
+        Logger.Information("Removed empty instance {Instance} after its last member left", instanceId);
     }
 
     public bool TryGetControllers(string instanceId, out IReadOnlyCollection<string> controllers)

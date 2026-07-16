@@ -1,6 +1,7 @@
 ﻿using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
@@ -90,11 +91,20 @@ namespace E2E.Tests.Services.Heroes
         [Fact]
         public void Server_Hero_Fields()
         {
+            var assertHelper = TestEnvironment.CreateAssertHelper<Hero>(HeroId);
+
             // Hero.Culture is initialized by HeroCreator.CreateSpecialHero(); clear it first so the pre-check passes
             Server.ObjectManager.TryGetObject<Hero>(HeroId, out var hero);
             HarmonyLib.AccessTools.Field(typeof(Hero), nameof(Hero.Culture)).SetValue(hero, null);
             TestEnvironment.AssertReferenceField<Hero, CultureObject>(nameof(Hero.Culture));
             TestEnvironment.AssertField<Hero, float>(nameof(Hero._power), 4.4f, defaultValue: hero._power);
+
+            assertHelper.AssertPropertyOwnerField<Hero, TraitObject>(nameof(Hero._heroTraits));
+            assertHelper.AssertPropertyOwnerField<Hero, PerkObject>(nameof(Hero._heroPerks));
+            assertHelper.AssertPropertyOwnerField<Hero, SkillObject>(nameof(Hero._heroSkills));
+            assertHelper.AssertPropertyOwnerField<Hero, CharacterAttribute>(nameof(Hero._characterAttributes));
+
+            TestEnvironment.AssertField<Hero, int>(nameof(Hero.Level), 10, defaultValue: hero.Level);
         }
 
         // Calls the REAL patched game method (not a reflection-invoked intercept), so this covers the
@@ -119,6 +129,49 @@ namespace E2E.Tests.Services.Heroes
                 Assert.True(client.ObjectManager.TryGetObject(HeroId, out Hero hero));
                 Assert.True(client.ObjectManager.TryGetObject(skillId, out SkillObject skill));
                 Assert.Equal(42, hero.GetSkillValue(skill));
+            }
+        }
+
+        // SetPerkValueInternal's bool->int branch defeats the transpiler, so SetPerkValuePatch routes
+        // perk changes through the cached PropertyOwner intercept - this exercises that prefix for real
+        [Fact]
+        public void Server_Hero_SetPerkValue_PropagatesToClients()
+        {
+            var perkId = TestEnvironment.CreateRegisteredObject<PerkObject>();
+
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                Assert.True(Server.ObjectManager.TryGetObject(perkId, out PerkObject perk));
+
+                hero.SetPerkValueInternal(perk, true);
+
+                Assert.True(hero.GetPerkValue(perk));
+            });
+
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                Assert.True(client.ObjectManager.TryGetObject(perkId, out PerkObject perk));
+                Assert.True(hero.GetPerkValue(perk));
+            }
+
+            // Resetting the perk rides the same message with value 0 (vanilla removes the key)
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                Assert.True(Server.ObjectManager.TryGetObject(perkId, out PerkObject perk));
+
+                hero.SetPerkValueInternal(perk, false);
+
+                Assert.False(hero.GetPerkValue(perk));
+            });
+
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                Assert.True(client.ObjectManager.TryGetObject(perkId, out PerkObject perk));
+                Assert.False(hero.GetPerkValue(perk));
             }
         }
 

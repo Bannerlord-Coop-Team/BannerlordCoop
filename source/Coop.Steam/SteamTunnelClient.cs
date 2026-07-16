@@ -36,16 +36,24 @@ public class SteamTunnelClient : IDisposable
         transport.ConnectionStateChanged += OnConnectionStateChanged;
     }
 
+    /// <summary>Raised when the remote Steam connection closes unexpectedly.</summary>
+    public event Action Closed;
+
     public int LocalPort { get; private set; }
 
     public void Start(ulong hostSteamId)
+    {
+        Start(hostSteamId, SteamTunnel.VirtualPort);
+    }
+
+    public void Start(ulong hostSteamId, int virtualPort)
     {
         transport.EnsureRelayAccess();
 
         socket = TunnelSocket.CreateLoopbackDatagramSocket();
         LocalPort = ((IPEndPoint)socket.LocalEndPoint).Port;
 
-        connection = transport.ConnectToHost(hostSteamId, SteamTunnel.VirtualPort);
+        connection = transport.ConnectToHost(hostSteamId, virtualPort);
 
         poller = new Poller(Update, SteamTunnel.PumpInterval);
         poller.Start();
@@ -116,6 +124,7 @@ public class SteamTunnelClient : IDisposable
             case TunnelConnectionState.Closed:
                 Logger.Warning("Steam tunnel to the host closed; {Status}",
                     transport.DescribeConnection(connection));
+                Closed?.Invoke();
                 break;
         }
     }

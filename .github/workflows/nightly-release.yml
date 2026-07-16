@@ -1,0 +1,199 @@
+name: Nightly Release
+
+on:
+  schedule:
+    - cron: '57 23 * * *'
+      timezone: America/Chicago
+  workflow_dispatch:
+    inputs:
+      release_date:
+        description: Release date to rebuild (YYYY-MM-DD); defaults to today in Central time
+        required: false
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: nightly-release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/development'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: garrettluskey/bannerlordcoop@sha256:8e99cad9fba3df32281c0de95cb20911414656f05cb890ad1777586ae6ee2f6b
+
+    steps:
+      - name: Checkout development
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Trust checkout directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Install timezone data
+        run: apk add --no-cache tzdata >/dev/null
+
+      - name: Find previous nightly commit
+        id: previous
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+        with:
+          result-encoding: string
+          script: |
+            const response = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'nightly-release.yml',
+              branch: 'development',
+              status: 'success',
+              per_page: 1,
+            });
+            return response.data.workflow_runs[0]?.head_sha ?? '';
+
+      - name: Link Bannerlord assemblies
+        run: ln -s /home/mb2 mb2
+
+      - name: Restore .NET Framework build inputs
+        run: |
+          set -eu
+          reference_package="$RUNNER_TEMP/net472.nupkg"
+          reference_root="$RUNNER_TEMP/net472"
+          mkdir -p "$reference_root" source/packages
+          wget -q \
+            https://api.nuget.org/v3-flatcontainer/microsoft.netframework.referenceassemblies.net472/1.0.3/microsoft.netframework.referenceassemblies.net472.1.0.3.nupkg \
+            -O "$reference_package"
+          echo "ffa0a5570a39f911399164d0581ffddef99b5e3dfbaa5f220e5ce22969bcf57c  $reference_package" | sha256sum -c -
+          unzip -q "$reference_package" -d "$reference_root"
+
+          sed -n 's/.*id="\([^"]*\)" version="\([^"]*\)".*/\1 \2/p' source/Coop/packages.config |
+            while read -r package_id package_version; do
+              lower_id=$(printf '%s' "$package_id" | tr '[:upper:]' '[:lower:]')
+              destination="source/packages/$package_id.$package_version"
+              package_file="$RUNNER_TEMP/$lower_id.$package_version.nupkg"
+              mkdir -p "$destination"
+              wget -q \
+                "https://api.nuget.org/v3-flatcontainer/$lower_id/$package_version/$lower_id.$package_version.nupkg" \
+                -O "$package_file"
+              unzip -q "$package_file" -d "$destination"
+            done
+
+      - name: Build release module
+        working-directory: source
+        run: |
+          dotnet build Coop/Coop.csproj \
+            -c Release \
+            -p:CustomAfterMicrosoftCommonTargets="$RUNNER_TEMP/net472/build/Microsoft.NETFramework.ReferenceAssemblies.net472.targets" \
+            -p:SourceRevisionId="$GITHUB_SHA" \
+            -p:IncludeSourceRevisionInInformationalVersion=true \
+            -p:ModName= \
+            -p:NuGetAudit=false \
+            --consoleLoggerParameters:ErrorsOnly
+
+      - name: Build release metadata
+        id: release
+        env:
+          PREVIOUS_SHA: ${{ steps.previous.outputs.result }}
+          REQUESTED_RELEASE_DATE: ${{ inputs.release_date }}
+        run: |
+          set -eu
+          if [ -n "$REQUESTED_RELEASE_DATE" ]; then
+            if ! printf '%s\n' "$REQUESTED_RELEASE_DATE" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
+              echo 'release_date must use YYYY-MM-DD' >&2
+              exit 1
+            fi
+            release_epoch=$(TZ=America/Chicago date -d "$REQUESTED_RELEASE_DATE 12:00:00" +%s)
+            if [ "$(TZ=America/Chicago date -d "@$release_epoch" +%F)" != "$REQUESTED_RELEASE_DATE" ]; then
+              echo 'release_date is not a valid calendar date' >&2
+              exit 1
+            fi
+          else
+            release_epoch=$(date +%s)
+            if [ "$GITHUB_EVENT_NAME" = schedule ]; then
+              release_hour=$(TZ=America/Chicago date +%H)
+              release_minute=$(TZ=America/Chicago date +%M)
+              if [ "$release_hour" -lt 23 ] || { [ "$release_hour" -eq 23 ] && [ "$release_minute" -lt 57 ]; }; then
+                release_epoch=$((release_epoch - 86400))
+              fi
+            fi
+          fi
+          release_date=$(TZ=America/Chicago date -d "@$release_epoch" +%F)
+          display_date=$(TZ=America/Chicago date -d "@$release_epoch" +%m-%d-%Y)
+          file_name="Coop $display_date.7z"
+          head_sha=$(git rev-parse HEAD)
+          base_sha="$PREVIOUS_SHA"
+          if [ -z "$base_sha" ] || ! git merge-base --is-ancestor "$base_sha" "$head_sha"; then
+            base_sha=
+          fi
+
+          mkdir -p artifact
+          printf 'release_date=%s\nfile_name=%s\nhead_sha=%s\nbase_sha=%s\n' \
+            "$release_date" "$file_name" "$head_sha" "$base_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Package module
+        env:
+          RELEASE_DATE: ${{ steps.release.outputs.release_date }}
+          FILE_NAME: ${{ steps.release.outputs.file_name }}
+          HEAD_SHA: ${{ steps.release.outputs.head_sha }}
+          BASE_SHA: ${{ steps.release.outputs.base_sha }}
+        run: |
+          set -eu
+          apk add --no-cache 7zip >/dev/null
+          module=release-stage/Coop
+          binary="$module/bin/Win64_Shipping_Client"
+          mkdir -p "$binary" "$module/GUI/Prefabs"
+
+          for file in source/Coop/bin/Release/*.dll; do
+            name=${file##*/}
+            case "$name" in
+              TaleWorlds.*|SandBox.*|StoryMode.*) continue ;;
+            esac
+            cp "$file" "$binary/"
+          done
+          for required in Coop.dll Common.dll Coop.Core.dll Coop.Steam.dll GameInterface.dll Missions.dll; do
+            test -s "$binary/$required"
+          done
+          cp deploy/start-client.bat deploy/start-server.bat 'deploy/Server Instructions.md' "$module/"
+          cp -R UIMovies/. "$module/GUI/Prefabs/"
+
+          coop_version=$(sed -n 's/.*<CoopVersion>\([^<]*\)<\/CoopVersion>.*/\1/p' source/Directory.Build.props)
+          game_version=$(sed -n 's/.*<GameVersion>\([^<]*\)<\/GameVersion>.*/\1/p' source/Coop/Coop.csproj)
+          test -n "$coop_version"
+          test -n "$game_version"
+          # shellcheck disable=SC2016
+          sed \
+            -e 's/${name}/Coop/g' \
+            -e 's/${main_class}/CoopMod/g' \
+            -e "s/\${version}/v$coop_version/g" \
+            -e "s/\${game_version}/$game_version/g" \
+            deploy/SubModule.xml > "$module/SubModule.xml"
+
+          (cd release-stage && 7z a -t7z -m0=LZMA2 -mx=9 -ms=on \
+            "../artifact/$FILE_NAME" Coop >/dev/null)
+          release_size=$(stat -c %s "artifact/$FILE_NAME")
+          if [ "$release_size" -gt 8388608 ]; then
+            echo "Release archive is $release_size bytes; the 8 MiB safety budget reserves 2 MiB below Discord's 10 MiB limit." >&2
+            exit 1
+          fi
+
+          if [ -n "$BASE_SHA" ]; then
+            base_json="\"$BASE_SHA\""
+          else
+            base_json=null
+          fi
+          printf '{"releaseDate":"%s","fileName":"%s","branch":"development","headSha":"%s","baseSha":%s}\n' \
+            "$RELEASE_DATE" "$FILE_NAME" "$HEAD_SHA" "$base_json" > artifact/manifest.json
+
+      - name: Upload nightly artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nightly-release-${{ steps.release.outputs.release_date }}
+          path: artifact/*
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 3

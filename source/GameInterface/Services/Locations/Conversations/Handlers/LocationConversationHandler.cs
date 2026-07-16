@@ -3,11 +3,17 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Locations.Conversations.Patches;
 using GameInterface.Services.Locations.Messages.Conversation;
+using GameInterface.Services.MapEvents.Messages.Conversation;
+using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.Players;
 using LiteNetLib;
 using Serilog;
 using System;
+using System.Collections.Concurrent;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.Locations.Conversations.Handlers;
@@ -31,14 +37,21 @@ internal class LocationConversationHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly LocationConversationTracker tracker;
+    private readonly IPlayerManager playerManager;
+    private readonly ConcurrentDictionary<NetPeer, string> waitingPartyByInitiator = new ConcurrentDictionary<NetPeer, string>();
 
     private DateTime lastBlockedMessageUtc = DateTime.MinValue;
 
-    public LocationConversationHandler(IMessageBroker messageBroker, INetwork network, LocationConversationTracker tracker)
+    public LocationConversationHandler(
+        IMessageBroker messageBroker,
+        INetwork network,
+        LocationConversationTracker tracker,
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.tracker = tracker;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<LocationConversationRequested>(Handle_LocationConversationRequested);
         messageBroker.Subscribe<LocationConversationEnded>(Handle_LocationConversationEnded);
@@ -58,6 +71,8 @@ internal class LocationConversationHandler : IHandler
         messageBroker.Unsubscribe<NetworkLocationConversationDenied>(Handle_NetworkLocationConversationDenied);
         messageBroker.Unsubscribe<NetworkLocationConversationEnded>(Handle_NetworkLocationConversationEnded);
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
+
+        waitingPartyByInitiator.Clear();
     }
 
     /// <summary>[Client] Forward the request to the server.</summary>
@@ -91,6 +106,7 @@ internal class LocationConversationHandler : IHandler
         if (tracker.TryBeginEngagement(peer, npcKey))
         {
             network.Send(peer, new NetworkAllowLocationConversation(request.Generation));
+            StartPlayerWaitingInteraction(peer, request.CharacterId);
         }
         else
         {
@@ -143,6 +159,7 @@ internal class LocationConversationHandler : IHandler
         }
 
         tracker.TryEndEngagement(peer, out _);
+        EndPlayerWaitingInteraction(peer);
     }
 
     /// <summary>[Server] A player disconnected: release the NPC held for them, if any.</summary>
@@ -151,6 +168,38 @@ internal class LocationConversationHandler : IHandler
         if (!ModInformation.IsServer) return;
 
         tracker.TryEndEngagement(payload.What.PlayerId, out _);
+        EndPlayerWaitingInteraction(payload.What.PlayerId);
+    }
+
+    private void StartPlayerWaitingInteraction(NetPeer initiatorPeer, string characterId)
+    {
+        if (!tracker.ObjectManager.TryGetObject<CharacterObject>(characterId, out var character)) return;
+
+        var targetHero = character.HeroObject;
+        if (targetHero?.IsPlayerHero() != true) return;
+
+        var targetParty = targetHero.PartyBelongedTo?.Party;
+        if (targetParty?.MobileParty?.IsPlayerParty() != true) return;
+        if (!tracker.ObjectManager.TryGetId(targetParty, out var targetPartyId)) return;
+        if (!waitingPartyByInitiator.TryAdd(initiatorPeer, targetPartyId)) return;
+
+        network.SendAll(new NetworkPlayerInteractionStarted(targetPartyId, GetPlayerName(initiatorPeer), isLocationInteraction: true));
+    }
+
+    private void EndPlayerWaitingInteraction(NetPeer initiatorPeer)
+    {
+        if (initiatorPeer == null) return;
+        if (!waitingPartyByInitiator.TryRemove(initiatorPeer, out var targetPartyId)) return;
+
+        network.SendAll(new NetworkPlayerInteractionEnded(targetPartyId, isLocationInteraction: true));
+    }
+
+    private string GetPlayerName(NetPeer peer)
+    {
+        if (!playerManager.TryGetPlayer(peer, out var player)) return "Another player";
+        if (!tracker.ObjectManager.TryGetObject<Hero>(player.HeroId, out var hero)) return "Another player";
+
+        return hero.Name?.ToString() ?? "Another player";
     }
 
     /// <summary>

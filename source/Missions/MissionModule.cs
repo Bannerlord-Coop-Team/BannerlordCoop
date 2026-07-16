@@ -1,9 +1,12 @@
 using Autofac;
+using Common.Network.Session;
+using GameInterface;
 using GameInterface.Services.Locations;
 using GameInterface.Services.MapEvents;
 using Missions.Agents.Handlers;
 using Missions.Battles;
 using Missions.Missiles.Handlers;
+using Missions.Missiles.Patches;
 using Missions.Services.Network;
 using Missions.Taverns;
 
@@ -17,11 +20,18 @@ namespace Missions;
 /// </summary>
 public class MissionModule : Module
 {
+    internal const string MissilePatchCategory = "CoopMissilePatches";
+
     protected override void Load(ContainerBuilder builder)
     {
         base.Load(builder);
 
+        builder.RegisterInstance(new HarmonyPatchCategoryRegistration(
+            typeof(AddMissileAuxPatch).Assembly,
+            MissilePatchCategory));
+
         builder.RegisterType<LiteNetP2PClient>().As<IBattleNetwork>().InstancePerLifetimeScope();
+        builder.RegisterType<NoopSteamMissionBridge>().As<ISteamMissionBridge>().InstancePerLifetimeScope();
 
         // MissionContext mirrors the server's instance membership and must live for the whole client
         // session (it subscribes to the MissionPeer* messages over the campaign connection), so it is a
@@ -48,6 +58,16 @@ public class MissionModule : Module
         builder.RegisterType<CoopLocationsController>()
             .AsSelf()
             .As<ILocationMissionBehavior>()
+            .InstancePerDependency();
+
+        // BR-102 host-epoch receiver policy. InstancePerDependency so each CoopBattleController (one per
+        // battle) is injected a FRESH policy whose accepted-epoch watermark starts clean and never leaks
+        // across battles — the controller's per-battle lifetime is the watermark's natural reset. The
+        // controller passes that ONE instance to BOTH siege replicators, so they SHARE a single watermark:
+        // a superseded hosting generation is then dropped consistently across every host-authority message
+        // type (engine placement and machine state/authority), not tracked independently per replicator.
+        builder.RegisterType<HostEpochPolicy>()
+            .As<IHostEpochPolicy>()
             .InstancePerDependency();
 
         // The field-battle P2P controller — the battle counterpart to CoopLocationsController. Transient so

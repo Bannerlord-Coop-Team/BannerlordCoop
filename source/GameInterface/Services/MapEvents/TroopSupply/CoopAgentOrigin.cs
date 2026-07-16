@@ -1,6 +1,8 @@
-using Common.Messaging;
+﻿using Common.Messaging;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEventParties.Messages;
 using Helpers;
+using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -10,19 +12,21 @@ using TaleWorlds.Library;
 namespace GameInterface.Services.MapEvents.TroopSupply;
 
 /// <summary>
-/// Agent origin for server-supplied coop battle troops. Mirrors <c>SimpleAgentOrigin</c> but carries the
-/// troop's <see cref="Party"/> for EVERY troop (not just heroes) — <c>SimpleAgentOrigin.Party</c> is null for
-/// non-heroes, which leaves <c>BattleCombatant</c> null so the engine can't put an enemy soldier on a team
-/// (it never spawns) and can't recognise the player's hero (the player isn't attached). Casualty hooks are
-/// no-ops: deaths flow through the existing <c>Agent.Die</c> → server path, so applying them here too would
-/// double-count. Score hits are the exception — they have no other path, so <c>OnScoreHit</c> reports them
-/// to the server (see the method).
+/// Agent origin for server-supplied coop battle troops. It carries each troop's party so the engine can assign
+/// teams, reports removals to the supplier that minted it so the engine's reinforcement quota advances (while
+/// leaving roster casualties to the network death path), and preserves the controlled hero's final health.
+/// Score hits are reported here because they have no other server path.
 /// </summary>
 public class CoopAgentOrigin : IAgentOriginBase
 {
     private readonly CharacterObject _troop;
     private readonly PartyBase _party;
     private readonly UniqueTroopDescriptor _descriptor;
+    // The CoopTroopSupplier this origin was supplied from, or null for origins built outside a supplier
+    // (puppets — PuppetSpawner / ReinforcementFielder): those are counted on their owner's client, never here.
+    private readonly CoopTroopSupplier _supplier;
+    // One-shot removal latch (native PartyGroupAgentOrigin's _isRemoved): 0 = standing, 1 = already counted.
+    private int _removedLatch;
     private Banner _banner;
     private readonly bool _hasThrownWeapon, _hasSpear, _hasShield, _hasHeavyArmor;
 
@@ -41,11 +45,12 @@ public class CoopAgentOrigin : IAgentOriginBase
     bool IAgentOriginBase.HasShield => _hasShield;
     bool IAgentOriginBase.HasSpear => _hasSpear;
 
-    public CoopAgentOrigin(CharacterObject troop, PartyBase party, int rank, Banner banner, UniqueTroopDescriptor descriptor, string mapEventPartyId = null)
+    public CoopAgentOrigin(CharacterObject troop, PartyBase party, int rank, Banner banner, UniqueTroopDescriptor descriptor, string mapEventPartyId = null, CoopTroopSupplier supplier = null)
     {
         _troop = troop;
         _party = party;
         _descriptor = descriptor;
+        _supplier = supplier;
         Rank = rank == -1 ? MBRandom.RandomInt(10000) : rank;
         _banner = banner;
         MapEventPartyId = mapEventPartyId;
@@ -102,10 +107,34 @@ public class CoopAgentOrigin : IAgentOriginBase
         }
     }
 
-    public void SetWounded() { }
-    public void SetKilled() { }
-    public void SetRouted(bool isOrderRetreat) { }
-    public void OnAgentRemoved(float agentHealth) { }
+    // [BR-073] Removal reports feed the supplier's NumRemovedTroops — the engine's ONLY casualty input for
+    // reinforcements (NumberOfActiveTroops = _numSpawnedTroops - supplier.NumRemovedTroops, and
+    // ComputeWaveBatch requests a wave only once enough of the initial allotment is removed). Without this
+    // feedback the engine believes every initial troop stands forever and never pulls a wave (the live
+    // 600-of-2000 stall). ENGINE QUOTA ONLY: roster casualties still flow exclusively through the network
+    // death path (MapEventParty.OnTroop* via the owner→server messages) — nothing here touches rosters.
+    public void SetWounded() { if (TryLatchRemoval()) _supplier.OnTroopWounded(_descriptor); }
+    public void SetKilled() { if (TryLatchRemoval()) _supplier.OnTroopKilled(_descriptor); }
+    public void SetRouted(bool isOrderRetreat) { if (TryLatchRemoval()) _supplier.OnTroopRouted(_descriptor, isOrderRetreat); }
+
+    // An agent can be reported removed more than once (a Wounded knockdown then a Killed finish, or a
+    // duplicate replicated removal), but must count exactly once against the quota — hence the one-shot
+    // latch, interlocked because replicated removals can arrive off the game thread. Origins without a
+    // supplier (puppets) never latch: their removals are not this client's to count.
+    private bool TryLatchRemoval() => _supplier != null && Interlocked.Exchange(ref _removedLatch, 1) == 0;
+
+    public void OnAgentRemoved(float agentHealth)
+    {
+        // Unlike the casualty hooks above, final agent health has no other path back to Hero.HitPoints. Vanilla
+        // performs this transfer in the origin hook, which also covers injured survivors removed during teardown.
+        if (!_troop.IsHero) return;
+
+        var hero = _troop.HeroObject;
+        if (hero.HeroState == Hero.CharacterStates.Dead) return;
+        if (!hero.IsControlledByThisInstance()) return;
+
+        hero.HitPoints = MathF.Max(1, MathF.Round(agentHealth));
+    }
 
     // Unlike the casualty hooks above, score hits have NO other path to the map event party in a coop battle
     // (the native PartyGroupAgentOrigin → supplier chain is substituted away), so this is where they are

@@ -145,9 +145,18 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
             var side = agent.Team != null ? agent.Team.Side : BattleSideEnum.None;
             int formationIndex = agent.Formation != null ? (int)agent.Formation.FormationIndex : -1;
 
+            var spawnEquipment = agent.SpawnEquipment;
+            var bodyProperties = agent.BodyPropertiesValue;
+
+            // The record carries the agent's ASSIGNMENT (OriginalOwner), not our current authority. For our own
+            // spawns the two are identical; for agents we only HOLD under temporary host control (BR-031) the
+            // difference matters twice: a fresh late joiner registers them under the same owner every other
+            // client already has them under, and a RECONNECTING owner recognizes its own troops in the catch-up
+            // replay and re-adopts them as locally driven (BR-033, see PuppetSpawner).
             records.Add(new BattleAgentSpawnData(
                 info.AgentId, characterId, agent.Position, side, agent.Health,
-                session.OwnControllerId, attribution.MapEventPartyId, attribution.TroopSeed,
+                info.OriginalOwner, attribution.MapEventPartyId, attribution.TroopSeed,
+                spawnEquipment, bodyProperties,
                 ResolveMountIdFor(info.AgentId, agent), formationIndex));
         }
         return records;
@@ -248,9 +257,12 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         // id we also carry in the spawn data.
         casualties.Record(agentId, mapEventPartyId, troopSeed, characterId);
 
+        var spawnEquipment = agent.SpawnEquipment;
+        var bodyProperties = agent.BodyPropertiesValue;
+
         BattleSideEnum side = agent.Team != null ? agent.Team.Side : BattleSideEnum.None;
         int formationIndex = agent.Formation != null ? (int)agent.Formation.FormationIndex : -1;
-        var data = new BattleAgentSpawnData(agentId, characterId, agent.Position, side, agent.Health, owner, mapEventPartyId, troopSeed, mountAgentId, formationIndex);
+        var data = new BattleAgentSpawnData(agentId, characterId, agent.Position, side, agent.Health, owner, mapEventPartyId, troopSeed, spawnEquipment, bodyProperties, mountAgentId, formationIndex);
 
         // Populate MapEvent's UpgradeTroopTracker with spawned agent to handle on the server during battle.
         messageBroker.Publish(this, new TrackTroopForUpgrades(mapEventPartyId, characterId));

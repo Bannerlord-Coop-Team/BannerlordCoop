@@ -66,12 +66,8 @@ public class CreateCharacterState : ConnectionStateBase
 
         if (!TryCreatePlayer(controllerId, hero, out var player))
         {
-            // Reject only this join: ending the game here (the old GoToMainMenu call) tore down
-            // the entire server session — and hard-crashed the headless server — because one
-            // client's hero failed id resolution. TryGetIdWithLogging has already named the
-            // object that failed to resolve.
-            Logger.Error("Failed to create player for {ControllerId}; disconnecting peer", controllerId);
-            netPeer.Disconnect();
+            Logger.Error("Failed to create player; disconnecting the joining peer");
+            ConnectionLogic.Peer.Disconnect();
             return;
         }
 

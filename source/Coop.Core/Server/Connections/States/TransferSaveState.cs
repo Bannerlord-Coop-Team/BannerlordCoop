@@ -54,6 +54,14 @@ public class TransferSaveState : ConnectionStateBase
 
             var saveResults = saveInterface.SaveCurrentGame();
 
+            // Disconnect peer on failure — before touching Data, which a failed snapshot may leave null.
+            if (!saveResults.Success)
+            {
+                Logger.Error("Join save snapshot failed for peer {PeerId}; disconnecting", connectionLogic.Peer.Id);
+                connectionLogic.Peer.Disconnect();
+                return;
+            }
+
             var savePacket = new GameSaveDataPacket(
                 SaveDataCompression.Compress(saveResults.Data),
                 saveResults.CampaignId,
@@ -63,13 +71,6 @@ public class TransferSaveState : ConnectionStateBase
                 coopSessionProvider.CoopSession?.AlleyPlayerData,
                 coopSessionProvider.CoopSession?.InteractionsPlayerData,
                 attachmentIdMapper.BuildServerMap());
-
-            // Disconnect peer on failure
-            if (!saveResults.Success)
-            {
-                connectionLogic.Peer.Disconnect();
-                return;
-            }
 
             // Start holding this peer's broadcasts now that the snapshot has been taken. The whole save
             // runs in a blocking GameThread.Run call issued from the network thread, so the poller is

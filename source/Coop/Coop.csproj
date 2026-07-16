@@ -209,7 +209,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="App.config" />
+    <None Include="app.config" />
     <None Include="Lib\NoHarmony\LICENSE" />
     <None Include="Lib\NoHarmony\README.md" />
     <None Include="packages.config" />
@@ -241,7 +241,7 @@
   <PropertyGroup>
     <ModName>Coop</ModName>
     <MainClass>CoopMod</MainClass>
-    <ModVersion>v0.0.2</ModVersion>
+    <ModVersion>v$(CoopVersion)</ModVersion>
     <GameVersion>v1.4.6</GameVersion>
   </PropertyGroup>
   <Import Project="$(MSBuildProjectDirectory)\..\..\Deploy.targets" />
