@@ -56,7 +56,7 @@ public class BattleReinforcementCasualtyQuotaTests : MissionTestEnvironment
     /// <c>_isRemoved</c>). RED today: <c>CoopAgentOrigin.SetKilled</c> is an empty body, so the counter
     /// stays 0 for the whole battle.
     /// </summary>
-    [Fact(Skip = "BR-073 TDD red: CoopAgentOrigin.SetKilled is a no-op, so the supplier's NumRemovedTroops never advances")]
+    [Fact]
     [Trait("Requirement", "BR-073")]
     public void OwnTroopKilled_AdvancesSupplierRemovedQuota()
     {
@@ -84,7 +84,7 @@ public class BattleReinforcementCasualtyQuotaTests : MissionTestEnvironment
     /// <c>SetRouted</c>) must advance the same quota — <c>NumRemovedTroops</c> is wounded+killed+routed.
     /// RED today: both hooks are empty bodies.
     /// </summary>
-    [Fact(Skip = "BR-073 TDD red: CoopAgentOrigin.SetWounded/SetRouted are no-ops, so wounded/routed removals never reach the supplier's quota")]
+    [Fact]
     [Trait("Requirement", "BR-073")]
     public void OwnTroopWoundedAndRouted_AdvanceSupplierRemovedQuota()
     {
@@ -110,7 +110,7 @@ public class BattleReinforcementCasualtyQuotaTests : MissionTestEnvironment
     /// replicated removals alike) — the supplier's quota must advance. RED today: the prefix calls
     /// <c>Origin.SetKilled()</c>, which is a no-op on <see cref="CoopAgentOrigin"/>.
     /// </summary>
-    [Fact(Skip = "BR-073 TDD red: the removal prefix calls Origin.SetKilled but CoopAgentOrigin drops it, so the death never reaches the supplier")]
+    [Fact]
     [Trait("Requirement", "BR-073")]
     public void AgentRemovedPrefix_KilledState_ReachesSupplierQuota()
     {
@@ -176,7 +176,7 @@ public class BattleReinforcementCasualtyQuotaTests : MissionTestEnvironment
     /// closed at 299. RED today: the batch is 0 at ANY casualty count, because the coop death path never
     /// moves <c>NumRemovedTroops</c>, so the engine believes all 600 initials are still standing forever.
     /// </summary>
-    [Fact(Skip = "BR-073 TDD red: with NumRemovedTroops frozen at 0 the native wave gate computes a 0 batch at any casualty count — reinforcements never spawn")]
+    [Fact]
     [Trait("Requirement", "BR-073")]
     public void WaveBatchGate_UnlocksWhenRemovedQuotaReachesWaveSize()
     {

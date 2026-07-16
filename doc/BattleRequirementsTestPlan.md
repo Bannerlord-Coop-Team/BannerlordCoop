@@ -355,6 +355,31 @@ migration/retreat 35/35 + mount identity 13/13; full E2E **570 passed / 8 skips 
 **Residual:** live 2-client PVP retreat re-check (the manual checklist row) still pending; the
 BR-073 reinforcement fix is the next increment.
 
+**Live-bug fix 2 (BR-073) (2026-07-15) — reinforcement stall FIXED (red → green).**
+`CoopAgentOrigin`'s casualty hooks now forward to the `CoopTroopSupplier` that minted the origin
+(`CreateOrigin` passes the supplier; puppet origins — `PuppetSpawner`/`ReinforcementFielder` —
+carry none and stay inert), one-shot per origin via an interlocked `_removedLatch` (the native
+`PartyGroupAgentOrigin._isRemoved` equivalent: a Wounded knockdown followed by a Killed finish, or
+a duplicate replicated removal, counts once). `CoopTroopSupplier.OnTroopWounded/Killed/Routed`
+increment under the existing gate lock and only for descriptors whose seed the supplier owns
+(`seedToPartyId`), so a foreign/puppet seed can never drive a side that locally spawned 0 negative
+and corrupt `IsSideDepleted`/the wave math; `NumRemovedTroops` reads under the same lock
+(replicated removals can arrive off the game thread). ENGINE QUOTA ONLY: the supplier hooks touch
+counters and nothing else — roster casualties remain single-sourced on the network death path
+(`MapEventParty.OnTroop*` via the owner→server messages; verified no roster mutation anywhere in
+the new chain, and the supplier hooks had no other caller). `RunJointInit` sizing untouched. The 4
+Wave-1 reds in `BattleReinforcementCasualtyQuotaTests` are unskipped and green (red re-confirmed
+first at the intended asserts: quota 1/2/1 expected vs 0 frozen, and the native `ComputeWaveBatch`
+300-batch expected vs 0 at any casualty count); both lock-ins
+(`PuppetOriginCasualty_DoesNotCountAgainstForeignSupplier`,
+`NativeContract_NumberOfActiveTroops_ReadsSupplierNumRemovedTroops`) stayed green. Suites:
+targeted reinforcement/supplier/reserve/casualty/score-hit filter 29/29; full E2E **574 passed /
+4 skips (pre-existing only — all TDD reds now green) / 0 failed (578)**; Coop.Tests 419 passed /
+1 skip (420).
+**Residual:** live 2-client check that waves actually field in a real ~2000-troop battle (new
+BR-073 row in [BattleManualTestChecklist.md](BattleManualTestChecklist.md)) — the engine's global
+3s reinforcement tick and puppet replication of fielded waves are only observable live.
+
 ## Suggested execution order
 
 1. **Wave 1 — the 25 `S` items:** almost all extend an existing harness pattern

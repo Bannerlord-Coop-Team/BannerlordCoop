@@ -116,7 +116,7 @@ public class CoopTroopSupplier : IMissionTroopSupplier
         }
     }
 
-    public int NumRemovedTroops => numWounded + numKilled + numRouted;
+    public int NumRemovedTroops { get { lock (gate) { return numWounded + numKilled + numRouted; } } }
 
     /// <summary>Whether the server's reserve has arrived (counts/identity known and final).</summary>
     public bool IsPopulated { get { lock (gate) { return populated; } } }
@@ -267,9 +267,29 @@ public class CoopTroopSupplier : IMissionTroopSupplier
         return null;
     }
 
-    public void OnTroopWounded(UniqueTroopDescriptor troopDescriptor) { numWounded++; }
-    public void OnTroopKilled(UniqueTroopDescriptor troopDescriptor) { numKilled++; }
-    public void OnTroopRouted(UniqueTroopDescriptor troopDescriptor, bool isOrderRetreat) { numRouted++; }
+    // [BR-073] Origin→supplier casualty feedback, called by this supplier's own CoopAgentOrigins (one-shot
+    // per origin) when the removal prefix reports a wound/kill/rout. NumRemovedTroops is the engine's only
+    // casualty input for reinforcements (NumberOfActiveTroops = spawned − removed), so without these the
+    // wave gate never opens. ENGINE BOOKKEEPING ONLY — roster casualties remain single-sourced on the
+    // network death path (MapEventParty.OnTroop*). Seed-scoped so a descriptor this supplier doesn't own
+    // (a foreign or puppet seed) can never perturb this side's count — a side that locally spawned 0 must
+    // never go negative and corrupt IsSideDepleted / the wave math. Locked: supply runs on the game thread
+    // while replicated removals can arrive off it.
+    public void OnTroopWounded(UniqueTroopDescriptor troopDescriptor)
+    {
+        lock (gate) { if (seedToPartyId.ContainsKey(troopDescriptor.UniqueSeed)) numWounded++; }
+    }
+
+    public void OnTroopKilled(UniqueTroopDescriptor troopDescriptor)
+    {
+        lock (gate) { if (seedToPartyId.ContainsKey(troopDescriptor.UniqueSeed)) numKilled++; }
+    }
+
+    public void OnTroopRouted(UniqueTroopDescriptor troopDescriptor, bool isOrderRetreat)
+    {
+        lock (gate) { if (seedToPartyId.ContainsKey(troopDescriptor.UniqueSeed)) numRouted++; }
+    }
+
     public void OnTroopScoreHit(UniqueTroopDescriptor descriptor, BasicCharacterObject attackedCharacter, int damage, bool isFatal, bool isTeamKill, WeaponComponentData attackerWeapon) { }
 
     private IAgentOriginBase CreateOrigin(TroopReserveEntry entry, string partyId)
@@ -282,8 +302,10 @@ public class CoopTroopSupplier : IMissionTroopSupplier
         }
         // CoopAgentOrigin carries the troop's party for ALL troops (SimpleAgentOrigin gives non-heroes a null
         // party → no team → no spawn) and the server's descriptor, so every client agrees on troop identity.
+        // It also carries this supplier, so removals feed back into NumRemovedTroops (the engine's
+        // reinforcement quota) — see OnTroopWounded/Killed/Routed above.
         var party = ResolveParty(partyId);
-        var origin = new CoopAgentOrigin(character, party, -1, null, new UniqueTroopDescriptor(entry.Seed), partyId);
+        var origin = new CoopAgentOrigin(character, party, -1, null, new UniqueTroopDescriptor(entry.Seed), partyId, this);
         if (party == null)
             Logger.Warning("[TroopSupply] {Side} origin char={Char} (isHero={Hero}) got NULL party — partyId {PartyId} unresolvable → no team / not player-commanded",
                 Side, entry.CharacterId, character.IsHero, partyId);
