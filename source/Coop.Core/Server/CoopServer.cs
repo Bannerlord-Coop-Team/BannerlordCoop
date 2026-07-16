@@ -134,38 +134,19 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
     {
-        int maxPayloadBytes = GetMaxInboundPayloadBytes(channelNumber);
-        if (reader.AvailableBytes > maxPayloadBytes)
-        {
-            Logger.Warning(
-                "Disconnecting peer after oversized payload: {PayloadBytes} bytes on channel {Channel}",
-                reader.AvailableBytes,
-                channelNumber);
-            peer.Disconnect();
-            return;
-        }
+        object received = serializer.Deserialize(reader.GetRemainingBytes());
 
-        try
+        if (received is IPacket packet)
         {
-            object received = serializer.Deserialize(reader.GetRemainingBytes());
-
-            if (received is IPacket packet)
-            {
-                packetManager.HandleReceive(peer, packet);
-            }
-            else if (received is IMessage message)
-            {
-                messagePacketHandler.PublishEvent(peer, message);
-            }
-            else
-            {
-                Logger.Error("Received payload deserialized to neither IPacket nor IMessage: {Type}", received?.GetType());
-            }
+            packetManager.HandleReceive(peer, packet);
         }
-        catch (Exception ex)
+        else if (received is IMessage message)
         {
-            Logger.Warning(ex, "Disconnecting peer after invalid packet");
-            peer.Disconnect();
+            messagePacketHandler.PublishEvent(peer, message);
+        }
+        else
+        {
+            Logger.Error("Received payload deserialized to neither IPacket nor IMessage: {Type}", received?.GetType());
         }
     }
 

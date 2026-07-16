@@ -8,80 +8,48 @@ namespace GameInterface.Serialization;
 
 internal static class SerializedTypeResolver
 {
-    public static Type ResolveLoadedType(string assemblyQualifiedName)
+    public static Type ResolveLoadedType(string typeName)
     {
-        if (string.IsNullOrWhiteSpace(assemblyQualifiedName))
+        if (string.IsNullOrWhiteSpace(typeName))
             throw new SerializationException("Serialized type name was empty");
 
-        Assembly[] loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies();
-        Type resolved = Type.GetType(
-            assemblyQualifiedName,
-            assemblyName => ResolveLoadedAssembly(loadedAssemblies, assemblyName),
-            (assembly, typeName, ignoreCase) => ResolveType(loadedAssemblies, assembly, typeName, ignoreCase),
+        Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
+        Type type = Type.GetType(
+            typeName,
+            requested => assemblies.FirstOrDefault(assembly => assembly.FullName == requested.FullName),
+            (assembly, name, ignoreCase) => assembly?.GetType(name, false, ignoreCase) ??
+                assemblies.Select(candidate => candidate.GetType(name, false, ignoreCase))
+                    .FirstOrDefault(candidate => candidate != null),
             throwOnError: false,
             ignoreCase: false);
 
-        if (resolved == null)
-            throw new SerializationException($"Serialized type {assemblyQualifiedName} is not already loaded");
+        if (type == null)
+            throw new SerializationException($"Serialized type {typeName} is not already loaded");
 
-        return resolved;
+        return type;
     }
 
-    public static Type ResolveEnumerableType(string assemblyQualifiedName)
+    public static Type ResolveEnumerableType(string typeName)
     {
-        Type type = ResolveLoadedType(assemblyQualifiedName);
-        if (type.IsArray)
-        {
-            if (type.GetArrayRank() != 1)
-                throw new SerializationException($"Only one-dimensional arrays are supported, not {type}");
-            return type;
-        }
-
-        if (type.IsGenericType)
-        {
-            Type definition = type.GetGenericTypeDefinition();
-            if (definition == typeof(List<>) || definition == typeof(HashSet<>)) return type;
-        }
+        Type type = ResolveLoadedType(typeName);
+        if (type.IsArray && type.GetArrayRank() == 1) return type;
+        if (type.IsGenericType &&
+            (type.GetGenericTypeDefinition() == typeof(List<>) ||
+             type.GetGenericTypeDefinition() == typeof(HashSet<>))) return type;
 
         throw new SerializationException($"Serialized enumerable type {type} is not allowed");
     }
 
-    public static Type ResolveDictionaryType(string assemblyQualifiedName)
+    public static Type ResolveDictionaryType(string typeName)
     {
-        Type type = ResolveLoadedType(assemblyQualifiedName);
-        if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Dictionary<,>)) return type;
-
-        throw new SerializationException($"Serialized dictionary type {type} is not allowed");
+        return ResolveGenericType(typeName, typeof(Dictionary<,>));
     }
 
-    public static Type ResolveGenericType(string assemblyQualifiedName, params Type[] allowedDefinitions)
+    public static Type ResolveGenericType(string typeName, params Type[] allowedDefinitions)
     {
-        Type type = ResolveLoadedType(assemblyQualifiedName);
+        Type type = ResolveLoadedType(typeName);
         if (type.IsGenericType && allowedDefinitions.Contains(type.GetGenericTypeDefinition())) return type;
 
         throw new SerializationException($"Serialized generic type {type} is not allowed");
-    }
-
-    private static Assembly ResolveLoadedAssembly(IEnumerable<Assembly> loadedAssemblies, AssemblyName requested)
-    {
-        return loadedAssemblies.FirstOrDefault(assembly =>
-            string.Equals(assembly.FullName, requested.FullName, StringComparison.Ordinal));
-    }
-
-    private static Type ResolveType(
-        IEnumerable<Assembly> loadedAssemblies,
-        Assembly assembly,
-        string typeName,
-        bool ignoreCase)
-    {
-        if (assembly != null) return assembly.GetType(typeName, throwOnError: false, ignoreCase: ignoreCase);
-
-        foreach (Assembly loadedAssembly in loadedAssemblies)
-        {
-            Type type = loadedAssembly.GetType(typeName, throwOnError: false, ignoreCase: ignoreCase);
-            if (type != null) return type;
-        }
-
-        return null;
     }
 }

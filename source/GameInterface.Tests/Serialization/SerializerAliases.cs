@@ -1,0 +1,1 @@
+﻿global using BinaryFormatterSerializer = GameInterface.Serialization.BinaryPackageSerializer;

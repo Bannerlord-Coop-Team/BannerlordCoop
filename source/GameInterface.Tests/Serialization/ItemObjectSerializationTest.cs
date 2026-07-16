@@ -37,7 +37,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             package.Pack();
 
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
+            byte[] bytes = BinaryFormatterSerializer.Serialize(package);
 
             Assert.NotEmpty(bytes);
         }
@@ -54,11 +54,11 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             var factory = container.Resolve<IBinaryPackageFactory>();
 
-            byte[] bytes = BinaryPackageSerializer.Serialize(factory.GetBinaryPackage(itemObject));
+            byte[] bytes = BinaryFormatterSerializer.Serialize(factory.GetBinaryPackage(itemObject));
 
             Assert.NotEmpty(bytes);
 
-            object obj = BinaryPackageSerializer.Deserialize(bytes);
+            object obj = BinaryFormatterSerializer.Deserialize(bytes);
 
             Assert.IsType<ItemObjectBinaryPackage>(obj);
 
@@ -86,11 +86,11 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             package.Pack();
 
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
+            byte[] bytes = BinaryFormatterSerializer.Serialize(package);
 
             Assert.NotEmpty(bytes);
 
-            object obj = BinaryPackageSerializer.Deserialize(bytes);
+            object obj = BinaryFormatterSerializer.Deserialize(bytes);
 
             Assert.IsType<ItemObjectBinaryPackage>(obj);
 

@@ -31,7 +31,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             package.Pack();
 
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
+            byte[] bytes = BinaryFormatterSerializer.Serialize(package);
 
             Assert.NotEmpty(bytes);
         } 
@@ -49,12 +49,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             package.Pack();
 
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
+            byte[] bytes = BinaryFormatterSerializer.Serialize(package);
 
             Assert.NotEmpty(bytes);
 
             var deserilizationFactory = container.Resolve<IBinaryPackageFactory>();
-            var bf = BinaryPackageSerializer.Deserialize<AttackCollisionDataBinaryPackage>(bytes);
+            var bf = BinaryFormatterSerializer.Deserialize<AttackCollisionDataBinaryPackage>(bytes);
             bf.BinaryPackageFactory = deserilizationFactory;
 
             var deserializeFactory = container.Resolve<IBinaryPackageFactory>();

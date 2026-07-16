@@ -1,11 +1,8 @@
-﻿using Common.Logging;
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.PacketHandlers;
 using Coop.Core.Client.Messages;
 using Coop.Core.Common.Network.Packets;
 using LiteNetLib;
-using Serilog;
-using System.IO;
 
 namespace Coop.Core.Client.Services.Save.PacketHandlers;
 
@@ -18,8 +15,6 @@ namespace Coop.Core.Client.Services.Save.PacketHandlers;
 /// </summary>
 internal class GameSaveDataPacketHandler : IPacketHandler
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<GameSaveDataPacketHandler>();
-
     public PacketType PacketType => PacketType.SaveData;
 
     private readonly IPacketManager packetManager;
@@ -41,22 +36,14 @@ internal class GameSaveDataPacketHandler : IPacketHandler
     {
         GameSaveDataPacket convertedPacket = (GameSaveDataPacket)packet;
 
-        try
-        {
-            messageBroker.Publish(this, new NetworkGameSaveDataReceived(
-                SaveDataCompression.Decompress(convertedPacket.GameSaveData),
-                convertedPacket.CampaignID,
-                convertedPacket.CraftingPlayerData,
-                convertedPacket.WorkshopPlayerData,
-                convertedPacket.CaravansPlayerData,
-                convertedPacket.AlleyPlayerData,
-                convertedPacket.InteractionsPlayerData,
-                convertedPacket.AttachmentIdMap));
-        }
-        catch (InvalidDataException ex)
-        {
-            Logger.Warning(ex, "Rejected invalid transfer save");
-            peer.Disconnect();
-        }
+        messageBroker.Publish(this, new NetworkGameSaveDataReceived(
+            SaveDataCompression.Decompress(convertedPacket.GameSaveData),
+            convertedPacket.CampaignID,
+            convertedPacket.CraftingPlayerData,
+            convertedPacket.WorkshopPlayerData,
+            convertedPacket.CaravansPlayerData,
+            convertedPacket.AlleyPlayerData,
+            convertedPacket.InteractionsPlayerData,
+            convertedPacket.AttachmentIdMap));
     }
 }

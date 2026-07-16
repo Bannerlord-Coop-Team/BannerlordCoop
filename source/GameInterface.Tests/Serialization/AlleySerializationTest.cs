@@ -52,7 +52,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             package.Pack();
 
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
+            byte[] bytes = BinaryFormatterSerializer.Serialize(package);
 
             Assert.NotEmpty(bytes);
         }
@@ -98,11 +98,11 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             package.Pack();
 
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
+            byte[] bytes = BinaryFormatterSerializer.Serialize(package);
 
             Assert.NotEmpty(bytes);
 
-            object obj = BinaryPackageSerializer.Deserialize(bytes);
+            object obj = BinaryFormatterSerializer.Deserialize(bytes);
 
             Assert.IsType<AlleyBinaryPackage>(obj);
 
