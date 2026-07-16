@@ -114,6 +114,7 @@ internal abstract class TestComponentBase
         RegisterMock<IBattleHostRegistry>(builder);
         RegisterMock<IBattleTroopLedger>(builder);
         RegisterMock<IRaidAiInterventionConfigInterface>(builder);
+        RegisterMock<ITacticalUnitSymbolsConfigInterface>(builder);
         RegisterMock<IVillageHostileActionInterface>(builder);
 
         // ISaveInterface is consumed by TransferSaveState's constructor, which packages a save the
