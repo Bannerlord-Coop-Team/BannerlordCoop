@@ -18,6 +18,16 @@ public interface IMissionContext : IDisposable
     void MapPeer(string controllerId, NetPeer peer);
     void RemovePeer(NetPeer peer);
     bool TryGetPeer(string controllerId, out NetPeer netPeer);
+
+    /// <summary>
+    /// Drop all mirrored membership and peer mappings for the mission we just left. The membership set
+    /// mirrors server-announced instance membership and is otherwise pruned only per-controller as the
+    /// server reports each departure — but once WE leave the instance the server stops fanning that
+    /// instance's churn to us, so a controller that drops while we are away is never removed and keeps
+    /// looking present. Call this at the local mission-exit chokepoint so the stale mirror does not survive
+    /// into a later re-entry (BR-054), where it is rebuilt from the server's fresh membership re-announce.
+    /// </summary>
+    void EndInstance();
 }
 
 /// <summary>
@@ -86,6 +96,11 @@ public class MissionContext : IMissionContext, IHandler
             peerToId.Clear();
         }
     }
+
+    // Leaving a mission wipes the whole mirror — same effect as leaving a location (Handle_PlayerLeftLocation),
+    // exposed for the battle exit chokepoint (BattleInstanceLifecycle.Leave). A re-entry rebuilds it from the
+    // server's membership re-announce, so this must not leave a stale controller behind.
+    public void EndInstance() => Clear();
 
     public void MapPeer(string controllerId, NetPeer peer)
     {

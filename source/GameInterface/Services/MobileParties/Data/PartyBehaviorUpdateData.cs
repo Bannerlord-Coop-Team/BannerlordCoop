@@ -25,34 +25,50 @@ public struct PartyBehaviorUpdateData
     public readonly CampaignVec2 BestTargetPoint;
 
     [ProtoMember(5)]
-    public readonly bool HasTarget;
-
-    [ProtoMember(8)]
     public CampaignVec2 PartyPosition { get; set; }
 
-    [ProtoMember(9)]
+    [ProtoMember(6)]
     public readonly AiBehavior DefaultBehavior;
 
-    [ProtoMember(10)]
+    [ProtoMember(7)]
     public readonly CampaignVec2 TargetPosition;
 
-    [ProtoMember(11)]
+    [ProtoMember(8)]
     public readonly MobileParty.NavigationType DesiredAiNavigationType;
 
     // Server-authored updates leave the origin null.
-    [ProtoMember(12)]
+    [ProtoMember(9)]
     public string OriginControllerId { get; set; }
 
-    // Field 13 was OriginRequestSequence in an earlier development build.
-    [ProtoMember(14)]
+    [ProtoMember(10)]
     public bool ForcePosition { get; set; }
+
+    [ProtoMember(11)]
+    public string TargetPartyId { get; set; }
+
+    [ProtoMember(12)]
+    public string TargetSettlementId { get; set; }
+
+    [ProtoMember(13)]
+    public CampaignVec2 MoveTargetPoint { get; set; }
+
+    [ProtoMember(14)]
+    public bool IsTargetingPort { get; set; }
+
+    [ProtoMember(15)]
+    public MoveModeType PartyMoveMode { get; set; }
+
+    [ProtoMember(16)]
+    public string MoveTargetPartyId { get; set; }
+
+    [ProtoMember(17)]
+    public bool IsInteractableAnchor { get; set; }
 
     public PartyBehaviorUpdateData(
         string mobilePartyId,
         AiBehavior newAiBehavior,
         string interactablePointId,
         CampaignVec2 bestTargetPoint,
-        bool hasTarget,
         CampaignVec2 partyPosition,
         AiBehavior defaultBehavior,
         CampaignVec2 targetPosition,
@@ -62,12 +78,18 @@ public struct PartyBehaviorUpdateData
         NewAiBehavior = newAiBehavior;
         InteractablePointId = interactablePointId;
         BestTargetPoint = bestTargetPoint;
-        HasTarget = hasTarget;
         PartyPosition = partyPosition;
         DefaultBehavior = defaultBehavior;
         TargetPosition = targetPosition;
         DesiredAiNavigationType = desiredAiNavigationType;
         OriginControllerId = null;
         ForcePosition = false;
+        TargetPartyId = null;
+        TargetSettlementId = null;
+        MoveTargetPoint = targetPosition;
+        IsTargetingPort = false;
+        PartyMoveMode = MoveModeType.Hold;
+        MoveTargetPartyId = null;
+        IsInteractableAnchor = false;
     }
 }

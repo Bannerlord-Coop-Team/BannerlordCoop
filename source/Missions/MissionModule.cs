@@ -60,6 +60,16 @@ public class MissionModule : Module
             .As<ILocationMissionBehavior>()
             .InstancePerDependency();
 
+        // BR-102 host-epoch receiver policy. InstancePerDependency so each CoopBattleController (one per
+        // battle) is injected a FRESH policy whose accepted-epoch watermark starts clean and never leaks
+        // across battles — the controller's per-battle lifetime is the watermark's natural reset. The
+        // controller passes that ONE instance to BOTH siege replicators, so they SHARE a single watermark:
+        // a superseded hosting generation is then dropped consistently across every host-authority message
+        // type (engine placement and machine state/authority), not tracked independently per replicator.
+        builder.RegisterType<HostEpochPolicy>()
+            .As<IHostEpochPolicy>()
+            .InstancePerDependency();
+
         // The field-battle P2P controller — the battle counterpart to CoopLocationsController. Transient so
         // each mission gets a fresh controller that is disposed with that mission. Attached to the mission by
         // CoopBattleBehaviorAttacher (below), never resolved by type from outside the Missions assembly.

@@ -1,7 +1,8 @@
-﻿using Common;
-using HarmonyLib;
+﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.Siege;
+using TaleWorlds.Core;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.SiegeEvents.Patches;
@@ -15,12 +16,15 @@ internal class DisableSiegeAmbushMenuPatch
 {
     private static readonly TextObject DisabledTooltip = new("{=!}Siege ambushes are not yet supported in Co-op.");
 
-    [HarmonyPostfix]
-    private static void Postfix(MenuCallbackArgs args, bool __result)
+    [HarmonyPrefix]
+    private static bool Prefix(MenuCallbackArgs args, ref bool __result)
     {
-        if (!__result) return;
+        __result = PlayerSiege.PlayerSiegeEvent != null && PlayerSiege.PlayerSide == BattleSideEnum.Defender;
+        if (!__result) return false;
 
+        args.optionLeaveType = GameMenuOption.LeaveType.SiegeAmbush;
         args.IsEnabled = false;
         args.Tooltip = DisabledTooltip;
+        return false;
     }
 }

@@ -6,6 +6,7 @@ using Coop.Core.Client.Services.SiegeEvents.Messages;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
 using GameInterface.Services.BesiegerCamps.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.SiegeEvents.Messages;
 using LiteNetLib;
@@ -29,13 +30,20 @@ internal class ServerSiegeEntryHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
+    private readonly IPlayerManager playerManager;
     private readonly ISiegeEventInterface siegeEventInterface;
 
-    public ServerSiegeEntryHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager, ISiegeEventInterface siegeEventInterface)
+    public ServerSiegeEntryHandler(
+        IMessageBroker messageBroker,
+        INetwork network,
+        IObjectManager objectManager,
+        IPlayerManager playerManager,
+        ISiegeEventInterface siegeEventInterface)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
+        this.playerManager = playerManager;
         this.siegeEventInterface = siegeEventInterface;
         messageBroker.Subscribe<NetworkRequestBesiegeSettlement>(HandleBesiege);
         messageBroker.Subscribe<NetworkRequestJoinSiegeCamp>(HandleJoin);
@@ -47,10 +55,12 @@ internal class ServerSiegeEntryHandler : IHandler
         messageBroker.Subscribe<SiegeCampPositionRolled>(HandleCampPosition);
     }
 
-    // Runs on the game thread already — published from the StartBattleAction patch; only resolves ids and broadcasts, so no GameThread.RunSafe.
+    // Runs on the game thread already; joins defenders with patches live before broadcasting the prompts.
     private void HandleAssaultStarted(MessagePayload<SiegeAssaultStarted> payload)
     {
         var obj = payload.What;
+
+        JoinConnectedSettlementDefenders(obj.AttackerParty, obj.Settlement);
 
         if (!objectManager.TryGetIdWithLogging(obj.AttackerParty, out var attackerPartyId)) return;
         if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
@@ -59,6 +69,23 @@ internal class ServerSiegeEntryHandler : IHandler
         network.SendAll(new NetworkPromptSiegeDefense(attackerPartyId, settlementId));
         // Also prompt the besieging players to adopt the replicated assault as their encounter so they can enter it.
         network.SendAll(new NetworkPromptSiegeAssault(attackerPartyId, settlementId));
+    }
+
+    private void JoinConnectedSettlementDefenders(MobileParty attackerParty, Settlement settlement)
+    {
+        var mapEvent = attackerParty?.MapEvent;
+        var defenderSide = mapEvent?.DefenderSide;
+        if (defenderSide == null) return;
+
+        foreach (var player in playerManager.Players)
+        {
+            if (!playerManager.IsConnected(player)) continue;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party)) continue;
+            if (party.CurrentSettlement != settlement || party.Party.MapEventSide != null) continue;
+            if (!mapEvent.CanPartyJoinBattle(party.Party, BattleSideEnum.Defender)) continue;
+
+            party.Party.MapEventSide = defenderSide;
+        }
     }
 
     // Runs on the game thread already — published from the StartSiegeEvent postfix, after the whole siege

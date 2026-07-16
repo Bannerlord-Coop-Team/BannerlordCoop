@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using TaleWorlds.Core;
 
@@ -34,16 +35,20 @@ public static class CoopTroopSupplierRegistry
         }
     }
 
-    /// <summary>[Network thread] Set a side's reserve (full authoritative set), or buffer it until a supplier exists.</summary>
-    public static void Feed(string mapEventId, BattleSideEnum side, PartyReserve[] reserve)
+    /// <summary>[Network thread] Set a side's reserve (full authoritative set), or buffer it until a supplier
+    /// exists. Returns the final local pointers of the parties the REPLACE dropped (the BR-033 flush payload;
+    /// see <see cref="CoopTroopSupplier.SetReserve"/>) — empty when buffered: with no supplier, nothing was
+    /// ever supplied locally, so there is nothing beyond the server's own ledger to flush.</summary>
+    public static IReadOnlyList<(string PartyId, int Supplied)> Feed(string mapEventId, BattleSideEnum side, PartyReserve[] reserve)
     {
         lock (Gate)
         {
             var key = Key(mapEventId, side);
             if (Suppliers.TryGetValue(key, out var supplier))
-                supplier.SetReserve(reserve);
-            else
-                Pending[key] = reserve; // latest wins
+                return supplier.SetReserve(reserve);
+
+            Pending[key] = reserve; // latest wins
+            return Array.Empty<(string, int)>();
         }
     }
 

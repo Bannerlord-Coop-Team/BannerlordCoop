@@ -152,4 +152,22 @@ public class CoopBattleMissionSpawnHandlerSizingTests
             remainingTroops,
             hasLiveAgent));
     }
+
+    [Fact]
+    public void EndConditionHold_MustObserveFieldedSidesBeforeTerminalReplayDepletesOne()
+    {
+        Assert.True(CoopBattleController.ShouldReleaseEndConditionHold(
+            deploymentActivated: true,
+            attackerFielded: true,
+            defenderFielded: true,
+            attackerMissingReserveAccepted: false,
+            defenderMissingReserveAccepted: false));
+
+        Assert.False(CoopBattleController.ShouldReleaseEndConditionHold(
+            deploymentActivated: true,
+            attackerFielded: true,
+            defenderFielded: false,
+            attackerMissingReserveAccepted: false,
+            defenderMissingReserveAccepted: false));
+    }
 }

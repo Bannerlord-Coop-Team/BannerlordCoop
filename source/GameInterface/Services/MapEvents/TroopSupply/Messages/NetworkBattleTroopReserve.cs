@@ -22,10 +22,24 @@ public class NetworkBattleTroopReserve : IEvent
     [ProtoMember(3)]
     public readonly PartyReserve[] Parties = Array.Empty<PartyReserve>();
 
-    public NetworkBattleTroopReserve(string mapEventId, int side, PartyReserve[] parties)
+    /// <summary>
+    /// The server needs the receiver's FINAL supplied pointers for every party this REPLACE takes away
+    /// (BR-033 shrink refresh): the receiver must answer with a <see cref="NetworkBattleSupplyProgress"/>
+    /// whose <c>IsFlush</c> is set — one ack per flagged message — BEFORE the dropped parties can be
+    /// re-issued to their returning owner. The server's ledger lags the holder's true local pointer by up
+    /// to one throttled report interval, so serving the returner without this handshake can re-issue
+    /// descriptors the holder already fielded (duplicate agents sharing one UniqueSeed). Additive and
+    /// default-false, so a legacy peer simply applies the REPLACE and never acks (the server's deadline
+    /// fallback then serves the returner from the ledger, accepting today's race).
+    /// </summary>
+    [ProtoMember(4)]
+    public readonly bool FlushRequested;
+
+    public NetworkBattleTroopReserve(string mapEventId, int side, PartyReserve[] parties, bool flushRequested = false)
     {
         MapEventId = mapEventId;
         Side = side;
         Parties = parties;
+        FlushRequested = flushRequested;
     }
 }
