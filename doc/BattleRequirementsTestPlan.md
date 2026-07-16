@@ -275,6 +275,60 @@ methods); `TestMessageBroker`'s weak semantics deliberately kept faithful. Verif
 consecutive zero-fail runs of the Missions filter + 2 full-suite runs (117 total, 2 template
 skips, 0 failures).
 
+**Live-bug increment (2026-07-15) — two 2-client live-session bugs root-caused, RED tests written
+(fix increment pending).**
+**BR-051 (non-host retreat leaves troops in the battle):**
+`BattleAuthorityMigrator.DespawnControllerTroops` selects a retreating NON-host's troops by
+comparing each agent's team side to the LOCAL client's `PlayerTeam` side — a filter that assumes
+all players fight on the same side. In the live PVP battle (MapEvent_Created_308, retreater
+testclient = Attacker, remaining host testclient2 = Defender) every one of the retreater's 600
+troops and its hero puppet failed the side test and silently leaked (`despawned == 0` also
+suppresses the success log — the only trace was the side-agnostic mount cleanup line at 21:22:43).
+The retreat signal itself WAS delivered (server-relayed `MissionPeerLeft` over the reliable relay);
+no adoption runs on a graceful retreat, so the leaked agents sat registered to an absent controller
+as frozen, effectively unkillable puppets. On re-engage (21:22:50→21:23:18) the BR-033 reclaim
+no-ops (nothing was adopted) and the fresh 600-record redeploy stacked on top — ~1200
+testclient-keyed Attackers, another ghost cohort per leaky retreat. The host-retreat path
+(`DespawnOwnPartyTroops`, ownership-based selection: origin party + hero belt-check) worked in the
+same session (21:23:38, "Despawned 600 retreating own-party troop(s) of host testclient2").
+**Fix direction:** select the non-host retreater's troops by OWNERSHIP exactly like the host path
+(`TryGetPlayerParty` + `IsRetreatersAgent`), with an OriginalOwner-scoped fallback when the party
+is unresolvable, and a warning when 0 are despawned while non-mount entries were registered.
+New tests (`BattleNonHostRetreatDespawnTests`): 3 RED skip-marked —
+`NonHostRetreat_OpposingSideTroops_AreDespawnedOnRemainingClients`,
+`NonHostRetreat_OpposingHeroPuppet_IsDespawned`,
+`NonHostRetreat_ThenReengageRedeploy_DoesNotAccumulateStaleAgents` — plus 2 green lock-ins pinning
+the fix's scope (`NonHostRetreat_ExHostHeldAdoptedAgents_AreNotDespawnedAsOwnParty` — an adopted
+agent the retreater merely HELD must not be despawned as own-party;
+`HostRetreat_OwnershipDespawn_StillWorks_PvpSides` — the host branch is already side-agnostic).
+**BR-073 (reinforcements never spawn past the initial allotment):**
+`CoopAgentOrigin.SetKilled/SetWounded/SetRouted` are deliberate no-ops ("leaves roster casualties
+to the network death path"), so `CoopTroopSupplier.NumRemovedTroops` is frozen at 0 for the whole
+battle. The native engine's wave formula is driven entirely by that counter
+(`MissionBattleSideSpawnContext.NumberOfActiveTroops = _numSpawnedTroops -
+supplier.NumRemovedTroops`; `ComputeWaveBatch` requires `InitialSpawnedNumber -
+NumberActiveTroops >= wave size`), so after the initial battle-size allotment (600 per client at
+BattleSize 600 — live battle 406 logged exactly two SupplyTroops calls, (600)→600 then (0)→0,
+never `reinforcement=true`) every 3s batch check computes 0 forever while 1400 eligible reserves
+remained. The coop prefix `BattleAgentLogicHitRewardPatch.OnAgentRemovedPrefix` faithfully calls
+the origin hooks — the break is solely inside `CoopAgentOrigin`; `CoopTroopSupplier.OnTroop*` DO
+count but have no caller. Sizing (initial==total in `RunJointInit`) mirrors the native handler and
+is NOT the stall. **Fix direction:** restore the origin→supplier casualty feedback, seed-scoped to
+supplier-owned descriptors and one-shot per origin (native `PartyGroupAgentOrigin._isRemoved`
+latch), so puppet origins (built with no supplier linkage) can't corrupt a side that locally
+spawned 0. New tests (`BattleReinforcementCasualtyQuotaTests`): 4 RED skip-marked —
+`OwnTroopKilled_AdvancesSupplierRemovedQuota` (incl. the one-shot latch),
+`OwnTroopWoundedAndRouted_AdvanceSupplierRemovedQuota`,
+`AgentRemovedPrefix_KilledState_ReachesSupplierQuota` (the full prefix→origin→supplier seam),
+`WaveBatchGate_UnlocksWhenRemovedQuotaReachesWaveSize` (the REAL native
+`MissionBattleSideSpawnContext` around a real supplier: 299 coop-path kills keep the gate closed,
+the 300th must open a 300 batch — publicized `_numSpawnedTroops`/`ComputeWaveBatch`, no Cecil
+needed) — plus 2 green lock-ins (`PuppetOriginCasualty_DoesNotCountAgainstForeignSupplier` pins the
+seed-scoping invariant; `NativeContract_NumberOfActiveTroops_ReadsSupplierNumRemovedTroops` pins
+the native formula so a game update that changes the feedback contract fails loudly).
+Suites after skip-marking: full E2E 567 passed / 11 skips (4 pre-existing + 7 TDD reds) / 0
+failed (578); Coop.Tests untouched, 419 passed / 1 skip (420).
+
 Harness lessons for later waves: never disable-patch `MapEvent.FinalizeEventAux` in an E2E
 PatchScope (it already carries a production prefix — two-prefix `InvalidProgramException`, and the
 broken patch state poisons every later test in the run); harness-created parties spawn with
