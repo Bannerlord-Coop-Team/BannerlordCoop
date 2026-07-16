@@ -8,6 +8,7 @@ using GameInterface.Services.Players;
 using LiteNetLib;
 using Missions.Data;
 using Missions.Messages;
+using Missions.Services.Network;
 using Serilog;
 using System;
 using TaleWorlds.Core;
@@ -83,7 +84,9 @@ public class CoopBattleController : CoopMissionController
         IPlayerManager playerManager,
         ICoopMissionComponent coopMissionComponent,
         IBattleHostRegistry hostRegistry,
-        IAgentFormationAssigner formationAssigner)
+        IAgentFormationAssigner formationAssigner,
+        IMissionContext missionContext,
+        IHostEpochPolicy hostEpochPolicy)
         : base(network, messageBroker, objectManager, coopMissionComponent)
     {
         var session = new BattleSession(controllerIdProvider, hostRegistry);
@@ -91,7 +94,7 @@ public class CoopBattleController : CoopMissionController
 
         var deployment = new BattleDeploymentCoordinator(network, messageBroker, session);
 
-        lifecycle = new BattleInstanceLifecycle(network, relayNetwork, messageBroker, objectManager, coopMissionComponent, session);
+        lifecycle = new BattleInstanceLifecycle(network, relayNetwork, messageBroker, objectManager, coopMissionComponent, session, missionContext);
         replicator = new OwnedAgentReplicator(network, messageBroker, objectManager, coopMissionComponent, session, casualties, deployment);
         deathReporter = new AgentDeathReporter(network, relayNetwork, messageBroker, objectManager, coopMissionComponent, session, casualties);
         routReporter = new AgentRoutReporter(network, messageBroker, coopMissionComponent, session, casualties);
@@ -99,10 +102,14 @@ public class CoopBattleController : CoopMissionController
         puppetDeathApplier = new PuppetDeathApplier(messageBroker, coopMissionComponent, casualties);
         puppetRoutApplier = new PuppetRoutApplier(messageBroker, coopMissionComponent, casualties);
         damageRouter = new BattleDamageRouter(network, messageBroker, coopMissionComponent, session);
-        authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner);
+        authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, missionContext);
         reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, session, deployment, formationAssigner);
-        siegeEngineDeployment = new SiegeEngineDeploymentReplicator(network, messageBroker, session);
-        siegeMachineState = new SiegeMachineStateReplicator(network, messageBroker, session, coopMissionComponent.AgentRegistry);
+        // BR-102: ONE host-epoch policy shared by both siege replicators, so its accepted-epoch
+        // watermark spans every host-authority message type (engine placement + machine state/authority)
+        // — a superseded hosting generation is dropped consistently across both. The policy is a
+        // per-battle transient (see MissionModule), so this controller's per-battle lifetime resets it.
+        siegeEngineDeployment = new SiegeEngineDeploymentReplicator(network, messageBroker, session, hostEpochPolicy);
+        siegeMachineState = new SiegeMachineStateReplicator(network, messageBroker, session, coopMissionComponent.AgentRegistry, hostEpochPolicy);
         siegeWeaponFire = new SiegeWeaponFireReplicator(network, messageBroker, coopMissionComponent.AgentRegistry);
         supplyReporter = new SupplyProgressReporter(relayNetwork, session);
 
@@ -141,6 +148,24 @@ public class CoopBattleController : CoopMissionController
         base.Dispose();
     }
 
+    // MISSION-READY (BR-010): the native MissionState.FinishMissionLoading fans Mission.AfterStart() out to
+    // the behaviors only once Mission.IsLoadingFinished turned true, so this is the moment this client has
+    // FINISHED LOADING the battle mission. Announce it so BattleHostHandler requests the host election —
+    // the server's per-battle order becomes the mission-ready order (BR-013), not the entry order. The
+    // session began at entry (PlayerEnteredBattle -> BattleInstanceLifecycle), well before loading finishes.
+    public override void AfterStart()
+    {
+        base.AfterStart();
+
+        // BR-025: the deployment time limit begins when this player becomes mission-ready — right here.
+        Deployment.OnMissionReady();
+
+        if (Session.HasInstance)
+            messageBroker.Publish(this, new BattleMissionReady(Session.InstanceId));
+        else
+            Logger.Warning("[BattleHost] Battle mission finished loading with no instance session — cannot announce mission-ready");
+    }
+
     public override void OnMissionTick(float dt)
     {
         base.OnMissionTick(dt);
@@ -158,7 +183,8 @@ public class CoopBattleController : CoopMissionController
         BattleConclusionGate.IsInCoopBattleMission = true;
         BattleConclusionGate.IsLocalBattleHost = Session.IsLocalHost;
 
-        // Drain before the end-condition gate below so a release sees this tick's fresh puppets.
+        // Register the buffered puppet batch before the one-shot end-condition gate so it can observe both
+        // sides as fielded even when a queued terminal event removes every agent on one side this tick.
         puppetSpawner.DrainPendingPuppets();
 
         // Vanilla's end checks unlock at the LOCAL deployment finish, but a side whose troops arrive as
@@ -179,10 +205,19 @@ public class CoopBattleController : CoopMissionController
             }
         }
 
+        // Terminal events can now remove freshly registered puppets without preventing the one-shot gate
+        // above from releasing. Vanilla end checks will observe the resulting depletion normally.
+        puppetDeathApplier.DrainPendingDeaths();
+        puppetRoutApplier.DrainPendingRouts();
+
         siegeEngineDeployment.DrainPending(dt);
         siegeMachineState.Tick(dt);
         diagnostics.Tick(dt);
         supplyReporter.Tick(dt);
+
+        // BR-025: expire the local deployment time limit (auto-finishes deployment via the native Start
+        // Battle path when the game-configured limit elapses; a no-op once deployment has finished).
+        Deployment.Tick(dt);
     }
 
     public override void OnPreDisplayMissionTick(float dt)

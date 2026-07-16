@@ -92,7 +92,6 @@ namespace Coop.Core
             var advertisementConfig = new SessionAdvertisementConfig
             {
                 EnableSteamInvites = connectMessage.EnableSteamInvites,
-                PublicAddress = connectMessage.PublicAddress ?? string.Empty,
             };
 
             StartAsClient(configuration, advertisementConfig);
@@ -173,7 +172,6 @@ namespace Coop.Core
                 // The spawned server owns the Steam listener and public lobby. This loopback
                 // client must not create a second lobby and user-flavor tunnel.
                 EnableSteamInvites = false,
-                PublicAddress = string.Empty,
                 Visibility = visibility,
             };
 

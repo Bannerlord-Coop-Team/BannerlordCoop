@@ -8,6 +8,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
 using Serilog;
+using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
@@ -60,14 +61,34 @@ public class ResolveCharacterState : ConnectionStateBase
 
     internal void Handle_ModuleVersionsValidate(MessagePayload<NetworkModuleVersionsValidate> obj)
     {
-        var clientModules = obj.What.Modules;
-        var serverModules = moduleInfoProvider.GetModuleInfos();
+        // Same guard as Handle_ClientValidate: every connection in this state receives every
+        // client's broadcastable messages, so without it each concurrent joiner would also be
+        // answered with a result computed from another client's module list.
+        var peer = obj.Who as NetPeer;
+        if (peer != ConnectionLogic.Peer) return;
 
-        var result = moduleValidator.Validate(serverModules, clientModules.Select(ConvertToModuleInfo), out var error);
+        bool result;
+        string error;
+        try
+        {
+            var clientModules = obj.What.Modules;
+            var serverModules = moduleInfoProvider.GetModuleInfos();
+
+            result = moduleValidator.Validate(serverModules, clientModules.Select(ConvertToModuleInfo), out error);
+        }
+        catch (Exception e)
+        {
+            // A throw here used to die in the network poller, so the client never received an
+            // answer and sat on the "Validating modules..." loading screen forever. Answer with a
+            // denial instead so the joiner gets a visible reason.
+            Logger.Error(e, "Module validation threw for peer {Peer}", ConnectionLogic.Peer?.Id);
+            result = false;
+            error = $"The server failed to validate the module list ({e.GetType().Name}). " +
+                    "Check that the client and server run the same game and mod versions.";
+        }
 
         var validateMessage = new NetworkModuleVersionsValidated(result, error);
-        var playerPeer = ConnectionLogic.Peer;
-        network.SendImmediate(playerPeer, validateMessage);
+        network.SendImmediate(ConnectionLogic.Peer, validateMessage);
     }
 
     internal void Handle_ClientValidate(MessagePayload<NetworkClientValidate> obj)

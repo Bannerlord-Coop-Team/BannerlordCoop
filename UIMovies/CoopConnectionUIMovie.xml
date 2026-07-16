@@ -65,30 +65,6 @@
                     </ListPanel>
 
                     <ListPanel WidthSizePolicy="Fixed" SuggestedWidth="760" HeightSizePolicy="Fixed" SuggestedHeight="76"
-                               HorizontalAlignment="Center" IsVisible="@PublicAddressVisible"
-                               StackLayout.LayoutMethod="HorizontalLeftToRight">
-                      <Children>
-                        <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="270" HeightSizePolicy="StretchToParent"
-                                    Brush="Clan.TabControl.Text" Brush.FontSize="28"
-                                    Brush.TextHorizontalAlignment="Right" Brush.TextVerticalAlignment="Center"
-                                    MarginRight="20" Text="@PublicAddressText"/>
-                        <EditableTextWidget WidthSizePolicy="Fixed" SuggestedWidth="390" HeightSizePolicy="Fixed" SuggestedHeight="58"
-                                            VerticalAlignment="Center" Brush="ScoreboardPanels_2" Brush.AlphaFactor="0.75"
-                                            Brush.FontSize="28" Brush.TextHorizontalAlignment="Center"
-                                            Brush.TextVerticalAlignment="Center" Text="@PublicAddress"/>
-                        <HintWidget DataSource="{FriendsAddressHint}" WidthSizePolicy="Fixed" SuggestedWidth="44"
-                                    HeightSizePolicy="StretchToParent" MarginLeft="14"
-                                    Command.HoverBegin="ExecuteBeginHint" Command.HoverEnd="ExecuteEndHint">
-                          <Children>
-                            <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
-                                        DoNotAcceptEvents="true" Brush="Clan.TabControl.Text"
-                                        Brush.TextVerticalAlignment="Center" Text="(i)"/>
-                          </Children>
-                        </HintWidget>
-                      </Children>
-                    </ListPanel>
-
-                    <ListPanel WidthSizePolicy="Fixed" SuggestedWidth="760" HeightSizePolicy="Fixed" SuggestedHeight="76"
                                HorizontalAlignment="Center" StackLayout.LayoutMethod="HorizontalLeftToRight">
                       <Children>
                         <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="270" HeightSizePolicy="StretchToParent"
@@ -311,17 +287,8 @@
                          VerticalAlignment="Bottom" MarginBottom="44" Command.Click="ActionCancel"/>
 
         <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="256" HeightSizePolicy="Fixed" SuggestedHeight="64"
-                    VerticalAlignment="Bottom" HorizontalAlignment="Right" PositionYOffset="-220" PositionXOffset="-6"
+                    VerticalAlignment="Bottom" HorizontalAlignment="Right" PositionYOffset="-170" PositionXOffset="-6"
                     Brush="ScoreboardPanels_2" Text="@CommunityText"/>
-
-        <ListPanel WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
-                   HorizontalAlignment="Right" VerticalAlignment="Bottom" MarginBottom="60"
-                   StackLayout.LayoutMethod="HorizontalLeftToRight">
-          <Children>
-            <Standard.Button HorizontalAlignment="Left" VerticalAlignment="Bottom"
-                             Command.Click="ActionGithub" Parameter.Text="@GithubButtonText" PositionXOffset="-20"/>
-          </Children>
-        </ListPanel>
 
         <ListPanel WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
                    HorizontalAlignment="Right" VerticalAlignment="Bottom" MarginBottom="10"
@@ -333,7 +300,7 @@
         </ListPanel>
 
         <ListPanel WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
-                   HorizontalAlignment="Right" VerticalAlignment="Bottom" MarginBottom="110"
+                   HorizontalAlignment="Right" VerticalAlignment="Bottom" MarginBottom="60"
                    StackLayout.LayoutMethod="HorizontalLeftToRight">
           <Children>
             <Standard.Button HorizontalAlignment="Left" VerticalAlignment="Bottom"
@@ -342,11 +309,11 @@
         </ListPanel>
 
         <ListPanel WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
-                   HorizontalAlignment="Right" VerticalAlignment="Bottom" MarginBottom="160"
+                   HorizontalAlignment="Right" VerticalAlignment="Bottom" MarginBottom="110"
                    StackLayout.LayoutMethod="HorizontalLeftToRight">
           <Children>
             <Standard.Button HorizontalAlignment="Left" VerticalAlignment="Bottom"
-                             Command.Click="ActionBuyMeACoffee" Parameter.Text="@BuyMeACoffeeButtonText" PositionXOffset="-20"/>
+                             Command.Click="ActionDonate" Parameter.Text="@DonateButtonText" PositionXOffset="-20"/>
           </Children>
         </ListPanel>
       </Children>
