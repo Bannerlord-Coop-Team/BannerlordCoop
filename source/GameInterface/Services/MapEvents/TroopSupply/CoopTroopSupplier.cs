@@ -63,9 +63,16 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     /// so a side this client owns nothing on (empty set) reports "done" instead of blocking deployment.
     /// A party's pointer never rewinds: if we have already supplied further than a (possibly stale) resend
     /// carries, we keep our local pointer — see the monotonic resume below.
+    /// <para>
+    /// Returns the FINAL local supplied pointers of the parties this REPLACE dropped (held before, absent
+    /// from the new set) — the BR-033 flush payload. Captured under the same lock as the replace itself, so
+    /// no supply can advance a dropped party between the capture and the removal: the returned pointers are
+    /// definitively this supplier's last word on those parties.
+    /// </para>
     /// </summary>
-    public void SetReserve(IReadOnlyList<PartyReserve> reserve)
+    public IReadOnlyList<(string PartyId, int Supplied)> SetReserve(IReadOnlyList<PartyReserve> reserve)
     {
+        var dropped = new List<(string PartyId, int Supplied)>();
         lock (gate)
         {
             // Capture the current per-party pointers before rebuilding. A resend can carry a STALE pointer: the
@@ -87,6 +94,7 @@ public class CoopTroopSupplier : IMissionTroopSupplier
                     int supplied = Math.Min(Math.Max(0, party.SuppliedCount), entries.Length);
                     if (priorSupplied.TryGetValue(party.PartyId, out var local) && local > supplied)
                         supplied = Math.Min(local, entries.Length);
+                    priorSupplied.Remove(party.PartyId); // kept — not part of the dropped set
                     parties.Add(new PartyState
                     {
                         PartyId = party.PartyId,
@@ -98,10 +106,15 @@ public class CoopTroopSupplier : IMissionTroopSupplier
                 }
             }
             populated = true;
+
+            // Whatever the new set did not re-claim was DROPPED by this replace.
+            foreach (var prior in priorSupplied)
+                dropped.Add((prior.Key, prior.Value));
         }
 
-        Logger.Information("[TroopSupply] Supplier {MapEvent} side {Side}: SetReserve {Parties} parties / {Entries} troops",
-            MapEventId, Side, parties.Count, NumTroopsNotSupplied);
+        Logger.Information("[TroopSupply] Supplier {MapEvent} side {Side}: SetReserve {Parties} parties / {Entries} troops ({Dropped} parties dropped)",
+            MapEventId, Side, parties.Count, NumTroopsNotSupplied, dropped.Count);
+        return dropped;
     }
 
     /// <summary>How many troops have been supplied per party — reported back to the server for the ledger.</summary>

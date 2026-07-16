@@ -10,6 +10,7 @@ using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.MapEvents.TroopSupply.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using LiteNetLib;
 using Missions.Messages;
@@ -39,7 +40,11 @@ namespace Missions.Battles;
 /// The server also owns the RESERVE SCOPE across membership churn: a member that DROPS (not retreats) is
 /// marked absent so its parties fall into the host's owned set (the reserve half of the BR-031 adoption),
 /// and its RETURN re-issues the current scope to both sides of the handoff — the returner's grant and a
-/// shrunk refresh to the host (BR-033), so no two suppliers ever hold the same party's reserve.
+/// shrunk refresh to the host (BR-033), so no two suppliers ever hold the same party's reserve. Because the
+/// host's supplied-progress reports are throttled, the shrunk refresh carries a FLUSH handshake: the host
+/// acks each flagged side with its final local pointers for the dropped parties, and the returner's grant
+/// is deferred until those land in the ledger (with host-departure and deadline fallbacks so the returner
+/// is never stranded) — see <see cref="HandleControllerReturn"/>.
 /// </para>
 /// </summary>
 internal class BattleHostHandler : IHandler
@@ -53,6 +58,7 @@ internal class BattleHostHandler : IHandler
     private readonly IBattleHostRegistry hostRegistry;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IBattleTroopReserveBuilder reserveBuilder;
+    private readonly IBattleTroopLedger ledger;
 
     // [Server] Highest host epoch ever issued per battle instance (BR-102), retained across assignment
     // removal: clients keep their last assignment when a battle is fully abandoned (only the server's entry
@@ -82,6 +88,34 @@ internal class BattleHostHandler : IHandler
         public NetPeer Peer;
     }
 
+    /// <summary>
+    /// [Server] How long a deferred return grant waits for the host's flush ack (BR-033 handshake) before
+    /// the returner is served from the current ledger anyway — the returner must NEVER be stranded on a
+    /// lost ack or a legacy host that ignores <c>FlushRequested</c>. Checked on the campaign tick.
+    /// Internal-settable so tests can drive the deadline without wall-clock waits.
+    /// </summary>
+    internal TimeSpan FlushAckDeadline { get; set; } = TimeSpan.FromSeconds(2.5);
+
+    // [Server] Per battle: return grants DEFERRED behind the shrunk host's flush acks (BR-033 handshake).
+    // The ledger only holds the host's last THROTTLED progress report, so the returner must not be served
+    // until the host flushed its true local pointers for the parties the shrink refresh dropped. One entry
+    // per outstanding returner, completed FIFO as the acks arrive (the refreshes travel one reliable-ordered
+    // stream and every flagged side message produces exactly one ack, so ack order matches refresh order),
+    // or by the fallbacks: the host's departure serves them, the tick deadline serves them, teardown drops
+    // them. Game thread only (all mutation sites run under GameThread.RunSafe or on the campaign tick).
+    private readonly Dictionary<string, List<PendingReturn>> pendingReturns = new Dictionary<string, List<PendingReturn>>();
+
+    private sealed class PendingReturn
+    {
+        public string MapEventId;
+        public string ReturnerControllerId;
+        public NetPeer ReturnerPeer;
+        public string HostControllerId;
+        public bool IncludeEmptySides;
+        public int AwaitedAcks;
+        public DateTime DeadlineUtc;
+    }
+
     public BattleHostHandler(
         IMessageBroker messageBroker,
         INetwork network,
@@ -89,7 +123,8 @@ internal class BattleHostHandler : IHandler
         IPlayerManager playerManager,
         IBattleHostRegistry hostRegistry,
         IControllerIdProvider controllerIdProvider,
-        IBattleTroopReserveBuilder reserveBuilder)
+        IBattleTroopReserveBuilder reserveBuilder,
+        IBattleTroopLedger ledger)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -98,6 +133,7 @@ internal class BattleHostHandler : IHandler
         this.hostRegistry = hostRegistry;
         this.controllerIdProvider = controllerIdProvider;
         this.reserveBuilder = reserveBuilder;
+        this.ledger = ledger;
 
         messageBroker.Subscribe<PlayerEnteredBattle>(Handle_PlayerEnteredBattle);
         messageBroker.Subscribe<BattleMissionReady>(Handle_BattleMissionReady);
@@ -105,6 +141,8 @@ internal class BattleHostHandler : IHandler
         messageBroker.Subscribe<NetworkBattleHostAssigned>(Handle_NetworkBattleHostAssigned);
         messageBroker.Subscribe<MissionMemberDeparted>(Handle_MissionMemberDeparted);
         messageBroker.Subscribe<NetworkRequestBattleReserves>(Handle_NetworkRequestBattleReserves);
+        messageBroker.Subscribe<NetworkBattleSupplyProgress>(Handle_NetworkBattleSupplyProgress);
+        messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
     }
 
     public void Dispose()
@@ -115,6 +153,8 @@ internal class BattleHostHandler : IHandler
         messageBroker.Unsubscribe<NetworkBattleHostAssigned>(Handle_NetworkBattleHostAssigned);
         messageBroker.Unsubscribe<MissionMemberDeparted>(Handle_MissionMemberDeparted);
         messageBroker.Unsubscribe<NetworkRequestBattleReserves>(Handle_NetworkRequestBattleReserves);
+        messageBroker.Unsubscribe<NetworkBattleSupplyProgress>(Handle_NetworkBattleSupplyProgress);
+        messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
     }
 
     /// <summary>[Client] Entering a battle (still loading): request only the reserves we already OWN, so our
@@ -204,9 +244,14 @@ internal class BattleHostHandler : IHandler
 
             // A request from a member that had DROPPED is its return: re-scope the reserves (its parties
             // leave the host's scope) before serving, and refresh the shrunk holder. Normally a no-op here —
-            // the entry-time reserve request (below) arrives first and already handled the return.
-            HandleControllerReturn(mapEventId, mapEvent, requesterId);
+            // the entry-time reserve request (below) arrives first and already handled the return. When the
+            // return's flush handshake is (still) in flight, the grant is deferred: fold this election-time
+            // request into the pending grant (upgrading it to carry explicit empties) instead of serving
+            // early from a ledger the host has not caught up yet.
+            bool deferred = HandleControllerReturn(mapEventId, mapEvent, requesterId, requester, includeEmptySides: true);
             RememberHostPeer(mapEventId, requesterId, requester);
+            if (deferred || TryDeferToPendingReturn(mapEventId, requesterId, requester, includeEmptySides: true))
+                return;
 
             // Feed the ready client the troop reserves it owns — its own parties, plus the unowned (NPC)
             // parties when it is the elected host (BR-010: the NPC grant travels WITH the election). Empties
@@ -237,12 +282,18 @@ internal class BattleHostHandler : IHandler
 
             // A request from a member that had DROPPED is its re-entry (BR-033): take its parties back out
             // of the host's reserve scope BEFORE computing the reply — the returner's grant below must carry
-            // its own parties again — and push the shrunk holder its refresh.
-            HandleControllerReturn(mapEventId, mapEvent, requesterId);
+            // its own parties again — and push the shrunk holder its refresh. The refresh asks the holder to
+            // FLUSH its final local pointers (they can be AHEAD of its throttled reports in the ledger), and
+            // while that handshake is in flight the returner's grant is DEFERRED — serving it from the
+            // lagging ledger would re-issue descriptors the holder already fielded.
+            bool deferred = HandleControllerReturn(mapEventId, mapEvent, requesterId, requester, includeEmptySides: false);
 
             // The current host's adoption/sweep re-request also refreshes its live peer (a promoted host
             // announces itself here after a migration).
             RememberHostPeer(mapEventId, requesterId, requester);
+
+            if (deferred || TryDeferToPendingReturn(mapEventId, requesterId, requester, includeEmptySides: false))
+                return;
 
             SendOwnedReserves(mapEventId, mapEvent, requester, requesterId, includeEmptySides: false);
         });
@@ -255,7 +306,15 @@ internal class BattleHostHandler : IHandler
     private void SendOwnedReserves(string mapEventId, MapEvent mapEvent, NetPeer requester, string requesterId, bool includeEmptySides)
     {
         if (requester == null) return;
+        SendSideReserves(requester, mapEventId,
+            BuildOwnedReserves(mapEventId, mapEvent, requesterId, includeEmptySides), flushRequested: false);
+    }
 
+    // [Server, game thread] The per-side reserve messages a requester's grant/refresh consists of, at the
+    // current ledger pointers. Split from the send so the BR-033 shrink refresh knows how many flush acks
+    // to await BEFORE any flagged message goes out.
+    private List<SideReserve> BuildOwnedReserves(string mapEventId, MapEvent mapEvent, string requesterId, bool includeEmptySides)
+    {
         bool isHost = hostRegistry.TryGet(mapEventId, out var assignment)
             && assignment.HostControllerId == requesterId;
 
@@ -263,14 +322,22 @@ internal class BattleHostHandler : IHandler
         // BR-031 adoption); the builder treats their owners as absent.
         absentControllers.TryGetValue(mapEventId, out var absent);
 
+        var sides = new List<SideReserve>();
         foreach (var sideReserve in reserveBuilder.GetOwnedReserves(mapEvent, requesterId, isHost, absent))
         {
             if (!includeEmptySides && (sideReserve.Parties == null || sideReserve.Parties.Length == 0))
                 continue;
-
-            network.Send(requester, new NetworkBattleTroopReserve(
-                mapEventId, (int)sideReserve.Side, sideReserve.Parties));
+            sides.Add(sideReserve);
         }
+        return sides;
+    }
+
+    private void SendSideReserves(NetPeer receiver, string mapEventId, List<SideReserve> reserves, bool flushRequested)
+    {
+        if (receiver == null) return;
+        foreach (var sideReserve in reserves)
+            network.Send(receiver, new NetworkBattleTroopReserve(
+                mapEventId, (int)sideReserve.Side, sideReserve.Parties, flushRequested));
     }
 
     /// <summary>[Server, game thread] Record the current host's live peer for this battle, from one of its
@@ -289,17 +356,26 @@ internal class BattleHostHandler : IHandler
     /// host's reserve scope (BR-033). Because nothing else tells the holder to let go, the current host is
     /// RE-FED its owned set — now without the returned parties, with explicit empties so a side that became
     /// empty is cleared — using the same NetworkBattleTroopReserve REPLACE semantics migration re-feeds use.
+    /// The refresh is sent with <c>FlushRequested</c>: the ledger only holds the host's last THROTTLED
+    /// progress report and can lag its true local pointer, so the returner's grant is DEFERRED (a pending
+    /// return is recorded; returns true) until the host's flush acks land the dropped parties' final
+    /// pointers in the ledger — otherwise descriptors the host fielded in the report gap would be re-served
+    /// and spawn twice. Fallbacks guarantee the returner is never stranded: no live host peer serves it
+    /// immediately from the ledger (return false — the pre-handshake race accepted), the host's departure
+    /// serves outstanding pendings, and the campaign-tick deadline serves them when no ack ever arrives.
     /// Ordering guarantees: all scope decisions (drop-marking, this return, both replies) serialize on the
     /// server game thread against one ledger snapshot; server→host messages are reliable-ordered on the
     /// host's stream, so this refresh can never be overtaken by an earlier, fatter grant; and pointers can
     /// never rewind — the refresh carries the ledger's monotonic pointers and the supplier resumes from
     /// max(local, server). A no-op for members that never dropped, so a duplicate request changes nothing.
     /// </summary>
-    private void HandleControllerReturn(string mapEventId, MapEvent mapEvent, string requesterId)
+    /// <returns>True when the requester's grant is handled through a pending return (deferred behind the
+    /// host's flush acks — possibly already completed inline) so the caller must not also serve it.</returns>
+    private bool HandleControllerReturn(string mapEventId, MapEvent mapEvent, string requesterId, NetPeer requesterPeer, bool includeEmptySides)
     {
-        if (string.IsNullOrEmpty(requesterId)) return;
+        if (string.IsNullOrEmpty(requesterId)) return false;
         if (!absentControllers.TryGetValue(mapEventId, out var absent) || !absent.Remove(requesterId))
-            return;
+            return false;
         if (absent.Count == 0)
             absentControllers.Remove(mapEventId);
 
@@ -307,22 +383,213 @@ internal class BattleHostHandler : IHandler
             requesterId, mapEventId);
 
         if (!hostRegistry.TryGet(mapEventId, out var assignment))
-            return;
+            return false;
         if (assignment.HostControllerId == requesterId)
-            return; // the returner IS the current host — the grant it is about to receive is the refresh
+            return false; // the returner IS the current host — the grant it is about to receive is the refresh
 
         if (!hostPeers.TryGetValue(mapEventId, out var host) || host.ControllerId != assignment.HostControllerId)
         {
             // A promoted host that has not re-requested yet has no live peer recorded — and needs no refresh:
-            // its own upcoming adoption re-request is already served the post-return scope.
+            // its own upcoming adoption re-request is already served the post-return scope. With no holder to
+            // flush, the caller serves the returner straight from the ledger (fallback: never strand it).
             Logger.Information("[BattleHost] No live peer recorded for host {Host} of {MapEventId}; skipping reserve refresh (its next request is already re-scoped)",
                 assignment.HostControllerId, mapEventId);
+            return false;
+        }
+
+        // Build the shrunk refresh BEFORE recording the pending so the awaited ack count (one per side
+        // message) is known, and record the pending BEFORE sending so an ack can never miss it — the sends
+        // can complete the whole handshake inline (the in-process test harness delivers synchronously).
+        var refresh = BuildOwnedReserves(mapEventId, mapEvent, host.ControllerId, includeEmptySides: true);
+        if (refresh.Count == 0 || requesterPeer == null)
+        {
+            // Nothing to flush, or no peer to defer a grant for: refresh unflagged (legacy semantics) and
+            // let the caller serve immediately from the ledger.
+            SendSideReserves(host.Peer, mapEventId, refresh, flushRequested: false);
+            Logger.Information("[BattleHost] Refreshed host {Host}'s reserve scope for {MapEventId} after {Controller} returned",
+                host.ControllerId, mapEventId, requesterId);
+            return false;
+        }
+
+        var pending = new PendingReturn
+        {
+            MapEventId = mapEventId,
+            ReturnerControllerId = requesterId,
+            ReturnerPeer = requesterPeer,
+            HostControllerId = host.ControllerId,
+            IncludeEmptySides = includeEmptySides,
+            AwaitedAcks = refresh.Count,
+            DeadlineUtc = DateTime.UtcNow + FlushAckDeadline,
+        };
+        if (!pendingReturns.TryGetValue(mapEventId, out var pendings))
+        {
+            pendings = new List<PendingReturn>();
+            pendingReturns[mapEventId] = pendings;
+        }
+        pendings.Add(pending);
+
+        SendSideReserves(host.Peer, mapEventId, refresh, flushRequested: true);
+        Logger.Information("[BattleHost] Refreshed host {Host}'s reserve scope for {MapEventId} after {Controller} returned; the return grant awaits {Acks} flush ack(s)",
+            host.ControllerId, mapEventId, requesterId, refresh.Count);
+        return true;
+    }
+
+    /// <summary>[Server, game thread] A repeat request from a controller whose return grant is still
+    /// PENDING — e.g. the mission-ready election request arriving while the entry request's flush handshake
+    /// is in flight: fold it into the pending grant instead of serving early from the not-yet-caught-up
+    /// ledger. The eventual grant is upgraded to explicit empties when any folded request needed them (the
+    /// election reply's sizing contract), and the peer is refreshed. Duplicate returns are thereby
+    /// idempotent: one grant serves them all once the acks (or a fallback) land.</summary>
+    private bool TryDeferToPendingReturn(string mapEventId, string requesterId, NetPeer requesterPeer, bool includeEmptySides)
+    {
+        if (!pendingReturns.TryGetValue(mapEventId, out var pendings))
+            return false;
+
+        foreach (var pending in pendings)
+        {
+            if (pending.ReturnerControllerId != requesterId)
+                continue;
+
+            pending.IncludeEmptySides |= includeEmptySides;
+            if (requesterPeer != null)
+                pending.ReturnerPeer = requesterPeer;
+            Logger.Information("[BattleHost] Folded {Controller}'s reserve request for {MapEventId} into its pending return (grant deferred until the host's flush ack)",
+                requesterId, mapEventId);
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>[Server] A FLUSH ACK from the shrunk holder (BR-033 handshake): land the flushed pointers in
+    /// the LEDGER first, then complete the battle's oldest pending return once all of its refresh messages
+    /// are acked — the returner's grant is then computed at the caught-up pointers. The pointers are applied
+    /// to the injected ledger directly rather than relying on <c>BattleSupplyProgressHandler</c> having run
+    /// first: broker delivery order between two subscribers is registration-order dependent with no
+    /// contract, while the direct apply makes ack-before-grant self-contained — and the double application
+    /// is harmless because <c>ReportSupplied</c> is monotonic and clamped. Acks complete pendings FIFO per
+    /// battle: the refreshes travel the host's one reliable-ordered stream and every flagged side message
+    /// produces exactly one ack, so ack arrival order matches refresh order. A stale or duplicate ack (its
+    /// pending already completed by a fallback, or none ever existed) still lands its pointers and changes
+    /// nothing else. Periodic (non-flush) reports stay <c>BattleSupplyProgressHandler</c>'s job.</summary>
+    private void Handle_NetworkBattleSupplyProgress(MessagePayload<NetworkBattleSupplyProgress> payload)
+    {
+        if (ModInformation.IsClient) return;
+
+        var message = payload.What;
+        if (!message.IsFlush) return;
+
+        // Pending-return state is game-thread-only (as is serving the grant).
+        GameThread.RunSafe(() =>
+        {
+            if (message.Entries != null)
+                foreach (var entry in message.Entries)
+                    ledger.ReportSupplied(message.MapEventId, entry.PartyId, entry.SuppliedCount);
+
+            if (!pendingReturns.TryGetValue(message.MapEventId, out var pendings) || pendings.Count == 0)
+                return;
+
+            var pending = pendings[0];
+            if (--pending.AwaitedAcks > 0)
+                return;
+
+            pendings.RemoveAt(0);
+            if (pendings.Count == 0)
+                pendingReturns.Remove(message.MapEventId);
+
+            ServePendingReturn(pending, "the host's flush acks caught the ledger up");
+        });
+    }
+
+    /// <summary>[Server, game thread — published by the Campaign.Tick postfix] Deadline sweep for pending
+    /// returns: a flush ack that never arrives (a legacy host without the handshake, a lost message) must
+    /// not strand the returner — past <see cref="FlushAckDeadline"/> it is served from the current ledger
+    /// with a warning, accepting the pre-handshake race for that one grant. Tick-driven on purpose: no
+    /// background timers into the broker/network.</summary>
+    private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
+    {
+        if (ModInformation.IsClient) return;
+        if (pendingReturns.Count == 0) return;
+
+        var now = DateTime.UtcNow;
+        List<PendingReturn> expired = null;
+        foreach (var pendings in pendingReturns.Values)
+            foreach (var pending in pendings)
+                if (now >= pending.DeadlineUtc)
+                    (expired ??= new List<PendingReturn>()).Add(pending);
+        if (expired == null) return;
+
+        foreach (var pending in expired)
+        {
+            if (pendingReturns.TryGetValue(pending.MapEventId, out var pendings))
+            {
+                pendings.Remove(pending);
+                if (pendings.Count == 0)
+                    pendingReturns.Remove(pending.MapEventId);
+            }
+
+            Logger.Warning("[BattleHost] Host {Host} never acked the reserve flush for {MapEventId} within {Deadline}; serving {Controller}'s return grant from the current ledger",
+                pending.HostControllerId, pending.MapEventId, FlushAckDeadline, pending.ReturnerControllerId);
+            ServePendingReturn(pending, "flush-ack deadline");
+        }
+    }
+
+    // [Server, game thread] Complete a pending return: serve the returner its owned reserves at the
+    // ledger's current pointers (isHost/absent are evaluated at serve time, so a returner promoted while it
+    // waited is served its post-promotion scope). The reason makes the completing path visible in the logs.
+    private void ServePendingReturn(PendingReturn pending, string reason)
+    {
+        if (!objectManager.TryGetObject<MapEvent>(pending.MapEventId, out var mapEvent))
+        {
+            Logger.Warning("[BattleHost] Dropping the pending return grant of {Controller} to {MapEventId}: the map event no longer resolves",
+                pending.ReturnerControllerId, pending.MapEventId);
             return;
         }
 
-        SendOwnedReserves(mapEventId, mapEvent, host.Peer, host.ControllerId, includeEmptySides: true);
-        Logger.Information("[BattleHost] Refreshed host {Host}'s reserve scope for {MapEventId} after {Controller} returned",
-            assignment.HostControllerId, mapEventId, requesterId);
+        SendOwnedReserves(pending.MapEventId, mapEvent, pending.ReturnerPeer, pending.ReturnerControllerId, pending.IncludeEmptySides);
+        Logger.Information("[BattleHost] Served {Controller}'s deferred return grant for {MapEventId} ({Reason})",
+            pending.ReturnerControllerId, pending.MapEventId, reason);
+    }
+
+    // [Server, game thread] The host owing flush acks DEPARTED: no ack is coming — serve every pending
+    // return that was waiting on it from the CURRENT ledger (whatever the departed host fielded past its
+    // last throttled report is lost with it; the pre-handshake race is accepted over stranding a returner).
+    private void ServePendingReturnsAwaitingHost(string mapEventId, string departedHostId)
+    {
+        if (!pendingReturns.TryGetValue(mapEventId, out var pendings))
+            return;
+
+        var toServe = new List<PendingReturn>();
+        for (int i = pendings.Count - 1; i >= 0; i--)
+        {
+            if (pendings[i].HostControllerId != departedHostId)
+                continue;
+            toServe.Insert(0, pendings[i]);
+            pendings.RemoveAt(i);
+        }
+        if (pendings.Count == 0)
+            pendingReturns.Remove(mapEventId);
+
+        foreach (var pending in toServe)
+            ServePendingReturn(pending, "the host departed before its flush ack");
+    }
+
+    // [Server, game thread] The RETURNER dropped again while its grant was still pending: cancel it — there
+    // is no one to serve, and its next return restarts the handshake against the then-current scope.
+    private void CancelPendingReturns(string mapEventId, string returnerControllerId)
+    {
+        if (!pendingReturns.TryGetValue(mapEventId, out var pendings))
+            return;
+
+        for (int i = pendings.Count - 1; i >= 0; i--)
+        {
+            if (pendings[i].ReturnerControllerId != returnerControllerId)
+                continue;
+            pendings.RemoveAt(i);
+            Logger.Information("[BattleHost] Cancelled the pending return grant of {Controller} to {MapEventId}: it departed again before the flush ack",
+                returnerControllerId, mapEventId);
+        }
+        if (pendings.Count == 0)
+            pendingReturns.Remove(mapEventId);
     }
 
     /// <summary>[Server] A member departed a battle: promote the next successor if it was the host (host
@@ -390,6 +657,10 @@ internal class BattleHostHandler : IHandler
                 MarkAbsent(mapEventId, controllerId);
             }
 
+            // If the departed member had a return grant pending (it re-entered and dropped AGAIN before the
+            // host's flush ack), the grant is moot — cancel it rather than serve a gone peer.
+            CancelPendingReturns(mapEventId, controllerId);
+
             if (!hostRegistry.TryGet(mapEventId, out var assignment))
                 return; // no host elected yet — the departure bookkeeping above is all that applies
 
@@ -418,6 +689,11 @@ internal class BattleHostHandler : IHandler
 
                     if (objectManager.TryGetObject<MapEvent>(mapEventId, out var abandonedEvent))
                         reserveBuilder.ForgetMapEvent(abandonedEvent);
+
+                    // A returner whose grant was pending on the departed host's flush ack must still be
+                    // served (it is one of the still-loading participants). AFTER the re-flatten above, so
+                    // it resumes from the same reset pointers the eventual host will re-spawn from.
+                    ServePendingReturnsAwaitingHost(mapEventId, controllerId);
                     return;
                 }
 
@@ -436,6 +712,11 @@ internal class BattleHostHandler : IHandler
                     controllerId, mapEventId, newHost, promoted.Epoch, string.Join(", ", successors));
 
                 network.SendAll(ToMessage(mapEventId, promoted));
+
+                // The departed host can no longer ack a reserve flush: serve any return grant that was
+                // pending on it from the current ledger. AFTER the promotion, so the grant is scoped
+                // against the new assignment (a promoted returner is served its host scope).
+                ServePendingReturnsAwaitingHost(mapEventId, controllerId);
             }
             else if (successors.Remove(controllerId))
             {
@@ -548,12 +829,15 @@ internal class BattleHostHandler : IHandler
     }
 
     // [Server, game thread] The battle instance ended (empty, or abandoned with no successors): drop its
-    // per-battle scope bookkeeping alongside the assignment + reserve teardown. The epoch watermark
-    // intentionally survives (see issuedEpochs).
+    // per-battle scope bookkeeping alongside the assignment + reserve teardown. Pending returns die with
+    // the instance too — an EMPTY instance means the pending returner itself is gone (nothing to serve; a
+    // later re-entry restarts from the entry flow). The epoch watermark intentionally survives (see
+    // issuedEpochs).
     private void ClearBattleRecords(string mapEventId)
     {
         absentControllers.Remove(mapEventId);
         hostPeers.Remove(mapEventId);
+        pendingReturns.Remove(mapEventId);
     }
 
     // [Server] Issue the battle's next host epoch (BR-102): one past the highest ever issued for this map

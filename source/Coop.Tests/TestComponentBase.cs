@@ -107,9 +107,10 @@ internal abstract class TestComponentBase
         RegisterMock<IAutoRegistryFactory>(builder);
         RegisterMock<IBattleTroopReserveBuilder>(builder);
         RegisterMock<IMapEventInitializationBarrier>(builder);
-        // BattleHostHandler (MissionModule, auto-activated) needs the registry, which the real
-        // containers get from GameInterfaceModule — not loaded here.
+        // BattleHostHandler (MissionModule, auto-activated) needs the registry and the troop ledger,
+        // which the real containers get from GameInterfaceModule — not loaded here.
         RegisterMock<IBattleHostRegistry>(builder);
+        RegisterMock<IBattleTroopLedger>(builder);
         RegisterMock<IRaidAiInterventionConfigInterface>(builder);
         RegisterMock<IVillageHostileActionInterface>(builder);
 

@@ -1,8 +1,12 @@
 using System.Linq;
+using Common.Messaging;
 using Common.Network;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.MapEvents.TroopSupply.Handlers;
 using GameInterface.Services.MapEvents.TroopSupply.Messages;
+using GameInterface.Services.PlayerCaptivityService.Messages;
+using Missions.Battles;
 using Missions.Messages;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -443,5 +447,334 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
         {
             CoopTroopSupplierRegistry.ClearBattle(mapEventId);
         }
+    }
+
+    // ---------------------------------------------------------------------------------------------------
+    // BR-033 flush handshake: the host's supplied-progress reports are THROTTLED (~1s), so at the moment a
+    // dropped owner returns, the server's ledger can lag the host's true local pointer. Serving the
+    // returner from the lagging ledger re-issues descriptors the host already fielded (duplicate agents
+    // sharing one UniqueSeed; corrupted seed-keyed casualty attribution). The shrink refresh therefore
+    // carries FlushRequested, the host answers each flagged side with an IsFlush progress report holding
+    // the dropped parties' FINAL local pointers (captured atomically with the REPLACE), and the server
+    // defers the returner's grant until those pointers landed in the ledger — with fallbacks so the
+    // returner is NEVER stranded (host departure serves it; a tick-driven deadline serves it).
+    // ---------------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// Stands up the BR-033 race window: the returner drops, the host adopts its party through the real
+    /// wire grant into a REAL registered defender-side supplier, fields <paramref name="reportedToLedger"/>
+    /// troops and reports them (the server's ledger pointer advances), then fields more troops inside the
+    /// reporter's throttle window WITHOUT a report — the host's true local pointer
+    /// (<paramref name="suppliedLocally"/>) is now AHEAD of the server's ledger.
+    /// </summary>
+    private (string mapEventId, string returnerMepId, CoopTroopSupplier hostDefenderSupplier) SetupHostAheadOfLedger(
+        int reportedToLedger, int suppliedLocally)
+    {
+        var (mapEventId, partyIds) = SetupCoopBattle("host-ctrl", "returner-ctrl");
+        var clients = Clients.ToArray();
+        var host = clients[0];
+
+        GiveRoster(mapEventId, partyIds[1], ReturnerTroopCount);
+        var returnerMepId = GetMapEventPartyId(mapEventId, partyIds[1]);
+
+        EnterBattle(clients[0], mapEventId); // first mission-ready -> host
+        EnterBattle(clients[1], mapEventId); // successor
+        DepartBattle("returner-ctrl", mapEventId, wasRetreat: false);
+
+        // The registry is process-static: drop the returner's own buffered entry/election feeds so the
+        // host-labeled supplier below is populated only by the grant actually addressed to the HOST.
+        CoopTroopSupplierRegistry.ClearBattle(mapEventId);
+        var hostDefenderSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, null);
+        CoopTroopSupplierRegistry.Register(hostDefenderSupplier);
+
+        // The host adopts (records its live peer on the server) and its supplier receives the grant.
+        RequestOwnedReserves(host, mapEventId, "host-ctrl");
+        Assert.True(hostDefenderSupplier.IsPopulated,
+            "the adoption grant must populate the host's supplier with the dropped player's reserve");
+        Assert.Equal(ReturnerTroopCount, hostDefenderSupplier.TotalTroops);
+
+        // The host fields part of the adopted reserve and REPORTS it, exactly as SupplyProgressReporter
+        // does — the server's ledger pointer advances to reportedToLedger...
+        hostDefenderSupplier.SupplyTroops(reportedToLedger);
+        var progress = hostDefenderSupplier.GetSuppliedByParty()
+            .Select(party => new SupplyProgressEntry(party.partyId, party.supplied))
+            .ToArray();
+        host.Call(() => host.Resolve<INetwork>().SendAll(new NetworkBattleSupplyProgress(mapEventId, progress)));
+
+        // ...then fields MORE inside the reporter's ~1s throttle window (no report goes out): the host's
+        // true local pointer is now AHEAD of the server's ledger. This is the shrink-refresh race window.
+        hostDefenderSupplier.SupplyTroops(suppliedLocally - reportedToLedger);
+
+        return (mapEventId, returnerMepId, hostDefenderSupplier);
+    }
+
+    /// <summary>
+    /// BR-033 (throttled-report race): the host supplied PAST its last progress report when the dropped
+    /// owner returns. The returner's grant must resume at the host's TRUE local pointer — obtained via the
+    /// flush handshake on the shrink refresh — not at the lagging ledger value; otherwise the descriptors
+    /// the host fielded in the report gap are re-issued and spawn twice (PuppetSpawner dedups by AgentId,
+    /// not by UniqueSeed).
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "BR-033")]
+    public void ReEntryGrant_ResumesFromTheHostsTruePointer_WhenTheLedgerLagsItsReports()
+    {
+        const int reportedToLedger = 1;
+        const int suppliedLocally = 3;
+
+        var (mapEventId, returnerMepId, _) = SetupHostAheadOfLedger(reportedToLedger, suppliedLocally);
+        var returner = Clients.ToArray()[1];
+        try
+        {
+            // The returner re-enters through the real entry + election flow.
+            int returnerBaseline = FeedBaseline(returner, mapEventId);
+            EnterBattle(returner, mapEventId);
+
+            var returnerFeeds = FeedsSince(returner, mapEventId, returnerBaseline);
+            var defenderFeeds = returnerFeeds.Where(feed => feed.Side == (int)BattleSideEnum.Defender).ToArray();
+            Assert.True(defenderFeeds.Length > 0, "the returner must still be served its side on re-entry");
+            var resumed = defenderFeeds.Last().Parties.Single(party => party.PartyId == returnerMepId);
+
+            // The grant resumes at the host's TRUE pointer (post-flush), not the stale ledger value.
+            Assert.Equal(suppliedLocally, resumed.SuppliedCount);
+            Assert.Equal(ReturnerTroopCount, resumed.Entries.Length);
+
+            // No descriptor is served twice: the seeds the host already fielded must not be in the tail
+            // the returner will field from its resumed pointer.
+            var hostFieldedSeeds = resumed.Entries.Take(suppliedLocally).Select(entry => entry.Seed);
+            var returnerTailSeeds = resumed.Entries.Skip(resumed.SuppliedCount).Select(entry => entry.Seed);
+            Assert.Empty(hostFieldedSeeds.Intersect(returnerTailSeeds));
+        }
+        finally
+        {
+            CoopTroopSupplierRegistry.ClearBattle(mapEventId);
+        }
+    }
+
+    /// <summary>
+    /// BR-033 (ack-before-grant ordering): the host's IsFlush progress must land in the LEDGER before the
+    /// returner's grant is computed. If the grant were computed first (or the flush never applied), the
+    /// grant's pointer and the ledger's post-return pointer would diverge — here both must equal the
+    /// host's true pointer.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "BR-033")]
+    public void FlushedPointers_LandInTheLedger_BeforeTheReturnersGrantIsComputed()
+    {
+        const int reportedToLedger = 1;
+        const int suppliedLocally = 3;
+
+        var (mapEventId, returnerMepId, _) = SetupHostAheadOfLedger(reportedToLedger, suppliedLocally);
+        var returner = Clients.ToArray()[1];
+        try
+        {
+            int returnerBaseline = FeedBaseline(returner, mapEventId);
+            EnterBattle(returner, mapEventId);
+
+            // The flush landed in the authoritative ledger...
+            int ledgerPointer = -1;
+            Server.Call(() =>
+            {
+                Assert.True(Server.Resolve<IBattleTroopLedger>()
+                    .TryGetReserve(mapEventId, returnerMepId, out _, out ledgerPointer));
+            });
+            Assert.Equal(suppliedLocally, ledgerPointer);
+
+            // ...and BEFORE the grant was computed: the grant carries that same caught-up pointer.
+            var defenderFeeds = FeedsSince(returner, mapEventId, returnerBaseline)
+                .Where(feed => feed.Side == (int)BattleSideEnum.Defender).ToArray();
+            Assert.True(defenderFeeds.Length > 0, "the returner must still be served its side on re-entry");
+            var resumed = defenderFeeds.Last().Parties.Single(party => party.PartyId == returnerMepId);
+            Assert.Equal(ledgerPointer, resumed.SuppliedCount);
+        }
+        finally
+        {
+            CoopTroopSupplierRegistry.ClearBattle(mapEventId);
+        }
+    }
+
+    /// <summary>
+    /// BR-033 fallback (host departs): the shrink refresh went out but the host DISCONNECTS before its
+    /// flush ack arrives. The pending return must not strand the returner — the host's departure serves it
+    /// from the current ledger (the last REPORTED pointer; the unreported supplies vanished with the host,
+    /// today's race accepted). The unresponsive host is modeled by disposing its client-side reserve
+    /// handler, so the flagged refresh is delivered but never processed or acked.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "BR-033")]
+    public void HostDepartingBeforeTheFlushAck_ServesThePendingReturner_FromTheLedger()
+    {
+        const int reportedToLedger = 1;
+        const int suppliedLocally = 3;
+
+        var (mapEventId, returnerMepId, _) = SetupHostAheadOfLedger(reportedToLedger, suppliedLocally);
+        var clients = Clients.ToArray();
+        var host = clients[0];
+        var returner = clients[1];
+        try
+        {
+            // The host goes unresponsive: the flagged shrink refresh will be delivered but never acked.
+            host.Call(() => host.Resolve<BattleTroopReserveHandler>().Dispose());
+
+            // The returner re-enters: its grant is DEFERRED behind the flush handshake — no reserve feed yet.
+            int returnerBaseline = FeedBaseline(returner, mapEventId);
+            EnterBattle(returner, mapEventId);
+            Assert.Empty(FeedsSince(returner, mapEventId, returnerBaseline));
+
+            // The host drops. Its departure must complete the pending return: the returner is served from
+            // the current ledger instead of waiting for an ack that can no longer come.
+            DepartBattle("host-ctrl", mapEventId, wasRetreat: false);
+
+            var defenderFeeds = FeedsSince(returner, mapEventId, returnerBaseline)
+                .Where(feed => feed.Side == (int)BattleSideEnum.Defender).ToArray();
+            Assert.True(defenderFeeds.Length > 0,
+                "the host's departure must serve the pending return — the returner is never stranded");
+            var resumed = defenderFeeds.Last().Parties.Single(party => party.PartyId == returnerMepId);
+            Assert.Equal(reportedToLedger, resumed.SuppliedCount); // the ledger value — the un-acked tail is lost with the host
+            Assert.Equal(ReturnerTroopCount, resumed.Entries.Length);
+        }
+        finally
+        {
+            CoopTroopSupplierRegistry.ClearBattle(mapEventId);
+        }
+    }
+
+    /// <summary>
+    /// BR-033 fallback (deadline): the flush ack never arrives (a legacy host that ignores FlushRequested,
+    /// or a lost message) and the host never departs. A server-side, campaign-tick-driven deadline must
+    /// serve the pending returner from the current ledger — the returner is never stranded. The deadline is
+    /// set to zero so the first tick after the deferral expires it without wall-clock waits.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "BR-033")]
+    public void FlushAckNeverArriving_ServesThePendingReturner_AfterTheDeadline()
+    {
+        const int reportedToLedger = 1;
+        const int suppliedLocally = 3;
+
+        var (mapEventId, returnerMepId, _) = SetupHostAheadOfLedger(reportedToLedger, suppliedLocally);
+        var clients = Clients.ToArray();
+        var host = clients[0];
+        var returner = clients[1];
+        try
+        {
+            // A legacy/unresponsive host: applies nothing, acks nothing.
+            host.Call(() => host.Resolve<BattleTroopReserveHandler>().Dispose());
+
+            // Expire pendings on the first tick after creation.
+            Server.Call(() => Server.Resolve<BattleHostHandler>().FlushAckDeadline = TimeSpan.Zero);
+
+            int returnerBaseline = FeedBaseline(returner, mapEventId);
+            EnterBattle(returner, mapEventId);
+            Assert.Empty(FeedsSince(returner, mapEventId, returnerBaseline)); // deferred, no tick yet
+
+            // The campaign tick sweeps the expired pending and serves the returner from the ledger.
+            Server.Call(() => Server.Resolve<IMessageBroker>().Publish(this, new CampaignTick()));
+
+            var defenderFeeds = FeedsSince(returner, mapEventId, returnerBaseline)
+                .Where(feed => feed.Side == (int)BattleSideEnum.Defender).ToArray();
+            Assert.True(defenderFeeds.Length > 0,
+                "the deadline must serve the pending return — the returner is never stranded");
+            var resumed = defenderFeeds.Last().Parties.Single(party => party.PartyId == returnerMepId);
+            Assert.Equal(reportedToLedger, resumed.SuppliedCount);
+            Assert.Equal(ReturnerTroopCount, resumed.Entries.Length);
+        }
+        finally
+        {
+            CoopTroopSupplierRegistry.ClearBattle(mapEventId);
+        }
+    }
+
+    /// <summary>
+    /// BR-033 legacy client contract: an UNFLAGGED shrink (FlushRequested = false — what today's server, or
+    /// a legacy one, sends) behaves exactly as before: the REPLACE applies and NO flush ack is sent. A
+    /// FLAGGED shrink acks each message once with the dropped parties' final local pointers (IsFlush set),
+    /// even when the REPLACE drops nothing.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "BR-033")]
+    public void UnflaggedShrink_AppliesTheReplaceWithoutAcking_AndFlaggedShrinkAcksDroppedPointers()
+    {
+        const string mapEventId = "flush_contract_battle";
+        const string returnedParty = "returned-party";
+        const string keptParty = "kept-party";
+
+        var client = Clients.First();
+
+        TroopReserveEntry[] Entries(int count, int seedBase) =>
+            Enumerable.Range(0, count).Select(i => new TroopReserveEntry(seedBase + i, $"char_{seedBase + i}", 0)).ToArray();
+        PartyReserve[] BothParties() => new[]
+        {
+            new PartyReserve(returnedParty, 0, Entries(4, seedBase: 100)),
+            new PartyReserve(keptParty, 0, Entries(3, seedBase: 200)),
+        };
+        PartyReserve[] ShrunkToKept() => new[] { new PartyReserve(keptParty, 0, Entries(3, seedBase: 200)) };
+
+        CoopTroopSupplierRegistry.ClearBattle(mapEventId);
+        try
+        {
+            var supplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, null);
+            CoopTroopSupplierRegistry.Register(supplier);
+            supplier.SetReserve(BothParties());
+            supplier.SupplyTroops(2); // advance "returned-party" locally to 2
+
+            int AckCount() => client.NetworkSentMessages.GetMessages<NetworkBattleSupplyProgress>()
+                .Count(message => message.MapEventId == mapEventId);
+            int ackBaseline = AckCount();
+
+            // LEGACY: an unflagged shrink applies the REPLACE (the returned party leaves the supplier)
+            // but sends NO ack — exactly today's behavior.
+            client.SimulateMessage(Server.NetPeer,
+                new NetworkBattleTroopReserve(mapEventId, (int)BattleSideEnum.Defender, ShrunkToKept()));
+            Assert.Equal(3, supplier.TotalTroops); // only kept-party remains
+            Assert.Equal(ackBaseline, AckCount());
+
+            // FLAGGED: re-seed and advance again, then shrink with FlushRequested — exactly ONE ack, with
+            // IsFlush set, carrying the dropped party's FINAL local pointer.
+            supplier.SetReserve(BothParties());
+            supplier.SupplyTroops(2);
+            client.SimulateMessage(Server.NetPeer,
+                new NetworkBattleTroopReserve(mapEventId, (int)BattleSideEnum.Defender, ShrunkToKept(), flushRequested: true));
+
+            var acks = client.NetworkSentMessages.GetMessages<NetworkBattleSupplyProgress>()
+                .Where(message => message.MapEventId == mapEventId)
+                .Skip(ackBaseline)
+                .ToArray();
+            var ack = Assert.Single(acks);
+            Assert.True(ack.IsFlush);
+            var flushed = Assert.Single(ack.Entries);
+            Assert.Equal(returnedParty, flushed.PartyId);
+            Assert.Equal(2, flushed.SuppliedCount);
+        }
+        finally
+        {
+            CoopTroopSupplierRegistry.ClearBattle(mapEventId);
+        }
+    }
+
+    /// <summary>
+    /// Wire safety of the additive handshake fields: both flags survive a real protobuf round trip (and
+    /// default to false, so unflagged/legacy traffic is unchanged on the wire).
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "BR-033")]
+    public void FlushHandshakeFields_RoundTripOverTheWire()
+    {
+        var reserve = Server.EnsureSerializable(new NetworkBattleTroopReserve(
+            "rt_battle", (int)BattleSideEnum.Attacker, Array.Empty<PartyReserve>(), flushRequested: true));
+        Assert.True(reserve.FlushRequested);
+
+        var legacyReserve = Server.EnsureSerializable(new NetworkBattleTroopReserve(
+            "rt_battle", (int)BattleSideEnum.Attacker, Array.Empty<PartyReserve>()));
+        Assert.False(legacyReserve.FlushRequested);
+
+        var flush = Server.EnsureSerializable(new NetworkBattleSupplyProgress(
+            "rt_battle", new[] { new SupplyProgressEntry("party", 2) }, isFlush: true));
+        Assert.True(flush.IsFlush);
+        Assert.Equal(2, flush.Entries.Single().SuppliedCount);
+
+        var legacyReport = Server.EnsureSerializable(new NetworkBattleSupplyProgress(
+            "rt_battle", new[] { new SupplyProgressEntry("party", 2) }));
+        Assert.False(legacyReport.IsFlush);
     }
 }
