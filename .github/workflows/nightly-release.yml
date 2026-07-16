@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     container:
-      image: garrettluskey/bannerlordcoop@sha256:8e99cad9fba3df32281c0de95cb20911414656f05cb890ad1777586ae6ee2f6b
+      image: garrettluskey/bannerlordcoop:latest
 
     steps:
       - name: Checkout development
