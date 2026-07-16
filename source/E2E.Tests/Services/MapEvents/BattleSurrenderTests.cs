@@ -23,8 +23,9 @@ namespace E2E.Tests.Services.MapEvents;
 /// injected <see cref="PlayerSurrendered"/> event:
 /// <list type="bullet">
 /// <item>BR-060 — a participating player's native surrender action forwards exactly one surrender request.</item>
-/// <item>BR-061 — the final result records the surrendered hero as a prisoner (and the "troops as prisoners"
-/// clause, which the current player-party forfeiture does not satisfy, is pinned as a TDD-red skip).</item>
+/// <item>BR-061 — the final result records the surrendered heroes AND troops as prisoners: the leader via
+/// its own capture, the regular troops via the roster transfer, and companion heroes riding in the party
+/// via individual <c>TakePrisonerAction</c> captures (dead companions excepted).</item>
 /// <item>BR-063 — one side surrendering before the mission begins resolves the battle without the opposing
 /// side ever entering/loading a mission.</item>
 /// </list>
@@ -123,6 +124,151 @@ public class BattleSurrenderTests : MapEventTestBase
         AssertCaptorPrisonerCount(Server, setup.initiatorPartyId, troopId, 3);
         foreach (var client in Clients)
             AssertCaptorPrisonerCount(client, setup.initiatorPartyId, troopId, 3);
+    }
+
+    /// <summary>
+    /// BR-061: the final result records surrendered HEROES as prisoners — including companion heroes riding
+    /// in the surrendered party, not just its leader. A companion (a registered hero whose character sits in
+    /// the member roster alongside regular troops) must end up a proper hero prisoner of the captor
+    /// (captivity state synced everywhere), and the captor's prison roster must gain the companion on top of
+    /// the leader and the transferred troops. Guards the BR-061 residual where companions were silently
+    /// discarded by the roster emptying (not captured, not freed, not killed).
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "BR-061")]
+    public void RecipientSurrender_RecordsCompanionHeroAsPrisonerOfCaptor_OnAllInstances()
+    {
+        var setup = SetupTwoOpposingPlayersInBattle();
+        var companionHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+
+        // The surrendering (recipient) party fields a companion hero AND three ordinary troops
+        // alongside its leader hero.
+        SeedCompanionInParty(companionHeroId, setup.recipientPartyId);
+        SeedPartyTroopOnAll(setup.recipientPartyId, troopId, 3);
+
+        // Baselines — harness rosters are nondeterministic, so all count asserts are baseline-relative.
+        // Every live hero riding in the party is captured individually (the registered leader natively, the
+        // companion and the harness party's own bootstrap lord via the companion capture), so hero
+        // expectations are counted from the roster, never hard-coded.
+        var surrenderedTroops = GetPartyNonHeroManCount(Server, setup.recipientPartyId);
+        var surrenderedHeroes = GetPartyLiveHeroCount(Server, setup.recipientPartyId);
+        Assert.True(surrenderedHeroes >= 2, "setup must field at least the leader and the companion");
+        var serverPrisonBefore = GetPartyPrisonerCount(Server, setup.initiatorPartyId);
+        var clientPrisonBefore = Clients.ToDictionary(c => c, c => GetPartyPrisonerCount(c, setup.initiatorPartyId));
+
+        PublishRecipientSurrender(setup);
+        TestEnvironment.FlushCoalescer();
+
+        // The companion is a proper hero prisoner of the captor everywhere (BR-061 "heroes" clause)...
+        AssertCaptivity(Server, companionHeroId, setup.initiatorPartyId);
+        foreach (var client in Clients)
+            AssertCaptivity(client, companionHeroId, setup.initiatorPartyId);
+
+        // ...and the leader's capture still works exactly as before, alongside the companion's.
+        AssertCaptivity(Server, setup.recipientHeroId, setup.initiatorPartyId);
+        foreach (var client in Clients)
+            AssertCaptivity(client, setup.recipientHeroId, setup.initiatorPartyId);
+
+        // The captor's prison roster gained the surrendered troops plus EVERY live hero that rode in the party.
+        AssertPartyPrisonerCount(Server, setup.initiatorPartyId, serverPrisonBefore + surrenderedTroops + surrenderedHeroes);
+        foreach (var client in Clients)
+            AssertPartyPrisonerCount(client, setup.initiatorPartyId, clientPrisonBefore[client] + surrenderedTroops + surrenderedHeroes);
+
+        // The regular-troop transfer is unchanged: the seeded troops are the captor's prisoners everywhere.
+        AssertCaptorPrisonerCount(Server, setup.initiatorPartyId, troopId, 3);
+        foreach (var client in Clients)
+            AssertCaptorPrisonerCount(client, setup.initiatorPartyId, troopId, 3);
+    }
+
+    /// <summary>
+    /// BR-061 re-entrancy: capturing a companion from inside the surrender processing re-publishes
+    /// <c>PrisonerTaken</c> for the same player party (the companion's <c>PartyBelongedTo</c> IS that party,
+    /// so the TakePrisonerAction postfix fires again). The surrender must still be processed exactly once:
+    /// exact prison-roster deltas (a nested pass would double the troop transfer), the surrendered party's
+    /// roster at exactly zero everywhere (never negative), and the party parked.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "BR-061")]
+    public void RecipientSurrenderWithCompanion_ProcessesSurrenderExactlyOnce()
+    {
+        var setup = SetupTwoOpposingPlayersInBattle();
+        var companionHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+
+        SeedCompanionInParty(companionHeroId, setup.recipientPartyId);
+        SeedPartyTroopOnAll(setup.recipientPartyId, troopId, 3);
+
+        var surrenderedTroops = GetPartyNonHeroManCount(Server, setup.recipientPartyId);
+        var surrenderedHeroes = GetPartyLiveHeroCount(Server, setup.recipientPartyId);
+        var serverPrisonBefore = GetPartyPrisonerCount(Server, setup.initiatorPartyId);
+        var clientPrisonBefore = Clients.ToDictionary(c => c, c => GetPartyPrisonerCount(c, setup.initiatorPartyId));
+
+        PublishRecipientSurrender(setup);
+        TestEnvironment.FlushCoalescer();
+
+        // Exactly one processing pass: the troop transfer ran once — a re-entrant nested pass would show up
+        // here as a doubled troop element (6) and a doubled total delta.
+        AssertCaptorPrisonerCount(Server, setup.initiatorPartyId, troopId, 3);
+        AssertPartyPrisonerCount(Server, setup.initiatorPartyId, serverPrisonBefore + surrenderedTroops + surrenderedHeroes);
+        foreach (var client in Clients)
+        {
+            AssertCaptorPrisonerCount(client, setup.initiatorPartyId, troopId, 3);
+            AssertPartyPrisonerCount(client, setup.initiatorPartyId, clientPrisonBefore[client] + surrenderedTroops + surrenderedHeroes);
+        }
+
+        // The surrendered party's member roster is exactly zero — no double removal driving it negative,
+        // no leftover companion element — on the server and every client.
+        AssertPartyManCount(Server, setup.recipientPartyId, 0);
+        foreach (var client in Clients)
+            AssertPartyManCount(client, setup.recipientPartyId, 0);
+
+        // The party was parked (IsActive is server-local state, so it is asserted on the server only).
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(setup.recipientPartyId, out var party));
+            Assert.False(party.IsActive, "surrendered player party should be parked");
+        });
+    }
+
+    /// <summary>
+    /// BR-061 boundary: a DEAD companion hero must never be taken prisoner. With a dead companion's element
+    /// still in the surrendered party's roster, the surrender captures only the leader (prison delta =
+    /// troops + 1) and the dead companion stays out of captivity everywhere. Pins the aliveness guard of the
+    /// companion capture (wounded companions are captured — aliveness is the only bar, matching native).
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "BR-061")]
+    public void RecipientSurrender_DoesNotCaptureDeadCompanionHero()
+    {
+        var setup = SetupTwoOpposingPlayersInBattle();
+        var companionHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+
+        SeedCompanionInParty(companionHeroId, setup.recipientPartyId);
+        SeedPartyTroopOnAll(setup.recipientPartyId, troopId, 3);
+
+        // The companion died before the surrender resolved (its roster element is still present).
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(companionHeroId, out var companion));
+            companion.ChangeState(Hero.CharacterStates.Dead);
+        }, MapEventDisabledMethods);
+
+        // Counted AFTER the death: the live-hero count excludes the dead companion, so the expected prison
+        // delta is exactly "everyone but the dead hero".
+        var surrenderedTroops = GetPartyNonHeroManCount(Server, setup.recipientPartyId);
+        var surrenderedLiveHeroes = GetPartyLiveHeroCount(Server, setup.recipientPartyId);
+        var serverPrisonBefore = GetPartyPrisonerCount(Server, setup.initiatorPartyId);
+
+        PublishRecipientSurrender(setup);
+        TestEnvironment.FlushCoalescer();
+
+        // Only the live heroes were captured beyond the troops; the dead companion is not a prisoner anywhere.
+        AssertPartyPrisonerCount(Server, setup.initiatorPartyId, serverPrisonBefore + surrenderedTroops + surrenderedLiveHeroes);
+        AssertCaptivity(Server, companionHeroId, null);
+        foreach (var client in Clients)
+            AssertCaptivity(client, companionHeroId, null);
     }
 
     /// <summary>
@@ -232,6 +378,29 @@ public class BattleSurrenderTests : MapEventTestBase
         EnableHeadlessEncounterFinish(Clients.Last());
 
         return new SurrenderSetup(ctx, initiatorHeroId, recipientHeroId, ctx.AttackerPartyId, ctx.DefenderPartyId);
+    }
+
+    /// <summary>
+    /// Seeds a companion hero into the member roster of the party with <paramref name="partyId"/>, riding
+    /// alongside the party's own (leader) hero. Mirrors <see cref="PreparePlayerPartyForCapture"/>:
+    /// AddToCounts replicates the roster element to every client even under AllowedThread
+    /// (TroopRosterAddToCountsPatch publishes for AddToCounts regardless), while the PartyBelongedTo wire
+    /// stays server-local — exactly the shape of a real companion, whose PartyBelongedTo IS the player party
+    /// (which is what makes the TakePrisonerAction postfix re-publish PrisonerTaken for that party).
+    /// </summary>
+    private void SeedCompanionInParty(string heroId, string partyId)
+    {
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+
+            using (new AllowedThread())
+            {
+                party.MemberRoster.AddToCounts(hero.CharacterObject, 1);
+                hero.PartyBelongedTo = party;
+            }
+        }, MapEventDisabledMethods);
     }
 
     private void PreparePlayerPartyForCapture(string heroId, string partyId)

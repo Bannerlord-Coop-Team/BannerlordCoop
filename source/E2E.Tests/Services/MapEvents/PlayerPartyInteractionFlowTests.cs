@@ -1156,11 +1156,15 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.HostileDemand);
         SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.ConfirmHostileDemand);
 
-        // BR-061 baseline: the responder's hero and regular troops become the initiator's prisoners on the
-        // yield, so snapshot the rosters first — harness parties spawn with their own rosters, and raw hero
-        // roster elements are never transferred (heroes are captured individually via TakePrisonerAction).
+        // BR-061 baseline: the responder's heroes and regular troops become the initiator's prisoners on
+        // the yield, so snapshot the rosters first — harness parties spawn with their own rosters, and raw
+        // hero roster elements are never transferred (each hero is captured individually via
+        // TakePrisonerAction: the responder hero directly, every other rider — the harness lord party's
+        // bootstrap lord included — through the companion capture).
         var responderTroopsAtSurrender = GetPartyNonHeroManCount(Server, responderMobilePartyId);
+        var responderRidingHeroes = GetPartyLiveHeroCount(Server, responderMobilePartyId);
         var initiatorPrisonersBefore = GetPartyPrisonerCount(Server, initiatorMobilePartyId);
+        var initiatorPrisonersBeforeByClient = Clients.ToDictionary(c => c, c => GetPartyPrisonerCount(c, initiatorMobilePartyId));
 
         Server.NetworkSentMessages.Clear();
         SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.YieldHostileDemand, HostileDemandSurrenderDisabledMethods());
@@ -1178,8 +1182,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
 
         AssertWarDeclared(Server, initiatorClanId, responderClanId);
         AssertCaptivity(Server, responderHeroId, initiatorMobilePartyId);
-        // BR-061: the yielded party's hero (+1) AND regular troops are all recorded as the initiator's prisoners.
-        AssertPartyPrisonerCount(Server, initiatorMobilePartyId, initiatorPrisonersBefore + responderTroopsAtSurrender + 1);
+        // BR-061: the yielded party's heroes AND regular troops are all recorded as the initiator's prisoners.
+        AssertPartyPrisonerCount(Server, initiatorMobilePartyId, initiatorPrisonersBefore + responderTroopsAtSurrender + responderRidingHeroes);
         AssertPartyManCount(Server, responderMobilePartyId, 0);
         AssertHostileEncounterTornDown(Server, initiatorPartyId);
         AssertCapturedPlayerPartyParked(Server, responderPartyId);
@@ -1187,6 +1191,10 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         Assert.Equal(responderMobilePartyId, leaderChanged.MobilePartyId);
         Assert.Null(leaderChanged.LeaderHeroId);
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPartyComponentLeaderChanged>());
+
+        // The troop transfer replicates as coalesced roster deltas; drain them before reading client state.
+        TestEnvironment.FlushCoalescer();
+
         foreach (var syncedClient in Clients)
         {
             Assert.Contains(syncedClient.InternalMessages.GetMessages<DeclareWarChanged>(), message =>
@@ -1194,7 +1202,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
                 message.Faction2Id == responderClanId);
             AssertWarDeclared(syncedClient, initiatorClanId, responderClanId);
             AssertCaptivity(syncedClient, responderHeroId, initiatorMobilePartyId);
-            AssertPartyPrisonerCount(syncedClient, initiatorMobilePartyId, 1);
+            AssertPartyPrisonerCount(syncedClient, initiatorMobilePartyId,
+                initiatorPrisonersBeforeByClient[syncedClient] + responderTroopsAtSurrender + responderRidingHeroes);
             AssertPartyManCount(syncedClient, responderMobilePartyId, 0);
             AssertHostileEncounterTornDown(syncedClient, initiatorPartyId);
             AssertCapturedPlayerPartyParked(syncedClient, responderPartyId);

@@ -243,6 +243,21 @@ assignment it stamps from); a claimant lagging behind a receiver's newer assignm
 deltas dropped for the sub-second convergence window (self-heals on the assignment broadcast /
 next state change).
 
+**Alignment increment 10 (2026-07-15) — BR-061 companion heroes FIXED (red → green).**
+Companion heroes riding in a surrendered player party vanished (skipped by the troop transfer,
+discarded by the roster emptying). Fix: `Handle_PrisonerTaken` now **parks the party first**
+(`IsActive = false` moved ahead of the capture work — re-entrancy analysis showed capturing a
+companion via the real `TakePrisonerAction` synchronously publishes a nested `PrisonerTaken` for
+the same party, which the existing `!IsActive` guard now short-circuits; suppression approaches
+were rejected because they would also suppress the capture's replication), then captures each
+surviving hero element via `TakePrisonerAction.Apply` (wounded captured, dead skipped), then the
+existing troop transfer/emptying. Discovery: harness lord parties carry a bootstrap lord hero in
+the roster — it previously vanished too and is now correctly captured; two existing tests were
+*strengthened* to the correct expectations (one gained a stronger, flushed baseline-relative
+client assert). Held captives in the surrendered party's own prison roster remain discarded —
+out of BR-061's scope, noted in code. 3 new tests (2 red→green, 1 pins the dead-companion
+guard). Suites: targeted 69/69, full E2E **562 passed / 4 pre-existing skips / 0 failed** (566).
+
 Harness lessons for later waves: never disable-patch `MapEvent.FinalizeEventAux` in an E2E
 PatchScope (it already carries a production prefix — two-prefix `InvalidProgramException`, and the
 broken patch state poisons every later test in the run); harness-created parties spawn with

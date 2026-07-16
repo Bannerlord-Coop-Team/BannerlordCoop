@@ -634,6 +634,32 @@ public abstract class MapEventTestBase : IDisposable
         return count;
     }
 
+    /// <summary>
+    /// Counts the live (alive, non-prisoner, non-depleted) hero elements in the member roster of the party
+    /// with <paramref name="partyId"/> — the heroes a capture takes prisoner individually via
+    /// <c>TakePrisonerAction</c>: the registered player hero through the native defeat path and every other
+    /// rider through the companion capture (BR-061). The harness lord party spawns with its own bootstrap
+    /// lord hero riding in the roster, so hero expectations must be counted, never hard-coded.
+    /// </summary>
+    protected int GetPartyLiveHeroCount(EnvironmentInstance instance, string partyId)
+    {
+        int count = 0;
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            for (int i = 0; i < party.MemberRoster.Count; i++)
+            {
+                var element = party.MemberRoster.GetElementCopyAtIndex(i);
+                if (element.Character?.IsHero != true || element.Number <= 0) continue;
+
+                var hero = element.Character.HeroObject;
+                if (hero?.IsAlive == true && !hero.IsPrisoner)
+                    count++;
+            }
+        });
+        return count;
+    }
+
     /// <summary>Reads the prison-roster man count of the party on the given instance (see <see cref="GetPartyManCount"/>).</summary>
     protected int GetPartyPrisonerCount(EnvironmentInstance instance, string partyId)
     {
