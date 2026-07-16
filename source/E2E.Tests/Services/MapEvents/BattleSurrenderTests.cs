@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -269,6 +270,68 @@ public class BattleSurrenderTests : MapEventTestBase
         AssertCaptivity(Server, companionHeroId, null);
         foreach (var client in Clients)
             AssertCaptivity(client, companionHeroId, null);
+    }
+
+    /// <summary>
+    /// BR-061 boundary: a companion killed DURING the battle must never be taken prisoner — even though it
+    /// still reports <c>IsAlive == true</c> at capture time. During an active map event native
+    /// <c>KillCharacterAction.ApplyInternal</c> defers the kill: it only records a battle <c>DeathMark</c>
+    /// (<c>DiedInBattle</c>) and returns while the victim's party still has a <c>MapEvent</c>, so the hero's
+    /// state stays Active and <c>IsAlive</c> is still true when the surrender is processed. Native (and the
+    /// coop <c>MapEventResultsInterface</c> reimplementation of <c>CaptureDefeatedPartyMembers</c>) gate
+    /// capture on the battle DeathMark, not on aliveness; the companion capture must do the same.
+    /// <para>
+    /// This is the reviewer's exact scenario, distinct from
+    /// <see cref="RecipientSurrender_DoesNotCaptureDeadCompanionHero"/> (which sets the state to Dead, so
+    /// <c>IsAlive</c> is already false and the old aliveness guard alone catches it). Pre-fix mechanism:
+    /// <c>CaptureCompanionHeroes</c> skipped only <c>!IsAlive</c>/<c>IsPrisoner</c>, so this DeathMarked-but-alive
+    /// companion PASSES the guard, <c>TakePrisonerAction.Apply</c> runs, and it becomes a prisoner of the
+    /// captor — failing <c>AssertCaptivity(companionHeroId, null)</c>. With the DeathMark check added
+    /// (<c>HasBattleDeathMark</c>), the companion is skipped and stays free.
+    /// </para>
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "BR-061")]
+    public void RecipientSurrender_DoesNotCaptureBattleDeadCompanionHero_WhenIsAliveStillTrue()
+    {
+        var setup = SetupTwoOpposingPlayersInBattle();
+        var companionHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+
+        SeedCompanionInParty(companionHeroId, setup.recipientPartyId);
+        SeedPartyTroopOnAll(setup.recipientPartyId, troopId, 3);
+
+        // The companion was killed in THIS battle. Native defers the kill while the map event is active — only a
+        // battle DeathMark is recorded, and the hero is still IsAlive == true when the surrender is processed.
+        // This is exactly the state the aliveness-only guard failed to treat as dead.
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(companionHeroId, out var companion));
+            companion.AddDeathMark(null, KillCharacterAction.KillCharacterActionDetail.DiedInBattle);
+
+            Assert.True(companion.IsAlive, "battle death is deferred mid-map-event: the companion must still be IsAlive here");
+            Assert.Equal(KillCharacterAction.KillCharacterActionDetail.DiedInBattle, companion.DeathMark);
+        }, MapEventDisabledMethods);
+
+        // Counted AFTER the death mark: capturable heroes exclude the battle-dead companion (aliveness alone
+        // would still count it), so the expected prison delta is exactly "everyone capturable but the dead hero".
+        var surrenderedTroops = GetPartyNonHeroManCount(Server, setup.recipientPartyId);
+        var capturableHeroes = GetPartyCapturableHeroCount(Server, setup.recipientPartyId);
+        var serverPrisonBefore = GetPartyPrisonerCount(Server, setup.initiatorPartyId);
+
+        PublishRecipientSurrender(setup);
+        TestEnvironment.FlushCoalescer();
+
+        // The battle-dead companion is NOT a prisoner anywhere (the reviewer's exact scenario).
+        AssertCaptivity(Server, companionHeroId, null);
+        foreach (var client in Clients)
+            AssertCaptivity(client, companionHeroId, null);
+
+        // The leader's capture still works — the surrender WAS processed; only the dead companion was skipped.
+        AssertCaptivity(Server, setup.recipientHeroId, setup.initiatorPartyId);
+
+        // Only the capturable (live, un-death-marked) heroes were captured beyond the troops.
+        AssertPartyPrisonerCount(Server, setup.initiatorPartyId, serverPrisonBefore + surrenderedTroops + capturableHeroes);
     }
 
     /// <summary>

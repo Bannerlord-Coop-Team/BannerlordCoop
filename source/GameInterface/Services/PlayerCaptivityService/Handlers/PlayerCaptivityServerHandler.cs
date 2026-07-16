@@ -164,11 +164,19 @@ internal class PlayerCaptivityServerHandler : IHandler
     /// (BR-061 "heroes" clause) through the real <see cref="TakePrisonerAction"/> — the same action that
     /// captured the leader — so each companion gets proper hero captivity state, with the member-roster
     /// removal, the captor's prison-roster add and the auto-synced <see cref="Hero.PartyBelongedToAsPrisoner"/>
-    /// each replicating to the clients. Wounded companions are captured (aliveness is the only bar, matching
-    /// native surrender); dead heroes are never captured, and one already a prisoner is not captured again.
+    /// each replicating to the clients. Wounded companions are still captured; a companion killed in THIS
+    /// battle is never captured, and one already a prisoner is not captured again.
     /// MUST run after the party is parked: each capture re-publishes <see cref="PrisonerTaken"/> for this
     /// same party (the companion's <see cref="Hero.PartyBelongedTo"/> is the player party), and the IsActive
     /// guard in <see cref="Handle_PrisonerTaken"/> is what short-circuits that nested pass.
+    /// <para>
+    /// Aliveness alone is NOT a sufficient dead-check here: during an active map event native
+    /// <see cref="KillCharacterAction"/> defers the kill (it only stamps a <see cref="Hero.DeathMark"/> and
+    /// returns while the victim's party still has a <see cref="MapEvent"/>), so a hero killed in this very
+    /// battle still reports <see cref="Hero.IsAlive"/> == true. The battle DeathMark is the reliable
+    /// dead-signal, matching native <c>MapEvent.CaptureDefeatedPartyMembers</c> and the coop
+    /// <c>MapEventResultsInterface</c> reimplementation — see <see cref="HasBattleDeathMark"/>.
+    /// </para>
     /// </summary>
     private static void CaptureCompanionHeroes(TroopRoster memberRoster, PartyBase captor)
     {
@@ -185,7 +193,11 @@ internal class PlayerCaptivityServerHandler : IHandler
             if (element.Number <= 0) continue;
 
             var companion = element.Character.HeroObject;
-            if (companion == null || !companion.IsAlive || companion.IsPrisoner) continue;
+            // A companion killed in this battle is skipped: its death is deferred to a DeathMark while the map
+            // event is active, so IsAlive is still true here (see HasBattleDeathMark). Aliveness alone would
+            // capture a dead companion — check the DeathMark too. A wounded (not dead) companion has no battle
+            // death mark and is still captured.
+            if (companion == null || !companion.IsAlive || HasBattleDeathMark(companion) || companion.IsPrisoner) continue;
 
             companions.Add(companion);
         }
@@ -197,6 +209,20 @@ internal class PlayerCaptivityServerHandler : IHandler
             TakePrisonerAction.Apply(captor, companion);
         }
     }
+
+    /// <summary>
+    /// True when <paramref name="hero"/> was killed in the current battle. During an active map event native
+    /// <see cref="KillCharacterAction"/> defers the kill: <c>ApplyInternal</c> only records a
+    /// <see cref="Hero.DeathMark"/> and returns while the victim's party still has a <see cref="MapEvent"/>, so
+    /// a hero killed in THIS battle still reports <see cref="Hero.IsAlive"/> == true when the surrender is
+    /// processed. The battle death marks are therefore the reliable "is dead" signal at capture time — exactly
+    /// what native <c>MapEvent.CaptureDefeatedPartyMembers</c> and the coop <c>MapEventResultsInterface</c>
+    /// reimplementation gate on (DiedInBattle / DiedInLabor). A merely-wounded hero carries no battle death
+    /// mark, so it stays capturable.
+    /// </summary>
+    private static bool HasBattleDeathMark(Hero hero)
+        => hero.DeathMark == KillCharacterAction.KillCharacterActionDetail.DiedInBattle
+        || hero.DeathMark == KillCharacterAction.KillCharacterActionDetail.DiedInLabor;
 
     /// <summary>
     /// Records the surrendered party's remaining regular troops as prisoners of the captor (BR-061): each
