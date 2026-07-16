@@ -376,10 +376,10 @@ public class AgentMovementHandler : IAgentMovementHandler
                 GameThread.RunSafe(() =>
                 {
                     if (Mission.Current == null) return;
-                    if (agent != null && agent.Health > 0)
+                    if (agent != null && agent.IsActive() && agent.Health > 0)
                     {
-                        agent.MakeDead(false, ActionIndexCache.act_none);
-                        agent.FadeOut(false, true);
+                        bool hideMount = agent.HasMount && agent.MountAgent != null && agent.MountAgent.IsActive();
+                        agent.FadeOut(false, hideMount);
                     }
                 });
             }
