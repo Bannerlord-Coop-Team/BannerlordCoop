@@ -307,10 +307,19 @@ public class MapEventEnvironmentTests : MapEventTestBase
     [Fact]
     public void EscapeFromCaptivity_RestoresExactlyOneMan_OnServerAndAllClients()
     {
-        // Arrange — a player alone in their party (just the hero) loses a battle and is captured.
+        // Arrange — a player party (hero + its spawned roster) loses a battle and is captured. BR-061:
+        // the heroes AND the regular troops become the captor's prisoners, so snapshot the counts first —
+        // harness parties spawn with nondeterministic rosters (the lord party includes its own bootstrap
+        // lord hero, captured via the companion capture). The player hero itself is added by
+        // DefeatPlayerPartyInBattle AFTER this snapshot, hence the explicit +1 below.
         var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
         var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var capturedTroops = GetPartyNonHeroManCount(Server, partyId);
+        var capturedRidingHeroes = GetPartyLiveHeroCount(Server, partyId);
         DefeatPlayerPartyInBattle(heroId, partyId, captorPartyId);
+
+        // The troop transfer replicates as coalesced roster deltas; drain them before reading client state.
+        TestEnvironment.FlushCoalescer();
 
         AssertCaptivity(Server, heroId, captorPartyId);
 
@@ -323,28 +332,30 @@ public class MapEventEnvironmentTests : MapEventTestBase
             AssertPartyManCount(client, partyId, 0);
         }
 
-        // ...and the captor holds the prisoner exactly once everywhere (a replicated prison-roster
-        // add applied on top of a locally derived one used to double the count on clients).
-        AssertPartyPrisonerCount(Server, captorPartyId, 1);
+        // ...and the captor holds the player hero (+1), every riding hero AND the party's troops as
+        // prisoners (BR-061), counted once everywhere (a replicated prison-roster add applied on top of a
+        // locally derived one used to double the count on clients).
+        AssertPartyPrisonerCount(Server, captorPartyId, capturedTroops + capturedRidingHeroes + 1);
         foreach (var client in Clients)
         {
-            AssertPartyPrisonerCount(client, captorPartyId, 1);
+            AssertPartyPrisonerCount(client, captorPartyId, capturedTroops + capturedRidingHeroes + 1);
         }
 
         // Act — the player escapes ("you were able to get away"): the owning client requests the
         // release and the server applies it authoritatively.
         ReleasePlayerByEscapeRequest(Clients.First(), heroId, partyId);
 
-        // Assert — the player is free and the restored party counts exactly one man everywhere,
-        // and no phantom prisoner is left behind in the captor's roster.
+        // Assert — the player is free and the restored party counts exactly one man everywhere, and
+        // exactly the hero's element left the captor's prison roster: the captured troops AND the other
+        // captured riding heroes remain the captor's prisoners (escape frees the hero, not the army).
         AssertCaptivity(Server, heroId, null);
         AssertPlayerPartyRestored(Server, heroId, partyId);
-        AssertPartyPrisonerCount(Server, captorPartyId, 0);
+        AssertPartyPrisonerCount(Server, captorPartyId, capturedTroops + capturedRidingHeroes);
         foreach (var client in Clients)
         {
             AssertCaptivity(client, heroId, null);
             AssertHeroInPartyRoster(client, heroId, partyId);
-            AssertPartyPrisonerCount(client, captorPartyId, 0);
+            AssertPartyPrisonerCount(client, captorPartyId, capturedTroops + capturedRidingHeroes);
         }
     }
 

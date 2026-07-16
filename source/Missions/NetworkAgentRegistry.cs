@@ -26,6 +26,12 @@ public interface INetworkAgentRegistry : IDisposable
     bool TryTransferAuthority(string controllerId, Guid agentId);
 
     IReadOnlyCollection<CoopAgentInfo> GetAgents(string controllerId);
+
+    /// <summary>
+    /// Every controller id that currently holds at least one registered agent (by CURRENT authority, the
+    /// same keying as <see cref="GetAgents"/>). Snapshot — safe to iterate while the registry mutates.
+    /// </summary>
+    IReadOnlyCollection<string> GetControllerIds();
 }
 
 /// <inheritdoc cref="INetworkAgentRegistry"/>
@@ -226,6 +232,16 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
 
             // Snapshot under the lock — the underlying list can be mutated by register/remove.
             return agents.ToArray();
+        }
+    }
+
+    /// <inheritdoc/>
+    public IReadOnlyCollection<string> GetControllerIds()
+    {
+        lock (gate)
+        {
+            // Snapshot under the lock — the map can be mutated by register/remove/transfer.
+            return ControllerAgentMap.Keys.ToArray();
         }
     }
 

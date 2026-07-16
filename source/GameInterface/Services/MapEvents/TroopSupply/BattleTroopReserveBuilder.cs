@@ -5,6 +5,7 @@ using GameInterface.Services.Players;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -32,7 +33,15 @@ public readonly struct SideReserve
 /// </summary>
 public interface IBattleTroopReserveBuilder : IGameAbstraction
 {
-    IReadOnlyList<SideReserve> GetOwnedReserves(MapEvent mapEvent, string controllerId, bool isHost);
+    /// <summary>
+    /// The reserves <paramref name="controllerId"/> currently owns. A party whose resolved owning controller
+    /// is in <paramref name="absentControllers"/> (a member that DROPPED from this battle and has not
+    /// re-entered — tracked by the caller from the server's membership signals) is treated as unowned, so it
+    /// falls to the host: the reserve half of the BR-031 adoption. Player registrations survive a disconnect,
+    /// so ownership alone cannot see the drop — the absent set is what re-scopes it.
+    /// </summary>
+    IReadOnlyList<SideReserve> GetOwnedReserves(MapEvent mapEvent, string controllerId, bool isHost,
+        IReadOnlyCollection<string> absentControllers = null);
 
     /// <summary>Forget a controller's parties because it RETREATED: drop them from the ledger and the built-set
     /// so that, if it rejoins, its party is re-flattened fresh (supplied pointer reset) and re-spawns. Do NOT
@@ -69,7 +78,8 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
         this.playerManager = playerManager;
     }
 
-    public IReadOnlyList<SideReserve> GetOwnedReserves(MapEvent mapEvent, string controllerId, bool isHost)
+    public IReadOnlyList<SideReserve> GetOwnedReserves(MapEvent mapEvent, string controllerId, bool isHost,
+        IReadOnlyCollection<string> absentControllers = null)
     {
         if (mapEvent == null || !objectManager.TryGetId(mapEvent, out var mapEventId))
             return Array.Empty<SideReserve>();
@@ -85,10 +95,11 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
                 continue;
 
             // Who fields this party: its own player; or — for an AI party in a player-led army — that army
-            // leader (#3 "army leader deploys the army"); or, when no player does, the host.
+            // leader (#3 "army leader deploys the army"); or, when no player does (including a player that
+            // DROPPED from this battle and hasn't returned), the host.
             TryGetOwningPlayer(party, out var partyOwnerController);
             TryGetArmyLeaderPlayer(party, out var armyLeaderController);
-            var owningController = ResolveOwningController(partyOwnerController, armyLeaderController);
+            var owningController = ResolveOwningController(partyOwnerController, armyLeaderController, absentControllers);
             if (!IsOwnedByRequester(owningController, controllerId, isHost))
                 continue;
 
@@ -224,11 +235,20 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
     }
 
     /// <summary>
-    /// The controller that owns a party's reserve, or null if no connected player does (so the host fields it).
+    /// The controller that owns a party's reserve, or null if no present player does (so the host fields it).
     /// A party's own player wins; an AI party (no own player) in a player-led army falls to that army leader.
+    /// An owner in <paramref name="absentControllers"/> (dropped from the battle, not yet returned) resolves
+    /// to null: its parties fall to the host until it re-enters, at which point the caller re-issues both
+    /// scopes (the returner's grant and the host's shrunk refresh).
     /// </summary>
-    internal static string ResolveOwningController(string partyOwnerController, string armyLeaderController)
-        => partyOwnerController ?? armyLeaderController;
+    internal static string ResolveOwningController(string partyOwnerController, string armyLeaderController,
+        IReadOnlyCollection<string> absentControllers = null)
+    {
+        var owner = partyOwnerController ?? armyLeaderController;
+        if (owner != null && absentControllers != null && absentControllers.Contains(owner))
+            return null;
+        return owner;
+    }
 
     /// <summary>
     /// Whether <paramref name="requesterController"/> fields the party: it is the owning controller, or — when

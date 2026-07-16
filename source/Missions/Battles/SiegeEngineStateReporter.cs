@@ -46,7 +46,8 @@ public class SiegeEngineStateReporter : ISiegeEngineStateReporter
 
         // Leaving with successors still fighting is a retreat/handoff, not the battle's end — the last
         // player out reports, matching BattleResultCommitter's commit gate.
-        if (hostRegistry.TryGet(session.InstanceId, out var assignment) && assignment.SuccessorControllerIds.Count > 0) return;
+        bool hasAssignment = hostRegistry.TryGet(session.InstanceId, out var assignment);
+        if (hasAssignment && assignment.SuccessorControllerIds.Count > 0) return;
 
         if (!objectManager.TryGetObject<MapEvent>(session.InstanceId, out var mapEvent)) return;
         if (!mapEvent.IsSiegeAssault) return;
@@ -57,8 +58,10 @@ public class SiegeEngineStateReporter : ISiegeEngineStateReporter
         enginesLogic.GetMissionSiegeWeapons(out var defenderWeapons, out var attackerWeapons);
 
         Logger.Information("[BattleSync] Reporting final siege engine states for instance {Instance}", session.InstanceId);
+        // BR-102: stamp the report with our hosting generation so the server can refuse a stale one.
         relayNetwork.SendAll(new NetworkSiegeEngineStatesReport(session.InstanceId,
             SiegeEngineStateConverter.ToEngineStates(attackerWeapons),
-            SiegeEngineStateConverter.ToEngineStates(defenderWeapons)));
+            SiegeEngineStateConverter.ToEngineStates(defenderWeapons),
+            hasAssignment ? assignment.Epoch : 0));
     }
 }
