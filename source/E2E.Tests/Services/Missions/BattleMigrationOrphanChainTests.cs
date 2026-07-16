@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using Common.Messaging;
 using E2E.Tests.Environment.Instance;
@@ -19,12 +19,12 @@ namespace E2E.Tests.Services.Missions;
 
 /// <summary>
 /// BR-031 (Temporary Host Control) across BR-016 (Host Migration Continuity) when two departures STACK:
-/// player C disconnects mid-battle and the host H adopts C's surviving agents — an adoption that is
+/// player C disconnects mid-battle and the host H adopts C's surviving agents â€” an adoption that is
 /// holder-LOCAL by design (only H's registry re-keys them to H; every other registry still keys them to the
 /// absent C). When H then departs too, the promoted successor S must take over EVERYTHING the departed host
-/// was driving — not only the agents S's registry keys to H (H's own), but also the agents keyed to ANY
+/// was driving â€” not only the agents S's registry keys to H (H's own), but also the agents keyed to ANY
 /// controller that is no longer in the mission (C's adopted survivors). Without that sweep they are orphaned:
-/// no client drives them, and — because the joiner catch-up replays only agents a client HOLDS — a returning
+/// no client drives them, and â€” because the joiner catch-up replays only agents a client HOLDS â€” a returning
 /// C gets nothing replayed and the BR-033 reclaim never sees them. Full-pipeline over the mock mesh in the
 /// BattleReconnectControlTests style: server-mediated membership messages in, registry/Controller state
 /// asserted (movement is IPacket and not assertable here).
@@ -33,7 +33,7 @@ public class BattleMigrationOrphanChainTests : MissionTestEnvironment
 {
     public BattleMigrationOrphanChainTests(ITestOutputHelper output) : base(output, numClients: 4) { }
 
-    /// <summary>The MapEventParty id wrapping a player's party — the attribution the spawn records carry.</summary>
+    /// <summary>The MapEventParty id wrapping a player's party â€” the attribution the spawn records carry.</summary>
     private string GetMapEventPartyId(string mapEventId, string partyId)
     {
         string mepId = null;
@@ -122,9 +122,9 @@ public class BattleMigrationOrphanChainTests : MissionTestEnvironment
     }
 
     /// <summary>
-    /// The stacked-departure core: C disconnects (H adopts — the BR-031 fixture, holder-local), then H
+    /// The stacked-departure core: C disconnects (H adopts â€” the BR-031 fixture, holder-local), then H
     /// departs and S is promoted. S must now HOLD everything the departed host was driving: H's own agents
-    /// AND C's adopted survivors — the latter are keyed to the ABSENT C in S's registry (the adoption never
+    /// AND C's adopted survivors â€” the latter are keyed to the ABSENT C in S's registry (the adoption never
     /// propagated), so a sweep that only looks for CurrentAuthority == H strands them driverless forever.
     /// After the migration every swept agent is S's (assignment intact) and AI-driven on S.
     /// </summary>
@@ -156,7 +156,7 @@ public class BattleMigrationOrphanChainTests : MissionTestEnvironment
             var (hostController, hostMock) = StandUpBattleClient(fixture, host, mapEventId, assignment);
             var (successorController, successorMock) = StandUpBattleClient(fixture, successor, mapEventId, assignment);
 
-            // Server-mediated membership intros — the same signal MissionContext mirrors. Sent before any
+            // Server-mediated membership intros â€” the same signal MissionContext mirrors. Sent before any
             // agents exist, so the join-info replays they trigger are empty.
             Publish(host, new NetworkMissionPeerEntered("S", mapEventId));
             Publish(host, new NetworkMissionPeerEntered("C", mapEventId));
@@ -167,16 +167,16 @@ public class BattleMigrationOrphanChainTests : MissionTestEnvironment
             // troops as S received it (S's registry keys it to H).
             var cRecords = new[]
             {
-                new BattleAgentSpawnData(cHeroAgentId, troopCharacterId, default, BattleSideEnum.Attacker, 100f, "C", cMepId, 41),
-                new BattleAgentSpawnData(cTroopAgentId, troopCharacterId, default, BattleSideEnum.Attacker, 100f, "C", cMepId, 42),
+                new BattleAgentSpawnData(cHeroAgentId, troopCharacterId, default, BattleSideEnum.Attacker, 100f, "C", cMepId, 41, new Equipment(), default),
+                new BattleAgentSpawnData(cTroopAgentId, troopCharacterId, default, BattleSideEnum.Attacker, 100f, "C", cMepId, 42, new Equipment(), default),
             };
             ReceiveSpawnRecords(host, cRecords);
             ReceiveSpawnRecords(successor, cRecords);
             ReceiveSpawnRecords(successor,
-                new BattleAgentSpawnData(hTroopAgentId, troopCharacterId, default, BattleSideEnum.Attacker, 100f, "H", hMepId, 43));
+                new BattleAgentSpawnData(hTroopAgentId, troopCharacterId, default, BattleSideEnum.Attacker, 100f, "H", hMepId, 43, new Equipment(), default));
 
             // C drops ungracefully (server fan-out to both remaining members). BR-031: the host adopts;
-            // the successor does not (holder-local adoption — its registry still keys C's agents to C).
+            // the successor does not (holder-local adoption â€” its registry still keys C's agents to C).
             Publish(host, new MissionPeerDisconnected("C", mapEventId));
             Publish(successor, new MissionPeerDisconnected("C", mapEventId));
 
@@ -216,7 +216,7 @@ public class BattleMigrationOrphanChainTests : MissionTestEnvironment
     /// S swept), C re-enters. Because S now HOLDS C's agents, the joiner catch-up replays them to C (the
     /// replay carries the ASSIGNMENT owner) and the reclaim returns them: authority back at C on S, S's
     /// temporary AI control released, and the returner locally controls its restored troops. Without the
-    /// sweep neither happens — S holds nothing of C's, so C returns to a battle that has forgotten it.
+    /// sweep neither happens â€” S holds nothing of C's, so C returns to a battle that has forgotten it.
     /// </summary>
     [Fact]
     [Trait("Requirement", "BR-016")]
@@ -247,7 +247,7 @@ public class BattleMigrationOrphanChainTests : MissionTestEnvironment
 
             var cRecords = new[]
             {
-                new BattleAgentSpawnData(cTroopAgentId, troopCharacterId, default, BattleSideEnum.Attacker, 100f, "C", cMepId, 51),
+                new BattleAgentSpawnData(cTroopAgentId, troopCharacterId, default, BattleSideEnum.Attacker, 100f, "C", cMepId, 51, new Equipment(), default),
             };
             ReceiveSpawnRecords(host, cRecords);
             ReceiveSpawnRecords(successor, cRecords);
@@ -261,7 +261,7 @@ public class BattleMigrationOrphanChainTests : MissionTestEnvironment
             AssertAuthority(successor, cTroopAgentId, "S", "C");
 
             // C reconnects: a fresh mission on its client, then the server tells the remaining member it
-            // entered — the same exchange that drives the join-info/catch-up flow (S replays what it HOLDS,
+            // entered â€” the same exchange that drives the join-info/catch-up flow (S replays what it HOLDS,
             // then the reclaim hands authority back).
             var (returnerController, returnerMock) = StandUpBattleClient(
                 fixture, returner, mapEventId, new BattleHostAssignment("S", Array.Empty<string>(), epoch: 2));
@@ -276,7 +276,7 @@ public class BattleMigrationOrphanChainTests : MissionTestEnvironment
             {
                 var registry = returner.Resolve<INetworkAgentRegistry>();
                 Assert.True(registry.TryGetAgentInfo(cTroopAgentId, out var info),
-                    "the returner's troop was not replayed — the swept holder must replay what it holds");
+                    "the returner's troop was not replayed â€” the swept holder must replay what it holds");
                 Assert.Equal("C", info.CurrentAuthority);
                 Assert.Equal("C", info.OriginalOwner);
                 Assert.True(registry.IsLocallyControlled(cTroopAgentId));
@@ -300,7 +300,7 @@ public class BattleMigrationOrphanChainTests : MissionTestEnvironment
     /// <summary>
     /// The sweep works REPEATEDLY: C drops (H adopts), H drops (S promoted, sweeps), S drops (T promoted,
     /// sweeps). On T, C's agents were still keyed to the absent C (neither H's nor S's holder-local adoption
-    /// ever touched T's registry), so T's sweep must catch them — and the assignment (OriginalOwner == C)
+    /// ever touched T's registry), so T's sweep must catch them â€” and the assignment (OriginalOwner == C)
     /// survives the whole chain, keeping the BR-033 reclaim possible at every generation.
     /// </summary>
     [Fact]
@@ -343,7 +343,7 @@ public class BattleMigrationOrphanChainTests : MissionTestEnvironment
 
             var cRecords = new[]
             {
-                new BattleAgentSpawnData(cTroopAgentId, troopCharacterId, default, BattleSideEnum.Attacker, 100f, "C", cMepId, 61),
+                new BattleAgentSpawnData(cTroopAgentId, troopCharacterId, default, BattleSideEnum.Attacker, 100f, "C", cMepId, 61, new Equipment(), default),
             };
             ReceiveSpawnRecords(host, cRecords);
             ReceiveSpawnRecords(successor, cRecords);
@@ -369,7 +369,7 @@ public class BattleMigrationOrphanChainTests : MissionTestEnvironment
             AssertController(successor, cTroopAgentId, AgentControllerType.AI);
             AssertAuthority(third, cTroopAgentId, "C", "C"); // holder-local: T's bookkeeping unchanged
 
-            // 3) S drops: T promoted; on T the troop is STILL keyed to C — the sweep must catch it again.
+            // 3) S drops: T promoted; on T the troop is STILL keyed to C â€” the sweep must catch it again.
             Publish(third, new MissionPeerDisconnected("S", mapEventId));
             PromoteHost(third, mapEventId, new BattleHostAssignment("T", Array.Empty<string>(), epoch: 3), "S", isPromotedClient: true);
 
@@ -427,9 +427,9 @@ public class BattleMigrationOrphanChainTests : MissionTestEnvironment
             Publish(successor, new NetworkMissionPeerEntered("D", mapEventId));
 
             ReceiveSpawnRecords(successor,
-                new BattleAgentSpawnData(hTroopAgentId, troopCharacterId, default, BattleSideEnum.Attacker, 100f, "H", hMepId, 71),
-                new BattleAgentSpawnData(cTroopAgentId, troopCharacterId, default, BattleSideEnum.Attacker, 100f, "C", cMepId, 72),
-                new BattleAgentSpawnData(dTroopAgentId, troopCharacterId, default, BattleSideEnum.Attacker, 100f, "D", dMepId, 73));
+                new BattleAgentSpawnData(hTroopAgentId, troopCharacterId, default, BattleSideEnum.Attacker, 100f, "H", hMepId, 71, new Equipment(), default),
+                new BattleAgentSpawnData(cTroopAgentId, troopCharacterId, default, BattleSideEnum.Attacker, 100f, "C", cMepId, 72, new Equipment(), default),
+                new BattleAgentSpawnData(dTroopAgentId, troopCharacterId, default, BattleSideEnum.Attacker, 100f, "D", dMepId, 73, new Equipment(), default));
 
             // C drops (S is not the host: adopts nothing), then H drops and S is promoted.
             Publish(successor, new MissionPeerDisconnected("C", mapEventId));

@@ -135,7 +135,6 @@ public class PuppetSpawner : IPuppetSpawner
         // its owner over the mesh.
         bool isOwnAgent = session.IsOwn(data.OwnerControllerId);
         bool isOwnHero = isOwnAgent && character.IsHero && character.HeroObject == Hero.MainHero;
-        var equipment = character.IsHero ? character.HeroObject.BattleEquipment : character.Equipment;
 
         // Carry the troop's party so the agent has a real BattleCombatant — the battle observer/scoreboard
         // reads origin.BattleCombatant, and SimpleAgentOrigin leaves it null for non-hero troops.
@@ -163,7 +162,8 @@ public class PuppetSpawner : IPuppetSpawner
         buildData.InitialPosition(data.Position);
         buildData.Team(team);
         buildData.InitialDirection(Vec2.Forward);
-        buildData.Equipment(equipment);
+        buildData.Equipment(data.SpawnEquipment); // Use calculated equipment from spawning client instead of character equipment (random per troop per client)
+        buildData.BodyProperties(data.BodyProperties);
         buildData.TroopOrigin(origin);
         buildData.Controller(isOwnHero ? AgentControllerType.Player
             : isOwnAgent ? AgentControllerType.AI

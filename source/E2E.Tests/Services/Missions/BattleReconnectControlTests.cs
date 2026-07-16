@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using Common.Messaging;
 using Common.Util;
@@ -23,11 +23,11 @@ namespace E2E.Tests.Services.Missions;
 /// BR-033 (Restored Troop Control) / BR-034 (Invalid Former Troops): after a disconnected player reconnects
 /// and synchronizes, they resume CONTROL of their previously ASSIGNED surviving troops; troops removed while
 /// they were away are not restored. The fixture is the BR-031 adoption (the host temporarily assumed control
-/// of the dropped player's survivors, preserving the assignment — the registry's OriginalOwner); the behavior
+/// of the dropped player's survivors, preserving the assignment â€” the registry's OriginalOwner); the behavior
 /// under test is the RECLAIM on the returner's re-entry: the same server-mediated
 /// <see cref="NetworkMissionPeerEntered"/> that drives the join catch-up makes every instance return authority
 /// to the original owner, the (current) holder releases its live AI control back to an inert puppet, and the
-/// returner — caught up by the holder's replay, whose records carry the ASSIGNMENT owner — re-adopts its own
+/// returner â€” caught up by the holder's replay, whose records carry the ASSIGNMENT owner â€” re-adopts its own
 /// agents as locally driven (hero as the player-controlled main agent when alive, troops as local AI).
 /// Movement is IPacket (not routable in this harness), so the tests assert registry authority, Controller
 /// state and roster/registry contents, never motion.
@@ -36,7 +36,7 @@ public class BattleReconnectControlTests : MissionTestEnvironment
 {
     public BattleReconnectControlTests(ITestOutputHelper output) : base(output, numClients: 3) { }
 
-    /// <summary>The MapEventParty id wrapping a player's party — the attribution the spawn records carry.</summary>
+    /// <summary>The MapEventParty id wrapping a player's party â€” the attribution the spawn records carry.</summary>
     private string GetMapEventPartyId(string mapEventId, string partyId)
     {
         string mepId = null;
@@ -54,7 +54,7 @@ public class BattleReconnectControlTests : MissionTestEnvironment
 
     /// <summary>
     /// A registered troop character every instance resolves, plus one linked to the RETURNING client's own
-    /// hero (statics are per-instance in this harness, so the link is made under the returner's scope — on
+    /// hero (statics are per-instance in this harness, so the link is made under the returner's scope â€” on
     /// every other instance the character is just some hero, not the local main hero).
     /// </summary>
     private (string heroCharacterId, string troopCharacterId) CreateBattleCharacters(EnvironmentInstance returner)
@@ -124,11 +124,11 @@ public class BattleReconnectControlTests : MissionTestEnvironment
     }
 
     /// <summary>
-    /// BR-033 core, on every instance: "C" disconnects mid-battle (the host "H" adopts its surviving troops —
+    /// BR-033 core, on every instance: "C" disconnects mid-battle (the host "H" adopts its surviving troops â€”
     /// BR-031, the fixture), then re-enters through the same server-mediated entry that drives the join
     /// catch-up. Afterwards EVERY instance has the survivors' CurrentAuthority back at "C" (assignment intact),
     /// the host is no longer AI-driving them (released back to inert puppets), and the returner is locally
-    /// controlling them — its hero re-adopted as the player-controlled main agent, its troops as local AI.
+    /// controlling them â€” its hero re-adopted as the player-controlled main agent, its troops as local AI.
     /// </summary>
     [Fact]
     [Trait("Requirement", "BR-033")]
@@ -159,8 +159,8 @@ public class BattleReconnectControlTests : MissionTestEnvironment
             // C's original spawn broadcast (its hero + one troop), as H and B received it before the drop.
             var records = new[]
             {
-                new BattleAgentSpawnData(heroAgentId, heroCharacterId, default, BattleSideEnum.Attacker, 100f, "C", cMepId, 11),
-                new BattleAgentSpawnData(troopAgentId, troopCharacterId, default, BattleSideEnum.Attacker, 100f, "C", cMepId, 12),
+                new BattleAgentSpawnData(heroAgentId, heroCharacterId, default, BattleSideEnum.Attacker, 100f, "C", cMepId, 11, new Equipment(), default),
+                new BattleAgentSpawnData(troopAgentId, troopCharacterId, default, BattleSideEnum.Attacker, 100f, "C", cMepId, 12, new Equipment(), default),
             };
             ReceiveSpawnRecords(host, records);
             ReceiveSpawnRecords(bystander, records);
@@ -179,7 +179,7 @@ public class BattleReconnectControlTests : MissionTestEnvironment
             AssertAuthority(bystander, troopAgentId, "C", "C");
 
             // C reconnects: a fresh mission on its client, then the server tells the existing members it
-            // entered the instance — the same exchange that drives the join-info/catch-up flow.
+            // entered the instance â€” the same exchange that drives the join-info/catch-up flow.
             var (returnerController, returnerMock) = StandUpBattleClient(fixture, returner, mapEventId, assignment);
 
             Publish(host, new NetworkMissionPeerEntered("C", mapEventId));
@@ -232,9 +232,9 @@ public class BattleReconnectControlTests : MissionTestEnvironment
 
     /// <summary>
     /// BR-034: agents of the disconnected player killed while they were away (through the real replicated
-    /// death path) are NOT restored on reconnect — only the survivors transfer back. The dead stay out of
+    /// death path) are NOT restored on reconnect â€” only the survivors transfer back. The dead stay out of
     /// every registry and nothing re-registers or re-spawns them on the returner (baseline-relative roster
-    /// asserts). The hero is among the dead here, so no main agent is re-adopted either — the troops still
+    /// asserts). The hero is among the dead here, so no main agent is re-adopted either â€” the troops still
     /// return to the player's control.
     /// </summary>
     [Fact]
@@ -266,9 +266,9 @@ public class BattleReconnectControlTests : MissionTestEnvironment
 
             var records = new[]
             {
-                new BattleAgentSpawnData(heroAgentId, heroCharacterId, default, BattleSideEnum.Attacker, 100f, "C", cMepId, 21),
-                new BattleAgentSpawnData(survivorAgentId, troopCharacterId, default, BattleSideEnum.Attacker, 100f, "C", cMepId, 22),
-                new BattleAgentSpawnData(casualtyAgentId, troopCharacterId, default, BattleSideEnum.Attacker, 100f, "C", cMepId, 23),
+                new BattleAgentSpawnData(heroAgentId, heroCharacterId, default, BattleSideEnum.Attacker, 100f, "C", cMepId, 21, new Equipment(), default),
+                new BattleAgentSpawnData(survivorAgentId, troopCharacterId, default, BattleSideEnum.Attacker, 100f, "C", cMepId, 22, new Equipment(), default),
+                new BattleAgentSpawnData(casualtyAgentId, troopCharacterId, default, BattleSideEnum.Attacker, 100f, "C", cMepId, 23, new Equipment(), default),
             };
             ReceiveSpawnRecords(host, records);
             ReceiveSpawnRecords(bystander, records);
@@ -278,7 +278,7 @@ public class BattleReconnectControlTests : MissionTestEnvironment
             Publish(bystander, new MissionPeerDisconnected("C", mapEventId));
             AssertAuthority(host, casualtyAgentId, "H", "C");
 
-            // While C is away, its hero and one troop die under host control — the REAL replicated death
+            // While C is away, its hero and one troop die under host control â€” the REAL replicated death
             // path: the authority broadcasts the death, every client deregisters, the server is told.
             host.Call(() =>
             {
@@ -386,7 +386,7 @@ public class BattleReconnectControlTests : MissionTestEnvironment
 
             ReceiveSpawnRecords(newHost, new[]
             {
-                new BattleAgentSpawnData(troopAgentId, troopCharacterId, default, BattleSideEnum.Attacker, 100f, "C", cMepId, 31),
+                new BattleAgentSpawnData(troopAgentId, troopCharacterId, default, BattleSideEnum.Attacker, 100f, "C", cMepId, 31, new Equipment(), default),
             });
 
             // ...then A leaves and the server promotes B (BR-014): the host assignment moves to B.
@@ -437,7 +437,7 @@ public class BattleReconnectControlTests : MissionTestEnvironment
     /// <summary>
     /// Scope and idempotence of the reclaim, on the holding host: a peer-entered for a DIFFERENT instance
     /// reclaims nothing; the real re-entry returns only the returner's own agents (another connected player's
-    /// assignment is untouched — BR-022 — and the host's own agents stay the host's); a DUPLICATE peer-entered
+    /// assignment is untouched â€” BR-022 â€” and the host's own agents stay the host's); a DUPLICATE peer-entered
     /// does not double-transfer or disturb the released state; and a controller that never owned agents in
     /// this battle triggers nothing.
     /// </summary>
@@ -481,7 +481,7 @@ public class BattleReconnectControlTests : MissionTestEnvironment
 
                 var broker = host.Resolve<IMessageBroker>();
 
-                // C drops; the host adopts C's survivor (BR-031). D is still connected — untouched.
+                // C drops; the host adopts C's survivor (BR-031). D is still connected â€” untouched.
                 broker.Publish(host, new MissionPeerDisconnected("C", mapEventId));
                 Assert.True(registry.TryGetAgentInfo(survivorId, out var adopted));
                 Assert.Equal("H", adopted.CurrentAuthority);
