@@ -7,6 +7,7 @@ using GameInterface.Services.UI.Interfaces;
 using Moq;
 using System;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using Xunit;
 
 namespace Coop.Tests.Server.Services.Connection;
@@ -31,13 +32,19 @@ public class TacticalUnitSymbolsConfigSnapshotHandlerTests
             var peer = new TestNetwork().CreatePeer();
             int gameThreadId = 0;
             int snapshotThreadId = 0;
+            using var snapshotSent = new ManualResetEventSlim(false);
             GameThread.Run(() => gameThreadId = Environment.CurrentManagedThreadId, blocking: true);
             configInterface.Setup(config => config.SendSnapshot(peer))
-                .Callback(() => snapshotThreadId = Environment.CurrentManagedThreadId);
+                .Callback(() =>
+                {
+                    snapshotThreadId = Environment.CurrentManagedThreadId;
+                    snapshotSent.Set();
+                });
             using var handler = new TacticalUnitSymbolsConfigSnapshotHandler(messageBroker, configInterface.Object);
 
             messageBroker.Publish(this, new PlayerCampaignEntered(peer));
 
+            Assert.True(snapshotSent.Wait(TimeSpan.FromSeconds(5)), "snapshot was not sent within the timeout");
             configInterface.Verify(config => config.SendSnapshot(peer), Times.Once);
             Assert.Equal(gameThreadId, snapshotThreadId);
         }

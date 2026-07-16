@@ -31,7 +31,6 @@ internal class TacticalUnitSymbolsConfigSnapshotHandler : IHandler
 
         GameThread.RunSafe(
             () => tacticalUnitSymbolsConfigInterface.SendSnapshot(payload.What.playerId),
-            blocking: true,
             context: nameof(Handle_PlayerCampaignEntered));
     }
 }
