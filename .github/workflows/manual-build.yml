@@ -26,7 +26,7 @@ jobs:
 
     steps:
       - name: Checkout requested commit
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.commit_sha }}
           fetch-depth: 0
@@ -137,7 +137,7 @@ jobs:
             "$FILE_NAME" "$HEAD_SHA" > artifact/manifest.json
 
       - name: Upload manual build artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@v7
         with:
           name: manual-build-${{ steps.artifact.outputs.head_sha }}
           path: artifact/*
