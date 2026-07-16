@@ -25,7 +25,7 @@ internal class PartyLifetimePatches
     [HarmonyPostfix]
     private static void PostfixCtor(MobileParty __instance)
     {
-        Logger.Debug("[{Instance}] MobileParty created with name {partyName}, {StringId}", __instance, __instance.Name, __instance.StringId);
+        Logger.Debug("MobileParty created: {StringId}", __instance.StringId);
     }
 }
 
