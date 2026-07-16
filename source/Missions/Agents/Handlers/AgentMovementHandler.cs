@@ -358,9 +358,8 @@ public class AgentMovementHandler : IAgentMovementHandler
 
         if (controllerId == controllerIdProvider.ControllerId) return;
 
-        // In a coop field battle a departing player's troops are NOT despawned: the host adopts them
-        // (CoopBattleController.HandlePeerGone) so they keep fighting under host AI, and other peers keep
-        // them as puppets that follow the host's movement. Skip the location-style cleanup entirely.
+        // BattleAuthorityMigrator owns battle withdrawal because it can distinguish the player's party from
+        // NPC forces the departed host was running. Skip this location-style all-controller cleanup.
         if (BattleSpawnGate.IsCoopBattleActive) return;
 
         bool sceneActive = Mission.Current != null;

@@ -33,7 +33,7 @@ namespace Missions.Battles;
 /// casualty; peer-side puppet kill.</item>
 /// <item><see cref="PuppetSpawner"/> — peer-side puppet spawn/buffer/drain.</item>
 /// <item><see cref="BattleDamageRouter"/> — puppet hits routed to and applied by the owner.</item>
-/// <item><see cref="BattleAuthorityMigrator"/> — retreat despawn vs. disconnect adoption, host migration.</item>
+/// <item><see cref="BattleAuthorityMigrator"/> — player-party withdrawal and host migration.</item>
 /// <item><see cref="ReinforcementFielder"/> — the host fields new AI parties mid-battle.</item>
 /// <item><see cref="SupplyProgressReporter"/> / <see cref="BattleResultCommitter"/> — server ledger + result commit.</item>
 /// <item><see cref="BattleDeploymentCoordinator"/> — deployment activation ("any client" NPC release) and the
@@ -98,7 +98,7 @@ public class CoopBattleController : CoopMissionController
         replicator = new OwnedAgentReplicator(network, messageBroker, objectManager, coopMissionComponent, session, casualties, deployment);
         deathReporter = new AgentDeathReporter(network, relayNetwork, messageBroker, objectManager, coopMissionComponent, session, casualties);
         routReporter = new AgentRoutReporter(network, messageBroker, coopMissionComponent, session, casualties);
-        puppetSpawner = new PuppetSpawner(messageBroker, objectManager, coopMissionComponent, session, casualties, deployment, formationAssigner);
+        puppetSpawner = new PuppetSpawner(messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner);
         puppetDeathApplier = new PuppetDeathApplier(messageBroker, coopMissionComponent, casualties);
         puppetRoutApplier = new PuppetRoutApplier(messageBroker, coopMissionComponent, casualties);
         damageRouter = new BattleDamageRouter(network, messageBroker, coopMissionComponent, session);

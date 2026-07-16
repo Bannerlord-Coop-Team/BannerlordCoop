@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using GameInterface.Services;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -35,17 +35,15 @@ public interface IBattleTroopReserveBuilder : IGameAbstraction
 {
     /// <summary>
     /// The reserves <paramref name="controllerId"/> currently owns. A party whose resolved owning controller
-    /// is in <paramref name="absentControllers"/> (a member that DROPPED from this battle and has not
-    /// re-entered — tracked by the caller from the server's membership signals) is treated as unowned, so it
-    /// falls to the host: the reserve half of the BR-031 adoption. Player registrations survive a disconnect,
-    /// so ownership alone cannot see the drop — the absent set is what re-scopes it.
+    /// is in <paramref name="absentControllers"/> (a member explicitly marked absent without withdrawing) is
+    /// treated as unowned, so it falls to the host. Player registrations survive that absence, so ownership
+    /// alone cannot see it — the absent set is what re-scopes the party.
     /// </summary>
     IReadOnlyList<SideReserve> GetOwnedReserves(MapEvent mapEvent, string controllerId, bool isHost,
         IReadOnlyCollection<string> absentControllers = null);
 
-    /// <summary>Forget a controller's parties because it RETREATED: drop them from the ledger and the built-set
-    /// so that, if it rejoins, its party is re-flattened fresh (supplied pointer reset) and re-spawns. Do NOT
-    /// call this on a disconnect — there the host adopts the troops, and resetting would double-spawn them.</summary>
+    /// <summary>Forget a controller's withdrawn parties: drop them from the ledger and the built-set so that,
+    /// if it rejoins, its party is re-flattened fresh (supplied pointer reset) and re-spawns.</summary>
     void ForgetController(MapEvent mapEvent, string controllerId);
 
     /// <summary>Forget EVERY reserve of a battle (its whole ledger entry + flatten cache). Called when a battle
