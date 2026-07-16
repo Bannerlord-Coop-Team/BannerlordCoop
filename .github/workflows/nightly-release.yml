@@ -96,8 +96,16 @@ jobs:
           PREVIOUS_SHA: ${{ steps.previous.outputs.result }}
         run: |
           set -eu
-          release_date=$(TZ=America/Chicago date +%F)
-          display_date=$(TZ=America/Chicago date +%m-%d-%Y)
+          release_epoch=$(date +%s)
+          if [ "$GITHUB_EVENT_NAME" = schedule ]; then
+            release_hour=$(TZ=America/Chicago date +%H)
+            release_minute=$(TZ=America/Chicago date +%M)
+            if [ "$release_hour" -lt 23 ] || { [ "$release_hour" -eq 23 ] && [ "$release_minute" -lt 57 ]; }; then
+              release_epoch=$((release_epoch - 86400))
+            fi
+          fi
+          release_date=$(TZ=America/Chicago date -d "@$release_epoch" +%F)
+          display_date=$(TZ=America/Chicago date -d "@$release_epoch" +%m-%d-%Y)
           file_name="Coop $display_date.7z"
           head_sha=$(git rev-parse HEAD)
           base_sha="$PREVIOUS_SHA"
