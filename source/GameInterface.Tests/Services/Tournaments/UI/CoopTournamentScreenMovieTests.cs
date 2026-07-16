@@ -46,6 +46,39 @@ public class CoopTournamentScreenMovieTests
         Assert.DoesNotContain("ExecuteSkipRound", movie);
     }
 
+    [Fact]
+    public void Movie_UsesNativeWagerSliderLayoutAndHitTesting()
+    {
+        var movie = File.ReadAllText(FindRepositoryFile("UIMovies", "CoopTournamentScreen.xml"));
+        var document = XDocument.Parse(movie);
+
+        var slider = Assert.Single(document.Descendants("SliderWidget"));
+        Assert.Equal("SliderWidget", slider.Attribute("Id")?.Value);
+        Assert.Equal("Bottom", slider.Attribute("VerticalAlignment")?.Value);
+        Assert.Equal("Filler", slider.Attribute("Filler")?.Value);
+        Assert.Equal("SliderHandle", slider.Attribute("Handle")?.Value);
+
+        var canvas = Assert.Single(slider.Descendants("Widget"), element =>
+            element.Attribute("Sprite")?.Value == @"SPGeneral\SPOptions\standart_slider_canvas");
+        Assert.Equal("Center", canvas.Attribute("VerticalAlignment")?.Value);
+        Assert.Equal("false", canvas.Attribute("IsEnabled")?.Value);
+
+        var frame = Assert.Single(slider.Descendants("Widget"), element =>
+            element.Attribute("Sprite")?.Value == @"SPGeneral\SPOptions\standart_slider_frame");
+        Assert.Equal("Center", frame.Attribute("VerticalAlignment")?.Value);
+        Assert.Equal("false", frame.Attribute("IsEnabled")?.Value);
+
+        var filler = Assert.Single(slider.Descendants("Widget"), element =>
+            element.Attribute("Id")?.Value == "Filler");
+        Assert.Single(filler.Descendants("Widget"), element =>
+            element.Attribute("Sprite")?.Value == @"SPGeneral\SPOptions\standart_slider_fill");
+
+        var handle = Assert.Single(slider.Descendants("ImageWidget"), element =>
+            element.Attribute("Id")?.Value == "SliderHandle");
+        Assert.Equal("Center", handle.Attribute("VerticalAlignment")?.Value);
+        Assert.Equal("true", handle.Attribute("DoNotAcceptEvents")?.Value);
+    }
+
     private static string FindRepositoryFile(params string[] pathParts)
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

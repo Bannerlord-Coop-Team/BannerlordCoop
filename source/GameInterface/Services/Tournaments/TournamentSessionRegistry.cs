@@ -56,11 +56,9 @@ public sealed class TournamentSessionSeed
 
 public interface ITournamentSessionRegistry : IGameAbstraction
 {
-    bool HasActiveSessions { get; }
     TournamentSessionSnapshot[] GetAll();
     bool TryGet(string sessionId, out TournamentSessionSnapshot snapshot);
     bool TryGetByTown(string townId, out TournamentSessionSnapshot snapshot);
-    bool CanEnterMission(string missionInstanceId, string controllerId);
     TournamentMutationStatus TryCreate(TournamentSessionSeed seed, out TournamentSessionSnapshot snapshot);
     TournamentMutationStatus TryJoin(
         string sessionId,
@@ -144,34 +142,6 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
     private readonly object gate = new();
     private readonly Dictionary<string, TournamentSessionState> sessionsById = new();
     private readonly Dictionary<string, string> sessionIdsByTown = new();
-
-    public bool CanEnterMission(string missionInstanceId, string controllerId)
-    {
-        if (string.IsNullOrEmpty(missionInstanceId) || string.IsNullOrEmpty(controllerId)) return false;
-        lock (gate)
-        {
-            TournamentSessionState session = sessionsById.Values
-                .FirstOrDefault(state => state.MissionInstanceId == missionInstanceId);
-            if (session == null || !session.IsActive) return false;
-            return session.TryGetActiveContestant(controllerId, out _) ||
-                session.PendingSpectators.Contains(controllerId) ||
-                session.Spectators.Contains(controllerId) ||
-                session.Entrants.Contains(controllerId);
-        }
-    }
-
-    public bool HasActiveSessions
-    {
-        get
-        {
-            lock (gate)
-            {
-                return sessionsById.Values.Any(session =>
-                    session.Phase != TournamentSessionPhase.Preparation &&
-                    session.Phase != TournamentSessionPhase.Completed);
-            }
-        }
-    }
 
     public TournamentSessionSnapshot[] GetAll()
     {

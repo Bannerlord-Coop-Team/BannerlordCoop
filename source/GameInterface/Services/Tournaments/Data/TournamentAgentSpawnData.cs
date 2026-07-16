@@ -30,19 +30,19 @@ public sealed class TournamentAgentSpawnData
     public readonly Vec3 Position;
     [ProtoMember(11)]
     public readonly Vec2 Direction;
-    [ProtoMember(15)]
+    [ProtoMember(12)]
     public readonly float Health;
-    [ProtoMember(16)]
+    [ProtoMember(13)]
     public readonly Guid MountAgentId;
-    [ProtoMember(17)]
+    [ProtoMember(14)]
     public readonly string MountCharacterId;
-    [ProtoMember(18)]
+    [ProtoMember(15)]
     public readonly int MountDescriptorSeed;
-    [ProtoMember(19)]
+    [ProtoMember(16)]
     public readonly EquipmentElement[] MountEquipment;
-    [ProtoMember(20)]
+    [ProtoMember(17)]
     public readonly float MountHealth;
-    [ProtoMember(21)]
+    [ProtoMember(18)]
     public readonly uint TeamColor2;
 
     public TournamentAgentSpawnData(

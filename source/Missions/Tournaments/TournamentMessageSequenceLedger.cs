@@ -20,6 +20,15 @@ public class TournamentMessageSequenceLedger
         }
     }
 
+    public bool HasReached(string originControllerId, long sequence)
+    {
+        if (string.IsNullOrEmpty(originControllerId) || sequence <= 0) return false;
+        lock (gate)
+        {
+            return sequences.TryGetValue(originControllerId, out long last) && last >= sequence;
+        }
+    }
+
     public void Clear()
     {
         lock (gate)

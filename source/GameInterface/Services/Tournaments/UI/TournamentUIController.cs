@@ -30,6 +30,7 @@ internal sealed class TournamentUIController : ITournamentUIController, IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly IControllerIdProvider controllerIdProvider;
+    private readonly ITournamentGameInterface tournamentGameInterface;
     private readonly ConcurrentDictionary<string, TournamentSessionSnapshot> sessionsById = new();
     private readonly IRelayNetwork[] relayNetworks;
     private readonly ConcurrentDictionary<string, TournamentSessionSnapshot> sessionsByTownId = new();
@@ -48,12 +49,14 @@ internal sealed class TournamentUIController : ITournamentUIController, IHandler
         INetwork network,
         IObjectManager objectManager,
         IControllerIdProvider controllerIdProvider,
+        ITournamentGameInterface tournamentGameInterface,
         IEnumerable<IRelayNetwork> relayNetworks = null)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.controllerIdProvider = controllerIdProvider;
+        this.tournamentGameInterface = tournamentGameInterface;
         this.relayNetworks = relayNetworks?.ToArray() ?? Array.Empty<IRelayNetwork>();
 
         messageBroker.Subscribe<TournamentSessionUpdated>(Handle_TournamentSessionUpdated);
@@ -80,6 +83,29 @@ internal sealed class TournamentUIController : ITournamentUIController, IHandler
     {
         snapshot = null;
         return !string.IsNullOrEmpty(townId) && sessionsByTownId.TryGetValue(townId, out snapshot);
+    }
+
+    public bool TryGetBetQuote(
+        TournamentSessionSnapshot snapshot,
+        out TournamentBetQuote quote)
+    {
+        quote = null;
+        TournamentContestantData contestant = snapshot?.Contestants.FirstOrDefault(candidate =>
+            candidate.IsHuman &&
+            !candidate.IsReplaced &&
+            candidate.ControllerId == LocalControllerId);
+        if (contestant == null ||
+            !objectManager.TryGetObject(contestant.CharacterId, out CharacterObject character) ||
+            character.HeroObject == null)
+        {
+            return false;
+        }
+
+        return tournamentGameInterface.TryGetBetQuote(
+            snapshot,
+            character.HeroObject,
+            contestant.SlotId,
+            out quote);
     }
 
     public string GetPreparationPrizeName(string townId)

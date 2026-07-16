@@ -329,93 +329,95 @@
         </Widget>
 
 
-        <Widget Id="BetWindow" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
-                Sprite="BlankWhiteSquare_9" Color="#000000FF" AlphaFactor="0.75"
-                IsVisible="@IsBetWindowEnabled">
+        <Widget Id="BetWindow" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" HorizontalAlignment="Center" VerticalAlignment="Center" Sprite="BlankWhiteSquare_9" Color="#000000FF" AlphaFactor="0.75" Command.Click="ExecuteBet" IsVisible="@IsBetWindowEnabled">
           <Children>
-            <DimensionSyncWidget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="512"
-                                 HorizontalAlignment="Center" VerticalAlignment="Center" DimensionToSync="Vertical"
-                                 WidgetToCopyHeightFrom="BetWindowInnerPanel">
+            <NavigationForcedScopeCollectionTargeter CollectionID="BetWindowForcedCollection" CollectionParent="..\." />
+
+            <DimensionSyncWidget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="512" DimensionToSync="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center" WidgetToCopyHeightFrom="BetWindowInnerPanel">
               <Children>
+
                 <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" ClipContents="true">
                   <Children>
-                    <Widget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="512" SuggestedHeight="645"
-                            HorizontalAlignment="Center" VerticalAlignment="Top" Sprite="StdAssets\Popup\canvas" />
+                    <Widget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="512" SuggestedHeight="645" HorizontalAlignment="Center" VerticalAlignment="Top" Sprite="StdAssets\Popup\canvas" />
                   </Children>
                 </Widget>
-                <ListPanel Id="BetWindowInnerPanel" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
-                           MarginLeft="15" MarginRight="15" StackLayout.LayoutMethod="VerticalTopToBottom">
+
+                <ListPanel Id="BetWindowInnerPanel" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" StackLayout.LayoutMethod="VerticalTopToBottom" MarginLeft="15" MarginRight="15">
                   <Children>
-                    <AutoHideRichTextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
-                                            MarginTop="10" Brush="Popup.Title.Text" MinHeight="50"
-                                            Text="@BetTitleText" />
-                    <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="23"
-                            Sprite="StdAssets\Popup\divider" />
-                    <RichTextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
-                                    MarginTop="10" Brush="Popup.Description.Text" Text="@BetDescriptionText" />
-                    <RichTextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
-                                    HorizontalAlignment="Center" MarginTop="10" Brush="Tournament.BetPopup.Text"
-                                    Text="@BetOddsText" />
-                    <TextWidget WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
-                                HorizontalAlignment="Center" MarginTop="30" Brush="Tournament.BetPopup.Text"
-                                Text="@CurrentWagerText" />
-                    <ListPanel WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
-                               HorizontalAlignment="Center" StackLayout.LayoutMethod="HorizontalLeftToRight">
+
+                    <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" StackLayout.LayoutMethod="VerticalTopToBottom" MarginBottom="5">
                       <Children>
-                        <TextWidget WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
-                                    Brush="Tournament.BetPopup.Text" IntText="@WageredDenars" />
-                        <Widget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="35" SuggestedHeight="35"
-                                Sprite="General\Icons\Coin@2x" />
-                        <TextWidget WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren" MarginRight="5"
-                                    Brush="Tournament.BetPopup.Text" Text="-&gt;" />
-                        <TextWidget WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
-                                    Brush="Tournament.BetPopup.Text" IntText="@ExpectedBetDenars" />
-                        <Widget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="35" SuggestedHeight="35"
-                                Sprite="General\Icons\Coin@2x" />
+                        <!--Title-->
+                        <AutoHideRichTextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginTop="10" Brush="Popup.Title.Text" MinHeight="50" Text="@BetTitleText" WidgetToHideIfEmpty="..\TitleDivider" />
+
+                        <!--Divider-->
+                        <Widget Id="TitleDivider" WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="23" Sprite="StdAssets\Popup\divider" />
+
+                        <!--Description-->
+                        <RichTextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginTop="10" Brush="Popup.Description.Text" MaxHeight="480" MinHeight="10" Text="@BetDescriptionText" />
+
                       </Children>
                     </ListPanel>
-                    <SliderWidget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="338" SuggestedHeight="42"
-                                  HorizontalAlignment="Center" MarginTop="25" Filler="Filler" Handle="SliderHandle"
-                                  MaxValueInt="@MaximumBetValue" MinValueInt="0" ValueInt="@WageredDenars">
+
+                    <!--<TextWidget WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren" VerticalAlignment="Center" HorizontalAlignment="Center" Text="ODDS" Brush="Tournament.BetPopup.Text"/>-->
+
+                    <RichTextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" Text="@BetOddsText" HorizontalAlignment="Center" MarginTop="0" Brush="Tournament.BetPopup.Text"/>
+
+                    <TextWidget WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren" VerticalAlignment="Center" HorizontalAlignment="Center" Text="@CurrentWagerText" Brush="Tournament.BetPopup.Text" MarginTop="50"/>
+
+                    <ListPanel WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren" HorizontalAlignment="Center">
                       <Children>
-                        <Widget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="362" SuggestedHeight="38"
-                                HorizontalAlignment="Center" Sprite="SPGeneral\SPOptions\standart_slider_canvas" />
-                        <Widget Id="Filler" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="345" SuggestedHeight="35"
-                                Sprite="SPGeneral\SPOptions\standart_slider_fill" ClipContents="true" />
-                        <Widget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="400" SuggestedHeight="65"
-                                HorizontalAlignment="Center" Sprite="SPGeneral\SPOptions\standart_slider_frame" />
-                        <ImageWidget Id="SliderHandle" DoNotAcceptEvents="true" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed"
-                                     SuggestedWidth="14" SuggestedHeight="38" HorizontalAlignment="Left"
-                                     Brush="SPOptions.Slider.Handle" />
+                        <TextWidget WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren" VerticalAlignment="Center" IntText="@WageredDenars" Brush="Tournament.BetPopup.Text"/>
+                        <Widget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="35" SuggestedHeight="35" VerticalAlignment="Center" Sprite="General\Icons\Coin@2x" />
+                        <TextWidget WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren" VerticalAlignment="Center" Text="-&gt;" MarginRight="5" Brush="Tournament.BetPopup.Text"/>
+                        <TextWidget WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren" VerticalAlignment="Center" IntText="@ExpectedBetDenars" Brush="Tournament.BetPopup.Text"/>
+                        <Widget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="35" SuggestedHeight="35" VerticalAlignment="Center" Sprite="General\Icons\Coin@2x" />
+                      </Children>
+                    </ListPanel>
+
+                    <NavigationScopeTargeter ScopeID="TournamentBetWindowSliderScope" ScopeParent="..\SliderWidget" />
+                    <SliderWidget Id="SliderWidget" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="338" SuggestedHeight="42" HorizontalAlignment="Center" VerticalAlignment="Bottom" Filler="Filler" Handle="SliderHandle" MaxValueInt="@MaximumBetValue" MinValueInt="0" ValueInt="@WageredDenars">
+                      <Children>
+                        <Widget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="362" SuggestedHeight="38" HorizontalAlignment="Center" VerticalAlignment="Center" Sprite="SPGeneral\SPOptions\standart_slider_canvas" IsEnabled="false" />
+                        <Widget Id="Filler" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="345" SuggestedHeight="35" VerticalAlignment="Center" Sprite="SPGeneral\SPOptions\standart_slider_fill" ClipContents="true">
+                          <Children>
+                            <Widget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="345" SuggestedHeight="35" HorizontalAlignment="Left" VerticalAlignment="Center" Sprite="SPGeneral\SPOptions\standart_slider_fill" />
+                          </Children>
+                        </Widget>
+                        <Widget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="400" SuggestedHeight="65" HorizontalAlignment="Center" VerticalAlignment="Center" Sprite="SPGeneral\SPOptions\standart_slider_frame" IsEnabled="false" />
+                        <ImageWidget Id="SliderHandle" DoNotAcceptEvents="true" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="14" SuggestedHeight="38" HorizontalAlignment="Left" VerticalAlignment="Center" Brush="SPOptions.Slider.Handle" GamepadNavigationIndex="0"/>
                       </Children>
                     </SliderWidget>
-                    <ListPanel WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren" HorizontalAlignment="Center"
-                               MarginTop="20" StackLayout.LayoutMethod="HorizontalLeftToRight">
+
+                    <NavigationScopeTargeter ScopeID="TournamentBetWindowControlsScope" ScopeParent="..\BetControls" ScopeMovements="Horizontal" />
+                    <ListPanel Id="BetControls" WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren" HorizontalAlignment="Center" MarginTop="20" StackLayout.LayoutMethod="HorizontalLeftToRight">
                       <Children>
-                        <ToggleButtonWidget DoNotPassEventsToChildren="true" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed"
-                                            SuggestedWidth="220" SuggestedHeight="64" Brush="Popup.Cancel.Button"
-                                            WidgetToClose="..\..\..\..\..\BetWindow">
+
+                        <ToggleButtonWidget DoNotPassEventsToChildren="true" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="251" SuggestedHeight="64" HorizontalAlignment="Right" VerticalAlignment="Center" Brush="Popup.Cancel.Button" WidgetToClose="..\..\..\..\..\BetWindow" GamepadNavigationIndex="0">
                           <Children>
-                            <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
-                                        Brush="Popup.Button.Text" Text="@CancelText" />
+                            <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Brush="Popup.Button.Text" Text="@CancelText" MarginLeft="40" MarginRight="40"/>
+                            <InputKeyVisualWidget DataSource="{CancelInputKey}" DoNotAcceptEvents="true" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="45" SuggestedHeight="45" HorizontalAlignment="Left" VerticalAlignment="Center" PositionXOffset="10" KeyID="@KeyID" IsVisible="@IsVisible"/>
                           </Children>
                         </ToggleButtonWidget>
-                        <ToggleButtonWidget DoNotPassEventsToChildren="true" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed"
-                                            SuggestedWidth="220" SuggestedHeight="64" Brush="Popup.Done.Button"
-                                            Command.Click="ExecuteBet" WidgetToClose="..\..\..\..\..\BetWindow">
+
+                        <ToggleButtonWidget DoNotPassEventsToChildren="true" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="251" SuggestedHeight="64" HorizontalAlignment="Right" VerticalAlignment="Center" Brush="Popup.Done.Button" Command.Click="ExecuteBet" WidgetToClose="..\..\..\..\..\BetWindow" GamepadNavigationIndex="1">
                           <Children>
-                            <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
-                                        Brush="Popup.Button.Text" Text="@AcceptText" />
+                            <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Brush="Popup.Button.Text" Text="@AcceptText" MarginLeft="40" MarginRight="40"/>
+                            <InputKeyVisualWidget DataSource="{DoneInputKey}" DoNotAcceptEvents="true" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="45" SuggestedHeight="45" HorizontalAlignment="Left" VerticalAlignment="Center" PositionXOffset="10" KeyID="@KeyID" IsVisible="@IsVisible"/>
                           </Children>
                         </ToggleButtonWidget>
+
                       </Children>
                     </ListPanel>
+
                   </Children>
                 </ListPanel>
-                <BrushWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
-                             Brush="Popup.Frame" IsEnabled="false" />
+                <!--Frame Border-->
+                <BrushWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Brush="Popup.Frame" IsEnabled="false" />
+
               </Children>
             </DimensionSyncWidget>
+
           </Children>
         </Widget>
         <Widget WidthSizePolicy="Fixed" HeightSizePolicy="CoverChildren" SuggestedWidth="360" IsVisible="@IsCurrentMatchActive">

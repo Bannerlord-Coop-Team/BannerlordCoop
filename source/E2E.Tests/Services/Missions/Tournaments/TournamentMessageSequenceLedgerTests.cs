@@ -17,6 +17,20 @@ public class TournamentMessageSequenceLedgerTests
     }
 
     [Fact]
+    public void HasReached_ReportsAppliedSequencePerOrigin()
+    {
+        var ledger = new TournamentMessageSequenceLedger();
+        Assert.True(ledger.TryAccept("attacker", 7));
+
+        Assert.True(ledger.HasReached("attacker", 6));
+        Assert.True(ledger.HasReached("attacker", 7));
+        Assert.False(ledger.HasReached("attacker", 8));
+        Assert.False(ledger.HasReached("other", 7));
+        Assert.False(ledger.HasReached(null, 7));
+        Assert.False(ledger.HasReached("attacker", 0));
+    }
+
+    [Fact]
     public void Clear_StartsFreshMatchStreamsWithoutAcceptingInvalidSequences()
     {
         var ledger = new TournamentMessageSequenceLedger();

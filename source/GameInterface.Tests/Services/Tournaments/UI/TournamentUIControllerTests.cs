@@ -1,7 +1,9 @@
 using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Tournaments;
 using GameInterface.Services.Tournaments.Data;
 using GameInterface.Services.Tournaments.Messages;
 using GameInterface.Services.Tournaments.UI;
@@ -9,6 +11,7 @@ using Moq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using TaleWorlds.CampaignSystem;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Tournaments.UI;
@@ -146,6 +149,50 @@ public class TournamentUIControllerTests
         Assert.Equal(2, requests[1].Sequence);
     }
 
+    [Fact]
+    public void BetQuote_UsesCanonicalLocalContestantInsteadOfGlobalPlayerCharacter()
+    {
+        var hero = ObjectHelper.SkipConstructor<Hero>();
+        var character = ObjectHelper.SkipConstructor<CharacterObject>();
+        character._heroObject = hero;
+        var snapshot = CreateSnapshot(
+            "session-a",
+            "town-a",
+            8,
+            TournamentSessionPhase.AwaitingChoices,
+            true,
+            "match-a");
+        var expected = new TournamentBetQuote(150, 4f);
+        var objectManager = new Mock<IObjectManager>();
+        CharacterObject resolvedCharacter = character;
+        objectManager.Setup(value => value.TryGetObject("character-a", out resolvedCharacter))
+            .Returns(true);
+        var gameInterface = new Mock<ITournamentGameInterface>();
+        TournamentBetQuote resolvedQuote = expected;
+        gameInterface.Setup(value => value.TryGetBetQuote(
+                snapshot,
+                hero,
+                "slot-a",
+                out resolvedQuote))
+            .Returns(true);
+        var controllerIdProvider = new Mock<IControllerIdProvider>();
+        controllerIdProvider.SetupGet(value => value.ControllerId).Returns("player-a");
+        using var controller = new TournamentUIController(
+            new Mock<IMessageBroker>().Object,
+            new Mock<INetwork>().Object,
+            objectManager.Object,
+            controllerIdProvider.Object,
+            gameInterface.Object);
+
+        Assert.True(controller.TryGetBetQuote(snapshot, out var quote));
+        Assert.Same(expected, quote);
+        gameInterface.Verify(value => value.TryGetBetQuote(
+            snapshot,
+            hero,
+            "slot-a",
+            out resolvedQuote), Times.Once);
+    }
+
     private static TournamentUIController CreateController(
         string controllerId,
         out List<IMessage> sent)
@@ -162,7 +209,8 @@ public class TournamentUIControllerTests
             new Mock<IMessageBroker>().Object,
             network.Object,
             new Mock<IObjectManager>().Object,
-            controllerIdProvider.Object);
+            controllerIdProvider.Object,
+            new Mock<ITournamentGameInterface>().Object);
     }
 
     private static TournamentSessionSnapshot CreateSnapshot(

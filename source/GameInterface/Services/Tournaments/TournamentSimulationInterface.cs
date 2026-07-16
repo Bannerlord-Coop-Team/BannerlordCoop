@@ -1,9 +1,10 @@
+using Common.Util;
 using GameInterface.Services.Tournaments.Data;
+using SandBox.Tournaments.MissionLogics;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.Tournaments;
@@ -99,115 +100,40 @@ public sealed partial class TournamentGameInterface
         out TournamentBetQuote quote)
     {
         quote = null;
-        if (snapshot == null || hero == null || string.IsNullOrEmpty(slotId))
-            return false;
-
-        TournamentRoundData currentRound = snapshot.Rounds.FirstOrDefault(round =>
-            round.Matches.Any(match => match.MatchId == snapshot.CurrentMatchId));
-        if (currentRound == null)
-            return false;
-
-        List<KeyValuePair<Hero, int>> leaderboard = Campaign.Current?.TournamentManager?.GetLeaderboard()
-            ?? new List<KeyValuePair<Hero, int>>();
-        int highestWins = leaderboard.Count == 0 ? 0 : leaderboard.Max(entry => entry.Value);
-        if (!TryCalculateRoundPowers(
-                snapshot,
-                currentRound,
-                slotId,
-                leaderboard,
-                highestWins,
-                out float playerTeamPower,
-                out float currentMatchOpponentPower,
-                out float totalRoundPower))
-            return false;
-
-        int heroWins = GetTournamentWins(leaderboard, hero);
-        float heroPower = 30f + hero.Level + Math.Max(0, (heroWins * 12) - (highestWins * 2));
-        float odd = TournamentBettingMath.CalculateOdd(
-            heroPower,
-            playerTeamPower,
-            currentMatchOpponentPower,
-            totalRoundPower);
-        int maximumBet = TournamentBettingMath.CalculateMaximumBet(
-            hero.GetPerkValue(DefaultPerks.Roguery.DeepPockets),
-            DefaultPerks.Roguery.DeepPockets.PrimaryBonus);
-        quote = new TournamentBetQuote(maximumBet, odd);
-        return true;
-    }
-
-    private bool TryCalculateRoundPowers(
-        TournamentSessionSnapshot snapshot,
-        TournamentRoundData currentRound,
-        string slotId,
-        List<KeyValuePair<Hero, int>> leaderboard,
-        int highestWins,
-        out float playerTeamPower,
-        out float currentMatchOpponentPower,
-        out float totalRoundPower)
-    {
-        playerTeamPower = 0f;
-        currentMatchOpponentPower = 0f;
-        totalRoundPower = 0f;
-        bool playerTeamFound = false;
-        foreach (TournamentMatchData match in currentRound.Matches)
+        if (snapshot == null ||
+            hero?.CharacterObject == null ||
+            string.IsNullOrEmpty(slotId) ||
+            Game.Current == null ||
+            !TryHydrateRounds(snapshot, out var rounds, out var participants, out _) ||
+            !TryFindCurrentMatch(snapshot, rounds, out var roundIndex, out _) ||
+            !participants.TryGetValue(slotId, out var playerParticipant) ||
+            playerParticipant.Character != hero.CharacterObject ||
+            !snapshot.Rounds[roundIndex].Matches
+                .First(match => match.MatchId == snapshot.CurrentMatchId)
+                .Teams.Any(team => team.ParticipantSlotIds.Contains(slotId)))
         {
-            foreach (TournamentTeamData team in match.Teams)
-            {
-                if (!TryCalculateTeamPower(snapshot, team, slotId, leaderboard, highestWins, out float teamPower))
-                    return false;
-
-                totalRoundPower += teamPower;
-                bool isCurrentMatch = match.MatchId == snapshot.CurrentMatchId;
-                bool isPlayerTeam = team.ParticipantSlotIds.Contains(slotId);
-                if (isCurrentMatch && isPlayerTeam)
-                {
-                    playerTeamPower = teamPower;
-                    playerTeamFound = true;
-                }
-                else if (isCurrentMatch)
-                {
-                    currentMatchOpponentPower += teamPower;
-                }
-            }
+            return false;
         }
-        return playerTeamFound;
-    }
 
-    private bool TryCalculateTeamPower(
-        TournamentSessionSnapshot snapshot,
-        TournamentTeamData team,
-        string playerSlotId,
-        List<KeyValuePair<Hero, int>> leaderboard,
-        int highestWins,
-        out float teamPower)
-    {
-        teamPower = 0f;
-        foreach (string participantSlotId in team.ParticipantSlotIds)
+        var behavior = ObjectHelper.SkipConstructor<TournamentBehavior>();
+        behavior.Rounds = rounds;
+        behavior._participants = participants.Values.ToArray();
+        behavior.CurrentRoundIndex = roundIndex;
+        behavior.IsPlayerParticipating = true;
+        behavior.IsPlayerEliminated = false;
+
+        // CalculateBet has no player parameter, so scope its single-player global to the authenticated bettor.
+        BasicCharacterObject previousPlayerTroop = Game.Current.PlayerTroop;
+        try
         {
-            if (participantSlotId == playerSlotId)
-                continue;
-            TournamentContestantData contestant = snapshot.Contestants
-                .FirstOrDefault(candidate => candidate.SlotId == participantSlotId);
-            if (contestant == null ||
-                !objectManager.TryGetObject(contestant.CharacterId, out CharacterObject character))
-                return false;
-
-            int wins = character.IsHero
-                ? GetTournamentWins(leaderboard, character.HeroObject)
-                : 0;
-            teamPower += character.Level + Math.Max(0, (wins * 8) - (highestWins * 2));
+            Game.Current.PlayerTroop = hero.CharacterObject;
+            behavior.CalculateBet();
+            quote = new TournamentBetQuote(behavior.GetMaximumBet(), behavior.BetOdd);
+            return true;
         }
-        return true;
-    }
-    private static int GetTournamentWins(List<KeyValuePair<Hero, int>> leaderboard, Hero hero)
-    {
-        if (hero == null)
-            return 0;
-        for (int i = 0; i < leaderboard.Count; i++)
+        finally
         {
-            if (leaderboard[i].Key == hero)
-                return leaderboard[i].Value;
+            Game.Current.PlayerTroop = previousPlayerTroop;
         }
-        return 0;
     }
 }

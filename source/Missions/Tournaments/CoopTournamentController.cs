@@ -9,6 +9,7 @@ using GameInterface.Services.Tournaments.Messages;
 using LiteNetLib;
 using Missions.Data;
 using Missions.Agents;
+using Missions.Agents.Patches;
 using Missions.Battles;
 using Missions.Messages;
 using Missions.Tournaments.Messages;
@@ -29,6 +30,7 @@ namespace Missions.Tournaments;
 
 public class CoopTournamentController : CoopMissionController
 {
+    private const int MaximumPendingTournamentPackets = 256;
     private static readonly ILogger Logger = LogManager.GetLogger<CoopTournamentController>();
     private readonly INetwork relayNetwork;
     private readonly INetworkWorldItemRegistry worldItemRegistry;
@@ -56,9 +58,12 @@ public class CoopTournamentController : CoopMissionController
     private bool leaveRequested;
     private long leaveRequestRevision = -1;
     private readonly TournamentMessageSequenceLedger receivedDamageSequences = new();
+    private readonly TournamentMessageSequenceLedger appliedDamageSequences = new();
     private readonly TournamentMessageSequenceLedger receivedKnockoutSequences = new();
     private readonly TournamentMessageSequenceLedger receivedRuntimeSequences = new();
     private readonly System.Collections.Generic.HashSet<Guid> applyingDamage = new();
+    private readonly List<NetworkTournamentAgentKnockedOut> pendingKnockouts = new();
+    private readonly List<IEvent> pendingTournamentPackets = new();
     private long damageSequence;
     private long knockoutSequence;
     private long runtimeSequence;
@@ -121,6 +126,7 @@ public class CoopTournamentController : CoopMissionController
         coopMissionComponent.AgentRegistry.Clear();
         relayNetwork.SendAll(new NetworkMissionEntered(session.OwnControllerId, initialSnapshot.MissionInstanceId));
         relayNetwork.SendAll(new NetworkTournamentMissionEntered(initialSnapshot.SessionId, initialSnapshot.Revision));
+        DrainPendingTournamentPackets();
     }
 
     private void Handle_SessionUpdated(MessagePayload<TournamentSessionUpdated> payload)
@@ -161,6 +167,7 @@ public class CoopTournamentController : CoopMissionController
         if (updated.CurrentMatchId != previousMatchId)
             ResetMatchRuntimeState();
         TryStartHostMatch();
+        DrainPendingTournamentPackets();
     }
 
     private void ResetSubmittedState(TournamentSessionSnapshot updated, string previousMatchId)
@@ -200,8 +207,11 @@ public class CoopTournamentController : CoopMissionController
         pendingApplyManifest = null;
         pendingResult = null;
         receivedDamageSequences.Clear();
+        appliedDamageSequences.Clear();
         receivedKnockoutSequences.Clear();
         receivedRuntimeSequences.Clear();
+        pendingKnockouts.Clear();
+        RemovePendingTournamentPacketsForOtherMatches();
         damageSequence = 0;
         knockoutSequence = 0;
         runtimeSequence = 0;
@@ -345,6 +355,7 @@ public class CoopTournamentController : CoopMissionController
         RefreshNativeFightState();
         if (latestRuntimeState?.MatchId == manifest.MatchId)
             ApplyRuntimeState(latestRuntimeState);
+        DrainPendingTournamentPackets();
         if (session.IsLocalHost && startedMatchId == manifest.MatchId)
         {
             Mission.Current.AllowAiTicking = true;
@@ -355,13 +366,8 @@ public class CoopTournamentController : CoopMissionController
     private void Handle_RuntimeState(MessagePayload<NetworkTournamentRuntimeState> payload)
     {
         NetworkTournamentRuntimeState state = payload.What;
-        if (state == null || snapshot == null || state.SessionId != snapshot.SessionId) return;
-        if (state.MatchId != snapshot.CurrentMatchId || state.Revision > snapshot.Revision) return;
-        if (state.OriginControllerId != session.HostControllerId) return;
-        if (!receivedRuntimeSequences.TryAccept(state.OriginControllerId, state.Sequence)) return;
-
-        latestRuntimeState = state;
-        GameThread.RunSafe(() => ApplyRuntimeState(state));
+        if (state == null) return;
+        GameThread.RunSafe(() => QueueOrApplyTournamentPacket(state));
     }
 
     public bool InterceptBlow(Agent victim, Blow blow, AttackCollisionData collisionData)
@@ -409,13 +415,8 @@ public class CoopTournamentController : CoopMissionController
     private void Handle_ApplyTournamentDamage(MessagePayload<NetworkApplyTournamentDamage> payload)
     {
         NetworkApplyTournamentDamage message = payload.What;
-        if (snapshot == null || message.SessionId != snapshot.SessionId) return;
-        if (message.MatchId != snapshot.CurrentMatchId || message.Revision > snapshot.Revision) return;
-        if (string.IsNullOrEmpty(message.OriginControllerId)) return;
-
-        if (!receivedDamageSequences.TryAccept(message.OriginControllerId, message.Sequence)) return;
-
-        GameThread.RunSafe(() => ApplyTournamentDamage(message));
+        if (message == null) return;
+        GameThread.RunSafe(() => QueueOrApplyTournamentPacket(message));
     }
 
     private void ApplyTournamentDamage(NetworkApplyTournamentDamage message)
@@ -452,13 +453,16 @@ public class CoopTournamentController : CoopMissionController
         activeDamageMessage = message;
         try
         {
-            victim.RegisterBlow(blow, in collisionData);
+            RegisterBlowPatch.RunOriginalRegisterBlow(victim, blow, collisionData);
         }
         finally
         {
             activeDamageMessage = previousDamageMessage;
             applyingDamage.Remove(message.VictimAgentId);
         }
+
+        appliedDamageSequences.TryAccept(message.OriginControllerId, message.Sequence);
+        ApplyPendingKnockouts();
     }
 
     private void CaptureHitProgression(
@@ -591,6 +595,8 @@ public class CoopTournamentController : CoopMissionController
 
         if (authority == session.OwnControllerId)
         {
+            NetworkApplyTournamentDamage damage = activeDamageMessage?.VictimAgentId == agentId
+                ? activeDamageMessage : null;
             long sequence = ++knockoutSequence;
             var message = new NetworkTournamentAgentKnockedOut(
                 snapshot.SessionId,
@@ -598,7 +604,9 @@ public class CoopTournamentController : CoopMissionController
                 snapshot.Revision,
                 session.OwnControllerId,
                 sequence,
-                agentId);
+                agentId,
+                damage?.OriginControllerId,
+                damage?.Sequence ?? 0);
             receivedKnockoutSequences.TryAccept(session.OwnControllerId, sequence);
             network.SendAll(message);
             RemoveOwnedKnockoutRegistration(agentId);
@@ -620,13 +628,8 @@ public class CoopTournamentController : CoopMissionController
     private void Handle_AgentKnockedOut(MessagePayload<NetworkTournamentAgentKnockedOut> payload)
     {
         NetworkTournamentAgentKnockedOut message = payload.What;
-        if (snapshot == null || message.SessionId != snapshot.SessionId) return;
-        if (message.MatchId != snapshot.CurrentMatchId || message.Revision > snapshot.Revision) return;
-        if (string.IsNullOrEmpty(message.OriginControllerId)) return;
-
-        if (!receivedKnockoutSequences.TryAccept(message.OriginControllerId, message.Sequence)) return;
-
-        GameThread.RunSafe(() => ApplyKnockout(message));
+        if (message == null) return;
+        GameThread.RunSafe(() => QueueOrApplyTournamentPacket(message));
     }
 
     private void ApplyKnockout(NetworkTournamentAgentKnockedOut message)
@@ -635,7 +638,17 @@ public class CoopTournamentController : CoopMissionController
             .FirstOrDefault(record => record.AgentId == message.AgentId);
         if (data == null || data.ControllerId != message.OriginControllerId) return;
         if (data.ControllerId == session.OwnControllerId) return;
+        if (ShouldDeferKnockout(message))
+        {
+            pendingKnockouts.Add(message);
+            return;
+        }
 
+        ApplyKnockout(message, data);
+    }
+
+    private void ApplyKnockout(NetworkTournamentAgentKnockedOut message, TournamentAgentSpawnData data)
+    {
         var registry = coopMissionComponent.AgentRegistry;
         Agent agent;
         if (registry.TryGetAgentInfo(message.AgentId, out var info))
@@ -674,6 +687,241 @@ public class CoopTournamentController : CoopMissionController
 
         if (session.IsLocalHost)
             PublishRuntimeState();
+    }
+
+    private bool ShouldDeferKnockout(NetworkTournamentAgentKnockedOut message) =>
+        session.IsLocalHost &&
+        !string.IsNullOrEmpty(message.DamageOriginControllerId) &&
+        message.DamageSequence > 0 &&
+        !appliedDamageSequences.HasReached(message.DamageOriginControllerId, message.DamageSequence);
+
+    private void ApplyPendingKnockouts()
+    {
+        if (!session.IsLocalHost || pendingKnockouts.Count == 0) return;
+        for (int index = pendingKnockouts.Count - 1; index >= 0; index--)
+        {
+            NetworkTournamentAgentKnockedOut message = pendingKnockouts[index];
+            if (ShouldDeferKnockout(message)) continue;
+            pendingKnockouts.RemoveAt(index);
+            ApplyKnockout(message);
+        }
+    }
+
+    private void QueueOrApplyTournamentPacket(IEvent packet)
+    {
+        if (ShouldRetryTournamentPacket(packet))
+            BufferTournamentPacket(packet);
+        else
+            pendingTournamentPackets.RemoveAll(candidate => IsSameTournamentPacket(candidate, packet));
+    }
+
+    private void DrainPendingTournamentPackets()
+    {
+        if (pendingTournamentPackets.Count == 0) return;
+
+        IEvent[] pending = pendingTournamentPackets.ToArray();
+        pendingTournamentPackets.Clear();
+        foreach (IEvent packet in pending)
+            if (ShouldRetryTournamentPacket(packet))
+                BufferTournamentPacket(packet);
+    }
+
+    private bool ShouldRetryTournamentPacket(IEvent packet)
+    {
+        return packet switch
+        {
+            NetworkApplyTournamentDamage damage => ShouldRetryDamage(damage),
+            NetworkTournamentRuntimeState runtime => ShouldRetryRuntimeState(runtime),
+            NetworkTournamentAgentKnockedOut knockout => ShouldRetryKnockout(knockout),
+            _ => false
+        };
+    }
+
+    private bool ShouldRetryDamage(NetworkApplyTournamentDamage message)
+    {
+        if (string.IsNullOrEmpty(message.OriginControllerId) || message.VictimAgentId == Guid.Empty)
+            return false;
+
+        TournamentPacketState state = GetTournamentPacketState(
+            message.SessionId,
+            message.MatchId,
+            message.Revision);
+        if (state != TournamentPacketState.Ready)
+            return state == TournamentPacketState.Pending;
+
+        var registry = coopMissionComponent.AgentRegistry;
+        if (!registry.TryGetAgentInfo(message.VictimAgentId, out var victimInfo)) return true;
+        CoopAgentInfo attackerInfo = null;
+        if (message.AttackerAgentId != Guid.Empty &&
+            !registry.TryGetAgentInfo(message.AttackerAgentId, out attackerInfo)) return true;
+        if (!TournamentDamageAuthority.IsValidOrigin(
+                message.OriginControllerId,
+                victimInfo.CurrentAuthority,
+                message.AttackerAgentId,
+                attackerInfo?.CurrentAuthority)) return false;
+        if (!receivedDamageSequences.TryAccept(message.OriginControllerId, message.Sequence)) return false;
+
+        ApplyTournamentDamage(message);
+        return false;
+    }
+
+    private bool ShouldRetryRuntimeState(NetworkTournamentRuntimeState state)
+    {
+        if (string.IsNullOrEmpty(state.OriginControllerId)) return false;
+
+        TournamentPacketState packetState = GetTournamentPacketState(
+            state.SessionId,
+            state.MatchId,
+            state.Revision);
+        if (packetState != TournamentPacketState.Ready)
+            return packetState == TournamentPacketState.Pending;
+        if (state.OriginControllerId != session.HostControllerId) return false;
+        if (latestManifest == null || latestManifest.MatchId != state.MatchId) return true;
+        if (!AreRuntimeStateAgentsResolved(state)) return true;
+        if (!receivedRuntimeSequences.TryAccept(state.OriginControllerId, state.Sequence)) return false;
+
+        latestRuntimeState = state;
+        ApplyRuntimeState(state);
+        return false;
+    }
+
+    private bool AreRuntimeStateAgentsResolved(NetworkTournamentRuntimeState state)
+    {
+        foreach (Guid agentId in TournamentRuntimeStateRules.GetAgents(state).Keys)
+        {
+            bool belongsToManifest = latestManifest.Agents.Any(data =>
+                data.AgentId == agentId || data.MountAgentId == agentId);
+            if (!belongsToManifest ||
+                !TournamentRuntimeAuthority.ShouldApplyHostAggregate(
+                    agentId,
+                    latestManifest,
+                    snapshot,
+                    session.OwnControllerId)) continue;
+            if (!coopMissionComponent.AgentRegistry.TryGetAgentInfo(agentId, out _)) return false;
+        }
+        return true;
+    }
+
+    private bool ShouldRetryKnockout(NetworkTournamentAgentKnockedOut message)
+    {
+        if (string.IsNullOrEmpty(message.OriginControllerId) || message.AgentId == Guid.Empty)
+            return false;
+
+        TournamentPacketState state = GetTournamentPacketState(
+            message.SessionId,
+            message.MatchId,
+            message.Revision);
+        if (state != TournamentPacketState.Ready)
+            return state == TournamentPacketState.Pending;
+        if (latestManifest == null || latestManifest.MatchId != message.MatchId) return true;
+
+        TournamentAgentSpawnData data = latestManifest.Agents
+            .FirstOrDefault(record => record.AgentId == message.AgentId);
+        if (data == null || data.ControllerId != message.OriginControllerId) return false;
+        if (data.ControllerId == session.OwnControllerId) return false;
+        if (!coopMissionComponent.AgentRegistry.TryGetAgentInfo(message.AgentId, out _) &&
+            !manifestAgentInstances.ContainsKey(message.AgentId)) return true;
+        if (!receivedKnockoutSequences.TryAccept(message.OriginControllerId, message.Sequence)) return false;
+
+        ApplyKnockout(message);
+        return false;
+    }
+
+    private TournamentPacketState GetTournamentPacketState(
+        string sessionId,
+        string matchId,
+        long revision)
+    {
+        if (string.IsNullOrEmpty(sessionId) || string.IsNullOrEmpty(matchId))
+            return TournamentPacketState.Rejected;
+        if (snapshot == null) return TournamentPacketState.Pending;
+        if (sessionId != snapshot.SessionId) return TournamentPacketState.Rejected;
+        if (revision > snapshot.Revision) return TournamentPacketState.Pending;
+        if (matchId != snapshot.CurrentMatchId) return TournamentPacketState.Rejected;
+        return TournamentPacketState.Ready;
+    }
+
+    private void BufferTournamentPacket(IEvent packet)
+    {
+        if (pendingTournamentPackets.Any(candidate => IsSameTournamentPacket(candidate, packet))) return;
+        if (pendingTournamentPackets.Count >= MaximumPendingTournamentPackets)
+        {
+            pendingTournamentPackets.RemoveAt(0);
+            Logger.Warning(
+                "[Tournament] Dropping the oldest pending tournament packet after reaching the {Maximum} packet limit",
+                MaximumPendingTournamentPackets);
+        }
+        pendingTournamentPackets.Add(packet);
+    }
+
+    private void RemovePendingTournamentPacketsForOtherMatches()
+    {
+        if (snapshot == null)
+        {
+            pendingTournamentPackets.Clear();
+            return;
+        }
+
+        pendingTournamentPackets.RemoveAll(packet =>
+            !TryGetTournamentPacketIdentity(packet, out string sessionId, out string matchId, out _, out _) ||
+            sessionId != snapshot.SessionId ||
+            matchId != snapshot.CurrentMatchId);
+    }
+
+    private static bool IsSameTournamentPacket(IEvent first, IEvent second)
+    {
+        if (first?.GetType() != second?.GetType()) return false;
+        return TryGetTournamentPacketIdentity(first, out string firstSession, out string firstMatch,
+                out string firstOrigin, out long firstSequence) &&
+            TryGetTournamentPacketIdentity(second, out string secondSession, out string secondMatch,
+                out string secondOrigin, out long secondSequence) &&
+            firstSession == secondSession &&
+            firstMatch == secondMatch &&
+            firstOrigin == secondOrigin &&
+            firstSequence == secondSequence;
+    }
+
+    private static bool TryGetTournamentPacketIdentity(
+        IEvent packet,
+        out string sessionId,
+        out string matchId,
+        out string originControllerId,
+        out long sequence)
+    {
+        switch (packet)
+        {
+            case NetworkApplyTournamentDamage damage:
+                sessionId = damage.SessionId;
+                matchId = damage.MatchId;
+                originControllerId = damage.OriginControllerId;
+                sequence = damage.Sequence;
+                return true;
+            case NetworkTournamentRuntimeState runtime:
+                sessionId = runtime.SessionId;
+                matchId = runtime.MatchId;
+                originControllerId = runtime.OriginControllerId;
+                sequence = runtime.Sequence;
+                return true;
+            case NetworkTournamentAgentKnockedOut knockout:
+                sessionId = knockout.SessionId;
+                matchId = knockout.MatchId;
+                originControllerId = knockout.OriginControllerId;
+                sequence = knockout.Sequence;
+                return true;
+            default:
+                sessionId = null;
+                matchId = null;
+                originControllerId = null;
+                sequence = 0;
+                return false;
+        }
+    }
+
+    private enum TournamentPacketState
+    {
+        Ready,
+        Pending,
+        Rejected
     }
 
     protected override void SendJoinInfo(string controllerId)
@@ -1366,7 +1614,10 @@ public class CoopTournamentController : CoopMissionController
 
         coopMissionComponent.AgentMovementHandler.Interpolator.Forget(agent);
         if (agent.MountAgent != null)
+        {
             coopMissionComponent.AgentMovementHandler.Interpolator.Forget(agent.MountAgent);
+            agent.MountAgent.Controller = AgentControllerType.AI;
+        }
         agent.Controller = AgentControllerType.AI;
         AgentAiWaker.Wake(agent);
     }
@@ -1577,6 +1828,10 @@ public class CoopTournamentController : CoopMissionController
         matchLifecycle.Dispose();
         manifestAgentData.Clear();
         manifestAgentInstances.Clear();
+        pendingKnockouts.Clear();
+        pendingTournamentPackets.Clear();
+        receivedDamageSequences.Clear();
+        appliedDamageSequences.Clear();
         pendingApplyManifest = null;
         missionReadyForManifest = false;
         agentSpawner.Reset();

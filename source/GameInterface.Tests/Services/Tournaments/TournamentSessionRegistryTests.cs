@@ -343,24 +343,6 @@ public class TournamentSessionRegistryTests
     }
 
     [Fact]
-    public void MissionAdmission_RequiresExactActiveSessionAndEnrolledController()
-    {
-        var registry = new TournamentSessionRegistry();
-        TournamentSessionSnapshot snapshot = CreateStartedSession(registry, humanInMatch: true);
-
-        Assert.True(registry.CanEnterMission(snapshot.MissionInstanceId, "player-1"));
-        Assert.False(registry.CanEnterMission(snapshot.MissionInstanceId, "outsider"));
-        Assert.False(registry.CanEnterMission("another-instance", "player-1"));
-
-        Assert.Equal(TournamentMutationStatus.Applied, registry.TryRequestSpectate(
-            snapshot.SessionId,
-            snapshot.Revision,
-            "spectator",
-            out snapshot));
-        Assert.True(registry.CanEnterMission(snapshot.MissionInstanceId, "spectator"));
-    }
-
-    [Fact]
     public void SpawnManifest_RejectsSessionOrBracketRevisionMismatch()
     {
         var registry = new TournamentSessionRegistry();
@@ -603,19 +585,6 @@ public class TournamentSessionRegistryTests
         Assert.Equal("session-2", second.SessionId);
         Assert.True(registry.TryGetByTown("town-1", out var current));
         Assert.Equal(second.SessionId, current.SessionId);
-    }
-
-    [Fact]
-    public void HasActiveSessions_DoesNotPersistPreparationButBlocksStartedTournamentSave()
-    {
-        var registry = new TournamentSessionRegistry();
-        TournamentSessionSnapshot preparation = CreateSession(registry, "session-1", "town-1");
-        Assert.False(registry.HasActiveSessions);
-
-        registry.Remove(preparation.SessionId);
-        CreateStartedSession(registry, humanInMatch: true);
-
-        Assert.True(registry.HasActiveSessions);
     }
 
     private static TournamentSessionSnapshot CreateSession(

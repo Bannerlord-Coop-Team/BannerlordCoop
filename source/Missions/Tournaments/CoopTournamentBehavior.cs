@@ -37,7 +37,6 @@ public class CoopTournamentBehavior : TournamentBehavior
     public override void AfterStart()
     {
         bracketHydrator.Apply(this, snapshot);
-        CalculateBet();
     }
 
     public override void OnMissionTick(float dt)
@@ -73,9 +72,6 @@ public class CoopTournamentBehavior : TournamentBehavior
             updated);
         snapshot = updated;
         if (refreshBracket)
-        {
             bracketHydrator.Apply(this, updated);
-            CalculateBet();
-        }
     }
 }

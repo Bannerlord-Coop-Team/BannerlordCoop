@@ -545,7 +545,7 @@ internal sealed class CoopTournamentVM : TournamentVM
         Tournament.OverallExpectedDenars = acceptedBetSummary.ExpectedPayout;
         _thisRoundBettedAmount = acceptedBetSummary.ThisRoundBettedDenars;
         MaximumBetValue = GetRemainingBetValue(
-            Tournament.GetMaximumBet(),
+            RefreshBetQuote(),
             _thisRoundBettedAmount,
             Tournament.PlayerDenars);
         WageredDenars = 0;
@@ -646,10 +646,12 @@ internal sealed class CoopTournamentVM : TournamentVM
     }
     private void RefreshCoopState()
     {
-        bool hasRemainingBet = snapshot != null && GetRemainingBetValue(
-            Tournament.GetMaximumBet(),
+        int maximumBet = RefreshBetQuote();
+        MaximumBetValue = GetRemainingBetValue(
+            maximumBet,
             _thisRoundBettedAmount,
-            Tournament.PlayerDenars) > 0;
+            Tournament.PlayerDenars);
+        bool hasRemainingBet = snapshot != null && MaximumBetValue > 0;
         UIState state = CalculateUIState(snapshot, controller.LocalControllerId, hasRemainingBet);
 
         CanJoin = state.CanJoin;
@@ -673,6 +675,25 @@ internal sealed class CoopTournamentVM : TournamentVM
         SelectedChoiceText = GetSelectedChoiceText(state.SelectedChoice);
 
         OnPropertyChanged(nameof(IsBetButtonEnabled));
+    }
+
+    private int RefreshBetQuote()
+    {
+        if (!controller.TryGetBetQuote(snapshot, out var quote))
+            return Tournament.GetMaximumBet();
+
+        Tournament.BetOdd = quote.Odd;
+        ExpectedBetDenars = TournamentBettingMath.CalculateExpectedPayout(
+            WageredDenars,
+            quote.Odd);
+        GameTexts.SetVariable(
+            "NORMALIZED_EXPECTED_GOLD",
+            TournamentBettingMath.CalculateExpectedPayout(100, quote.Odd));
+        GameTexts.SetVariable(
+            "GOLD_ICON",
+            "{=!}<img src=\"General\\Icons\\Coin@2x\" extend=\"6\">");
+        BetOddsText = GameTexts.FindText("str_tournament_bet_odd").ToString();
+        return quote.MaximumBet;
     }
 
     private static string GetSelectedChoiceText(TournamentPlayerChoice choice)

@@ -5,33 +5,15 @@ namespace GameInterface.Tests.Services.Tournaments;
 
 public class TournamentBettingMathTests
 {
-    [Fact]
-    public void CalculateOdd_UsesCurrentOpponentsAndHalfPowerFromOtherMatches()
-    {
-        float odd = TournamentBettingMath.CalculateOdd(
-            heroPower: 40f,
-            playerTeamPower: 20f,
-            currentMatchOpponentPower: 60f,
-            totalRoundPower: 100f);
-
-        Assert.Equal(1.2f, odd);
-    }
-
     [Theory]
-    [InlineData(100f, 0f, 1f, 1f, 1.1f)]
-    [InlineData(1f, 0f, 100f, 100f, 4f)]
-    public void CalculateOdd_ClampsToNativeBounds(
-        float heroPower,
-        float playerTeamPower,
-        float opponentPower,
-        float totalPower,
-        float expected)
+    [InlineData(150, 4f, 600)]
+    [InlineData(150, 1.1f, 165)]
+    public void CalculateExpectedPayout_MatchesNativeTournamentBehavior(
+        int stake,
+        float odd,
+        int expected)
     {
-        Assert.Equal(expected, TournamentBettingMath.CalculateOdd(
-            heroPower,
-            playerTeamPower,
-            opponentPower,
-            totalPower));
+        Assert.Equal(expected, TournamentBettingMath.CalculateExpectedPayout(stake, odd));
     }
 
     [Theory]

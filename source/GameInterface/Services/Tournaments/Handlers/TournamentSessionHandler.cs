@@ -1126,6 +1126,7 @@ internal sealed partial class TournamentSessionHandler : IHandler
         try
         {
             RunFinalizationTransactions(snapshot, transaction);
+            RemoveCompletedTransaction(completionTransactions, snapshot.SessionId, transaction);
             Logger.Information(
                 "[Tournament] Finalized completed tournament session={SessionId}; ejecting all mission members",
                 snapshot.SessionId);
@@ -1138,6 +1139,17 @@ internal sealed partial class TournamentSessionHandler : IHandler
         {
             completionInProgress.Remove(snapshot.SessionId);
         }
+    }
+
+    internal static bool RemoveCompletedTransaction(
+        Dictionary<string, TournamentCompletionTransaction> completionTransactions,
+        string sessionId,
+        TournamentCompletionTransaction transaction)
+    {
+        return transaction?.IsCompleted == true &&
+            completionTransactions.TryGetValue(sessionId, out var current) &&
+            ReferenceEquals(current, transaction) &&
+            completionTransactions.Remove(sessionId);
     }
 
     private bool TryBeginFinalization(

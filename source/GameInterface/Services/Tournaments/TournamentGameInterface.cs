@@ -137,8 +137,7 @@ public sealed partial class TournamentGameInterface : ITournamentGameInterface
         out TournamentSessionSeed seed)
     {
         seed = null;
-        var identity = new TournamentSessionIdentity();
-        if (!objectManager.AddNewObject(identity, out var sessionId))
+        if (!TryCreateSessionId(objectManager, out var sessionId))
             return false;
         if (!TryCreateFrozenContestants(sortedCharacters, sessionId, out var contestants))
             return false;
@@ -153,6 +152,16 @@ public sealed partial class TournamentGameInterface : ITournamentGameInterface
             contestants);
         return true;
     }
+
+    internal static bool TryCreateSessionId(IObjectManager objectManager, out string sessionId)
+    {
+        var identity = new TournamentSessionIdentity();
+        if (!objectManager.AddNewObject(identity, out sessionId))
+            return false;
+
+        return objectManager.Remove(identity);
+    }
+
     private bool TryCreateFrozenRoster(
         Town town,
         FightTournamentGame tournamentGame,

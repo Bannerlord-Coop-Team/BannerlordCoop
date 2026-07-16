@@ -17,19 +17,9 @@ internal sealed partial class TournamentSessionHandler
         ledger.MatchAmounts.TryGetValue(request.MatchId, out var currentBet);
         if (TryReplayBetResponse(peer, request, ledger))
             return;
-        if (!IsBettingOpen(request, player, snapshot, out var hero, out var slot))
-        {
-            RecordAndSendBetResult(
-                peer,
-                ledger,
-                request,
-                snapshot.Revision,
-                false,
-                "Betting is closed",
-                currentBet);
-            return;
-        }
-        if (!tournamentGameInterface.TryGetBetQuote(snapshot, hero, slot.SlotId, out var quote))
+        if (!TryResolvePlayer(player, out var hero, out _) ||
+            !TryGetPlayerSlot(snapshot, player.ControllerId, out var slot) ||
+            !tournamentGameInterface.TryGetBetQuote(snapshot, hero, slot.SlotId, out var quote))
         {
             RecordAndSendBetResult(
                 peer,
@@ -61,7 +51,9 @@ internal sealed partial class TournamentSessionHandler
         GiveGoldAction.ApplyBetweenCharacters(hero, null, request.Amount, true);
         currentBet += request.Amount;
         ledger.MatchAmounts[request.MatchId] = currentBet;
-        ledger.ExpectedPayout += (int)(request.Amount * quote.Odd);
+        ledger.ExpectedPayout += TournamentBettingMath.CalculateExpectedPayout(
+            request.Amount,
+            quote.Odd);
         ledger.TotalBettedDenars += request.Amount;
         RecordAndSendBetResult(
             peer,
@@ -135,24 +127,6 @@ internal sealed partial class TournamentSessionHandler
         return true;
     }
 
-    private bool IsBettingOpen(
-        NetworkRequestTournamentBet request,
-        Player player,
-        TournamentSessionSnapshot snapshot,
-        out TaleWorlds.CampaignSystem.Hero hero,
-        out TournamentContestantData slot)
-    {
-        hero = null;
-        slot = null;
-        return request.Sequence > 0 &&
-            IsConfirmedEntrant(snapshot, player.ControllerId) &&
-            snapshot.Revision == request.ExpectedRevision &&
-            snapshot.Phase == TournamentSessionPhase.AwaitingChoices &&
-            snapshot.CurrentMatchId == request.MatchId &&
-            TryResolvePlayer(player, out hero, out _) &&
-            TryGetPlayerSlot(snapshot, player.ControllerId, out slot) &&
-            IsSlotInCurrentMatch(snapshot, slot.SlotId);
-    }
     private void RecordAndSendBetResult(
         NetPeer peer,
         BetLedgerEntry ledger,
