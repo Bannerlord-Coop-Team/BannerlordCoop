@@ -4,6 +4,7 @@ using Common.Messaging;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
+using Missions.Data;
 using GameInterface.Services.Players;
 using Missions.Messages;
 using Serilog;
@@ -168,6 +169,8 @@ public class PuppetSpawner : IPuppetSpawner
 
         var origin = new CoopAgentOrigin(character, party, -1, null, new UniqueTroopDescriptor(data.TroopSeed));
 
+        var missionEquipment = ResolveMissionEquipment(data.MissionEquipmentData);
+
         var buildData = new AgentBuildData(character);
         buildData.BodyProperties(character.GetBodyPropertiesMax());
         buildData.InitialPosition(data.Position);
@@ -175,7 +178,9 @@ public class PuppetSpawner : IPuppetSpawner
         buildData.InitialDirection(Vec2.Forward);
         buildData.Equipment(data.SpawnEquipment); // Use calculated equipment from spawning client instead of character equipment (random per troop per client)
         buildData.BodyProperties(data.BodyProperties);
+        buildData.Banner(data.Banner);
         buildData.TroopOrigin(origin);
+        buildData.MissionEquipment(missionEquipment);
         buildData.Controller(isOwnHero ? AgentControllerType.Player
             : isOwnAgent ? AgentControllerType.AI
             : AgentControllerType.None);
@@ -411,5 +416,33 @@ public class PuppetSpawner : IPuppetSpawner
 
         // No separate ally team on our side yet (only our own party present) — fall back to the main team.
         return mainTeam;
+    }
+
+    private MissionEquipment ResolveMissionEquipment(MissionEquipmentData data)
+    {
+        var missionEquipment = new MissionEquipment();
+        for (EquipmentIndex equipmentIndex = EquipmentIndex.WeaponItemBeginSlot; equipmentIndex < EquipmentIndex.NumAllWeaponSlots; equipmentIndex++)
+        {
+            missionEquipment._weaponSlots[(int)equipmentIndex] = ResolveMissionWeapon(data.WeaponSlots[(int)equipmentIndex]);
+        }
+        return missionEquipment;
+    }
+
+    private MissionWeapon ResolveMissionWeapon(MissionWeaponData data)
+    {
+        // Items can be null
+        objectManager.TryGetObject<ItemObject>(data.ItemObjectId, out var item);
+
+        var missionWeapon = new MissionWeapon(item, data.ItemModifier, data.Banner, data.DataValue, data.ReloadPhase, ResolveMissionSubWeapon(data.AmmoWeaponData)?.Value);
+        return missionWeapon;
+    }
+
+    private MissionWeapon.MissionSubWeapon ResolveMissionSubWeapon(MissionSubWeaponData data)
+    {
+        MissionWeapon.MissionSubWeapon missionSubWeapon = null;
+        if (data == null) return missionSubWeapon;
+
+        missionSubWeapon = new MissionWeapon.MissionSubWeapon(ResolveMissionWeapon(data.Value));
+        return missionSubWeapon;
     }
 }

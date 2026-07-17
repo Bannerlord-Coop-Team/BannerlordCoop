@@ -1,8 +1,10 @@
 using Common.Messaging;
+using Missions.Data;
 using ProtoBuf;
 using System;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
 
 namespace Missions.Messages;
 
@@ -51,14 +53,18 @@ public class BattleAgentSpawnData
     public readonly Equipment SpawnEquipment;
     [ProtoMember(11)]
     public readonly BodyProperties BodyProperties;
+    [ProtoMember(12)]
+    public readonly Banner Banner;
+    [ProtoMember(13)]
+    public readonly MissionEquipmentData MissionEquipmentData;
     // Network id of this agent's MOUNT (Guid.Empty when unmounted). The engine spawns the horse implicitly
     // with the rider (from its equipment) on every client; carrying the owner's id for it lets the receiver
     // register its puppet's horse under the SAME identity, so mount hits/deaths sync by the horse's own id.
-    [ProtoMember(12)]
+    [ProtoMember(14)]
     public readonly Guid MountAgentId;
     // The formation slot (a FormationClass cast to int, -1 for none) the owner placed this agent in, so a puppet
     // mirrors the owner's actual deployment split instead of a default troop-class grouping.
-    [ProtoMember(13)]
+    [ProtoMember(15)]
     public readonly int FormationIndex;
 
     public BattleAgentSpawnData(
@@ -72,6 +78,8 @@ public class BattleAgentSpawnData
         int troopSeed,
         Equipment spawnEquipment,
         BodyProperties bodyProperties,
+        Banner banner,
+        MissionEquipmentData missionEquipmentData,
         Guid mountAgentId = default,
         int formationIndex = -1)
     {
@@ -85,6 +93,8 @@ public class BattleAgentSpawnData
         TroopSeed = troopSeed;
         SpawnEquipment = spawnEquipment;
         BodyProperties = bodyProperties;
+        Banner = banner;
+        MissionEquipmentData = missionEquipmentData;
         MountAgentId = mountAgentId;
         FormationIndex = formationIndex;
     }
