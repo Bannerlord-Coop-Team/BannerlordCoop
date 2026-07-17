@@ -31,8 +31,14 @@ public interface IModuleValidator
 /// <inheritdoc href="IModuleValidator" />
 public class ModuleValidator : IModuleValidator
 {
+    private const string StoryModeModuleId = "StoryMode";
+
     public bool Validate(IEnumerable<ModuleInfo> serverModules, IEnumerable<ModuleInfo> clientModules, out string error)
     {
+        // StoryMode is disabled when Sandbox starts, after clients report their main-menu module list.
+        serverModules = serverModules.Where(ShouldValidateModule).ToList();
+        clientModules = clientModules.Where(ShouldValidateModule).ToList();
+
         if (!ValidateGameVersion(serverModules, clientModules, out error))
         {
             return false;
@@ -74,6 +80,11 @@ public class ModuleValidator : IModuleValidator
 
         error = null;
         return true;
+    }
+
+    private static bool ShouldValidateModule(ModuleInfo module)
+    {
+        return !string.Equals(module.Id, StoryModeModuleId, StringComparison.OrdinalIgnoreCase);
     }
 
     public bool ValidateNoDlc(IEnumerable<ModuleInfo> modules, out string error)
