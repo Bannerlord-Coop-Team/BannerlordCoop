@@ -3,6 +3,8 @@ using Common.Network.Session;
 using GameInterface;
 using GameInterface.Services.Locations;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.Tournaments;
+using Missions.Agents;
 using Missions.Agents.Handlers;
 using Missions.Agents.Patches;
 using Missions.Agents.Voice;
@@ -11,6 +13,8 @@ using Missions.Missiles.Handlers;
 using Missions.Missiles.Patches;
 using Missions.Services.Network;
 using Missions.Taverns;
+using Missions.Tournaments;
+using Missions.Tournaments.Spectators;
 
 namespace Missions;
 
@@ -105,6 +109,18 @@ public class MissionModule : Module
             .As<ICoopSiegeBattleLauncher>()
             .InstancePerLifetimeScope();
 
+        builder.RegisterType<CoopTournamentController>()
+            .AsSelf()
+            .InstancePerDependency();
+
+        builder.RegisterType<TournamentSpectatorAgentManagerFactory>()
+            .As<ITournamentSpectatorAgentManagerFactory>()
+            .InstancePerLifetimeScope();
+
+        builder.RegisterType<CoopTournamentLauncher>()
+            .As<ICoopTournamentLauncher>()
+            .InstancePerLifetimeScope();
+
         // Battle host election: elects on the server, stores the broadcast on clients, AutoActivated so it
         // subscribes up front on both. The assignment store itself (IBattleHostRegistry) is registered by
         // GameInterfaceModule — its handlers gate finalizes/conclusions on it too.
@@ -125,6 +141,7 @@ public class MissionModule : Module
 
         builder.RegisterType<NetworkAgentRegistry>().As<INetworkAgentRegistry>().InstancePerLifetimeScope();
         //builder.RegisterType<NetworkMissileRegistry>().As<INetworkMissileRegistry>().InstancePerDependency();
+        builder.RegisterType<NetworkWorldItemRegistry>().As<INetworkWorldItemRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<MissileHandler>().As<IMissileHandler>().InstancePerDependency();
         builder.RegisterType<AgentMovementHandler>().As<IAgentMovementHandler>().InstancePerDependency();
         builder.RegisterType<AgentActionHandler>().As<IAgentActionHandler>().InstancePerDependency();
