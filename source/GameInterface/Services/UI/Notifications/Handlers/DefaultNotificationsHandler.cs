@@ -993,11 +993,13 @@ internal class DefaultNotificationsHandler : IHandler
     }
     private void OnPartyRemovedFromArmy(DefaultNotificationsCampaignBehavior __instance, MobileParty party, Army army)
     {
-        if (army == MobileParty.MainParty.Army)
+        // MobileParty.MainParty.Army can already be null before this get reached
+        // so check if its the MainParty
+        if (army == MobileParty.MainParty.Army || party == MobileParty.MainParty) 
         {
             TextObject textObject = new TextObject("{=ApG1xg7O}{PARTY_NAME} has left {ARMY_NAME}.", null);
             textObject.SetTextVariable("PARTY_NAME", party.Name);
-            textObject.SetTextVariable("ARMY_NAME", party.Army?.Name);
+            textObject.SetTextVariable("ARMY_NAME", army.Name);
             InformationManager.DisplayMessage(new InformationMessage(textObject.ToString()));
         }
         if (party == MobileParty.MainParty)

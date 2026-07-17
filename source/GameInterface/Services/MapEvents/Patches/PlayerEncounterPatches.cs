@@ -285,14 +285,6 @@ internal class PlayerEncounterPatches
         if (Campaign.Current?.CurrentMenuContext != null)
             GameMenu.ExitToLast();
     }
-    [HarmonyPatch(typeof(EncounterGameMenuBehavior), "army_encounter_leave_on_consequence")]
-    [HarmonyPrefix]
-    private static bool ArmyEncounterLeavePrefix()
-    {
-        ClearEngageOrder(MobileParty.MainParty);
-        CloseLocalEncounterMenu(MobileParty.MainParty);
-        return false;
-    }
 
     private static bool IsBattleJoiner()
     {

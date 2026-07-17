@@ -1,9 +1,5 @@
 ﻿using Common;
-using Common.Logging;
-using GameInterface.Services.MapEvents.Patches;
 using HarmonyLib;
-using Serilog;
-using System;
 using System.Diagnostics;
 using TaleWorlds.CampaignSystem.Party;
 

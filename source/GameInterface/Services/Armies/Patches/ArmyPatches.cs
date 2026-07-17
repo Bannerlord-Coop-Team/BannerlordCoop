@@ -90,7 +90,6 @@ public class ArmyPatches
         return true;
     }
 
-
     [HarmonyPatch(typeof(Army), nameof(Army.Gather))]
     [HarmonyPrefix]
     public static bool GatherPrefix(Army __instance, Settlement initialHostileSettlement, MBReadOnlyList<MobileParty> partiesToCallToArmy = null)
@@ -174,6 +173,16 @@ public class ArmyPatches
         }
         return false;
     }
+    /// <summary>
+    /// This helps update the army speed
+    /// </summary>
+    [HarmonyPatch(typeof(MobileParty), nameof(MobileParty.AttachedTo), MethodType.Setter)]
+    [HarmonyPostfix]
+    private static void Soasdoasd(MobileParty __instance, MobileParty value)
+    {
+        value?.UpdateVersionNo();
+    }
+
     public static void AddMobilePartyInArmy(MobileParty mobileParty, Army army)
     {
         GameThread.RunSafe(() =>
@@ -196,6 +205,7 @@ public class ArmyPatches
         GameThread.RunSafe(() =>
         {
             if (!army._parties.Contains(mobileParty)) return;
+            army.LeaderParty.UpdateVersionNo();
             mobileParty.Ai.SetInitiative(1f, 1f, 24f);
             army._parties.Remove(mobileParty);
             if (ModInformation.IsServer)

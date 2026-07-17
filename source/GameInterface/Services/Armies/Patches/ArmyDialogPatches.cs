@@ -3,12 +3,15 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.PlayerCaptivityService.Patches;
+using GameInterface.Services.SiegeEvents.Messages;
 using HarmonyLib;
 using Serilog;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 
 /// <summary>
 /// Patch for Joining army through the EncounterGameMenu
@@ -47,8 +50,30 @@ internal class ArmyDialogPatches
         PlayerEncounter.Finish(true);
         if (MobileParty.MainParty.BesiegerCamp != null)
         {
-            MobileParty.MainParty.BesiegerCamp = null; // this will not sync to server/ other clients/ 
+            MessageBroker.Instance.Publish(null, new BreakSiegeAttempted(MobileParty.MainParty));
         }
+        return false;
+    }
+    [HarmonyPatch(typeof(EncounterGameMenuBehavior), nameof(EncounterGameMenuBehavior.leave_army_after_attack_on_consequence))]
+    [HarmonyPrefix]
+    private static bool Prefixleave_army_after_attack_on_consequence(EncounterGameMenuBehavior __instance)
+    {
+        if (PlayerEncounter.Current != null)
+        {
+            PlayerEncounter.Finish(true);
+        }
+        else
+        {
+            GameMenu.ExitToLast();
+        }
+        if (Settlement.CurrentSettlement != null)
+        {
+            LeaveSettlementAction.ApplyForParty(MobileParty.MainParty);
+            PartyBase.MainParty.SetVisualAsDirty();
+        }
+        var message = new MobilePartyInArmyRemoved(MobileParty.MainParty.Army, MobileParty.MainParty, MobileParty.MainParty);
+        MessageBroker.Instance.Publish(__instance, message);
+        ArmyPatches.RemoveMobilePartyInArmy(MobileParty.MainParty, MobileParty.MainParty.Army, MobileParty.MainParty);
         return false;
     }
 }
