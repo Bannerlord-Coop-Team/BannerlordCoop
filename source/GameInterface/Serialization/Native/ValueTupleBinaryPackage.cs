@@ -20,23 +20,23 @@ namespace GameInterface.Serialization.Native
         private Dictionary<string, IBinaryPackage> StoredFields = new Dictionary<string, IBinaryPackage>();
 
         private string ObjectType;
-        protected Type T => ResolveObjectType();
+        protected Type T => SerializedTypeResolver.ResolveType(ObjectType, typeof(ValueTuple<,>));
 
         public ValueTupleBinaryPackage(object kvp, IBinaryPackageFactory binaryPackageFactory)
         {
-            ObjectType = kvp.GetType().AssemblyQualifiedName;
-            var type = ResolveObjectType();
+            ObjectType = SerializedTypeResolver.Encode(kvp.GetType());
+            var type = T;
             Object = kvp;
             this.binaryPackageFactory = binaryPackageFactory;
 
             if (type.GetGenericTypeDefinition() != typeof(ValueTuple<,>)) throw new Exception(
-                $"{ObjectType} is not {typeof(ValueTuple<,>)}");
+                $"{type} is not {typeof(ValueTuple<,>)}");
         }
 
         public void Pack()
         {
             // Iterate through all of the instance fields of the object's type
-            var fields = ResolveObjectType().GetAllInstanceFields().GroupBy(o => o.Name).Select(g => g.First());
+            var fields = T.GetAllInstanceFields().GroupBy(o => o.Name).Select(g => g.First());
             foreach (FieldInfo field in fields)
             {
                 // Get the value of the current field in the object
@@ -49,7 +49,7 @@ namespace GameInterface.Serialization.Native
         public object Unpack(IBinaryPackageFactory binaryPackageFactory)
         {
             if (IsUnpacked) return Object;
-            var type = ResolveObjectType();
+            var type = T;
             this.binaryPackageFactory = binaryPackageFactory;
             
             Object = FormatterServices.GetUninitializedObject(type);
@@ -57,11 +57,6 @@ namespace GameInterface.Serialization.Native
             UnpackInternal();
 
             return Object;
-        }
-
-        private Type ResolveObjectType()
-        {
-            return SerializedTypeResolver.ResolveGenericType(ObjectType, typeof(ValueTuple<,>));
         }
 
         public T Unpack<T>(IBinaryPackageFactory binaryPackageFactory)

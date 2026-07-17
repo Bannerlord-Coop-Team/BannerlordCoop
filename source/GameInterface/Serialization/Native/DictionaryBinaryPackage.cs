@@ -27,7 +27,7 @@ namespace GameInterface.Serialization.Native
         {
             this.binaryPackageFactory = binaryPackageFactory;
             this.enumerable = enumerable;
-            enumerableType = enumerable.GetType().AssemblyQualifiedName;
+            enumerableType = SerializedTypeResolver.Encode(enumerable.GetType());
         }
 
         public void Pack()
@@ -46,7 +46,7 @@ namespace GameInterface.Serialization.Native
             this.binaryPackageFactory = binaryPackageFactory;
 
             var unpackedArray = packages.Select(e => e.Unpack(binaryPackageFactory)).ToArray();
-            var type = SerializedTypeResolver.ResolveDictionaryType(enumerableType);
+            var type = SerializedTypeResolver.ResolveType(enumerableType, typeof(Dictionary<,>));
             var newDict = Activator.CreateInstance(type);
 
             MethodInfo dictAdd = type.GetMethod("Add");

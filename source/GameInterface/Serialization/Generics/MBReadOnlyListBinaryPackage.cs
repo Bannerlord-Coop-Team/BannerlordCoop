@@ -24,17 +24,19 @@ namespace GameInterface.Serialization.Generics
         protected Dictionary<string, IBinaryPackage> StoredFields = new Dictionary<string, IBinaryPackage>();
 
         string ObjectType;
+        private Type ResolvedType => SerializedTypeResolver.ResolveType(
+            ObjectType, typeof(MBReadOnlyList<>), typeof(MBList<>));
 
         public MBReadOnlyListBinaryPackage(object obj, IBinaryPackageFactory binaryPackageFactory)
         {
             BinaryPackageFactory = binaryPackageFactory;
-            ObjectType = obj.GetType().AssemblyQualifiedName;
+            ObjectType = SerializedTypeResolver.Encode(obj.GetType());
             Object = obj;
         }
 
         public void Pack()
         {
-            var type = ResolveObjectType();
+            var type = ResolvedType;
             foreach (FieldInfo field in type.GetAllInstanceFields().GroupBy(o => o.Name).Select(g => g.First()))
             {
                 object obj = field.GetValue(Object);
@@ -49,7 +51,7 @@ namespace GameInterface.Serialization.Generics
             BinaryPackageFactory = binaryPackageFactory;
 
             IsUnpacked = true;
-            var type = ResolveObjectType();
+            var type = ResolvedType;
             Object = FormatterServices.GetUninitializedObject(type);
             var fields = type.GetAllInstanceFields();
 
@@ -70,14 +72,6 @@ namespace GameInterface.Serialization.Generics
             }
 
             return Object;
-        }
-
-        private Type ResolveObjectType()
-        {
-            return SerializedTypeResolver.ResolveGenericType(
-                ObjectType,
-                typeof(MBReadOnlyList<>),
-                typeof(MBList<>));
         }
 
         public T Unpack<T>(IBinaryPackageFactory binaryPackageFactory)

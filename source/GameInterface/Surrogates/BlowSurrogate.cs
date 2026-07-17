@@ -1,4 +1,4 @@
-using Common.Serialization;
+﻿using Common.Serialization;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using ProtoBuf;

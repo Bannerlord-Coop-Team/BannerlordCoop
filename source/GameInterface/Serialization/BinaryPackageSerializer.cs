@@ -7,17 +7,13 @@ using System.Xml;
 
 namespace GameInterface.Serialization;
 
-/// <summary>
-/// Serializes only the closed set of <see cref="IBinaryPackage"/> implementations.
-/// </summary>
 public static class BinaryPackageSerializer
 {
     public const int MaxPayloadBytes = 16 * 1024 * 1024;
     private const int MaxItemsInObjectGraph = 2_000_000;
 
-    private static readonly HashSet<Type> PackageTypes = new HashSet<Type>(typeof(IBinaryPackage)
-        .Assembly
-        .GetTypes()
+    private static readonly HashSet<Type> PackageTypes = new HashSet<Type>(
+        typeof(IBinaryPackage).Assembly.GetTypes()
         .Where(type => typeof(IBinaryPackage).IsAssignableFrom(type) &&
                        !type.IsAbstract &&
                        !type.IsInterface));
@@ -56,16 +52,14 @@ public static class BinaryPackageSerializer
         if (data.Length == 0 || data.Length > MaxPayloadBytes)
             throw new SerializationException("Binary package size was outside the allowed range");
 
-        var quotas = new XmlDictionaryReaderQuotas
+        using var reader = XmlDictionaryReader.CreateBinaryReader(data, new XmlDictionaryReaderQuotas
         {
             MaxArrayLength = MaxPayloadBytes,
             MaxBytesPerRead = 4096,
             MaxDepth = 128,
             MaxNameTableCharCount = 16 * 1024,
             MaxStringContentLength = MaxPayloadBytes,
-        };
-
-        using var reader = XmlDictionaryReader.CreateBinaryReader(data, quotas);
+        });
         object package = CreateSerializer().ReadObject(reader, verifyObjectName: true);
         if (package is IBinaryPackage == false || PackageTypes.Contains(package.GetType()) == false)
             throw new SerializationException("Binary package root type was not allowed");
@@ -73,13 +67,11 @@ public static class BinaryPackageSerializer
         return package;
     }
 
-    private static DataContractSerializer CreateSerializer()
-    {
-        return new DataContractSerializer(typeof(IBinaryPackage), new DataContractSerializerSettings
+    private static DataContractSerializer CreateSerializer() =>
+        new DataContractSerializer(typeof(IBinaryPackage), new DataContractSerializerSettings
         {
             KnownTypes = PackageTypes,
             MaxItemsInObjectGraph = MaxItemsInObjectGraph,
             PreserveObjectReferences = true,
         });
-    }
 }

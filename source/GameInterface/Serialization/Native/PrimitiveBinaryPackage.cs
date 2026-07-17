@@ -10,32 +10,30 @@ namespace GameInterface.Serialization.Native
         [NonSerialized]
         private object Object;
 
-        private string TypeName;
+        private string TypeDescriptor;
         private string Value;
         private string ExtraValue;
 
         public PrimitiveBinaryPackage(object @object)
         {
             if (@object == null) throw new ArgumentNullException(nameof(@object));
-            if (IsSupported(@object.GetType()) == false)
+            if (!IsSupported(@object.GetType()))
                 throw new SerializationException($"Primitive type {@object.GetType().FullName} is not allowed");
 
             Object = @object;
-            TypeName = @object.GetType().AssemblyQualifiedName;
+            TypeDescriptor = SerializedTypeResolver.Encode(@object.GetType());
             Value = Encode(@object);
         }
 
         public static bool IsSupported(Type type)
         {
             if (type == null) return false;
-            return type.IsEnum || type == typeof(bool) || type == typeof(byte) ||
-                   type == typeof(sbyte) || type == typeof(short) || type == typeof(ushort) ||
-                   type == typeof(int) || type == typeof(uint) || type == typeof(long) ||
-                   type == typeof(ulong) || type == typeof(float) || type == typeof(double) ||
-                   type == typeof(decimal) || type == typeof(char) || type == typeof(string) ||
-                   type == typeof(DateTime) || type == typeof(DateTimeOffset) ||
-                   type == typeof(TimeSpan) || type == typeof(Guid) ||
-                   type == typeof(Tuple<uint, float>);
+            if (type.IsEnum) return SerializedTypeResolver.IsAllowedExactType(type);
+            if (type == typeof(DateTimeOffset) || type == typeof(TimeSpan) ||
+                type == typeof(Guid) || type == typeof(Tuple<uint, float>)) return true;
+
+            TypeCode code = Type.GetTypeCode(type);
+            return code != TypeCode.Empty && code != TypeCode.Object && code != TypeCode.DBNull;
         }
 
         public void Pack() { }
@@ -72,8 +70,8 @@ namespace GameInterface.Serialization.Native
 
         private object Decode()
         {
-            Type type = SerializedTypeResolver.ResolveLoadedType(TypeName);
-            if (IsSupported(type) == false)
+            Type type = SerializedTypeResolver.ResolveType(TypeDescriptor);
+            if (!IsSupported(type))
                 throw new SerializationException($"Primitive type {type.FullName} is not allowed");
 
             if (type == typeof(Tuple<uint, float>))
