@@ -94,11 +94,6 @@ namespace Coop.Core.Client.Services.Time.Handlers
         internal void Handle_NetworkTimeControlLockChanged(MessagePayload<NetworkTimeControlLockChanged> obj)
         {
             timeControlLockState = TimeControlLockState.FromNetworkMessage(obj.What);
-
-            if (timeControlLockState.IsLocked)
-            {
-                timeControlInterface.ClientSetTimeControl(TimeControlEnum.Pause);
-            }
         }
 
         private bool TimeControlLockPolicy()

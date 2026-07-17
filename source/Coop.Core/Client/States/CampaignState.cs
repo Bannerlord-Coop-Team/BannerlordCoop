@@ -1,5 +1,6 @@
 ﻿// Ignore Spelling: Finalizer
 
+using Common;
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Common;
@@ -17,8 +18,10 @@ namespace Coop.Core.Client.States;
 public class CampaignState : ClientStateBase
 {
     private readonly IMessageBroker messageBroker;
+    private readonly ILoadingInterface loadingInterface;
     private readonly IGameStateInterface gameStateInterface;
     private readonly ICoopFinalizer coopFinalizer;
+    private readonly bool waitingForJoinCatchUp;
 
     public CampaignState(
         IClientLogic logic,
@@ -29,11 +32,17 @@ public class CampaignState : ClientStateBase
         ICoopFinalizer coopFinalizer) : base(logic)
     {
         this.messageBroker = messageBroker;
+        this.loadingInterface = loadingInterface;
         this.gameStateInterface = gameStateInterface;
         this.coopFinalizer = coopFinalizer;
+        waitingForJoinCatchUp = logic.State is LoadingState;
 
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Subscribe<MissionStateEntered>(Handle_MissionStateEntered);
+        if (waitingForJoinCatchUp)
+        {
+            messageBroker.Subscribe<NetworkJoinCatchUpComplete>(Handle_JoinCatchUpComplete);
+        }
 
         loadingInterface.SetLoadingMessage(
             "Loading Host Campaign",
@@ -42,15 +51,37 @@ public class CampaignState : ClientStateBase
         // Tell the server we have fully entered the campaign so it flushes the broadcasts it withheld
         // for us (the per-peer ConnectionMessageQueue) and resumes sending the live world stream.
         network.SendAll(new NetworkPlayerCampaignEntered());
-        messageBroker.Publish(this, new PlayerKillFeedColorResendRequested());
 
-        loadingInterface.HideLoadingScreen();
+        if (!waitingForJoinCatchUp)
+        {
+            CompleteCampaignEntry();
+        }
     }
 
     public override void Dispose()
     {
         messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Unsubscribe<MissionStateEntered>(Handle_MissionStateEntered);
+        if (waitingForJoinCatchUp)
+        {
+            messageBroker.Unsubscribe<NetworkJoinCatchUpComplete>(Handle_JoinCatchUpComplete);
+        }
+    }
+
+    internal void Handle_JoinCatchUpComplete(MessagePayload<NetworkJoinCatchUpComplete> obj)
+    {
+        // ReliableOrdered delivery publishes this after every held update. Deferring once more puts
+        // the release behind the game-thread actions those earlier handlers queued.
+        GameThread.RunSafe(() =>
+        {
+            CompleteCampaignEntry();
+        }, context: nameof(Handle_JoinCatchUpComplete));
+    }
+
+    private void CompleteCampaignEntry()
+    {
+        messageBroker.Publish(this, new PlayerKillFeedColorResendRequested());
+        loadingInterface.HideLoadingScreen();
     }
 
     internal void Handle_MissionStateEntered(MessagePayload<MissionStateEntered> obj)

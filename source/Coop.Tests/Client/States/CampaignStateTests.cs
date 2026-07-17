@@ -1,10 +1,14 @@
 ﻿using Autofac;
+using Common;
 using Common.Messaging;
 using Common.Tests.Utils;
 using Coop.Core.Client;
 using Coop.Core.Client.States;
+using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.UI.Interfaces;
+using GameInterface.Services.UI.Messages;
 using Moq;
 using Xunit;
 using Xunit.Abstractions;
@@ -106,5 +110,46 @@ public class CampaignStateTests
 
         clientLogic.ValidateModules();
         Assert.IsType<CampaignState>(clientLogic.State);
+    }
+
+    [Fact]
+    public void EnteringCampaign_KeepsLoadingScreenUntilCatchUpMarkerIsApplied()
+    {
+        // Arrange
+        clientComponent.TestNetwork.CreatePeer();
+        var loadingInterface = clientComponent.Container.Resolve<Mock<ILoadingInterface>>();
+        _ = clientLogic.SetState<LoadingState>();
+        loadingInterface.Reset();
+        _ = clientLogic.SetState<CampaignState>();
+
+        // Assert initial ready state
+        Assert.Single(clientComponent.TestNetwork.GetPeerMessagesFromType<NetworkPlayerCampaignEntered>(
+            clientComponent.TestNetwork.Peers[0]));
+        loadingInterface.Verify(m => m.HideLoadingScreen(), Times.Never);
+        Assert.Empty(TestMessageBroker.GetMessagesFromType<PlayerKillFeedColorResendRequested>());
+
+        // Act
+        TestMessageBroker.Publish(this, new NetworkJoinCatchUpComplete());
+        GameThread.Run(() => { }, blocking: true);
+
+        // Assert catch-up release
+        loadingInterface.Verify(m => m.HideLoadingScreen(), Times.Once);
+        Assert.Single(TestMessageBroker.GetMessagesFromType<PlayerKillFeedColorResendRequested>());
+    }
+
+    [Fact]
+    public void EnteringCampaignFromMission_DoesNotWaitForJoinCatchUpMarker()
+    {
+        // Arrange
+        var loadingInterface = clientComponent.Container.Resolve<Mock<ILoadingInterface>>();
+        _ = clientLogic.SetState<MissionState>();
+        loadingInterface.Reset();
+
+        // Act
+        _ = clientLogic.SetState<CampaignState>();
+
+        // Assert
+        loadingInterface.Verify(m => m.HideLoadingScreen(), Times.Once);
+        Assert.Single(TestMessageBroker.GetMessagesFromType<PlayerKillFeedColorResendRequested>());
     }
 }

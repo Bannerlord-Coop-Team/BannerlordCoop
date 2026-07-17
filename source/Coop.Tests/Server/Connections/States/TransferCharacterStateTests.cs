@@ -1,8 +1,10 @@
-using Autofac;
+﻿using Autofac;
 using Coop.Core.Common.Network.Packets;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.States;
 using Coop.Tests.Mocks;
+using GameInterface.Services.Heroes.Enum;
+using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
 using LiteNetLib;
 using Moq;
@@ -79,6 +81,8 @@ namespace Coop.Tests.Server.Connections.States
             var packet = Assert.Single(serverComponent.TestNetwork.GetPeerPacketsFromType<GameSaveDataPacket>(playerPeer));
             Assert.Equal(data, SaveDataCompression.Decompress(packet.GameSaveData));
             Assert.Equal(campaignId, packet.CampaignID);
+            serverComponent.Container.Resolve<Mock<ITimeControlInterface>>()
+                .Verify(m => m.ServerSetTimeControl(It.IsAny<TimeControlEnum>()), Times.Never);
 
             // The directed save is not sent to any other peer.
             var otherPeerGotSave =

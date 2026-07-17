@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Tests.Utils;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Connection.Handlers;
@@ -14,7 +14,7 @@ namespace Coop.Tests.Server.Services.Connection;
 public class PlayerConnectionServerMessageHandlerTests
 {
     private const string LoadingText = "Time controls disabled, 2 player(s) are currently joining the game";
-    private const string UnpauseReadyText = "All players connected, game can now be un-paused";
+    private const string TimeControlsReadyText = "All players connected, time controls enabled";
 
     [Fact]
     public void LoadingPlayersChanged_WhenPlayersLoading_SendsTimeControlsDisabledMessage()
@@ -38,7 +38,7 @@ public class PlayerConnectionServerMessageHandlerTests
     }
 
     [Fact]
-    public void LoadingPlayersChanged_WhenNoPlayersLoading_SendsUnpauseReadyMessage()
+    public void LoadingPlayersChanged_WhenNoPlayersLoading_SendsTimeControlsReadyMessage()
     {
         // Arrange
         var broker = new TestMessageBroker();
@@ -52,7 +52,7 @@ public class PlayerConnectionServerMessageHandlerTests
 
         // Assert
         var localMessage = Assert.Single(broker.GetMessagesFromType<SendInformationMessage>());
-        Assert.Equal(UnpauseReadyText, localMessage.Text);
+        Assert.Equal(TimeControlsReadyText, localMessage.Text);
 
         var connectedPeerMessage = Assert.Single(network.GetPeerMessagesFromType<SendInformationMessage>(connectedPeer));
         Assert.Equal(localMessage.Text, connectedPeerMessage.Text);

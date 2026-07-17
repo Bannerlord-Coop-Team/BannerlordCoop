@@ -79,7 +79,7 @@ namespace Coop.Tests.Client.Services.Time
         }
 
         [Fact]
-        public void NetworkTimeControlLockChanged_UpdatesUnpausePolicyAndForcesPauseWhenLocked()
+        public void NetworkTimeControlLockChanged_UpdatesPolicyWithoutChangingCurrentSpeed()
         {
             // Arrange
             Func<bool>? policy = null;
@@ -104,7 +104,7 @@ namespace Coop.Tests.Client.Services.Time
 
             // Assert
             Assert.False(policy());
-            mockTimeControlInterface.Verify(m => m.ClientSetTimeControl(TimeControlEnum.Pause), Times.Once);
+            mockTimeControlInterface.Verify(m => m.ClientSetTimeControl(It.IsAny<TimeControlEnum>()), Times.Never);
 
             // Act
             var unlocked = new MessagePayload<NetworkTimeControlLockChanged>(

@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common;
 using Common.Messaging;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
@@ -6,6 +7,7 @@ using Coop.Core.Server.Connections.States;
 using Coop.Tests.Extensions;
 using Coop.Tests.Mocks;
 using LiteNetLib;
+using System.Linq;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -72,9 +74,11 @@ namespace Coop.Tests.Server.Connections.States
             var payload = new MessagePayload<NetworkPlayerCampaignEntered>(
                 playerPeer, new NetworkPlayerCampaignEntered());
             currentState.PlayerCampaignEnteredHandler(payload);
+            DrainGameThread();
 
             // Assert
             Assert.Single(serverComponent.TestMessageBroker.GetMessagesFromType<PlayerCampaignEntered>());
+            Assert.Single(serverComponent.TestNetwork.GetPeerMessagesFromType<NetworkJoinCatchUpComplete>(playerPeer));
 
             Assert.IsType<CampaignState>(connectionLogic.State);
         }
@@ -89,11 +93,34 @@ namespace Coop.Tests.Server.Connections.States
             var payload = new MessagePayload<NetworkPlayerCampaignEntered>(
                 differentPeer, new NetworkPlayerCampaignEntered());
             currentState.PlayerCampaignEnteredHandler(payload);
+            DrainGameThread();
 
             // Assert
             Assert.Empty(serverComponent.TestMessageBroker.GetMessagesFromType<PlayerCampaignEntered>());
+            Assert.False(serverComponent.TestNetwork.SentNetworkMessages.ContainsKey(playerPeer.Id));
 
             Assert.IsType<LoadingState>(connectionLogic.State);
         }
+
+        [Fact]
+        public void PlayerCampaignEntered_SendsCatchUpMarkerAfterJoinSnapshots()
+        {
+            // Arrange
+            var currentState = connectionLogic.SetState<LoadingState>();
+            serverComponent.TestMessageBroker.Subscribe<PlayerCampaignEntered>(_ =>
+                serverComponent.TestNetwork.SendImmediate(playerPeer, new NetworkPlayerCampaignEntered()));
+
+            // Act
+            currentState.PlayerCampaignEnteredHandler(
+                new MessagePayload<NetworkPlayerCampaignEntered>(playerPeer, new NetworkPlayerCampaignEntered()));
+            DrainGameThread();
+
+            // Assert
+            var messages = serverComponent.TestNetwork.GetPeerMessages(playerPeer).ToArray();
+            Assert.Contains(messages, message => message is NetworkPlayerCampaignEntered);
+            Assert.IsType<NetworkJoinCatchUpComplete>(messages.Last());
+        }
+
+        private static void DrainGameThread() => GameThread.Run(() => { }, blocking: true);
     }
 }

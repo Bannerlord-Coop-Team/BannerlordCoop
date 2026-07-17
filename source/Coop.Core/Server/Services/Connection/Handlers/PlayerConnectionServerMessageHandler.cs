@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Network;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.GameDebug.Messages;
@@ -17,7 +17,7 @@ public class PlayerConnectionServerMessageHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
 
-    private const string UnpauseReadyMessage = "All players connected, game can now be un-paused";
+    private const string TimeControlsReadyMessage = "All players connected, time controls enabled";
 
     private int loadingPlayerCount;
 
@@ -40,7 +40,7 @@ public class PlayerConnectionServerMessageHandler : IHandler
     {
         Volatile.Write(ref loadingPlayerCount, obj.What.LoadingPlayerCount);
 
-        BroadcastNotification(loadingPlayerCount > 0 ? LoadingMessage(loadingPlayerCount) : UnpauseReadyMessage);
+        BroadcastNotification(loadingPlayerCount > 0 ? LoadingMessage(loadingPlayerCount) : TimeControlsReadyMessage);
     }
 
     internal void Handle_TimeSpeedChangeAttempted(MessagePayload<TimeSpeedChangedAttempted> obj)
