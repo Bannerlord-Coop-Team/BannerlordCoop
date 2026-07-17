@@ -802,6 +802,29 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Fact]
+    public void ConversationRequest_WhilePlayerInteractionActive_IsIgnoredUntilInteractionEnds()
+    {
+        var (client1, _, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+        var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
+
+        client1.Call(() => Assert.True(PlayerPartyInteractionDialogState.HasActiveState));
+        client1.NetworkSentMessages.Clear();
+
+        PublishConversationRequest(client1, initiatorPartyId, responderPartyId);
+
+        Assert.Empty(client1.NetworkSentMessages.GetMessages<NetworkRequestConversation>());
+
+        SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.Leave);
+        AssertInteractionStateCleared(client1);
+        client1.NetworkSentMessages.Clear();
+
+        PublishConversationRequest(client1, initiatorPartyId, responderPartyId);
+
+        Assert.Single(client1.NetworkSentMessages.GetMessages<NetworkRequestConversation>());
+    }
+
+    [Fact]
     public void EndedInteraction_IgnoresDelayedStateForSameSession()
     {
         var (client1, _, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
@@ -1510,6 +1533,24 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         Assert.NotNull(prefix);
 
         return (bool)prefix.Invoke(null, arguments)!;
+    }
+
+    private void PublishConversationRequest(
+        EnvironmentInstance client,
+        string initiatorPartyId,
+        string responderPartyId)
+    {
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
+            Assert.True(client.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
+
+            client.Resolve<IMessageBroker>().Publish(this, new ConversationRequested(
+                responderParty,
+                initiatorParty,
+                forcePlayerOutFromSettlement: false,
+                ConversationRestartSource.PlayerEncounter));
+        });
     }
 
     private void SubmitOption(
