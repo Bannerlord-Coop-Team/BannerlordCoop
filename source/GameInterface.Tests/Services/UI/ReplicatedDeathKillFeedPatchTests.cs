@@ -52,4 +52,56 @@ public class ReplicatedDeathKillFeedPatchTests : IDisposable
 
         Assert.False(BattleSpawnGate.TryGetReplicatedDeath(affectedAgent, out _, out _));
     }
+
+    [Fact]
+    public void RemoveRoutedPlayerHitNotification_RemovesOnlyMatchingVictimNotification()
+    {
+        BattleSpawnGate.BeginBattle("battle-1");
+        var firstAgent = ObjectHelper.SkipConstructor<Agent>();
+        var secondAgent = ObjectHelper.SkipConstructor<Agent>();
+        bool firstRemoved = false;
+        bool secondRemoved = false;
+
+        BattleSpawnGate.TrackRoutedPlayerHitNotification(firstAgent, 50, () => firstRemoved = true);
+        BattleSpawnGate.TrackRoutedPlayerHitNotification(secondAgent, 50, () => secondRemoved = true);
+
+        BattleSpawnGate.RemoveRoutedPlayerHitNotification(firstAgent, 50);
+
+        Assert.True(firstRemoved);
+        Assert.False(secondRemoved);
+    }
+
+    [Fact]
+    public void TrackRoutedPlayerHitNotification_RemovesNotification_WhenDeathArrivesFirst()
+    {
+        BattleSpawnGate.BeginBattle("battle-1");
+        var affectedAgent = ObjectHelper.SkipConstructor<Agent>();
+        bool notificationRemoved = false;
+
+        BattleSpawnGate.RemoveRoutedPlayerHitNotification(affectedAgent, 50);
+
+        BattleSpawnGate.TrackRoutedPlayerHitNotification(affectedAgent, 50, () => notificationRemoved = true);
+
+        Assert.True(notificationRemoved);
+    }
+
+    [Fact]
+    public void CombatLogContext_PreservesUntrackedEntryBeforeRoutedHit()
+    {
+        BattleSpawnGate.BeginBattle("battle-1");
+        var affectedAgent = ObjectHelper.SkipConstructor<Agent>();
+
+        BattleSpawnGate.EnqueueCombatLogContext(null!, 50);
+        BattleSpawnGate.EnqueueCombatLogContext(affectedAgent, 50);
+
+        BattleSpawnGate.BeginCombatLog();
+        Assert.False(BattleSpawnGate.TryGetCurrentRoutedPlayerHit(out _, out _));
+        BattleSpawnGate.EndCombatLog();
+
+        BattleSpawnGate.BeginCombatLog();
+        Assert.True(BattleSpawnGate.TryGetCurrentRoutedPlayerHit(out var actualAgent, out int damage));
+        Assert.Same(affectedAgent, actualAgent);
+        Assert.Equal(50, damage);
+        BattleSpawnGate.EndCombatLog();
+    }
 }

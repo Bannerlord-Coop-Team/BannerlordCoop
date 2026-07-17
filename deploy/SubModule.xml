@@ -24,5 +24,14 @@
         </SubModule>
     </SubModules>
     <Xmls>
+        <XmlNode>
+            <XmlName id="Items" path="tournament_spectator_throwables" />
+            <IncludedGameTypes>
+                <GameType value="Campaign" />
+                <GameType value="CampaignStoryMode" />
+                <GameType value="CustomGame" />
+                <GameType value="EditorGame" />
+            </IncludedGameTypes>
+        </XmlNode>
     </Xmls>
 </Module>

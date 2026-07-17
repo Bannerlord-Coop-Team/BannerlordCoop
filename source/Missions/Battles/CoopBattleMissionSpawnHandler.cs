@@ -79,7 +79,8 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
 
     // Size once both suppliers populate, then latch. If a reserve never lands, size a usable partial response
     // after ReserveHoldDeadlineSeconds; if no combatant exists, end the invalid mission instead. A mid-battle
-    // migration re-feed re-populates an already-sized supplier and is left to the adopt path.
+    // migration re-feed re-populates an already-sized supplier and is left to ReinforcementFielder, which can
+    // distinguish newly-owned parties with no adopted live agents without disturbing the initial phase sizing.
     public override void OnMissionTick(float dt)
     {
         base.OnMissionTick(dt);

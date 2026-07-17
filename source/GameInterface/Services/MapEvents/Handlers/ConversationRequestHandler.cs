@@ -87,9 +87,12 @@ internal class ConversationRequestHandler : IHandler
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
     }
 
-    /// <summary>[Client] Rate-limit, resolve ids, and forward the request to the server.</summary>
+    /// <summary>[Client] Ignore requests during a player interaction; otherwise rate-limit, resolve ids, and forward.</summary>
     private void Handle_ConversationRequested(MessagePayload<ConversationRequested> payload)
     {
+        if (PlayerPartyInteractionDialogState.HasActiveState)
+            return;
+
         var now = DateTime.UtcNow;
         if (now - lastRequestSentUtc < RequestCooldown)
             return; // drop: at most one request per cooldown window

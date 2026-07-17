@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.PacketHandlers;
 using Common.Util;
@@ -108,6 +108,13 @@ public class AgentActionHandler : IAgentActionHandler
             bool nowDiscrete = IsDiscreteAction(agent.GetCurrentActionType(0))
                             || IsDiscreteAction(agent.GetCurrentActionType(1));
 
+            // Native command actions are untyped, so recognize the main agent's order gesture by action name.
+            if (!nowDiscrete && agent == Mission.Current.MainAgent)
+            {
+                nowDiscrete = IsOrderGesture(AgentActionData.GetActionNameWithCode(action0))
+                           || IsOrderGesture(AgentActionData.GetActionNameWithCode(action1));
+            }
+
             // Broadcast entering/holding a discrete action, or leaving one (its END). Pure locomotion changes
             // (walk<->run<->idle) are skipped — the puppet reproduces those from the synced movement input.
             bool broadcast = nowDiscrete || (hadState && last.WasDiscrete);
@@ -170,6 +177,16 @@ public class AgentActionHandler : IAgentActionHandler
     private static bool IsDiscreteAction(Agent.ActionCodeType type)
     {
         return type != Agent.ActionCodeType.Other && type != Agent.ActionCodeType.Idle;
+    }
+
+    internal static bool IsOrderGesture(string actionName)
+    {
+        if (actionName == null) return false;
+
+        return actionName == "act_command"
+            || actionName.StartsWith("act_command_", StringComparison.Ordinal)
+            || actionName == "act_horse_command"
+            || actionName.StartsWith("act_horse_command_", StringComparison.Ordinal);
     }
 
     public void Dispose()

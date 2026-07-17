@@ -24,6 +24,15 @@ public class OutputSinkManager : ILogEventSink
         TextWriter textWriter = new StringWriter();
         logEvent.RenderMessage(textWriter);
 
+        // Logger.Error(ex, ...) attaches the exception separately from the message template;
+        // without this the callbacks (in-game console, headless server console) only ever see
+        // the message and the actual failure stays invisible.
+        if (logEvent.Exception != null)
+        {
+            textWriter.Write(Environment.NewLine);
+            textWriter.Write(logEvent.Exception);
+        }
+
         foreach (var callback in Callbacks)
         {
             callback(textWriter.ToString());

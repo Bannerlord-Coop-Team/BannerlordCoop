@@ -33,9 +33,22 @@ public class NetworkBattleSupplyProgress : IEvent
     [ProtoMember(2)]
     public readonly SupplyProgressEntry[] Entries = Array.Empty<SupplyProgressEntry>();
 
-    public NetworkBattleSupplyProgress(string mapEventId, SupplyProgressEntry[] entries)
+    /// <summary>
+    /// This report is the FLUSH ACK for a <see cref="NetworkBattleTroopReserve"/> whose
+    /// <c>FlushRequested</c> was set (BR-033 shrink refresh): <see cref="Entries"/> carries the sender's
+    /// FINAL local pointers for the parties that REPLACE dropped, captured atomically with the replace, so
+    /// the server can land them in the ledger and only then serve the returning owner. Distinguished from
+    /// the periodic throttled reports so the server can count acks against a pending return; the pointer
+    /// application itself stays idempotent either way (the ledger is monotonic + clamped). Additive and
+    /// default-false, so legacy senders keep plain periodic-report semantics.
+    /// </summary>
+    [ProtoMember(3)]
+    public readonly bool IsFlush;
+
+    public NetworkBattleSupplyProgress(string mapEventId, SupplyProgressEntry[] entries, bool isFlush = false)
     {
         MapEventId = mapEventId;
         Entries = entries;
+        IsFlush = isFlush;
     }
 }

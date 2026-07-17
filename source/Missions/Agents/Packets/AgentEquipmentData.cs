@@ -15,6 +15,11 @@ namespace Missions.Agents.Packets
 
         public void Apply(Agent agent)
         {
+            // Bannerlord's wield-change callback always reads every weapon slot. During mission teardown and the
+            // next tournament match's spawn, an agent can still be active while its MissionEquipment backing array
+            // is temporarily incomplete. Do not invoke the native wield path until all weapon slots are available.
+            if (!HasSafeWeaponSlots(agent?.Equipment)) return;
+
             // Only wield an index this agent actually has a weapon in RIGHT NOW. The sender's wielded index can point
             // to a slot that is EMPTY on this puppet — its loadout differs, its weapon depleted/broke, or this is a
             // stale packet landing as the mission tears down (the wielded weapon has already been put away). Wielding
@@ -39,6 +44,12 @@ namespace Missions.Agents.Packets
             return index >= EquipmentIndex.WeaponItemBeginSlot
                 && index < EquipmentIndex.NumAllWeaponSlots
                 && !agent.Equipment[index].IsEmpty;
+        }
+
+        internal static bool HasSafeWeaponSlots(MissionEquipment equipment)
+        {
+            return equipment?._weaponSlots != null &&
+                   equipment._weaponSlots.Length >= (int)EquipmentIndex.NumAllWeaponSlots;
         }
 
         [ProtoMember(1)]

@@ -25,11 +25,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     container:
-      image: garrettluskey/bannerlordcoop@sha256:8e99cad9fba3df32281c0de95cb20911414656f05cb890ad1777586ae6ee2f6b
+      image: garrettluskey/bannerlordcoop:latest
 
     steps:
       - name: Checkout development
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
@@ -42,7 +42,7 @@ jobs:
 
       - name: Find previous nightly commit
         id: previous
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+        uses: actions/github-script@v9
         with:
           result-encoding: string
           script: |
@@ -190,7 +190,7 @@ jobs:
             "$RELEASE_DATE" "$FILE_NAME" "$HEAD_SHA" "$base_json" > artifact/manifest.json
 
       - name: Upload nightly artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@v7
         with:
           name: nightly-release-${{ steps.release.outputs.release_date }}
           path: artifact/*
