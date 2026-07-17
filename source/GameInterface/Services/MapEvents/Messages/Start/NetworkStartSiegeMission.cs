@@ -21,15 +21,18 @@ internal record NetworkStartSiegeMission : ICommand
     public SiegeEngineState[] AttackerEngines { get; }
     [ProtoMember(5)]
     public SiegeEngineState[] DefenderEngines { get; }
+    [ProtoMember(6)]
+    public string InitiatingPartyId { get; }
 
     public NetworkStartSiegeMission(string mapEventId, int wallLevel, float[] wallHitPointRatios,
-        SiegeEngineState[] attackerEngines, SiegeEngineState[] defenderEngines)
+        SiegeEngineState[] attackerEngines, SiegeEngineState[] defenderEngines, string initiatingPartyId)
     {
         MapEventId = mapEventId;
         WallLevel = wallLevel;
         WallHitPointRatios = wallHitPointRatios;
         AttackerEngines = attackerEngines;
         DefenderEngines = defenderEngines;
+        InitiatingPartyId = initiatingPartyId;
     }
 }
 

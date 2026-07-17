@@ -124,6 +124,20 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Team), nameof(Team.GetFormation), nameof(Team_GetFormation));
         Prefix(typeof(Formation), nameof(Formation.SetControlledByAI), nameof(Formation_SetControlledByAI));
         Prefix(typeof(Formation), nameof(Formation.SetMovementOrder), nameof(Formation_SetMovementOrder));
+        // The adoption/reclaim bookkeeping keys formations in a HashSet, but the native GetHashCode/Equals
+        // overrides read engine state a skip-ctor shell doesn't have (NRE) — which silently aborted every
+        // MULTI-agent adoption after the first agent's conversion headless (single-agent tests never noticed:
+        // the throw came after that agent was already converted). Mocked shells hash and compare by identity.
+        harmony.Patch(
+            AccessTools.DeclaredMethod(typeof(Formation), nameof(GetHashCode))
+                ?? throw new MissingMethodException(typeof(Formation).FullName, nameof(GetHashCode)),
+            prefix: new HarmonyMethod(AccessTools.Method(typeof(MissionEngineFixture), nameof(Formation_GetHashCode))));
+        var formationEquals = AccessTools.DeclaredMethod(typeof(Formation), nameof(Equals), new[] { typeof(object) });
+        if (formationEquals != null)
+        {
+            harmony.Patch(formationEquals,
+                prefix: new HarmonyMethod(AccessTools.Method(typeof(MissionEngineFixture), nameof(Formation_Equals))));
+        }
         // NOTE: the coop adoption path's final step — Formation.SetMovementOrder(MovementOrder.MovementOrderCharge)
         // — can't run headless: the MovementOrder type initializer builds Timers from Mission.CurrentTime and
         // reads WorldPosition statics (engine-populated natives), so it NREs, and the static constants are
@@ -622,6 +636,20 @@ public sealed class MissionEngineFixture : IDisposable
         if (!MockFormation.ForShell(__instance, out var f)) return true;
         f.MovementOrderSet = true;
         f.Order = __0.OrderEnum;
+        return false;
+    }
+
+    private static bool Formation_GetHashCode(Formation __instance, ref int __result)
+    {
+        if (!MockFormation.ForShell(__instance, out _)) return true;
+        __result = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(__instance);
+        return false;
+    }
+
+    private static bool Formation_Equals(Formation __instance, object __0, ref bool __result)
+    {
+        if (!MockFormation.ForShell(__instance, out _)) return true;
+        __result = ReferenceEquals(__instance, __0);
         return false;
     }
 

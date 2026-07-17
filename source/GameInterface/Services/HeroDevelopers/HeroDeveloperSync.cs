@@ -14,6 +14,6 @@ internal class HeroDeveloperSync : IAutoSync
 
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(HeroDeveloper), nameof(HeroDeveloper._skillXps)));
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(HeroDeveloper), nameof(HeroDeveloper._newFocuses)));
-        AutoSyncRegistry.AddField(AccessTools.Field(typeof(HeroDeveloper), nameof(HeroDeveloper._totalXp)));
+        AutoSyncRegistry.AddField(AccessTools.Field(typeof(HeroDeveloper), nameof(HeroDeveloper._totalXp)), coalesce: true);
     }
 }

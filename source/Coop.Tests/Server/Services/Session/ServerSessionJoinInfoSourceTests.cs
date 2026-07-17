@@ -1,4 +1,4 @@
-using Coop.Core.Common.Configuration;
+﻿using Coop.Core.Common.Configuration;
 using Coop.Core.Server.Services.Session;
 using Xunit;
 
@@ -12,7 +12,7 @@ public class ServerSessionJoinInfoSourceTests
     public void Get_AdvertisesOnlyWhetherPasswordIsRequired(string password, bool expected)
     {
         var networkConfig = new NetworkConfig { Token = password };
-        var source = new ServerSessionJoinInfoSource(new SessionAdvertisementConfig(), networkConfig);
+        var source = new ServerSessionJoinInfoSource(networkConfig);
 
         var info = source.Get();
 

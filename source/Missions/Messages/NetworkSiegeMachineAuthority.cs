@@ -15,10 +15,18 @@ public class NetworkSiegeMachineAuthority : IEvent
     /// <summary>Owning controller; empty hands the machine back to the mission host.</summary>
     [ProtoMember(2)]
     public readonly string ControllerId;
+    /// <summary>
+    /// BR-102: the arbitrating host's epoch for this battle. Receivers drop an authority decision
+    /// stamped by an earlier hosting generation (a deposed host still arbitrating in flight across a
+    /// migration); 0 = unstamped (sender had no assignment yet), always accepted.
+    /// </summary>
+    [ProtoMember(3)]
+    public readonly int HostEpoch;
 
-    public NetworkSiegeMachineAuthority(int machineId, string controllerId)
+    public NetworkSiegeMachineAuthority(int machineId, string controllerId, int hostEpoch = 0)
     {
         MachineId = machineId;
         ControllerId = controllerId;
+        HostEpoch = hostEpoch;
     }
 }

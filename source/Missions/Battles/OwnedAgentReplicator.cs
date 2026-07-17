@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MapEvents.Messages;
@@ -145,9 +145,15 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
             var side = agent.Team != null ? agent.Team.Side : BattleSideEnum.None;
             int formationIndex = agent.Formation != null ? (int)agent.Formation.FormationIndex : -1;
 
+            var spawnEquipment = agent.SpawnEquipment;
+            var bodyProperties = agent.BodyPropertiesValue;
+
+            // Catch-up records carry the current holder. A migrated NPC must stay under the successor when its
+            // original host rejoins; labeling it with the original host would make that client drive it too.
             records.Add(new BattleAgentSpawnData(
                 info.AgentId, characterId, agent.Position, side, agent.Health,
                 session.OwnControllerId, attribution.MapEventPartyId, attribution.TroopSeed,
+                spawnEquipment, bodyProperties,
                 ResolveMountIdFor(info.AgentId, agent), formationIndex));
         }
         return records;
@@ -248,9 +254,12 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         // id we also carry in the spawn data.
         casualties.Record(agentId, mapEventPartyId, troopSeed, characterId);
 
+        var spawnEquipment = agent.SpawnEquipment;
+        var bodyProperties = agent.BodyPropertiesValue;
+
         BattleSideEnum side = agent.Team != null ? agent.Team.Side : BattleSideEnum.None;
         int formationIndex = agent.Formation != null ? (int)agent.Formation.FormationIndex : -1;
-        var data = new BattleAgentSpawnData(agentId, characterId, agent.Position, side, agent.Health, owner, mapEventPartyId, troopSeed, mountAgentId, formationIndex);
+        var data = new BattleAgentSpawnData(agentId, characterId, agent.Position, side, agent.Health, owner, mapEventPartyId, troopSeed, spawnEquipment, bodyProperties, mountAgentId, formationIndex);
 
         // Populate MapEvent's UpgradeTroopTracker with spawned agent to handle on the server during battle.
         messageBroker.Publish(this, new TrackTroopForUpgrades(mapEventPartyId, characterId));

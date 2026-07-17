@@ -9,6 +9,7 @@ using GameInterface.Services.Workshops;
 using GameInterface.Services.Alleys;
 using Xunit;
 using Xunit.Abstractions;
+using GameInterface.Services.Inventory.TradeSkills;
 
 namespace Coop.Tests.Server.Services.Save
 {
@@ -40,7 +41,8 @@ namespace Coop.Tests.Server.Services.Save
                 new WorkshopPlayerData(new()),
                 new CaravansPlayerData(new(), new()),
                 new AlleyPlayerData(new()),
-                new InteractionsPlayerData(new(), new(), new(), new()));
+                new InteractionsPlayerData(new(), new(), new(), new()),
+                new TradePlayerData(new()));
 
             string saveFile = SAVE_PATH + sessionData.UniqueGameId + ".json";
 

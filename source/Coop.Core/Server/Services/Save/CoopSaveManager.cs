@@ -16,8 +16,24 @@ namespace Coop.Core.Server.Services.Save
 
     internal class CoopSaveManager : ICoopSaveManager
     {
-        public string DefaultPath { get; } = "./saves/";
+        public string DefaultPath { get; } = ResolveDefaultPath();
         public string FileType { get; } = ".json";
+
+        /// <summary>
+        /// The session json (player→hero mappings + per-player session data) must persist next to
+        /// the campaign saves. The graphical host keeps its historical CWD-relative location (the
+        /// game bin's ./saves/). Headless and container hosts set BANNERLORD_USER_DIR — the
+        /// persistent data root, mounted as /data in Docker — and MUST store the session there:
+        /// written CWD-relative in a container it lands in the ephemeral layer, evaporates on
+        /// recreate, and returning players lose their heroes.
+        /// </summary>
+        private static string ResolveDefaultPath()
+        {
+            var userDir = Environment.GetEnvironmentVariable("BANNERLORD_USER_DIR");
+            return string.IsNullOrEmpty(userDir)
+                ? "./saves/"
+                : Path.Combine(userDir, "saves") + Path.DirectorySeparatorChar;
+        }
 
         /// <summary>
         /// Loads a CoopSession from the provided file name.

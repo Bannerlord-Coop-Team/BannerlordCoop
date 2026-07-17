@@ -39,6 +39,39 @@
             </ListPanel>
           </Children>
         </ListPanel>
+		  
+		<!-- Bottom-right community links (mirrors the connect screen). Lifted higher than the connect
+            screen so the lowest button clears the campaign map's bottom HUD/toolbar. -->
+		<TextWidget WidthSizePolicy="Fixed" SuggestedWidth="256" HeightSizePolicy="Fixed" SuggestedHeight="64"
+					VerticalAlignment="Bottom" HorizontalAlignment="Right" PositionYOffset="-270" PositionXOffset="-6"
+					Brush="ScoreboardPanels_2" Text="@CommunityText"/>
+
+		<ListPanel WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
+					HorizontalAlignment="Right" VerticalAlignment="Bottom" MarginBottom="110"
+					StackLayout.LayoutMethod="HorizontalLeftToRight">
+			<Children>
+				<Standard.Button HorizontalAlignment="Left" VerticalAlignment="Bottom"
+								Command.Click="ActionDiscord" Parameter.Text="@DiscordButtonText" PositionXOffset="-20"/>
+			</Children>
+		</ListPanel>
+
+		<ListPanel WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
+					HorizontalAlignment="Right" VerticalAlignment="Bottom" MarginBottom="160"
+					StackLayout.LayoutMethod="HorizontalLeftToRight">
+			<Children>
+				<Standard.Button HorizontalAlignment="Left" VerticalAlignment="Bottom"
+								Command.Click="ActionPatreon" Parameter.Text="@PatreonButtonText" PositionXOffset="-20"/>
+			</Children>
+		</ListPanel>
+
+		<ListPanel WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
+					HorizontalAlignment="Right" VerticalAlignment="Bottom" MarginBottom="210"
+					StackLayout.LayoutMethod="HorizontalLeftToRight">
+			<Children>
+				<Standard.Button HorizontalAlignment="Left" VerticalAlignment="Bottom"
+								Command.Click="ActionDonate" Parameter.Text="@DonateButtonText" PositionXOffset="-20"/>
+			</Children>
+		</ListPanel>
       </Children>
     </Widget>
   </Window>

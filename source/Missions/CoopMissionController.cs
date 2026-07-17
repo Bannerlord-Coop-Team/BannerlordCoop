@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
@@ -66,6 +66,7 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         // Controller.None puppets have no AI component to maintain a scripted guard, so reassert received
         // guard state every frame just before the engine ticks the agents.
         coopMissionComponent.AgentActionHandler.ApplyRemoteGuardStates();
+        coopMissionComponent.AgentVoiceHandler.PollVoices();
         coopMissionComponent.MissileHandler.DrainPendingShots();
     }
 
@@ -106,6 +107,7 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         // finalizer runs.
         coopMissionComponent.AgentMovementHandler.Dispose();
         coopMissionComponent.AgentActionHandler.Dispose();
+        coopMissionComponent.AgentVoiceHandler.Dispose();
 
         coopMissionComponent.MissileHandler.Dispose();
         coopMissionComponent.WeaponDropHandler.Dispose();

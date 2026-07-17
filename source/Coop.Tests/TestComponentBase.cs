@@ -16,6 +16,7 @@ using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
@@ -26,6 +27,7 @@ using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Time.Interfaces;
 using GameInterface.Services.TroopRosters.Interfaces;
+using GameInterface.Services.UI;
 using GameInterface.Services.UI.Interfaces;
 using GameInterface.Services.Villages.Interfaces;
 using Moq;
@@ -80,6 +82,7 @@ internal abstract class TestComponentBase
 
 
         builder.RegisterType<ObjectManager>().As<IObjectManager>().InstancePerLifetimeScope();
+        builder.RegisterType<MobilePartyBehaviorSnapshot>().As<IMobilePartyBehaviorSnapshot>().InstancePerDependency();
         builder.RegisterType<RegistryCollection>().As<IRegistryCollection>().InstancePerLifetimeScope();
         builder.RegisterType<KingdomCreationSettlementTracker>().As<IKingdomCreationSettlementTracker>().InstancePerLifetimeScope();
         builder.RegisterType<KingdomDecisionDataConverter>().As<IKingdomDecisionDataConverter>().InstancePerLifetimeScope();
@@ -105,10 +108,13 @@ internal abstract class TestComponentBase
         RegisterMock<IAutoRegistryFactory>(builder);
         RegisterMock<IBattleTroopReserveBuilder>(builder);
         RegisterMock<IMapEventInitializationBarrier>(builder);
-        // BattleHostHandler (MissionModule, auto-activated) needs the registry, which the real
-        // containers get from GameInterfaceModule — not loaded here.
+        RegisterMock<IConnectedPlayerCountService>(builder);
+        // BattleHostHandler (MissionModule, auto-activated) needs the registry and the troop ledger,
+        // which the real containers get from GameInterfaceModule — not loaded here.
         RegisterMock<IBattleHostRegistry>(builder);
+        RegisterMock<IBattleTroopLedger>(builder);
         RegisterMock<IRaidAiInterventionConfigInterface>(builder);
+        RegisterMock<ITacticalUnitSymbolsConfigInterface>(builder);
         RegisterMock<IVillageHostileActionInterface>(builder);
 
         // ISaveInterface is consumed by TransferSaveState's constructor, which packages a save the
