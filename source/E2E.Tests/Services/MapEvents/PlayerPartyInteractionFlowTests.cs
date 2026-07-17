@@ -81,7 +81,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
 
         RequestInteraction(client1, initiatorPartyId, responderPartyId);
 
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkConversationDenied>());
+        var denied = Server.NetworkSentMessages.GetMessages<NetworkConversationDenied>().Single();
+        Assert.Equal(ConversationDeniedReason.PlayerUnavailable, denied.Reason);
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>());
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>());
     }

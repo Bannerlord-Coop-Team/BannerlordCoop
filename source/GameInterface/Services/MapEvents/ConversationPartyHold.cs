@@ -20,7 +20,8 @@ internal static class ConversationPartyHold
 {
     private static readonly TimeSpan BlockedMessageCooldown = TimeSpan.FromSeconds(5);
 
-    private static DateTime lastBlockedMessageUtc = DateTime.MinValue;
+    private static DateTime lastInteractionBlockedMessageUtc = DateTime.MinValue;
+    private static DateTime lastPlayerUnavailableMessageUtc = DateTime.MinValue;
 
     /// <summary>
     /// Shows the local player why their interaction with an engaged party did nothing, at most once per cooldown
@@ -28,12 +29,24 @@ internal static class ConversationPartyHold
     /// </summary>
     public static void ShowInteractionBlockedMessage()
     {
-        var now = DateTime.UtcNow;
-        if (now - lastBlockedMessageUtc < BlockedMessageCooldown) return;
-        lastBlockedMessageUtc = now;
+        ShowBlockedMessage(
+            ref lastInteractionBlockedMessageUtc,
+            "You cannot interact with the party while another player is interacting with it");
+    }
 
-        InformationManager.DisplayMessage(new InformationMessage(
-            "You cannot interact with the party while another player is interacting with it"));
+    /// <summary>Shows the local player that the targeted player cannot currently be spoken to.</summary>
+    public static void ShowPlayerUnavailableMessage()
+    {
+        ShowBlockedMessage(ref lastPlayerUnavailableMessageUtc, "You cannot speak to this player right now");
+    }
+
+    private static void ShowBlockedMessage(ref DateTime lastMessageUtc, string message)
+    {
+        var now = DateTime.UtcNow;
+        if (now - lastMessageUtc < BlockedMessageCooldown) return;
+        lastMessageUtc = now;
+
+        InformationManager.DisplayMessage(new InformationMessage(message));
     }
 
     /// <summary>

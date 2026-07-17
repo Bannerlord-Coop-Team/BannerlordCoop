@@ -182,7 +182,7 @@ internal class ConversationRequestHandler : IHandler
             Logger.Debug(
                 "Rejecting PvP conversation: a player party is inactive. AttackerId={AttackerId}, DefenderId={DefenderId}",
                 request.AttackerId, request.DefenderId);
-            network.Send(requestingPeer, new NetworkConversationDenied());
+            network.Send(requestingPeer, new NetworkConversationDenied(ConversationDeniedReason.PlayerUnavailable));
             return false;
         }
 
@@ -208,7 +208,7 @@ internal class ConversationRequestHandler : IHandler
                 Logger.Debug(
                     "Rejecting PvP conversation: a party is already conversing with another player. AttackerId={AttackerId}, DefenderId={DefenderId}",
                     request.AttackerId, request.DefenderId);
-                network.Send(requestingPeer, new NetworkConversationDenied());
+                network.Send(requestingPeer, new NetworkConversationDenied(ConversationDeniedReason.PartyEngaged));
                 return false;
             }
 
@@ -287,7 +287,7 @@ internal class ConversationRequestHandler : IHandler
             Logger.Debug(
                 "Rejecting shared conversation for a non-hostile party. PartyId={PartyId}",
                 aiPartyId);
-            network.Send(requestingPeer, new NetworkConversationDenied());
+            network.Send(requestingPeer, new NetworkConversationDenied(ConversationDeniedReason.PartyEngaged));
             return;
         }
 
@@ -297,7 +297,7 @@ internal class ConversationRequestHandler : IHandler
             Logger.Debug(
                 "Rejecting conversation request: the party or the requester is already engaged. PartyId={PartyId}",
                 aiPartyId);
-            network.Send(requestingPeer, new NetworkConversationDenied());
+            network.Send(requestingPeer, new NetworkConversationDenied(ConversationDeniedReason.PartyEngaged));
             return;
         }
 
@@ -450,12 +450,15 @@ internal class ConversationRequestHandler : IHandler
         EndPvpInteraction(peer);
     }
 
-    /// <summary>[Client] The server denied the request because the party is engaged; tell the player why.</summary>
+    /// <summary>[Client] The server denied the request; tell the player why.</summary>
     private void Handle_NetworkConversationDenied(MessagePayload<NetworkConversationDenied> payload)
     {
         if (ModInformation.IsServer) return;
 
-        GameThread.Run(ConversationPartyHold.ShowInteractionBlockedMessage);
+        Action showMessage = payload.What.Reason == ConversationDeniedReason.PlayerUnavailable
+            ? ConversationPartyHold.ShowPlayerUnavailableMessage
+            : ConversationPartyHold.ShowInteractionBlockedMessage;
+        GameThread.RunSafe(showMessage, context: "Show conversation denied");
     }
 
     /// <summary>[Server] The defender's client reports it is showing the "hold on" popup; record its peer so a
