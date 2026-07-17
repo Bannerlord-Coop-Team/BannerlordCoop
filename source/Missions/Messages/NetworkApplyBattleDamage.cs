@@ -1,6 +1,7 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
 using System;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Messages;
@@ -46,8 +47,11 @@ public class NetworkApplyBattleDamage : IEvent
     /// </summary>
     [ProtoMember(7)]
     public bool IsMissile { get; }
+    /// <summary>The original missile weapon used by vanilla to select the combat skill reward.</summary>
+    [ProtoMember(8)]
+    public WeaponComponentData AttackerWeapon { get; }
     public NetworkApplyBattleDamage(Guid victimAgentId, Guid attackerAgentId, Blow blow, AttackCollisionData collisionData,
-        bool isMount = false, long missileShotSequence = 0)
+        bool isMount = false, long missileShotSequence = 0, WeaponComponentData attackerWeapon = null)
     {
         VictimAgentId = victimAgentId;
         AttackerAgentId = attackerAgentId;
@@ -56,5 +60,6 @@ public class NetworkApplyBattleDamage : IEvent
         IsMount = isMount;
         MissileShotSequence = missileShotSequence;
         IsMissile = blow.IsMissile;
+        AttackerWeapon = attackerWeapon;
     }
 }
