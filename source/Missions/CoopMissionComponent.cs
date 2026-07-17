@@ -1,4 +1,4 @@
-using Missions.Agents.Handlers;
+﻿using Missions.Agents.Handlers;
 using Missions.Missiles.Handlers;
 
 namespace Missions;
@@ -9,6 +9,7 @@ public interface ICoopMissionComponent
     IMissileHandler MissileHandler { get; }
     IAgentMovementHandler AgentMovementHandler { get; }
     IAgentActionHandler AgentActionHandler { get; }
+    IAgentVoiceHandler AgentVoiceHandler { get; }
     IWeaponDropHandler WeaponDropHandler { get; }
     IWeaponPickupHandler WeaponPickupHandler { get; }
     IShieldDamageHandler ShieldDamageHandler { get; }
@@ -24,6 +25,7 @@ public class CoopMissionComponent : ICoopMissionComponent
     public IMissileHandler MissileHandler { get; }
     public IAgentMovementHandler AgentMovementHandler { get; }
     public IAgentActionHandler AgentActionHandler { get; }
+    public IAgentVoiceHandler AgentVoiceHandler { get; }
 
     public IWeaponDropHandler WeaponDropHandler { get; }
 
@@ -43,6 +45,7 @@ public class CoopMissionComponent : ICoopMissionComponent
         IMissileHandler missileHandler,
         IAgentMovementHandler agentMovementHandler,
         IAgentActionHandler agentActionHandler,
+        IAgentVoiceHandler agentVoiceHandler,
         IWeaponDropHandler weaponDropHandler,
         IWeaponPickupHandler weaponPickupHandler,
         IShieldDamageHandler shieldDamageHandler,
@@ -55,6 +58,7 @@ public class CoopMissionComponent : ICoopMissionComponent
         MissileHandler = missileHandler;
         AgentMovementHandler = agentMovementHandler;
         AgentActionHandler = agentActionHandler;
+        AgentVoiceHandler = agentVoiceHandler;
         WeaponDropHandler = weaponDropHandler;
         WeaponPickupHandler = weaponPickupHandler;
         ShieldDamageHandler = shieldDamageHandler;

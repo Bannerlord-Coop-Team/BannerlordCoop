@@ -434,11 +434,18 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
         var mapEvent = attackerParty.MapEvent;
         if (mapEvent == null) return;
 
-        if (!mapEvent.CanPartyJoinBattle(PartyBase.MainParty, settlement.BattleSide))
+        if (PartyBase.MainParty.MapEventSide != mapEvent.DefenderSide)
         {
-            // Vanilla kicks a non-joinable defender out of the settlement. Runs outside AllowedThread so
-            // the leave routes through the normal co-op settlement-exit flow and replicates.
-            LeaveSettlementAction.ApplyForParty(MobileParty.MainParty);
+            if (!mapEvent.CanPartyJoinBattle(PartyBase.MainParty, settlement.BattleSide))
+            {
+                // Vanilla kicks a non-joinable defender out of the settlement. Runs outside AllowedThread so
+                // the leave routes through the normal co-op settlement-exit flow and replicates.
+                LeaveSettlementAction.ApplyForParty(MobileParty.MainParty);
+            }
+            else
+            {
+                Logger.Warning("Skipped the siege defense prompt at {Settlement}: the authoritative defender assignment is missing", settlement.StringId);
+            }
             return;
         }
 

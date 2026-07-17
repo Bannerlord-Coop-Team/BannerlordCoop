@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MapEvents.Messages;
@@ -148,6 +148,8 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
             var spawnEquipment = agent.SpawnEquipment;
             var bodyProperties = agent.BodyPropertiesValue;
 
+            // Catch-up records carry the current holder. A migrated NPC must stay under the successor when its
+            // original host rejoins; labeling it with the original host would make that client drive it too.
             records.Add(new BattleAgentSpawnData(
                 info.AgentId, characterId, agent.Position, side, agent.Health,
                 session.OwnControllerId, attribution.MapEventPartyId, attribution.TroopSeed,

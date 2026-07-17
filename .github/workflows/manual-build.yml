@@ -1,0 +1,146 @@
+name: Manual Build
+run-name: Manual build ${{ inputs.commit_sha }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: Full 40-character commit SHA to build
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: manual-build-${{ inputs.commit_sha }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: garrettluskey/bannerlordcoop:latest
+
+    steps:
+      - name: Checkout requested commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.commit_sha }}
+          fetch-depth: 0
+
+      - name: Trust and validate checkout
+        env:
+          REQUESTED_SHA: ${{ inputs.commit_sha }}
+        run: |
+          set -eu
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          printf '%s' "$REQUESTED_SHA" | grep -Eq '^[a-f0-9]{40}$'
+          test "$(git rev-parse HEAD)" = "$REQUESTED_SHA"
+
+      - name: Link Bannerlord assemblies
+        run: ln -s /home/mb2 mb2
+
+      - name: Restore .NET Framework build inputs
+        run: |
+          set -eu
+          reference_package="$RUNNER_TEMP/net472.nupkg"
+          reference_root="$RUNNER_TEMP/net472"
+          mkdir -p "$reference_root" source/packages
+          wget -q \
+            https://api.nuget.org/v3-flatcontainer/microsoft.netframework.referenceassemblies.net472/1.0.3/microsoft.netframework.referenceassemblies.net472.1.0.3.nupkg \
+            -O "$reference_package"
+          echo "ffa0a5570a39f911399164d0581ffddef99b5e3dfbaa5f220e5ce22969bcf57c  $reference_package" | sha256sum -c -
+          unzip -q "$reference_package" -d "$reference_root"
+
+          sed -n 's/.*id="\([^"]*\)" version="\([^"]*\)".*/\1 \2/p' source/Coop/packages.config |
+            while read -r package_id package_version; do
+              lower_id=$(printf '%s' "$package_id" | tr '[:upper:]' '[:lower:]')
+              destination="source/packages/$package_id.$package_version"
+              package_file="$RUNNER_TEMP/$lower_id.$package_version.nupkg"
+              mkdir -p "$destination"
+              wget -q \
+                "https://api.nuget.org/v3-flatcontainer/$lower_id/$package_version/$lower_id.$package_version.nupkg" \
+                -O "$package_file"
+              unzip -q "$package_file" -d "$destination"
+            done
+
+      - name: Build release module
+        working-directory: source
+        run: |
+          dotnet build Coop/Coop.csproj \
+            -c Release \
+            -p:CustomAfterMicrosoftCommonTargets="$RUNNER_TEMP/net472/build/Microsoft.NETFramework.ReferenceAssemblies.net472.targets" \
+            -p:SourceRevisionId="$(git rev-parse HEAD)" \
+            -p:IncludeSourceRevisionInInformationalVersion=true \
+            -p:ModName= \
+            -p:NuGetAudit=false \
+            --consoleLoggerParameters:ErrorsOnly
+
+      - name: Build artifact metadata
+        id: artifact
+        run: |
+          set -eu
+          head_sha=$(git rev-parse HEAD)
+          short_sha=$(printf '%.7s' "$head_sha")
+          file_name="Coop $short_sha.7z"
+          mkdir -p artifact
+          printf 'file_name=%s\nhead_sha=%s\n' "$file_name" "$head_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Package module
+        env:
+          FILE_NAME: ${{ steps.artifact.outputs.file_name }}
+          HEAD_SHA: ${{ steps.artifact.outputs.head_sha }}
+        run: |
+          set -eu
+          apk add --no-cache 7zip >/dev/null
+          module=release-stage/Coop
+          binary="$module/bin/Win64_Shipping_Client"
+          mkdir -p "$binary" "$module/GUI/Prefabs"
+
+          for file in source/Coop/bin/Release/*.dll; do
+            name=${file##*/}
+            case "$name" in
+              TaleWorlds.*|SandBox.*|StoryMode.*) continue ;;
+            esac
+            cp "$file" "$binary/"
+          done
+          for required in Coop.dll Common.dll Coop.Core.dll Coop.Steam.dll GameInterface.dll Missions.dll; do
+            test -s "$binary/$required"
+          done
+          cp deploy/start-client.bat deploy/start-server.bat 'deploy/Server Instructions.md' "$module/"
+          cp -R UIMovies/. "$module/GUI/Prefabs/"
+
+          coop_version=$(sed -n 's/.*<CoopVersion>\([^<]*\)<\/CoopVersion>.*/\1/p' source/Directory.Build.props)
+          game_version=$(sed -n 's/.*<GameVersion>\([^<]*\)<\/GameVersion>.*/\1/p' source/Coop/Coop.csproj)
+          test -n "$coop_version"
+          test -n "$game_version"
+          # shellcheck disable=SC2016
+          sed \
+            -e 's/${name}/Coop/g' \
+            -e 's/${main_class}/CoopMod/g' \
+            -e "s/\${version}/v$coop_version/g" \
+            -e "s/\${game_version}/$game_version/g" \
+            deploy/SubModule.xml > "$module/SubModule.xml"
+
+          (cd release-stage && 7z a -t7z -m0=LZMA2 -mx=9 -ms=on \
+            "../artifact/$FILE_NAME" Coop >/dev/null)
+          release_size=$(stat -c %s "artifact/$FILE_NAME")
+          if [ "$release_size" -gt 8388608 ]; then
+            echo "Release archive is $release_size bytes; the 8 MiB safety budget reserves 2 MiB below Discord's 10 MiB limit." >&2
+            exit 1
+          fi
+
+          printf '{"kind":"manual-build","fileName":"%s","headSha":"%s"}\n' \
+            "$FILE_NAME" "$HEAD_SHA" > artifact/manifest.json
+
+      - name: Upload manual build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: manual-build-${{ steps.artifact.outputs.head_sha }}
+          path: artifact/*
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 3

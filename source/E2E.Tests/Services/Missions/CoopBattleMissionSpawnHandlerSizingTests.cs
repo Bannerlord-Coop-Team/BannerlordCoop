@@ -1,4 +1,5 @@
 ﻿using Missions.Battles;
+using System.Collections.Generic;
 using Xunit;
 
 namespace E2E.Tests.Services.Missions;
@@ -91,5 +92,83 @@ public class CoopBattleMissionSpawnHandlerSizingTests
             defenderFielded: false,
             attackerMissingReserveAccepted: true,
             defenderMissingReserveAccepted: true));
+    }
+
+    [Fact]
+    public void MigrationRecoveryTargets_LargeArmyReserves_StayWithinJointBattleSize()
+    {
+        var targets = ReinforcementFielder.RecoveryTargets.Calculate(
+            defenderTotal: 1154,
+            attackerTotal: 1336,
+            battleSize: 1000,
+            maximumSideRatio: 0.75f,
+            defenderAdvantageFactor: 1f);
+
+        Assert.Equal(464, targets.Defenders);
+        Assert.Equal(536, targets.Attackers);
+        Assert.Equal(1000, targets.Defenders + targets.Attackers);
+    }
+
+    [Fact]
+    public void MigrationRecoveryTargets_OneSidedReserve_UsesAvailableBattleCapacity()
+    {
+        var targets = ReinforcementFielder.RecoveryTargets.Calculate(
+            defenderTotal: 1000,
+            attackerTotal: 0,
+            battleSize: 500,
+            maximumSideRatio: 0.75f,
+            defenderAdvantageFactor: 1f);
+
+        Assert.Equal(500, targets.Defenders);
+        Assert.Equal(0, targets.Attackers);
+    }
+
+    [Fact]
+    public void MigrationRecoveryTargets_SmallBattle_DoesNotInventTroops()
+    {
+        var targets = ReinforcementFielder.RecoveryTargets.Calculate(
+            defenderTotal: 40,
+            attackerTotal: 60,
+            battleSize: 1000,
+            maximumSideRatio: 0.75f,
+            defenderAdvantageFactor: 1f);
+
+        Assert.Equal(40, targets.Defenders);
+        Assert.Equal(60, targets.Attackers);
+    }
+
+    [Theory]
+    [InlineData(129, 0, 129)]
+    [InlineData(129, 120, 9)]
+    [InlineData(129, 129, 0)]
+    [InlineData(129, 140, 0)]
+    public void MigrationRecoveryParty_ReconcilesActiveRosterAgainstAgentsThatActuallyArrived(
+        int activeRoster,
+        int liveAgents,
+        int expectedMissing)
+    {
+        var missing = ReinforcementFielder.CalculateMissingByCharacter(
+            new Dictionary<string, int> { ["imperial_recruit"] = activeRoster },
+            new Dictionary<string, int> { ["imperial_recruit"] = liveAgents });
+
+        Assert.Equal(expectedMissing, missing.TryGetValue("imperial_recruit", out var count) ? count : 0);
+    }
+
+    [Fact]
+    public void EndConditionHold_MustObserveFieldedSidesBeforeTerminalReplayDepletesOne()
+    {
+        Assert.True(CoopBattleController.ShouldReleaseEndConditionHold(
+            deploymentActivated: true,
+            attackerFielded: true,
+            defenderFielded: true,
+            attackerMissingReserveAccepted: false,
+            defenderMissingReserveAccepted: false));
+
+        Assert.False(CoopBattleController.ShouldReleaseEndConditionHold(
+            deploymentActivated: true,
+            attackerFielded: true,
+            defenderFielded: false,
+            attackerMissingReserveAccepted: false,
+            defenderMissingReserveAccepted: false));
     }
 }

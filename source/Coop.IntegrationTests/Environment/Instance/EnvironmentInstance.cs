@@ -103,6 +103,22 @@ public abstract class EnvironmentInstance
     }
 
     /// <summary>
+    /// Subscribes to this instance's message broker, keeping the subscription delegate strongly referenced
+    /// for the lifetime of the instance. The broker (like the production <see cref="MessageBroker"/>) stores
+    /// subscriptions as <see cref="WeakDelegate"/>s — only the delegate's target is referenced, and only
+    /// weakly — so a bare lambda subscription's closure has no other owner and the first GC silently stops
+    /// delivery (a flaky, assertion-empty test failure). Production handlers stay alive via the DI container;
+    /// test lambdas must be pinned here instead of subscribing directly on the resolved broker.
+    /// </summary>
+    public void Subscribe<T>(Action<MessagePayload<T>> handler) where T : IMessage
+    {
+        pinnedSubscriptions.Add(handler);
+        Resolve<IMessageBroker>().Subscribe(handler);
+    }
+
+    private readonly List<object> pinnedSubscriptions = new();
+
+    /// <summary>
     /// Creates an uninitialized object that is registered with the object manager
     /// </summary>
     /// <typeparam name="T">Type to create</typeparam>

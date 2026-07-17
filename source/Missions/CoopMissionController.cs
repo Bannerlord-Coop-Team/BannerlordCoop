@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
@@ -62,6 +62,7 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         // transition can't be observed reliably off-thread, so actions are event-synced from here instead of
         // polled with movement.
         coopMissionComponent.AgentActionHandler.PollActions();
+        coopMissionComponent.AgentVoiceHandler.PollVoices();
         coopMissionComponent.MissileHandler.DrainPendingShots();
     }
 
@@ -102,6 +103,7 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         // finalizer runs.
         coopMissionComponent.AgentMovementHandler.Dispose();
         coopMissionComponent.AgentActionHandler.Dispose();
+        coopMissionComponent.AgentVoiceHandler.Dispose();
 
         coopMissionComponent.MissileHandler.Dispose();
         coopMissionComponent.WeaponDropHandler.Dispose();

@@ -1,4 +1,3 @@
-using Common.Messaging;
 using Coop.Core.Server.Services.Instances;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
@@ -66,8 +65,7 @@ public class MissionMembershipTests
     {
         var members = SetupClients().Take(2).ToArray();
         var departures = new List<MissionMemberDeparted>();
-        var messageBroker = TestEnvironment.Server.Resolve<IMessageBroker>();
-        messageBroker.Subscribe<MissionMemberDeparted>(payload => departures.Add(payload.What));
+        TestEnvironment.Server.Subscribe<MissionMemberDeparted>(payload => departures.Add(payload.What));
 
         Join(members[0]);
         Join(members[1]);
