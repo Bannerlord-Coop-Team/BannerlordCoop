@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Helpers;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -30,6 +31,7 @@ public readonly struct PartyDoneLogicAttempted : IEvent
     public readonly int PartyInfluenceChangeAmount;
     public readonly int PartyMoraleChangeAmount;
     public readonly bool DoNotApplyGoldTransactions;
+    public readonly PartyScreenHelper.PartyScreenMode PartyScreenMode;
 
     public PartyDoneLogicAttempted(
         Hero mainHero,
@@ -50,7 +52,8 @@ public readonly struct PartyDoneLogicAttempted : IEvent
         int partyGoldChangeAmount,
         int partyInfluenceChangeAmount,
         int partyMoraleChangeAmount,
-        bool doNotApplyGoldTransactions)
+        bool doNotApplyGoldTransactions,
+        PartyScreenHelper.PartyScreenMode partyScreenMode)
     {
         MainHero = mainHero;
         TakenPrisonersRoster = takenPrisonersRoster;
@@ -71,5 +74,6 @@ public readonly struct PartyDoneLogicAttempted : IEvent
         PartyInfluenceChangeAmount = partyInfluenceChangeAmount;
         PartyMoraleChangeAmount = partyMoraleChangeAmount;
         DoNotApplyGoldTransactions = doNotApplyGoldTransactions;
+        PartyScreenMode = partyScreenMode;
     }
 }

@@ -156,6 +156,9 @@ namespace Coop
 
         private void SetupLogging()
         {
+            const long maxLogFileSizeBytes = 30L * 1024 * 1024;
+            const long preservedLogBeginningBytes = 1L * 1024 * 1024;
+            const long compactedLogFileSizeBytes = 28L * 1024 * 1024;
             var outputTemplate = "[({ProcessId}) {Timestamp:HH:mm:ss} {Level:u3} {SourceContext}] {Message:lj}{NewLine}{Exception}";
 
             var filePostfix = isServer ? "server" : "client";
@@ -182,7 +185,12 @@ namespace Coop
             LogManager.Configuration
                 .Enrich.WithProcessId()
                 //.WriteTo.Debug(outputTemplate: outputTemplate) // Disabled: floods VS Output window causing frame hitching when debugger is attached
-                .WriteTo.File(filePath, outputTemplate: outputTemplate)
+                .WriteTo.Sink(new SizeLimitedFileSink(
+                    filePath,
+                    outputTemplate,
+                    maxLogFileSizeBytes,
+                    preservedLogBeginningBytes,
+                    compactedLogFileSizeBytes))
 #if DEBUG
                 .MinimumLevel.Debug();
 #else
@@ -253,7 +261,7 @@ namespace Coop
 
         public override void NoHarmonyLoad()
         {
-            Coop = new CoopartiveMultiplayerExperience();
+            Coop = new CoopartiveMultiplayerExperience(isServer);
 
             Updateables.Add(GameThread.Instance);
 

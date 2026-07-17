@@ -41,6 +41,7 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
     private readonly IBattleNetwork network;
     private readonly IMessageBroker messageBroker;
     private readonly IBattleSession session;
+    private readonly IHostEpochPolicy hostEpochPolicy;
 
     // Every placement transition, in wire order. Deployment/Disband mutates vanilla's ordered
     // _undeployedWeapons list, so collapsing this to the latest value per point can bind a different
@@ -66,11 +67,12 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
     private float pendingStallSeconds;
     private const float PendingStallDeadlineSeconds = 15f;
 
-    public SiegeEngineDeploymentReplicator(IBattleNetwork network, IMessageBroker messageBroker, IBattleSession session)
+    public SiegeEngineDeploymentReplicator(IBattleNetwork network, IMessageBroker messageBroker, IBattleSession session, IHostEpochPolicy hostEpochPolicy)
     {
         this.network = network;
         this.messageBroker = messageBroker;
         this.session = session;
+        this.hostEpochPolicy = hostEpochPolicy;
 
         messageBroker.Subscribe<SiegeEnginePlacementChanged>(Handle_PlacementChanged);
         messageBroker.Subscribe<NetworkSiegeEnginePlacement>(Handle_NetworkPlacement);
@@ -94,9 +96,15 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
     {
         if (!session.IsLocalHost) return;
 
-        int pointId = payload.What.Point.Id.Id;
-        Record(pointId, payload.What.WeaponTypeName);
-        network.SendAll(new NetworkSiegeEnginePlacement(pointId, payload.What.WeaponTypeName));
+        BroadcastPlacement(payload.What.Point.Id.Id, payload.What.WeaponTypeName);
+    }
+
+    // [Host] Record one placement transition into the authoritative history and announce it, stamped
+    // with our hosting generation (BR-102) so receivers can drop it if we turn out to be deposed.
+    private void BroadcastPlacement(int pointId, string weaponTypeName)
+    {
+        Record(pointId, weaponTypeName);
+        network.SendAll(new NetworkSiegeEnginePlacement(pointId, weaponTypeName, session.HostEpoch));
     }
 
     private void Record(int pointId, string weaponTypeName)
@@ -115,6 +123,10 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
                 Logger.Warning("[BattleSync] Dropping siege engine placement for point {PointId}: no mission", obj.PointId);
                 return;
             }
+
+            // BR-102: a deposed host's in-flight placement must not corrupt vanilla's ordered
+            // undeployed-weapon mapping NOR enter the history below (it would be replayed to joiners).
+            if (DropStaleHostEpoch(obj.HostEpoch, nameof(NetworkSiegeEnginePlacement))) return;
 
             // Record at receipt, not successful apply: a client promoted while its own scene is still loading
             // must nevertheless retain the complete authoritative history for later joiners.
@@ -219,6 +231,19 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
         {
             sweepDone = SweepUndeployedWeapons();
         }
+    }
+
+    // BR-102: drop a host-authority message stamped by an earlier hosting generation (a deposed host
+    // in flight across a migration). Unstamped (0) senders, an unassigned (0) receiver, and epochs at
+    // or ahead of our assignment are accepted — see HostEpochPolicy for the convergence rationale.
+    private bool DropStaleHostEpoch(int messageEpoch, string messageName)
+    {
+        int localEpoch = session.HostEpoch;
+        if (!hostEpochPolicy.IsStale(messageEpoch, localEpoch)) return false;
+
+        Logger.Information("[BattleSync] Dropped {Message} stamped with stale host epoch {Stale} (current {Current})",
+            messageName, messageEpoch, localEpoch);
+        return true;
     }
 
     // Apply one FIFO prefix only. A blocked transition is a global ordering barrier: even if a later point is
@@ -388,9 +413,13 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
 
         GameThread.RunSafe(() =>
         {
+            // BR-102: the replay asserts deployment authority NOW, so it carries the CURRENT epoch —
+            // not the epoch each transition was minted under — or a joiner holding a newer assignment
+            // than a promoted successor's original one would drop the whole replay.
+            int hostEpoch = session.HostEpoch;
             foreach (var placement in placements)
             {
-                network.Send(controllerId, new NetworkSiegeEnginePlacement(placement.Key, placement.Value));
+                network.Send(controllerId, new NetworkSiegeEnginePlacement(placement.Key, placement.Value, hostEpoch));
             }
 
             if (placements.Count > 0)

@@ -16,10 +16,13 @@ internal readonly struct NetworkPlayerInteractionStarted : ICommand
     public readonly string DefenderPartyId;
     [ProtoMember(2)]
     public readonly string AttackerName;
+    [ProtoMember(3)]
+    public readonly bool IsLocationInteraction;
 
-    public NetworkPlayerInteractionStarted(string defenderPartyId, string attackerName)
+    public NetworkPlayerInteractionStarted(string defenderPartyId, string attackerName, bool isLocationInteraction = false)
     {
         DefenderPartyId = defenderPartyId;
         AttackerName = attackerName;
+        IsLocationInteraction = isLocationInteraction;
     }
 }

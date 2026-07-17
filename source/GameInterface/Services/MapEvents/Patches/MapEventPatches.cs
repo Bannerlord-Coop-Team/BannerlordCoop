@@ -2,6 +2,8 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Registry.Auto;
+using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
@@ -45,13 +47,22 @@ internal class MapEventPatches
 
     [HarmonyPatch(nameof(MapEvent.FinalizeEventAux))]
     [HarmonyPrefix]
-    private static bool Prefix_FinalizeEventAux(MapEvent __instance)
+    [HarmonyPriority(Priority.First)]
+    private static bool Prefix_FinalizeEventAux(MapEvent __instance, out bool __state)
     {
+        __state = false;
+
+        if (ModInformation.IsServer)
+            MessageBroker.Instance.Publish(__instance, new MapEventContributionFlushRequested(__instance));
+
         if (CallOriginalPolicy.IsOriginalAllowed())
             return true;
 
         if (ModInformation.IsServer)
+        {
+            __state = !__instance.IsFinalized;
             return true;
+        }
 
         var message = new MapEventFinalizeAttempted(__instance);
         MessageBroker.Instance.Publish(__instance, message);
@@ -61,20 +72,25 @@ internal class MapEventPatches
 
     [HarmonyPatch(nameof(MapEvent.FinalizeEventAux))]
     [HarmonyPostfix]
-    private static void Postfix_FinalizeEventAux(MapEvent __instance)
+    private static void Postfix_FinalizeEventAux(MapEvent __instance, bool __state, bool __runOriginal)
     {
-        // By this point the event's parties have left it, so the server can
-        // re-evaluate whether any player is still in a map event.
-        if (ModInformation.IsClient)
+        if (!__runOriginal || !__state)
             return;
 
+        // Keep the event registered while finalized handlers clear their per-event state.
         MessageBroker.Instance.Publish(__instance, new MapEventFinalized(__instance));
+        MessageBroker.Instance.Publish(__instance, new InstanceDestroyed<MapEvent>(__instance));
     }
 
     [HarmonyPatch(nameof(MapEvent.BattleState), MethodType.Setter)]
     [HarmonyPrefix]
+    [HarmonyPriority(Priority.First)]
     private static bool Prefix_BattleState(MapEvent __instance, BattleState value)
     {
+        if (ModInformation.IsServer &&
+            (value == BattleState.AttackerVictory || value == BattleState.DefenderVictory))
+            MessageBroker.Instance.Publish(__instance, new MapEventContributionFlushRequested(__instance));
+
         if (CallOriginalPolicy.IsOriginalAllowed())
         {
             return true;

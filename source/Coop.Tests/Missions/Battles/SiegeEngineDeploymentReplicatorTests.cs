@@ -18,7 +18,7 @@ public class SiegeEngineDeploymentReplicatorTests : IDisposable
 
     public SiegeEngineDeploymentReplicatorTests()
     {
-        sut = new SiegeEngineDeploymentReplicator(network.Object, messageBroker.Object, session.Object);
+        sut = new SiegeEngineDeploymentReplicator(network.Object, messageBroker.Object, session.Object, new HostEpochPolicy());
     }
 
     [Fact]

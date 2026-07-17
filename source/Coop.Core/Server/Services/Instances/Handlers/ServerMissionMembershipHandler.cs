@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
 using Common.Network.Session;
@@ -129,11 +129,11 @@ public class ServerMissionMembershipHandler : IHandler
         }
 
         // Local signal for battle host migration / successor cleanup (no-op for non-battle instances). A drop
-        // is NOT a retreat — the host adopts the dropped player's troops, so the reserve pointer is kept.
+        // withdraws the player's party like a retreat, so forget its reserve and re-spawn it fresh on rejoin.
         messageBroker.Publish(this, new MissionMemberDeparted(
             controllerId,
             instanceId,
-            wasRetreat: false,
+            wasRetreat: true,
             isInstanceEmpty: remaining.Count == 0));
     }
 }

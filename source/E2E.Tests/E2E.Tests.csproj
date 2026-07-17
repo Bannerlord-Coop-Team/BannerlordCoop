@@ -9,6 +9,12 @@
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <Optimize>false</Optimize>
+    <DebugType>portable</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
+
   <ItemGroup>
 	<PackageReference Include="Krafs.Publicizer" Version="2.3.0">
 		<PrivateAssets>all</PrivateAssets>

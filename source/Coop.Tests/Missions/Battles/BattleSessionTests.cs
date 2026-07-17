@@ -65,6 +65,31 @@ public class BattleSessionTests
     }
 
     [Fact]
+    [Trait("Requirement", "BR-102")]
+    public void HostEpoch_IsZeroWithoutAnInstance_EvenWhenTheRegistryHasOne()
+    {
+        hostRegistry.Set("mapEvent1", new BattleHostAssignment("us", Array.Empty<string>(), epoch: 3));
+        Assert.Equal(0, session.HostEpoch);
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-102")]
+    public void HostEpoch_TracksTheCurrentAssignment()
+    {
+        session.TryBegin("mapEvent1");
+
+        // No assignment received yet: 0 = "cannot judge", the unstamped/accept convention.
+        Assert.Equal(0, session.HostEpoch);
+
+        hostRegistry.Set("mapEvent1", new BattleHostAssignment("us", Array.Empty<string>(), epoch: 1));
+        Assert.Equal(1, session.HostEpoch);
+
+        // A migration replaces the assignment; the session reflects the new generation immediately.
+        hostRegistry.Set("mapEvent1", new BattleHostAssignment("other", new[] { "us" }, epoch: 2));
+        Assert.Equal(2, session.HostEpoch);
+    }
+
+    [Fact]
     public void IsHostController_MatchesTheRecordedHost()
     {
         session.TryBegin("mapEvent1");

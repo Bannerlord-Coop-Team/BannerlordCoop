@@ -111,7 +111,8 @@ public class BattleDeathMirrorTests : MissionTestEnvironment
             var mock = fixture.CreateMission(peer);
             peerController = peer.Resolve<CoopBattleController>();
             var registry = peer.Resolve<INetworkAgentRegistry>();
-            peerVictim = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+            peerVictim = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
             Assert.True(registry.TryRegisterAgent("owner", victimId, peerVictim));
 
             peer.Resolve<IMessageBroker>().Publish(this,
@@ -132,5 +133,49 @@ public class BattleDeathMirrorTests : MissionTestEnvironment
         Assert.Equal(222, victimMirror.DeathAction);
 
         GC.KeepAlive(peerController);
+    }
+
+    [Fact]
+    public void DeathBeforeRegistration_AppliesWhenPendingDeathsDrain()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        var victimId = Guid.NewGuid();
+        Agent peerVictim = null!;
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var broker = peer.Resolve<IMessageBroker>();
+            using var applier = new PuppetDeathApplier(
+                broker,
+                peer.Resolve<ICoopMissionComponent>(),
+                new CasualtyAttributionMap());
+
+            broker.Publish(this,
+                new NetworkBattleAgentDied(
+                    victimId,
+                    wounded: false,
+                    Guid.Empty,
+                    inflictedDamage: 100,
+                    victimBodyPart: BoneBodyPartType.Head,
+                    deathAction: 456));
+
+            applier.DrainPendingDeaths();
+
+            peerVictim = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+            Assert.True(registry.TryRegisterAgent("owner", victimId, peerVictim));
+
+            applier.DrainPendingDeaths();
+            Assert.False(registry.TryGetAgentInfo(victimId, out _));
+        });
+
+        Assert.True(AgentMirror.TryGet(peerVictim, out var victimMirror));
+        Assert.False(victimMirror.IsActive);
+        Assert.True(victimMirror.WasKilled);
+        Assert.Equal(456, victimMirror.DeathAction);
     }
 }

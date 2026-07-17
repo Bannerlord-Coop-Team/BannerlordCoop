@@ -34,10 +34,7 @@ internal static class PlayerPartyTeleportPatches
             MessageBroker.Instance.Publish(
                 mainParty,
                 new PartyBehaviorChangeAttempted(
-                    mainParty.Ai,
-                    AiBehavior.Hold,
-                    null,
-                    mainParty.Position,
+                    mainParty,
                     forcePosition: true,
                     isCurrentlyAtSea: mainParty.IsCurrentlyAtSea,
                     resetMovementToHold: true));
