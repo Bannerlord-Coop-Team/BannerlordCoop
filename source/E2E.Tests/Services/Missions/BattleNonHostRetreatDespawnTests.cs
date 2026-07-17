@@ -8,7 +8,6 @@ using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.Players;
 using Missions;
 using Missions.Battles;
-using Missions.Data;
 using Missions.Messages;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -135,7 +134,7 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
                 broker.Publish(this, new NetworkSpawnBattleAgents(new[]
                 {
                     new BattleAgentSpawnData(lateReplayId, replayCharacterId, default, BattleSideEnum.Attacker,
-                        100f, "A", null, 106, new Equipment(), new BodyProperties(), new Banner(), new(new(5)), default),
+                        100f, "A", null, 106, new Equipment(), new BodyProperties(), new Banner(), new(new()), default),
                 }));
                 Assert.False(registry.TryGetAgentInfo(lateReplayId, out _),
                     "a non-host's late replay must be dropped even when its party attribution is missing");
@@ -188,9 +187,9 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
                 broker.Publish(this, new NetworkSpawnBattleAgents(new[]
                 {
                     new BattleAgentSpawnData(playerAgentId, characterId, default, BattleSideEnum.Attacker, 100f,
-                        "A", disconnectedMapEventPartyId, 102, new Equipment(), new BodyProperties(), new Banner(), new(new(5)), default),
+                        "A", disconnectedMapEventPartyId, 102, new Equipment(), new BodyProperties(), new Banner(), new(new()), default),
                     new BattleAgentSpawnData(npcAgentId, characterId, default, BattleSideEnum.Attacker, 100f,
-                        "A", npcMapEventPartyId, 103, new Equipment(), new BodyProperties(), new Banner(), new(new(5)), default),
+                        "A", npcMapEventPartyId, 103, new Equipment(), new BodyProperties(), new Banner(), new(new()), default),
                 }));
 
                 Assert.False(registry.TryGetAgentInfo(playerAgentId, out _),
@@ -202,7 +201,7 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
                 broker.Publish(this, new NetworkSpawnBattleAgents(new[]
                 {
                     new BattleAgentSpawnData(freshPlayerAgentId, characterId, default, BattleSideEnum.Attacker, 100f,
-                        "A", disconnectedMapEventPartyId, 104, new Equipment(), new BodyProperties(), new Banner(), new(new(5)), default),
+                        "A", disconnectedMapEventPartyId, 104, new Equipment(), new BodyProperties(), new Banner(), new(new()), default),
                 }));
 
                 Assert.True(registry.TryGetAgentInfo(freshPlayerAgentId, out _),

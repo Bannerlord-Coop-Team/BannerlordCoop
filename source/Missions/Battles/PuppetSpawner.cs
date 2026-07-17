@@ -420,10 +420,7 @@ public class PuppetSpawner : IPuppetSpawner
 
     private MissionEquipment ResolveMissionEquipment(MissionEquipmentData data)
     {
-        MissionEquipment missionEquipment = null;
-        if (data == null || data.WeaponSlots.Count == 0) return missionEquipment;
-
-        missionEquipment = new MissionEquipment();
+        var missionEquipment = new MissionEquipment();
         for (EquipmentIndex equipmentIndex = EquipmentIndex.WeaponItemBeginSlot; equipmentIndex < EquipmentIndex.NumAllWeaponSlots; equipmentIndex++)
         {
             missionEquipment._weaponSlots[(int)equipmentIndex] = ResolveMissionWeapon(data.WeaponSlots[(int)equipmentIndex]);
@@ -433,12 +430,10 @@ public class PuppetSpawner : IPuppetSpawner
 
     private MissionWeapon ResolveMissionWeapon(MissionWeaponData data)
     {
-        MissionWeapon missionWeapon = new();
-        if (data == null) return missionWeapon;
-
+        // Items can be null
         objectManager.TryGetObject<ItemObject>(data.ItemObjectId, out var item);
 
-        missionWeapon = new MissionWeapon(item, data.ItemModifier, data.Banner, data.DataValue, data.ReloadPhase, ResolveMissionSubWeapon(data.AmmoWeaponData)?.Value);
+        var missionWeapon = new MissionWeapon(item, data.ItemModifier, data.Banner, data.DataValue, data.ReloadPhase, ResolveMissionSubWeapon(data.AmmoWeaponData)?.Value);
         return missionWeapon;
     }
 

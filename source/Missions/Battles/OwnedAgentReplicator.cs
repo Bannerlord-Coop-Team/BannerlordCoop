@@ -148,7 +148,7 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
 
             var spawnEquipment = agent.SpawnEquipment;
             var bodyProperties = agent.BodyPropertiesValue;
-            var banner = agent.Origin?.Banner;
+            var banner = agent.Origin.Banner;
             var missionEquipmentData = PackMissionEquipmentData(agent.Equipment);
 
             // Catch-up records carry the current holder. A migrated NPC must stay under the successor when its
@@ -259,7 +259,7 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
 
         var spawnEquipment = agent.SpawnEquipment;
         var bodyProperties = agent.BodyPropertiesValue;
-        var agentBanner = agent.Origin?.Banner;
+        var agentBanner = agent.Origin.Banner;
         var missionEquipmentData = PackMissionEquipmentData(agent.Equipment);
 
         BattleSideEnum side = agent.Team != null ? agent.Team.Side : BattleSideEnum.None;
@@ -321,13 +321,11 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
 
     private MissionEquipmentData PackMissionEquipmentData(MissionEquipment equipment)
     {
-        var missionEquipmentData = new MissionEquipmentData(new(5));
-        if (equipment == null) return missionEquipmentData;
-
+        var missionEquipmentData = new MissionEquipmentData(new());
         for (EquipmentIndex equipmentIndex = EquipmentIndex.WeaponItemBeginSlot; equipmentIndex < EquipmentIndex.NumAllWeaponSlots; equipmentIndex++)
         {
             var packedWeapon = PackMissionWeapon(equipment._weaponSlots[(int)equipmentIndex]);
-            missionEquipmentData.WeaponSlots[(int)equipmentIndex] = packedWeapon;
+            missionEquipmentData.WeaponSlots.Add(packedWeapon);
         }
         return missionEquipmentData;
     }
