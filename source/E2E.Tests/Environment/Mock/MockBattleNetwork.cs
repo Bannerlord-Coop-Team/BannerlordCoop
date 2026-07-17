@@ -1,5 +1,6 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.PacketHandlers;
+using E2E.Tests.Environment;
 using E2E.Tests.Environment.Extensions;
 using LiteNetLib;
 using Missions;
@@ -17,6 +18,7 @@ public class MockBattleNetwork : IBattleNetwork
     private readonly MeshNetworkRouter router;
 
     public NetPeer NetPeer { get; } = NetPeerExtensions.CreatePeer();
+    public PacketCollection NetworkSentPackets { get; } = new PacketCollection();
 
     public MockBattleNetwork(MeshNetworkRouter router)
     {
@@ -31,8 +33,8 @@ public class MockBattleNetwork : IBattleNetwork
     public void Send(string controllerId, IMessage message) => router.Send(this, controllerId, message);
     public void SendAllBut(string controllerId, IMessage message) => router.SendAllBut(this, controllerId, message);
 
-    // The battle stack only sends IMessage over the mesh; packet-level mesh routing isn't exercised in tests.
-    public void SendAll(IPacket packet) => throw new NotImplementedException();
+    // Packet broadcasts are captured for sender-path assertions; packet-level mesh routing isn't exercised.
+    public void SendAll(IPacket packet) => NetworkSentPackets.Add(packet);
     public void Send(string controllerId, IPacket packet) => throw new NotImplementedException();
     public void SendAllBut(string controllerId, IPacket packet) => throw new NotImplementedException();
 }

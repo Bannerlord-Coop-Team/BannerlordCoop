@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
 using Missions;
 using Missions.Agents.Packets;
@@ -16,6 +17,44 @@ namespace E2E.Tests.Services.Missions;
 public class BattleBlockingSyncTests : MissionTestEnvironment
 {
     public BattleBlockingSyncTests(ITestOutputHelper output) : base(output) { }
+
+    [Fact]
+    public void PollActions_GuardOnlyTransition_SendsActionPacket()
+    {
+        using var fixture = new MissionEngineFixture();
+        var owner = Clients.First();
+        SetControllerId(owner, "owner");
+
+        owner.Call(() =>
+        {
+            var mock = fixture.CreateMission(owner);
+            var component = owner.Resolve<ICoopMissionComponent>();
+            var registry = owner.Resolve<INetworkAgentRegistry>();
+            var network = owner.Resolve<MockBattleNetwork>();
+            var agentId = Guid.NewGuid();
+
+            var agent = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                .Controller(AgentControllerType.Player));
+            Assert.True(registry.TryRegisterAgent("owner", agentId, agent));
+            Assert.True(AgentMirror.TryGet(agent, out var mirror));
+
+            int action0 = agent.GetCurrentAction(0).Index;
+            int action1 = agent.GetCurrentAction(1).Index;
+            component.AgentActionHandler.PollActions();
+            Assert.Empty(network.NetworkSentPackets.GetPackets<AgentActionPacket>());
+
+            mirror.GuardMode = Agent.GuardMode.Left;
+            component.AgentActionHandler.PollActions();
+
+            AgentActionPacket packet = Assert.Single(
+                network.NetworkSentPackets.GetPackets<AgentActionPacket>());
+            Assert.Equal(agentId, Assert.Single(packet.AgentIds));
+            AgentActionData data = Assert.Single(packet.Actions);
+            Assert.Equal(action0, data.Action0Index);
+            Assert.Equal(action1, data.Action1Index);
+            Assert.Equal(Agent.GuardMode.Left, data.GuardMode);
+        });
+    }
 
     [Fact]
     public void ActionTick_ReassertsHeldGuardAfterNativeDecay_WithoutAnotherPacket()
