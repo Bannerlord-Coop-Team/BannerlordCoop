@@ -53,8 +53,11 @@ namespace Coop
 
         private static string ClientServerModeMessage = "";
 
+        private const int ServerFramesPerSecond = 60;
+
         private bool isServer = false;
         private bool isAutoConnect = false;
+        private FrameLimiter serverFrameLimiter;
         public override void NoHarmonyInit() 
         {
             AssemblyHellscape.CreateAssemblyBindingRedirects();
@@ -387,6 +390,24 @@ namespace Coop
 #if DEBUG
             TryAutoConnect();
 #endif
+
+            LimitServerFrameRate();
+        }
+
+        private void LimitServerFrameRate()
+        {
+            if (ModInformation.IsServer)
+            {
+                if (serverFrameLimiter == null)
+                {
+                    serverFrameLimiter = new FrameLimiter(TimeSpan.FromSeconds(1d / ServerFramesPerSecond));
+                }
+
+                serverFrameLimiter.Throttle();
+                return;
+            }
+
+            serverFrameLimiter = null;
         }
 
         private bool _managedAutoStarted = false;
