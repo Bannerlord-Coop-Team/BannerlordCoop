@@ -5,6 +5,7 @@ using Common.Serialization;
 using Common.Util;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Services.MobileParties;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
@@ -153,6 +154,13 @@ internal class HeroInterface : IHeroInterface
             playerHero.PartyBelongedTo = null;
             messageBroker.Publish(this, new PlayerCaptivityChanged(playerHero.PartyBelongedToAsPrisoner));
         }
+
+        // The transferred host save carries the server's always-visible party state
+        // (PartyVisibilityServerPatches) and the native load path never rebuilds fog of war
+        // (Campaign.GameInitTick only runs for new campaigns), so distant parties and their battle
+        // icons would stay revealed forever. Queued so it runs once the campaign state is entered
+        // and the hero switched to above is the local main party.
+        GameThread.RunSafe(PartyVisibilitySweep.RebuildAroundMainParty);
     }
 
     private void SetupNewHero(Hero hero, Action<Hero> assignNetworkIds)
@@ -162,9 +170,21 @@ internal class HeroInterface : IHeroInterface
         party.Anchor = new AnchorPoint(party);
 
         party.Party.OnFinishLoadState();
-        party.IsVisible = true;
 
         party.CheckPositionsForMapChangeAndUpdateIfNeeded();
+
+        // On the server this write is coerced to always-visible by PartyVisibilityOnServerPatch;
+        // on clients it computes the real fog-of-war state so a remote player's new party is not
+        // permanently revealed wherever it spawned (the native per-tick sweep only re-evaluates
+        // parties near the local main party).
+        if (MobileParty.MainParty != null)
+        {
+            party.Party.UpdateVisibilityAndInspected(MobileParty.MainParty.Position);
+        }
+        else
+        {
+            party.IsVisible = true;
+        }
 
         // Headless hosts run without the SandBox.View layer, so the visual manager is null there
         // and party visuals are optional (same contract as PartyBaseExtensions.GetPartyVisual).
