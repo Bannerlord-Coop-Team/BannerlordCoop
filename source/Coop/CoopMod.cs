@@ -6,6 +6,7 @@ using Coop.Lib.NoHarmony;
 using Coop.UI.LoadGameUI;
 using GameInterface;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
+using GameInterface.Services.Tournaments.UI;
 using GameInterface.Services.UI;
 using GameInterface.Utils;
 using HarmonyLib;
@@ -334,7 +335,10 @@ namespace Coop
                 gameInterface.PatchGameStarted();
 
             if (gameStarterObject is CampaignGameStarter campaignGameStarter)
+            {
                 campaignGameStarter.AddBehavior(new PlayerPartyInteractionCampaignBehavior());
+                campaignGameStarter.AddBehavior(new CoopTournamentCampaignBehavior());
+            }
         }
 
         protected override void OnBeforeInitialModuleScreenSetAsRoot()

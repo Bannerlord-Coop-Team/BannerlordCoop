@@ -102,6 +102,9 @@ internal class ConversationRequestHandler : IHandler
             return;
         }
 
+        if (PlayerPartyInteractionDialogState.HasActiveState)
+            return;
+
         var now = DateTime.UtcNow;
         if (now - lastRequestSentUtc < RequestCooldown)
             return; // drop: at most one request per cooldown window

@@ -56,7 +56,8 @@ internal class SaveGameHandler : IHandler
             current?.WorkshopPlayerData ?? empty.WorkshopPlayerData,
             current?.CaravansPlayerData ?? empty.CaravansPlayerData,
             current?.AlleyPlayerData ?? empty.AlleyPlayerData,
-            current?.InteractionsPlayerData ?? empty.InteractionsPlayerData);
+            current?.InteractionsPlayerData ?? empty.InteractionsPlayerData,
+            current?.TradePlayerData ?? empty.TradePlayerData);
 
         coopSessionProvider.CoopSession = session;
 
@@ -76,14 +77,17 @@ internal class SaveGameHandler : IHandler
             loaded?.WorkshopPlayerData ?? empty.WorkshopPlayerData,
             loaded?.CaravansPlayerData ?? empty.CaravansPlayerData,
             loaded?.AlleyPlayerData ?? empty.AlleyPlayerData,
-            loaded?.InteractionsPlayerData ?? empty.InteractionsPlayerData);
+            loaded?.InteractionsPlayerData ?? empty.InteractionsPlayerData,
+            loaded?.TradePlayerData ?? empty.TradePlayerData);
 
         coopSessionProvider.CoopSession = savedSession;
     }
 
     private void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> obj)
     {
-        if (savedSession.Players == null) return;
+        // savedSession is only set by GameLoaded; hosting a NEW campaign never loads a save, so
+        // there is no previous session (and no players) to restore.
+        if (savedSession?.Players == null) return;
 
         foreach (var player in savedSession.Players)
         {

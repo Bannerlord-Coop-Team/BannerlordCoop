@@ -1,4 +1,6 @@
-﻿using E2E.Tests.Util;
+﻿using Common.Network.Coalescing;
+using E2E.Tests.Util;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.ViewModelCollection;
@@ -31,11 +33,44 @@ public class HeroDeveloperSyncTests : SyncTestBase
     {
         var assertHelper = TestEnvironment.CreateAssertHelper<HeroDeveloper>(HeroDeveloperId);
 
-        Server.ObjectManager.TryGetObject<HeroDeveloper>(HeroDeveloperId, out var heroDeveloper);
-
         //TestEnvironment.AssertDictionaryField<HeroDeveloper, (PropertyObject, float)>(nameof(HeroDeveloper._skillXps));
         assertHelper.AssertPropertyOwnerField<HeroDeveloper, SkillObject>(nameof(HeroDeveloper._newFocuses));
-        TestEnvironment.AssertField<HeroDeveloper, int>(nameof(HeroDeveloper._totalXp), 123, defaultValue: heroDeveloper._totalXp);
+    }
+
+    [Fact]
+    public void Server_TotalXpSets_CoalesceToLatestValue()
+    {
+        var totalXpField = AccessTools.Field(typeof(HeroDeveloper), nameof(HeroDeveloper._totalXp));
+        var intercept = TestEnvironment.GetIntercept(totalXpField);
+        int initialTotalXp = 0;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject(HeroDeveloperId, out HeroDeveloper heroDeveloper));
+            initialTotalXp = heroDeveloper._totalXp;
+
+            intercept.Invoke(null, new object[] { heroDeveloper, 100 });
+            intercept.Invoke(null, new object[] { heroDeveloper, 250 });
+            intercept.Invoke(null, new object[] { heroDeveloper, 777 });
+
+            Assert.Equal(777, heroDeveloper._totalXp);
+        });
+
+        Assert.True(Server.Resolve<ISendCoalescer>().HasPending);
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject(HeroDeveloperId, out HeroDeveloper heroDeveloper));
+            Assert.Equal(initialTotalXp, heroDeveloper._totalXp);
+        }
+
+        TestEnvironment.FlushCoalescer();
+
+        Assert.False(Server.Resolve<ISendCoalescer>().HasPending);
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject(HeroDeveloperId, out HeroDeveloper heroDeveloper));
+            Assert.Equal(777, heroDeveloper._totalXp);
+        }
     }
 
     [Fact]
