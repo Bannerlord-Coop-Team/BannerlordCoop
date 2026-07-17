@@ -31,8 +31,6 @@ namespace GameInterface.Services.Time.Patches
                     ModInformation.IsClient,
                     isCoopFieldBattleActive))
             {
-                // Keep server-time correction live without simulating the hidden client map.
-                Campaign.Current?.TickMapTime(dt);
                 return;
             }
 
