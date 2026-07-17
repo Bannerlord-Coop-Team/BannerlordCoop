@@ -9,6 +9,7 @@ using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using GameInterface.Services.Villages.Interfaces;
 using LiteNetLib;
 using Serilog;
@@ -44,6 +45,7 @@ internal class ConversationRequestHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly ConversationPartyTracker conversationPartyTracker;
     private readonly PlayerPartyInteractionHandler playerPartyInteractionHandler;
+    private readonly IPlayerManager playerManager;
 
     private DateTime lastRequestSentUtc = DateTime.MinValue;
 
@@ -57,13 +59,15 @@ internal class ConversationRequestHandler : IHandler
         INetwork network,
         IObjectManager objectManager,
         ConversationPartyTracker conversationPartyTracker,
-        PlayerPartyInteractionHandler playerPartyInteractionHandler)
+        PlayerPartyInteractionHandler playerPartyInteractionHandler,
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.conversationPartyTracker = conversationPartyTracker;
         this.playerPartyInteractionHandler = playerPartyInteractionHandler;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<ConversationRequested>(Handle_ConversationRequested);
         messageBroker.Subscribe<NetworkRequestConversation>(Handle_NetworkRequestConversation);
@@ -87,14 +91,20 @@ internal class ConversationRequestHandler : IHandler
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
     }
 
-    /// <summary>[Client] Rate-limit, resolve ids, and forward the request to the server.</summary>
+    /// <summary>Route a local encounter request to the server-side approval flow.</summary>
     private void Handle_ConversationRequested(MessagePayload<ConversationRequested> payload)
     {
+        var request = payload.What;
+
+        if (ModInformation.IsServer)
+        {
+            ProcessServerConversationRequest(request);
+            return;
+        }
+
         var now = DateTime.UtcNow;
         if (now - lastRequestSentUtc < RequestCooldown)
             return; // drop: at most one request per cooldown window
-
-        var request = payload.What;
 
         if (!objectManager.TryGetIdWithLogging(request.DefenderParty, out var defenderId)) return;
         if (!objectManager.TryGetIdWithLogging(request.AttackerParty, out var attackerId)) return;
@@ -105,6 +115,35 @@ internal class ConversationRequestHandler : IHandler
 
         // On a client, SendAll targets the server (its only connected peer).
         network.SendAll(new NetworkRequestConversation(defenderId, attackerId, request.ForcePlayerOutFromSettlement, request.Source));
+    }
+
+    private void ProcessServerConversationRequest(ConversationRequested request)
+    {
+        var attackerIsPlayer = request.AttackerParty?.MobileParty?.IsPlayerParty() == true;
+        var defenderIsPlayer = request.DefenderParty?.MobileParty?.IsPlayerParty() == true;
+        if (attackerIsPlayer == defenderIsPlayer) return;
+
+        var playerParty = attackerIsPlayer
+            ? request.AttackerParty.MobileParty
+            : request.DefenderParty.MobileParty;
+
+        if (!PlayerManager.TryGetControlledObjectInfo(playerParty, out var controlInfo)) return;
+        if (!playerManager.TryGetPeer(controlInfo.ObjectControllerId, out var playerPeer)) return;
+        if (!objectManager.TryGetIdWithLogging(request.DefenderParty, out var defenderId)) return;
+        if (!objectManager.TryGetIdWithLogging(request.AttackerParty, out var attackerId)) return;
+
+        Logger.Debug(
+            "Starting server-detected conversation. AttackerId={AttackerId}, DefenderId={DefenderId}",
+            attackerId,
+            defenderId);
+
+        ProcessConversationRequest(
+            playerPeer,
+            new NetworkRequestConversation(
+                defenderId,
+                attackerId,
+                request.ForcePlayerOutFromSettlement,
+                request.Source));
     }
 
     /// <summary>[Server] Validate the request; reply to allow, or stay silent to reject.</summary>
