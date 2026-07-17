@@ -4,9 +4,9 @@ using ProtoBuf;
 namespace Coop.Core.Server.Connections.Messages;
 
 /// <summary>
-/// Marks the end of the reliable-ordered updates withheld while a joining client loaded.
+/// Marks the end of the reliable world replay sent to a joining client.
 /// </summary>
 [ProtoContract]
-public record NetworkJoinCatchUpComplete : IEvent
+public record NetworkJoinReplayComplete : IEvent
 {
 }

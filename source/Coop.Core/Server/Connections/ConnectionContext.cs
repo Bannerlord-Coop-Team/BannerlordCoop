@@ -32,7 +32,7 @@ public class ConnectionContext
         ISendCoalescer coalescer,
         IAttachmentIdMapper attachmentIdMapper,
         IExistingPlayerSender existingPlayerSender,
-        IJoinMobilePartyPositionSnapshotSender joinMobilePartyPositionSnapshotSender)
+        IJoinCampaignBaselineSender joinCampaignBaselineSender)
     {
         MessageBroker = messageBroker;
         Network = network;
@@ -47,7 +47,7 @@ public class ConnectionContext
         Coalescer = coalescer;
         AttachmentIdMapper = attachmentIdMapper;
         ExistingPlayerSender = existingPlayerSender;
-        JoinMobilePartyPositionSnapshotSender = joinMobilePartyPositionSnapshotSender;
+        JoinCampaignBaselineSender = joinCampaignBaselineSender;
     }
 
     public IMessageBroker MessageBroker { get; }
@@ -63,5 +63,5 @@ public class ConnectionContext
     public ISendCoalescer Coalescer { get; }
     public IAttachmentIdMapper AttachmentIdMapper { get; }
     public IExistingPlayerSender ExistingPlayerSender { get; }
-    public IJoinMobilePartyPositionSnapshotSender JoinMobilePartyPositionSnapshotSender { get; }
+    public IJoinCampaignBaselineSender JoinCampaignBaselineSender { get; }
 }

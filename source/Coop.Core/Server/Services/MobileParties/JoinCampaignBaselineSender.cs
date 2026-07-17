@@ -1,7 +1,9 @@
 ﻿using Common.Network;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Time.Interfaces;
 using LiteNetLib;
+using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -9,26 +11,34 @@ using static GameInterface.Services.ObjectManager.ObjectManager;
 
 namespace Coop.Core.Server.Services.MobileParties;
 
-public interface IJoinMobilePartyPositionSnapshotSender
+public interface IJoinCampaignBaselineSender
 {
     void Send(NetPeer peer);
 }
 
-internal sealed class JoinMobilePartyPositionSnapshotSender : IJoinMobilePartyPositionSnapshotSender
+internal sealed class JoinCampaignBaselineSender : IJoinCampaignBaselineSender
 {
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
+    private readonly IMapTimeTrackerInterface mapTimeTrackerInterface;
 
-    public JoinMobilePartyPositionSnapshotSender(INetwork network, IObjectManager objectManager)
+    public JoinCampaignBaselineSender(
+        INetwork network,
+        IObjectManager objectManager,
+        IMapTimeTrackerInterface mapTimeTrackerInterface)
     {
         this.network = network;
         this.objectManager = objectManager;
+        this.mapTimeTrackerInterface = mapTimeTrackerInterface;
     }
 
     public void Send(NetPeer peer)
     {
         var parties = Campaign.Current?.CampaignObjectManager?.MobileParties;
-        if (parties == null) return;
+        if (parties == null || !mapTimeTrackerInterface.TryGetCurrentTicks(out long serverTicks))
+        {
+            throw new InvalidOperationException("Cannot capture a join baseline without a loaded campaign");
+        }
 
         var positions = new List<MobilePartyPositionData>(parties.Count);
         foreach (MobileParty party in parties)
@@ -41,6 +51,8 @@ internal sealed class JoinMobilePartyPositionSnapshotSender : IJoinMobilePartyPo
                 party.Position));
         }
 
-        network.SendImmediate(peer, new NetworkJoinMobilePartyPositions(positions.ToArray()));
+        network.SendImmediate(
+            peer,
+            new NetworkJoinCampaignBaseline(serverTicks, positions.ToArray()));
     }
 }

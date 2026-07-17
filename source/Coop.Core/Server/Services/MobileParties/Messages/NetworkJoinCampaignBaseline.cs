@@ -32,16 +32,20 @@ public readonly struct MobilePartyPositionData
 }
 
 /// <summary>
-/// Sends current authoritative party positions immediately before a joining client enters the map.
+/// Authoritative time and party-position baseline for a joining client.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkJoinMobilePartyPositions : IMessage
+public readonly struct NetworkJoinCampaignBaseline : IMessage
 {
     [ProtoMember(1)]
+    public readonly long ServerTicks;
+
+    [ProtoMember(2)]
     public readonly MobilePartyPositionData[] Positions;
 
-    public NetworkJoinMobilePartyPositions(MobilePartyPositionData[] positions)
+    public NetworkJoinCampaignBaseline(long serverTicks, MobilePartyPositionData[] positions)
     {
+        ServerTicks = serverTicks;
         Positions = positions;
     }
 }

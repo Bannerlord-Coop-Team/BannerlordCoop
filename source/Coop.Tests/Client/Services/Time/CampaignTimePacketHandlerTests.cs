@@ -1,5 +1,6 @@
 ﻿using Common.PacketHandlers;
 using Common.Tests.Utils;
+using Coop.Core.Client.Messages;
 using Coop.Core.Client.Services.Time.Handlers;
 using Coop.Core.Common.Network.Packets;
 using GameInterface.Services.Time.Interfaces;
@@ -35,6 +36,7 @@ public class CampaignTimePacketHandlerTests
         handler.HandlePacket(null, packet);
 
         mapTimeTracker.Verify(m => m.SyncCampaignTime(packet.ServerTicks, 0f), Times.Once);
+        Assert.Single(broker.GetMessagesFromType<CampaignTimeSampleReceived>());
     }
 
     [Theory]

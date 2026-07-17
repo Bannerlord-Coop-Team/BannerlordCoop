@@ -9,20 +9,20 @@ using Xunit.Abstractions;
 
 namespace Coop.Tests.Server.Services.MobileParties;
 
-public class NetworkJoinMobilePartyPositionsTests
+public class NetworkJoinCampaignBaselineTests
 {
     private readonly ServerTestComponent serverComponent;
 
-    public NetworkJoinMobilePartyPositionsTests(ITestOutputHelper output)
+    public NetworkJoinCampaignBaselineTests(ITestOutputHelper output)
     {
         serverComponent = new ServerTestComponent(output);
     }
 
     [Fact]
-    public void PositionSnapshot_RoundTripsAllPartyPositions()
+    public void CampaignBaseline_RoundTripsTimeAndPartyPositions()
     {
         var serializer = serverComponent.Container.Resolve<ICommonSerializer>();
-        var message = new NetworkJoinMobilePartyPositions(new[]
+        var message = new NetworkJoinCampaignBaseline(987654321L, new[]
         {
             new MobilePartyPositionData(
                 "main_party",
@@ -33,8 +33,9 @@ public class NetworkJoinMobilePartyPositionsTests
         });
 
         byte[] bytes = serializer.Serialize(message);
-        var received = Assert.IsType<NetworkJoinMobilePartyPositions>(serializer.Deserialize<IMessage>(bytes));
+        var received = Assert.IsType<NetworkJoinCampaignBaseline>(serializer.Deserialize<IMessage>(bytes));
 
+        Assert.Equal(987654321L, received.ServerTicks);
         Assert.Equal(2, received.Positions.Length);
         Assert.Equal("main_party", received.Positions[0].MobilePartyId);
         Assert.Equal(12.5f, received.Positions[0].X);

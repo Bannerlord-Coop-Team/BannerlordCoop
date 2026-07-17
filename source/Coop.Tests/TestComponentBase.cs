@@ -98,7 +98,7 @@ internal abstract class TestComponentBase
         RegisterMock<ITimeControlInterface>(builder);
         RegisterMock<ITroopRosterInterface>(builder);
         RegisterMock<IMapTimeTrackerInterface>(builder);
-        RegisterMock<IJoinMobilePartyPositionSnapshotSender>(builder);
+        RegisterMock<IJoinCampaignBaselineSender>(builder);
         RegisterMock<ILoadingInterface>(builder);
         RegisterMock<ICoopSessionProvider>(builder);
         RegisterMock<ITroopRosterInterface>(builder);

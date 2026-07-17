@@ -46,8 +46,8 @@ public class ServerModule : CommonModule
         builder.RegisterType<CoopServer>().As<ICoopServer>().As<INetwork>().As<INetEventListener>().InstancePerLifetimeScope();
         builder.RegisterType<SendCoalescer>().As<ISendCoalescer>().InstancePerLifetimeScope();
         builder.RegisterType<CoopSaveManager>().As<ICoopSaveManager>().InstancePerLifetimeScope();
-        builder.RegisterType<JoinMobilePartyPositionSnapshotSender>()
-            .As<IJoinMobilePartyPositionSnapshotSender>()
+        builder.RegisterType<JoinCampaignBaselineSender>()
+            .As<IJoinCampaignBaselineSender>()
             .InstancePerDependency();
 
         // Withholds world broadcasts from a peer until it has the transfer save and has entered the
