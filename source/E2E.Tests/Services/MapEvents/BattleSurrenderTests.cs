@@ -1,6 +1,8 @@
 using Common.Messaging;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
+using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
@@ -368,6 +370,46 @@ public class BattleSurrenderTests : MapEventTestBase
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkStartAttackMission>());
         foreach (var client in Clients)
             Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkStartAttackMission>());
+    }
+
+    /// <summary>
+    /// BR-001's exclusivity extended to surrender: while a live mission (or simulation) owns the map event,
+    /// a surrender request must not conclude the battle under the players resolving it — the server refuses
+    /// it authoritatively (<see cref="ServerBattleModeArbiter"/> backstop; the client menu refusal is
+    /// <c>BattleModeEncounterOptionsPatch</c>). Releasing the claim — the state a mission's end broadcast
+    /// leaves behind — re-admits the surrender, which then resolves normally.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "BR-001")]
+    [Trait("Requirement", "BR-060")]
+    public void RecipientSurrender_WhileEventClaimed_IsRefusedUntilClaimReleases()
+    {
+        var setup = SetupTwoOpposingPlayersInBattle();
+
+        Server.Call(() => Assert.True(ServerBattleModeArbiter.TryClaimMission(setup.ctx.MapEventId)));
+        try
+        {
+            Server.NetworkSentMessages.Clear();
+
+            PublishRecipientSurrender(setup);
+
+            // Refused: nobody was captured, the event survives everywhere, and no encounter close was sent.
+            AssertCaptivity(Server, setup.recipientHeroId, null);
+            Server.Call(() => Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(setup.ctx.MapEventId, out _)));
+            foreach (var client in Clients)
+                client.Call(() => Assert.True(client.ObjectManager.TryGetObject<MapEvent>(setup.ctx.MapEventId, out _)));
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkClosePvpEncounter>());
+        }
+        finally
+        {
+            Server.Call(() => ServerBattleModeArbiter.Release(setup.ctx.MapEventId));
+        }
+
+        // The released claim re-admits the surrender, which resolves the battle as usual.
+        PublishRecipientSurrender(setup);
+
+        AssertCaptivity(Server, setup.recipientHeroId, setup.initiatorPartyId);
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkClosePvpEncounter>());
     }
 
     // ------------------------------------------------------------------

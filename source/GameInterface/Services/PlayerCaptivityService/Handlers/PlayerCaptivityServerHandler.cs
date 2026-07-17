@@ -288,6 +288,18 @@ internal class PlayerCaptivityServerHandler : IHandler
         {
             try
             {
+                // While a live mission or an auto-resolve simulation owns this event, a surrender would
+                // conclude the battle under the players resolving it — refuse it until the claim releases
+                // (mission instance emptied / event finalized). The client menu already refuses the option
+                // while claimed (BattleModeEncounterOptionsPatch); this is the authoritative backstop for
+                // the race where the claim lands between the client's menu refresh and its click.
+                if (ServerBattleModeArbiter.IsClaimed(payload.What.MapEventId))
+                {
+                    Logger.Information("[PvPEncounterClose] Refused surrender of {PartyId} in {MapEventId}: the event is claimed by an active mission/simulation",
+                        playerParty.StringId, payload.What.MapEventId ?? "<none>");
+                    return;
+                }
+
                 var playerPartyIds = MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, objectManager);
                 if (!objectManager.TryGetIdWithLogging(playerParty.Party, out var surrenderedPartyId)) return;
 
