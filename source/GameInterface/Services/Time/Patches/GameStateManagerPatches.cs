@@ -1,5 +1,8 @@
-﻿using HarmonyLib;
+﻿using Common;
+using GameInterface.Services.MapEvents;
+using HarmonyLib;
 using SandBox.View.Map;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
@@ -17,30 +20,44 @@ namespace GameInterface.Services.Time.Patches
         [HarmonyPatch(nameof(GameStateManager.OnTick))]
         static void Prefix(ref GameStateManager __instance, float dt)
         {
-            if (!(__instance.ActiveState is MapState))
-            {
-                MapState mapState = __instance.LastOrDefault<MapState>();
-                if (mapState == null) return;
+            var activeState = __instance.ActiveState;
+            if (activeState is MapState) return;
 
-                // Co-op keeps the (now backgrounded) map ticking so the world keeps simulating
-                // without pausing while another screen (clan, kingdom, inventory, crafting, etc.) is on top.
-                // Unlike vanilla, that forced tick also runs the inactive map handler's UI/input callbacks.
-                // Those callbacks read stale input and can take focus from the active screen, which triggers
-                // map hotkeys while typing and immediately clears fields such as the blacksmith weapon name.
-                // Temporarily detach the handler so campaign simulation keeps ticking without the inactive
-                // map UI. Always restore it in finally: if OnTick throws and the handler stays null, later map
-                // input and lifecycle callbacks would remain broken for the rest of the session.
-                var handler = mapState.Handler;
-                mapState.Handler = null;
-                try
-                {
-                    mapState.OnTick(dt);
-                }
-                finally
-                {
-                    mapState.Handler = handler;
-                }
+            bool isCoopFieldBattleActive =
+                Campaign.Current?.MainParty?.MapEvent?.IsFieldBattle == true &&
+                BattleSpawnGate.IsCoopBattleActive;
+            if (!ShouldRunBackgroundCampaignSimulation(
+                    activeState,
+                    ModInformation.IsClient,
+                    isCoopFieldBattleActive))
+            {
+                // Keep server-time correction live without simulating the hidden client map.
+                Campaign.Current?.TickMapTime(dt);
+                return;
             }
+
+            MapState mapState = __instance.LastOrDefault<MapState>();
+            if (mapState == null) return;
+
+            // Co-op keeps the background map simulating under non-battle screens without ticking its UI.
+            var handler = mapState.Handler;
+            mapState.Handler = null;
+            try
+            {
+                mapState.OnTick(dt);
+            }
+            finally
+            {
+                mapState.Handler = handler;
+            }
+        }
+
+        internal static bool ShouldRunBackgroundCampaignSimulation(
+            TaleWorlds.Core.GameState activeState,
+            bool isClient,
+            bool isCoopFieldBattleActive)
+        {
+            return !isClient || activeState is not MissionState || !isCoopFieldBattleActive;
         }
     }
 
