@@ -66,8 +66,8 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
 
     private readonly object gate = new object();
     private readonly Dictionary<string, MissionInstance> byInstanceId = new Dictionary<string, MissionInstance>();
-    private readonly Dictionary<string, (string instanceId, NetPeer peer)> membershipByController =
-        new Dictionary<string, (string, NetPeer)>();
+    private readonly Dictionary<string, MissionMembership> membershipByController =
+        new Dictionary<string, MissionMembership>();
 
     public void HandleIntroductionRequest(
         NatPunchModule natPunchModule, IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token)
@@ -155,7 +155,7 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
                 .ToList();
 
             instance.MapPeer(controllerId, peer);
-            membershipByController[controllerId] = (instanceId, peer);
+            membershipByController[controllerId] = new MissionMembership(instanceId, peer);
             Logger.Information("Controller {Controller} entered instance {Instance} on {Peer}",
                 controllerId, instanceId, peer);
 
@@ -230,9 +230,21 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
     private void RemoveMembership(string instanceId, string controllerId, NetPeer peer)
     {
         if (!membershipByController.TryGetValue(controllerId, out var membership) ||
-            membership.instanceId != instanceId || !ReferenceEquals(membership.peer, peer)) return;
+            membership.InstanceId != instanceId || !ReferenceEquals(membership.Peer, peer)) return;
 
         membershipByController.Remove(controllerId);
+    }
+
+    private readonly struct MissionMembership
+    {
+        public string InstanceId { get; }
+        public NetPeer Peer { get; }
+
+        public MissionMembership(string instanceId, NetPeer peer)
+        {
+            InstanceId = instanceId;
+            Peer = peer;
+        }
     }
 
     // Drop the instance record once its last member is gone (BR-017: destroying the battle instance includes
