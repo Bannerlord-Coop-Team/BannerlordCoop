@@ -34,10 +34,16 @@ public sealed class MirrorAgent
     /// <summary>The mission this agent was spawned into (its mock's shell) — read by the movement apply path's
     /// <c>agent.Mission != Mission.Current</c> staleness guard.</summary>
     public Mission Mission { get; set; }
-    // Movement state carried by AgentData (capture reads these, apply writes them back on the puppet).
+    // Networked movement and action state captured from the engine.
     public Vec3 LookDirection { get; set; }
     public Vec2 MovementDirection { get; set; }
     public Vec2 InputVector { get; set; }
+    public Agent.MovementControlFlag MovementFlags { get; set; }
+    public Agent.EventControlFlag EventControlFlags { get; set; }
+    public bool CrouchMode { get; set; }
+    public Agent.GuardMode GuardMode { get; set; } = Agent.GuardMode.None;
+    public int SetWeaponGuardCalls { get; set; }
+    public int ResetGuardCalls { get; set; }
 }
 
 /// <summary>

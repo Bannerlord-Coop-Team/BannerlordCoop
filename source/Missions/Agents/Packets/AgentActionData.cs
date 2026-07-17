@@ -37,6 +37,65 @@ namespace Missions.Agents.Packets
             return movementFlags & DefendMovementFlagsMask;
         }
 
+        internal static void ApplyGuardState(Agent agent, Agent.GuardMode guardMode)
+        {
+            if (!IsGuardMode(guardMode))
+            {
+                if (guardMode == Agent.GuardMode.None && IsGuardMode(agent.CurrentGuardMode))
+                {
+                    agent.ResetGuard();
+                }
+                return;
+            }
+
+            Agent.UsageDirection direction = GuardModeToUsageDirection(guardMode);
+            if (direction != Agent.UsageDirection.None)
+            {
+                agent.SetWeaponGuard(direction);
+            }
+        }
+
+        internal static bool IsGuardMode(Agent.GuardMode guardMode)
+        {
+            switch (guardMode)
+            {
+                case Agent.GuardMode.Up:
+                case Agent.GuardMode.Down:
+                case Agent.GuardMode.Left:
+                case Agent.GuardMode.Right:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private static Agent.UsageDirection GuardModeToUsageDirection(Agent.GuardMode guardMode)
+        {
+            switch (guardMode)
+            {
+                case Agent.GuardMode.Up:
+                    return Agent.UsageDirection.AttackUp;
+                case Agent.GuardMode.Down:
+                    return Agent.UsageDirection.AttackDown;
+                case Agent.GuardMode.Left:
+                    return Agent.UsageDirection.AttackLeft;
+                case Agent.GuardMode.Right:
+                    return Agent.UsageDirection.AttackRight;
+                default:
+                    return Agent.UsageDirection.None;
+            }
+        }
+
+        private static int ToWireGuardState(Agent.GuardMode guardMode)
+        {
+            return IsGuardMode(guardMode) ? (int)guardMode + 1 : 0;
+        }
+
+        private static Agent.GuardMode FromWireGuardState(int guardState)
+        {
+            return guardState > 0 ? (Agent.GuardMode)(guardState - 1) : Agent.GuardMode.None;
+        }
+
         public AgentActionData(Agent agent)
         {
             ActionIndexCache cache0 = agent.GetCurrentAction(0);
@@ -47,6 +106,7 @@ namespace Missions.Agents.Packets
             MovementFlag = (uint)agent.MovementFlags;
             EventFlag = (uint)agent.EventControlFlags;
             CrouchMode = agent.CrouchMode;
+            GuardState = ToWireGuardState(agent.CurrentGuardMode);
 
             Action0CodeType = (int)actionTypeCh0;
             Action0Index = cache0.Index;
@@ -123,5 +183,8 @@ namespace Missions.Agents.Packets
         public uint EventFlag { get; }
         [ProtoMember(11)]
         public bool CrouchMode { get; }
+        [ProtoMember(12)]
+        public int GuardState { get; }
+        internal Agent.GuardMode GuardMode => FromWireGuardState(GuardState);
     }
 }

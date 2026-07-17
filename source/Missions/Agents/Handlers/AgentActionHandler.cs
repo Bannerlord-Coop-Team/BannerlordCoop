@@ -15,11 +15,14 @@ namespace Missions.Agents.Handlers;
 public interface IAgentActionHandler : IPacketHandler, IDisposable
 {
     /// <summary>
-    /// [Game thread] Detect discrete action and defend-input changes on owned agents and broadcast them. Driven per-frame from
+    /// [Game thread] Detect discrete action, defend-input, and realized guard changes on owned agents and broadcast them. Driven per-frame from
     /// CoopMissionController.OnMissionTick: the game thread is the only place a
     /// one-frame action transition can be observed without racing the engine, and event capture must be exact.
     /// </summary>
     void PollActions();
+
+    /// <summary>[Game thread] Reassert received puppet guards once per mission frame.</summary>
+    void ApplyRemoteGuardStates();
 }
 
 /// <summary>
@@ -27,7 +30,7 @@ public interface IAgentActionHandler : IPacketHandler, IDisposable
 /// an event — "this agent started a punch/attack/jump" — that plays out locally over time. So instead of polling
 /// the full action state every tick and re-applying it (which lost one-frame triggers, fought the local
 /// animation, and churned the skeleton), this diffs each owned agent's action channels ON THE GAME THREAD and,
-/// only when a DISCRETE action or held defend input changes, broadcasts it
+/// only when a DISCRETE action, held defend input, or realized guard state changes, broadcasts it
 /// <see cref="DeliveryMethod.ReliableOrdered"/>. The receiver applies the transition and lets the engine advance
 /// it. Locomotion (walk/run/idle) is skipped — it is reproduced from the synced <c>MovementInputVector</c>.
 /// </summary>
@@ -43,9 +46,11 @@ public class AgentActionHandler : IAgentActionHandler
     private readonly INetworkAgentRegistry agentRegistry;
     private readonly IControllerIdProvider controllerIdProvider;
 
-    // Last observed action indices and defend input per owned agent, so we broadcast only on change. WasDiscrete
+    // Last observed action indices, defend input, and guard state per owned agent, so we broadcast only on change. WasDiscrete
     // lets us also send the END of a discrete action while still skipping locomotion<->locomotion churn.
     private readonly Dictionary<Guid, ActionState> _lastActions = new Dictionary<Guid, ActionState>();
+    private readonly Dictionary<Guid, Agent.GuardMode> _remoteGuardStates =
+        new Dictionary<Guid, Agent.GuardMode>();
 
     private bool _disposed;
 
@@ -54,17 +59,20 @@ public class AgentActionHandler : IAgentActionHandler
         public readonly int Action0;
         public readonly int Action1;
         public readonly Agent.MovementControlFlag DefendFlags;
+        public readonly Agent.GuardMode GuardMode;
         public readonly bool WasDiscrete;
 
         public ActionState(
             int action0,
             int action1,
             Agent.MovementControlFlag defendFlags,
+            Agent.GuardMode guardMode,
             bool wasDiscrete)
         {
             Action0 = action0;
             Action1 = action1;
             DefendFlags = defendFlags;
+            GuardMode = guardMode;
             WasDiscrete = wasDiscrete;
         }
     }
@@ -107,6 +115,7 @@ public class AgentActionHandler : IAgentActionHandler
             int action0 = agent.GetCurrentAction(0).Index;
             int action1 = agent.GetCurrentAction(1).Index;
             var defendFlags = AgentActionData.GetDefendMovementFlags(agent.MovementFlags);
+            Agent.GuardMode guardMode = agent.CurrentGuardMode;
 
             bool hadState = _lastActions.TryGetValue(info.AgentId, out var last);
             bool defendChanged;
@@ -118,16 +127,28 @@ public class AgentActionHandler : IAgentActionHandler
             {
                 defendChanged = defendFlags != Agent.MovementControlFlag.None;
             }
-            if (hadState && last.Action0 == action0 && last.Action1 == action1 && !defendChanged)
+
+            bool guardChanged;
+            if (hadState)
+            {
+                guardChanged = last.GuardMode != guardMode;
+            }
+            else
+            {
+                guardChanged = AgentActionData.IsGuardMode(guardMode);
+            }
+
+            if (hadState && last.Action0 == action0 && last.Action1 == action1
+                && !defendChanged && !guardChanged)
                 continue;
 
             bool nowDiscrete = IsDiscreteAction(agent.GetCurrentActionType(0))
                             || IsDiscreteAction(agent.GetCurrentActionType(1));
 
-            // Defend input can change before its animation index, so send those transitions explicitly too.
-            bool broadcast = defendChanged || nowDiscrete || (hadState && last.WasDiscrete);
+            // Defend input and realized guard state can change before the animation index, so send them explicitly too.
+            bool broadcast = defendChanged || guardChanged || nowDiscrete || (hadState && last.WasDiscrete);
 
-            _lastActions[info.AgentId] = new ActionState(action0, action1, defendFlags, nowDiscrete);
+            _lastActions[info.AgentId] = new ActionState(action0, action1, defendFlags, guardMode, nowDiscrete);
             if (!broadcast)
                 continue;
 
@@ -145,6 +166,42 @@ public class AgentActionHandler : IAgentActionHandler
             ids.CopyTo(start, idChunk, 0, count);
             actions.CopyTo(start, dataChunk, 0, count);
             client.SendAll(new AgentActionPacket(idChunk, dataChunk));
+        }
+    }
+
+    public void ApplyRemoteGuardStates()
+    {
+        if (_disposed || Mission.Current == null || _remoteGuardStates.Count == 0) return;
+
+        List<Guid> staleIds = null;
+        using (new AllowedThread())
+        {
+            foreach (var guardState in _remoteGuardStates)
+            {
+                Guid agentId = guardState.Key;
+                if (agentRegistry.IsLocallyControlled(agentId)
+                    || !agentRegistry.TryGetAgentInfo(agentId, out var info))
+                {
+                    (staleIds ??= new List<Guid>()).Add(agentId);
+                    continue;
+                }
+
+                Agent agent = info.Agent;
+                if (agent == null || agent.Mission != Mission.Current || !agent.IsActive())
+                {
+                    (staleIds ??= new List<Guid>()).Add(agentId);
+                    continue;
+                }
+
+                // Vanilla's cautious behavior asserts SetWeaponGuard every agent tick while guarding.
+                AgentActionData.ApplyGuardState(agent, guardState.Value);
+            }
+        }
+
+        if (staleIds == null) return;
+        foreach (Guid agentId in staleIds)
+        {
+            _remoteGuardStates.Remove(agentId);
         }
     }
 
@@ -175,6 +232,16 @@ public class AgentActionHandler : IAgentActionHandler
                         continue;
 
                     data.Apply(agent);
+
+                    Agent.GuardMode guardMode = data.GuardMode;
+                    if (AgentActionData.IsGuardMode(guardMode))
+                    {
+                        _remoteGuardStates[agentId] = guardMode;
+                    }
+                    else if (_remoteGuardStates.Remove(agentId))
+                    {
+                        AgentActionData.ApplyGuardState(agent, Agent.GuardMode.None);
+                    }
                 }
             }
         });
@@ -194,5 +261,6 @@ public class AgentActionHandler : IAgentActionHandler
 
         packetManager.RemovePacketHandler(this);
         _lastActions.Clear();
+        _remoteGuardStates.Clear();
     }
 }

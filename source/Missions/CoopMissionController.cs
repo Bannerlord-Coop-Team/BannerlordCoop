@@ -62,6 +62,10 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         // transition can't be observed reliably off-thread, so actions are event-synced from here instead of
         // polled with movement.
         coopMissionComponent.AgentActionHandler.PollActions();
+
+        // Controller.None puppets have no AI component to maintain a scripted guard, so reassert received
+        // guard state every frame just before the engine ticks the agents.
+        coopMissionComponent.AgentActionHandler.ApplyRemoteGuardStates();
         coopMissionComponent.MissileHandler.DrainPendingShots();
     }
 

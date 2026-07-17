@@ -110,8 +110,17 @@ public sealed class MissionEngineFixture : IDisposable
         // AgentMountData also snapshots action channel 1; report "no action" so capture works headless (the
         // apply side's GetActionNameWithCode already returns null headless and skips SetActionChannel).
         Prefix(typeof(Agent), nameof(Agent.GetCurrentAction), nameof(Agent_GetCurrentAction));
+        Prefix(typeof(Agent), nameof(Agent.GetCurrentActionType), nameof(Agent_GetCurrentActionType));
         Prefix(typeof(Agent), nameof(Agent.GetCurrentAnimationFlag), nameof(Agent_GetCurrentAnimationFlag));
         Prefix(typeof(Agent), nameof(Agent.GetCurrentActionProgress), nameof(Agent_GetCurrentActionProgress));
+        Prefix(typeof(Agent), "get_MovementFlags", nameof(Agent_get_MovementFlags));
+        Prefix(typeof(Agent), "set_MovementFlags", nameof(Agent_set_MovementFlags));
+        Prefix(typeof(Agent), "get_EventControlFlags", nameof(Agent_get_EventControlFlags));
+        Prefix(typeof(Agent), "set_EventControlFlags", nameof(Agent_set_EventControlFlags));
+        Prefix(typeof(Agent), "get_CrouchMode", nameof(Agent_get_CrouchMode));
+        Prefix(typeof(Agent), "get_CurrentGuardMode", nameof(Agent_get_CurrentGuardMode));
+        Prefix(typeof(Agent), nameof(Agent.SetWeaponGuard), nameof(Agent_SetWeaponGuard));
+        Prefix(typeof(Agent), nameof(Agent.ResetGuard), nameof(Agent_ResetGuard));
         Prefix(typeof(Team), nameof(Team.GetFormation), nameof(Team_GetFormation));
         Prefix(typeof(Formation), nameof(Formation.SetControlledByAI), nameof(Formation_SetControlledByAI));
         Prefix(typeof(Formation), nameof(Formation.SetMovementOrder), nameof(Formation_SetMovementOrder));
@@ -509,6 +518,13 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
+    private static bool Agent_GetCurrentActionType(Agent __instance, ref Agent.ActionCodeType __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out _)) return true;
+        __result = Agent.ActionCodeType.Idle;
+        return false;
+    }
+
     private static bool Agent_GetCurrentAnimationFlag(Agent __instance, ref AnimFlags __result)
     {
         if (!AgentMirror.TryGet(__instance, out _)) return true;
@@ -520,6 +536,70 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!AgentMirror.TryGet(__instance, out _)) return true;
         __result = 0f;
+        return false;
+    }
+
+    private static bool Agent_get_MovementFlags(Agent __instance, ref Agent.MovementControlFlag __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.MovementFlags;
+        return false;
+    }
+
+    private static bool Agent_set_MovementFlags(Agent __instance, Agent.MovementControlFlag value)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.MovementFlags = value;
+        return false;
+    }
+
+    private static bool Agent_get_EventControlFlags(Agent __instance, ref Agent.EventControlFlag __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.EventControlFlags;
+        return false;
+    }
+
+    private static bool Agent_set_EventControlFlags(Agent __instance, Agent.EventControlFlag value)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.EventControlFlags = value;
+        return false;
+    }
+
+    private static bool Agent_get_CrouchMode(Agent __instance, ref bool __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.CrouchMode;
+        return false;
+    }
+
+    private static bool Agent_get_CurrentGuardMode(Agent __instance, ref Agent.GuardMode __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.GuardMode;
+        return false;
+    }
+
+    private static bool Agent_SetWeaponGuard(Agent __instance, Agent.UsageDirection direction)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.SetWeaponGuardCalls++;
+        switch (direction)
+        {
+            case Agent.UsageDirection.AttackUp: m.GuardMode = Agent.GuardMode.Up; break;
+            case Agent.UsageDirection.AttackDown: m.GuardMode = Agent.GuardMode.Down; break;
+            case Agent.UsageDirection.AttackLeft: m.GuardMode = Agent.GuardMode.Left; break;
+            case Agent.UsageDirection.AttackRight: m.GuardMode = Agent.GuardMode.Right; break;
+        }
+        return false;
+    }
+
+    private static bool Agent_ResetGuard(Agent __instance)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.ResetGuardCalls++;
+        m.GuardMode = Agent.GuardMode.None;
         return false;
     }
 
