@@ -58,6 +58,60 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             Assert.Equal(action1, data.Action1Index);
             Assert.Equal(Agent.GuardMode.Left, data.GuardMode);
             Assert.Equal(1L, Assert.Single(packet.Sequences));
+            Assert.Equal(0, packet.BattleHostEpoch);
+        });
+    }
+
+    [Theory]
+    [InlineData("owner", 7)]
+    [InlineData("other-host", 0)]
+    public void PollActions_StampsEpochOnlyForBattleHost(
+        string hostControllerId,
+        int expectedEpoch)
+    {
+        using var fixture = new MissionEngineFixture();
+        var owner = Clients.First();
+        SetControllerId(owner, "owner");
+
+        owner.Call(() =>
+        {
+            const string mapEventId = "mapEvent1";
+            BattleSpawnGate.BeginBattle(mapEventId);
+            try
+            {
+                var mock = fixture.CreateMission(owner);
+                var component = owner.Resolve<ICoopMissionComponent>();
+                var registry = owner.Resolve<INetworkAgentRegistry>();
+                var network = owner.Resolve<MockBattleNetwork>();
+                var hosts = owner.Resolve<IBattleHostRegistry>();
+                var agentId = Guid.NewGuid();
+
+                hosts.Set(
+                    mapEventId,
+                    new BattleHostAssignment(
+                        hostControllerId,
+                        Array.Empty<string>(),
+                        epoch: 7));
+
+                var agent = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                    .Controller(AgentControllerType.Player));
+                Assert.True(registry.TryRegisterAgent("owner", agentId, agent));
+                Assert.True(AgentMirror.TryGet(agent, out var mirror));
+
+                component.AgentActionHandler.PollActions();
+                Assert.Empty(network.NetworkSentPackets.GetPackets<AgentActionPacket>());
+
+                mirror.GuardMode = Agent.GuardMode.Right;
+                component.AgentActionHandler.PollActions();
+
+                AgentActionPacket packet = Assert.Single(
+                    network.NetworkSentPackets.GetPackets<AgentActionPacket>());
+                Assert.Equal(expectedEpoch, packet.BattleHostEpoch);
+            }
+            finally
+            {
+                BattleSpawnGate.EndBattle();
+            }
         });
     }
 
@@ -426,6 +480,16 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                     epoch: 2);
                 DrainGameThread();
 
+                broker.Publish(this, new NetworkMissionPeerEntered("A", mapEventId));
+                AssignBattleHost(
+                    broker,
+                    hosts,
+                    mapEventId,
+                    "B",
+                    Array.Empty<string>(),
+                    epoch: 2);
+                DrainGameThread();
+
                 var puppet = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
                     .Controller(AgentControllerType.None));
                 Assert.True(registry.TryRegisterAgent("A", agentId, puppet));
@@ -590,7 +654,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void LaterSuccessorAction_WaitsAcrossConsecutiveMigrations()
+    public void LaterSuccessorAction_WaitsAcrossMigrationsAfterOldHostRejoins()
     {
         using var fixture = new MissionEngineFixture();
         var observer = Clients.First();
@@ -669,6 +733,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 Assert.Equal(Agent.GuardMode.None, puppetMirror.GuardMode);
                 Assert.Equal(0, puppetMirror.SetWeaponGuardCalls);
 
+                broker.Publish(this, new NetworkMissionPeerEntered("A", mapEventId));
                 broker.Publish(this, new MissionPeerDisconnected("B", mapEventId));
                 AssignBattleHost(
                     broker,

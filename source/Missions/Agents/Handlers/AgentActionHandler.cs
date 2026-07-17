@@ -860,11 +860,43 @@ public class AgentActionHandler : IAgentActionHandler
                 return;
             }
 
-            var sourceAuthorities = new HashSet<string>(absentAuthorities);
-            _migrationLineages[hostEpoch] =
-                new MigrationLineage(hostControllerId, sourceAuthorities);
+            var directSourceAuthorities = new HashSet<string>(absentAuthorities);
+            var lineageSourceAuthorities =
+                new HashSet<string>(directSourceAuthorities);
+            foreach (var existingLineageByEpoch in _migrationLineages)
+            {
+                MigrationLineage existingLineage =
+                    existingLineageByEpoch.Value;
+                bool sameGeneration =
+                    existingLineageByEpoch.Key == hostEpoch
+                    && existingLineage.HostControllerId == hostControllerId;
+                if (sameGeneration
+                    || directSourceAuthorities.Contains(
+                        existingLineage.HostControllerId))
+                {
+                    lineageSourceAuthorities.UnionWith(
+                        existingLineage.SourceAuthorities);
+                }
+            }
 
-            foreach (string observedAuthority in sourceAuthorities)
+            _migrationLineages[hostEpoch] =
+                new MigrationLineage(
+                    hostControllerId,
+                    lineageSourceAuthorities);
+
+            List<Guid> inheritedAgentIds = null;
+            foreach (var migratedByAgent in _migratedActionAuthorities)
+            {
+                if (migratedByAgent.Value.BattleHostEpoch <= hostEpoch
+                    && directSourceAuthorities.Contains(
+                        migratedByAgent.Value.ControllerId))
+                {
+                    (inheritedAgentIds ??= new List<Guid>())
+                        .Add(migratedByAgent.Key);
+                }
+            }
+
+            foreach (string observedAuthority in directSourceAuthorities)
             {
                 foreach (CoopAgentInfo info in agentRegistry.GetAgents(
                     observedAuthority))
@@ -880,6 +912,20 @@ public class AgentActionHandler : IAgentActionHandler
                     _migratedActionAuthorities[info.AgentId] =
                         new MigratedActionAuthority(
                             observedAuthority,
+                            hostControllerId,
+                            hostEpoch);
+                }
+            }
+
+            if (inheritedAgentIds != null)
+            {
+                foreach (Guid agentId in inheritedAgentIds)
+                {
+                    MigratedActionAuthority inherited =
+                        _migratedActionAuthorities[agentId];
+                    _migratedActionAuthorities[agentId] =
+                        new MigratedActionAuthority(
+                            inherited.ObservedAuthority,
                             hostControllerId,
                             hostEpoch);
                 }
