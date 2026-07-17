@@ -1,4 +1,4 @@
-﻿using Common.Logging;
+using Common.Logging;
 using Common.Network;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.Inventory.TradeSkills.Data;
