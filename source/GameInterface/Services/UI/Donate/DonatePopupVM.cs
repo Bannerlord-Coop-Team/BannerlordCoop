@@ -19,9 +19,15 @@ public class DonatePopupVM : ViewModel
         "Bannerlord Coop is free and developed by volunteers.\n\n" +
         "Donations help cover servers, development tools, and other project costs so we can keep improving the mod.\n\n" +
         "If you enjoy the project and would like to support its development, consider donating.";
+    public string PayPalButtonText => "PayPal";
     public string BuyMeACoffeeButtonText => "Buy a Coffee";
     public string IfdianButtonText => "ifdian";
     public string CloseButtonText => "Close";
+
+    public void ActionPayPal()
+    {
+        System.Diagnostics.Process.Start("https://www.paypal.com/donate/?hosted_button_id=KHBSK4FXQ9GKS");
+    }
 
     public void ActionBuyMeACoffee()
     {
