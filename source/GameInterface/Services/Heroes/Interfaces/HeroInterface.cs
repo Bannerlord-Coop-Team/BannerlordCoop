@@ -165,7 +165,13 @@ internal class HeroInterface : IHeroInterface
         party.IsVisible = true;
 
         party.CheckPositionsForMapChangeAndUpdateIfNeeded();
-        MobilePartyVisualManager.Current.AddNewPartyVisualForParty(party);
+
+        // Headless hosts run without the SandBox.View layer, so the visual manager is null there
+        // and party visuals are optional (same contract as PartyBaseExtensions.GetPartyVisual).
+        // An unguarded call here aborts the whole hero setup before its network ids are assigned.
+        if (MobilePartyVisualManager.Current != null)
+            MobilePartyVisualManager.Current.AddNewPartyVisualForParty(party);
+
         CampaignEventDispatcher.Instance.OnPartyVisibilityChanged(party.Party);
 
         // Add to game managed lists
@@ -175,6 +181,10 @@ internal class HeroInterface : IHeroInterface
             Logger.Error("{type} was null when trying to register a {managedType}", typeof(CampaignObjectManager), typeof(Hero));
             return;
         }
+
+        // Restore the roster before assignNetworkIds registers it. Otherwise the AllowedThread AddToCounts
+        // patch sends a roster update before clients receive the hero creation message.
+        RestorePlayerMemberships(hero, party);
 
         // Assign the network StringIds BEFORE adding to the CampaignObjectManager. FindNextUniqueStringId derives
         // the next "PlayerN" from CampaignObjectType.MaxCreatedPostfixIndex, which is cached in OnItemAdded when an
@@ -204,6 +214,18 @@ internal class HeroInterface : IHeroInterface
         campaignObjectManager.AddHero(hero);
         campaignObjectManager.AddMobileParty(party);
         campaignObjectManager.AddClan(hero.Clan);
+    }
+
+    internal static void RestorePlayerMemberships(Hero hero, MobileParty party)
+    {
+        // PackageMainHero unregisters the player hero before packaging, so ClanBinaryPackage cannot store its
+        // network ID in the clan's hero and alive-lord caches.
+        if (!hero.Clan.Heroes.Contains(hero))
+            hero.Clan.OnLordAdded(hero);
+
+        // TroopRosterBinaryPackage excludes roster elements, so the imported party has an empty member roster.
+        if (party.MemberRoster.GetTroopCount(hero.CharacterObject) == 0)
+            party.MemberRoster.AddToCounts(hero.CharacterObject, 1, insertAtFront: true);
     }
 
     /// <summary>

@@ -4,11 +4,9 @@ using Coop.Core.Server.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Packets;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
-using Coop.IntegrationTests.Environment.Mock;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Handlers;
 using GameInterface.Services.MobileParties.Messages.Behavior;
-using LiteNetLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
@@ -26,42 +24,6 @@ public class PartyBehaviorTest
     }
 
     /// <summary>
-    /// Verify sending ControlledPartyBehaviorUpdated on the server
-    /// UpdatePartyBehavior triggers only on the server
-    /// </summary>
-    [Fact]
-    public void ControlledPartyBehaviorUpdated_Publishes_Server()
-    {
-        // Arrange
-        const string originControllerId = "Controller_1";
-        var data = new PartyBehaviorUpdateData("Test_Party", default, default, default, default, default, default, default, default)
-        {
-            OriginControllerId = originControllerId,
-        };
-        var message = new ControlledPartyBehaviorUpdated(data);
-
-        var client1 = TestEnvironment.Clients.First();
-        var server = TestEnvironment.Server;
-
-        // Act
-        client1.SimulateMessage(this, message);
-
-        // Assert
-        var update = Assert.Single(server.InternalMessages.GetMessages<UpdatePartyBehavior>());
-        Assert.Equal(originControllerId, update.BehaviorUpdateData.OriginControllerId);
-
-        var packet = Assert.Single(client1.Resolve<MockClient>().NetworkSentPackets.GetPackets<RequestMobilePartyBehaviorPacket>());
-        Assert.Equal(DeliveryMethod.ReliableOrdered, packet.DeliveryMethod);
-        Assert.Equal(originControllerId, packet.BehaviorUpdateData.OriginControllerId);
-
-        // Only publishes on the server
-        foreach (var client in TestEnvironment.Clients)
-        {
-            Assert.Equal(0, client.InternalMessages.GetMessageCount<UpdatePartyBehavior>());
-        }
-    }
-
-    /// <summary>
     /// Verify when the server internally receives PartyBehaviorUpdated
     /// UpdatePartyBehavior triggers on all other clients
     /// </summary>
@@ -69,12 +31,11 @@ public class PartyBehaviorTest
     public void ControlledPartyBehaviorUpdated_Publishes_AllClients()
     {
         // Arrange
-        var data = new PartyBehaviorUpdateData("Test_Party", default, default, default, default, default, default, default, default);
+        var data = new PartyBehaviorUpdateData("Test_Party", default, default, default, default, default, default, default);
 
         var message = new PartyBehaviorUpdated(ref data);
 
         var server = TestEnvironment.Server;
-
         // Act
         server.SimulateMessage(this, message);
 
@@ -94,13 +55,12 @@ public class PartyBehaviorTest
     [Fact]
     public void ServerCoalescesPartyBehaviorUpdates_SendsLatestOnly()
     {
-        // Arrange: two updates for the same party, distinguished by HasTarget so the latest is identifiable.
-        var first = new PartyBehaviorUpdateData("Test_Party", default, default, default, false, default, default, default, default);
-        var latest = new PartyBehaviorUpdateData("Test_Party", default, default, default, true, default, default, default, default);
-
+        var first = new PartyBehaviorUpdateData("Test_Party", default, default, default, default, default, default, default);
+        var expected = new CampaignVec2(new Vec2(42f, 24f), true);
+        var latest = first;
+        latest.MoveTargetPoint = expected;
         var server = TestEnvironment.Server;
 
-        // Act
         server.SimulateMessage(this, new PartyBehaviorUpdated(ref first));
         server.SimulateMessage(this, new PartyBehaviorUpdated(ref latest));
 
@@ -109,14 +69,13 @@ public class PartyBehaviorTest
 
         FlushCoalescer(server);
 
-        // Assert: the two updates for the same party collapse into one send carrying the latest behavior.
         var sent = Assert.Single(server.NetworkSentMessages.GetMessages<NetworkUpdatePartyBehavior>());
-        Assert.True(sent.BehaviorUpdateData.HasTarget);
+        AssertCampaignVec2Equal(expected, sent.BehaviorUpdateData.MoveTargetPoint);
 
         foreach (var client in TestEnvironment.Clients)
         {
-            var update = Assert.Single(client.InternalMessages.GetMessages<UpdatePartyBehavior>());
-            Assert.True(update.BehaviorUpdateData.HasTarget);
+            var received = Assert.Single(client.InternalMessages.GetMessages<UpdatePartyBehavior>());
+            AssertCampaignVec2Equal(expected, received.BehaviorUpdateData.MoveTargetPoint);
         }
     }
 
@@ -129,14 +88,13 @@ public class PartyBehaviorTest
         // Arrange
         const string compactPartyId = "Test_Party";
         const string fullPartyId = "MobileParty_Test_Party";
-        var pending = new PartyBehaviorUpdateData(compactPartyId, default, default, default, true, default, default, default, default);
-        var immediate = new PartyBehaviorUpdateData(fullPartyId, default, default, default, false, default, default, default, default)
+        var pending = new PartyBehaviorUpdateData(compactPartyId, default, default, default, default, default, default, default);
+        var immediate = new PartyBehaviorUpdateData(fullPartyId, default, default, default, default, default, default, default)
         {
             ForcePosition = true,
         };
 
         var server = TestEnvironment.Server;
-
         // Act
         server.SimulateMessage(this, new PartyBehaviorUpdated(ref pending));
         Assert.Equal(0, server.NetworkSentMessages.GetMessageCount<NetworkUpdatePartyBehavior>());
@@ -145,7 +103,7 @@ public class PartyBehaviorTest
 
         // Assert
         var sent = Assert.Single(server.NetworkSentMessages.GetMessages<NetworkUpdatePartyBehavior>());
-        Assert.False(sent.BehaviorUpdateData.HasTarget);
+        Assert.Null(sent.BehaviorUpdateData.InteractablePointId);
         Assert.True(sent.BehaviorUpdateData.ForcePosition);
 
         var serialized = server.EnsureSerializable(sent);
@@ -154,7 +112,7 @@ public class PartyBehaviorTest
         foreach (var client in TestEnvironment.Clients)
         {
             var update = Assert.Single(client.InternalMessages.GetMessages<UpdatePartyBehavior>());
-            Assert.False(update.BehaviorUpdateData.HasTarget);
+            Assert.Null(update.BehaviorUpdateData.InteractablePointId);
             Assert.True(update.BehaviorUpdateData.ForcePosition);
         }
     }
@@ -169,7 +127,6 @@ public class PartyBehaviorTest
             AiBehavior.EscortParty,
             "Old_Target",
             stalePoint,
-            true,
             stalePoint,
             default,
             stalePoint,
@@ -179,7 +136,6 @@ public class PartyBehaviorTest
             AiBehavior.GoToPoint,
             null,
             latestPoint,
-            false,
             latestPoint,
             default,
             latestPoint,
@@ -194,7 +150,7 @@ public class PartyBehaviorTest
             latestPredictions,
             ref staleEcho));
         Assert.Equal(AiBehavior.GoToPoint, staleEcho.NewAiBehavior);
-        Assert.False(staleEcho.HasTarget);
+        Assert.Null(staleEcho.InteractablePointId);
         Assert.Equal(latestPoint.X, staleEcho.BestTargetPoint.X);
         Assert.Equal(latestPoint.Y, staleEcho.BestTargetPoint.Y);
         Assert.Equal(latestPoint.IsOnLand, staleEcho.BestTargetPoint.IsOnLand);
@@ -232,5 +188,12 @@ public class PartyBehaviorTest
     private static void FlushCoalescer(EnvironmentInstance server)
     {
         server.Call(() => server.Resolve<ISendCoalescer>().Flush(server.Resolve<INetwork>()));
+    }
+
+    private static void AssertCampaignVec2Equal(CampaignVec2 expected, CampaignVec2 actual)
+    {
+        Assert.Equal(expected.X, actual.X);
+        Assert.Equal(expected.Y, actual.Y);
+        Assert.Equal(expected.IsOnLand, actual.IsOnLand);
     }
 }

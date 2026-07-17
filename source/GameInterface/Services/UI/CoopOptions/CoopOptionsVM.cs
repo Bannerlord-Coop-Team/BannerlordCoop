@@ -88,6 +88,7 @@ public class CoopOptionsVM : ViewModel
             var options = optionsStore.LoadOrDefault();
             tab.Apply(options);
             optionsStore.Save(options);
+
             tab.AfterApply();
         }
         catch

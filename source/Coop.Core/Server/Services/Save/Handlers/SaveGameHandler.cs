@@ -83,7 +83,9 @@ internal class SaveGameHandler : IHandler
 
     private void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> obj)
     {
-        if (savedSession.Players == null) return;
+        // savedSession is only set by GameLoaded; hosting a NEW campaign never loads a save, so
+        // there is no previous session (and no players) to restore.
+        if (savedSession?.Players == null) return;
 
         foreach (var player in savedSession.Players)
         {

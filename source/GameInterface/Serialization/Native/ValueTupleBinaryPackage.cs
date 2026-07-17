@@ -1,4 +1,6 @@
 ﻿using Common.Extensions;
+using Common.Logging;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,6 +12,8 @@ namespace GameInterface.Serialization.Native
     [Serializable]
     public class ValueTupleBinaryPackage : IBinaryPackage
     {
+        private static readonly ILogger Logger = LogManager.GetLogger<ValueTupleBinaryPackage>();
+
         [NonSerialized]
         private IBinaryPackageFactory binaryPackageFactory;
         [NonSerialized]
@@ -72,6 +76,15 @@ namespace GameInterface.Serialization.Native
             foreach (string fieldName in StoredFields.Keys)
             {
                 var field = fields.FirstOrDefault(f => f.Name.Equals(fieldName));
+
+                // Cross-runtime field skew (see BinaryPackageBase.UnpackFields): skip fields the
+                // sender's runtime packed that don't exist on this runtime's type.
+                if (field == null)
+                {
+                    Logger.Warning("[FieldSkew] {Type} has no field '{Field}' on this runtime; skipping packed value", type.Name, fieldName);
+                    continue;
+                }
+
                 field.SetValue((object)Object, StoredFields[fieldName].Unpack(binaryPackageFactory));
             }
         }

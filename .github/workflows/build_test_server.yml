@@ -17,10 +17,10 @@ jobs:
 
     steps:
       # Check out our code
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v7
       # Prepare msbuild tools, can probably use dotnet and run's just like nuget but this was quicker to test
     - name: Setup MSBuild
-      uses: microsoft/setup-msbuild@v1
+      uses: microsoft/setup-msbuild@v3
 
       # Run Nuget restore to ensure we have all the packages for the test server
     - name: Nuget Restore

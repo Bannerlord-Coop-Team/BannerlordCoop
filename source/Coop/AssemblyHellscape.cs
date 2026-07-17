@@ -14,6 +14,7 @@ namespace Coop
             "Microsoft.Bcl.AsyncInterfaces",
             "System.Threading.Tasks.Extensions",
             "System.Text.Json",
+            "System.Text.Encodings.Web",
             "Serilog",
             "System.Diagnostics.DiagnosticSource",
             "System.Memory",
