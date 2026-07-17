@@ -1,0 +1,83 @@
+using TaleWorlds.Library;
+
+namespace Missions.Tournaments.Spectators;
+
+internal static class TournamentSpectatorEmpireArenaLayout
+{
+    public static TournamentSpectatorSceneLayout Layout { get; } = new(
+        new[]
+        {
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(359.910f, 455.954f, 3.304f), 3.141f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(375.810f, 455.954f, 3.304f), 3.141f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(349.672f, 455.954f, 3.304f), 3.141f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(410.592f, 456.088f, 3.304f), 3.133f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(397.434f, 456.200f, 3.304f), 3.133f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(332.708f, 447.955f, 3.304f), -2.211f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(419.504f, 416.523f, 3.304f), 0f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(353.040f, 416.594f, 3.304f), 0f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(398.405f, 416.546f, 3.304f), 0f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(425.318f, 455.963f, 3.304f), 3.133f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(441.553f, 446.670f, 3.304f), 2.027f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(347.542f, 416.599f, 3.304f), 0f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(332.637f, 424.140f, 3.304f), -0.997f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(389.286f, 416.555f, 3.304f), 0f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(373.969f, 416.571f, 3.304f), 0f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(440.576f, 424.889f, 3.304f), 1.050f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(422.045f, 416.521f, 3.304f), 0f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(433.466f, 418.856f, 3.304f), 0.491f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(367.366f, 465.356f, 7.554f), 0f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(351.877f, 465.356f, 7.554f), 0f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(337.007f, 462.820f, 7.554f), 0.363f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(325.479f, 453.692f, 7.554f), 1.034f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(322.275f, 448.306f, 7.554f), 1.289f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(320.781f, 441.900f, 7.554f), 3.100f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(320.345f, 431.278f, 7.554f), -0.019f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(321.715f, 424.210f, 7.554f), 1.916f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(325.822f, 417.078f, 7.554f), 2.302f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(336.732f, 408.914f, 7.554f), 2.735f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(347.908f, 407.297f, 7.554f), 3.137f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(363.608f, 407.219f, 7.554f), 3.137f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(379.347f, 407.141f, 7.554f), 3.137f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(394.960f, 407.063f, 7.554f), 3.137f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(410.643f, 406.985f, 7.554f), 3.137f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(426.460f, 406.906f, 7.554f), 3.137f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(439.899f, 410.685f, 7.554f), -2.616f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(449.147f, 419.665f, 7.554f), -2.198f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(450.993f, 423.155f, 7.554f), -1.841f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(452.241f, 430.529f, 7.554f), -0.096f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(450.634f, 448.567f, 7.554f), -1.213f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(452.121f, 441.504f, 7.554f), 3.120f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(442.739f, 459.555f, 7.554f), -0.723f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(429.519f, 465.079f, 7.554f), -0.121f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(417.710f, 465.294f, 7.554f), 0.010f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_16x04m", new Vec3(405.955f, 465.174f, 7.554f), 0.010f, new Vec3(16f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_04x04m", new Vec3(366.255f, 414.655f, 3.338f), 1.570f, new Vec3(4f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_04x04m", new Vec3(366.252f, 412.089f, 4.837f), 1.570f, new Vec3(4f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_04x04m", new Vec3(364.400f, 410.063f, 4.837f), 0f, new Vec3(4f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_04x04m", new Vec3(363.163f, 410.059f, 4.837f), 0f, new Vec3(4f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_04x04m", new Vec3(361.103f, 411.987f, 4.837f), -1.569f, new Vec3(4f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_04x04m", new Vec3(361.099f, 414.522f, 3.262f), -1.569f, new Vec3(4f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_04x04m", new Vec3(406.451f, 414.593f, 3.262f), -1.569f, new Vec3(4f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_04x04m", new Vec3(406.455f, 412.046f, 4.792f), -1.569f, new Vec3(4f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_04x04m", new Vec3(408.411f, 410.115f, 4.792f), 0.020f, new Vec3(4f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_04x04m", new Vec3(409.448f, 410.136f, 4.792f), 0.020f, new Vec3(4f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_04x04m", new Vec3(411.383f, 412.191f, 4.792f), 1.580f, new Vec3(4f, 1f, 4f)),
+            new TournamentSpectatorBarrierData("_barrier_04x04m", new Vec3(411.363f, 414.371f, 4.102f), 1.580f, new Vec3(4f, 1f, 4f))
+        },
+        new[]
+        {
+            new TournamentSpectatorSpawnData(1, new Vec3(400.833f, 458.222f, 4.045f), 3.136f),
+            new TournamentSpectatorSpawnData(2, new Vec3(442.656f, 448.405f, 4.045f), 2.077f),
+            new TournamentSpectatorSpawnData(3, new Vec3(445.852f, 442.646f, 4.045f), 2.077f),
+            new TournamentSpectatorSpawnData(4, new Vec3(442.886f, 424.708f, 4.045f), 1.070f),
+            new TournamentSpectatorSpawnData(5, new Vec3(419.170f, 415.069f, 4.045f), 0f),
+            new TournamentSpectatorSpawnData(6, new Vec3(407.946f, 415.177f, 4.045f), 0f),
+            new TournamentSpectatorSpawnData(7, new Vec3(399.709f, 415.256f, 4.045f), 0f),
+            new TournamentSpectatorSpawnData(8, new Vec3(373.324f, 414.999f, 4.045f), 0f),
+            new TournamentSpectatorSpawnData(9, new Vec3(351.942f, 415.028f, 4.045f), 0f),
+            new TournamentSpectatorSpawnData(10, new Vec3(329.728f, 425.905f, 4.045f), -1.138f),
+            new TournamentSpectatorSpawnData(11, new Vec3(330.756f, 448.657f, 4.045f), -1.138f),
+            new TournamentSpectatorSpawnData(12, new Vec3(349.860f, 457.740f, 4.045f), -2.095f),
+            new TournamentSpectatorSpawnData(13, new Vec3(386.592f, 466.554f, 8.280f), -3.137f)
+        });
+}
