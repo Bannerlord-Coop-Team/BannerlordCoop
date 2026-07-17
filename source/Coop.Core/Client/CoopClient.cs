@@ -45,7 +45,8 @@ public class CoopClient : CoopNetworkBase, ICoopClient
         IMessageBroker messageBroker,
         IPacketManager packetManager,
         IMessagePacketHandler messagePacketHandler,
-        ICommonSerializer serializer) : base(config, serializer)
+        ICommonSerializer serializer,
+        IGameThreadSession gameThreadSession) : base(config, serializer, gameThreadSession)
     {
         this.messageBroker = messageBroker;
         this.packetManager = packetManager;
@@ -132,6 +133,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 
         if (isConnected == true)
         {
+            isConnected = false;
             messageBroker.Publish(this, new SendInformationMessage(disconnectInfo.Reason.ToString()));
             messageBroker.Publish(this, new NetworkDisconnected(disconnectInfo));
         }
@@ -171,16 +173,17 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 
         if (isConnected)
         {
-            Dispose();
+            return;
         }
 
         reconnectPending = false;
         reconnectAfter = DateTime.MinValue;
 
-        netManager.Start();
-
         var ip = ResolveConnectAddress(Config.Address, preferIPv6: false);
         ServerEndpoint = new IPEndPoint(ip, Config.Port);
+
+        netManager.Start();
+        StartNetworkPoller();
 
         Logger.Information("Attempting connection to {Endpoint}...", ServerEndpoint);
         netManager.Connect(ServerEndpoint, Config.Token);

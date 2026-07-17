@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Coalescing;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.MobileParties;
 using LiteNetLib;
@@ -15,28 +16,38 @@ public class LoadingState : ConnectionStateBase
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IJoinCampaignBaselineSender campaignBaselineSender;
+    private readonly IConnectionMessageQueue connectionMessageQueue;
+    private readonly ISendCoalescer coalescer;
     private bool campaignEntryQueued;
     private volatile bool replayMarkerSent;
-    private bool baselineQueued;
-    private volatile bool baselineSent;
-    private volatile bool baselineRefreshQueued;
-    private volatile bool baselineRefreshed;
+    private volatile bool baselineSendQueued;
+    private volatile int initialBaselinesSent;
+    private volatile int finalBaselinesSent;
+    private volatile bool finalBaselinePhase;
+    private bool finalBarrierQueued;
+    private volatile bool worldReadySent;
     private bool catchUpAppliedQueued;
 
     public LoadingState(
         IConnectionLogic connectionLogic,
         IMessageBroker messageBroker,
         INetwork network,
-        IJoinCampaignBaselineSender campaignBaselineSender)
+        IJoinCampaignBaselineSender campaignBaselineSender,
+        IConnectionMessageQueue connectionMessageQueue,
+        ISendCoalescer coalescer)
         : base(connectionLogic)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.campaignBaselineSender = campaignBaselineSender;
+        this.connectionMessageQueue = connectionMessageQueue;
+        this.coalescer = coalescer;
 
         messageBroker.Subscribe<NetworkPlayerCampaignEntered>(PlayerCampaignEnteredHandler);
         messageBroker.Subscribe<NetworkJoinReplayApplied>(JoinReplayAppliedHandler);
         messageBroker.Subscribe<NetworkJoinCampaignBaselineRequested>(JoinCampaignBaselineRequestedHandler);
+        messageBroker.Subscribe<NetworkJoinCampaignBaselineApplied>(JoinCampaignBaselineAppliedHandler);
+        messageBroker.Subscribe<NetworkJoinFinalCampaignBaselineApplied>(JoinFinalCampaignBaselineAppliedHandler);
         messageBroker.Subscribe<NetworkJoinCatchUpApplied>(JoinCatchUpAppliedHandler);
     }
 
@@ -47,6 +58,8 @@ public class LoadingState : ConnectionStateBase
         messageBroker.Unsubscribe<NetworkPlayerCampaignEntered>(PlayerCampaignEnteredHandler);
         messageBroker.Unsubscribe<NetworkJoinReplayApplied>(JoinReplayAppliedHandler);
         messageBroker.Unsubscribe<NetworkJoinCampaignBaselineRequested>(JoinCampaignBaselineRequestedHandler);
+        messageBroker.Unsubscribe<NetworkJoinCampaignBaselineApplied>(JoinCampaignBaselineAppliedHandler);
+        messageBroker.Unsubscribe<NetworkJoinFinalCampaignBaselineApplied>(JoinFinalCampaignBaselineAppliedHandler);
         messageBroker.Unsubscribe<NetworkJoinCatchUpApplied>(JoinCatchUpAppliedHandler);
     }
 
@@ -61,8 +74,8 @@ public class LoadingState : ConnectionStateBase
         {
             if (ReferenceEquals(ConnectionLogic.State, this) == false) return;
 
-            // Flushing first puts the marker at the tail of every held reliable world update.
             messageBroker.Publish(this, new PlayerCampaignEntered(playerId));
+            connectionMessageQueue.Flush(playerId);
             replayMarkerSent = true;
             network.SendImmediate(playerId, new NetworkJoinReplayComplete());
         }, context: nameof(PlayerCampaignEnteredHandler));
@@ -71,16 +84,12 @@ public class LoadingState : ConnectionStateBase
     internal void JoinReplayAppliedHandler(MessagePayload<NetworkJoinReplayApplied> obj)
     {
         var playerId = (NetPeer)obj.Who;
-        if (playerId != ConnectionLogic.Peer || !replayMarkerSent || baselineQueued) return;
+        if (playerId != ConnectionLogic.Peer || !replayMarkerSent || initialBaselinesSent != 0) return;
 
-        baselineQueued = true;
-        GameThread.RunSafe(() =>
-        {
-            if (ReferenceEquals(ConnectionLogic.State, this) == false) return;
-
-            baselineSent = true;
-            campaignBaselineSender.Send(playerId);
-        }, context: nameof(JoinReplayAppliedHandler));
+        QueueBaseline(
+            playerId,
+            isFinalBaseline: false,
+            context: nameof(JoinReplayAppliedHandler));
     }
 
     internal void JoinCampaignBaselineRequestedHandler(
@@ -88,22 +97,88 @@ public class LoadingState : ConnectionStateBase
     {
         var playerId = (NetPeer)obj.Who;
         if (playerId != ConnectionLogic.Peer ||
-            !baselineSent ||
-            baselineRefreshQueued ||
-            catchUpAppliedQueued)
+            initialBaselinesSent == 0 ||
+            finalBarrierQueued)
         {
             return;
         }
 
-        baselineRefreshQueued = true;
+        QueueBaseline(
+            playerId,
+            isFinalBaseline: finalBaselinePhase,
+            context: nameof(JoinCampaignBaselineRequestedHandler));
+    }
+
+    private void QueueBaseline(NetPeer playerId, bool isFinalBaseline, string context)
+    {
+        if (baselineSendQueued || finalBarrierQueued) return;
+
+        baselineSendQueued = true;
+        GameThread.RunSafe(() =>
+        {
+            if (ReferenceEquals(ConnectionLogic.State, this) == false)
+            {
+                baselineSendQueued = false;
+                return;
+            }
+
+            coalescer.Flush(network);
+            connectionMessageQueue.Flush(playerId);
+            if (isFinalBaseline)
+            {
+                finalBaselinesSent++;
+            }
+            else
+            {
+                initialBaselinesSent++;
+            }
+            baselineSendQueued = false;
+            campaignBaselineSender.Send(playerId);
+        }, context: context);
+    }
+
+    internal void JoinCampaignBaselineAppliedHandler(
+        MessagePayload<NetworkJoinCampaignBaselineApplied> obj)
+    {
+        var playerId = (NetPeer)obj.Who;
+        if (playerId != ConnectionLogic.Peer ||
+            initialBaselinesSent < 2 ||
+            baselineSendQueued ||
+            finalBaselinePhase ||
+            finalBarrierQueued)
+        {
+            return;
+        }
+
+        finalBaselinePhase = true;
+        QueueBaseline(
+            playerId,
+            isFinalBaseline: true,
+            context: nameof(JoinCampaignBaselineAppliedHandler));
+    }
+
+    internal void JoinFinalCampaignBaselineAppliedHandler(
+        MessagePayload<NetworkJoinFinalCampaignBaselineApplied> obj)
+    {
+        var playerId = (NetPeer)obj.Who;
+        if (playerId != ConnectionLogic.Peer ||
+            !finalBaselinePhase ||
+            finalBaselinesSent == 0 ||
+            baselineSendQueued ||
+            finalBarrierQueued)
+        {
+            return;
+        }
+
+        finalBarrierQueued = true;
         GameThread.RunSafe(() =>
         {
             if (ReferenceEquals(ConnectionLogic.State, this) == false) return;
 
-            baselineRefreshed = true;
-            baselineRefreshQueued = false;
-            campaignBaselineSender.Send(playerId);
-        }, context: nameof(JoinCampaignBaselineRequestedHandler));
+            coalescer.Flush(network);
+            worldReadySent = true;
+            connectionMessageQueue.OpenWithTail(playerId, new NetworkJoinWorldReady());
+        }, context: nameof(JoinFinalCampaignBaselineAppliedHandler));
     }
 
     internal void JoinCatchUpAppliedHandler(MessagePayload<NetworkJoinCatchUpApplied> obj)
@@ -111,9 +186,7 @@ public class LoadingState : ConnectionStateBase
         var playerId = (NetPeer)obj.Who;
 
         if (playerId != ConnectionLogic.Peer ||
-            !baselineSent ||
-            baselineRefreshQueued ||
-            !baselineRefreshed ||
+            !worldReadySent ||
             catchUpAppliedQueued)
         {
             return;

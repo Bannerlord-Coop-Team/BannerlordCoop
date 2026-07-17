@@ -1,13 +1,13 @@
-﻿using Common.Network;
+﻿using Common.Logging;
+using Common.Network;
 using Coop.Core.Server.Services.MobileParties.Messages;
-using GameInterface.Services.ObjectManager;
+using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.Time.Interfaces;
 using LiteNetLib;
+using Serilog;
 using System;
-using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
-using static GameInterface.Services.ObjectManager.ObjectManager;
 
 namespace Coop.Core.Server.Services.MobileParties;
 
@@ -18,18 +18,20 @@ public interface IJoinCampaignBaselineSender
 
 internal sealed class JoinCampaignBaselineSender : IJoinCampaignBaselineSender
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<JoinCampaignBaselineSender>();
+
     private readonly INetwork network;
-    private readonly IObjectManager objectManager;
     private readonly IMapTimeTrackerInterface mapTimeTrackerInterface;
+    private readonly IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot;
 
     public JoinCampaignBaselineSender(
         INetwork network,
-        IObjectManager objectManager,
-        IMapTimeTrackerInterface mapTimeTrackerInterface)
+        IMapTimeTrackerInterface mapTimeTrackerInterface,
+        IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot)
     {
         this.network = network;
-        this.objectManager = objectManager;
         this.mapTimeTrackerInterface = mapTimeTrackerInterface;
+        this.mobilePartyBehaviorSnapshot = mobilePartyBehaviorSnapshot;
     }
 
     public void Send(NetPeer peer)
@@ -40,19 +42,28 @@ internal sealed class JoinCampaignBaselineSender : IJoinCampaignBaselineSender
             throw new InvalidOperationException("Cannot capture a join baseline without a loaded campaign");
         }
 
-        var positions = new List<MobilePartyPositionData>(parties.Count);
-        foreach (MobileParty party in parties)
+        var partyStates = new MobilePartyJoinState[parties.Count];
+        bool isComplete = true;
+        for (int i = 0; i < parties.Count; i++)
         {
-            if (!objectManager.TryGetIdWithLogging(party, out string partyId))
-                continue;
+            MobileParty party = parties[i];
+            if (!mobilePartyBehaviorSnapshot.TryCreateJoinState(party, out MobilePartyJoinState state))
+            {
+                Logger.Warning("Could not capture a complete join baseline for party {Party}", party?.StringId);
+                isComplete = false;
+                break;
+            }
 
-            positions.Add(new MobilePartyPositionData(
-                Compact(partyId, typeof(MobileParty)),
-                party.Position));
+            PartyBehaviorUpdateData behavior = state.Behavior;
+            behavior.ForcePosition = true;
+            state.Behavior = behavior;
+            partyStates[i] = state;
         }
+
+        if (isComplete == false) partyStates = Array.Empty<MobilePartyJoinState>();
 
         network.SendImmediate(
             peer,
-            new NetworkJoinCampaignBaseline(serverTicks, positions.ToArray()));
+            new NetworkJoinCampaignBaseline(serverTicks, partyStates, isComplete));
     }
 }

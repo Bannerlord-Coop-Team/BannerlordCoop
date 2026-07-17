@@ -4,9 +4,9 @@ using ProtoBuf;
 namespace Coop.Core.Server.Connections.Messages;
 
 /// <summary>
-/// Confirms that a joining client applied the final reliable world-stream marker.
+/// Marks the reliable world-stream point at which a joining client can enter the map.
 /// </summary>
 [ProtoContract]
-public record NetworkJoinCatchUpApplied : IEvent
+public record NetworkJoinWorldReady : IEvent
 {
 }

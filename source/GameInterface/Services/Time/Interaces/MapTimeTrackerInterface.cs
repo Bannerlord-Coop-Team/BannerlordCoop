@@ -44,12 +44,11 @@ public interface IMapTimeTrackerInterface : IGameAbstraction
     void ApplyCampaignJoinBaseline(long serverTicks);
 
     /// <summary>
-    /// Evaluates a post-baseline heartbeat to finish local catch-up or request a fresher baseline.
+    /// Evaluates post-baseline heartbeats until local campaign time is current.
     /// </summary>
     /// <param name="baselineRefreshRequired">
-    /// True when this baseline arrived far enough behind the server that a fresher world baseline is required.
+    /// True when the party and time baseline is too stale and must be requested again.
     /// </param>
-    /// <returns>True when the caller can finish the join or request the indicated refresh.</returns>
     bool TryCompleteCampaignJoinCatchUp(out bool baselineRefreshRequired);
 
     /// <summary>
@@ -369,7 +368,6 @@ internal class MapTimeTrackerInterface : IMapTimeTrackerInterface
             hasPostJoinBaselineHeartbeat = true;
             joinBaselineRequiresRefresh = joinBaselineRequiresRefresh || isDiscontinuity;
         }
-
         if (isDiscontinuity == false &&
             elapsedSincePreviousHeartbeat > 0f &&
             !skipNextServerRateEstimate)

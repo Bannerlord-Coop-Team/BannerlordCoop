@@ -4,7 +4,7 @@ using ProtoBuf;
 namespace Coop.Core.Server.Connections.Messages;
 
 /// <summary>
-/// Requests a fresher reliable time and party-position baseline while joining.
+/// Requests another complete time and mobile-party baseline while joining.
 /// </summary>
 [ProtoContract]
 public record NetworkJoinCampaignBaselineRequested : ICommand

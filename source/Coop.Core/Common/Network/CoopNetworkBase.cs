@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
@@ -25,20 +26,25 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
     protected readonly ICommonSerializer serializer;
 
     private readonly Poller poller;
+    private readonly IGameThreadSession gameThreadSession;
+    private int pollerStarted;
 
     // Profiles outbound packets; dumps per-type counts and byte totals every 10 seconds (server only).
     private readonly PacketProfiler packetProfiler = new PacketProfiler(TimeSpan.FromSeconds(10));
 
-    private CancellationTokenSource CancellationTokenSource;
-    // Guard against double-dispose: finalizer calls Dispose() after explicit Dispose() on reconnect
-    private bool _disposed = false;
+    // Guard against repeated container and explicit disposal.
+    private int disposed;
 
     protected readonly NetManager netManager;
 
-    protected CoopNetworkBase(INetworkConfig configuration, ICommonSerializer serializer)
+    protected CoopNetworkBase(
+        INetworkConfig configuration,
+        ICommonSerializer serializer,
+        IGameThreadSession gameThreadSession)
     {
         Config = configuration;
         this.serializer = serializer;
+        this.gameThreadSession = gameThreadSession;
 
         netManager = new NetManager(this)
         {
@@ -57,31 +63,49 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
         // surface it (plus ping) in every profile dump to make congestion visible in the log.
         packetProfiler.ExtraStatsProvider = DescribePeerQueues;
 
-        CancellationTokenSource = new CancellationTokenSource();
-        poller = new Poller(Update, Config.NetworkPollInterval);
-        poller.Start();
+        poller = new Poller(UpdateWithinGameThreadSession, Config.NetworkPollInterval);
     }
 
-    ~CoopNetworkBase()
+    private void UpdateWithinGameThreadSession(TimeSpan frameTime)
     {
-        Dispose();
+        using (gameThreadSession.Activate())
+        {
+            if (gameThreadSession.IsActive == false) return;
+
+            try
+            {
+                Update(frameTime);
+            }
+            catch (OperationCanceledException) when (gameThreadSession.IsActive == false)
+            {
+                // Teardown woke a blocking game-thread marshal in this callback.
+            }
+        }
+    }
+
+    protected void StartNetworkPoller()
+    {
+        if (Interlocked.CompareExchange(ref pollerStarted, 1, 0) == 0)
+        {
+            poller.Start();
+        }
     }
 
     public virtual void Dispose()
     {
-        // Prevent ObjectDisposedException if GC finalizer runs after explicit Dispose on reconnect
-        if (_disposed) return;
-        _disposed = true;
+        if (Volatile.Read(ref disposed) != 0) return;
+        if (poller.IsPollingThread)
+        {
+            throw new InvalidOperationException(
+                "The network must be disposed after its poll callback returns.");
+        }
+        if (Interlocked.Exchange(ref disposed, 1) != 0) return;
 
-        netManager.Stop();
-
+        // Wake blocking game-thread marshals before waiting for the poll callback to return.
+        gameThreadSession.Cancel();
+        poller.StopAndWait(Timeout.InfiniteTimeSpan);
         packetProfiler.Dispose();
-
-        CancellationTokenSource.Cancel();
-        CancellationTokenSource.Dispose();
-
-        // Tell GC not to run the finalizer — Dispose() already cleaned up, avoids double-call
-        GC.SuppressFinalize(this);
+        netManager.Stop();
     }
 
     public virtual void SendAllBut(NetManager netManager, NetPeer netPeer, IPacket packet)

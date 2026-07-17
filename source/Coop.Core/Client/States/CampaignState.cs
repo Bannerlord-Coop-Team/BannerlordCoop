@@ -27,9 +27,14 @@ public class CampaignState : ClientStateBase
     private readonly IMapTimeTrackerInterface mapTimeTrackerInterface;
     private readonly bool waitingForJoinCatchUp;
     private bool replayAppliedQueued;
-    private volatile bool baselineApplied;
+    private volatile bool baselineResponseExpected;
+    private volatile bool finalBaselineResponseExpected;
+    private int successfulBaselines;
+    private volatile bool waitingForTimeCatchUp;
+    private volatile bool finalTimeCatchUp;
+    private volatile bool timeCatchUpCheckQueued;
+    private volatile bool waitingForWorldReady;
     private volatile bool joinCompletionQueued;
-    private bool hasRequestedBaselineRefresh;
 
     public CampaignState(
         IClientLogic logic,
@@ -56,14 +61,14 @@ public class CampaignState : ClientStateBase
             messageBroker.Subscribe<NetworkJoinReplayComplete>(Handle_JoinReplayComplete);
             messageBroker.Subscribe<JoinCampaignBaselineApplied>(Handle_JoinCampaignBaselineApplied);
             messageBroker.Subscribe<CampaignTimeSampleReceived>(Handle_CampaignTimeSampleReceived);
+            messageBroker.Subscribe<NetworkJoinWorldReady>(Handle_JoinWorldReady);
         }
 
         loadingInterface.SetLoadingMessage(
             "Loading Host Campaign",
             "Creating remote player heroes...");
 
-        // Tell the server we have fully entered the campaign so it flushes the broadcasts it withheld
-        // for us (the per-peer ConnectionMessageQueue) and resumes sending the live world stream.
+        // Tell the server the campaign exists locally so it can begin the ordered replay and baselines.
         network.SendAll(new NetworkPlayerCampaignEntered());
 
         if (!waitingForJoinCatchUp)
@@ -81,6 +86,7 @@ public class CampaignState : ClientStateBase
             messageBroker.Unsubscribe<NetworkJoinReplayComplete>(Handle_JoinReplayComplete);
             messageBroker.Unsubscribe<JoinCampaignBaselineApplied>(Handle_JoinCampaignBaselineApplied);
             messageBroker.Unsubscribe<CampaignTimeSampleReceived>(Handle_CampaignTimeSampleReceived);
+            messageBroker.Unsubscribe<NetworkJoinWorldReady>(Handle_JoinWorldReady);
         }
     }
 
@@ -94,56 +100,112 @@ public class CampaignState : ClientStateBase
         {
             if (ReferenceEquals(Logic.State, this) == false) return;
 
+            baselineResponseExpected = true;
             network.SendAll(new NetworkJoinReplayApplied());
         }, context: nameof(Handle_JoinReplayComplete));
     }
 
     internal void Handle_JoinCampaignBaselineApplied(MessagePayload<JoinCampaignBaselineApplied> obj)
     {
-        if (baselineApplied) return;
+        if (!baselineResponseExpected || waitingForTimeCatchUp || waitingForWorldReady) return;
+
+        bool isFinalBaseline = finalBaselineResponseExpected;
+        baselineResponseExpected = false;
+        finalBaselineResponseExpected = false;
 
         loadingInterface.SetLoadingMessage(
             "Loading Host Campaign",
             "Catching up to the host...");
 
-        if (!hasRequestedBaselineRefresh)
+        if (!obj.What.Success)
         {
-            hasRequestedBaselineRefresh = true;
-            mapTimeTrackerInterface.ResetForCampaignJoin();
-            network.SendAll(new NetworkJoinCampaignBaselineRequested());
+            RequestBaseline(isFinalBaseline);
             return;
         }
 
-        baselineApplied = true;
+        if (isFinalBaseline)
+        {
+            waitingForTimeCatchUp = true;
+            finalTimeCatchUp = true;
+            return;
+        }
+
+        successfulBaselines++;
+        if (successfulBaselines < 2)
+        {
+            RequestBaseline(isFinalBaseline: false);
+            return;
+        }
+
+        waitingForTimeCatchUp = true;
+        finalTimeCatchUp = false;
+    }
+
+    private void RequestBaseline(bool isFinalBaseline)
+    {
+        waitingForTimeCatchUp = false;
+        finalTimeCatchUp = false;
+        mapTimeTrackerInterface.ResetForCampaignJoin();
+        baselineResponseExpected = true;
+        finalBaselineResponseExpected = isFinalBaseline;
+        network.SendAll(new NetworkJoinCampaignBaselineRequested());
     }
 
     internal void Handle_CampaignTimeSampleReceived(MessagePayload<CampaignTimeSampleReceived> obj)
     {
-        if (!baselineApplied || joinCompletionQueued) return;
+        if (!waitingForTimeCatchUp || timeCatchUpCheckQueued) return;
+
+        timeCatchUpCheckQueued = true;
+        GameThread.RunSafe(() =>
+        {
+            try
+            {
+                if (ReferenceEquals(Logic.State, this) == false) return;
+                if (!mapTimeTrackerInterface.TryCompleteCampaignJoinCatchUp(
+                    out bool baselineRefreshRequired))
+                {
+                    return;
+                }
+
+                if (baselineRefreshRequired)
+                {
+                    RequestBaseline(finalTimeCatchUp);
+                    return;
+                }
+
+                waitingForTimeCatchUp = false;
+                if (finalTimeCatchUp)
+                {
+                    finalTimeCatchUp = false;
+                    waitingForWorldReady = true;
+                    network.SendAll(new NetworkJoinFinalCampaignBaselineApplied());
+                    return;
+                }
+
+                mapTimeTrackerInterface.ResetForCampaignJoin();
+                baselineResponseExpected = true;
+                finalBaselineResponseExpected = true;
+                network.SendAll(new NetworkJoinCampaignBaselineApplied());
+            }
+            finally
+            {
+                timeCatchUpCheckQueued = false;
+            }
+        }, context: nameof(Handle_CampaignTimeSampleReceived));
+    }
+
+    internal void Handle_JoinWorldReady(MessagePayload<NetworkJoinWorldReady> obj)
+    {
+        if (!waitingForWorldReady || joinCompletionQueued) return;
 
         joinCompletionQueued = true;
         GameThread.RunSafe(() =>
         {
             if (ReferenceEquals(Logic.State, this) == false) return;
 
-            if (!mapTimeTrackerInterface.TryCompleteCampaignJoinCatchUp(out bool baselineRefreshRequired))
-            {
-                joinCompletionQueued = false;
-                return;
-            }
-
-            if (baselineRefreshRequired)
-            {
-                baselineApplied = false;
-                joinCompletionQueued = false;
-                mapTimeTrackerInterface.ResetForCampaignJoin();
-                network.SendAll(new NetworkJoinCampaignBaselineRequested());
-                return;
-            }
-
             CompleteCampaignEntry();
             network.SendAll(new NetworkJoinCatchUpApplied());
-        }, context: nameof(Handle_CampaignTimeSampleReceived));
+        }, context: nameof(Handle_JoinWorldReady));
     }
 
     private void CompleteCampaignEntry()

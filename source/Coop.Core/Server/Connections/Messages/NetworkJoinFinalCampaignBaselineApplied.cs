@@ -4,9 +4,9 @@ using ProtoBuf;
 namespace Coop.Core.Server.Connections.Messages;
 
 /// <summary>
-/// Confirms that a joining client applied the final reliable world-stream marker.
+/// Confirms that the final complete join baseline is current on the client.
 /// </summary>
 [ProtoContract]
-public record NetworkJoinCatchUpApplied : IEvent
+public record NetworkJoinFinalCampaignBaselineApplied : ICommand
 {
 }

@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Util;
 using Serilog;
 using System;
@@ -18,10 +18,12 @@ public class GameThread : IUpdateable
     private static readonly Lazy<GameThread> m_Instance =
         new Lazy<GameThread>(() => new GameThread());
 
-    private readonly Queue<(Action Act, EventWaitHandle Wait, string Label)> m_Queue =
-        new Queue<(Action, EventWaitHandle, string)>();
+    private readonly Queue<(Action Act, EventWaitHandle Wait, string Label, IGameThreadSession Session)> m_Queue =
+        new Queue<(Action, EventWaitHandle, string, IGameThreadSession)>();
 
     private readonly object m_QueueLock = new object();
+    private static readonly AsyncLocal<IGameThreadSession> m_AmbientSession =
+        new AsyncLocal<IGameThreadSession>();
     private int m_GameLoopThreadId;
 
     public int QueueLength
@@ -90,8 +92,8 @@ public class GameThread : IUpdateable
             throw new ArgumentException("Wrong thread!");
         }
 
-        List<(Action Act, EventWaitHandle Wait, string Label)> toBeRun =
-            new List<(Action, EventWaitHandle, string)>();
+        List<(Action Act, EventWaitHandle Wait, string Label, IGameThreadSession Session)> toBeRun =
+            new List<(Action, EventWaitHandle, string, IGameThreadSession)>();
 
         int backlog;
         lock (Instance.m_QueueLock)
@@ -105,21 +107,35 @@ public class GameThread : IUpdateable
 
         if (!Instrument)
         {
-            foreach ((Action Act, EventWaitHandle Wait, string Label) task in toBeRun)
+            foreach ((Action Act, EventWaitHandle Wait, string Label, IGameThreadSession Session) task in toBeRun)
             {
-                task.Act?.Invoke();
-                task.Wait?.Set();
+                RunQueuedTask(task);
             }
             return;
         }
 
         long frameStart = Stopwatch.GetTimestamp();
-        foreach ((Action Act, EventWaitHandle Wait, string Label) task in toBeRun)
+        foreach ((Action Act, EventWaitHandle Wait, string Label, IGameThreadSession Session) task in toBeRun)
         {
+            if (task.Session?.IsActive == false)
+            {
+                task.Wait?.Set();
+                continue;
+            }
+
             long actionStart = Stopwatch.GetTimestamp();
-            task.Act?.Invoke();
+            try
+            {
+                using (ActivateSession(task.Session))
+                {
+                    task.Act?.Invoke();
+                }
+            }
+            finally
+            {
+                task.Wait?.Set();
+            }
             long actionTicks = Stopwatch.GetTimestamp() - actionStart;
-            task.Wait?.Set();
 
             string label = task.Label ?? "(unlabeled)";
             m_PerLabel.TryGetValue(label, out (long Ticks, int Count) agg);
@@ -208,6 +224,17 @@ public class GameThread : IUpdateable
         [CallerFilePath] string callerFile = null,
         [CallerMemberName] string callerMember = null)
     {
+        IGameThreadSession session = m_AmbientSession.Value;
+        if (session?.IsActive == false)
+        {
+            if (blocking)
+            {
+                throw new OperationCanceledException(
+                    $"The game-thread session ended before the blocking {nameof(Run)} action was queued.");
+            }
+            return;
+        }
+
         if (Thread.CurrentThread.ManagedThreadId == Instance.m_GameLoopThreadId)
         {
             action();
@@ -221,15 +248,27 @@ public class GameThread : IUpdateable
             string resolved = label ?? BuildLabel(callerFile, callerMember);
             lock (Instance.m_QueueLock)
             {
-                Instance.m_Queue.Enqueue((action, ewh, resolved));
+                Instance.m_Queue.Enqueue((action, ewh, resolved, session));
             }
 
-            if (ewh != null && ewh.WaitOne(BlockingTimeout) == false)
+            if (ewh == null) return;
+
+            int waitResult = session == null
+                ? (ewh.WaitOne(BlockingTimeout) ? 0 : WaitHandle.WaitTimeout)
+                : WaitHandle.WaitAny(
+                    new[] { ewh, session.CancellationWaitHandle },
+                    BlockingTimeout);
+            if (waitResult == WaitHandle.WaitTimeout)
             {
                 throw new TimeoutException(
                     $"A blocking {nameof(Run)} action was not processed by the game loop " +
                     $"within {BlockingTimeout.TotalSeconds:0} seconds. The game loop thread is not pumping " +
                     $"{nameof(GameThread)}.{nameof(Update)} (initialized: {Instance.IsInitialized}).");
+            }
+            if (waitResult == 1)
+            {
+                throw new OperationCanceledException(
+                    $"The game-thread session ended before the blocking {nameof(Run)} action completed.");
             }
         }
     }
@@ -325,5 +364,42 @@ public class GameThread : IUpdateable
     public void MarkGameThread()
     {
         m_GameLoopThreadId = Thread.CurrentThread.ManagedThreadId;
+    }
+
+    internal static IDisposable ActivateSession(IGameThreadSession session) =>
+        new SessionScope(session);
+
+    private static void RunQueuedTask(
+        (Action Act, EventWaitHandle Wait, string Label, IGameThreadSession Session) task)
+    {
+        try
+        {
+            if (task.Session?.IsActive == false) return;
+
+            using (ActivateSession(task.Session))
+            {
+                task.Act?.Invoke();
+            }
+        }
+        finally
+        {
+            task.Wait?.Set();
+        }
+    }
+
+    private sealed class SessionScope : IDisposable
+    {
+        private readonly IGameThreadSession previous;
+
+        public SessionScope(IGameThreadSession session)
+        {
+            previous = m_AmbientSession.Value;
+            m_AmbientSession.Value = session;
+        }
+
+        public void Dispose()
+        {
+            m_AmbientSession.Value = previous;
+        }
     }
 }

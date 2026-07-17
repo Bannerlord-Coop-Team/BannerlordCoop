@@ -264,6 +264,24 @@ public class MapTimeTrackerInterfaceTests
         Assert.False(tracker.BeginCorrection(210L, 1000L));
         Assert.True(tracker.TryCompleteCampaignJoinCatchUp(210L, 10L, out refreshRequired));
         Assert.False(refreshRequired);
+        Assert.False(tracker.TryConsumeHardSync(out _));
+    }
+
+    [Fact]
+    public void CompleteCampaignJoinBaseline_NormalCorrectionResumesAfterCurrentHeartbeat()
+    {
+        var tracker = CreateSynchronizedTracker();
+        tracker.ResetForCampaignJoin();
+        tracker.CompleteCampaignJoinBaseline(200L);
+
+        Assert.False(tracker.BeginCorrection(210L, 100L));
+        Assert.False(tracker.TryConsumeHardSync(out _));
+        Assert.True(tracker.TryCompleteCampaignJoinCatchUp(210L, 10L, out bool refreshRequired));
+        Assert.False(refreshRequired);
+
+        Assert.True(tracker.BeginCorrection(1000L, 100L));
+        Assert.True(tracker.TryConsumeHardSync(out long serverTicks));
+        Assert.Equal(1000L, serverTicks);
     }
 
     [Fact]

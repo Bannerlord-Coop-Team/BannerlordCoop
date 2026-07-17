@@ -62,7 +62,8 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         IMissionManager missionManager,
         Lazy<IOverloadedPeerManager> overloadedPeerManager,
         ISendCoalescer coalescer,
-        ICommonSerializer serializer) : base(configuration, serializer)
+        ICommonSerializer serializer,
+        IGameThreadSession gameThreadSession) : base(configuration, serializer, gameThreadSession)
     {
         // Dependancy assignment
         this.messageBroker = messageBroker;
@@ -193,6 +194,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
         if (netManager.Start(IPAddress.Any, IPAddress.IPv6Any, Config.Port))
         {
+            StartNetworkPoller();
             messageBroker.Publish(this, new ServerListening());
             return;
         }
@@ -212,7 +214,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     // Every per-peer send funnels through here, so a still-loading peer's world deltas are dropped
     // (pre-save) or held (loading) instead of sent live — broadcasts and direct sends alike. The queue
-    // replays the held ones on campaign entry. Connection-level traffic that must always reach a
+    // replays the held ones during the join barriers. Connection-level traffic that must always reach a
     // mid-join peer (the save, the join handshake) uses SendImmediate to bypass this.
     public override void Send(NetPeer netPeer, IPacket packet)
     {
