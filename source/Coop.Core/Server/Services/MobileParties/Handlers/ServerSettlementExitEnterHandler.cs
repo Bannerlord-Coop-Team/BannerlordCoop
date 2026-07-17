@@ -135,7 +135,10 @@ public class ServerSettlementExitEnterHandler : IHandler
         {
             return;
         }
-
+        if (ModInformation.IsClient)
+        {
+            network.SendAll(new PartyLeaveSettlementAttempted(payload.MobileParty));
+        }
         network.SendAll(new NetworkPartyLeaveSettlement(
             Compact(mobilePartyId, typeof(MobileParty))));
 

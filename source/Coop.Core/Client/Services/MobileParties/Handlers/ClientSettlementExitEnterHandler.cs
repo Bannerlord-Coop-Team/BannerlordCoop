@@ -178,14 +178,6 @@ public class ClientSettlementExitEnterHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging(payload.PartyId, out MobileParty party)) return;
 
-            // WaitMenuLeavePrefix calls ApplyForParty as client, which only sends to server
-            // so send it to all clients now
-            // PartyLeaveSettlement checks for if currentsettlement is null,
-            // so no need to gate PartyLeaveSettlement when a client applies it twice.
-            if (ModInformation.IsServer)
-            {
-                network.SendAll(new NetworkPartyLeaveSettlement(payload.PartyId));
-            }
             using (new AllowedThread())
             {
                 settlementInterface.PartyLeaveSettlement(party);

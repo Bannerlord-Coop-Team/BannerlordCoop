@@ -269,8 +269,6 @@ public class ArmyPatches
                 {
                     Campaign.Current.CameraFollowParty = clientMobileParty?.Party; // This runs after the party was captured. So guard it to only run when its not captured
                 }
-            }
-            {
                 army.StopTrackingTargetSettlement();
             }
             mobileParty.Party.SetVisualAsDirty();

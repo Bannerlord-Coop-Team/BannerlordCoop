@@ -1,7 +1,9 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Armies.Messages;
 using HarmonyLib;
+using SandBox.CampaignBehaviors;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -19,6 +21,8 @@ namespace GameInterface.Services.Armies.Patches;
 [HarmonyPatch]
 internal class PlayerArmyWaitBehaviorPatches
 {
+    [HarmonyPatch(nameof(PlayerArmyWaitBehavior.OnTick))]
+    static bool Prefix() => ModInformation.IsClient;
     private static readonly ILogger Logger = LogManager.GetLogger<PlayerArmyWaitBehaviorPatches>();
     [HarmonyPatch(typeof(PlayerArmyWaitBehavior), nameof(PlayerArmyWaitBehavior.wait_menu_army_leave_on_consequence))]
     [HarmonyPrefix]
@@ -45,7 +49,7 @@ internal class PlayerArmyWaitBehaviorPatches
     [HarmonyPrefix]
     private static bool Prefixwait_menu_army_abandon_on_consequence(PlayerArmyWaitBehavior __instance, MenuCallbackArgs args)
     {
-        ChangeClanInfluenceAction.Apply(Clan.PlayerClan, (float)(-(float)Campaign.Current.Models.DiplomacyModel.GetInfluenceCostOfAbandoningArmy()));
+        MessageBroker.Instance.Publish(__instance, new ChangeClanInfluence(Clan.PlayerClan, (int)(-(float)Campaign.Current.Models.DiplomacyModel.GetInfluenceCostOfAbandoningArmy())));
         if (PlayerEncounter.Current != null)
         {
             PlayerEncounter.Finish(true);
