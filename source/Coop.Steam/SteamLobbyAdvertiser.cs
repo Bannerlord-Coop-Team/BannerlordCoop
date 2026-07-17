@@ -9,7 +9,7 @@ namespace Coop.Steam;
 /// Advertises the session as a friends-only Steam lobby carrying the join info, and sets
 /// rich presence so friends get "Join Game" in their Steam friends list.
 /// </summary>
-public class SteamLobbyAdvertiser : ISessionAdvertiser
+public class SteamLobbyAdvertiser : ISessionAdvertiser, ISteamLobbyOwner
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SteamLobbyAdvertiser>();
 
@@ -17,6 +17,7 @@ public class SteamLobbyAdvertiser : ISessionAdvertiser
     public const string ConnectLobbyArgument = "+connect_lobby";
 
     protected readonly ISteamLobbyApi lobbyApi;
+    private readonly ISteamLobbyMembership lobbyMembership;
 
     private ulong lobbyId;
     private bool createInFlight;
@@ -25,11 +26,21 @@ public class SteamLobbyAdvertiser : ISessionAdvertiser
     private SessionJoinInfo pendingInfo;
 
     public SteamLobbyAdvertiser(ISteamLobbyApi lobbyApi)
+        : this(lobbyApi, null)
+    {
+    }
+
+    public SteamLobbyAdvertiser(ISteamLobbyApi lobbyApi, ISteamLobbyMembership lobbyMembership)
     {
         this.lobbyApi = lobbyApi;
+        this.lobbyMembership = lobbyMembership;
     }
 
     public bool IsAdvertising => lobbyId != 0;
+    public bool CanInviteFriends => lobbyId != 0 || lobbyMembership?.IsInLobby == true;
+    public ulong LobbyId => lobbyId;
+
+    public event Action<ulong> LobbyChanged;
 
     public virtual void Advertise(SessionJoinInfo info)
     {
@@ -84,6 +95,7 @@ public class SteamLobbyAdvertiser : ISessionAdvertiser
         // Lobby ids are logged as strings; numeric log properties get double-rounded past 2^53 in structured viewers.
         Logger.Information("Steam lobby {LobbyId} created", lobbyId.ToString());
         ApplyLobbyData();
+        if (lobbyId == createdLobbyId) LobbyChanged?.Invoke(lobbyId);
     }
 
     private void ApplyLobbyData()
@@ -165,6 +177,7 @@ public class SteamLobbyAdvertiser : ISessionAdvertiser
                 Logger.Error(ex, "Could not leave Steam lobby {LobbyId}", lobbyId.ToString());
             }
             lobbyId = 0;
+            LobbyChanged?.Invoke(0);
         }
 
         if (richPresenceSet)
@@ -183,7 +196,8 @@ public class SteamLobbyAdvertiser : ISessionAdvertiser
 
     public bool InviteFriends()
     {
-        if (lobbyId == 0) return false;
+        ulong inviteLobbyId = lobbyId != 0 ? lobbyId : lobbyMembership?.LobbyId ?? 0;
+        if (inviteLobbyId == 0) return false;
 
         if (!lobbyApi.IsOverlayEnabled)
         {
@@ -191,7 +205,7 @@ public class SteamLobbyAdvertiser : ISessionAdvertiser
             return false;
         }
 
-        lobbyApi.OpenInviteDialog(lobbyId);
+        lobbyApi.OpenInviteDialog(inviteLobbyId);
         return true;
     }
 

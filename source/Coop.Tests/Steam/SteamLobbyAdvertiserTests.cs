@@ -194,8 +194,43 @@ namespace Coop.Tests.Steam
         {
             advertiser.Advertise(Info());
 
+            Assert.True(advertiser.CanInviteFriends);
             Assert.True(advertiser.InviteFriends());
             Assert.Contains(api.NextCreatedLobbyId, api.InviteDialogsOpened);
+        }
+
+        [Fact]
+        public void Advertise_RaisesLobbyChangedAfterCreation()
+        {
+            ulong changedLobbyId = 0;
+            advertiser.LobbyChanged += lobbyId => changedLobbyId = lobbyId;
+
+            advertiser.Advertise(Info());
+
+            Assert.Equal(api.NextCreatedLobbyId, changedLobbyId);
+        }
+
+        [Fact]
+        public void StopAdvertising_RaisesLobbyChangedWithZero()
+        {
+            ulong changedLobbyId = 1;
+            advertiser.LobbyChanged += lobbyId => changedLobbyId = lobbyId;
+            advertiser.Advertise(Info());
+
+            advertiser.StopAdvertising();
+
+            Assert.Equal(0UL, changedLobbyId);
+        }
+
+        [Fact]
+        public void InviteFriends_AsLobbyMember_OpensOverlayDialog()
+        {
+            var membership = new StubSteamLobbyMembership { LobbyId = 42 };
+            var memberAdvertiser = new SteamLobbyAdvertiser(api, membership);
+
+            Assert.True(memberAdvertiser.CanInviteFriends);
+            Assert.True(memberAdvertiser.InviteFriends());
+            Assert.Contains(42UL, api.InviteDialogsOpened);
         }
 
         [Fact]
@@ -211,6 +246,7 @@ namespace Coop.Tests.Steam
         [Fact]
         public void InviteFriends_WithoutLobby_ReturnsFalse()
         {
+            Assert.False(advertiser.CanInviteFriends);
             Assert.False(advertiser.InviteFriends());
         }
 
@@ -238,6 +274,15 @@ namespace Coop.Tests.Steam
 
             Assert.False(advertiser.IsAdvertising);
             Assert.Contains(api.NextCreatedLobbyId, api.LeftLobbies);
+        }
+
+        private sealed class StubSteamLobbyMembership : ISteamLobbyMembership
+        {
+            public ulong LobbyId { get; set; }
+            public bool IsInLobby => LobbyId != 0;
+
+            public void JoinSessionLobby(ulong lobbyId) => LobbyId = lobbyId;
+            public void LeaveSessionLobby() => LobbyId = 0;
         }
     }
 }
